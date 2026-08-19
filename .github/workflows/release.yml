@@ -61,7 +61,8 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-          cache: pnpm
+          # npm trusted-publishing docs: do not cache the package manager on release.
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
@@ -90,7 +91,9 @@ jobs:
 
       - run: git push origin HEAD:main --follow-tags
 
-      - run: pnpm --filter ${{ inputs.package }} publish --provenance --access public --no-git-checks
+      - name: Publish with npm OIDC
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --access public
 
       - name: Create GitHub release
         env:
