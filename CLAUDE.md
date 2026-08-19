@@ -20,7 +20,9 @@ pnpm run test:coverage
 - `vouchington-tooling` — CLI (`vouchington`) and subpath libraries
 - `eslint-plugin-vouchington` — non-generic Vouchington lint rules
 
-Generic ESLint/Oxlint rules belong in `jonathanong/no-mistakes`, not this repo.
+Generic ESLint/Oxlint rules belong in `jonathanong/no-mistakes`, not this repo. This workspace is too small for `no-mistakes` test planning; keep generic rules upstream.
+
+Use `pr-shepherd` (not `gh pr checks`) to iterate pull requests.
 
 ## Extracted modules
 
@@ -30,4 +32,4 @@ Record the source SHA and path list in the commit body when copying from the pro
 
 ## Publishing
 
-Do not publish from a laptop. The `Release` workflow is `workflow_dispatch` and will use npm trusted publishing once configured. There is no `NPM_TOKEN` on purpose.
+Do not publish from a laptop. The `Release` workflow is `workflow_dispatch` and publishes with npm trusted publishing (OIDC). `RELEASE_TOKEN` needs Contents Read & Write on this repository for the version-bump push and GitHub release. There is no `NPM_TOKEN` on purpose.

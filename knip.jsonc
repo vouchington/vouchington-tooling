@@ -1,7 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip/schema.json",
-  // Peer of eslint-plugin-vouchington; imported only from plugin tests.
-  "ignoreDependencies": ["eslint"],
+  // eslint: peer of eslint-plugin-vouchington; imported only from plugin tests.
+  // pr-shepherd: agent CLI, not imported from source.
+  "ignoreDependencies": ["eslint", "pr-shepherd"],
   "workspaces": {
     "packages/vouchington-tooling": {
       "entry": ["src/index.mts!", "src/cli/index.mts!"],
