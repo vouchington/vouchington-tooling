@@ -8,8 +8,6 @@ import {
 import { parseSql } from './parser.mts'
 import { isRecord } from './unknown-record.mts'
 
-export type { ForeignKey, SqlMigrationConstraintMetadata } from './constraint-shared.mts'
-
 /** Inline `col UUID REFERENCES ...` and table-level `FOREIGN KEY (...) REFERENCES ...` forms. */
 /* v8 ignore start -- defensive parse-tree walks */
 function collectCreateStmtForeignKeys(
