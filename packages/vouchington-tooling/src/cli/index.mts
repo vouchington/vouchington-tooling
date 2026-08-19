@@ -4,10 +4,31 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readPackageVersion } from '../package-version.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
+import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
+import { runScript } from './commands/spawn-script.mts'
+import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
-import { parseCli } from './parse.mts'
+import { parseCli, type ScriptCommand } from './parse.mts'
+import { packageScriptPath } from './script-path.mts'
 import { printUsage } from './usage.mts'
+
+const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
+  'gha-output': { command: 'bash', path: 'scripts/gha/write-github-multiline-output.sh' },
+  'gha-needs-results': { command: 'bash', path: 'scripts/gha/check-needs-results.sh' },
+  'download-with-diagnostics': {
+    command: 'bash',
+    path: 'scripts/gha/download-with-diagnostics.sh',
+  },
+  'host-pressure-diagnostics': {
+    command: 'bash',
+    path: 'scripts/gha/host-pressure-diagnostics.sh',
+  },
+  'allocate-browser-safe-ports': {
+    command: 'python3',
+    path: 'scripts/allocate-browser-safe-ports.py',
+  },
+}
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {
   const parsed = parseCli(argv)
@@ -28,6 +49,14 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runWithHostLock(parsed.args)
     case 'gha-runtime-audit':
       return runGhaRuntimeAudit(parsed)
+    case 'script': {
+      const spec = SCRIPT_PATHS[parsed.command]
+      return runScript(spec.command, packageScriptPath(spec.path), parsed.args)
+    }
+    case 'pnpm-install':
+      return runPnpmInstallCli(parsed.args)
+    case 'vitest-blob-manifest':
+      return runVitestBlobManifestCommand(parsed.args)
   }
 }
 

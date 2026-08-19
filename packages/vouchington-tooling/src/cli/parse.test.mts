@@ -94,6 +94,56 @@ describe('parseCli', () => {
     })
   })
 
+  it('forwards script, pnpm-install, and vitest-blob-manifest arguments', () => {
+    expect(parseCli(['node', 'vouchington', 'gha-output', 'name'])).toEqual({
+      kind: 'script',
+      command: 'gha-output',
+      args: ['name'],
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-needs-results', 'jobs'])).toEqual({
+      kind: 'script',
+      command: 'gha-needs-results',
+      args: ['jobs'],
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'download-with-diagnostics', 'https://x', 'out']),
+    ).toEqual({
+      kind: 'script',
+      command: 'download-with-diagnostics',
+      args: ['https://x', 'out'],
+    })
+    expect(parseCli(['node', 'vouchington', 'host-pressure-diagnostics'])).toEqual({
+      kind: 'script',
+      command: 'host-pressure-diagnostics',
+      args: [],
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'allocate-browser-safe-ports', '2', '--policy', 'p.json']),
+    ).toEqual({
+      kind: 'script',
+      command: 'allocate-browser-safe-ports',
+      args: ['2', '--policy', 'p.json'],
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'pnpm-install',
+        '--runner-lifecycle',
+        'persistent',
+        '--install-scripts',
+        'true',
+      ]),
+    ).toEqual({
+      kind: 'pnpm-install',
+      args: ['--runner-lifecycle', 'persistent', '--install-scripts', 'true'],
+    })
+    expect(parseCli(['node', 'vouchington', 'vitest-blob-manifest', 'tooling'])).toEqual({
+      kind: 'vitest-blob-manifest',
+      args: ['tooling'],
+    })
+  })
+
   it('rejects invalid gha-runtime-audit options', () => {
     expect(parseCli(['node', 'vouchington', 'gha-runtime-audit'])).toEqual({
       kind: 'error',

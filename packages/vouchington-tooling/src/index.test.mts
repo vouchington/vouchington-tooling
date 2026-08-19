@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   EphemeralListenerAttemptsExhaustedError,
   MissingSqlAstParserError,
+  VITEST_BLOB_MANIFEST_VERSION,
+  gitEnv,
+  isReleaseAgeViolation,
   isRunnerReservedPort,
   lineOfUtf8ByteOffset,
   runnerPortPolicy,
@@ -16,5 +19,8 @@ describe('package exports', () => {
       'EphemeralListenerAttemptsExhaustedError',
     )
     expect(new MissingSqlAstParserError().name).toBe('MissingSqlAstParserError')
+    expect(VITEST_BLOB_MANIFEST_VERSION).toBe('vitest-blob-manifest:v1')
+    expect(isReleaseAgeViolation('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION')).toBe(true)
+    expect(typeof gitEnv).toBe('function')
   })
 })

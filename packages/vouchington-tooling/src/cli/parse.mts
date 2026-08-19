@@ -6,7 +6,25 @@ export type ParsedCli =
   | { kind: 'error'; message: string }
   | { kind: 'runner-port-policy'; file?: string; reserved?: number }
   | { kind: 'with-host-lock'; args: string[] }
+  | { kind: 'script'; command: ScriptCommand; args: string[] }
+  | { kind: 'pnpm-install'; args: string[] }
+  | { kind: 'vitest-blob-manifest'; args: string[] }
   | ParsedGhaRuntimeAudit
+
+export type ScriptCommand =
+  | 'gha-output'
+  | 'gha-needs-results'
+  | 'download-with-diagnostics'
+  | 'host-pressure-diagnostics'
+  | 'allocate-browser-safe-ports'
+
+const SCRIPT_COMMANDS = new Set<ScriptCommand>([
+  'gha-output',
+  'gha-needs-results',
+  'download-with-diagnostics',
+  'host-pressure-diagnostics',
+  'allocate-browser-safe-ports',
+])
 
 export function parseCli(argv: readonly string[]): ParsedCli {
   const args = argv.slice(2)
@@ -17,6 +35,11 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'runner-port-policy') return parseRunnerPortPolicy(rest)
   if (command === 'with-host-lock') return { kind: 'with-host-lock', args: rest }
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
+  if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
+  if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
+  if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
+    return { kind: 'script', command: command as ScriptCommand, args: rest }
+  }
   return { kind: 'error', message: `unknown command: ${command}` }
 }
 
