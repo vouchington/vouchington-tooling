@@ -35,7 +35,8 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-slim
+    # knip's oxc-parser OOMs on ubuntu-slim; match the CI test job.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Check RELEASE_TOKEN is set
