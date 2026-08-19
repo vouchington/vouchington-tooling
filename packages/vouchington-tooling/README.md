@@ -16,6 +16,7 @@ vouchington runner-port-policy
 vouchington runner-port-policy --file ./policy.json
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
+vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
 ```
 
 Host-lock environment:
@@ -37,4 +38,5 @@ import {
 } from 'vouchington-tooling/runner-port-policy'
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements, stripSqlComments } from 'vouchington-tooling/sql-scanner'
+import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
 ```

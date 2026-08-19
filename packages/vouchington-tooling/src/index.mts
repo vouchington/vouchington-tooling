@@ -40,3 +40,12 @@ export {
   sqlFragments,
   stripSqlComments,
 } from './sql-scanner/index.mts'
+export { auditCiJobRuntime, parseWorkflowNameMatch } from './gha-runtime-audit/index.mts'
+export type {
+  GhApiExecutor,
+  RuntimeAuditOptions,
+  RuntimeAuditResult,
+  RuntimeAuditWorkflowFilter,
+  RuntimeJobResult,
+  RuntimeSample,
+} from './gha-runtime-audit/index.mts'

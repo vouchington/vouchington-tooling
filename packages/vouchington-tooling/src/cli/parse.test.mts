@@ -64,4 +64,48 @@ describe('parseCli', () => {
       args: ['--name', 'build', '--', 'true'],
     })
   })
+
+  it('parses gha-runtime-audit workflow filters', () => {
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-runtime-audit',
+        '--repository',
+        'owner/repo',
+        '--branch',
+        'main',
+        '--pr-workflow',
+        'CI',
+        '--push-workflow',
+        '/^Main CI \\(.+\\)$/',
+      ]),
+    ).toEqual({
+      kind: 'gha-runtime-audit',
+      repository: 'owner/repo',
+      branch: 'main',
+      workflows: [
+        { name: 'CI', event: 'pull_request' },
+        { name: /^Main CI \(.+\)$/, event: 'push' },
+      ],
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-runtime-audit', '--help'])).toEqual({
+      kind: 'help',
+    })
+  })
+
+  it('rejects invalid gha-runtime-audit options', () => {
+    expect(parseCli(['node', 'vouchington', 'gha-runtime-audit'])).toEqual({
+      kind: 'error',
+      message: 'gha-runtime-audit requires --pr-workflow or --push-workflow',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-runtime-audit', '--pr-workflow'])).toEqual({
+      kind: 'error',
+      message: '--pr-workflow requires a value',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-runtime-audit', '--wat'])).toEqual({
+      kind: 'error',
+      message: 'unknown gha-runtime-audit option: --wat',
+    })
+  })
 })

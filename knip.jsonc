@@ -10,6 +10,7 @@
         "src/cli/index.mts!",
         "src/sql-ast/index.mts!",
         "src/sql-scanner/index.mts!",
+        "src/gha-runtime-audit/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },
