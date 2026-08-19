@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readPackageVersion } from '../package-version.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
@@ -34,7 +35,12 @@ function readInstalledVersion(): string {
 }
 
 export function isMainModule(metaUrl: string, argv1: string | undefined): boolean {
-  return argv1 !== undefined && metaUrl === pathToFileURL(argv1).href
+  if (argv1 === undefined) return false
+  try {
+    return metaUrl === pathToFileURL(realpathSync(argv1)).href
+  } catch {
+    return metaUrl === pathToFileURL(resolve(argv1)).href
+  }
 }
 
 /* v8 ignore next 3 */
