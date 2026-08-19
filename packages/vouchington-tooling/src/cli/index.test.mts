@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isMainModule, runCli } from './index.mts'
 import { printUsage, USAGE } from './usage.mts'
@@ -95,8 +96,12 @@ describe('runCli', () => {
   })
 
   it('identifies the main module from argv', () => {
+    const relative = 'packages/vouchington-tooling/src/cli/index.mts'
     expect(isMainModule('file:///tmp/cli.mjs', undefined)).toBe(false)
     expect(isMainModule('file:///tmp/cli.mjs', '/tmp/cli.mjs')).toBe(true)
+    expect(isMainModule(pathToFileURL(resolve(relative)).href, relative)).toBe(true)
+    const missing = 'does-not-exist.mjs'
+    expect(isMainModule(pathToFileURL(resolve(missing)).href, missing)).toBe(true)
   })
 
   it('writes usage to an explicit stream', () => {

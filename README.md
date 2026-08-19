@@ -7,7 +7,7 @@ Public tooling extracted from the Vouchington product monorepo. Two npm packages
 | [`vouchington-tooling`](./packages/vouchington-tooling)             | Libraries plus the `vouchington` CLI          |
 | [`eslint-plugin-vouchington`](./packages/eslint-plugin-vouchington) | Non-generic Vouchington ESLint / Oxlint rules |
 
-This repository is not published yet. Test locally. Trusted publishing (OIDC) will land after the first stub release.
+Both packages are published to npm. Releases go through the `Release` workflow (`workflow_dispatch`) using npm trusted publishing (OIDC). Do not publish from a laptop.
 
 ## CLI
 
