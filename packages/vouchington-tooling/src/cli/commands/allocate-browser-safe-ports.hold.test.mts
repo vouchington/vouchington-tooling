@@ -137,7 +137,10 @@ describe('allocate-browser-safe-ports.py hold mode', () => {
 
   it('holds five ports from a numeric runner slice', async () => {
     const liveWorkspace = process.env.GITHUB_WORKSPACE
-    const useLiveSlot = process.env.GITHUB_ACTIONS === 'true' && Boolean(liveWorkspace)
+    const useLiveSlot =
+      process.env.GITHUB_ACTIONS === 'true' &&
+      Boolean(liveWorkspace) &&
+      /(?:actions-runner|actions-runners)\/\d+\/_work/.test(liveWorkspace ?? '')
     const root = useLiveSlot ? undefined : await mkdtemp(join(tmpdir(), 'runner-slot-'))
     // Spoofs the max runner slot (see synthesizedRunnerSlot); no host-wide lock needed here
     // since this test never binds a real host socket, only the daemon's own file-lock holds.
