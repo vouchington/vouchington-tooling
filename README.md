@@ -27,10 +27,11 @@ Subpath imports keep consumers off modules they do not need. Heavy parsers are o
 
 ```ts
 import { isRunnerReservedPort, runnerPortPolicy } from 'vouchington-tooling/runner-port-policy'
-import { initSqlAst, lineOfUtf8ByteOffset } from 'vouchington-tooling/sql-ast'
+import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
+import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 ```
 
-`sql-ast` requires the optional dependency `@libpg-query/parser`.
+`sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
 
 ### `eslint-plugin-vouchington`
 

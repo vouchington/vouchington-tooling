@@ -10,7 +10,33 @@ export type { EphemeralListenerOptions, RunnerPortPolicy } from './runner-port-p
 
 export {
   extractAlterTableAddColumnLocations,
+  extractCreateIndexMetadata,
+  extractCreateTableMetadata,
+  extractDefaultFunction,
+  extractDropIndexMetadata,
+  extractFuncCallArgColumnNames,
+  extractMigrationConstraintMetadata,
   initSqlAst,
   lineOfUtf8ByteOffset,
   MissingSqlAstParserError,
+  parseSql,
 } from './sql-ast/index.mts'
+export type {
+  ForeignKey,
+  SqlCreateIndexMetadata,
+  SqlCreateTableColumn,
+  SqlCreateTableMetadata,
+  SqlDropIndexMetadata,
+  SqlIndexParam,
+  SqlMigrationConstraintMetadata,
+} from './sql-ast/index.mts'
+export {
+  dollarQuoteEnd,
+  lineOf,
+  maskSqlQuotedText,
+  readDollarQuoteDelimiter,
+  readStringLiteral,
+  splitSqlStatements,
+  sqlFragments,
+  stripSqlComments,
+} from './sql-scanner/index.mts'
