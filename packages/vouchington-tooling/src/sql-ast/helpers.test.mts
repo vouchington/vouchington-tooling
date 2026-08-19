@@ -61,6 +61,7 @@ describe('sql-ast helpers', () => {
       BEGIN
         ALTER TABLE children ADD CONSTRAINT children_parent_id_fkey
           FOREIGN KEY (parent_id) REFERENCES parents(id);
+        ALTER TABLE children VALIDATE CONSTRAINT children_parent_id_fkey;
       END
       $$;
     `)
@@ -68,6 +69,7 @@ describe('sql-ast helpers', () => {
       { tableName: 'children', referencedTableName: 'parents' },
     ])
     expect(metadata.addedConstraints).toEqual([])
+    expect(metadata.validatedConstraints.size).toBe(0)
   })
 
   it('extracts CREATE INDEX and implicit unique indexes', () => {
@@ -114,6 +116,7 @@ describe('sql-ast helpers', () => {
         tableElts: [
           1,
           { ColumnDef: {} },
+          { ColumnDef: { colname: 'id' } },
           {
             ColumnDef: {
               colname: 'id',
@@ -122,6 +125,8 @@ describe('sql-ast helpers', () => {
           },
           { Constraint: { contype: 'CONSTR_CHECK' } },
           { Constraint: { contype: 'CONSTR_UNIQUE' } },
+          { Constraint: { contype: 'CONSTR_UNIQUE', keys: [1] } },
+          { Constraint: { contype: 'CONSTR_UNIQUE', keys: [{ String: {} }] } },
         ],
       },
       0,

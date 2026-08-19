@@ -44,6 +44,8 @@ describe('sql-scanner', () => {
       index: 2,
       end: 9,
     })
+    expect(readStringLiteral(String.raw`E'cr\rlf'`, 0)?.text).toBe('cr\rlf')
+    expect(readStringLiteral(String.raw`E'q\"'`, 0)?.text).toBe('q"')
     expect(dollarQuoteEnd('prefix $tag$body$tag$ suffix', 12, '$tag$')).toBe(16)
     expect(sqlFragments("SELECT 'foo''bar', $tag$baz$tag$;")).toEqual([
       { text: "foo'bar", index: 8 },
@@ -102,5 +104,8 @@ describe('sql-scanner', () => {
     expect(readDollarQuoteDelimiter('a$tag$', 1)).toBeNull()
     expect(readDollarQuoteDelimiter(' $tag$', 1)).toBe('$tag$')
     expect(maskSqlQuotedText('SELECT $$keep$$')).not.toContain('keep')
+    const maskedMultilineDollar = maskSqlQuotedText('SELECT $$\nkeep$$')
+    expect(maskedMultilineDollar).toContain('\n')
+    expect(maskedMultilineDollar).not.toContain('keep')
   })
 })

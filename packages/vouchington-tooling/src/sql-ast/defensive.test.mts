@@ -12,7 +12,9 @@ describe('sql-ast defensive parse trees', () => {
             { stmt: undefined },
             { stmt: { SelectStmt: {} } },
             { stmt: { CreateStmt: {} } },
+            { stmt: { CreateStmt: { relation: { relname: 'empty_elts' } } } },
             {
+              stmt_location: 8,
               stmt: {
                 CreateStmt: {
                   relation: { relname: 't' },
@@ -20,6 +22,7 @@ describe('sql-ast defensive parse trees', () => {
                     undefined,
                     { Integer: { ival: 1 } },
                     { ColumnDef: {} },
+                    { ColumnDef: { colname: 'bare' } },
                     {
                       ColumnDef: {
                         colname: 'id',
@@ -29,9 +32,14 @@ describe('sql-ast defensive parse trees', () => {
                     { Constraint: { contype: 'CONSTR_CHECK' } },
                     { Constraint: { contype: 'CONSTR_FOREIGN', fk_attrs: 'bad' } },
                     { Constraint: { contype: 'CONSTR_UNIQUE' } },
+                    { Constraint: { contype: 'CONSTR_PRIMARY' } },
+                    { Constraint: { contype: 'CONSTR_UNIQUE', keys: [1] } },
                     { Constraint: { contype: 'CONSTR_UNIQUE', keys: [{ Integer: { ival: 1 } }] } },
                     {
-                      Constraint: { contype: 'CONSTR_PRIMARY', keys: [{ String: { sval: 'id' } }] },
+                      Constraint: {
+                        contype: 'CONSTR_PRIMARY',
+                        keys: [null, {}, { String: { sval: 'id' } }],
+                      },
                     },
                   ],
                 },
@@ -43,6 +51,7 @@ describe('sql-ast defensive parse trees', () => {
       if (sql === 'alter') {
         return {
           stmts: [
+            { stmt: { AlterTableStmt: { relation: { relname: 'no_cmds' } } } },
             {
               stmt: {
                 AlterTableStmt: {
@@ -54,6 +63,12 @@ describe('sql-ast defensive parse trees', () => {
                     { AlterTableCmd: { subtype: 'AT_AddConstraint' } },
                     {
                       AlterTableCmd: { subtype: 'AT_AddConstraint', def: { Integer: { ival: 1 } } },
+                    },
+                    {
+                      AlterTableCmd: {
+                        subtype: 'AT_AddConstraint',
+                        def: { Constraint: { contype: 'CONSTR_CHECK' } },
+                      },
                     },
                     {
                       AlterTableCmd: {
@@ -73,6 +88,7 @@ describe('sql-ast defensive parse trees', () => {
         return {
           stmts: [
             { stmt: { DropStmt: { removeType: 'OBJECT_TABLE' } } },
+            { stmt: { DropStmt: { removeType: 'OBJECT_INDEX' } } },
             {
               stmt: {
                 DropStmt: {
@@ -91,12 +107,16 @@ describe('sql-ast defensive parse trees', () => {
       return {
         stmts: [
           { stmt: { IndexStmt: {} } },
+          { stmt: { IndexStmt: { relation: { relname: 'bare' } } } },
           {
+            stmt_location: 4,
             stmt: {
               IndexStmt: {
                 relation: { relname: 't' },
                 indexParams: [
                   undefined,
+                  { IndexElem: { name: 'n', opclass: [] } },
+                  { IndexElem: { name: 'n', opclass: [{ String: {} }, { Integer: { ival: 1 } }] } },
                   { IndexElem: { name: 'n', opclass: [{ String: { sval: 'ops' } }] } },
                 ],
               },
@@ -110,6 +130,9 @@ describe('sql-ast defensive parse trees', () => {
     expect(
       fresh.extractCreateTableMetadata('create').some((table) => table.tableName === 't'),
     ).toBe(true)
+    expect(fresh.extractCreateIndexMetadata('create').some((index) => index.relname === 't')).toBe(
+      true,
+    )
     expect(fresh.extractMigrationConstraintMetadata('empty')).toMatchObject({ foreignKeys: [] })
     expect(
       fresh.extractMigrationConstraintMetadata('alter').validatedConstraints.has('t.chk'),

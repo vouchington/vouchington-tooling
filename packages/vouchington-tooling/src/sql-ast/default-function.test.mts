@@ -114,4 +114,15 @@ describe('extractFuncCallArgColumnNames', () => {
   it('returns an empty array for a node that is not a FuncCall', () => {
     expect(extractFuncCallArgColumnNames({ Integer: { ival: 0 } })).toEqual([])
   })
+
+  it('treats a ColumnRef without fields as having no column names', () => {
+    expect(
+      extractFuncCallArgColumnNames({
+        FuncCall: {
+          funcname: [{ String: { sval: 'uuid_extract_timestamp' } }],
+          args: [{ ColumnRef: {} }],
+        },
+      }),
+    ).toEqual([])
+  })
 })
