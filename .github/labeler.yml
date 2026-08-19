@@ -1,0 +1,20 @@
+tooling:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/vouchington-tooling/**'
+eslint-plugin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/eslint-plugin-vouchington/**'
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'README.md'
+          - 'docs/**'
+          - '**/*.md'
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'package.json'
+          - 'pnpm-lock.yaml'

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  // Peer of eslint-plugin-vouchington; imported only from plugin tests.
+  "ignoreDependencies": ["eslint"],
+  "workspaces": {
+    "packages/vouchington-tooling": {
+      "entry": ["src/index.mts!", "src/cli/index.mts!"],
+      "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
+    },
+    "packages/eslint-plugin-vouchington": {
+      "entry": ["src/index.mts!"],
+      "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
+    },
+  },
+}

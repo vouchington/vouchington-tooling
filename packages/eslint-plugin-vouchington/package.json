@@ -1,0 +1,45 @@
+{
+  "name": "eslint-plugin-vouchington",
+  "version": "0.0.0",
+  "description": "Non-generic Vouchington ESLint and Oxlint rules.",
+  "homepage": "https://github.com/vouchington/vouchington-tooling/tree/main/packages/eslint-plugin-vouchington#readme",
+  "bugs": {
+    "url": "https://github.com/vouchington/vouchington-tooling/issues"
+  },
+  "license": "MIT",
+  "author": "Jonathan Ong",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vouchington/vouchington-tooling.git",
+    "directory": "packages/eslint-plugin-vouchington"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
+  },
+  "peerDependencies": {
+    "eslint": ">=9"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "vouchington-tooling-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Public Vouchington tooling: CLI, libraries, and house-style ESLint rules.",
+  "homepage": "https://github.com/vouchington/vouchington-tooling#readme",
+  "bugs": {
+    "url": "https://github.com/vouchington/vouchington-tooling/issues"
+  },
+  "license": "MIT",
+  "author": "Jonathan Ong",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vouchington/vouchington-tooling.git"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "pnpm run oxlint && pnpm run oxfmt:check && pnpm run knip && pnpm run dependency-cruiser",
+    "oxlint": "oxlint --type-aware --deny-warnings",
+    "oxlint:fix": "oxlint --type-aware --fix --deny-warnings",
+    "oxfmt": "oxfmt",
+    "oxfmt:check": "oxfmt --check",
+    "knip": "knip",
+    "dependency-cruiser": "depcruise packages",
+    "actionlint": "github-actionlint"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "dependency-cruiser": "^18.2.0",
+    "eslint": "^10.8.1",
+    "github-actionlint": "^1.7.12",
+    "knip": "^6.32.2",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@11.22.0"
+}

@@ -1,0 +1,59 @@
+{
+  "name": "vouchington-tooling",
+  "version": "0.0.0",
+  "description": "Vouchington CLI and extractable tooling libraries.",
+  "homepage": "https://github.com/vouchington/vouchington-tooling/tree/main/packages/vouchington-tooling#readme",
+  "bugs": {
+    "url": "https://github.com/vouchington/vouchington-tooling/issues"
+  },
+  "license": "MIT",
+  "author": "Jonathan Ong",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vouchington/vouchington-tooling.git",
+    "directory": "packages/vouchington-tooling"
+  },
+  "bin": {
+    "vouchington": "dist/cli/index.mjs"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./runner-port-policy": {
+      "types": "./dist/runner-port-policy/index.d.mts",
+      "import": "./dist/runner-port-policy/index.mjs",
+      "default": "./dist/runner-port-policy/index.mjs"
+    },
+    "./sql-ast": {
+      "types": "./dist/sql-ast/index.d.mts",
+      "import": "./dist/sql-ast/index.mjs",
+      "default": "./dist/sql-ast/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "pnpm run build",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
+  },
+  "optionalDependencies": {
+    "@libpg-query/parser": "^17.6.10"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
