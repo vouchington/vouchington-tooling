@@ -9,7 +9,7 @@ describe('eslint compatibility', () => {
       overrideConfig: [
         {
           files: ['**/*.js'],
-          plugins: { vouchington: plugin },
+          plugins: { vouchington: plugin as ESLint.Plugin },
         },
       ],
     })
