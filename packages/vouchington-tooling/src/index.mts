@@ -65,7 +65,9 @@ export type {
   VitestBlobManifest,
 } from './vitest-blob-manifest/index.mts'
 export {
+  findWorkspaceLinkMismatches,
   formatReleaseAgeFailure,
+  INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   parseInstallOptions,
   parseReleaseAgeViolations,

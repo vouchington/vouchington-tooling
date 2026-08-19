@@ -4,6 +4,7 @@ import {
   MissingSqlAstParserError,
   VITEST_BLOB_MANIFEST_VERSION,
   gitEnv,
+  INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
   lineOfUtf8ByteOffset,
@@ -21,6 +22,7 @@ describe('package exports', () => {
     expect(new MissingSqlAstParserError().name).toBe('MissingSqlAstParserError')
     expect(VITEST_BLOB_MANIFEST_VERSION).toBe('vitest-blob-manifest:v1')
     expect(isReleaseAgeViolation('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION')).toBe(true)
+    expect(INSTALL_TERMINATION_FAILED).toBe(-1)
     expect(typeof gitEnv).toBe('function')
   })
 })

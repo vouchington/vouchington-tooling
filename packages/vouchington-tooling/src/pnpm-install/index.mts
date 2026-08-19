@@ -1,9 +1,37 @@
 export { runInstallLifecycle } from './runner.mts'
-export { parseInstallOptions } from './support.mts'
-export type { InstallOptions, Lifecycle } from './support.mts'
+export { runPnpm } from './exec.mts'
+export {
+  baseInstallArgs,
+  findWorkspaceLinkMismatches,
+  listWorkspaces,
+  logWorkspaceLinkMismatches,
+  parseInstallOptions,
+  reportGlibcVersionRuntime,
+} from './support.mts'
+export type {
+  CaptureCommand,
+  CommandResult,
+  InstallOptions,
+  Lifecycle,
+  Workspace,
+  WorkspaceLinkMismatch,
+} from './support.mts'
 export {
   formatReleaseAgeFailure,
   isReleaseAgeViolation,
   parseReleaseAgeViolations,
 } from './release-age.mts'
-export { INSTALL_TERMINATION_FAILED } from './process.mts'
+export {
+  INSTALL_TERMINATION_FAILED,
+  installExitCode,
+  safeProcessGroup,
+  startInstallHeartbeat,
+  terminateProcessGroup,
+  terminateSafeProcessGroup,
+} from './process.mts'
+export {
+  persistentDependencyTreeIsCold,
+  persistentMetadataFingerprint,
+  persistentMetadataMatches,
+  writePersistentMetadataStamp,
+} from './metadata.mts'
