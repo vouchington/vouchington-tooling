@@ -35,4 +35,6 @@ import {
   listenOnRunnerUnreservedEphemeralPort,
   runnerPortPolicy,
 } from 'vouchington-tooling/runner-port-policy'
+import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
+import { splitSqlStatements, stripSqlComments } from 'vouchington-tooling/sql-scanner'
 ```

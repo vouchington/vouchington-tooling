@@ -5,7 +5,12 @@
   "ignoreDependencies": ["eslint", "pr-shepherd"],
   "workspaces": {
     "packages/vouchington-tooling": {
-      "entry": ["src/index.mts!", "src/cli/index.mts!"],
+      "entry": [
+        "src/index.mts!",
+        "src/cli/index.mts!",
+        "src/sql-ast/index.mts!",
+        "src/sql-scanner/index.mts!",
+      ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },
     "packages/eslint-plugin-vouchington": {
