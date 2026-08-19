@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+import { readFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+import { readPackageVersion } from '../package-version.mts'
+import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
+import { runWithHostLock } from './commands/with-host-lock.mts'
+import { parseCli } from './parse.mts'
+import { printUsage } from './usage.mts'
+
+export function runCli(argv: readonly string[] = process.argv): number {
+  const parsed = parseCli(argv)
+  switch (parsed.kind) {
+    case 'help':
+      printUsage()
+      return 0
+    case 'version':
+      process.stdout.write(`${readInstalledVersion()}\n`)
+      return 0
+    case 'error':
+      process.stderr.write(`vouchington: ${parsed.message}\n`)
+      printUsage(process.stderr)
+      return 2
+    case 'runner-port-policy':
+      return runRunnerPortPolicy(parsed)
+    case 'with-host-lock':
+      return runWithHostLock(parsed.args)
+  }
+}
+
+function readInstalledVersion(): string {
+  return readPackageVersion(
+    JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
+  )
+}
+
+export function isMainModule(metaUrl: string, argv1: string | undefined): boolean {
+  return argv1 !== undefined && metaUrl === pathToFileURL(argv1).href
+}
+
+/* v8 ignore next 3 */
+if (isMainModule(import.meta.url, process.argv[1])) {
+  process.exitCode = runCli()
+}
