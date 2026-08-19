@@ -12,6 +12,7 @@ export default defineConfig({
         'packages/*/src/**/*.test-helpers.mts',
         'packages/*/src/index.mts',
         'packages/*/src/sql-ast/index.mts',
+        'packages/*/src/gha-runtime-audit/index.mts',
       ],
       thresholds: {
         lines: 100,

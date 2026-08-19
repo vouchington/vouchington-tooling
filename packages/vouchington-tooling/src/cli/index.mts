@@ -3,12 +3,13 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readPackageVersion } from '../package-version.mts'
+import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { parseCli } from './parse.mts'
 import { printUsage } from './usage.mts'
 
-export function runCli(argv: readonly string[] = process.argv): number {
+export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {
   const parsed = parseCli(argv)
   switch (parsed.kind) {
     case 'help':
@@ -25,6 +26,8 @@ export function runCli(argv: readonly string[] = process.argv): number {
       return runRunnerPortPolicy(parsed)
     case 'with-host-lock':
       return runWithHostLock(parsed.args)
+    case 'gha-runtime-audit':
+      return runGhaRuntimeAudit(parsed)
   }
 }
 
@@ -43,7 +46,19 @@ export function isMainModule(metaUrl: string, argv1: string | undefined): boolea
   }
 }
 
-/* v8 ignore next 3 */
+/* v8 ignore next 8 */
 if (isMainModule(import.meta.url, process.argv[1])) {
-  process.exitCode = runCli()
+  const result = runCli()
+  if (typeof result === 'number') process.exitCode = result
+  else {
+    result.then(
+      (code) => {
+        process.exitCode = code
+      },
+      (error: unknown) => {
+        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+        process.exitCode = 1
+      },
+    )
+  }
 }

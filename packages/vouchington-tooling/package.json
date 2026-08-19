@@ -45,6 +45,11 @@
       "import": "./dist/sql-scanner/index.mjs",
       "default": "./dist/sql-scanner/index.mjs"
     },
+    "./gha-runtime-audit": {
+      "types": "./dist/gha-runtime-audit/index.d.mts",
+      "import": "./dist/gha-runtime-audit/index.mjs",
+      "default": "./dist/gha-runtime-audit/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

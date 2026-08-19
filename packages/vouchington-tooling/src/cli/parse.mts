@@ -1,9 +1,12 @@
+import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
+
 export type ParsedCli =
   | { kind: 'help' }
   | { kind: 'version' }
   | { kind: 'error'; message: string }
   | { kind: 'runner-port-policy'; file?: string; reserved?: number }
   | { kind: 'with-host-lock'; args: string[] }
+  | ParsedGhaRuntimeAudit
 
 export function parseCli(argv: readonly string[]): ParsedCli {
   const args = argv.slice(2)
@@ -13,6 +16,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   const [command, ...rest] = args
   if (command === 'runner-port-policy') return parseRunnerPortPolicy(rest)
   if (command === 'with-host-lock') return { kind: 'with-host-lock', args: rest }
+  if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
   return { kind: 'error', message: `unknown command: ${command}` }
 }
 
