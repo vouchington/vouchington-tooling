@@ -49,3 +49,33 @@ export type {
   RuntimeJobResult,
   RuntimeSample,
 } from './gha-runtime-audit/index.mts'
+export {
+  createVitestBlobManifest,
+  inspectVitestBlobBundle,
+  parseVitestBlobManifest,
+  serializeVitestBlobManifest,
+  VITEST_BLOB_MANIFEST_FILENAME,
+  VITEST_BLOB_MANIFEST_VERSION,
+  vitestBlobBundlePaths,
+  writeVitestBlobManifest,
+} from './vitest-blob-manifest/index.mts'
+export type {
+  InspectedVitestBlobBundle,
+  VitestBlobIdentity,
+  VitestBlobManifest,
+} from './vitest-blob-manifest/index.mts'
+export {
+  formatReleaseAgeFailure,
+  isReleaseAgeViolation,
+  parseInstallOptions,
+  parseReleaseAgeViolations,
+  runInstallLifecycle,
+} from './pnpm-install/index.mts'
+export type { InstallOptions, Lifecycle } from './pnpm-install/index.mts'
+export {
+  buildContextFromTrackedFiles,
+  buildSharedContext,
+  gitEnv,
+  runNamedChecks,
+} from './shared-context/index.mts'
+export type { NamedCheck, SharedContext } from './shared-context/index.mts'

@@ -18,6 +18,13 @@ vouchington runner-port-policy
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
+vouchington gha-output name
+vouchington gha-needs-results
+vouchington download-with-diagnostics <url> <destination>
+vouchington host-pressure-diagnostics
+vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-ports ./ports.json
+vouchington vitest-blob-manifest <suite> [reports-directory]
+vouchington pnpm-install --runner-lifecycle persistent --install-scripts true
 ```
 
 ## Packages
@@ -31,6 +38,9 @@ import { isRunnerReservedPort, runnerPortPolicy } from 'vouchington-tooling/runn
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
+import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
+import { runInstallLifecycle } from 'vouchington-tooling/pnpm-install'
+import { buildSharedContext, runNamedChecks } from 'vouchington-tooling/shared-context'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.

@@ -50,6 +50,21 @@
       "import": "./dist/gha-runtime-audit/index.mjs",
       "default": "./dist/gha-runtime-audit/index.mjs"
     },
+    "./vitest-blob-manifest": {
+      "types": "./dist/vitest-blob-manifest/index.d.mts",
+      "import": "./dist/vitest-blob-manifest/index.mjs",
+      "default": "./dist/vitest-blob-manifest/index.mjs"
+    },
+    "./pnpm-install": {
+      "types": "./dist/pnpm-install/index.d.mts",
+      "import": "./dist/pnpm-install/index.mjs",
+      "default": "./dist/pnpm-install/index.mjs"
+    },
+    "./shared-context": {
+      "types": "./dist/shared-context/index.d.mts",
+      "import": "./dist/shared-context/index.mjs",
+      "default": "./dist/shared-context/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

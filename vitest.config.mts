@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    fileParallelism: false,
     include: ['packages/*/src/**/*.test.mts'],
     coverage: {
       provider: 'v8',
@@ -13,6 +14,9 @@ export default defineConfig({
         'packages/*/src/index.mts',
         'packages/*/src/sql-ast/index.mts',
         'packages/*/src/gha-runtime-audit/index.mts',
+        'packages/*/src/pnpm-install/index.mts',
+        'packages/*/src/shared-context/index.mts',
+        'packages/*/src/vitest-blob-manifest/index.mts',
       ],
       thresholds: {
         lines: 100,
