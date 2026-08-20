@@ -32,6 +32,40 @@ describe('pnpm install lifecycle', () => {
     }
   })
 
+  it('reconciles a matching stamp when leftover natives do not match this runtime', async () => {
+    const fixture = await makeFixture()
+    try {
+      const cold = await runInstaller(fixture)
+      expect(cold.stderr).toContain('persistent dependency tree is absent; installing cold')
+      await resetInstallCalls(fixture)
+      const store = join(
+        fixture.root,
+        'node_modules',
+        '.pnpm',
+        'native@1.0.0',
+        'node_modules',
+        'native',
+      )
+      await mkdir(store, { recursive: true })
+      await writeFile(
+        join(store, 'addon.node'),
+        process.platform === 'darwin'
+          ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
+          : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+      )
+      const repaired = await runInstaller(fixture)
+      expect(repaired.stderr).toContain(
+        'persistent optional native binaries do not match this runtime; reconciling',
+      )
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   it('falls back to reconciliation when a cold install leaves an invalid workspace link', async () => {
     const fixture = await makeFixture()
     try {

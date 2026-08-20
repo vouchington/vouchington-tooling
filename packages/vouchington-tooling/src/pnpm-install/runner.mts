@@ -6,6 +6,7 @@ import {
   persistentMetadataMatches,
   writePersistentMetadataStamp,
 } from './metadata.mts'
+import { nativeBinariesMatchRuntime } from './native-health.mts'
 import { runPnpm } from './exec.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
@@ -72,12 +73,18 @@ async function persistent(options: InstallOptions) {
   const runCapture = (args: string[]) => runPnpm(args, options, true)
   const fingerprint = await persistentMetadataFingerprint(runCapture, options.installScripts)
   const stamped = await persistentMetadataMatches(fingerprint)
+  const nativesMatch = await nativeBinariesMatchRuntime()
+  const provenanceOk = stamped && nativesMatch
 
   // An absent tree has nothing to repair, so one ordinary install below matches the
   // reconciled end state. Check first: an install would otherwise make the tree non-cold.
-  const cold = !stamped && (await persistentDependencyTreeIsCold())
-  if (!stamped && !cold) {
-    console.warn('persistent dependency metadata provenance is missing or changed; reconciling')
+  const cold = !provenanceOk && (await persistentDependencyTreeIsCold())
+  if (!provenanceOk && !cold) {
+    console.warn(
+      stamped && !nativesMatch
+        ? 'persistent optional native binaries do not match this runtime; reconciling'
+        : 'persistent dependency metadata provenance is missing or changed; reconciling',
+    )
     await reconcileOrFail(options, runCapture)
     await writePersistentMetadataStamp(fingerprint)
     return 'persistent metadata reconciled'
