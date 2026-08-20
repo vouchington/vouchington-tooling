@@ -20,7 +20,7 @@ describe('pnpm install lifecycle', () => {
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
       await expect(readFile(join(fixture.root, stamp), 'utf8')).resolves.toEqual(
-        expect.stringContaining('"version":1'),
+        expect.stringContaining('"version":2'),
       )
       await resetInstallCalls(fixture)
       await expect(runInstaller(fixture)).resolves.toBeDefined()

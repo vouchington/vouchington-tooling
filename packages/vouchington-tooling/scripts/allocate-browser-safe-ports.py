@@ -297,6 +297,14 @@ def read_pid(path: Path) -> int | None:
         return None
 
 
+def workspace_holder_pid(workspace: str) -> int | None:
+    identity = durable_identity_dir(workspace)
+    pid = read_pid(identity / "pid")
+    if pid is None or not pid_is_alive(pid) or not is_our_holder(pid, workspace):
+        return None
+    return pid
+
+
 def reap_stale_holder(workspace: str) -> None:
     identity = durable_identity_dir(workspace)
     pid_path = identity / "pid"
@@ -595,6 +603,10 @@ def request_stop(hold_dir: Path, workspace: str) -> None:
         if current is None or not pid_is_alive(current):
             break
         time.sleep(HOLD_POLL_SECONDS)
+    successor = workspace_holder_pid(workspace)
+    if successor is not None and successor != pid:
+        # A replacement holder for this workspace already reaped us and took the ports.
+        return
     for port in remaining:
         wait_until_port_bindable(port)
 
