@@ -65,6 +65,26 @@
       "import": "./dist/shared-context/index.mjs",
       "default": "./dist/shared-context/index.mjs"
     },
+    "./gha-selected-files": {
+      "types": "./dist/gha-selected-files/index.d.mts",
+      "import": "./dist/gha-selected-files/index.mjs",
+      "default": "./dist/gha-selected-files/index.mjs"
+    },
+    "./gha-artifacts-cleanup": {
+      "types": "./dist/gha-artifacts-cleanup/index.d.mts",
+      "import": "./dist/gha-artifacts-cleanup/index.mjs",
+      "default": "./dist/gha-artifacts-cleanup/index.mjs"
+    },
+    "./http-origin": {
+      "types": "./dist/http-origin/index.d.mts",
+      "import": "./dist/http-origin/index.mjs",
+      "default": "./dist/http-origin/index.mjs"
+    },
+    "./process-line-buffer": {
+      "types": "./dist/process-line-buffer/index.d.mts",
+      "import": "./dist/process-line-buffer/index.mjs",
+      "default": "./dist/process-line-buffer/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -74,6 +94,12 @@
     "build": "node scripts/build.mjs",
     "prepack": "pnpm run build",
     "typecheck": "tsc --noEmit --project tsconfig.json"
+  },
+  "dependencies": {
+    "picomatch": "4.0.5"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3"
   },
   "optionalDependencies": {
     "@libpg-query/parser": "^18.0.0"

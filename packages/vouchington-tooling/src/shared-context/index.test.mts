@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildSharedContext, gitEnv, runNamedChecks } from './index.mts'
-import { clearFakeGitEnv, installFakeGit } from './fake-git.test-helpers.mts'
+import { clearFakeGitEnv, installFakeGit } from './fake-git.mts'
 
 describe('shared-context', () => {
   const tempRoot = process.env.RUNNER_TEMP || tmpdir()

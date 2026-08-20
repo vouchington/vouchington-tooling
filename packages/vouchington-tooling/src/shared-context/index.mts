@@ -5,6 +5,9 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
+export { clearFakeGitEnv, installFakeGit, setFakeGitTrackedFiles } from './fake-git.mts'
+export type { FakeGitOptions } from './fake-git.mts'
+
 export function gitEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),

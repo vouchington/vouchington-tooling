@@ -142,6 +142,195 @@ describe('parseCli', () => {
       kind: 'vitest-blob-manifest',
       args: ['tooling'],
     })
+    expect(parseCli(['node', 'vouchington', 'diagnose-port-collision', '--ports', '2200'])).toEqual(
+      {
+        kind: 'script',
+        command: 'diagnose-port-collision',
+        args: ['--ports', '2200'],
+      },
+    )
+    expect(parseCli(['node', 'vouchington', 'prepare-trivy-db'])).toEqual({
+      kind: 'script',
+      command: 'prepare-trivy-db',
+      args: [],
+    })
+  })
+
+  it('parses http-origin flags', () => {
+    expect(parseCli(['node', 'vouchington', 'http-origin'])).toEqual({
+      kind: 'http-origin',
+      field: 'origin',
+      value: '',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'http-origin', '--field', 'cdn_origin', 'https://x.test']),
+    ).toEqual({
+      kind: 'http-origin',
+      field: 'cdn_origin',
+      value: 'https://x.test',
+    })
+    expect(parseCli(['node', 'vouchington', 'http-origin', '--', '--looks-like-flag'])).toEqual({
+      kind: 'http-origin',
+      field: 'origin',
+      value: '--looks-like-flag',
+    })
+    expect(parseCli(['node', 'vouchington', 'http-origin', '--help'])).toEqual({ kind: 'help' })
+    expect(parseCli(['node', 'vouchington', 'http-origin', '--field'])).toEqual({
+      kind: 'error',
+      message: '--field requires a name',
+    })
+    expect(parseCli(['node', 'vouchington', 'http-origin', '--wat'])).toEqual({
+      kind: 'error',
+      message: 'unknown http-origin option: --wat',
+    })
+    expect(parseCli(['node', 'vouchington', 'http-origin', 'a', 'b'])).toEqual({
+      kind: 'error',
+      message: 'http-origin accepts at most one value',
+    })
+  })
+
+  it('parses gha-artifacts-cleanup subcommands', () => {
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'run',
+        '--run-id',
+        '42',
+        '--keep-pattern',
+        'plan-*',
+        '--delete-pattern',
+        'coverage-*',
+        '--patterns-file',
+        'patterns.json',
+      ]),
+    ).toEqual({
+      kind: 'gha-artifacts-cleanup',
+      subcommand: 'run',
+      runId: '42',
+      keepPatterns: ['plan-*'],
+      deletePatterns: ['coverage-*'],
+      patternsFile: 'patterns.json',
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'sweep',
+        '--older-than-hours',
+        '6',
+      ]),
+    ).toEqual({
+      kind: 'gha-artifacts-cleanup',
+      subcommand: 'sweep',
+      olderThanHours: 6,
+      keepPatterns: [],
+      deletePatterns: [],
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'sweep',
+        '--older-than-hours',
+        '6',
+        '--patterns-file',
+        'patterns.json',
+      ]),
+    ).toEqual({
+      kind: 'gha-artifacts-cleanup',
+      subcommand: 'sweep',
+      olderThanHours: 6,
+      keepPatterns: [],
+      deletePatterns: [],
+      patternsFile: 'patterns.json',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', '--help'])).toEqual({
+      kind: 'help',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--help'])).toEqual({
+      kind: 'help',
+    })
+  })
+
+  it('rejects invalid gha-artifacts-cleanup options', () => {
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup'])).toEqual({
+      kind: 'error',
+      message: 'gha-artifacts-cleanup requires run or sweep',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'bogus'])).toEqual({
+      kind: 'error',
+      message: 'unknown gha-artifacts-cleanup subcommand: bogus',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run'])).toEqual({
+      kind: 'error',
+      message: 'gha-artifacts-cleanup run requires --run-id',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'sweep'])).toEqual({
+      kind: 'error',
+      message: 'gha-artifacts-cleanup sweep requires --older-than-hours',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'sweep', '--older-than-hours']),
+    ).toEqual({
+      kind: 'error',
+      message: '--older-than-hours requires a value',
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'sweep',
+        '--older-than-hours',
+        '   ',
+      ]),
+    ).toEqual({
+      kind: 'error',
+      message: '--older-than-hours must be a non-negative number',
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'sweep',
+        '--older-than-hours',
+        '-1',
+      ]),
+    ).toEqual({
+      kind: 'error',
+      message: '--older-than-hours must be a non-negative number',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--keep-pattern']),
+    ).toEqual({
+      kind: 'error',
+      message: '--keep-pattern requires a value',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--wat'])).toEqual({
+      kind: 'error',
+      message: 'unknown gha-artifacts-cleanup option: --wat',
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--run-id'])).toEqual({
+      kind: 'error',
+      message: '--run-id requires a value',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--delete-pattern']),
+    ).toEqual({
+      kind: 'error',
+      message: '--delete-pattern requires a value',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--patterns-file']),
+    ).toEqual({
+      kind: 'error',
+      message: '--patterns-file requires a value',
+    })
   })
 
   it('rejects invalid gha-runtime-audit options', () => {
