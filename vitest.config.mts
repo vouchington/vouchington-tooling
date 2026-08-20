@@ -16,6 +16,7 @@ export default defineConfig({
         'packages/*/src/gha-runtime-audit/index.mts',
         'packages/*/src/pnpm-install/index.mts',
         'packages/*/src/shared-context/index.mts',
+        'packages/*/src/gha-artifacts-cleanup/index.mts',
         'packages/*/src/vitest-blob-manifest/index.mts',
       ],
       thresholds: {

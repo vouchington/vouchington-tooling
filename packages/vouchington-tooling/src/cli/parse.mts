@@ -1,3 +1,7 @@
+import {
+  parseGhaArtifactsCleanup,
+  type ParsedGhaArtifactsCleanup,
+} from './parse-gha-artifacts-cleanup.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
 
 export type ParsedCli =
@@ -9,7 +13,9 @@ export type ParsedCli =
   | { kind: 'script'; command: ScriptCommand; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
+  | { kind: 'http-origin'; field: string; value: string }
   | ParsedGhaRuntimeAudit
+  | ParsedGhaArtifactsCleanup
 
 export type ScriptCommand =
   | 'gha-output'
@@ -17,6 +23,8 @@ export type ScriptCommand =
   | 'download-with-diagnostics'
   | 'host-pressure-diagnostics'
   | 'allocate-browser-safe-ports'
+  | 'diagnose-port-collision'
+  | 'prepare-trivy-db'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
@@ -24,6 +32,8 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'download-with-diagnostics',
   'host-pressure-diagnostics',
   'allocate-browser-safe-ports',
+  'diagnose-port-collision',
+  'prepare-trivy-db',
 ])
 
 export function parseCli(argv: readonly string[]): ParsedCli {
@@ -37,6 +47,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
   if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
+  if (command === 'http-origin') return parseHttpOrigin(rest)
+  if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
   }
@@ -73,4 +85,31 @@ function parseRunnerPortPolicy(args: readonly string[]): ParsedCli {
     ...(file === undefined ? {} : { file }),
     ...(reserved === undefined ? {} : { reserved }),
   }
+}
+
+function parseHttpOrigin(args: readonly string[]): ParsedCli {
+  let field = 'origin'
+  const values: string[] = []
+  let index = 0
+  while (index < args.length) {
+    const flag = args[index]!
+    index += 1
+    if (flag === '--help' || flag === '-h') return { kind: 'help' }
+    if (flag === '--field') {
+      const value = args[index]
+      if (value === undefined) return { kind: 'error', message: '--field requires a name' }
+      field = value
+      index += 1
+      continue
+    }
+    if (flag === '--') {
+      values.push(...args.slice(index))
+      break
+    }
+    if (flag.startsWith('-'))
+      return { kind: 'error', message: `unknown http-origin option: ${flag}` }
+    values.push(flag)
+  }
+  if (values.length > 1) return { kind: 'error', message: 'http-origin accepts at most one value' }
+  return { kind: 'http-origin', field, value: values[0] ?? '' }
 }

@@ -3,7 +3,9 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readPackageVersion } from '../package-version.mts'
+import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
+import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runScript } from './commands/spawn-script.mts'
@@ -28,6 +30,11 @@ const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
     command: 'python3',
     path: 'scripts/allocate-browser-safe-ports.py',
   },
+  'diagnose-port-collision': {
+    command: 'bash',
+    path: 'scripts/gha/diagnose-port-collision.sh',
+  },
+  'prepare-trivy-db': { command: 'bash', path: 'scripts/gha/prepare-trivy-db.sh' },
 }
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {
@@ -57,6 +64,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runPnpmInstallCli(parsed.args)
     case 'vitest-blob-manifest':
       return runVitestBlobManifestCommand(parsed.args)
+    case 'http-origin':
+      return runHttpOrigin(parsed.field, parsed.value)
+    case 'gha-artifacts-cleanup':
+      return runGhaArtifactsCleanup(parsed)
   }
 }
 

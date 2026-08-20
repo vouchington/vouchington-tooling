@@ -9,6 +9,10 @@ Commands:
   download-with-diagnostics     Download a URL and report HTTP status on failure
   host-pressure-diagnostics     Print a bounded host memory/OOM/PSI snapshot
   allocate-browser-safe-ports   Allocate Fetch-safe localhost ports
+  diagnose-port-collision       Capture bounded localhost port diagnostics
+  prepare-trivy-db              Download the Trivy vulnerability database
+  gha-artifacts-cleanup         Delete classified GitHub Actions artifacts
+  http-origin                   Validate an optional HTTP(S) origin
   vitest-blob-manifest          Stamp a vitest-blob-manifest:v1 identity file
   pnpm-install                  Install a pnpm workspace with retry and release-age fail-fast
 
@@ -41,6 +45,11 @@ gha-needs-results [label]
 download-with-diagnostics <url> <destination> [-- curl-args...]
 host-pressure-diagnostics
 allocate-browser-safe-ports [count] [--policy path] [--forbidden-ports path]
+diagnose-port-collision [--ports "2200 2216"] [--output-dir PATH]
+prepare-trivy-db
+gha-artifacts-cleanup run --run-id <id> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
+gha-artifacts-cleanup sweep --older-than-hours <n> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
+http-origin [--field NAME] [value]
 vitest-blob-manifest <suite> [reports-directory]
 pnpm-install --runner-lifecycle persistent|ephemeral|ephemeral-full --install-scripts true|false
 `

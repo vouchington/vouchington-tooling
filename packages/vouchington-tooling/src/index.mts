@@ -77,7 +77,39 @@ export type { InstallOptions, Lifecycle } from './pnpm-install/index.mts'
 export {
   buildContextFromTrackedFiles,
   buildSharedContext,
+  clearFakeGitEnv,
   gitEnv,
+  installFakeGit,
   runNamedChecks,
+  setFakeGitTrackedFiles,
 } from './shared-context/index.mts'
-export type { NamedCheck, SharedContext } from './shared-context/index.mts'
+export type { FakeGitOptions, NamedCheck, SharedContext } from './shared-context/index.mts'
+export {
+  decodeSelectedFiles,
+  encodeSelectedFiles,
+  formatMultilineOutput,
+  SELECTED_FILES_ENV_MAX_BYTES,
+  selectedFilesExceedEnvBudget,
+  writeSelectedFilesOutput,
+} from './gha-selected-files/index.mts'
+export {
+  createArtifactClassifier,
+  parseArtifactPatternsJson,
+  planRunDeletions,
+  runCleanup,
+  sweepCleanup,
+} from './gha-artifacts-cleanup/index.mts'
+export type {
+  ArtifactClassification,
+  ArtifactClassifier,
+  ArtifactPatterns,
+  CleanupRequest,
+  DeletionSummary,
+} from './gha-artifacts-cleanup/index.mts'
+export { validateOptionalHttpOrigin } from './http-origin/index.mts'
+export {
+  boundPendingLine,
+  DEFAULT_MAX_PENDING_LINE_LENGTH,
+  DEFAULT_TRUNCATED_LINE_MARKER,
+  splitCompleteLines,
+} from './process-line-buffer/index.mts'

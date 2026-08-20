@@ -23,6 +23,10 @@ vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
 vouchington host-pressure-diagnostics
 vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-ports ./ports.json
+vouchington diagnose-port-collision --ports "2200 2216"
+vouchington prepare-trivy-db
+vouchington gha-artifacts-cleanup run --run-id 123 --keep-pattern 'plan-*'
+vouchington http-origin --field cdn_origin https://images.example.com
 vouchington vitest-blob-manifest <suite> [reports-directory]
 vouchington pnpm-install --runner-lifecycle persistent --install-scripts true
 ```
@@ -40,7 +44,15 @@ import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
 import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
 import { runInstallLifecycle } from 'vouchington-tooling/pnpm-install'
-import { buildSharedContext, runNamedChecks } from 'vouchington-tooling/shared-context'
+import {
+  buildSharedContext,
+  installFakeGit,
+  runNamedChecks,
+} from 'vouchington-tooling/shared-context'
+import { writeSelectedFilesOutput } from 'vouchington-tooling/gha-selected-files'
+import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
+import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
+import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.

@@ -52,6 +52,14 @@ importers:
         version: 10.8.1(jiti@2.7.0)(supports-color@7.2.0)
 
   packages/vouchington-tooling:
+    dependencies:
+      picomatch:
+        specifier: 4.0.5
+        version: 4.0.5
+    devDependencies:
+      '@types/picomatch':
+        specifier: ^4.0.3
+        version: 4.0.3
     optionalDependencies:
       '@libpg-query/parser':
         specifier: ^18.0.0
@@ -803,6 +811,9 @@ packages:
 
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
+
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -2512,6 +2523,8 @@ snapshots:
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
+
+  '@types/picomatch@4.0.3': {}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true

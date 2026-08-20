@@ -3,12 +3,15 @@ import {
   EphemeralListenerAttemptsExhaustedError,
   MissingSqlAstParserError,
   VITEST_BLOB_MANIFEST_VERSION,
+  boundPendingLine,
   gitEnv,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
   lineOfUtf8ByteOffset,
   runnerPortPolicy,
+  SELECTED_FILES_ENV_MAX_BYTES,
+  validateOptionalHttpOrigin,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -24,5 +27,8 @@ describe('package exports', () => {
     expect(isReleaseAgeViolation('ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION')).toBe(true)
     expect(INSTALL_TERMINATION_FAILED).toBe(-1)
     expect(typeof gitEnv).toBe('function')
+    expect(SELECTED_FILES_ENV_MAX_BYTES).toBe(120_000)
+    expect(() => validateOptionalHttpOrigin('')).not.toThrow()
+    expect(boundPendingLine('ok')).toBe('ok')
   })
 })

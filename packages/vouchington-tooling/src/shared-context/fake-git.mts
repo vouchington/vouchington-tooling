@@ -35,7 +35,11 @@ export function installFakeGit({
   process.env[FAKE_GIT_LS_FILES_EXIT_CODE] = String(lsFilesExitCode)
   process.env[FAKE_GIT_LS_FILES_STDERR] = lsFilesStderr
   if (repoRoot !== undefined) process.env[FAKE_GIT_ROOT] = repoRoot
-  process.env[FAKE_GIT_FILES] = [...trackedFiles].toSorted().join('\n')
+  setFakeGitTrackedFiles(trackedFiles)
+}
+
+export function setFakeGitTrackedFiles(files: readonly string[]): void {
+  process.env[FAKE_GIT_FILES] = [...files].toSorted().join('\n')
 }
 
 export function clearFakeGitEnv(): void {
