@@ -211,6 +211,7 @@ SCRIPT_NAME = "allocate-browser-safe-ports.py"
 HOLD_POLL_SECONDS = 0.05
 HOLD_READY_TIMEOUT_SECONDS = 2.0
 CONTROL_WAIT_SECONDS = 2.0
+OWNER_PROBE_SECONDS = 0.4
 
 
 def resolve_workspace(workspace: str) -> str:
@@ -560,6 +561,90 @@ def port_is_bindable(port: int) -> bool:
         probe.close()
 
 
+def run_owner_probe(command: list[str]) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=OWNER_PROBE_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout
+
+
+def compact_probe_text(output: str) -> str:
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    return " | ".join(lines)[:200]
+
+
+def pids_holding_port(port: int) -> list[int]:
+    pids: list[int] = []
+    seen: set[int] = set()
+    for raw in run_owner_probe(["lsof", "-nP", "-t", f"-iTCP:{port}"]).split():
+        if not raw.isdigit():
+            continue
+        pid = int(raw)
+        if pid in seen:
+            continue
+        seen.add(pid)
+        pids.append(pid)
+    if pids:
+        return pids
+    for token in run_owner_probe(["ss", "-ntp", f"( sport = :{port} )"]).replace(",", " ").split():
+        if not token.startswith("pid="):
+            continue
+        raw_pid = token[4:].split(")")[0]
+        if not raw_pid.isdigit():
+            continue
+        pid = int(raw_pid)
+        if pid in seen:
+            continue
+        seen.add(pid)
+        pids.append(pid)
+    return pids
+
+
+def sibling_allocator_owner(port: int, excluded_pid: int | None) -> tuple[int, str] | None:
+    for owner_pid in pids_holding_port(port):
+        if excluded_pid is not None and owner_pid == excluded_pid:
+            continue
+        command = process_command_line(owner_pid)
+        if command is None or SCRIPT_NAME not in command:
+            continue
+        return owner_pid, command
+    return None
+
+
+def describe_port_owner(port: int) -> str:
+    pids = pids_holding_port(port)
+    if pids:
+        details: list[str] = []
+        for owner_pid in pids:
+            command = process_command_line(owner_pid) or "unknown"
+            details.append(f"pid {owner_pid} {command}")
+        return compact_probe_text("; ".join(details))
+    lsof_text = compact_probe_text(run_owner_probe(["lsof", "-nP", f"-iTCP:{port}"]))
+    if lsof_text:
+        return f"lsof {lsof_text}"
+    ss_text = compact_probe_text(run_owner_probe(["ss", "-ntp", f"( sport = :{port} )"]))
+    if ss_text:
+        lowered = ss_text.lower()
+        if "time-wait" in lowered or "time_wait" in lowered:
+            return f"TIME_WAIT {ss_text}"
+        return f"ss {ss_text}"
+    return "no owner"
+
+
+def report_sibling_owner(port: int, owner_pid: int, command: str) -> None:
+    print(
+        f"port {port} still held by pid {owner_pid} ({command}); leaving owner in place",
+        file=sys.stderr,
+    )
+
+
 def wait_until_port_bindable(port: int) -> None:
     deadline = time.monotonic() + CONTROL_WAIT_SECONDS
     while time.monotonic() < deadline:
@@ -567,6 +652,29 @@ def wait_until_port_bindable(port: int) -> None:
             return
         time.sleep(HOLD_POLL_SECONDS)
     raise RuntimeError(f"port {port} did not become bindable")
+
+
+def wait_until_port_bindable_or_sibling(port: int, excluded_pid: int | None) -> None:
+    deadline = time.monotonic() + CONTROL_WAIT_SECONDS
+    probed = False
+    while time.monotonic() < deadline:
+        if port_is_bindable(port):
+            return
+        if not probed:
+            sibling = sibling_allocator_owner(port, excluded_pid)
+            if sibling is not None:
+                report_sibling_owner(port, sibling[0], sibling[1])
+                return
+            probed = True
+        time.sleep(HOLD_POLL_SECONDS)
+    sibling = sibling_allocator_owner(port, excluded_pid)
+    if sibling is not None:
+        report_sibling_owner(port, sibling[0], sibling[1])
+        return
+    occupancy = describe_port_owner(port)
+    raise RuntimeError(
+        f"port {port} did not become bindable after {CONTROL_WAIT_SECONDS}s ({occupancy})"
+    )
 
 
 def request_release(hold_dir: Path, port: int) -> None:
@@ -592,9 +700,11 @@ def request_stop(hold_dir: Path, workspace: str) -> None:
     (hold_dir / "stop").write_text("1")
     pid_path = hold_dir / "pid"
     pid = read_pid(pid_path) if pid_path.is_file() else None
+    stopped_live_holder = False
     if pid is not None and pid_is_alive(pid) and is_our_holder(pid, workspace):
         try:
             os.kill(pid, signal.SIGTERM)
+            stopped_live_holder = True
         except ProcessLookupError:
             pass
     deadline = time.monotonic() + CONTROL_WAIT_SECONDS
@@ -607,8 +717,10 @@ def request_stop(hold_dir: Path, workspace: str) -> None:
     if successor is not None and successor != pid:
         # A replacement holder for this workspace already reaped us and took the ports.
         return
+    if not stopped_live_holder:
+        return
     for port in remaining:
-        wait_until_port_bindable(port)
+        wait_until_port_bindable_or_sibling(port, pid)
 
 
 def check_holder(hold_dir: Path, workspace: str) -> None:
