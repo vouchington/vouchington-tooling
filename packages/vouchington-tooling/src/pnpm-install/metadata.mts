@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { type CaptureCommand, listWorkspaces, reportGlibcVersionRuntime } from './support.mts'
 
-type PersistentMetadataStamp = { fingerprint: string; version: 2 }
+type PersistentMetadataStamp = { fingerprint: string; version: 3 }
 
 function persistentMetadataStampPath() {
   return path.join(process.cwd(), 'node_modules', '.pnpm-install-metadata-health.json')
@@ -80,7 +80,7 @@ export async function persistentMetadataMatches(fingerprint: string) {
     const stamp = JSON.parse(
       await readFile(persistentMetadataStampPath(), 'utf8'),
     ) as PersistentMetadataStamp
-    return stamp.version === 2 && stamp.fingerprint === fingerprint
+    return stamp.version === 3 && stamp.fingerprint === fingerprint
   } catch {
     return false
   }
@@ -105,7 +105,7 @@ export async function writePersistentMetadataStamp(fingerprint: string) {
   try {
     await writeFile(
       temporary,
-      `${JSON.stringify({ fingerprint, version: 2 } satisfies PersistentMetadataStamp)}\n`,
+      `${JSON.stringify({ fingerprint, version: 3 } satisfies PersistentMetadataStamp)}\n`,
     )
     await rename(temporary, stampPath)
   } finally {
