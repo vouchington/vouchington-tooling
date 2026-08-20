@@ -52,10 +52,8 @@ async function searchRoot(nodeModules: string) {
   try {
     const info = await stat(pnpmStore)
     return info.isDirectory() ? pnpmStore : nodeModules
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return nodeModules
-    /* v8 ignore next -- non-ENOENT stat failures are host-specific */
-    throw error
+  } catch {
+    return nodeModules
   }
 }
 
@@ -69,10 +67,8 @@ export async function nativeBinariesMatchRuntime(
   try {
     const info = await stat(nodeModules)
     if (!info.isDirectory()) return true
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
-    /* v8 ignore next -- non-ENOENT stat failures are host-specific */
-    throw error
+  } catch {
+    return true
   }
 
   const cwd = await searchRoot(nodeModules)
