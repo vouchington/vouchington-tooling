@@ -229,6 +229,25 @@ describe('parseCli', () => {
       keepPatterns: [],
       deletePatterns: [],
     })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-artifacts-cleanup',
+        'sweep',
+        '--older-than-hours',
+        '6',
+        '--patterns-file',
+        'patterns.json',
+      ]),
+    ).toEqual({
+      kind: 'gha-artifacts-cleanup',
+      subcommand: 'sweep',
+      olderThanHours: 6,
+      keepPatterns: [],
+      deletePatterns: [],
+      patternsFile: 'patterns.json',
+    })
     expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', '--help'])).toEqual({
       kind: 'help',
     })

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { runCli } from '../index.mts'
-import { runHttpOrigin } from './http-origin.mts'
+import { formatCliError, runHttpOrigin } from './http-origin.mts'
 
 describe('http-origin CLI', () => {
   const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
@@ -18,6 +18,11 @@ describe('http-origin CLI', () => {
   it('prints the field-specific error and returns 1', () => {
     expect(runHttpOrigin('cdn_origin', 'https://images.example.com/path')).toBe(1)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('cdn_origin must be empty')
+  })
+
+  it('formats Error messages and non-Error throws', () => {
+    expect(formatCliError(new Error('nope'))).toBe('nope')
+    expect(formatCliError('boom')).toBe('boom')
   })
 
   it('dispatches through runCli', () => {
