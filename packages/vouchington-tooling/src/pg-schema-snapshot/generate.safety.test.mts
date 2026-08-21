@@ -1,10 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { writeGeneratedFile } from './file-safety.mts'
+import { lstatOrNull, writeGeneratedFile } from './file-safety.mts'
 import { markdownFilesOnDisk } from './markdown-files.mts'
 import { writeSchemaSnapshot } from './generate.mts'
 import { renderSchemaMarkdown } from './render-markdown.mts'
@@ -182,6 +184,48 @@ describe('writeSchemaSnapshot path safety', () => {
     await expect(markdownFilesOnDisk(root)).rejects.toThrow(
       'Unsafe generated PostgreSQL schema snapshot path',
     )
+  })
+
+  it('propagates non-ENOENT lstat failures', async () => {
+    const root = await tempRoot()
+    const hidden = join(root, 'hidden')
+    await mkdir(hidden)
+    await writeFile(join(hidden, 'file'), 'x\n')
+    await chmod(hidden, 0o000)
+    try {
+      await expect(lstatOrNull(join(hidden, 'file'))).rejects.toThrow()
+    } finally {
+      await chmod(hidden, 0o755)
+    }
+  })
+
+  it('propagates mkdir failures other than EEXIST', async () => {
+    const root = await tempRoot()
+    const file = join(root, 'not-a-dir')
+    await writeFile(file, 'x\n')
+    await expect(
+      writeGeneratedFile(root, join(file, 'child', 'out.json'), '{}\n'),
+    ).rejects.toThrow()
+  })
+
+  it('propagates non-ENOENT read failures in check mode', async () => {
+    const root = await tempRoot()
+    await mkdir(join(root, 'schema.json'))
+    await expect(
+      writeSchemaSnapshot({
+        snapshot,
+        markdown: renderSchemaMarkdown(snapshot),
+        check: true,
+        root,
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('skips non-file Markdown directory entries', async () => {
+    const root = await tempRoot()
+    await mkdir(join(root, 'markdown'), { recursive: true })
+    await promisify(execFile)('mkfifo', [join(root, 'markdown/pipe')])
+    expect(await markdownFilesOnDisk(root)).toEqual([])
   })
 
   it('collects symlink leaves when scanning generated Markdown', async () => {

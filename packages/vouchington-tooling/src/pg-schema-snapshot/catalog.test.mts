@@ -43,7 +43,9 @@ describe('catalog readers', () => {
   })
 
   it('returns rows from each reader', async () => {
-    const query: CatalogQuery = async () => ({ rows: [{ ok: true }] })
+    const query: CatalogQuery = async <Row extends Record<string, unknown>>() => ({
+      rows: [{ ok: true }] as unknown as Row[],
+    })
     await expect(readTables(query)).resolves.toEqual([{ ok: true }])
     await expect(readColumns(query)).resolves.toEqual([{ ok: true }])
     await expect(readConstraints(query)).resolves.toEqual([{ ok: true }])
