@@ -113,3 +113,34 @@ export {
   DEFAULT_TRUNCATED_LINE_MARKER,
   splitCompleteLines,
 } from './process-line-buffer/index.mts'
+export {
+  buildSchemaSnapshot,
+  detectRenamedIndexes,
+  generateSchemaSnapshot,
+  indexShapeKey,
+  readSchemaCatalog,
+  renderSchemaMarkdown,
+  stableStringify,
+  writeSchemaSnapshot,
+} from './pg-schema-snapshot/index.mts'
+export type {
+  CatalogQuery,
+  PartitionPolicy,
+  SchemaCatalog,
+  SchemaGrowthMaps,
+  SchemaSnapshot,
+  SchemaTableSnapshot,
+} from './pg-schema-snapshot/index.mts'
+export {
+  buildOpenApiDocument,
+  hashContractSchema,
+  nodeToOpenApi,
+  writeOpenApi,
+} from './openapi-document/index.mts'
+export type {
+  BuildOpenApiDocumentInput,
+  ContractSchema,
+  OpenApiDocument,
+  RequestContract,
+  ResponseContract,
+} from './openapi-document/index.mts'

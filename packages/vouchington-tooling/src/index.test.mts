@@ -5,6 +5,8 @@ import {
   VITEST_BLOB_MANIFEST_VERSION,
   boundPendingLine,
   gitEnv,
+  indexShapeKey,
+  hashContractSchema,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
@@ -30,5 +32,9 @@ describe('package exports', () => {
     expect(SELECTED_FILES_ENV_MAX_BYTES).toBe(120_000)
     expect(() => validateOptionalHttpOrigin('')).not.toThrow()
     expect(boundPendingLine('ok')).toBe('ok')
+    expect(indexShapeKey('idx', 'CREATE INDEX idx ON t (id)')).toBe('CREATE INDEX <name> ON t (id)')
+    expect(hashContractSchema({ root: { type: 'string' }, definitions: {} })).toMatch(
+      /^[0-9a-f]{64}$/,
+    )
   })
 })
