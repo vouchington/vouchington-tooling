@@ -38,6 +38,8 @@ describe('catalog readers', () => {
     expect(sql).toHaveLength(10)
     expect(sql.join('\n')).toMatch(/readSchemaSnapshotTables/)
     expect(sql.join('\n')).toMatch(/readSchemaSnapshotColumns/)
+    expect(sql.join('\n')).toMatch(/pg_attribute\.atttypmod/)
+    expect(sql.join('\n')).not.toMatch(/atttypemod/)
     expect(sql.join('\n')).toMatch(/pg_inherits/)
     expect(sql.join('\n')).toMatch(/pg_depend/)
   })
