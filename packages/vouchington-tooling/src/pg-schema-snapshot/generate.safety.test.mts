@@ -199,13 +199,27 @@ describe('writeSchemaSnapshot path safety', () => {
     }
   })
 
-  it('propagates mkdir failures other than EEXIST', async () => {
+  it('rejects generated files whose parent path component is not a directory', async () => {
     const root = await tempRoot()
     const file = join(root, 'not-a-dir')
     await writeFile(file, 'x\n')
-    await expect(
-      writeGeneratedFile(root, join(file, 'child', 'out.json'), '{}\n'),
-    ).rejects.toThrow()
+    await expect(writeGeneratedFile(root, join(file, 'child', 'out.json'), '{}\n')).rejects.toThrow(
+      'Unsafe generated PostgreSQL schema snapshot path',
+    )
+  })
+
+  it('propagates mkdir failures other than EEXIST', async () => {
+    const root = await tempRoot()
+    const locked = join(root, 'locked')
+    await mkdir(locked)
+    await chmod(locked, 0o555)
+    try {
+      await expect(
+        writeGeneratedFile(root, join(locked, 'child', 'out.json'), '{}\n'),
+      ).rejects.toMatchObject({ code: 'EACCES' })
+    } finally {
+      await chmod(locked, 0o755)
+    }
   })
 
   it('propagates non-ENOENT read failures in check mode', async () => {

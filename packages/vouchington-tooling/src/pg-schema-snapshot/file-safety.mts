@@ -16,7 +16,6 @@ async function assertSafeDirectory(path: string, create: boolean): Promise<void>
   let stats = await lstatOrNull(path)
   if (stats === null && create) {
     await mkdir(path).catch((error: NodeJS.ErrnoException) =>
-      /* v8 ignore next -- concurrent create is a benign race */
       error.code === 'EEXIST' ? undefined : Promise.reject(error),
     )
     stats = await lstatOrNull(path)
