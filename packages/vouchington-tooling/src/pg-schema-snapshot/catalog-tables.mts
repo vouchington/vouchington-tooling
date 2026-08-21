@@ -54,7 +54,7 @@ export async function readColumns(query: CatalogQuery): Promise<CatalogColumnRow
       SELECT
         target.relname AS table_name,
         pg_attribute.attname AS column_name,
-        format_type(pg_attribute.atttypid, pg_attribute.atttypemod) AS data_type,
+        format_type(pg_attribute.atttypid, pg_attribute.atttypmod) AS data_type,
         NOT pg_attribute.attnotnull AS nullable,
         pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS default_expression,
         pg_attribute.attidentity AS identity,
