@@ -22,7 +22,6 @@ export default defineConfig({
         'packages/*/src/openapi-document/index.mts',
         'packages/*/src/**/*-types.mts',
         'packages/*/src/pg-schema-snapshot/types.mts',
-        'packages/*/src/pg-schema-snapshot/catalog-*.mts',
       ],
       thresholds: {
         lines: 100,

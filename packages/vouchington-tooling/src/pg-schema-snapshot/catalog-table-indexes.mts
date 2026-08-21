@@ -1,4 +1,3 @@
-/* v8 ignore start -- catalog query helpers require a live database */
 import {
   EXCLUDE_EXTENSION_OWNED,
   EXCLUDE_PARTITION_CHILDREN,
@@ -122,5 +121,3 @@ export async function readTriggers(query: CatalogQuery): Promise<CatalogTriggerR
   )
   return rows
 }
-
-/* v8 ignore stop */

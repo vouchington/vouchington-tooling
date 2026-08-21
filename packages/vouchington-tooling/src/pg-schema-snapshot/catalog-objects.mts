@@ -1,4 +1,3 @@
-/* v8 ignore start -- catalog query helpers require a live database */
 import { EXCLUDE_EXTENSION_OWNED } from './catalog-shared.mts'
 import type { CatalogQuery } from './types.mts'
 
@@ -113,5 +112,3 @@ export async function readPolicies(query: CatalogQuery): Promise<CatalogPolicyRo
   )
   return rows
 }
-
-/* v8 ignore stop */

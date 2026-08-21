@@ -1,4 +1,3 @@
-/* v8 ignore start -- catalog query helpers require a live database */
 import {
   type CatalogEnumValueRow,
   type CatalogExtensionRow,
@@ -101,5 +100,3 @@ export async function readSchemaCatalog(query: CatalogQuery): Promise<SchemaCata
     policies,
   }
 }
-
-/* v8 ignore stop */

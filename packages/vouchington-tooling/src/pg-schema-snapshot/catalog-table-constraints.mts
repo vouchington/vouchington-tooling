@@ -1,4 +1,3 @@
-/* v8 ignore start -- catalog query helpers require a live database */
 import {
   EXCLUDE_EXTENSION_OWNED,
   EXCLUDE_PARTITION_CHILDREN,
@@ -75,5 +74,3 @@ export async function readConstraints(query: CatalogQuery): Promise<CatalogConst
   )
   return rows
 }
-
-/* v8 ignore stop */
