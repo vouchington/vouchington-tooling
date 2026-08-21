@@ -64,4 +64,9 @@ import {
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
+import {
+  generateSchemaSnapshot,
+  renderSchemaMarkdown,
+} from 'vouchington-tooling/pg-schema-snapshot'
+import { buildOpenApiDocument, writeOpenApi } from 'vouchington-tooling/openapi-document'
 ```

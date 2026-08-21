@@ -18,6 +18,10 @@ export default defineConfig({
         'packages/*/src/shared-context/index.mts',
         'packages/*/src/gha-artifacts-cleanup/index.mts',
         'packages/*/src/vitest-blob-manifest/index.mts',
+        'packages/*/src/pg-schema-snapshot/index.mts',
+        'packages/*/src/openapi-document/index.mts',
+        'packages/*/src/**/*-types.mts',
+        'packages/*/src/pg-schema-snapshot/types.mts',
       ],
       thresholds: {
         lines: 100,

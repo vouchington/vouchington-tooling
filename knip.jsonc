@@ -19,6 +19,8 @@
         "src/gha-artifacts-cleanup/index.mts!",
         "src/http-origin/index.mts!",
         "src/process-line-buffer/index.mts!",
+        "src/pg-schema-snapshot/index.mts!",
+        "src/openapi-document/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

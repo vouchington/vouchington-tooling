@@ -85,6 +85,16 @@
       "import": "./dist/process-line-buffer/index.mjs",
       "default": "./dist/process-line-buffer/index.mjs"
     },
+    "./pg-schema-snapshot": {
+      "types": "./dist/pg-schema-snapshot/index.d.mts",
+      "import": "./dist/pg-schema-snapshot/index.mjs",
+      "default": "./dist/pg-schema-snapshot/index.mjs"
+    },
+    "./openapi-document": {
+      "types": "./dist/openapi-document/index.d.mts",
+      "import": "./dist/openapi-document/index.mjs",
+      "default": "./dist/openapi-document/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
