@@ -262,14 +262,17 @@ describe('Vitest blob S3 transport', () => {
     expect(tarVerboseMemberSize('-rw-r--r--  0 runner staff  12 Jan  1 00:00 tooling.json')).toBe(
       12,
     )
+    expect(tarVerboseMemberSize('-rw-r--r-- 0/0            12 2026-08-22 10:00 tooling.json')).toBe(
+      12,
+    )
     expect(() => tarVerboseMemberSize('-rw-r--r--  0 x y not-a-size Jan 1 00:00 x')).toThrow(
       /malformed/,
     )
-    expect(() => tarVerboseMemberSize('-rw-r--r--  0 x y -1 Jan 1 00:00 x')).toThrow(/malformed/)
+    expect(() => tarVerboseMemberSize('not a tar listing')).toThrow(/malformed/)
     expect(() =>
       assertTarMemberSizes([
-        '-rw-r--r--  0 x y 12 Jan  1 00:00 vitest-blob-manifest.json',
-        '-rw-r--r--  0 x y 33554433 Jan  1 00:00 tooling.json',
+        '-rw-r--r-- 0/0 12 2026-08-22 10:00 vitest-blob-manifest.json',
+        '-rw-r--r-- 0/0 33554433 2026-08-22 10:00 tooling.json',
       ]),
     ).toThrow(/member size limit/)
     expect(() =>

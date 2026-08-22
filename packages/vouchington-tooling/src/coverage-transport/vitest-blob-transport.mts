@@ -69,9 +69,11 @@ export function packVitestBlobBundle(
 }
 
 export function tarVerboseMemberSize(line: string): number {
-  const parts = line.trim().split(/\s+/)
-  const size = Number(parts[4])
-  if (parts.length < 6 || !Number.isSafeInteger(size) || size < 0) {
+  const match =
+    line.match(/\s(\d+)\s+\d{4}-\d{2}-\d{2}(?:\s|$)/) ??
+    line.match(/\s(\d+)\s+[A-Z][a-z]{2}\s+\d{1,2}\s/)
+  const size = match === null ? Number.NaN : Number(match[1])
+  if (!Number.isSafeInteger(size) || size < 0) {
     throw new Error('Vitest blob archive listing is malformed')
   }
   return size
