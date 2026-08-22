@@ -41,6 +41,13 @@ function clampTreeMtimes(root: string): number {
       for (const entry of fs.readdirSync(entryPath, { withFileTypes: true })) {
         visit(path.join(entryPath, entry.name), entry.isDirectory())
       }
+    } else {
+      const stats = fs.lstatSync(entryPath)
+      if (stats.isFile() && stats.nlink > 1) {
+        const copyPath = `${entryPath}.${process.pid}.copy`
+        fs.copyFileSync(entryPath, copyPath)
+        fs.renameSync(copyPath, entryPath)
+      }
     }
     fs.lutimesSync(entryPath, 0, 0)
     entriesTouched += 1

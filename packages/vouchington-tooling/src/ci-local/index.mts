@@ -64,11 +64,11 @@ function runCommand(
   spawn: CiLocalSpawn,
   stdout: LineWriter,
 ): number {
-  const envPreview = Object.entries(command.env ?? {})
-    .flatMap(([key, value]) => (value !== undefined ? [`${key}=${value}`] : []))
-    .join(' ')
+  const envPreview = Object.keys(command.env ?? {})
+    .filter((key) => command.env?.[key] !== undefined)
+    .join(',')
   const renderedCommand = envPreview
-    ? `${envPreview} bash -c ${JSON.stringify(command.command)}`
+    ? `env ${envPreview} bash -c ${JSON.stringify(command.command)}`
     : command.command
 
   writeLine(stdout, `\n$ ${renderedCommand}`)

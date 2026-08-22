@@ -1,4 +1,5 @@
 import {
+  linkSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -76,6 +77,24 @@ describe('normalizeDeployedLayer', () => {
     expect(lstatSync(linkPath).mtimeMs).toBe(0)
     expect(lstatSync(modulesDir).mtimeMs).toBe(0)
     expect(lstatSync(prodDir).mtimeMs).toBe(0)
+  })
+
+  it('breaks hardlinks before clamping mtimes', () => {
+    const prodDir = makeProdDir()
+    const storeFile = path.join(path.dirname(prodDir), 'store', 'keep.js')
+    const linked = path.join(prodDir, 'node_modules', 'keep.js')
+    mkdirSync(path.dirname(storeFile), { recursive: true })
+    mkdirSync(path.dirname(linked), { recursive: true })
+    writeFileSync(path.join(prodDir, 'node_modules', '.modules.yaml'), '{}\n')
+    writeFileSync(storeFile, 'shared\n')
+    linkSync(storeFile, linked)
+    utimesSync(storeFile, new Date('2026-08-17T04:16:02Z'), new Date('2026-08-17T04:16:02Z'))
+
+    normalizeDeployedLayer(prodDir)
+
+    expect(lstatSync(linked).nlink).toBe(1)
+    expect(lstatSync(linked).mtimeMs).toBe(0)
+    expect(lstatSync(storeFile).mtimeMs).toBeGreaterThan(0)
   })
 
   it('fails closed when .modules.yaml is missing', () => {

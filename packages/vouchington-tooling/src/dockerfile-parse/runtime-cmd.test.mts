@@ -457,4 +457,36 @@ CMD ["serve.mts"]
       /Workspace package not found for filter: @entrypoints\/api/,
     )
   })
+
+  it('accepts COPY destination . and directory-form pnpm filters', () => {
+    const monorepoRoot = makeMonorepo()
+    const relative = `
+FROM base-node AS deploy-api
+RUN pnpm --filter ./services/api --prod deploy /prod/api
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api .
+CMD ["serve.mts"]
+`.trim()
+    const absolute = `
+FROM base-node AS deploy-api
+RUN pnpm --filter ${path.join(monorepoRoot, 'services', 'api')} --prod deploy /prod/api
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api ./
+CMD ["serve.mts"]
+`.trim()
+    expect(parseDockerfileRuntimeImages(relative, { monorepoRoot })[0]).toMatchObject({
+      pnpmFilter: './services/api',
+      workspaceDir: path.join(monorepoRoot, 'services', 'api'),
+    })
+    expect(parseDockerfileRuntimeImages(absolute, { monorepoRoot })[0]?.workspaceDir).toBe(
+      path.join(monorepoRoot, 'services', 'api'),
+    )
+    expect(() =>
+      parseDockerfileRuntimeImages(relative.replace('./services/api', './missing'), {
+        monorepoRoot,
+      }),
+    ).toThrow(/Workspace package not found for filter: \.\/missing/)
+  })
 })

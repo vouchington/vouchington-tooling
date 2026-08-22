@@ -189,8 +189,9 @@ describe('ci-local', () => {
       runCiLocal({ args: ['lint', '--dry-run'], targets: TARGETS, cwd, spawn, stdout, stderr }),
     ).toBe(0)
     expect(stdout.text()).toContain('lint: run lint')
-    expect(stdout.text()).toContain('TOKEN=secret bash -c "echo lint"')
+    expect(stdout.text()).toContain('env TOKEN bash -c "echo lint"')
     expect(stdout.text()).toContain('$ echo extra')
+    expect(stdout.text()).not.toContain('secret')
     expect(stdout.text()).not.toContain('EMPTY=')
     expect(spawn).not.toHaveBeenCalled()
   })

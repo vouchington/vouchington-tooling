@@ -178,7 +178,7 @@ RUN node-prewarm "/nodejs/bin/node serve.mts" --port abc NODE_PREWARM_PORT=nope
   it('honors copySourcePrefix, prewarmBinary, and prewarmPortEnv options', () => {
     const fixture = `
 FROM base-node AS worker-foo-prewarm
-COPY --link --from=deploy-worker-foo /deploy/worker-foo ./
+COPY --link --from=deploy-worker-foo /deploy/worker-foo .
 RUN READY_PORT=4000 warmup@1.0.0 "/nodejs/bin/node serve.mts" --port 4000
 `.trim()
 

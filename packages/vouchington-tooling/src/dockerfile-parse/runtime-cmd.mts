@@ -127,7 +127,7 @@ function matchCopyTarget(
       ?.getValue()
     if (!fromStage) continue
     const args = instruction.getArguments()
-    if (args.at(-1)?.getValue() !== './') continue
+    if (args.at(-1)?.getValue() !== './' && args.at(-1)?.getValue() !== '.') continue
     const sourcePath = args[0]?.getValue()
     if (sourcePath?.startsWith(copySourcePrefix)) return { fromStage, sourcePath }
   }
@@ -146,6 +146,11 @@ function matchCmdScriptPath(instructions: StageInstruction[]): string | undefine
 }
 
 function findWorkspaceDirByPackageName(monorepoRoot: string, packageName: string): string {
+  if (packageName.startsWith('.') || packageName.startsWith('/')) {
+    const dir = path.resolve(monorepoRoot, packageName)
+    if (existsSync(path.join(dir, 'package.json'))) return dir
+    throw new Error(`Workspace package not found for filter: ${packageName}`)
+  }
   const monorepoPackage = JSON.parse(readFileSync(path.join(monorepoRoot, 'package.json'), 'utf8'))
   const workspaces: string[] = Array.isArray(monorepoPackage.workspaces)
     ? monorepoPackage.workspaces

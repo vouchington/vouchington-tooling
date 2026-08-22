@@ -67,7 +67,7 @@ function matchCopySource(
     if (!(instruction instanceof Copy)) continue
     if (!instruction.getFlags().some((flag) => flag.getName() === 'from')) continue
     const args = instruction.getArguments()
-    if (args.at(-1)?.getValue() !== './') continue
+    if (args.at(-1)?.getValue() !== './' && args.at(-1)?.getValue() !== '.') continue
     const sourcePath = args[0]?.getValue()
     if (sourcePath?.startsWith(copySourcePrefix)) return sourcePath
   }
