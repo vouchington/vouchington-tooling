@@ -18,12 +18,19 @@ export function nodeToOpenApi(
       return { type: 'null' }
     case 'boolean':
     case 'number':
-    case 'string':
       return { type: node.type }
+    case 'string':
+      return { type: node.type, ...(node.format === undefined ? {} : { format: node.format }) }
     case 'literal':
       return { const: node.value }
     case 'array':
-      return { type: 'array', items: nodeToOpenApi(node.items, ctx) }
+      return {
+        type: 'array',
+        items: nodeToOpenApi(node.items, ctx),
+        ...(node.minItems === undefined ? {} : { minItems: node.minItems }),
+        ...(node.maxItems === undefined ? {} : { maxItems: node.maxItems }),
+        ...(node.uniqueItems === undefined ? {} : { uniqueItems: node.uniqueItems }),
+      }
     case 'tuple':
       return tupleToOpenApi(node, ctx)
     case 'object':

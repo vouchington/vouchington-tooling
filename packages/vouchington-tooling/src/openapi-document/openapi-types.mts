@@ -8,6 +8,7 @@ export type OpenApiSchema = {
   prefixItems?: OpenApiSchema[]
   minItems?: number
   maxItems?: number
+  uniqueItems?: boolean
   minimum?: number
   maximum?: number
   pattern?: string

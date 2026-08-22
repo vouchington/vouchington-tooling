@@ -8,9 +8,15 @@ export type ContractSchemaNode =
   | { type: 'null' }
   | { type: 'boolean' }
   | { type: 'number' }
-  | { type: 'string' }
+  | { type: 'string'; format?: 'uuid' }
   | { type: 'literal'; value: boolean | number | string }
-  | { type: 'array'; items: ContractSchemaNode }
+  | {
+      type: 'array'
+      items: ContractSchemaNode
+      minItems?: number
+      maxItems?: number
+      uniqueItems?: boolean
+    }
   | { type: 'tuple'; items: ContractSchemaNode[]; optionalItems: number; rest?: ContractSchemaNode }
   | {
       type: 'object'
