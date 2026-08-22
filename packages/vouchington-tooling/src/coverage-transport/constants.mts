@@ -1,4 +1,5 @@
 export const DEFAULT_COVERAGE_MANIFEST_FILENAME = 'coverage-manifest.json'
+export const DEFAULT_MAX_BODY_BYTES = 32 * 1024 * 1024
 
 const MANIFEST_FILENAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json$/
 

@@ -285,6 +285,25 @@ describe('coverage transport control and HTTP boundary', () => {
     expect(errors.join('\n')).not.toContain(server.origin)
   })
 
+  it('does not upload coverage files that exceed the download body ceiling', async () => {
+    const server = await startStorageServer()
+    const root = mkdtempSync(join(tmpdir(), 'coverage-http-'))
+    mkdirSync(join(root, 'coverage'))
+    writeFileSync(join(root, 'coverage/lcov.info'), 'SF:src/a.ts\nend_of_record\n')
+    writeFileSync(join(root, 'coverage/coverage-manifest.json'), '{"version":1}\n')
+    const controlPath = join(root, 'control.json')
+    writeTransportControl(controlPath, makeControl(server.origin))
+    await expect(
+      cmdUpload(controlPath, 'fixture', {
+        cwd: root,
+        retryDelayMs: 1,
+        maxBodyBytes: 8,
+        expectedIdentity,
+      }),
+    ).resolves.toEqual({ coverage: false, blob: false })
+    expect(server.objects.size).toBe(0)
+  })
+
   it('defaults upload cwd to process.cwd', async () => {
     const root = mkdtempSync(join(tmpdir(), 'coverage-cwd-'))
     const controlPath = join(root, 'control.json')

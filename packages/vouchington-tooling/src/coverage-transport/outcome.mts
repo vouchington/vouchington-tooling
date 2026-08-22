@@ -101,9 +101,9 @@ export function assertCoverageTransportBlobOutcome(
 export type AppendOutput = (path: string, data: string) => void
 
 /**
- * Writes `blob=true|false` to `$GITHUB_OUTPUT` so producer workflows can gate their GitHub-fallback
- * blob upload on a signal that actually means "the blob persisted" — not the upload subcommand's
- * exit code, which tracks the coverage pair. A no-op outside CI (`githubOutputPath` unset).
+ * Writes `blob=true|false` to `$GITHUB_OUTPUT` for outcome reporting. GitHub-fallback blob upload
+ * must always be attempted when enabled; do not gate it on this signal. The upload subcommand's
+ * exit code tracks the coverage pair, not the blob. A no-op outside CI (`githubOutputPath` unset).
  */
 export function writeUploadOutcomeOutput(
   outcome: { readonly blob: boolean },

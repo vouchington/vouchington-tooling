@@ -76,6 +76,19 @@ describe('parseTransportControl', () => {
         },
       }),
     ).toThrow('Coverage URL map has an invalid URL')
+    expect(
+      parseTransportControl({
+        ...base,
+        coverage: {
+          web: {
+            lcovGet: 'HTTPS://example.test/a',
+            lcovPut: 'HTTPS://example.test/a',
+            manifestGet: 'HTTPS://example.test/a',
+            manifestPut: 'HTTPS://example.test/a',
+          },
+        },
+      }).mode,
+    ).toBe('presigned')
   })
 
   it('rejects a control whose attempt is ahead of the current run', () => {
@@ -87,6 +100,14 @@ describe('parseTransportControl', () => {
       reason: 'presign unavailable',
     })
     chmodSync(path, 0o600)
+    expect(() =>
+      readTransportControl(path, {
+        repository: 'owner/repo',
+        revision: 'a'.repeat(40),
+        runId: '1',
+        currentAttempt: Number.NaN,
+      }),
+    ).toThrow(/identity/)
     expect(() =>
       readTransportControl(path, {
         repository: 'owner/repo',

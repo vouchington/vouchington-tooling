@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { DEFAULT_COVERAGE_MANIFEST_FILENAME, assertCoverageManifestFilename } from './constants.mts'
+import {
+  DEFAULT_COVERAGE_MANIFEST_FILENAME,
+  DEFAULT_MAX_BODY_BYTES,
+  assertCoverageManifestFilename,
+} from './constants.mts'
 import {
   readTransportControl,
   type ExpectedTransportIdentity,
@@ -43,13 +47,23 @@ export async function cmdUpload(
   const coverageUrls = control.coverage[suite]
   const lcovPath = join(cwd, 'coverage', 'lcov.info')
   const manifestPath = join(cwd, 'coverage', manifestFilename)
-  const lcovStored =
+  const maxBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES
+  const lcov =
     coverageUrls && existsSync(lcovPath) && existsSync(manifestPath)
-      ? await fetchPut(coverageUrls.lcovPut, await readFile(lcovPath), options)
+      ? await readFile(lcovPath)
+      : null
+  const manifest = lcov === null ? null : await readFile(manifestPath)
+  const lcovStored =
+    coverageUrls &&
+    lcov !== null &&
+    manifest !== null &&
+    lcov.byteLength <= maxBytes &&
+    manifest.byteLength <= maxBytes
+      ? await fetchPut(coverageUrls.lcovPut, lcov, options)
       : false
   const coverage =
-    lcovStored && coverageUrls
-      ? await fetchPut(coverageUrls.manifestPut, await readFile(manifestPath), options)
+    lcovStored && coverageUrls && manifest !== null && manifest.byteLength <= maxBytes
+      ? await fetchPut(coverageUrls.manifestPut, manifest, options)
       : false
   if (coverageUrls && existsSync(lcovPath) && existsSync(manifestPath)) {
     logTransport(

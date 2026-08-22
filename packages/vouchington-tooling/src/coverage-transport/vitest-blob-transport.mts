@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
   mkdirSync,
@@ -8,7 +7,6 @@ import {
   renameSync,
   rmSync,
   statSync,
-  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -24,9 +22,11 @@ import {
   writeVitestBlobManifest,
 } from '../vitest-blob-manifest/index.mts'
 
-function archivePath(suite: string): string {
+function archiveWorkspace(suite: string): { root: string; archive: string } {
   assertVitestSuite(suite)
-  return join(tmpdir(), `ct-blob-${suite}-${randomUUID()}.tar.gz`)
+  const root = mkdtempSync(join(tmpdir(), `ct-blob-${suite}-`))
+  chmodSync(root, 0o700)
+  return { root, archive: join(root, 'bundle.tar.gz') }
 }
 
 function assertVitestSuite(suite: string): void {
@@ -40,7 +40,7 @@ export function packVitestBlobBundle(
   options: RequestOptions,
 ): Buffer | null {
   const directory = join(cwd, '.vitest-reports')
-  const archive = archivePath(suite)
+  const { root, archive } = archiveWorkspace(suite)
   try {
     writeVitestBlobManifest(directory, {
       suite,
@@ -66,11 +66,7 @@ export function packVitestBlobBundle(
     )
     return null
   } finally {
-    try {
-      unlinkSync(archive)
-    } catch {
-      // The process temp directory is swept independently.
-    }
+    rmSync(root, { recursive: true, force: true })
   }
 }
 
@@ -155,7 +151,7 @@ export async function downloadVitestBlobBundles(
         logTransport(options, `[coverage-transport] No vitest blob available for ${suite}`)
         return
       }
-      const archive = archivePath(suite)
+      const { root, archive } = archiveWorkspace(suite)
       const invalidMarker = join(destinationRoot, `.invalid-${suite}`)
       try {
         writeFileSync(archive, data, { flag: 'wx', mode: 0o600 })
@@ -176,11 +172,7 @@ export async function downloadVitestBlobBundles(
         }
         throw error
       } finally {
-        try {
-          unlinkSync(archive)
-        } catch {
-          // The process temp directory is swept independently.
-        }
+        rmSync(root, { recursive: true, force: true })
       }
     }),
   )

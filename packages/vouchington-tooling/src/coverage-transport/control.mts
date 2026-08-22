@@ -75,7 +75,7 @@ function assertUrlMap(
     }
     for (const field of fields) {
       const value = urls[field]
-      if (typeof value !== 'string' || !URL.canParse(value) || !/^https?:/.test(value)) {
+      if (typeof value !== 'string' || !URL.canParse(value) || !/^https?:/i.test(value)) {
         throw new Error(`${label} URL map has an invalid URL`)
       }
     }
@@ -162,6 +162,9 @@ export function readTransportControl(
     throw new Error('Coverage transport control file must have mode 0600')
   }
   const control = parseTransportControl(JSON.parse(readFileSync(path, 'utf8')) as unknown)
+  if (expected && !positiveInteger(expected.currentAttempt)) {
+    throw new Error('Coverage transport control identity does not match this run')
+  }
   if (
     expected &&
     (control.repository !== expected.repository ||

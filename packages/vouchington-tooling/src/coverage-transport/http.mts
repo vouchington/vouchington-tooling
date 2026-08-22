@@ -1,9 +1,9 @@
 import type { RequestOptions } from './control.mts'
+import { DEFAULT_MAX_BODY_BYTES } from './constants.mts'
 
 const FETCH_TIMEOUT_MS = 30_000
 const FETCH_ATTEMPTS = 2
 const DEFAULT_RETRY_DELAY_MS = 1000
-const DEFAULT_MAX_BODY_BYTES = 32 * 1024 * 1024
 
 function formatTransportError(value: unknown, seen: WeakSet<object>): string {
   if (typeof value === 'object' && value !== null) {
