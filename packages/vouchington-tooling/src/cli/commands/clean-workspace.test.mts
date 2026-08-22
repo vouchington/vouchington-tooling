@@ -51,7 +51,7 @@ function runCleanWorkspace(options: {
         EXTRA_KEEP: options.extraKeep ?? '',
         GITHUB_TOKEN: '',
         GITHUB_WORKSPACE: workspace,
-        HEAD_REPO: options.headRepo ?? 'example/repo',
+        HEAD_REPO: options.headRepo === undefined ? 'example/repo' : options.headRepo,
         PR_AUTHOR: options.prAuthor,
         PRESERVE_NODE_MODULES: String(options.preserveNodeModules ?? true),
         RUNNER_TOOL_CACHE: workspace,
@@ -107,6 +107,73 @@ describe('clean-workspace', () => {
     expect(runCleanWorkspace({ extraKeep: 'kept', prAuthor: 'maintainer' })).toMatchObject({
       keptDependency: true,
       keptExtra: true,
+      removedJunk: true,
+    })
+  })
+
+  it('derives fork metadata from native GitHub event context', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'clean-workspace-event-'))
+    try {
+      execFileSync('git', ['init', '--quiet'], { cwd: workspace })
+      execFileSync('git', ['config', 'user.name', 'Test'], { cwd: workspace })
+      execFileSync('git', ['config', 'user.email', 'tests@example.com'], { cwd: workspace })
+      writeFileSync(join(workspace, '.gitignore'), 'node_modules/\n')
+      writeFileSync(join(workspace, 'tracked.txt'), 'tracked\n')
+      execFileSync('git', ['add', '.'], { cwd: workspace })
+      execFileSync('git', ['commit', '--quiet', '-m', 'fixture'], { cwd: workspace })
+      mkdirSync(join(workspace, 'node_modules/example'), { recursive: true })
+      writeFileSync(join(workspace, 'node_modules/example/index.js'), 'preserved\n')
+      writeFileSync(join(workspace, 'junk.txt'), 'removed\n')
+      const eventPath = join(workspace, 'event.json')
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          pull_request: {
+            head: { repo: { full_name: 'example/repo' } },
+            user: { login: 'maintainer' },
+          },
+        }),
+      )
+
+      execFileSync('bash', [scriptPath], {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          BASE_REF: 'main',
+          BASE_REPO: '',
+          DEEPEN: 'false',
+          EVENT_NAME: '',
+          EXTRA_KEEP: '',
+          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_REPOSITORY: 'example/repo',
+          GITHUB_TOKEN: '',
+          GITHUB_WORKSPACE: workspace,
+          HEAD_REPO: '',
+          PR_AUTHOR: '',
+          PRESERVE_NODE_MODULES: 'true',
+          RUNNER_TOOL_CACHE: workspace,
+        },
+        stdio: 'pipe',
+      })
+
+      expect(existsSync(join(workspace, 'node_modules/example/index.js'))).toBe(true)
+      expect(existsSync(join(workspace, 'junk.txt'))).toBe(false)
+    } finally {
+      rmSync(workspace, { force: true, recursive: true })
+    }
+  })
+
+  it('fails closed on pull_request events when fork metadata is missing', () => {
+    expect(
+      runCleanWorkspace({
+        headRepo: '',
+        prAuthor: 'maintainer',
+      }),
+    ).toEqual({
+      keptDependency: false,
+      keptExtra: false,
+      keptNestedDependency: false,
       removedJunk: true,
     })
   })

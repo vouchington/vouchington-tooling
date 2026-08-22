@@ -1,7 +1,7 @@
 import picomatch from 'picomatch'
 import { normalizeFilename, type RuleContextLike } from './ast-helpers.mts'
 
-export const DEFAULT_CURSOR_INCLUDE = ['**/*.{ts,mts,tsx,js,mjs,cjs}']
+export const DEFAULT_CURSOR_INCLUDE = ['**/*.{ts,mts,tsx,js,mjs}']
 const DEFAULT_CURSOR_ANNOTATION = '^\\s*/\\*\\s*\\S[^]*?\\*/'
 
 export type CursorModuleConfig = {

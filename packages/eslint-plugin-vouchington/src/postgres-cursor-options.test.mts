@@ -90,5 +90,6 @@ describe('matchesCursorFile', () => {
         defaults,
       ),
     ).toBe(true)
+    expect(matchesCursorFile(context('/repo/service.cjs'), defaults)).toBe(false)
   })
 })

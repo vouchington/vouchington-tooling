@@ -165,6 +165,40 @@ CMD ["serve.mts"]
     })
   })
 
+  it('parses pnpm --filter/--prod options before deploy and --filter=value', () => {
+    const monorepoRoot = makeMonorepo()
+    const dockerfile = `
+FROM base-node AS deploy-api
+RUN pnpm install
+RUN pnpm --filter=@entrypoints/api --prod deploy /prod/api
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api ./
+CMD ["serve.mts"]
+`.trim()
+
+    const [image] = parseDockerfileRuntimeImages(dockerfile, { monorepoRoot })
+    expect(image).toMatchObject({
+      stage: 'api',
+      pnpmFilter: '@entrypoints/api',
+      cmdPath: 'serve.mts',
+    })
+  })
+
+  it('skips pnpm deploy commands that omit the filter or production target', () => {
+    const monorepoRoot = makeMonorepo()
+    const dockerfile = `
+FROM base-node AS deploy-api
+RUN pnpm deploy --prod /prod/api ; pnpm --filter=@entrypoints/api deploy
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api ./
+CMD ["serve.mts"]
+`.trim()
+
+    expect(parseDockerfileRuntimeImages(dockerfile, { monorepoRoot })).toEqual([])
+  })
+
   it('keeps instructions for unnamed stages by using the stage index', () => {
     const monorepoRoot = makeMonorepo()
     const dockerfile = `

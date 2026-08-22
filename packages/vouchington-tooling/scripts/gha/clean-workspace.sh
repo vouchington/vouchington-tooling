@@ -2,16 +2,67 @@
 set -euo pipefail
 
 EXTRA_KEEP="${EXTRA_KEEP:-}"
-EVENT_NAME="${EVENT_NAME:-}"
+EVENT_NAME="${EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
 HEAD_REPO="${HEAD_REPO:-}"
-BASE_REPO="${BASE_REPO:-}"
+BASE_REPO="${BASE_REPO:-${GITHUB_REPOSITORY:-}}"
 PRESERVE_NODE_MODULES="${PRESERVE_NODE_MODULES:-true}"
 PR_AUTHOR="${PR_AUTHOR:-}"
 DEEPEN="${DEEPEN:-false}"
 BASE_REF="${BASE_REF:-main}"
 GENERATED_REPAIR_PATHS="${GENERATED_REPAIR_PATHS:-}"
 
-git reset --hard HEAD
+read_pull_request_field() {
+  local field="$1"
+  [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "${GITHUB_EVENT_PATH}" ] || return 0
+  node --input-type=module -e '
+    import { readFileSync } from "node:fs"
+    const event = JSON.parse(readFileSync(process.argv[1], "utf8"))
+    const value =
+      process.argv[2] === "head"
+        ? event.pull_request?.head?.repo?.full_name
+        : event.pull_request?.user?.login
+    process.stdout.write(value == null ? "" : String(value))
+  ' "${GITHUB_EVENT_PATH}" "${field}" 2>/dev/null || true
+}
+
+if [ -z "${HEAD_REPO}" ]; then
+  HEAD_REPO="$(read_pull_request_field head)"
+fi
+if [ -z "${PR_AUTHOR}" ]; then
+  PR_AUTHOR="$(read_pull_request_field author)"
+fi
+
+restore_user_directory_write_bits() {
+  local path
+  for path in "$@"; do
+    if [ -e "${path}" ]; then
+      if find -P "${path}" -xdev -type d -exec chmod u+rwx {} +; then
+        continue
+      fi
+      if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        sudo -n find -P "${path}" -xdev -type d -exec chown -h "$(id -u):$(id -g)" {} + ||
+          echo "::warning::Could not reclaim directory ownership under ${path}; retrying chmod without ownership repair."
+        find -P "${path}" -xdev -type d -exec chmod u+rwx {} + ||
+          echo "::warning::Could not restore user directory write bits under ${path} after reclaiming ownership; cleanup may fail if stale directories remain locked down."
+      else
+        echo "::warning::Could not restore user directory write bits under ${path}; cleanup may fail if stale directories remain locked down."
+      fi
+    fi
+  done
+}
+restore_workspace_write_bits() {
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    sudo -n find -P . -xdev -path ./.git -prune -o -type d -exec chown -h "$(id -u):$(id -g)" {} +
+  fi
+  find -P . -xdev -path ./.git -prune -o -type d -exec chmod u+rwx {} +
+}
+
+if ! git reset --hard HEAD; then
+  echo "::warning::git reset --hard failed; reclaiming workspace write bits and retrying once."
+  restore_workspace_write_bits ||
+    echo "::warning::Could not restore workspace write bits completely; retrying git reset with the repaired subset."
+  git reset --hard HEAD
+fi
 excludes=()
 # Trust-gate: a fork pull request is the only untrusted case.
 # `HEAD_REPO` is non-empty only on `pull_request` events; a
@@ -29,7 +80,9 @@ excludes=()
 # `github.event_name` evaluates against the *caller's* event — so
 # the trust-gate applies uniformly to direct and reusable workflows.
 is_fork_pr=false
-if [ "${EVENT_NAME}" = "pull_request" ] && [ -n "${HEAD_REPO}" ] && [ "${HEAD_REPO}" != "${BASE_REPO}" ]; then
+if [ "${EVENT_NAME}" = "pull_request" ] && {
+  [ -z "${HEAD_REPO}" ] || [ "${HEAD_REPO}" != "${BASE_REPO}" ]
+}; then
   is_fork_pr=true
 fi
 is_dependabot_pr=false
@@ -66,30 +119,6 @@ if [ "${is_fork_pr}" = "false" ] && [ "${is_dependabot_pr}" = "false" ]; then
     set +f
   fi
 fi
-restore_user_directory_write_bits() {
-  local path
-  for path in "$@"; do
-    if [ -e "${path}" ]; then
-      if find -P "${path}" -xdev -type d -exec chmod u+rwx {} +; then
-        continue
-      fi
-      if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-        sudo -n find -P "${path}" -xdev -type d -exec chown -h "$(id -u):$(id -g)" {} + ||
-          echo "::warning::Could not reclaim directory ownership under ${path}; retrying chmod without ownership repair."
-        find -P "${path}" -xdev -type d -exec chmod u+rwx {} + ||
-          echo "::warning::Could not restore user directory write bits under ${path} after reclaiming ownership; cleanup may fail if stale directories remain locked down."
-      else
-        echo "::warning::Could not restore user directory write bits under ${path}; cleanup may fail if stale directories remain locked down."
-      fi
-    fi
-  done
-}
-restore_workspace_write_bits() {
-  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-    sudo -n find -P . -xdev -path ./.git -prune -o -type d -exec chown -h "$(id -u):$(id -g)" {} +
-  fi
-  find -P . -xdev -path ./.git -prune -o -type d -exec chmod u+rwx {} +
-}
 generated_repair_paths=()
 if [ -n "${RUNNER_TEMP:-}" ]; then
   generated_repair_paths+=("${RUNNER_TEMP}/wrangler-logs")
@@ -126,7 +155,9 @@ done < <(find -P . -xdev -path ./.git -prune -o -type d -path '*/node_modules/.c
 # this persistent runner will see it, force-clean, and remove it. Use
 # the raw event test (not the sentinel-overridden is_fork_pr) so a
 # trusted job that consumed the sentinel does not re-write it.
-if [ "${EVENT_NAME}" = "pull_request" ] && [ -n "${HEAD_REPO}" ] && [ "${HEAD_REPO}" != "${BASE_REPO}" ]; then
+if [ "${EVENT_NAME}" = "pull_request" ] && {
+  [ -z "${HEAD_REPO}" ] || [ "${HEAD_REPO}" != "${BASE_REPO}" ]
+}; then
   touch "${SENTINEL}" || echo "::warning::Could not write contamination sentinel to ${SENTINEL}; the next trusted run on this persistent runner may not force-clean node_modules."
 fi
 if [ "${DEEPEN}" = "true" ]; then

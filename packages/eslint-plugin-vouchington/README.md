@@ -36,14 +36,14 @@ If `modules` or `executors` is missing or empty, the rule loads and reports noth
 
 ### Options
 
-| Name           | Type       | Required | Default                        |
-| -------------- | ---------- | -------- | ------------------------------ |
-| `modules`      | `string[]` | yes      | —                              |
-| `executors`    | `string[]` | yes      | —                              |
-| `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs,cjs}` |
-| `exclude`      | `string[]` | no       | `[]`                           |
-| `includeFiles` | `string[]` | no       | `[]`                           |
-| `annotation`   | `string`   | no       | `^\\s*/\\*\\s*\\S[^]*?\\*/`    |
+| Name           | Type       | Required | Default                     |
+| -------------- | ---------- | -------- | --------------------------- |
+| `modules`      | `string[]` | yes      | —                           |
+| `executors`    | `string[]` | yes      | —                           |
+| `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs}`  |
+| `exclude`      | `string[]` | no       | `[]`                        |
+| `includeFiles` | `string[]` | no       | `[]`                        |
+| `annotation`   | `string`   | no       | `^\\s*/\\*\\s*\\S[^]*?\\*/` |
 
 `include` and `exclude` are picomatch globs relative to the lint cwd. `includeFiles` are exact relative paths that stay in even when `exclude` matches.
 

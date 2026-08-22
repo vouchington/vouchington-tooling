@@ -58,8 +58,6 @@ function deployKey(stage: string, target: string): string {
 function collectDeployTargets(
   stages: readonly { stage: string; instructions: StageInstruction[] }[],
 ): Map<string, string> {
-  const deployRegex =
-    /pnpm(?:\s+--?\S+(?:\s+(?!deploy\b)\S+)?)*\s+deploy\s+--filter\s+(\S+)\s+--prod\s+(\/\S+)/g
   const targetToFilter = new Map<string, string>()
   for (const { stage, instructions } of stages) {
     for (const instruction of instructions) {
@@ -68,12 +66,53 @@ function collectDeployTargets(
         .getArguments()
         .map((argument) => argument.getValue())
         .join(' ')
-      for (const match of runText.matchAll(deployRegex)) {
-        targetToFilter.set(deployKey(stage, match[2]!), match[1]!)
+      for (const { filter, target } of parsePnpmDeploys(runText)) {
+        targetToFilter.set(deployKey(stage, target), filter)
       }
     }
   }
   return targetToFilter
+}
+
+function parsePnpmDeploys(runText: string): { filter: string; target: string }[] {
+  const found: { filter: string; target: string }[] = []
+  for (const command of runText.split(/\s*(?:&&|;)\s*/)) {
+    const parsed = parsePnpmDeploy(command)
+    if (parsed) found.push(parsed)
+  }
+  return found
+}
+
+function parsePnpmDeploy(command: string): { filter: string; target: string } | undefined {
+  const tokens = command.split(/\s+/).filter(Boolean)
+  const pnpm = tokens.indexOf('pnpm')
+  if (pnpm === -1) return undefined
+  const deploy = tokens.indexOf('deploy', pnpm + 1)
+  if (deploy === -1) return undefined
+  const filter = flagValue(tokens, pnpm, tokens.length, 'filter')
+  const prodTarget = flagValue(tokens, deploy + 1, tokens.length, 'prod')
+  const positional = tokens[deploy + 1]
+  const target =
+    prodTarget ??
+    (tokens.slice(pnpm, deploy).includes('--prod') && positional?.startsWith('/')
+      ? positional
+      : undefined)
+  return filter && target ? { filter, target } : undefined
+}
+
+function flagValue(
+  tokens: readonly string[],
+  start: number,
+  end: number,
+  name: string,
+): string | undefined {
+  const flag = `--${name}`
+  for (let index = start; index < end; index += 1) {
+    const token = tokens[index]
+    if (token === flag) return tokens[index + 1]
+    if (token?.startsWith(`${flag}=`)) return token.slice(flag.length + 1)
+  }
+  return undefined
 }
 
 function matchCopyTarget(
