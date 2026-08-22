@@ -227,3 +227,16 @@ export {
   nextPageUrlFromLinkHeader,
   validatePaginationRequestUrl,
 } from './http-link-pagination/index.mts'
+export {
+  cmdDownloadCoverage,
+  cmdDownloadVitestBlobs,
+  cmdUpload,
+  mintPresignedControl,
+  transportObjectKeys,
+} from './coverage-transport/index.mts'
+export type {
+  ExpectedTransportIdentity,
+  ObjectSigner,
+  PresignIdentity,
+  TransportControl,
+} from './coverage-transport/index.mts'

@@ -130,6 +130,11 @@
       "import": "./dist/http-link-pagination/index.mjs",
       "default": "./dist/http-link-pagination/index.mjs"
     },
+    "./coverage-transport": {
+      "types": "./dist/coverage-transport/index.d.mts",
+      "import": "./dist/coverage-transport/index.mjs",
+      "default": "./dist/coverage-transport/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
