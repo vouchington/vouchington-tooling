@@ -20,6 +20,37 @@ describe('nodeToOpenApi', () => {
     expect(convert({ type: 'literal', value: 'active' })).toEqual({ const: 'active' })
   })
 
+  it('projects UUID formats and array constraints through nested schemas', () => {
+    expect(
+      convert(
+        obj({
+          resources: prop({
+            type: 'array',
+            items: { type: 'string', format: 'uuid' },
+            minItems: 1,
+            maxItems: 3,
+            uniqueItems: true,
+          }),
+          id: prop({ type: 'string', format: 'uuid' }),
+        }),
+      ),
+    ).toEqual({
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        resources: {
+          type: 'array',
+          items: { type: 'string', format: 'uuid' },
+          minItems: 1,
+          maxItems: 3,
+          uniqueItems: true,
+        },
+      },
+      required: ['id', 'resources'],
+      additionalProperties: false,
+    })
+  })
+
   it('converts array items and a ref via the sanitized name map', () => {
     expect(convert({ type: 'array', items: { type: 'string' } })).toEqual({
       type: 'array',
