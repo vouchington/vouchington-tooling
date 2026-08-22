@@ -1,0 +1,20 @@
+{
+  "name": "vouchington",
+  "interface": {
+    "displayName": "Vouchington"
+  },
+  "plugins": [
+    {
+      "name": "security-triage",
+      "source": {
+        "source": "local",
+        "path": "./plugins/security-triage"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Security"
+    }
+  ]
+}

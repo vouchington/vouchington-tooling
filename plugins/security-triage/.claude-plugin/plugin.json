@@ -1,0 +1,9 @@
+{
+  "name": "security-triage",
+  "version": "0.1.0",
+  "description": "Repository-neutral Codex Security finding triage.",
+  "author": {
+    "name": "Vouchington"
+  },
+  "skills": "./skills/"
+}

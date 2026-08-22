@@ -9,6 +9,54 @@ Public tooling extracted from the Vouchington product monorepo. Two npm packages
 
 Both packages are published to npm. Releases go through the `Release` workflow (`workflow_dispatch`) using npm trusted publishing (OIDC). Do not publish from a laptop.
 
+## Agent plugins
+
+The repository also publishes the public [`security-triage`](./plugins/security-triage) agent
+plugin. Its single `triage-codex-security` skill is packaged for Codex, Claude, Grok, and Cursor.
+It is intentionally repository-neutral: it analyzes findings and returns a versioned handoff,
+while each consuming repository owns issue taxonomy and issue creation.
+
+### Install
+
+Codex:
+
+```bash
+codex plugin marketplace add vouchington/vouchington-tooling --ref main
+codex plugin add security-triage@vouchington
+```
+
+Claude:
+
+```bash
+claude plugin marketplace add vouchington/vouchington-tooling --sparse .claude-plugin plugins
+claude plugin install security-triage@vouchington
+```
+
+Grok can install the public plugin directly from its subdirectory:
+
+```bash
+grok plugin install vouchington/vouchington-tooling#plugins/security-triage
+```
+
+Grok also consumes the Claude-compatible plugin package when installed through a compatible
+marketplace flow.
+
+Cursor loads local Agent Plugins. Clone the source once and link its plugin directory into Cursor's
+local plugin root, then restart Cursor or reload the window:
+
+```bash
+mkdir -p ~/.cursor/plugins/sources ~/.cursor/plugins/local
+git clone --depth 1 https://github.com/vouchington/vouchington-tooling.git \
+  ~/.cursor/plugins/sources/vouchington-tooling
+ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/security-triage \
+  ~/.cursor/plugins/local/security-triage
+```
+
+The clone and symlink commands intentionally fail if either target already exists, preventing an
+update from overwriting or nesting an existing local plugin.
+
+Centralized Cursor marketplace publication is not part of this repository change.
+
 ## CLI
 
 ```bash

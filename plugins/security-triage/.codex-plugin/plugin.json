@@ -1,0 +1,26 @@
+{
+  "name": "security-triage",
+  "version": "0.1.0",
+  "description": "Repository-neutral Codex Security finding triage.",
+  "author": {
+    "name": "Vouchington",
+    "url": "https://github.com/vouchington"
+  },
+  "homepage": "https://github.com/vouchington/vouchington-tooling",
+  "repository": "https://github.com/vouchington/vouchington-tooling",
+  "license": "MIT",
+  "keywords": ["security", "triage", "codex-security"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Security triage",
+    "shortDescription": "Triage Codex Security findings safely.",
+    "longDescription": "A repository-neutral workflow for analyzing Codex Security findings and producing approved, auditable outcomes.",
+    "developerName": "Vouchington",
+    "category": "Security",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/vouchington/vouchington-tooling",
+    "defaultPrompt": ["Triage Codex Security findings for this repository."],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
