@@ -100,12 +100,16 @@ describe('remapReviewComments', () => {
       review([
         comment({ path: 'src/old.mts', line: 2 }),
         comment({ path: 'src/new.mts', line: 5, start_line: 99, start_side: 'RIGHT' }),
+        comment({ path: 'src/new.mts', line: 6, start_line: 1 }),
+        comment({ path: 'src/new.mts', line: 50, start_line: 1, start_side: 'RIGHT' }),
         comment({ path: 'missing.mts', line: 3 }),
       ]),
       index,
     )
     expect(remapped.comments[0]?.path).toBe('src/new.mts')
     expect(remapped.comments[1]?.start_line).toBeUndefined()
+    expect(remapped.comments[2]?.start_line).toBeUndefined()
+    expect(remapped.comments[3]?.start_line).toBeUndefined()
     expect(remapped.body).toContain('missing.mts:3')
     expect(
       nearestReviewLine(
@@ -142,6 +146,33 @@ describe('remapReviewComments', () => {
         5,
       ),
     ).toEqual({ line: 6, kind: 'context' })
+    expect(
+      nearestReviewLine(
+        [
+          { line: 4, kind: 'add' },
+          { line: 10, kind: 'context' },
+        ],
+        5,
+      ),
+    ).toEqual({ line: 4, kind: 'add' })
+    expect(
+      nearestReviewLine(
+        [
+          { line: 4, kind: 'add' },
+          { line: 6, kind: 'context' },
+        ],
+        5,
+      ),
+    ).toEqual({ line: 4, kind: 'add' })
+    expect(
+      nearestReviewLine(
+        [
+          { line: 6, kind: 'context' },
+          { line: 4, kind: 'context' },
+        ],
+        5,
+      ),
+    ).toEqual({ line: 6, kind: 'context' })
     const remapped = remapReviewComments(
       review(
         [
@@ -159,5 +190,11 @@ describe('remapReviewComments', () => {
       indexReviewFiles([{ filename: 'src/add.mts', patch: '@@ -0,0 +1,2 @@\n+one\n+two\n' }]),
     )
     expect(snapped.comments[0]?.line).toBe(2)
+    expect(
+      remapReviewComments(
+        review([comment({ path: 'src/add.mts', line: 1, side: 'RIGHT' })], ''),
+        indexReviewFiles([{ filename: 'src/add.mts', patch: '@@ -0,0 +1 @@\n+one\n' }]),
+      ).body,
+    ).toBe('Inline findings only.')
   })
 })

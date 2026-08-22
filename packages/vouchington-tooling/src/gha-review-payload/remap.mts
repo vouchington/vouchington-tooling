@@ -60,7 +60,7 @@ function placeComment(comment: ReviewComment, index: CommentableIndex): ReviewCo
       index.has(resolved, placed.side, placed.line))
   const target = rangeOk ? placed : withoutRange(placed)
   if (index.has(resolved, target.side, target.line)) {
-    return target.line === originalLine ? target : withSnap(target, originalPath, originalLine)
+    return target
   }
   const alt = otherSide(target.side)
   if (index.has(resolved, alt, target.line)) {
