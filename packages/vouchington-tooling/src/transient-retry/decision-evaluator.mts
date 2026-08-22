@@ -16,6 +16,8 @@ export type DecisionResult =
 
 export interface EvaluateRulesOptions {
   afterRuleEvaluated?: (context: RetryContext, rule: RetryRule) => Promise<void> | void
+  /** Defaults to `no-match`. Use `dispatch` when unmatched work should leave the retry engine. */
+  unmatchedDecision?: 'no-match' | 'dispatch'
 }
 
 function normalizedAttempt(context: RetryContext, rule: RetryRule): number {
@@ -71,11 +73,17 @@ export async function decide(
     if (rule.decision !== undefined && rule.decision !== 'rerun') {
       return { decision: rule.decision, matchedRule: rule.id }
     }
+    if (rule.retryTarget === undefined) {
+      return { decision: 'rerun', matchedRule: rule.id, targetName: '' }
+    }
     const resolved = resolveTargetName(rule.retryTarget, context)
     if (resolved.targetName === undefined) {
       return { decision: 'no-match', matchedRule: rule.id, reason: resolved.reason }
     }
     return { decision: 'rerun', matchedRule: rule.id, targetName: resolved.targetName }
+  }
+  if (options.unmatchedDecision === 'dispatch') {
+    return { decision: 'dispatch', matchedRule: '' }
   }
   return { decision: 'no-match', matchedRule: '', reason: 'no-rule' }
 }

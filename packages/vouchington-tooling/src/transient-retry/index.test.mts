@@ -142,17 +142,39 @@ describe('decide', () => {
     })
   })
 
-  it('does not expose provider dispatch for a matched rerun without a target', async () => {
+  it('returns an untargeted rerun when a matched rerun omits retryTarget', async () => {
+    await expect(
+      decide(context(), [
+        {
+          id: 'untargeted',
+          maxAttempts: 1,
+          match: () => true,
+        },
+      ]),
+    ).resolves.toEqual({ decision: 'rerun', matchedRule: 'untargeted', targetName: '' })
+  })
+
+  it('fails closed when a matched rerun supplies a null retry target', async () => {
     await expect(
       decide(context(), [
         {
           id: 'unsafe',
           maxAttempts: 1,
           match: () => true,
-          retryTarget: undefined,
+          retryTarget: null,
         } as unknown as RetryRule,
       ]),
     ).resolves.toEqual({ decision: 'no-match', matchedRule: 'unsafe', reason: 'invalid-target' })
+  })
+
+  it('returns dispatch when unmatchedDecision is dispatch and no rule matches', async () => {
+    await expect(
+      decide(context(), [rerun({ match: () => false })], { unmatchedDecision: 'dispatch' }),
+    ).resolves.toEqual({ decision: 'dispatch', matchedRule: '' })
+    await expect(decide(context(), [], { unmatchedDecision: 'dispatch' })).resolves.toEqual({
+      decision: 'dispatch',
+      matchedRule: '',
+    })
   })
 
   it('fails closed when target resolution throws or returns malformed values', async () => {

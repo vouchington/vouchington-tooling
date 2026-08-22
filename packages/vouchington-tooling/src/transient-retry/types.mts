@@ -10,7 +10,7 @@ export interface RetryContext {
   targetNames?: ReadonlySet<string>
 }
 
-export type RetryDecision = 'rerun' | 'ignore' | 'fresh-plan' | 'reap-lock'
+export type RetryDecision = 'rerun' | 'ignore' | 'fresh-plan' | 'reap-lock' | 'dispatch'
 
 export type RetryTarget =
   | { targetName: string; targetFamily?: never; resolveTargetName?: never }
@@ -33,8 +33,8 @@ interface RetryRuleBase {
 export type RetryRule =
   | (RetryRuleBase & {
       decision?: 'rerun'
-      /** Reruns must name a resolved target; full-provider reruns stay private. */
-      retryTarget: RetryTarget
+      /** When omitted, the match is an untargeted provider-level rerun. */
+      retryTarget?: RetryTarget
     })
   | (RetryRuleBase & {
       decision: Exclude<RetryDecision, 'rerun'>

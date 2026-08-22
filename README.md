@@ -59,6 +59,7 @@ import { parseCsvRows } from 'vouchington-tooling/csv'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { parseReviewPayload } from 'vouchington-tooling/gha-review-payload'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
+import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.

@@ -20,6 +20,7 @@ export default defineConfig({
         'packages/*/src/vitest-blob-manifest/index.mts',
         'packages/*/src/pg-schema-snapshot/index.mts',
         'packages/*/src/openapi-document/index.mts',
+        'packages/*/src/coverage-transport/index.mts',
         'packages/*/src/**/*-types.mts',
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],

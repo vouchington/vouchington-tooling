@@ -79,6 +79,7 @@ import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
+import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their

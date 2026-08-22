@@ -7,6 +7,7 @@ import {
   gitEnv,
   indexShapeKey,
   hashContractSchema,
+  mintPresignedControl,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
@@ -36,5 +37,6 @@ describe('package exports', () => {
     expect(hashContractSchema({ root: { type: 'string' }, definitions: {} })).toMatch(
       /^[0-9a-f]{64}$/,
     )
+    expect(typeof mintPresignedControl).toBe('function')
   })
 })
