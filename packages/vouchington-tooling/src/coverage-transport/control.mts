@@ -45,6 +45,7 @@ export interface ExpectedTransportIdentity {
 export interface RequestOptions {
   readonly retryDelayMs?: number
   readonly timeoutMs?: number
+  readonly maxBodyBytes?: number
   readonly log?: (line: string) => void
 }
 

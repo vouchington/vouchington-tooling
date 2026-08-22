@@ -22,6 +22,7 @@ export interface MintPresignedControlOptions {
 }
 
 export function transportObjectKeys(
+  repository: string,
   runId: string,
   controlAttempt: number,
   suite: string,
@@ -33,6 +34,8 @@ export function transportObjectKeys(
 } {
   assertCoverageManifestFilename(manifestFilename)
   if (
+    repository.includes('..') ||
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) ||
     !/^[1-9][0-9]*$/.test(runId) ||
     !Number.isSafeInteger(controlAttempt) ||
     controlAttempt < 1 ||
@@ -40,7 +43,7 @@ export function transportObjectKeys(
   ) {
     throw new Error('Coverage transport key identity is invalid')
   }
-  const prefix = `coverage-transport/${runId}/${controlAttempt}`
+  const prefix = `coverage-transport/${repository}/${runId}/${controlAttempt}`
   return {
     lcov: `${prefix}/coverage/${suite}/lcov.info`,
     manifest: `${prefix}/coverage/${suite}/${manifestFilename}`,
@@ -71,6 +74,7 @@ export async function mintPresignedControl(
 
   for (const suite of coverageSuites) {
     const keys = transportObjectKeys(
+      identity.repository,
       identity.runId,
       identity.controlAttempt,
       suite,
@@ -85,6 +89,7 @@ export async function mintPresignedControl(
   }
   for (const suite of blobSuites) {
     const key = transportObjectKeys(
+      identity.repository,
       identity.runId,
       identity.controlAttempt,
       suite,

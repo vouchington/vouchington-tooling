@@ -3,6 +3,7 @@ import type { RequestOptions } from './control.mts'
 const FETCH_TIMEOUT_MS = 30_000
 const FETCH_ATTEMPTS = 2
 const DEFAULT_RETRY_DELAY_MS = 1000
+const DEFAULT_MAX_BODY_BYTES = 32 * 1024 * 1024
 
 function formatTransportError(value: unknown, seen: WeakSet<object>): string {
   if (typeof value === 'object' && value !== null) {
@@ -37,6 +38,27 @@ async function delay(milliseconds: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 }
 
+async function cancelBody(response: Response): Promise<void> {
+  await response.body?.cancel()
+}
+
+async function readLimitedBody(response: Response, maxBytes: number): Promise<Buffer> {
+  if (response.body === null) return Buffer.alloc(0)
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) return Buffer.concat(chunks)
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel()
+      throw new Error('[coverage-transport] GET body exceeds size limit')
+    }
+    chunks.push(value)
+  }
+}
+
 interface TransportResponse {
   readonly ok: boolean
   readonly status: number
@@ -62,9 +84,13 @@ async function request(
       // without retrying the same URL or emitting a misleading transport-error diagnostic.
       if (response.ok || response.status === 404) {
         const payload =
-          method === 'GET' && response.ok ? Buffer.from(await response.arrayBuffer()) : undefined
+          method === 'GET' && response.ok
+            ? await readLimitedBody(response, options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)
+            : undefined
+        if (payload === undefined) await cancelBody(response)
         return { ok: response.ok, status: response.status, body: payload }
       }
+      await cancelBody(response)
       logTransport(options, `[coverage-transport] ${method} failed: HTTP ${response.status}`)
     } catch (error) {
       logTransport(options, `[coverage-transport] ${method} error: ${redactTransportLog(error)}`)

@@ -88,6 +88,70 @@ describe('coverage transport HTTP miss vs exhaustion', () => {
     }
   })
 
+  it('treats a GET with no body as empty bytes', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = async () => new Response(null, { status: 200 })
+    try {
+      await expect(fetchGet('http://example.test/empty')).resolves.toEqual(Buffer.alloc(0))
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  it('rejects GET bodies over the configured byte ceiling', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = async () => new Response('hello-world')
+    try {
+      await expect(
+        fetchGet('http://example.test/big', { maxBodyBytes: 4, retryDelayMs: 0 }),
+      ).rejects.toThrow('[coverage-transport] GET exhausted')
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  it('cancels unused GET bodies on 404', async () => {
+    let cancelled = false
+    const original = globalThis.fetch
+    globalThis.fetch = async () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled = true
+          },
+        }),
+        { status: 404 },
+      )
+    try {
+      await expect(fetchGet('http://example.test/missing')).resolves.toBeNull()
+      expect(cancelled).toBe(true)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  it('cancels unused bodies after a non-404 HTTP failure', async () => {
+    let cancelled = false
+    const original = globalThis.fetch
+    globalThis.fetch = async () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled = true
+          },
+        }),
+        { status: 503 },
+      )
+    try {
+      await expect(
+        fetchPut('http://example.test/object', Buffer.from('x'), { retryDelayMs: 0 }),
+      ).resolves.toBe(false)
+      expect(cancelled).toBe(true)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
   it('skips the retry delay when retryDelayMs is zero', async () => {
     await expect(fetchGet('http://127.0.0.1:1/missing', { retryDelayMs: 0 })).rejects.toThrow(
       '[coverage-transport] GET exhausted',

@@ -4,23 +4,23 @@ import { mintPresignedControl, transportObjectKeys } from './presign.mts'
 
 describe('coverage transport S3 keys', () => {
   it('binds coverage and blob objects to the run and control attempt', () => {
-    expect(transportObjectKeys('12345', 3, 'web-shard-2')).toEqual({
-      lcov: 'coverage-transport/12345/3/coverage/web-shard-2/lcov.info',
-      manifest: 'coverage-transport/12345/3/coverage/web-shard-2/coverage-manifest.json',
-      blob: 'coverage-transport/12345/3/blobs/web-shard-2.tar.gz',
+    expect(transportObjectKeys('owner/repo', '12345', 3, 'web-shard-2')).toEqual({
+      lcov: 'coverage-transport/owner/repo/12345/3/coverage/web-shard-2/lcov.info',
+      manifest: 'coverage-transport/owner/repo/12345/3/coverage/web-shard-2/coverage-manifest.json',
+      blob: 'coverage-transport/owner/repo/12345/3/blobs/web-shard-2.tar.gz',
     })
   })
 
   it('uses an injected manifest filename', () => {
-    expect(transportObjectKeys('12345', 1, 'web', 'manifest.json').manifest).toBe(
-      'coverage-transport/12345/1/coverage/web/manifest.json',
+    expect(transportObjectKeys('owner/repo', '12345', 1, 'web', 'manifest.json').manifest).toBe(
+      'coverage-transport/owner/repo/12345/1/coverage/web/manifest.json',
     )
   })
 
   it.each(['../../outside.json', 'sub/dir.json', '', '.', '..', 'manifest'])(
     'rejects unsafe manifest filenames %#',
     (filename) => {
-      expect(() => transportObjectKeys('12345', 1, 'web', filename)).toThrowError(
+      expect(() => transportObjectKeys('owner/repo', '12345', 1, 'web', filename)).toThrowError(
         'Coverage manifest filename is invalid',
       )
     },
@@ -31,10 +31,19 @@ describe('coverage transport S3 keys', () => {
     ['1', 0, 'web'],
     ['1', 1, '../web'],
   ])('rejects unsafe key identity %#', (runId, attempt, suite) => {
-    expect(() => transportObjectKeys(runId, attempt, suite)).toThrowError(
+    expect(() => transportObjectKeys('owner/repo', runId, attempt, suite)).toThrowError(
       'Coverage transport key identity is invalid',
     )
   })
+
+  it.each(['../outside', 'owner', 'owner/repo/extra'])(
+    'rejects a repository that is not owner/name %#',
+    (repository) => {
+      expect(() => transportObjectKeys(repository, '1', 1, 'web')).toThrowError(
+        'Coverage transport key identity is invalid',
+      )
+    },
+  )
 })
 
 describe('mintPresignedControl', () => {
@@ -70,14 +79,14 @@ describe('mintPresignedControl', () => {
       expiresAt: '2026-01-01T00:01:00.000Z',
     })
     expect(control.coverage.web?.lcovPut).toBe(
-      'https://example.test/put/coverage-transport/99/2/coverage/web/lcov.info',
+      'https://example.test/put/coverage-transport/owner/repo/99/2/coverage/web/lcov.info',
     )
     expect(control.blobs.schema?.get).toBe(
-      'https://example.test/get/coverage-transport/99/2/blobs/schema.tar.gz',
+      'https://example.test/get/coverage-transport/owner/repo/99/2/blobs/schema.tar.gz',
     )
     expect(signed.filter((entry) => entry.includes('/blobs/schema.tar.gz'))).toEqual([
-      'put:60:coverage-transport/99/2/blobs/schema.tar.gz',
-      'get:60:coverage-transport/99/2/blobs/schema.tar.gz',
+      'put:60:coverage-transport/owner/repo/99/2/blobs/schema.tar.gz',
+      'get:60:coverage-transport/owner/repo/99/2/blobs/schema.tar.gz',
     ])
   })
 
