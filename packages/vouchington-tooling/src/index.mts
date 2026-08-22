@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- package entry point enumerates the supported public API. */
+
 export {
   EphemeralListenerAttemptsExhaustedError,
   isRunnerReservedPort,
@@ -51,19 +53,34 @@ export type {
 } from './gha-runtime-audit/index.mts'
 export {
   createVitestBlobManifest,
+  createVitestReportAttempt,
   inspectVitestBlobBundle,
   parseVitestBlobManifest,
+  parseVitestReportAttempt,
+  readVitestReportAttempts,
   serializeVitestBlobManifest,
+  serializeVitestReportAttempt,
   VITEST_BLOB_MANIFEST_FILENAME,
   VITEST_BLOB_MANIFEST_VERSION,
+  VITEST_REPORT_ATTEMPT_PREFIX,
+  VITEST_REPORT_ATTEMPT_VERSION,
   vitestBlobBundlePaths,
   writeVitestBlobManifest,
+  writeVitestReportAttempt,
 } from './vitest-blob-manifest/index.mts'
 export type {
   InspectedVitestBlobBundle,
   VitestBlobIdentity,
   VitestBlobManifest,
+  VitestReportAttempt,
+  VitestReportAttemptIdentity,
 } from './vitest-blob-manifest/index.mts'
+export { prepareVitestReports } from './vitest-blob-manifest/reports.mts'
+export type {
+  PrepareVitestReportsOptions,
+  SelectedVitestReport,
+  VitestReportExpectation,
+} from './vitest-blob-manifest/reports.mts'
 export {
   findWorkspaceLinkMismatches,
   formatReleaseAgeFailure,
@@ -74,6 +91,19 @@ export {
   runInstallLifecycle,
 } from './pnpm-install/index.mts'
 export type { InstallOptions, Lifecycle } from './pnpm-install/index.mts'
+export {
+  flattenReleaseAgeSelectors,
+  packageNameFromPnpmLockKey,
+  pnpmLockPackageKeyMatchesSelector,
+  validateReleaseAgeExemptionGroups,
+  validateReleaseAgePolicy,
+} from './pnpm-install/index.mts'
+export type {
+  ReleaseAgeExemptionGroup,
+  ReleaseAgePermanentExemption,
+  ReleaseAgePolicyConfig,
+  ReleaseAgePolicySnapshot,
+} from './pnpm-install/index.mts'
 export {
   buildContextFromTrackedFiles,
   buildSharedContext,
@@ -144,3 +174,56 @@ export type {
   RequestContract,
   ResponseContract,
 } from './openapi-document/index.mts'
+export { decide, deriveRetryAttempt } from './transient-retry/index.mts'
+export type {
+  DecisionResult,
+  EvaluateRulesOptions,
+  NoMatchReason,
+  RetryContext,
+  RetryDecision,
+  RetryRule,
+  RetryTarget,
+} from './transient-retry/index.mts'
+export { escapeSpreadsheetFormula, parseCsvRows, streamCsvRows, stripCsvBom } from './csv/index.mts'
+export {
+  MissingResponseBodyError,
+  readResponseBody,
+  readResponseBodyAsBuffer,
+  ResponseBodyTooLargeError,
+} from './http-body/index.mts'
+export type { ReadResponseBodyOptions } from './http-body/index.mts'
+export { parseAstGrepRuleArgs, runAstGrepRule } from './ast-grep-rule/index.mts'
+export type { AstGrepRuleInvocation, RunAstGrepRuleOptions } from './ast-grep-rule/index.mts'
+export {
+  bodyOnlyReviewFallback,
+  indexReviewFiles,
+  MAX_REVIEW_COMMENTS,
+  MAX_REVIEW_PAYLOAD_BYTES,
+  nearestReviewLine,
+  parsePatchCommentable,
+  parseReviewFilesJson,
+  parseReviewPayload,
+  readRegularReviewPayload,
+  remapReviewComments,
+  ReviewPayloadError,
+  reviewCommentSubject,
+  rewriteSnappedSuggestion,
+  snapReviewNote,
+  stageReviewPayload,
+  writeStagedOutput,
+} from './gha-review-payload/index.mts'
+export type {
+  CommentableIndex,
+  CommentableLine,
+  LineKind,
+  PayloadRequirement,
+  ReviewComment,
+  ReviewFile,
+  ReviewSide,
+  SanitizedReview,
+} from './gha-review-payload/index.mts'
+export {
+  nextPageCursorFromLinkHeader,
+  nextPageUrlFromLinkHeader,
+  validatePaginationRequestUrl,
+} from './http-link-pagination/index.mts'

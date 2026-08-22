@@ -43,7 +43,8 @@ import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-
 import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
 import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
-import { runInstallLifecycle } from 'vouchington-tooling/pnpm-install'
+import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
+import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'
 import {
   buildSharedContext,
   installFakeGit,
@@ -53,9 +54,18 @@ import { writeSelectedFilesOutput } from 'vouchington-tooling/gha-selected-files
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
+import { decide } from 'vouchington-tooling/transient-retry'
+import { parseCsvRows } from 'vouchington-tooling/csv'
+import { readResponseBody } from 'vouchington-tooling/http-body'
+import { parseReviewPayload } from 'vouchington-tooling/gha-review-payload'
+import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
+
+Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
+response bodies, and pagination links. Product policy, credentials, and network transport remain in
+the consuming repository.
 
 ### `eslint-plugin-vouchington`
 

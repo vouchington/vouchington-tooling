@@ -50,8 +50,12 @@ import {
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements, stripSqlComments } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
-import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
-import { runInstallLifecycle } from 'vouchington-tooling/pnpm-install'
+import {
+  readVitestReportAttempts,
+  writeVitestBlobManifest,
+} from 'vouchington-tooling/vitest-blob-manifest'
+import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
+import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'
 import {
   buildSharedContext,
   installFakeGit,
@@ -69,4 +73,14 @@ import {
   renderSchemaMarkdown,
 } from 'vouchington-tooling/pg-schema-snapshot'
 import { buildOpenApiDocument, writeOpenApi } from 'vouchington-tooling/openapi-document'
+import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
+import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
+import { readResponseBody } from 'vouchington-tooling/http-body'
+import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
+import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
+import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 ```
+
+The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
+boundaries. They do not include provider credentials, product policy, network transport, or
+repository-specific package names; consumers supply those through their own adapters.

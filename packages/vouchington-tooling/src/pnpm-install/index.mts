@@ -22,6 +22,19 @@ export {
   parseReleaseAgeViolations,
 } from './release-age.mts'
 export {
+  flattenReleaseAgeSelectors,
+  packageNameFromPnpmLockKey,
+  pnpmLockPackageKeyMatchesSelector,
+  validateReleaseAgeExemptionGroups,
+  validateReleaseAgePolicy,
+} from './release-age-policy.mts'
+export type {
+  ReleaseAgeExemptionGroup,
+  ReleaseAgePermanentExemption,
+  ReleaseAgePolicyConfig,
+  ReleaseAgePolicySnapshot,
+} from './release-age-policy.mts'
+export {
   INSTALL_TERMINATION_FAILED,
   installExitCode,
   safeProcessGroup,
