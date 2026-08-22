@@ -77,6 +77,11 @@ vouchington gha-artifacts-cleanup run --run-id 123 --keep-pattern 'plan-*'
 vouchington http-origin --field cdn_origin https://images.example.com
 vouchington vitest-blob-manifest <suite> [reports-directory]
 vouchington pnpm-install --runner-lifecycle persistent --install-scripts true
+vouchington check-cache-size /tmp/cache 1048576 node-modules
+vouchington make-shard-matrix 4
+vouchington load-runner-env
+vouchington clean-workspace
+vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 ```
 
 ## Packages
@@ -108,9 +113,17 @@ import { readResponseBody } from 'vouchington-tooling/http-body'
 import { parseReviewPayload } from 'vouchington-tooling/gha-review-payload'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
+import { pruneDeployedRuntimeDeps } from 'vouchington-tooling/pnpm-deploy'
+import { parseDockerfileRuntimeImages } from 'vouchington-tooling/dockerfile-parse'
+import { checkSccComplexity } from 'vouchington-tooling/scc-complexity'
+import { runCiLocal } from 'vouchington-tooling/ci-local'
+import { rateLimitDelay } from 'vouchington-tooling/gha-rate-limit'
+import { parseCheckpoint } from 'vouchington-tooling/gha-pr-checkpoint'
+import { checkWorkspaceGatesPolicy } from 'vouchington-tooling/workspace-gates'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
+`dockerfile-parse` uses `dockerfile-ast`.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in
@@ -124,7 +137,7 @@ House-style rules shared across Vouchington repositories. Rule routing:
 2. **Vouchington convention** with no product nouns → this plugin
 3. **Single-repo product coupling** → stays in the product monorepo
 
-The plugin ships with no rules until a candidate passes (2).
+The plugin currently ships `postgres-cursor-call-contract`. Callers pass module specifiers and executor names; product paths stay in the consuming repository.
 
 ## Development
 

@@ -8,8 +8,6 @@ Non-generic Vouchington house-style ESLint and Oxlint rules.
 2. **Vouchington convention** — shared across Vouchington repos, no product table/SKU/route names → this plugin
 3. **Single-repo product coupling** — stays in the product monorepo until it can be parameterized into (2)
 
-This package currently ships no rules. Candidates are added only after they pass (2).
-
 ```js
 // eslint.config.js
 import vouchington from 'eslint-plugin-vouchington'
@@ -17,7 +15,54 @@ import vouchington from 'eslint-plugin-vouchington'
 export default [
   {
     plugins: { vouchington },
-    rules: {},
+    rules: {
+      'vouchington/postgres-cursor-call-contract': [
+        'error',
+        {
+          modules: ['@db/cursors'],
+          executors: ['runCursor', 'runCursorBatches'],
+        },
+      ],
+    },
   },
 ]
+```
+
+## `postgres-cursor-call-contract`
+
+Require cursor helpers imported from configured modules to be called directly, with SQL that starts with a static `/* name */` annotation.
+
+If `modules` or `executors` is missing or empty, the rule loads and reports nothing.
+
+### Options
+
+| Name           | Type       | Required | Default                        |
+| -------------- | ---------- | -------- | ------------------------------ |
+| `modules`      | `string[]` | yes      | —                              |
+| `executors`    | `string[]` | yes      | —                              |
+| `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs,cjs}` |
+| `exclude`      | `string[]` | no       | `[]`                           |
+| `includeFiles` | `string[]` | no       | `[]`                           |
+| `annotation`   | `string`   | no       | `^\\s*/\\*\\s*\\S[^]*?\\*/`    |
+
+`include` and `exclude` are picomatch globs relative to the lint cwd. `includeFiles` are exact relative paths that stay in even when `exclude` matches.
+
+### Oxlint
+
+```json
+{
+  "jsPlugins": [{ "name": "vouchington", "specifier": "eslint-plugin-vouchington" }],
+  "plugins": [],
+  "rules": {
+    "vouchington/postgres-cursor-call-contract": [
+      "error",
+      {
+        "modules": ["@db/cursors"],
+        "executors": ["runCursor", "runCursorBatches"],
+        "exclude": ["**/*.test.mts"],
+        "includeFiles": ["lib/test-helpers/seed.mts"]
+      }
+    ]
+  }
+}
 ```

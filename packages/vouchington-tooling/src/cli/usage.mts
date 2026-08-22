@@ -15,6 +15,11 @@ Commands:
   http-origin                   Validate an optional HTTP(S) origin
   vitest-blob-manifest          Stamp a vitest-blob-manifest:v1 identity file
   pnpm-install                  Install a pnpm workspace with retry and release-age fail-fast
+  check-cache-size              Measure a path and decide whether to save a GHA cache
+  make-shard-matrix             Emit a [1..N] GitHub Actions shard matrix
+  load-runner-env               Overlay a runner env file onto GITHUB_ENV with injection guards
+  clean-workspace               Reset a persistent-runner workspace with a fork-PR trust gate
+  install-github-release        Download a checksum-verified GitHub Release binary
 
 Options:
   -h, --help       Show this help
@@ -52,6 +57,11 @@ gha-artifacts-cleanup sweep --older-than-hours <n> [--keep-pattern glob] [--dele
 http-origin [--field NAME] [value]
 vitest-blob-manifest <suite> [reports-directory]
 pnpm-install --runner-lifecycle persistent|ephemeral|ephemeral-full --install-scripts true|false
+check-cache-size <path> <max-bytes> <label>
+make-shard-matrix <total>
+load-runner-env
+clean-workspace
+install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

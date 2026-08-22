@@ -25,6 +25,11 @@ export type ScriptCommand =
   | 'allocate-browser-safe-ports'
   | 'diagnose-port-collision'
   | 'prepare-trivy-db'
+  | 'check-cache-size'
+  | 'make-shard-matrix'
+  | 'load-runner-env'
+  | 'clean-workspace'
+  | 'install-github-release'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
@@ -34,6 +39,11 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'allocate-browser-safe-ports',
   'diagnose-port-collision',
   'prepare-trivy-db',
+  'check-cache-size',
+  'make-shard-matrix',
+  'load-runner-env',
+  'clean-workspace',
+  'install-github-release',
 ])
 
 export function parseCli(argv: readonly string[]): ParsedCli {

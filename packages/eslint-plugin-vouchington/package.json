@@ -36,6 +36,12 @@
     "prepack": "pnpm run build",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
+  "dependencies": {
+    "picomatch": "4.0.5"
+  },
+  "devDependencies": {
+    "@types/picomatch": "4.0.3"
+  },
   "peerDependencies": {
     "eslint": ">=9"
   },

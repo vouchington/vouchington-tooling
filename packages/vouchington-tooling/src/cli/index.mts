@@ -35,6 +35,11 @@ const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
     path: 'scripts/gha/diagnose-port-collision.sh',
   },
   'prepare-trivy-db': { command: 'bash', path: 'scripts/gha/prepare-trivy-db.sh' },
+  'check-cache-size': { command: 'bash', path: 'scripts/gha/check-cache-size.sh' },
+  'make-shard-matrix': { command: 'bash', path: 'scripts/gha/make-shard-matrix.sh' },
+  'load-runner-env': { command: 'bash', path: 'scripts/gha/load-runner-env.sh' },
+  'clean-workspace': { command: 'bash', path: 'scripts/gha/clean-workspace.sh' },
+  'install-github-release': { command: 'bash', path: 'scripts/gha/install-github-release.sh' },
 }
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {

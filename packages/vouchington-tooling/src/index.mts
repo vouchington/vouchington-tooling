@@ -240,3 +240,63 @@ export type {
   PresignIdentity,
   TransportControl,
 } from './coverage-transport/index.mts'
+export {
+  EPOCH_PRUNED_AT,
+  normalizeDeployedLayer,
+  pruneDeployedRuntimeDeps,
+  restoreDeployedWorkspacePackages,
+} from './pnpm-deploy/index.mts'
+export type {
+  NormalizeDeployedLayerResult,
+  PruneResult,
+  RestoreWorkspacePackagesOptions,
+} from './pnpm-deploy/index.mts'
+export {
+  parseDockerfilePrewarmStages,
+  parseDockerfileRuntimeImages,
+} from './dockerfile-parse/index.mts'
+export type {
+  DockerfilePrewarmStage,
+  DockerfileRuntimeImage,
+  ParseDockerfilePrewarmOptions,
+  ParseDockerfileRuntimeImagesOptions,
+} from './dockerfile-parse/index.mts'
+export {
+  buildSccArgs,
+  checkSccComplexity,
+  parseSccComplexityViolations,
+  SCC_COMPLEXITY_LIMIT,
+} from './scc-complexity/index.mts'
+export type { SccComplexityOptions, SccComplexityViolation } from './scc-complexity/index.mts'
+export { assertWorkflowCommandDrift, parseCiLocalArgs, runCiLocal } from './ci-local/index.mts'
+export type {
+  CiLocalCommand,
+  CiLocalSpawn,
+  CiLocalSpawnOptions,
+  CiLocalSpawnResult,
+  CiLocalTarget,
+  RunCiLocalOptions,
+} from './ci-local/index.mts'
+export {
+  GitHubRateLimitError,
+  isRateLimited,
+  isRetryableCancellationError,
+  MAX_RATE_LIMIT_WAIT_MS,
+  rateLimitDelay,
+  reserveRateLimitDelay,
+} from './gha-rate-limit/index.mts'
+export {
+  CHECKPOINT_MARKER,
+  isTrustedCheckpointComment,
+  parseCheckpoint,
+  renderCheckpoint,
+  sortedCheckpointCandidates,
+  validateCheckpoint,
+} from './gha-pr-checkpoint/index.mts'
+export type {
+  Checkpoint,
+  CheckpointCodecOptions,
+  GitHubComment,
+} from './gha-pr-checkpoint/index.mts'
+export { checkWorkspaceGatesPolicy } from './workspace-gates/index.mts'
+export type { WorkspaceGatesOptions } from './workspace-gates/index.mts'

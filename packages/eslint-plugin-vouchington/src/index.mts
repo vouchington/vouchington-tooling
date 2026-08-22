@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { readPackageVersion } from './package-version.mts'
+import { createPostgresCursorCallContractRule } from './postgres-cursor-call-contract.mts'
 
 export interface VouchingtonPlugin {
   meta: { name: string; version: string }
@@ -17,7 +18,9 @@ export const RULE_ROUTING = [
 export function createPlugin(version = readInstalledVersion()): VouchingtonPlugin {
   return {
     meta: { name: PLUGIN_NAME, version },
-    rules: {},
+    rules: {
+      'postgres-cursor-call-contract': createPostgresCursorCallContractRule(),
+    },
   }
 }
 
