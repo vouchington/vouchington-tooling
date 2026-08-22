@@ -46,6 +46,7 @@ export interface RequestOptions {
   readonly retryDelayMs?: number
   readonly timeoutMs?: number
   readonly maxBodyBytes?: number
+  readonly maxMemberBytes?: number
   readonly log?: (line: string) => void
 }
 

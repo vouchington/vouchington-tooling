@@ -245,6 +245,21 @@ describe('Vitest blob S3 transport', () => {
     expect(logs.join('\n')).toContain('vitest blob pack failed')
   })
 
+  it('returns null when a packed report exceeds the member ceiling', () => {
+    const producer = root()
+    const reports = join(producer, '.vitest-reports')
+    mkdirSync(reports)
+    writeFileSync(join(reports, 'tooling.json'), `${'x'.repeat(32)}\n`)
+    const logs: string[] = []
+    expect(
+      packVitestBlobBundle(producer, suite, identity, {
+        maxMemberBytes: 8,
+        log: (line) => logs.push(line),
+      }),
+    ).toBeNull()
+    expect(logs.join('\n')).toContain('vitest blob pack failed')
+  })
+
   it('rejects a traversal-shaped control key before constructing archive paths', async () => {
     const { archive } = packedFixture()
     const destination = join(root(), 'download')

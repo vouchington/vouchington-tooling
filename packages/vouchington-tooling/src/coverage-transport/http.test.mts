@@ -30,6 +30,15 @@ describe('coverage transport HTTP miss vs exhaustion', () => {
     expect(line).not.toContain('do-not-log')
   })
 
+  it('redacts uppercase URL schemes', () => {
+    expect(redactTransportLog('see HTTPS://bucket.invalid/object?secret=do-not-log')).toContain(
+      '[redacted-url]',
+    )
+    expect(redactTransportLog('see HTTPS://bucket.invalid/object?secret=do-not-log')).not.toContain(
+      'do-not-log',
+    )
+  })
+
   it('redacts circular error causes without walking forever', () => {
     const error = new Error('outer')
     error.cause = error

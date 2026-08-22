@@ -20,7 +20,7 @@ function formatTransportError(value: unknown, seen: WeakSet<object>): string {
 
 export function redactTransportLog(value: unknown): string {
   return formatTransportError(value, new WeakSet()).replaceAll(
-    /https?:\/\/[^\s]+/g,
+    /https?:\/\/[^\s]+/gi,
     '[redacted-url]',
   )
 }

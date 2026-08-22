@@ -7,6 +7,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -48,8 +49,13 @@ export function packVitestBlobBundle(
       runId: identity.runId,
       runAttempt: identity.currentAttempt,
     })
-    const paths = vitestBlobBundlePaths(directory, suite).map((path) => basename(path))
-    execFileSync('tar', ['czf', archive, '-C', directory, ...paths], {
+    const paths = vitestBlobBundlePaths(directory, suite)
+    const limit = options.maxMemberBytes ?? MAX_VITEST_BLOB_MEMBER_BYTES
+    if (paths.some((path) => statSync(path).size > limit)) {
+      throw new Error('Vitest blob member exceeds size limit')
+    }
+    const names = paths.map((path) => basename(path))
+    execFileSync('tar', ['czf', archive, '-C', directory, ...names], {
       stdio: ['ignore', 'ignore', 'inherit'],
     })
     return readFileSync(archive)
