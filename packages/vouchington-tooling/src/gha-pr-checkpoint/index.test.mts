@@ -67,6 +67,11 @@ describe('PR checkpoints', () => {
     expect(
       parseCheckpoint(renderCheckpoint(checkpoint()), { marker: 'custom.checkpoint:v2' }),
     ).toBeUndefined()
+    expect(
+      parseCheckpoint(renderCheckpoint(checkpoint(), { marker: 'custom.checkpoint:v2' }), {
+        marker: 'custom.checkpoint:v2',
+      }),
+    ).toEqual(checkpoint({ marker: 'custom.checkpoint:v2' }))
     expect(parseCheckpoint(`<!-- ${CHECKPOINT_MARKER} definitely-not-json -->`)).toBeUndefined()
     expect(parseCheckpoint('plain comment')).toBeUndefined()
   })
@@ -141,6 +146,20 @@ describe('PR checkpoints', () => {
     expect(validateCheckpoint(checkpoint({ sessionId: 'nope' }))).toMatchObject({
       sessionId: 'nope',
     })
+    const globalPattern = /sess-[0-9a-f]{8}/g
+    const stickyPattern = /^sess-[0-9a-f]{8}$/y
+    expect(validateCheckpoint(checkpoint(), { sessionIdPattern: globalPattern })).toEqual(
+      checkpoint(),
+    )
+    expect(validateCheckpoint(checkpoint(), { sessionIdPattern: globalPattern })).toEqual(
+      checkpoint(),
+    )
+    expect(validateCheckpoint(checkpoint(), { sessionIdPattern: stickyPattern })).toEqual(
+      checkpoint(),
+    )
+    expect(validateCheckpoint(checkpoint(), { sessionIdPattern: stickyPattern })).toEqual(
+      checkpoint(),
+    )
   })
 
   it('accepts every checkpoint status', () => {

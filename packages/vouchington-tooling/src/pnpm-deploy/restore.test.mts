@@ -248,6 +248,94 @@ describe('restoreDeployedWorkspacePackages', () => {
     )
   })
 
+  it('merges remaining scoped packages into an existing scope directory', () => {
+    const { alphaContent, backendDir, prodDir } = makeFixture()
+    mkdirSync(path.join(alphaContent, 'node_modules', '@workspace'), { recursive: true })
+    writeFileSync(path.join(alphaContent, 'node_modules', '@workspace', 'keep.txt'), 'keep\n')
+
+    restoreDeployedWorkspacePackages({ backendDir, prodDir })
+
+    const nested = path.join(
+      prodDir,
+      'workspace-packages',
+      ALPHA_STORE,
+      '@services',
+      'alpha',
+      'node_modules',
+    )
+    expect(readFileSync(path.join(nested, '@workspace', 'keep.txt'), 'utf8')).toBe('keep\n')
+    expect(lstatSync(path.join(nested, '@workspace', 'config')).isSymbolicLink()).toBe(true)
+    expect(readFileSync(path.join(nested, '@workspace', 'config', 'env.mts'), 'utf8')).toBe(
+      'export const env = true\n',
+    )
+  })
+
+  it('leaves existing sibling files and symlinks in place while merging', () => {
+    const { alphaContent, backendDir, pnpmRoot, prodDir } = makeFixture()
+    mkdirSync(path.join(alphaContent, 'node_modules'), { recursive: true })
+    writeFileSync(path.join(alphaContent, 'node_modules', 'pg'), 'nested file\n')
+    relativeSymlink(
+      path.join(alphaContent, 'node_modules', '@workspace'),
+      path.join(pnpmRoot, CONFIG_STORE, 'node_modules', '@workspace'),
+    )
+    mkdirSync(path.join(alphaContent, 'node_modules', 'notes'), { recursive: true })
+    writeFileSync(path.join(pnpmRoot, ALPHA_STORE, 'node_modules', 'notes'), 'not a directory\n')
+
+    restoreDeployedWorkspacePackages({ backendDir, prodDir })
+
+    const nested = path.join(
+      prodDir,
+      'workspace-packages',
+      ALPHA_STORE,
+      '@services',
+      'alpha',
+      'node_modules',
+    )
+    expect(readFileSync(path.join(nested, 'pg'), 'utf8')).toBe('nested file\n')
+    expect(lstatSync(path.join(nested, '@workspace')).isSymbolicLink()).toBe(true)
+    expect(lstatSync(path.join(nested, 'notes')).isDirectory()).toBe(true)
+  })
+
+  it('discovers nested workspace globs', () => {
+    const { backendDir, pnpmRoot, prodDir } = makeFixture()
+    const pkgDir = path.join(backendDir, 'libs', 'one', 'pkg')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@libs/one-pkg' }))
+    writeFileSync(
+      path.join(backendDir, 'package.json'),
+      JSON.stringify({
+        name: '@workspace/backend',
+        workspaces: ['services/*', 'libs/*/pkg'],
+      }),
+    )
+    const store = '@libs+one-pkg@file+backend+libs+one+pkg'
+    const content = path.join(pnpmRoot, store, 'node_modules', '@libs', 'one-pkg')
+    mkdirSync(content, { recursive: true })
+    writeFileSync(path.join(content, 'index.mts'), 'export const nested = true\n')
+
+    restoreDeployedWorkspacePackages({ backendDir, prodDir })
+
+    expect(
+      readFileSync(
+        path.join(prodDir, 'workspace-packages', store, '@libs', 'one-pkg', 'index.mts'),
+        'utf8',
+      ),
+    ).toBe('export const nested = true\n')
+  })
+
+  it('ignores workspace globs with more than one star in a path segment', () => {
+    const { alphaContent, backendDir, prodDir } = makeFixture()
+    writeFileSync(
+      path.join(backendDir, 'package.json'),
+      JSON.stringify({ name: '@workspace/backend', workspaces: ['*services*'] }),
+    )
+
+    restoreDeployedWorkspacePackages({ backendDir, prodDir })
+
+    expect(lstatSync(alphaContent).isDirectory()).toBe(true)
+    expect(existsSync(path.join(prodDir, 'workspace-packages'))).toBe(false)
+  })
+
   it('replaces a stale relocated copy from a previous layout', () => {
     const { backendDir, prodDir } = makeFixture()
     const relocated = path.join(prodDir, 'workspace-packages', ALPHA_STORE, '@services', 'alpha')
@@ -348,16 +436,29 @@ describe('runRestoreDeployedWorkspacePackagesCli', () => {
   })
 
   it.each([
-    [['/argument'], { PROD_DIR: '/environment' }, '/argument'],
-    [[], { PROD_DIR: '/environment' }, '/environment'],
+    [
+      ['/prod', '/backend'],
+      { PROD_DIR: '/environment', BACKEND_DIR: '/env-backend' },
+      { prodDir: '/prod', backendDir: '/backend' },
+    ],
+    [
+      ['/prod'],
+      { PROD_DIR: '/environment', BACKEND_DIR: '/env-backend' },
+      { prodDir: '/prod', backendDir: '/env-backend' },
+    ],
+    [
+      [],
+      { PROD_DIR: '/environment', BACKEND_DIR: '/env-backend' },
+      { prodDir: '/environment', backendDir: '/env-backend' },
+    ],
   ])('uses argument then environment directory precedence', (args, env, expected) => {
-    const calls: string[] = []
+    const calls: object[] = []
 
     runRestoreDeployedWorkspacePackagesCli({
       args,
       env,
       isMain: true,
-      restore: (options) => calls.push(String(options?.prodDir)),
+      restore: (options) => calls.push(options),
     })
 
     expect(calls).toEqual([expected])
@@ -367,10 +468,21 @@ describe('runRestoreDeployedWorkspacePackagesCli', () => {
     expect(() =>
       runRestoreDeployedWorkspacePackagesCli({
         args: [],
-        env: {},
+        env: { BACKEND_DIR: '/backend' },
         isMain: true,
         restore: () => undefined,
       }),
     ).toThrow(/PROD_DIR or a directory argument is required/)
+  })
+
+  it('throws when no backend directory argument and no BACKEND_DIR are provided', () => {
+    expect(() =>
+      runRestoreDeployedWorkspacePackagesCli({
+        args: ['/prod'],
+        env: {},
+        isMain: true,
+        restore: () => undefined,
+      }),
+    ).toThrow(/BACKEND_DIR or a backend directory argument is required/)
   })
 })

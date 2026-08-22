@@ -198,6 +198,20 @@ CMD node serve.mts
     expect(parseDockerfileRuntimeImages(dockerfile, { monorepoRoot })).toEqual([])
   })
 
+  it('skips JSON CMD instructions that do not include a script path', () => {
+    const monorepoRoot = makeMonorepo()
+    const dockerfile = `
+FROM base-node AS deploy-api
+RUN pnpm deploy --filter @entrypoints/api --prod /prod/api
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api ./
+CMD ["node", "--port", "3000"]
+`.trim()
+
+    expect(parseDockerfileRuntimeImages(dockerfile, { monorepoRoot })).toEqual([])
+  })
+
   it('collects every deploy target from a combined RUN instruction', () => {
     const monorepoRoot = makeMonorepo()
     const dockerfile = `
@@ -285,6 +299,51 @@ CMD ["node", "serve.mts"]
       pnpmFilter: '@apps/api',
       cmdPath: 'serve.mts',
       workspaceDir: path.join(monorepoRoot, 'apps', 'api'),
+    })
+  })
+
+  it('keeps the script path when CMD has arguments after the entrypoint', () => {
+    const monorepoRoot = makeMonorepo()
+    const dockerfile = `
+FROM base-node AS deploy-api
+RUN pnpm deploy --filter @entrypoints/api --prod /prod/api
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/api ./
+CMD ["serve.mts", "--port", "3000"]
+`.trim()
+
+    const [image] = parseDockerfileRuntimeImages(dockerfile, { monorepoRoot })
+    expect(image?.cmdPath).toBe('serve.mts')
+  })
+
+  it('matches COPY --from against the deploying stage, not just the path', () => {
+    const monorepoRoot = makeMonorepo()
+    const dockerfile = `
+FROM base-node AS deploy-api
+RUN pnpm deploy --filter @entrypoints/api --prod /prod/app
+
+FROM base-node AS deploy-worker
+RUN pnpm deploy --filter @entrypoints/worker-cpu --prod /prod/app
+
+FROM runtime-base AS api
+COPY --from=deploy-api /prod/app ./
+CMD ["serve.mts"]
+
+FROM runtime-base AS worker
+COPY --from=deploy-worker /prod/app ./
+CMD ["serve.mts"]
+`.trim()
+
+    const filters = Object.fromEntries(
+      parseDockerfileRuntimeImages(dockerfile, { monorepoRoot }).map((image) => [
+        image.stage,
+        image.pnpmFilter,
+      ]),
+    )
+    expect(filters).toEqual({
+      api: '@entrypoints/api',
+      worker: '@entrypoints/worker-cpu',
     })
   })
 

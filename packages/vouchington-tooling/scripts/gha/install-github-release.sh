@@ -80,7 +80,19 @@ if [ -n "${GITHUB_PATH:-}" ]; then
   echo "$BIN_DIR" >> "$GITHUB_PATH"
 fi
 
-if [ -f "$BIN_DIR/$BIN_NAME" ] && "$BIN_DIR/$BIN_NAME" --version 2>/dev/null | grep -q "$VERSION"; then
+already_installed() {
+  local output
+  output="$("$BIN_DIR/$BIN_NAME" --version 2>/dev/null || true)"
+  printf '%s\n' "$output" | awk -v v="$VERSION" '
+    {
+      n = split($0, parts, /[^0-9A-Za-z.-]+/)
+      for (i = 1; i <= n; i++) if (parts[i] == v) found = 1
+    }
+    END { exit found ? 0 : 1 }
+  '
+}
+
+if [ -f "$BIN_DIR/$BIN_NAME" ] && already_installed; then
   echo "$BIN_NAME $VERSION already installed"
   exit 0
 fi

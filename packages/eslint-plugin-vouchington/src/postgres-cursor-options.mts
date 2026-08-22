@@ -27,19 +27,23 @@ export function resolveCursorContractOptions(raw: unknown): ResolvedCursorOption
   const exclude = optionalStringArray(record.exclude, record.exclude !== undefined)
   const includeFiles = optionalStringArray(record.includeFiles, record.includeFiles !== undefined)
   if (include === null || exclude === null || includeFiles === null) return null
+  let annotation: RegExp
   try {
-    return {
-      modules: new Set(modules),
-      executors: new Set(executors),
-      include: include ?? DEFAULT_CURSOR_INCLUDE,
-      exclude: exclude ?? [],
-      includeFiles: (includeFiles ?? []).map((file) => file.replace(/^(?:\.\/)+/, '')),
-      annotation: new RegExp(
-        typeof record.annotation === 'string' ? record.annotation : DEFAULT_CURSOR_ANNOTATION,
-      ),
-    }
+    annotation = new RegExp(
+      typeof record.annotation === 'string' ? record.annotation : DEFAULT_CURSOR_ANNOTATION,
+    )
   } catch {
-    return null
+    throw new Error(
+      `postgres-cursor-call-contract annotation is not a valid regular expression: ${String(record.annotation)}`,
+    )
+  }
+  return {
+    modules: new Set(modules),
+    executors: new Set(executors),
+    include: include ?? DEFAULT_CURSOR_INCLUDE,
+    exclude: exclude ?? [],
+    includeFiles: (includeFiles ?? []).map((file) => file.replace(/^(?:\.\/)+/, '')),
+    annotation,
   }
 }
 

@@ -33,7 +33,12 @@ describe('resolveCursorContractOptions', () => {
     expect(resolveCursorContractOptions({ ...base, exclude: {} })).toBeNull()
     expect(resolveCursorContractOptions({ ...base, includeFiles: [1] })).toBeNull()
     expect(resolveCursorContractOptions({ ...base, annotation: 1 })).toBeNull()
-    expect(resolveCursorContractOptions({ ...base, annotation: '[' })).toBeNull()
+  })
+
+  it('throws when the annotation is not a valid regular expression', () => {
+    expect(() => resolveCursorContractOptions({ ...base, annotation: '[' })).toThrow(
+      /annotation is not a valid regular expression/,
+    )
   })
 
   it('applies defaults and compiles the annotation regex', () => {

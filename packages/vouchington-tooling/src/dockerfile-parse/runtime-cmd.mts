@@ -1,8 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { Cmd, Copy, DockerfileParser, Run } from 'dockerfile-ast'
 
+import { expandWorkspaceGlob } from '../workspace-glob.mts'
 import { collectStages, type StageInstruction } from './stages.mts'
 
 export interface DockerfileRuntimeImage {
@@ -19,6 +20,8 @@ export interface ParseDockerfileRuntimeImagesOptions {
   copySourcePrefix?: string
 }
 
+const CMD_SCRIPT = /\.(?:[cm]?[jt]s|tsx)$/u
+
 export function parseDockerfileRuntimeImages(
   dockerfile: string,
   { monorepoRoot, copySourcePrefix = '/prod/' }: ParseDockerfileRuntimeImagesOptions,
@@ -32,7 +35,7 @@ export function parseDockerfileRuntimeImages(
     const target = matchCopyTarget(instructions, copySourcePrefix)
     if (!target) continue
 
-    const pnpmFilter = targetToFilter.get(target)
+    const pnpmFilter = targetToFilter.get(deployKey(target.fromStage, target.sourcePath))
     if (!pnpmFilter) continue
 
     const cmdPath = matchCmdScriptPath(instructions)
@@ -48,13 +51,17 @@ export function parseDockerfileRuntimeImages(
   return images
 }
 
+function deployKey(stage: string, target: string): string {
+  return `${stage}\0${target}`
+}
+
 function collectDeployTargets(
-  stages: readonly { instructions: StageInstruction[] }[],
+  stages: readonly { stage: string; instructions: StageInstruction[] }[],
 ): Map<string, string> {
   const deployRegex =
     /pnpm(?:\s+--?\S+(?:\s+(?!deploy\b)\S+)?)*\s+deploy\s+--filter\s+(\S+)\s+--prod\s+(\/\S+)/g
   const targetToFilter = new Map<string, string>()
-  for (const { instructions } of stages) {
+  for (const { stage, instructions } of stages) {
     for (const instruction of instructions) {
       if (!(instruction instanceof Run)) continue
       const runText = instruction
@@ -62,7 +69,7 @@ function collectDeployTargets(
         .map((argument) => argument.getValue())
         .join(' ')
       for (const match of runText.matchAll(deployRegex)) {
-        targetToFilter.set(match[2]!, match[1]!)
+        targetToFilter.set(deployKey(stage, match[2]!), match[1]!)
       }
     }
   }
@@ -72,15 +79,18 @@ function collectDeployTargets(
 function matchCopyTarget(
   instructions: StageInstruction[],
   copySourcePrefix: string,
-): string | undefined {
+): { fromStage: string; sourcePath: string } | undefined {
   for (const instruction of instructions) {
     if (!(instruction instanceof Copy)) continue
-    if (!instruction.getFlags().some((flag) => flag.getName() === 'from')) continue
+    const fromStage = instruction
+      .getFlags()
+      .find((flag) => flag.getName() === 'from')
+      ?.getValue()
+    if (!fromStage) continue
     const args = instruction.getArguments()
     if (args.at(-1)?.getValue() !== './') continue
-    const [source] = args
-    const sourcePath = source?.getValue()
-    if (sourcePath?.startsWith(copySourcePrefix)) return sourcePath
+    const sourcePath = args[0]?.getValue()
+    if (sourcePath?.startsWith(copySourcePrefix)) return { fromStage, sourcePath }
   }
   return undefined
 }
@@ -89,9 +99,11 @@ function matchCmdScriptPath(instructions: StageInstruction[]): string | undefine
   const cmds = instructions.filter((instruction): instruction is Cmd => instruction instanceof Cmd)
   if (cmds.length === 0) return undefined
 
-  const lastCmd = cmds.at(-1)!
-  const parts = lastCmd.getJSONStrings()?.map((argument) => argument.getJSONValue())
-  return parts?.at(-1)
+  const parts = cmds
+    .at(-1)!
+    .getJSONStrings()
+    ?.map((argument) => argument.getJSONValue())
+  return parts?.find((part) => CMD_SCRIPT.test(part))
 }
 
 function findWorkspaceDirByPackageName(monorepoRoot: string, packageName: string): string {
@@ -101,17 +113,7 @@ function findWorkspaceDirByPackageName(monorepoRoot: string, packageName: string
     : []
 
   for (const pattern of workspaces) {
-    if (!pattern.includes('*')) {
-      const dir = path.join(monorepoRoot, pattern)
-      if (matchesPackage(dir, packageName)) return dir
-      continue
-    }
-
-    const prefix = pattern.slice(0, pattern.indexOf('*'))
-    const baseDir = path.join(monorepoRoot, prefix)
-    if (!existsSync(baseDir)) continue
-    for (const entry of readdirSafe(baseDir)) {
-      const dir = path.join(baseDir, entry)
+    for (const dir of expandWorkspaceGlob(monorepoRoot, pattern)) {
       if (matchesPackage(dir, packageName)) return dir
     }
   }
@@ -124,14 +126,4 @@ function matchesPackage(dir: string, packageName: string): boolean {
   if (!existsSync(pkgPath)) return false
   const { name } = JSON.parse(readFileSync(pkgPath, 'utf8'))
   return name === packageName
-}
-
-function readdirSafe(dir: string): string[] {
-  try {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory() ? [entry.name] : [],
-    )
-  } catch {
-    return []
-  }
 }

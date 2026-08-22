@@ -70,7 +70,9 @@ export function renderCheckpoint(
   options: { marker?: string } = {},
 ): string {
   const marker = options.marker ?? checkpoint.marker
-  const payload = Buffer.from(JSON.stringify(checkpoint), 'utf8').toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ ...checkpoint, marker }), 'utf8').toString(
+    'base64url',
+  )
   const session = checkpoint.sessionUrl
     ? `[${checkpoint.sessionId}](${checkpoint.sessionUrl})`
     : `\`${checkpoint.sessionId || 'pending'}\``
@@ -144,7 +146,7 @@ export function validateCheckpoint(
   if (
     checkpoint.sessionId &&
     options.sessionIdPattern &&
-    !options.sessionIdPattern.test(checkpoint.sessionId)
+    !matchesPattern(options.sessionIdPattern, checkpoint.sessionId)
   ) {
     return undefined
   }
@@ -173,6 +175,10 @@ export function sortedCheckpointCandidates(
       )
       return timestampOrder || right.comment.id - left.comment.id
     })
+}
+
+function matchesPattern(pattern: RegExp, value: string): boolean {
+  return new RegExp(pattern.source, pattern.flags.replaceAll(/[gy]/g, '')).test(value)
 }
 
 function escapeRegExp(value: string): string {

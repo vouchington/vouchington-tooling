@@ -82,4 +82,50 @@ describe('install-github-release', () => {
     expect(skipped.stdout).toContain('lychee 0.24.2 already installed')
     expect(skipped.stderr).not.toContain('curl should not run')
   })
+
+  it('does not treat VERSION metacharacters as a regex match', () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-regex-'))
+    temporaryDirectories.push(temporaryDirectory)
+    mkdirSync(join(temporaryDirectory, 'bin'))
+    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 0x24x2\n')
+    chmodSync(join(temporaryDirectory, 'bin', 'lychee'), 0o755)
+    const result = runHelper(
+      [
+        '--repo',
+        'lycheeverse/lychee',
+        '--version',
+        '0.24.2',
+        '--asset',
+        'lychee.tar.gz',
+        '--bin',
+        'lychee',
+      ],
+      { RUNNER_TEMP: temporaryDirectory },
+    )
+    expect(result.status).toBe(99)
+    expect(result.stderr).toContain('curl should not run')
+  })
+
+  it('does not treat a longer version string as already installed', () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-prefix-'))
+    temporaryDirectories.push(temporaryDirectory)
+    mkdirSync(join(temporaryDirectory, 'bin'))
+    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 0.24.20\n')
+    chmodSync(join(temporaryDirectory, 'bin', 'lychee'), 0o755)
+    const result = runHelper(
+      [
+        '--repo',
+        'lycheeverse/lychee',
+        '--version',
+        '0.24.2',
+        '--asset',
+        'lychee.tar.gz',
+        '--bin',
+        'lychee',
+      ],
+      { RUNNER_TEMP: temporaryDirectory },
+    )
+    expect(result.status).toBe(99)
+    expect(result.stderr).toContain('curl should not run')
+  })
 })
