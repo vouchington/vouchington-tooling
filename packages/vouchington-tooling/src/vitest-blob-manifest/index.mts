@@ -9,9 +9,13 @@ import {
 } from 'node:fs'
 import { basename, join } from 'node:path'
 
+import { VITEST_SUITE_PATTERN } from './constants.mts'
+
+export * from './report-attempt.mts'
+export { VITEST_SUITE_PATTERN } from './constants.mts'
+
 export const VITEST_BLOB_MANIFEST_FILENAME = 'vitest-blob-manifest.json'
 export const VITEST_BLOB_MANIFEST_VERSION = 'vitest-blob-manifest:v1'
-export const VITEST_SUITE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export interface VitestBlobManifest {
   readonly version: typeof VITEST_BLOB_MANIFEST_VERSION

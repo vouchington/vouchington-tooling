@@ -55,6 +55,11 @@
       "import": "./dist/vitest-blob-manifest/index.mjs",
       "default": "./dist/vitest-blob-manifest/index.mjs"
     },
+    "./vitest-reports": {
+      "types": "./dist/vitest-blob-manifest/reports.d.mts",
+      "import": "./dist/vitest-blob-manifest/reports.mjs",
+      "default": "./dist/vitest-blob-manifest/reports.mjs"
+    },
     "./pnpm-install": {
       "types": "./dist/pnpm-install/index.d.mts",
       "import": "./dist/pnpm-install/index.mjs",
@@ -95,6 +100,36 @@
       "import": "./dist/openapi-document/index.mjs",
       "default": "./dist/openapi-document/index.mjs"
     },
+    "./transient-retry": {
+      "types": "./dist/transient-retry/index.d.mts",
+      "import": "./dist/transient-retry/index.mjs",
+      "default": "./dist/transient-retry/index.mjs"
+    },
+    "./csv": {
+      "types": "./dist/csv/index.d.mts",
+      "import": "./dist/csv/index.mjs",
+      "default": "./dist/csv/index.mjs"
+    },
+    "./http-body": {
+      "types": "./dist/http-body/index.d.mts",
+      "import": "./dist/http-body/index.mjs",
+      "default": "./dist/http-body/index.mjs"
+    },
+    "./ast-grep-rule": {
+      "types": "./dist/ast-grep-rule/index.d.mts",
+      "import": "./dist/ast-grep-rule/index.mjs",
+      "default": "./dist/ast-grep-rule/index.mjs"
+    },
+    "./gha-review-payload": {
+      "types": "./dist/gha-review-payload/index.d.mts",
+      "import": "./dist/gha-review-payload/index.mjs",
+      "default": "./dist/gha-review-payload/index.mjs"
+    },
+    "./http-link-pagination": {
+      "types": "./dist/http-link-pagination/index.d.mts",
+      "import": "./dist/http-link-pagination/index.mjs",
+      "default": "./dist/http-link-pagination/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -106,6 +141,8 @@
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
+    "csv-parse": "7.0.2",
+    "csv-stringify": "6.8.2",
     "picomatch": "4.0.5"
   },
   "devDependencies": {
