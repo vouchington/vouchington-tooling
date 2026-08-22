@@ -1,0 +1,14 @@
+[
+  {
+    "selectedRemote": "origin",
+    "canonicalRepository": "github.com/example-owner/first-repository",
+    "defaultBranch": "main",
+    "evidenceSha": "1111111111111111111111111111111111111111"
+  },
+  {
+    "selectedRemote": "origin",
+    "canonicalRepository": "git.example/Team/second-repository",
+    "defaultBranch": "trunk",
+    "evidenceSha": "2222222222222222222222222222222222222222"
+  }
+]
