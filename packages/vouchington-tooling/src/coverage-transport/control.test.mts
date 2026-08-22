@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync } from 'node:fs'
+import { chmodSync, mkdtempSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -95,5 +95,25 @@ describe('parseTransportControl', () => {
         currentAttempt: 0,
       }),
     ).toThrow(/identity/)
+  })
+
+  it('replaces a pre-existing world-readable control without a permission window', () => {
+    const root = mkdtempSync(join(tmpdir(), 'coverage-control-'))
+    const path = join(root, 'control.json')
+    writeFileSync(path, 'stale\n', { mode: 0o644 })
+    chmodSync(path, 0o644)
+    writeTransportControl(path, {
+      ...identity,
+      mode: 'fallback-only',
+      reason: 'presign unavailable',
+    })
+    expect(statSync(path).mode & 0o777).toBe(0o600)
+    expect(() =>
+      writeTransportControl(join(root, 'missing', 'control.json'), {
+        ...identity,
+        mode: 'fallback-only',
+        reason: 'presign unavailable',
+      }),
+    ).toThrow()
   })
 })

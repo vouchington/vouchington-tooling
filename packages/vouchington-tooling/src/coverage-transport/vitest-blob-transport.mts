@@ -87,13 +87,20 @@ export function tarVerboseMemberSize(line: string): number {
 
 const MAX_VITEST_BLOB_MEMBER_BYTES = 32 * 1024 * 1024
 
-export function assertTarMemberSizes(verboseLines: readonly string[]): void {
-  if (verboseLines.some((line) => tarVerboseMemberSize(line) > MAX_VITEST_BLOB_MEMBER_BYTES)) {
+export function assertTarMemberSizes(
+  verboseLines: readonly string[],
+  maxMemberBytes: number = MAX_VITEST_BLOB_MEMBER_BYTES,
+): void {
+  if (verboseLines.some((line) => tarVerboseMemberSize(line) > maxMemberBytes)) {
     throw new Error('Vitest blob archive exceeds the member size limit')
   }
 }
 
-function validateArchive(archive: string, suite: string): readonly string[] {
+function validateArchive(
+  archive: string,
+  suite: string,
+  maxMemberBytes: number,
+): readonly string[] {
   const entries = execFileSync('tar', ['tzf', archive], { encoding: 'utf8' })
     .split('\n')
     .filter(Boolean)
@@ -107,12 +114,17 @@ function validateArchive(archive: string, suite: string): readonly string[] {
   if (verbose.length !== 2 || verbose.some((line) => !line.startsWith('-'))) {
     throw new Error(`Vitest blob archive for ${suite} must contain regular files`)
   }
-  assertTarMemberSizes(verbose)
+  assertTarMemberSizes(verbose, maxMemberBytes)
   return entries
 }
 
-function extractValidatedBundle(archive: string, destinationRoot: string, suite: string): void {
-  const entries = validateArchive(archive, suite)
+function extractValidatedBundle(
+  archive: string,
+  destinationRoot: string,
+  suite: string,
+  maxMemberBytes: number,
+): void {
+  const entries = validateArchive(archive, suite, maxMemberBytes)
   mkdirSync(destinationRoot, { recursive: true })
   const temporary = mkdtempSync(join(destinationRoot, `.vitest-blob-${suite}-`))
   try {
@@ -147,7 +159,12 @@ export async function downloadVitestBlobBundles(
       const invalidMarker = join(destinationRoot, `.invalid-${suite}`)
       try {
         writeFileSync(archive, data, { flag: 'wx', mode: 0o600 })
-        extractValidatedBundle(archive, destinationRoot, suite)
+        extractValidatedBundle(
+          archive,
+          destinationRoot,
+          suite,
+          options.maxMemberBytes ?? MAX_VITEST_BLOB_MEMBER_BYTES,
+        )
         rmSync(invalidMarker, { recursive: true, force: true })
         logTransport(options, `[coverage-transport] Downloaded vitest blob for ${suite}`)
       } catch (error) {

@@ -1,4 +1,5 @@
-import { chmodSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 
 import { VITEST_SUITE_PATTERN } from '../vitest-blob-manifest/index.mts'
 
@@ -135,8 +136,22 @@ export function parseTransportControl(raw: unknown): TransportControl {
 
 export function writeTransportControl(path: string, control: TransportControl): void {
   const validated = parseTransportControl(control)
-  writeFileSync(path, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 })
-  chmodSync(path, 0o600)
+  const temporary = `${path}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(temporary, `${JSON.stringify(validated, null, 2)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    })
+    chmodSync(temporary, 0o600)
+    renameSync(temporary, path)
+  } catch (error) {
+    try {
+      unlinkSync(temporary)
+    } catch {
+      // The write/rename failure is the actionable error.
+    }
+    throw error
+  }
 }
 
 export function readTransportControl(

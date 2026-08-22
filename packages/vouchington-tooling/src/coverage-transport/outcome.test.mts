@@ -93,8 +93,23 @@ describe('coverage transport outcome guards', () => {
 
   it('accepts a persisted blob primary or a successful fallback, and warns when the peer is degraded', () => {
     const lines: string[] = []
-    expect(assertCoverageTransportBlobOutcome('fixture', 'true', 'skipped', 'skipped')).toBe(true)
+    expect(
+      assertCoverageTransportBlobOutcome('fixture', 'true', 'success', 'skipped', (line) =>
+        lines.push(line),
+      ),
+    ).toBe(true)
+    expect(lines).toEqual([])
 
+    expect(
+      assertCoverageTransportBlobOutcome('fixture', 'true', 'failure', 'cancelled', (line) =>
+        lines.push(line),
+      ),
+    ).toBe(true)
+    expect(lines).toEqual([
+      '::warning::Vitest blob persisted only to S3 for suite=fixture; GitHub artifact fallback is degraded.',
+    ])
+
+    lines.length = 0
     expect(
       assertCoverageTransportBlobOutcome('fixture', 'false', 'failure', 'success', (line) =>
         lines.push(line),

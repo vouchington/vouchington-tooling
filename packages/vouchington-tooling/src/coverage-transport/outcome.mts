@@ -76,7 +76,14 @@ export function assertCoverageTransportBlobOutcome(
   emit: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
 ): boolean {
   const artifactSucceeded = artifactAttempt1 === 'success' || artifactAttempt2 === 'success'
-  if (primaryPersisted === 'true') return true
+  if (primaryPersisted === 'true') {
+    if (!artifactSucceeded) {
+      emit(
+        `::warning::Vitest blob persisted only to S3 for suite=${suite}; GitHub artifact fallback is degraded.`,
+      )
+    }
+    return true
+  }
   if (artifactSucceeded) {
     if (primaryPersisted === 'false') {
       emit(

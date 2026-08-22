@@ -296,6 +296,27 @@ describe('Vitest blob S3 transport', () => {
         '-rw-r--r--  0 x y 12 Jan  1 00:00 tooling.json',
       ]),
     ).not.toThrow()
+    expect(() =>
+      assertTarMemberSizes(
+        [
+          '-rw-r--r-- 0/0 12 2026-08-22 10:00 vitest-blob-manifest.json',
+          '-rw-r--r-- 0/0 12 2026-08-22 10:00 tooling.json',
+        ],
+        8,
+      ),
+    ).toThrow(/member size limit/)
+  })
+
+  it('honors maxMemberBytes when validating downloaded archives', async () => {
+    const { archive } = packedFixture()
+    const destination = join(root(), 'download')
+    await expect(
+      downloadVitestBlobBundles(
+        { tooling: { get: await serve(archive), put: 'unused' } },
+        destination,
+        { retryDelayMs: 1, maxMemberBytes: 1 },
+      ),
+    ).rejects.toThrow(/member size limit/)
   })
 
   it('uploads and downloads a manifest-bound blob independently of coverage', async () => {
