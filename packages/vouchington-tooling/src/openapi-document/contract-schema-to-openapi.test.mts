@@ -51,6 +51,24 @@ describe('nodeToOpenApi', () => {
     })
   })
 
+  it('retains falsy array constraints', () => {
+    expect(
+      convert({
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 0,
+        maxItems: 0,
+        uniqueItems: false,
+      }),
+    ).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 0,
+      maxItems: 0,
+      uniqueItems: false,
+    })
+  })
+
   it('converts array items and a ref via the sanitized name map', () => {
     expect(convert({ type: 'array', items: { type: 'string' } })).toEqual({
       type: 'array',
