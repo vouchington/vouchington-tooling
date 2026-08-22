@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-vouchington",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Non-generic Vouchington ESLint and Oxlint rules.",
   "homepage": "https://github.com/vouchington/vouchington-tooling/tree/main/packages/eslint-plugin-vouchington#readme",
   "bugs": {
