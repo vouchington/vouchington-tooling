@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { DEFAULT_COVERAGE_MANIFEST_FILENAME } from './constants.mts'
+import { DEFAULT_COVERAGE_MANIFEST_FILENAME, assertCoverageManifestFilename } from './constants.mts'
 import {
   readTransportControl,
   type ExpectedTransportIdentity,
@@ -39,6 +39,7 @@ export async function cmdUpload(
   }
   const cwd = options.cwd ?? process.cwd()
   const manifestFilename = options.coverageManifestFilename ?? DEFAULT_COVERAGE_MANIFEST_FILENAME
+  assertCoverageManifestFilename(manifestFilename)
   const coverageUrls = control.coverage[suite]
   const lcovPath = join(cwd, 'coverage', 'lcov.info')
   const manifestPath = join(cwd, 'coverage', manifestFilename)
@@ -81,6 +82,8 @@ export async function cmdDownloadCoverage(
     logTransport(options, '[coverage-transport] S3 unavailable; artifact fallback required')
     return
   }
+  const manifestFilename = options.coverageManifestFilename ?? DEFAULT_COVERAGE_MANIFEST_FILENAME
+  assertCoverageManifestFilename(manifestFilename)
   await Promise.all(
     Object.entries(control.coverage).map(async ([suite, urls]) => {
       const [lcov, manifest] = await Promise.all([
@@ -94,11 +97,7 @@ export async function cmdDownloadCoverage(
       const destination = join(destinationRoot, `coverage-${suite}`)
       mkdirSync(destination, { recursive: true })
       writeFileSync(join(destination, 'lcov.info'), lcov)
-      writeFileSync(
-        join(destination, options.coverageManifestFilename ?? DEFAULT_COVERAGE_MANIFEST_FILENAME),
-        manifest,
-        { mode: 0o600 },
-      )
+      writeFileSync(join(destination, manifestFilename), manifest, { mode: 0o600 })
       logTransport(options, `[coverage-transport] Downloaded coverage pair for ${suite}`)
     }),
   )

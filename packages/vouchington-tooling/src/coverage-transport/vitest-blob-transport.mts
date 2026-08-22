@@ -68,6 +68,23 @@ export function packVitestBlobBundle(
   }
 }
 
+export function tarVerboseMemberSize(line: string): number {
+  const parts = line.trim().split(/\s+/)
+  const size = Number(parts[4])
+  if (parts.length < 6 || !Number.isSafeInteger(size) || size < 0) {
+    throw new Error('Vitest blob archive listing is malformed')
+  }
+  return size
+}
+
+const MAX_VITEST_BLOB_MEMBER_BYTES = 32 * 1024 * 1024
+
+export function assertTarMemberSizes(verboseLines: readonly string[]): void {
+  if (verboseLines.some((line) => tarVerboseMemberSize(line) > MAX_VITEST_BLOB_MEMBER_BYTES)) {
+    throw new Error('Vitest blob archive exceeds the member size limit')
+  }
+}
+
 function validateArchive(archive: string, suite: string): readonly string[] {
   const entries = execFileSync('tar', ['tzf', archive], { encoding: 'utf8' })
     .split('\n')
@@ -82,6 +99,7 @@ function validateArchive(archive: string, suite: string): readonly string[] {
   if (verbose.length !== 2 || verbose.some((line) => !line.startsWith('-'))) {
     throw new Error(`Vitest blob archive for ${suite} must contain regular files`)
   }
+  assertTarMemberSizes(verbose)
   return entries
 }
 

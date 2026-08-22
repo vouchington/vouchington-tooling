@@ -18,7 +18,12 @@ import { listenOnRunnerUnreservedEphemeralPort } from '../runner-port-policy/ind
 import { inspectVitestBlobBundle } from '../vitest-blob-manifest/index.mts'
 import { writeTransportControl, type PresignedTransportControl } from './control.mts'
 import { cmdDownloadVitestBlobs, cmdUpload } from './lib.mts'
-import { downloadVitestBlobBundles, packVitestBlobBundle } from './vitest-blob-transport.mts'
+import {
+  assertTarMemberSizes,
+  downloadVitestBlobBundles,
+  packVitestBlobBundle,
+  tarVerboseMemberSize,
+} from './vitest-blob-transport.mts'
 
 const suite = 'tooling'
 const identity = {
@@ -251,6 +256,28 @@ describe('Vitest blob S3 transport', () => {
       ),
     ).rejects.toThrow('Invalid Vitest suite')
     expect(existsSync(join(destination, '../../outside'))).toBe(false)
+  })
+
+  it('parses tar verbose sizes and rejects members over the ceiling', () => {
+    expect(tarVerboseMemberSize('-rw-r--r--  0 runner staff  12 Jan  1 00:00 tooling.json')).toBe(
+      12,
+    )
+    expect(() => tarVerboseMemberSize('-rw-r--r--  0 x y not-a-size Jan 1 00:00 x')).toThrow(
+      /malformed/,
+    )
+    expect(() => tarVerboseMemberSize('-rw-r--r--  0 x y -1 Jan 1 00:00 x')).toThrow(/malformed/)
+    expect(() =>
+      assertTarMemberSizes([
+        '-rw-r--r--  0 x y 12 Jan  1 00:00 vitest-blob-manifest.json',
+        '-rw-r--r--  0 x y 33554433 Jan  1 00:00 tooling.json',
+      ]),
+    ).toThrow(/member size limit/)
+    expect(() =>
+      assertTarMemberSizes([
+        '-rw-r--r--  0 x y 12 Jan  1 00:00 vitest-blob-manifest.json',
+        '-rw-r--r--  0 x y 12 Jan  1 00:00 tooling.json',
+      ]),
+    ).not.toThrow()
   })
 
   it('uploads and downloads a manifest-bound blob independently of coverage', async () => {

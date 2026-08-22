@@ -1,5 +1,5 @@
 import type { PresignedTransportControl } from './control.mts'
-import { DEFAULT_COVERAGE_MANIFEST_FILENAME } from './constants.mts'
+import { assertCoverageManifestFilename, DEFAULT_COVERAGE_MANIFEST_FILENAME } from './constants.mts'
 
 const DEFAULT_PRESIGN_TTL_SECONDS = 14_400
 
@@ -11,8 +11,8 @@ export interface PresignIdentity {
 }
 
 export interface ObjectSigner {
-  signPut(key: string): Promise<string>
-  signGet(key: string): Promise<string>
+  signPut(key: string, ttlSeconds: number): Promise<string>
+  signGet(key: string, ttlSeconds: number): Promise<string>
 }
 
 export interface MintPresignedControlOptions {
@@ -31,6 +31,7 @@ export function transportObjectKeys(
   readonly manifest: string
   readonly blob: string
 } {
+  assertCoverageManifestFilename(manifestFilename)
   if (
     !/^[1-9][0-9]*$/.test(runId) ||
     !Number.isSafeInteger(controlAttempt) ||
@@ -76,10 +77,10 @@ export async function mintPresignedControl(
       manifestFilename,
     )
     control.coverage[suite] = {
-      lcovPut: await signer.signPut(keys.lcov),
-      lcovGet: await signer.signGet(keys.lcov),
-      manifestPut: await signer.signPut(keys.manifest),
-      manifestGet: await signer.signGet(keys.manifest),
+      lcovPut: await signer.signPut(keys.lcov, ttlSeconds),
+      lcovGet: await signer.signGet(keys.lcov, ttlSeconds),
+      manifestPut: await signer.signPut(keys.manifest, ttlSeconds),
+      manifestGet: await signer.signGet(keys.manifest, ttlSeconds),
     }
   }
   for (const suite of blobSuites) {
@@ -90,8 +91,8 @@ export async function mintPresignedControl(
       manifestFilename,
     ).blob
     control.blobs[suite] = {
-      put: await signer.signPut(key),
-      get: await signer.signGet(key),
+      put: await signer.signPut(key, ttlSeconds),
+      get: await signer.signGet(key, ttlSeconds),
     }
   }
   return control

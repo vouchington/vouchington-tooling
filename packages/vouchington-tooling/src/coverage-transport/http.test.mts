@@ -63,6 +63,31 @@ describe('coverage transport HTTP miss vs exhaustion', () => {
     expect(logs.some((line) => line.includes('GET error:'))).toBe(true)
   })
 
+  it('aborts a stalled GET body under the same timeout', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = async (_url, init) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => {
+            try {
+              controller.error(new DOMException('The operation was aborted.', 'AbortError'))
+            } catch {
+              // The stream may already be errored by a previous abort.
+            }
+          })
+        },
+      })
+      return new Response(body)
+    }
+    try {
+      await expect(
+        fetchGet('http://example.test/stalled', { timeoutMs: 20, retryDelayMs: 0 }),
+      ).rejects.toThrow('[coverage-transport] GET exhausted')
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
   it('skips the retry delay when retryDelayMs is zero', async () => {
     await expect(fetchGet('http://127.0.0.1:1/missing', { retryDelayMs: 0 })).rejects.toThrow(
       '[coverage-transport] GET exhausted',

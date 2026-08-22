@@ -285,6 +285,35 @@ describe('coverage transport control and HTTP boundary', () => {
     expect(errors.join('\n')).not.toContain(server.origin)
   })
 
+  it('defaults upload cwd to process.cwd', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'coverage-cwd-'))
+    const controlPath = join(root, 'control.json')
+    writeTransportControl(controlPath, makeControl('https://storage.invalid'))
+    await expect(cmdUpload(controlPath, 'fixture', { expectedIdentity })).resolves.toEqual({
+      coverage: false,
+      blob: false,
+    })
+  })
+
+  it('rejects a path-shaped coverage manifest filename before writing', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'coverage-http-'))
+    const controlPath = join(root, 'control.json')
+    writeTransportControl(controlPath, makeControl('https://storage.invalid'))
+    await expect(
+      cmdUpload(controlPath, 'fixture', {
+        cwd: root,
+        expectedIdentity,
+        coverageManifestFilename: '../../outside.json',
+      }),
+    ).rejects.toThrow('Coverage manifest filename is invalid')
+    await expect(
+      cmdDownloadCoverage(controlPath, join(root, 'download'), {
+        expectedIdentity,
+        coverageManifestFilename: '../../outside.json',
+      }),
+    ).rejects.toThrow('Coverage manifest filename is invalid')
+  })
+
   it('rejects upload and download through a wrong run, revision, or attempt', async () => {
     const server = await startStorageServer()
     const root = mkdtempSync(join(tmpdir(), 'coverage-http-'))

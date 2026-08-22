@@ -17,6 +17,15 @@ describe('coverage transport S3 keys', () => {
     )
   })
 
+  it.each(['../../outside.json', 'sub/dir.json', '', '.', '..', 'manifest'])(
+    'rejects unsafe manifest filenames %#',
+    (filename) => {
+      expect(() => transportObjectKeys('12345', 1, 'web', filename)).toThrowError(
+        'Coverage manifest filename is invalid',
+      )
+    },
+  )
+
   it.each([
     ['0', 1, 'web'],
     ['1', 0, 'web'],
@@ -41,12 +50,12 @@ describe('mintPresignedControl', () => {
       ['web'],
       ['web', 'schema'],
       {
-        signPut: async (key) => {
-          signed.push(`put:${key}`)
+        signPut: async (key, ttlSeconds) => {
+          signed.push(`put:${ttlSeconds}:${key}`)
           return `https://example.test/put/${key}`
         },
-        signGet: async (key) => {
-          signed.push(`get:${key}`)
+        signGet: async (key, ttlSeconds) => {
+          signed.push(`get:${ttlSeconds}:${key}`)
           return `https://example.test/get/${key}`
         },
       },
@@ -67,8 +76,8 @@ describe('mintPresignedControl', () => {
       'https://example.test/get/coverage-transport/99/2/blobs/schema.tar.gz',
     )
     expect(signed.filter((entry) => entry.includes('/blobs/schema.tar.gz'))).toEqual([
-      'put:coverage-transport/99/2/blobs/schema.tar.gz',
-      'get:coverage-transport/99/2/blobs/schema.tar.gz',
+      'put:60:coverage-transport/99/2/blobs/schema.tar.gz',
+      'get:60:coverage-transport/99/2/blobs/schema.tar.gz',
     ])
   })
 

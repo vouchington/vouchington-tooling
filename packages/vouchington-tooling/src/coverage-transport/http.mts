@@ -37,17 +37,21 @@ async function delay(milliseconds: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 }
 
+interface TransportResponse {
+  readonly ok: boolean
+  readonly status: number
+  readonly body: Buffer | undefined
+}
+
 async function request(
   method: 'GET' | 'PUT',
   url: string,
   body: Buffer | undefined,
   options: RequestOptions,
-): Promise<Response | null> {
+): Promise<TransportResponse | null> {
   for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
     const controller = new AbortController()
-    /* v8 ignore start -- the 30s fetch ceiling is not worth a live wait in unit tests */
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    /* v8 ignore stop */
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? FETCH_TIMEOUT_MS)
     try {
       const response = await fetch(url, {
         method,
@@ -56,7 +60,11 @@ async function request(
       })
       // A missing presigned object is terminal. Let fetchGet yield null or fetchPut yield false
       // without retrying the same URL or emitting a misleading transport-error diagnostic.
-      if (response.ok || response.status === 404) return response
+      if (response.ok || response.status === 404) {
+        const payload =
+          method === 'GET' && response.ok ? Buffer.from(await response.arrayBuffer()) : undefined
+        return { ok: response.ok, status: response.status, body: payload }
+      }
       logTransport(options, `[coverage-transport] ${method} failed: HTTP ${response.status}`)
     } catch (error) {
       logTransport(options, `[coverage-transport] ${method} error: ${redactTransportLog(error)}`)
@@ -83,5 +91,5 @@ export async function fetchGet(url: string, options: RequestOptions = {}): Promi
   const response = await request('GET', url, undefined, options)
   if (response?.status === 404) return null
   if (!response?.ok) throw new Error('[coverage-transport] GET exhausted')
-  return Buffer.from(await response.arrayBuffer())
+  return response.body as Buffer
 }
