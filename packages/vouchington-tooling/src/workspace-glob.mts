@@ -11,17 +11,15 @@ export function expandWorkspaceGlob(root: string, pattern: string): string[] {
         next.push(path.join(current, part))
         continue
       }
+      if (part === '**') {
+        next.push(current, ...descendantDirs(current))
+        continue
+      }
       const suffix = part.slice(star + 1)
       if (suffix.includes('*')) continue
       const prefix = part.slice(0, star)
-      let entries
-      try {
-        entries = readdirSync(current, { withFileTypes: true })
-      } catch {
-        continue
-      }
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith(prefix) && entry.name.endsWith(suffix)) {
+      for (const entry of readDirs(current)) {
+        if (entry.name.startsWith(prefix) && entry.name.endsWith(suffix)) {
           next.push(path.join(current, entry.name))
         }
       }
@@ -29,4 +27,23 @@ export function expandWorkspaceGlob(root: string, pattern: string): string[] {
     currents = next
   }
   return currents
+}
+
+function descendantDirs(dir: string): string[] {
+  const found: string[] = []
+  for (const entry of readDirs(dir)) {
+    const child = path.join(dir, entry.name)
+    found.push(child, ...descendantDirs(child))
+  }
+  return found
+}
+
+function readDirs(dir: string) {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).filter(
+      (entry) => entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git',
+    )
+  } catch {
+    return []
+  }
 }

@@ -18,6 +18,7 @@ describe('expandWorkspaceGlob', () => {
     testDirs.push(root)
     mkdirSync(path.join(root, 'services', 'api'), { recursive: true })
     mkdirSync(path.join(root, 'libs', 'one', 'pkg'), { recursive: true })
+    mkdirSync(path.join(root, 'libs', 'one', 'node_modules', 'pkg'), { recursive: true })
     mkdirSync(path.join(root, 'blocked-dir'), { recursive: true })
     writeFileSync(path.join(root, 'blocked'), 'file\n')
     writeFileSync(path.join(root, 'services', 'README'), 'file\n')
@@ -34,5 +35,12 @@ describe('expandWorkspaceGlob', () => {
     expect(expandWorkspaceGlob(root, 'blocked*')).toEqual([path.join(root, 'blocked-dir')])
     expect(expandWorkspaceGlob(root, 'missing/*')).toEqual([])
     expect(expandWorkspaceGlob(root, '*x*')).toEqual([])
+    expect(expandWorkspaceGlob(root, 'libs/**').toSorted()).toEqual(
+      [
+        path.join(root, 'libs'),
+        path.join(root, 'libs', 'one'),
+        path.join(root, 'libs', 'one', 'pkg'),
+      ].toSorted(),
+    )
   })
 })

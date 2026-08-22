@@ -57,6 +57,14 @@ restore_workspace_write_bits() {
   find -P . -xdev -path ./.git -prune -o -type d -exec chmod u+rwx {} +
 }
 
+workspace_sentinel_key() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+    return
+  fi
+  shasum -a 256 | awk '{print $1}'
+}
+
 if ! git reset --hard HEAD; then
   echo "::warning::git reset --hard failed; reclaiming workspace write bits and retrying once."
   restore_workspace_write_bits ||
@@ -97,7 +105,7 @@ fi
 # regardless of its trust level, then removes itself. Keyed on the
 # workspace path so multiple repos on the same runner don't
 # interfere.
-_ws_key="$(printf '%s' "${GITHUB_WORKSPACE:-$(pwd)}" | tr -cd 'A-Za-z0-9' | tail -c 40)"
+_ws_key="$(printf '%s' "${GITHUB_WORKSPACE:-$(pwd)}" | workspace_sentinel_key)"
 SENTINEL="${RUNNER_TOOL_CACHE:-${HOME}}/.cw-fork-pr-${_ws_key}"
 if [ -f "${SENTINEL}" ]; then
   rm -f "${SENTINEL}"
@@ -172,12 +180,6 @@ if [ "${DEEPEN}" = "true" ]; then
     )
   fi
   git_fetch_once() {
-    case " $* " in
-      *" --unshallow "*)
-        git "${fetch_git_config[@]}" fetch "$@"
-        return $?
-        ;;
-    esac
     local timeout_seconds=25
     if command -v timeout >/dev/null 2>&1; then
       timeout --kill-after=5s "${timeout_seconds}s" git "${fetch_git_config[@]}" fetch "$@"
