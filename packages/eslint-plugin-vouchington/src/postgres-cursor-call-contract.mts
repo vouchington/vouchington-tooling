@@ -67,10 +67,14 @@ export function createPostgresCursorCallContractRule() {
             namespaceCursorMember(context, callee, helpers, options)
           if (!executor) return
           const argument = (node.arguments as NodeLike[] | undefined)?.[0]
+          const reportNode = argument ?? node
           const head = argument ? queryHead(context, argument, helpers, options) : null
-          if (head === null) context.report({ messageId: 'staticQuery', node: argument ?? node })
-          else if (!options.annotation.test(head)) {
-            context.report({ messageId: 'annotation', node: argument ?? node })
+          if (head === null) {
+            context.report({ messageId: 'staticQuery', node: reportNode })
+            return
+          }
+          if (!options.annotation.test(head)) {
+            context.report({ messageId: 'annotation', node: reportNode })
           }
         },
         Identifier(node: NodeLike) {
@@ -139,11 +143,13 @@ function reExportsCursor(node: NodeLike, config: CursorModuleConfig): boolean {
   const source = node.source as { value?: unknown } | undefined
   if (!isCursorModule(source?.value, config) || node.exportKind === 'type') return false
   if (node.type === 'ExportAllDeclaration') return true
-  return ((node.specifiers as NodeLike[] | undefined) ?? []).some((specifier) => {
-    const local = specifier.local as { name?: string; value?: unknown } | undefined
-    const name = local?.name ?? local?.value
-    return specifier.exportKind !== 'type' && isCursorExecutor(name, config)
-  })
+  return (
+    (node.specifiers as NodeLike[] | undefined)?.some((specifier) => {
+      const local = specifier.local as { name?: string; value?: unknown } | undefined
+      const name = local?.name ?? local?.value
+      return specifier.exportKind !== 'type' && isCursorExecutor(name, config)
+    }) === true
+  )
 }
 
 function isTypeOnlyExport(identifier: NodeLike): boolean {

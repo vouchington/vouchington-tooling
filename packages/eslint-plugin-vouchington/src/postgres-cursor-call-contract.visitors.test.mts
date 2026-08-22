@@ -41,7 +41,10 @@ function mockContext(
     report: (descriptor) => reports.push({ messageId: descriptor.messageId }),
     sourceCode: {
       getScope: () => ({
-        set: { get: () => variable ?? undefined },
+        set: {
+          get: (name?: string) =>
+            name && variable && name === variable.name ? variable : undefined,
+        },
         variables: variable ? [variable] : [],
         upper: null,
       }),
@@ -113,6 +116,10 @@ describe('postgres-cursor-call-contract visitors', () => {
         { type: 'ExportSpecifier', local: { value: 'helper' } },
       ],
     })
+    visitors.ExportNamedDeclaration?.({
+      type: 'ExportNamedDeclaration',
+      source: { value: '@db/cursors' },
+    })
     expect(reports).toEqual([])
     visitors.ExportNamedDeclaration?.({
       type: 'ExportNamedDeclaration',
@@ -132,5 +139,29 @@ describe('postgres-cursor-call-contract visitors', () => {
         }),
       ),
     ).toEqual({})
+  })
+
+  it('reports missing and unannotated SQL and ignores unrelated callees', () => {
+    const variable = importVar('runCursor', 'ImportSpecifier')
+    const reports: Array<{ messageId: string }> = []
+    const visitors = rule.create(mockContext(variable, reports))
+    const callee = variable.references[0]?.identifier as NodeLike
+    visitors.CallExpression?.({ type: 'CallExpression', callee, arguments: [] })
+    visitors.CallExpression?.({
+      type: 'CallExpression',
+      callee,
+      arguments: [{ type: 'Literal', value: 'SELECT 1' }],
+    })
+    visitors.CallExpression?.({
+      type: 'CallExpression',
+      callee,
+      arguments: [{ type: 'Literal', value: '/* rows */ SELECT 1' }],
+    })
+    visitors.CallExpression?.({
+      type: 'CallExpression',
+      callee: { type: 'Identifier', name: 'other' },
+      arguments: [{ type: 'Literal', value: 'SELECT 1' }],
+    })
+    expect(reports).toEqual([{ messageId: 'staticQuery' }, { messageId: 'annotation' }])
   })
 })
