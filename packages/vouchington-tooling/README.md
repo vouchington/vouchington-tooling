@@ -28,6 +28,11 @@ vouchington gha-artifacts-cleanup run --run-id 123 --keep-pattern 'plan-*' --del
 vouchington http-origin --field cdn_origin https://images.example.com
 vouchington vitest-blob-manifest <suite> [reports-directory]
 vouchington pnpm-install --runner-lifecycle persistent --install-scripts true
+vouchington check-cache-size /tmp/cache 1048576 node-modules
+vouchington make-shard-matrix 4
+vouchington load-runner-env
+vouchington clean-workspace
+vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 ```
 
 Host-lock environment:
@@ -80,6 +85,13 @@ import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
+import { pruneDeployedRuntimeDeps } from 'vouchington-tooling/pnpm-deploy'
+import { parseDockerfileRuntimeImages } from 'vouchington-tooling/dockerfile-parse'
+import { checkSccComplexity } from 'vouchington-tooling/scc-complexity'
+import { runCiLocal } from 'vouchington-tooling/ci-local'
+import { rateLimitDelay } from 'vouchington-tooling/gha-rate-limit'
+import { parseCheckpoint } from 'vouchington-tooling/gha-pr-checkpoint'
+import { checkWorkspaceGatesPolicy } from 'vouchington-tooling/workspace-gates'
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their

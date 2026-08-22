@@ -8,6 +8,9 @@ import {
   indexShapeKey,
   hashContractSchema,
   mintPresignedControl,
+  pruneDeployedRuntimeDeps,
+  SCC_COMPLEXITY_LIMIT,
+  CHECKPOINT_MARKER,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
@@ -38,5 +41,8 @@ describe('package exports', () => {
       /^[0-9a-f]{64}$/,
     )
     expect(typeof mintPresignedControl).toBe('function')
+    expect(typeof pruneDeployedRuntimeDeps).toBe('function')
+    expect(SCC_COMPLEXITY_LIMIT).toBe(50)
+    expect(CHECKPOINT_MARKER).toBe('pr-checkpoint:v1')
   })
 })

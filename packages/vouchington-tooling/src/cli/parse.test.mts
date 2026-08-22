@@ -154,6 +154,35 @@ describe('parseCli', () => {
       command: 'prepare-trivy-db',
       args: [],
     })
+    expect(
+      parseCli(['node', 'vouchington', 'check-cache-size', '/tmp/cache', '100', 'name']),
+    ).toEqual({
+      kind: 'script',
+      command: 'check-cache-size',
+      args: ['/tmp/cache', '100', 'name'],
+    })
+    expect(parseCli(['node', 'vouchington', 'make-shard-matrix', '4'])).toEqual({
+      kind: 'script',
+      command: 'make-shard-matrix',
+      args: ['4'],
+    })
+    expect(parseCli(['node', 'vouchington', 'load-runner-env'])).toEqual({
+      kind: 'script',
+      command: 'load-runner-env',
+      args: [],
+    })
+    expect(parseCli(['node', 'vouchington', 'clean-workspace'])).toEqual({
+      kind: 'script',
+      command: 'clean-workspace',
+      args: [],
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'install-github-release', '--repo', 'owner/name']),
+    ).toEqual({
+      kind: 'script',
+      command: 'install-github-release',
+      args: ['--repo', 'owner/name'],
+    })
   })
 
   it('parses http-origin flags', () => {

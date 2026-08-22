@@ -135,6 +135,41 @@
       "import": "./dist/coverage-transport/index.mjs",
       "default": "./dist/coverage-transport/index.mjs"
     },
+    "./pnpm-deploy": {
+      "types": "./dist/pnpm-deploy/index.d.mts",
+      "import": "./dist/pnpm-deploy/index.mjs",
+      "default": "./dist/pnpm-deploy/index.mjs"
+    },
+    "./dockerfile-parse": {
+      "types": "./dist/dockerfile-parse/index.d.mts",
+      "import": "./dist/dockerfile-parse/index.mjs",
+      "default": "./dist/dockerfile-parse/index.mjs"
+    },
+    "./scc-complexity": {
+      "types": "./dist/scc-complexity/index.d.mts",
+      "import": "./dist/scc-complexity/index.mjs",
+      "default": "./dist/scc-complexity/index.mjs"
+    },
+    "./ci-local": {
+      "types": "./dist/ci-local/index.d.mts",
+      "import": "./dist/ci-local/index.mjs",
+      "default": "./dist/ci-local/index.mjs"
+    },
+    "./gha-rate-limit": {
+      "types": "./dist/gha-rate-limit/index.d.mts",
+      "import": "./dist/gha-rate-limit/index.mjs",
+      "default": "./dist/gha-rate-limit/index.mjs"
+    },
+    "./gha-pr-checkpoint": {
+      "types": "./dist/gha-pr-checkpoint/index.d.mts",
+      "import": "./dist/gha-pr-checkpoint/index.mjs",
+      "default": "./dist/gha-pr-checkpoint/index.mjs"
+    },
+    "./workspace-gates": {
+      "types": "./dist/workspace-gates/index.d.mts",
+      "import": "./dist/workspace-gates/index.mjs",
+      "default": "./dist/workspace-gates/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -148,7 +183,9 @@
   "dependencies": {
     "csv-parse": "7.0.2",
     "csv-stringify": "6.8.2",
-    "picomatch": "4.0.5"
+    "dockerfile-ast": "0.7.1",
+    "picomatch": "4.0.5",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@types/picomatch": "^4.0.3"
