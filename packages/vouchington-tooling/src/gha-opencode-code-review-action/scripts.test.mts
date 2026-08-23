@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -12,7 +20,8 @@ const installText = readFileSync(installCli, 'utf8')
 describe('opencode-code-review scripts', () => {
   it('rejects extra_prompt unless the caller is private and writes a file-only prompt', () => {
     const root = mkdtempSync(join(tmpdir(), 'opencode-prompt-'))
-    const trusted = join(root, 'trusted-review-prompt')
+    const workspace = join(root, 'workspace')
+    const trusted = join(workspace, '.trusted-review-prompt')
     const output = join(root, 'github-output')
     mkdirSync(join(trusted, '.agents/skills/agent-workflow'), { recursive: true })
     mkdirSync(join(trusted, 'docs/prompts'), { recursive: true })
@@ -23,7 +32,7 @@ describe('opencode-code-review scripts', () => {
       ...process.env,
       GITHUB_ACTION_PATH: resolve('.github/actions/opencode-code-review'),
       GITHUB_OUTPUT: output,
-      GITHUB_WORKSPACE: join(root, 'workspace'),
+      GITHUB_WORKSPACE: workspace,
       RUNNER_TEMP: root,
       REVIEW_TARGET: 'owner/repo#1',
       PROMPT_PATH: '.agents/skills/agent-workflow/code-review-prompt.md',
@@ -110,6 +119,50 @@ describe('opencode-code-review scripts', () => {
       expect(readFileSync(output, 'utf8')).toContain(
         `bin=${join(root, 'home/opencode-vci-fixture/bin/opencode')}`,
       )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('restores the caller OpenCode project files after installing the review-project', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opencode-restore-'))
+    const workspace = join(root, 'workspace')
+    mkdirSync(join(workspace, '.opencode'), { recursive: true })
+    writeFileSync(join(workspace, '.opencode/user.md'), 'keep-me\n')
+    writeFileSync(join(workspace, 'opencode.json'), '{"user":true}\n')
+    writeFileSync(join(workspace, 'opencode.jsonc'), '// user\n')
+    const env = {
+      ...process.env,
+      GITHUB_ACTION_PATH: resolve('.github/actions/opencode-code-review'),
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: join(root, 'tmp'),
+    }
+    try {
+      expect(
+        spawnSync(
+          'bash',
+          [resolve('.github/actions/opencode-code-review/install-review-project.sh')],
+          {
+            encoding: 'utf8',
+            env,
+          },
+        ).status,
+      ).toBe(0)
+      expect(existsSync(join(workspace, '.opencode/user.md'))).toBe(false)
+      expect(readFileSync(join(workspace, 'opencode.json'), 'utf8')).toContain('autoupdate')
+      expect(
+        spawnSync(
+          'bash',
+          [resolve('.github/actions/opencode-code-review/restore-review-project.sh')],
+          {
+            encoding: 'utf8',
+            env,
+          },
+        ).status,
+      ).toBe(0)
+      expect(readFileSync(join(workspace, '.opencode/user.md'), 'utf8')).toBe('keep-me\n')
+      expect(readFileSync(join(workspace, 'opencode.json'), 'utf8')).toBe('{"user":true}\n')
+      expect(readFileSync(join(workspace, 'opencode.jsonc'), 'utf8')).toBe('// user\n')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

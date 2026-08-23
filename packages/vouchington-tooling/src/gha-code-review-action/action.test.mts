@@ -53,7 +53,7 @@ describe('code-review action', () => {
 
   it('checks out the trusted prompt into runner temp and uses OS tmpdir worktrees', () => {
     const checkout = stepByName.get('Checkout trusted review prompt')
-    expect(checkout?.with?.path).toBe('${{ runner.temp }}/trusted-review-prompt')
+    expect(checkout?.with?.path).toBe('.trusted-review-prompt')
     const home = stepByName.get('Isolate Claude Code install home')
     expect(home?.run).toContain('worktree-create.sh')
     expect(home?.run).toContain('VOUCHINGTON_ACTION_PATH')

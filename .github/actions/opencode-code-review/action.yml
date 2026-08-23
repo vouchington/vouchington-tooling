@@ -53,7 +53,7 @@ runs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         ref: ${{ inputs.trusted_prompt_ref }}
-        path: ${{ runner.temp }}/trusted-review-prompt
+        path: .trusted-review-prompt
         fetch-depth: 1
         persist-credentials: false
 
@@ -162,11 +162,7 @@ runs:
         fi
         mkdir -p "${GITHUB_WORKSPACE}/.review-context"
         cp "$OPENCODE_PROMPT_PATH" "${GITHUB_WORKSPACE}/.review-context/prompt.md"
-        rm -rf "${GITHUB_WORKSPACE}/.opencode"
-        rm -f "${GITHUB_WORKSPACE}/opencode.json" "${GITHUB_WORKSPACE}/opencode.jsonc"
-        cp -a "${GITHUB_ACTION_PATH}/review-project" "${GITHUB_WORKSPACE}/.opencode"
-        rm -rf "${GITHUB_WORKSPACE}/.opencode/plugins"
-        cp "${GITHUB_ACTION_PATH}/review-project/opencode.json" "${GITHUB_WORKSPACE}/opencode.json"
+        bash "$GITHUB_ACTION_PATH/install-review-project.sh"
         "$OPENCODE_BIN" run \
           --model "$OPENCODE_MODEL" \
           --agent code-review \
@@ -247,8 +243,7 @@ runs:
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
           "${GITHUB_WORKSPACE}/.review-context" \
           "${GITHUB_WORKSPACE}/.vouchington-tooling" \
-          "${GITHUB_WORKSPACE}/.opencode" \
-          "${GITHUB_WORKSPACE}/opencode.json" \
+          "${GITHUB_WORKSPACE}/.trusted-review-prompt" \
           "${RUNNER_TEMP}/code-review-payload" \
-          "${RUNNER_TEMP}/trusted-review-prompt" \
           "${RUNNER_TEMP}/opencode-review-prompt.md"
+        bash "$GITHUB_ACTION_PATH/restore-review-project.sh"

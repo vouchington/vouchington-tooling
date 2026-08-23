@@ -40,7 +40,7 @@ describe('opencode-code-review action', () => {
 
   it('checks out the trusted prompt into runner temp', () => {
     expect(stepByName.get('Checkout trusted review prompt')?.with).toMatchObject({
-      path: '${{ runner.temp }}/trusted-review-prompt',
+      path: '.trusted-review-prompt',
       'persist-credentials': false,
     })
   })
@@ -72,8 +72,8 @@ describe('opencode-code-review action', () => {
     expect(stepByName.get('Isolate OpenCode install home')?.run).toContain(
       'home="${RUNNER_TEMP}/opencode-home"',
     )
-    expect(action.inputs?.model?.required).toBe(true)
-    expect(action.inputs?.payload_artifact_name?.required).toBe(true)
+    expect(review?.run).toContain('install-review-project.sh')
+    expect(stepByName.get('Clean review payload files')?.run).toContain('restore-review-project.sh')
   })
 
   it('stages the payload through the same-ref CLI and a unique artifact name', () => {

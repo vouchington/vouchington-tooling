@@ -7,7 +7,7 @@ if [ -n "${EXTRA_PROMPT:-}" ] && [ "${REPO_PRIVATE:-}" != 'true' ]; then
 fi
 prompt_rel="$(bash "${GITHUB_ACTION_PATH:?}/../code-review/validate-prompt-path.sh" "${PROMPT_PATH:?}")"
 inline_rel="$(bash "$GITHUB_ACTION_PATH/../code-review/validate-prompt-path.sh" "${INLINE_PROMPT_PATH:?}")"
-trusted_root="${RUNNER_TEMP:?}/trusted-review-prompt"
+trusted_root="${GITHUB_WORKSPACE:?}/.trusted-review-prompt"
 trusted_prompt="$trusted_root/$prompt_rel"
 trusted_inline_prompt="$trusted_root/$inline_rel"
 prompt_file="${RUNNER_TEMP}/opencode-review-prompt.md"
