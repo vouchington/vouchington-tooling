@@ -300,3 +300,15 @@ export type {
 } from './gha-pr-checkpoint/index.mts'
 export { checkWorkspaceGatesPolicy } from './workspace-gates/index.mts'
 export type { WorkspaceGatesOptions } from './workspace-gates/index.mts'
+export { validateNugetUpdate } from './nuget-central-version/index.mts'
+export { normalizeSwiftSource } from './swift-semantic-equal/index.mts'
+export {
+  isSwiftCodeOffset,
+  parseUniqueSwiftBinaryTargetChecksum,
+} from './swift-source-offset/index.mts'
+export { validateResolvedPinDelta } from './swift-resolved-pin-delta/index.mts'
+export type {
+  ResolvedDocument,
+  ResolvedPin,
+  ValidateResolvedPinDeltaOptions,
+} from './swift-resolved-pin-delta/index.mts'

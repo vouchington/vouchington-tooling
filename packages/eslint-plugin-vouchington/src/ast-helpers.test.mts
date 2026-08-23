@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   findVariable,
+  memberIsRead,
   normalizeFilename,
+  patternPropertyName,
   propertyName,
   unwrap,
   type NodeLike,
@@ -187,5 +189,56 @@ describe('normalizeFilename', () => {
     expect(normalizeFilename({ filename: '/repo/src/a.ts', cwd: '/repo/' })).toBe('src/a.ts')
     expect(normalizeFilename({ filename: '/other/a.ts', cwd: '/repo' })).toBe('/other/a.ts')
     expect(normalizeFilename({ filename: 'src/a.ts' })).toBe('src/a.ts')
+  })
+})
+
+describe('patternPropertyName and memberIsRead', () => {
+  it('reads object-pattern keys and treats assignment/delete as non-reads', () => {
+    expect(patternPropertyName(null)).toBeNull()
+    expect(
+      patternPropertyName({
+        type: 'Property',
+        computed: false,
+        key: { type: 'Identifier', name: 'invalidate' },
+      }),
+    ).toBe('invalidate')
+    expect(
+      patternPropertyName({
+        type: 'Property',
+        computed: false,
+        key: { type: 'Identifier', name: 1 },
+      }),
+    ).toBeNull()
+    expect(
+      patternPropertyName({
+        type: 'Property',
+        computed: true,
+        key: { type: 'Literal', value: 'invalidate' },
+      }),
+    ).toBe('invalidate')
+    const member: NodeLike = {
+      type: 'MemberExpression',
+      property: { type: 'Identifier', name: 'invalidate' },
+    }
+    expect(memberIsRead(member)).toBe(true)
+    const assigned: NodeLike = {
+      type: 'MemberExpression',
+      property: { type: 'Identifier', name: 'invalidate' },
+    }
+    assigned.parent = { type: 'AssignmentExpression', operator: '=', left: assigned }
+    expect(assigned.parent.left).toBe(assigned)
+    expect(memberIsRead(assigned)).toBe(false)
+    const compound: NodeLike = {
+      type: 'MemberExpression',
+      property: { type: 'Identifier', name: 'invalidate' },
+    }
+    compound.parent = { type: 'AssignmentExpression', operator: '+=', left: compound }
+    expect(memberIsRead(compound)).toBe(true)
+    expect(
+      memberIsRead({
+        ...member,
+        parent: { type: 'UnaryExpression', operator: 'delete' },
+      }),
+    ).toBe(false)
   })
 })

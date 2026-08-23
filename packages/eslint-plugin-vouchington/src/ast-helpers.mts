@@ -81,6 +81,25 @@ export function propertyName(
   return member.computed ? staticPropertyName(property) : null
 }
 
+export function patternPropertyName(
+  property: NodeLike | null | undefined,
+): string | number | boolean | bigint | null {
+  if (!property) return null
+  if (!property.computed && (property.key as NodeLike | undefined)?.type === 'Identifier') {
+    const name = (property.key as NodeLike).name
+    return typeof name === 'string' ? name : null
+  }
+  return staticPropertyName(property.key as NodeLike | undefined)
+}
+
+export function memberIsRead(node: NodeLike): boolean {
+  const parent = node.parent
+  if (parent?.type === 'AssignmentExpression' && parent.left === node) {
+    return parent.operator !== '='
+  }
+  return !(parent?.type === 'UnaryExpression' && parent.operator === 'delete')
+}
+
 export function normalizeFilename(context: { filename: string; cwd?: string }): string {
   const filename = context.filename.replaceAll('\\', '/')
   const cwd = context.cwd?.replaceAll('\\', '/').replace(/\/$/, '')

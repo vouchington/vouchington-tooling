@@ -17,6 +17,8 @@ import {
   lineOfUtf8ByteOffset,
   runnerPortPolicy,
   SELECTED_FILES_ENV_MAX_BYTES,
+  validateNugetUpdate,
+  normalizeSwiftSource,
   validateOptionalHttpOrigin,
 } from './index.mts'
 
@@ -44,5 +46,7 @@ describe('package exports', () => {
     expect(typeof pruneDeployedRuntimeDeps).toBe('function')
     expect(SCC_COMPLEXITY_LIMIT).toBe(50)
     expect(CHECKPOINT_MARKER).toBe('pr-checkpoint:v1')
+    expect(typeof validateNugetUpdate).toBe('function')
+    expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
   })
 })

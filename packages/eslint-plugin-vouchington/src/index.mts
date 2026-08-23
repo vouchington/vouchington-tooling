@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { readPackageVersion } from './package-version.mts'
+import { createBannedMemberReadRule } from './banned-member-read.mts'
+import { createFactoryOwnerLocationRule } from './factory-owner-location.mts'
 import { createPostgresCursorCallContractRule } from './postgres-cursor-call-contract.mts'
 
 export interface VouchingtonPlugin {
@@ -20,6 +22,8 @@ export function createPlugin(version = readInstalledVersion()): VouchingtonPlugi
     meta: { name: PLUGIN_NAME, version },
     rules: {
       'postgres-cursor-call-contract': createPostgresCursorCallContractRule(),
+      'banned-member-read': createBannedMemberReadRule(),
+      'factory-owner-location': createFactoryOwnerLocationRule(),
     },
   }
 }

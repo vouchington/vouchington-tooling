@@ -57,6 +57,31 @@ describe('install-github-release', () => {
     expect(runHelper(['--unknown']).status).toBe(2)
   })
 
+  it('accepts installer flags used by lychee, gitleaks, and opencode', () => {
+    expect(runHelper(['--repo']).status).toBe(2)
+    const skipped = runHelper(
+      [
+        '--repo',
+        'gitleaks/gitleaks',
+        '--version',
+        '8.30.1',
+        '--asset',
+        'gitleaks_{version}_{platform}.tar.gz',
+        '--bin',
+        'gitleaks',
+        '--version-flag',
+        'version',
+        '--checksums-asset',
+        'gitleaks_{version}_checksums.txt',
+        '--bin-dir',
+        '/tmp/unused-bin',
+        '--no-checksum',
+      ],
+      {},
+    )
+    expect(skipped.status).toBe(99)
+  })
+
   it('skips the download when a matching binary is already installed', () => {
     const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-skip-'))
     temporaryDirectories.push(temporaryDirectory)

@@ -82,6 +82,14 @@ vouchington make-shard-matrix 4
 vouchington load-runner-env
 vouchington clean-workspace
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
+vouchington run-with-timeout 120 10 docker push example
+vouchington lint-links --offline
+vouchington materialize-pr-context
+vouchington wait-for-apt-locks
+vouchington install-playwright-chromium-arm64
+vouchington ghcr-package-retention example%2Fapi
+vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
+vouchington swift-semantic-equal BASE HEAD App.swift
 ```
 
 ## Packages
@@ -120,6 +128,10 @@ import { runCiLocal } from 'vouchington-tooling/ci-local'
 import { rateLimitDelay } from 'vouchington-tooling/gha-rate-limit'
 import { parseCheckpoint } from 'vouchington-tooling/gha-pr-checkpoint'
 import { checkWorkspaceGatesPolicy } from 'vouchington-tooling/workspace-gates'
+import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
+import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
+import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
+import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
@@ -137,7 +149,7 @@ House-style rules shared across Vouchington repositories. Rule routing:
 2. **Vouchington convention** with no product nouns → this plugin
 3. **Single-repo product coupling** → stays in the product monorepo
 
-The plugin currently ships `postgres-cursor-call-contract`. Callers pass module specifiers and executor names; product paths stay in the consuming repository.
+The plugin currently ships `postgres-cursor-call-contract`, `banned-member-read`, and `factory-owner-location`. Callers pass module specifiers, members, factories, and owner files; product paths stay in the consuming repository.
 
 ## Development
 
