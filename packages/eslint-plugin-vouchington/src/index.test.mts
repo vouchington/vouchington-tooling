@@ -5,7 +5,11 @@ describe('eslint-plugin-vouchington', () => {
   it('exports routing documentation and the postgres cursor rule', () => {
     expect(plugin.meta.name).toBe(PLUGIN_NAME)
     expect(plugin.meta.version).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(Object.keys(plugin.rules)).toEqual(['postgres-cursor-call-contract'])
+    expect(Object.keys(plugin.rules)).toEqual([
+      'postgres-cursor-call-contract',
+      'banned-member-read',
+      'factory-owner-location',
+    ])
     expect(plugin.rules['postgres-cursor-call-contract']).toEqual(
       expect.objectContaining({ create: expect.any(Function) }),
     )

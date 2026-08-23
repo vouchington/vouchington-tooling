@@ -13,6 +13,8 @@ export type ParsedCli =
   | { kind: 'script'; command: ScriptCommand; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
+  | { kind: 'nuget-central-version'; args: string[] }
+  | { kind: 'swift-semantic-equal'; args: string[] }
   | { kind: 'http-origin'; field: string; value: string }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
@@ -30,6 +32,12 @@ export type ScriptCommand =
   | 'load-runner-env'
   | 'clean-workspace'
   | 'install-github-release'
+  | 'run-with-timeout'
+  | 'lint-links'
+  | 'materialize-pr-context'
+  | 'wait-for-apt-locks'
+  | 'install-playwright-chromium-arm64'
+  | 'ghcr-package-retention'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
@@ -44,6 +52,12 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'load-runner-env',
   'clean-workspace',
   'install-github-release',
+  'run-with-timeout',
+  'lint-links',
+  'materialize-pr-context',
+  'wait-for-apt-locks',
+  'install-playwright-chromium-arm64',
+  'ghcr-package-retention',
 ])
 
 export function parseCli(argv: readonly string[]): ParsedCli {
@@ -57,6 +71,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
   if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
+  if (command === 'nuget-central-version') return { kind: 'nuget-central-version', args: rest }
+  if (command === 'swift-semantic-equal') return { kind: 'swift-semantic-equal', args: rest }
   if (command === 'http-origin') return parseHttpOrigin(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {

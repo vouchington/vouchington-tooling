@@ -104,6 +104,11 @@ describe('runCli', () => {
     expect(isMainModule(pathToFileURL(resolve(missing)).href, missing)).toBe(true)
   })
 
+  it('routes nuget and swift commands', () => {
+    expect(runCli(['node', 'vouchington', 'swift-semantic-equal', 'base'])).toBe(1)
+    expect(runCli(['node', 'vouchington', 'nuget-central-version', 'a'])).toBe(1)
+  })
+
   it('writes usage to an explicit stream', () => {
     const chunks: string[] = []
     printUsage({ write: (chunk: string) => chunks.push(chunk) } as unknown as NodeJS.WritableStream)

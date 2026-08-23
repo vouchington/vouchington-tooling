@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: install-github-release.sh --repo owner/name --version VERSION --asset TEMPLATE --bin NAME [--tag-prefix PREFIX] [--strip-components N]" >&2
+  echo "usage: install-github-release.sh --repo owner/name --version VERSION --asset TEMPLATE --bin NAME [--tag-prefix PREFIX] [--strip-components N] [--bin-dir DIR] [--version-flag FLAG] [--checksums-asset NAME] [--no-checksum]" >&2
 }
 
 REPO="${REPO:-}"
@@ -11,6 +11,10 @@ ASSET_TEMPLATE="${ASSET_TEMPLATE:-}"
 BIN_NAME="${BIN_NAME:-}"
 TAG_PREFIX="${TAG_PREFIX:-}"
 STRIP_COMPONENTS="${STRIP_COMPONENTS:-1}"
+BIN_DIR="${INSTALL_BIN_DIR:-}"
+VERSION_FLAG="${VERSION_FLAG:---version}"
+CHECKSUMS_ASSET="${CHECKSUMS_ASSET:-}"
+NO_CHECKSUM="${NO_CHECKSUM:-0}"
 
 if [ -n "${RELEASE_OWNER:-}" ] && [ -n "${RELEASE_REPO:-}" ]; then
   REPO="${RELEASE_OWNER}/${RELEASE_REPO}"
@@ -48,6 +52,25 @@ while [ "${#}" -gt 0 ]; do
       STRIP_COMPONENTS="$2"
       shift 2
       ;;
+    --bin-dir)
+      [ "${#}" -ge 2 ] || { usage; exit 2; }
+      BIN_DIR="$2"
+      shift 2
+      ;;
+    --version-flag)
+      [ "${#}" -ge 2 ] || { usage; exit 2; }
+      VERSION_FLAG="$2"
+      shift 2
+      ;;
+    --checksums-asset)
+      [ "${#}" -ge 2 ] || { usage; exit 2; }
+      CHECKSUMS_ASSET="$2"
+      shift 2
+      ;;
+    --no-checksum)
+      NO_CHECKSUM=1
+      shift
+      ;;
     -h | --help)
       usage
       exit 2
@@ -74,7 +97,7 @@ if ! [[ "$STRIP_COMPONENTS" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-BIN_DIR="${RUNNER_TEMP:-${HOME}/.local}/bin"
+BIN_DIR="${BIN_DIR:-${RUNNER_TEMP:-${HOME}/.local}/bin}"
 mkdir -p "$BIN_DIR"
 if [ -n "${GITHUB_PATH:-}" ]; then
   echo "$BIN_DIR" >> "$GITHUB_PATH"
@@ -82,7 +105,8 @@ fi
 
 already_installed() {
   local output
-  output="$("$BIN_DIR/$BIN_NAME" --version 2>/dev/null || true)"
+  # shellcheck disable=SC2086
+  output="$("$BIN_DIR/$BIN_NAME" $VERSION_FLAG 2>/dev/null || true)"
   printf '%s\n' "$output" | awk -v v="$VERSION" '
     {
       n = split($0, parts, /[^0-9A-Za-z.-]+/)
@@ -115,22 +139,42 @@ fi
 asset_name="$ASSET_TEMPLATE"
 asset_name="${asset_name//\{version\}/${VERSION}}"
 asset_name="${asset_name//\{platform\}/${RELEASE_PLATFORM}}"
+checksums_name="$CHECKSUMS_ASSET"
+checksums_name="${checksums_name//\{version\}/${VERSION}}"
+checksums_name="${checksums_name//\{platform\}/${RELEASE_PLATFORM}}"
 base_url="https://github.com/${REPO}/releases/download/${TAG_PREFIX}${VERSION}"
-archive="${RUNNER_TEMP:-/tmp}/${BIN_NAME}-${VERSION}-${RELEASE_PLATFORM}.tar.gz"
-extract_dir="${RUNNER_TEMP:-/tmp}/${BIN_NAME}-${VERSION}-${RELEASE_PLATFORM}"
+work="${RUNNER_TEMP:-/tmp}/${BIN_NAME}-${VERSION}-${RELEASE_PLATFORM}"
+archive="${work}-archive"
+extract_dir="${work}-extract"
 
 rm -rf "$extract_dir"
 mkdir -p "$extract_dir"
 curl -fsSL -o "$archive" "${base_url}/${asset_name}"
-curl -fsSL -o "${archive}.sha256" "${base_url}/${asset_name}.sha256"
-expected=$(awk '{print $1}' "${archive}.sha256")
-if command -v sha256sum >/dev/null 2>&1; then
-  echo "${expected}  ${archive}" | sha256sum -c -
-else
-  echo "${expected}  ${archive}" | shasum -a 256 -c -
+if [ "$NO_CHECKSUM" != 1 ]; then
+  if [ -n "$checksums_name" ]; then
+    curl -fsSL -o "${archive}.checksums" "${base_url}/${checksums_name}"
+    expected=$(grep -F "$asset_name" "${archive}.checksums" | awk '{print $1}')
+    rm "${archive}.checksums"
+  else
+    curl -fsSL -o "${archive}.sha256" "${base_url}/${asset_name}.sha256"
+    expected=$(awk '{print $1}' "${archive}.sha256")
+    rm "${archive}.sha256"
+  fi
+  if [ -z "$expected" ]; then
+    echo "install-github-release.sh: checksum not found for ${asset_name}" >&2
+    rm -f "$archive"
+    exit 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    echo "${expected}  ${archive}" | sha256sum -c -
+  else
+    echo "${expected}  ${archive}" | shasum -a 256 -c -
+  fi
 fi
-rm "${archive}.sha256"
-tar -xzf "$archive" -C "$extract_dir" --strip-components="$STRIP_COMPONENTS"
+case "$asset_name" in
+  *.zip) unzip -q "$archive" -d "$extract_dir" ;;
+  *) tar -xzf "$archive" -C "$extract_dir" --strip-components="$STRIP_COMPONENTS" ;;
+esac
 mv "$extract_dir/$BIN_NAME" "$BIN_DIR/$BIN_NAME"
 chmod +x "$BIN_DIR/$BIN_NAME"
 rm -rf "$archive" "$extract_dir"

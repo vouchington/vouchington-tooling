@@ -170,6 +170,26 @@
       "import": "./dist/workspace-gates/index.mjs",
       "default": "./dist/workspace-gates/index.mjs"
     },
+    "./nuget-central-version": {
+      "types": "./dist/nuget-central-version/index.d.mts",
+      "import": "./dist/nuget-central-version/index.mjs",
+      "default": "./dist/nuget-central-version/index.mjs"
+    },
+    "./swift-semantic-equal": {
+      "types": "./dist/swift-semantic-equal/index.d.mts",
+      "import": "./dist/swift-semantic-equal/index.mjs",
+      "default": "./dist/swift-semantic-equal/index.mjs"
+    },
+    "./swift-source-offset": {
+      "types": "./dist/swift-source-offset/index.d.mts",
+      "import": "./dist/swift-source-offset/index.mjs",
+      "default": "./dist/swift-source-offset/index.mjs"
+    },
+    "./swift-resolved-pin-delta": {
+      "types": "./dist/swift-resolved-pin-delta/index.d.mts",
+      "import": "./dist/swift-resolved-pin-delta/index.mjs",
+      "default": "./dist/swift-resolved-pin-delta/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

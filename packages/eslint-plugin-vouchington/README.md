@@ -47,6 +47,38 @@ If `modules` or `executors` is missing or empty, the rule loads and reports noth
 
 `include` and `exclude` are picomatch globs relative to the lint cwd. `includeFiles` are exact relative paths that stay in even when `exclude` matches.
 
+## `banned-member-read`
+
+Ban reads of configured object members, including object-pattern aliases. Assignments and `delete` are allowed.
+
+If `members` is missing or empty, the rule loads and reports nothing. Consumers keep product exceptions in `exclude` / `includeFiles`.
+
+### Options
+
+| Name           | Type       | Required | Default                    |
+| -------------- | ---------- | -------- | -------------------------- |
+| `members`      | `string[]` | yes      | —                          |
+| `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs}` |
+| `exclude`      | `string[]` | no       | `[]`                       |
+| `includeFiles` | `string[]` | no       | `[]`                       |
+
+## `factory-owner-location`
+
+Keep configured factory calls in owner files. Detects named imports, namespace members, and `createRequire(...)(module)` provenance from `node:module`.
+
+If `modules`, `factories`, or `owners` is missing or empty, the rule loads and reports nothing. Virtual-program / test-lifecycle overlays stay in the consuming repo.
+
+### Options
+
+| Name           | Type       | Required | Default                    |
+| -------------- | ---------- | -------- | -------------------------- |
+| `modules`      | `string[]` | yes      | —                          |
+| `factories`    | `string[]` | yes      | —                          |
+| `owners`       | `string[]` | yes      | —                          |
+| `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs}` |
+| `exclude`      | `string[]` | no       | `[]`                       |
+| `includeFiles` | `string[]` | no       | `[]`                       |
+
 ### Oxlint
 
 ```json

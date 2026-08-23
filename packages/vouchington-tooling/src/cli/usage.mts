@@ -20,6 +20,14 @@ Commands:
   load-runner-env               Overlay a runner env file onto GITHUB_ENV with injection guards
   clean-workspace               Reset a persistent-runner workspace with a fork-PR trust gate
   install-github-release        Download a checksum-verified GitHub Release binary
+  run-with-timeout              Run a command with GNU timeout or a Perl fallback
+  lint-links                    Two-pass lychee: internal links fail, external warn
+  materialize-pr-context        Dump PR title/body/files/diff/comments and #N crawl
+  wait-for-apt-locks            Wait until apt/dpkg lock files are free
+  install-playwright-chromium-arm64  Install Playwright Chromium from browsers.json
+  ghcr-package-retention        Delete old GHCR package versions past KEEP_MIN
+  nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
+  swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
 
 Options:
   -h, --help       Show this help
@@ -61,7 +69,15 @@ check-cache-size <path> <max-bytes> <label>
 make-shard-matrix <total>
 load-runner-env
 clean-workspace
-install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name
+install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name [--tag-prefix PREFIX] [--no-checksum] [--checksums-asset NAME] [--version-flag FLAG] [--bin-dir DIR]
+run-with-timeout <timeout-seconds> <kill-after-seconds> <command...>
+lint-links [--offline] [--config PATH] [--glob PATTERN] [files...]
+materialize-pr-context
+wait-for-apt-locks
+install-playwright-chromium-arm64 [name:archive...]
+ghcr-package-retention <url-encoded-package>...
+nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
+swift-semantic-equal <base> <head> <file.swift>
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

@@ -183,6 +183,26 @@ describe('parseCli', () => {
       command: 'install-github-release',
       args: ['--repo', 'owner/name'],
     })
+    expect(parseCli(['node', 'vouchington', 'run-with-timeout', '30', '5', 'true'])).toEqual({
+      kind: 'script',
+      command: 'run-with-timeout',
+      args: ['30', '5', 'true'],
+    })
+    expect(parseCli(['node', 'vouchington', 'lint-links', '--offline'])).toEqual({
+      kind: 'script',
+      command: 'lint-links',
+      args: ['--offline'],
+    })
+    expect(parseCli(['node', 'vouchington', 'nuget-central-version', 'a', 'b', 'c', 'd'])).toEqual({
+      kind: 'nuget-central-version',
+      args: ['a', 'b', 'c', 'd'],
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'swift-semantic-equal', 'base', 'head', 'A.swift']),
+    ).toEqual({
+      kind: 'swift-semantic-equal',
+      args: ['base', 'head', 'A.swift'],
+    })
   })
 
   it('parses http-origin flags', () => {
