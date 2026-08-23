@@ -15,6 +15,8 @@ export type ParsedCli =
   | { kind: 'vitest-blob-manifest'; args: string[] }
   | { kind: 'nuget-central-version'; args: string[] }
   | { kind: 'swift-semantic-equal'; args: string[] }
+  | { kind: 'post-review'; args: string[] }
+  | { kind: 'stage-review-payload'; args: string[] }
   | { kind: 'http-origin'; field: string; value: string }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
@@ -73,6 +75,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
   if (command === 'nuget-central-version') return { kind: 'nuget-central-version', args: rest }
   if (command === 'swift-semantic-equal') return { kind: 'swift-semantic-equal', args: rest }
+  if (command === 'post-review') return { kind: 'post-review', args: rest }
+  if (command === 'stage-review-payload') return { kind: 'stage-review-payload', args: rest }
   if (command === 'http-origin') return parseHttpOrigin(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {

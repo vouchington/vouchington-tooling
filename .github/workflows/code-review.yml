@@ -1,0 +1,182 @@
+name: Code Review
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      trusted_prompt_ref:
+        description: Trusted git ref for review prompt files
+        required: false
+        type: string
+        default: ${{ github.sha }}
+      prompt_path:
+        required: false
+        type: string
+        default: .agents/skills/agent-workflow/code-review-prompt.md
+      inline_prompt_path:
+        required: false
+        type: string
+        default: docs/prompts/code-review-inline-comments.md
+      extra_prompt:
+        description: Extra prompt text. The action rejects this unless the caller is private.
+        required: false
+        type: string
+        default: ''
+      model:
+        required: false
+        type: string
+        default: opus
+      effort:
+        required: false
+        type: string
+        default: xhigh
+      runs_on:
+        description: JSON array of runner labels
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
+      required_review:
+        required: false
+        type: boolean
+        default: false
+      token_source:
+        required: false
+        type: string
+        default: claude-app
+      provider_name:
+        required: false
+        type: string
+        default: Claude
+    secrets:
+      claude_code_oauth_token:
+        required: false
+      provider_api_token:
+        required: false
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+      model:
+        description: Claude model to use
+        required: false
+        type: choice
+        default: opus
+        options:
+          - haiku
+          - sonnet
+          - opus
+      effort:
+        description: Thinking effort level
+        required: false
+        type: choice
+        default: xhigh
+        options:
+          - low
+          - medium
+          - high
+          - xhigh
+          - max
+      required_review:
+        description: Fail the workflow if the review cannot run
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  review:
+    runs-on: ${{ fromJSON(inputs.runs_on || '["ubuntu-latest"]') }}
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Checkout review actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vouchington/vouchington-tooling
+          ref: ${{ github.workflow_sha }}
+          path: .vouchington-tooling
+          fetch-depth: 1
+
+      - name: Run Code Review
+        id: agent
+        uses: ./.vouchington-tooling/.github/actions/code-review
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          provider_name: ${{ inputs.provider_name || 'Claude' }}
+          trusted_prompt_ref: ${{ inputs.trusted_prompt_ref || github.sha }}
+          prompt_path: ${{ inputs.prompt_path || '.agents/skills/agent-workflow/code-review-prompt.md' }}
+          inline_prompt_path: ${{ inputs.inline_prompt_path || 'docs/prompts/code-review-inline-comments.md' }}
+          extra_prompt: ${{ inputs.extra_prompt || '' }}
+          model: ${{ inputs.model }}
+          effort: ${{ inputs.effort }}
+          claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
+          provider_api_token: ${{ secrets.provider_api_token }}
+
+      - name: Require agent success
+        if: >-
+          always() &&
+          (inputs.required_review == true || inputs.required_review == 'true') &&
+          (steps.agent.outcome != 'success' || steps.agent.outputs.agent_outcome != 'success')
+        run: |
+          echo "::error::Code Review agent did not complete successfully."
+          exit 1
+
+  poster:
+    needs: [review]
+    if: always() && needs.review.outputs.payload_artifact_id != ''
+    runs-on: ${{ fromJSON(inputs.runs_on || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      id-token: write
+    outputs:
+      poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
+      posted: ${{ steps.poster.outputs.posted }}
+    steps:
+      - name: Checkout review actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vouchington/vouchington-tooling
+          ref: ${{ github.workflow_sha }}
+          path: .vouchington-tooling
+          fetch-depth: 1
+
+      - name: Post Code Review
+        id: poster
+        uses: ./.vouchington-tooling/.github/actions/code-review-poster
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
+          provider_name: ${{ inputs.provider_name || 'Claude' }}
+          token_source: ${{ inputs.token_source || 'claude-app' }}
+
+      - name: Require poster success
+        if: >-
+          always() &&
+          (inputs.required_review == true || inputs.required_review == 'true') &&
+          (steps.poster.outcome != 'success' || steps.poster.outputs.poster_outcome != 'success')
+        run: |
+          echo "::error::Code Review poster did not complete successfully."
+          exit 1

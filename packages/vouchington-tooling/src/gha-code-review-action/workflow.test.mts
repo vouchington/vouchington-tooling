@@ -1,0 +1,60 @@
+import { readFileSync } from 'node:fs'
+
+import { parse as load } from 'yaml'
+import { describe, expect, it } from 'vitest'
+
+type Workflow = {
+  on?: {
+    workflow_call?: { inputs?: Record<string, unknown>; secrets?: Record<string, unknown> }
+    workflow_dispatch?: { inputs?: Record<string, unknown> }
+    issue_comment?: unknown
+  }
+  jobs?: Record<
+    string,
+    {
+      steps?: Array<{ uses?: string; name?: string; with?: Record<string, unknown> }>
+      permissions?: Record<string, unknown>
+    }
+  >
+}
+
+const workflow = load(readFileSync('.github/workflows/code-review.yml', 'utf8')) as Workflow
+const text = readFileSync('.github/workflows/code-review.yml', 'utf8')
+
+describe('code-review reusable workflow', () => {
+  it('does not expose a free-text prompt on public dispatch', () => {
+    expect(workflow.on?.issue_comment).toBeUndefined()
+    expect(text).not.toContain('@claude')
+    const dispatchInputs = Object.keys(workflow.on?.workflow_dispatch?.inputs ?? {})
+    expect(dispatchInputs).toEqual(['pr_number', 'model', 'effort', 'required_review'])
+    expect(workflow.on?.workflow_call?.inputs).not.toHaveProperty('prompt')
+    expect(workflow.on?.workflow_dispatch?.inputs).not.toHaveProperty('prompt')
+    expect(workflow.on?.workflow_dispatch?.inputs).not.toHaveProperty('extra_prompt')
+  })
+
+  it('runs an uncredentialed agent job and a separate poster job', () => {
+    expect(Object.keys(workflow.jobs ?? {})).toEqual(['review', 'poster'])
+    expect(workflow.jobs?.review?.permissions).toEqual({
+      actions: 'read',
+      contents: 'read',
+      'pull-requests': 'read',
+    })
+    expect(workflow.jobs?.poster?.permissions).toEqual({
+      actions: 'read',
+      contents: 'read',
+      'pull-requests': 'write',
+      'id-token': 'write',
+    })
+    const reviewUses = workflow.jobs?.review?.steps?.map((step) => step.uses)
+    expect(reviewUses?.some((uses) => uses?.includes('code-review'))).toBe(true)
+    expect(reviewUses?.some((uses) => uses?.includes('code-review-poster'))).toBe(false)
+    expect(
+      workflow.jobs?.poster?.steps?.some((step) => step.uses?.includes('code-review-poster')),
+    ).toBe(true)
+  })
+
+  it('loads nested composites from the workflow SHA, not the caller SHA', () => {
+    expect(text).toContain('ref: ${{ github.workflow_sha }}')
+    expect(text).toContain('repository: vouchington/vouchington-tooling')
+  })
+})

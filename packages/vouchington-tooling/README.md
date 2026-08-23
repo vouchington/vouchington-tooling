@@ -41,6 +41,8 @@ vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington swift-semantic-equal BASE HEAD App.swift
+vouchington post-review
+vouchington stage-review-payload optional|required <source> <destination>
 ```
 
 Host-lock environment:
@@ -91,6 +93,7 @@ import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
+import { runPostReview } from 'vouchington-tooling/gha-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
 import { pruneDeployedRuntimeDeps } from 'vouchington-tooling/pnpm-deploy'
@@ -107,5 +110,5 @@ import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
-boundaries. They do not include provider credentials, product policy, network transport, or
-repository-specific package names; consumers supply those through their own adapters.
+boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied
+credentials (job token or a minted Claude GitHub App token).

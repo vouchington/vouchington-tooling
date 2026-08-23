@@ -10,6 +10,8 @@ import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runScript } from './commands/spawn-script.mts'
 import { runNugetCentralVersionCommand } from './commands/nuget-central-version.mts'
+import { runPostReviewCommand } from './commands/post-review.mts'
+import { runStageReviewPayloadCommand } from './commands/stage-review-payload.mts'
 import { runSwiftSemanticEqualCommand } from './commands/swift-semantic-equal.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
@@ -84,6 +86,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runNugetCentralVersionCommand(parsed.args)
     case 'swift-semantic-equal':
       return runSwiftSemanticEqualCommand(parsed.args)
+    case 'post-review':
+      return runPostReviewCommand()
+    case 'stage-review-payload':
+      return runStageReviewPayloadCommand(parsed.args)
     case 'http-origin':
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':
