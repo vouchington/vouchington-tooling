@@ -74,6 +74,14 @@ private. There is no `@claude` mention workflow.
   with:
     pr_number: ${{ inputs.pr_number }}
     artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+
+- uses: vouchington/vouchington-tooling/.github/actions/opencode-code-review@<sha>
+  with:
+    pr_number: ${{ inputs.pr_number }}
+    trusted_prompt_ref: ${{ github.sha }}
+    model: openrouter/stealth/ox-alpha
+    payload_artifact_name: opencode
+    openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
 ```
 
 Or call the two-job reusable workflow:
