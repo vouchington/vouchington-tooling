@@ -79,11 +79,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Stash existing trusted prompt directory
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/stash-trusted-prompt-dir.sh"
+
     - name: Checkout trusted review prompt
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         ref: ${{ inputs.trusted_prompt_ref }}
-        path: ${{ runner.temp }}/trusted-review-prompt
+        path: .trusted-review-prompt
         fetch-depth: 1
 
     - name: Build review prompt
@@ -113,7 +117,7 @@ runs:
         fi
         prompt_rel="$(bash "$GITHUB_ACTION_PATH/validate-prompt-path.sh" "$PROMPT_PATH")"
         inline_rel="$(bash "$GITHUB_ACTION_PATH/validate-prompt-path.sh" "$INLINE_PROMPT_PATH")"
-        trusted_root="${RUNNER_TEMP}/trusted-review-prompt"
+        trusted_root="${GITHUB_WORKSPACE}/.trusted-review-prompt"
         trusted_prompt="$trusted_root/$prompt_rel"
         trusted_inline_prompt="$trusted_root/$inline_rel"
         prompt_file="${RUNNER_TEMP}/code-review-prompt.md"
@@ -301,10 +305,10 @@ runs:
       run: |
         set -euo pipefail
         bash "${VOUCHINGTON_ACTION_PATH:?}/cleanup-worktrees.sh"
+        bash "$GITHUB_ACTION_PATH/restore-trusted-prompt-dir.sh"
         rm -rf \
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
           "${GITHUB_WORKSPACE}/.vouchington-tooling" \
           "${RUNNER_TEMP}/code-review-payload" \
-          "${RUNNER_TEMP}/trusted-review-prompt" \
           "${RUNNER_TEMP}/code-review-prompt.md" \
           "${RUNNER_TEMP}/vouchington-tooling-runtime"
