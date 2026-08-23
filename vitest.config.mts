@@ -6,7 +6,7 @@ export default defineConfig({
     include: ['packages/*/src/**/*.test.mts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'lcov', 'cobertura'],
       include: ['packages/*/src/**/*.mts'],
       exclude: [
         'packages/*/src/**/*.test.mts',
