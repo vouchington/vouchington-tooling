@@ -78,13 +78,26 @@ describe('github review adapter', () => {
         stdoutFail,
       ),
     ).toMatchObject({ ok: false, status: 401 })
+
+    const bare: GhExec = () => {
+      throw { stdout: 'HTTP 500 Internal Server Error' }
+    }
+    expect(
+      postWithGh(
+        'o/r',
+        '3',
+        { event: 'COMMENT', commit_id: HEAD_SHA, body: 'ok', comments: [] },
+        'tok',
+        bare,
+      ),
+    ).toMatchObject({ ok: false, status: 500 })
   })
 
   it('writes posted output only when GITHUB_OUTPUT is set', () => {
     const dir = mkdtempSync(join(tmpdir(), 'posted-output-'))
     const output = join(dir, 'github-output')
     try {
-      writePostedOutput(true)
+      writePostedOutput(true, '')
       writeFileSync(output, '')
       writePostedOutput(true, output)
       writePostedOutput(false, output)
