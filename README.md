@@ -57,6 +57,38 @@ update from overwriting or nesting an existing local plugin.
 
 Centralized Cursor marketplace publication is not part of this repository change.
 
+## GitHub Actions
+
+Pin by commit SHA. The public actions never take a free-text `prompt` input. Prompt text comes from
+trusted files on `trusted_prompt_ref`. `extra_prompt` is rejected unless the calling repository is
+private. There is no `@claude` mention workflow.
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/code-review@<sha>
+  with:
+    pr_number: ${{ inputs.pr_number }}
+    trusted_prompt_ref: ${{ github.sha }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+- uses: vouchington/vouchington-tooling/.github/actions/code-review-poster@<sha>
+  with:
+    pr_number: ${{ inputs.pr_number }}
+    artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+```
+
+Or call the two-job reusable workflow:
+
+```yaml
+jobs:
+  review:
+    uses: vouchington/vouchington-tooling/.github/workflows/code-review.yml@<sha>
+    with:
+      pr_number: ${{ inputs.pr_number }}
+      runs_on: '["self-hosted","Claude Code"]'
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
 ## CLI
 
 ```bash
@@ -90,6 +122,8 @@ vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington swift-semantic-equal BASE HEAD App.swift
+vouchington post-review
+vouchington stage-review-payload optional|required <source> <destination>
 ```
 
 ## Packages
@@ -119,6 +153,7 @@ import { decide } from 'vouchington-tooling/transient-retry'
 import { parseCsvRows } from 'vouchington-tooling/csv'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { parseReviewPayload } from 'vouchington-tooling/gha-review-payload'
+import { runPostReview } from 'vouchington-tooling/gha-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
 import { pruneDeployedRuntimeDeps } from 'vouchington-tooling/pnpm-deploy'

@@ -223,6 +223,25 @@ export type {
   SanitizedReview,
 } from './gha-review-payload/index.mts'
 export {
+  CLAUDE_OIDC_AUDIENCE,
+  createActionsClaudeTokenIo,
+  mintClaudeAppToken,
+  PostReviewError,
+  requireEnv,
+  resolveReviewPostToken,
+  revokeClaudeAppToken,
+  runPostReview,
+  runPostReviewCli,
+  withClaudeAppToken,
+} from './gha-post-review/index.mts'
+export type {
+  ClaudeTokenIo,
+  PostResult,
+  PostReviewIo,
+  PullFile,
+  ReviewPostToken,
+} from './gha-post-review/index.mts'
+export {
   nextPageCursorFromLinkHeader,
   nextPageUrlFromLinkHeader,
   validatePaginationRequestUrl,

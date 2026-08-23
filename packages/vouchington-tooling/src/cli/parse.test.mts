@@ -203,6 +203,16 @@ describe('parseCli', () => {
       kind: 'swift-semantic-equal',
       args: ['base', 'head', 'A.swift'],
     })
+    expect(parseCli(['node', 'vouchington', 'post-review'])).toEqual({
+      kind: 'post-review',
+      args: [],
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'stage-review-payload', 'required', 'src', 'dest']),
+    ).toEqual({
+      kind: 'stage-review-payload',
+      args: ['required', 'src', 'dest'],
+    })
   })
 
   it('parses http-origin flags', () => {

@@ -28,6 +28,8 @@ Commands:
   ghcr-package-retention        Delete old GHCR package versions past KEEP_MIN
   nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
   swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
+  post-review                   Post one COMMENT review from a staged payload file
+  stage-review-payload          Validate a review payload file into a staging directory
 
 Options:
   -h, --help       Show this help
@@ -78,6 +80,8 @@ install-playwright-chromium-arm64 [name:archive...]
 ghcr-package-retention <url-encoded-package>...
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
 swift-semantic-equal <base> <head> <file.swift>
+post-review
+stage-review-payload optional|required <source> <destination>
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

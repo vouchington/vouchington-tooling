@@ -28,6 +28,7 @@
         "src/ci-local/index.mts!",
         "src/gha-rate-limit/index.mts!",
         "src/gha-pr-checkpoint/index.mts!",
+        "src/gha-post-review/index.mts!",
         "src/workspace-gates/index.mts!",
         "src/nuget-central-version/index.mts!",
         "src/nuget-central-version/cli.mts!",
