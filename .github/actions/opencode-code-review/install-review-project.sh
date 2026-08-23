@@ -17,3 +17,4 @@ fi
 cp -a "${GITHUB_ACTION_PATH:?}/review-project" "${workspace}/.opencode"
 rm -rf "${workspace}/.opencode/plugins"
 cp "${GITHUB_ACTION_PATH}/review-project/opencode.json" "${workspace}/opencode.json"
+: > "${RUNNER_TEMP}/opencode-review-project-installed"

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -93,6 +93,69 @@ describe('stage-runtime.sh', () => {
       expect(existsSync(join(dest, '.github/actions/code-review/worktree-create.sh'))).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('trusted prompt directory stash', () => {
+  it('restores a caller-owned checkout path after cleanup', () => {
+    const root = mkdtempSync(join(tmpdir(), 'trusted-prompt-stash-'))
+    const workspace = join(root, 'workspace')
+    const tmp = join(root, 'tmp')
+    mkdirSync(join(workspace, '.trusted-review-prompt'), { recursive: true })
+    mkdirSync(tmp, { recursive: true })
+    writeFileSync(join(workspace, '.trusted-review-prompt/owned.md'), 'caller\n')
+    const env = {
+      ...process.env,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: tmp,
+    }
+    try {
+      expect(
+        spawnSync('bash', [join(actionDir, 'stash-trusted-prompt-dir.sh')], {
+          encoding: 'utf8',
+          env,
+        }).status,
+      ).toBe(0)
+      expect(existsSync(join(workspace, '.trusted-review-prompt'))).toBe(false)
+      mkdirSync(join(workspace, '.trusted-review-prompt'), { recursive: true })
+      writeFileSync(join(workspace, '.trusted-review-prompt/checkout.md'), 'trusted\n')
+      expect(
+        spawnSync('bash', [join(actionDir, 'restore-trusted-prompt-dir.sh')], {
+          encoding: 'utf8',
+          env,
+        }).status,
+      ).toBe(0)
+      expect(readFileSync(join(workspace, '.trusted-review-prompt/owned.md'), 'utf8')).toBe(
+        'caller\n',
+      )
+      expect(existsSync(join(workspace, '.trusted-review-prompt/checkout.md'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not delete a caller-owned path when stash never ran', () => {
+    const root = mkdtempSync(join(tmpdir(), 'trusted-prompt-skip-'))
+    const workspace = join(root, 'workspace')
+    mkdirSync(join(workspace, '.trusted-review-prompt'), { recursive: true })
+    writeFileSync(join(workspace, '.trusted-review-prompt/owned.md'), 'caller\n')
+    try {
+      expect(
+        spawnSync('bash', [join(actionDir, 'restore-trusted-prompt-dir.sh')], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_WORKSPACE: workspace,
+            RUNNER_TEMP: join(root, 'tmp'),
+          },
+        }).status,
+      ).toBe(0)
+      expect(readFileSync(join(workspace, '.trusted-review-prompt/owned.md'), 'utf8')).toBe(
+        'caller\n',
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
   })
 })

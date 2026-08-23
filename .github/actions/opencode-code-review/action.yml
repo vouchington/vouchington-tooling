@@ -49,6 +49,10 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Stash existing trusted prompt directory
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/../code-review/stash-trusted-prompt-dir.sh"
+
     - name: Checkout trusted review prompt
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
@@ -243,7 +247,7 @@ runs:
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
           "${GITHUB_WORKSPACE}/.review-context" \
           "${GITHUB_WORKSPACE}/.vouchington-tooling" \
-          "${GITHUB_WORKSPACE}/.trusted-review-prompt" \
           "${RUNNER_TEMP}/code-review-payload" \
           "${RUNNER_TEMP}/opencode-review-prompt.md"
+        bash "$GITHUB_ACTION_PATH/../code-review/restore-trusted-prompt-dir.sh"
         bash "$GITHUB_ACTION_PATH/restore-review-project.sh"

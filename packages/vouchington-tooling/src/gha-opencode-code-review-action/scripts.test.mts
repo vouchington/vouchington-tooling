@@ -124,6 +124,32 @@ describe('opencode-code-review scripts', () => {
     }
   })
 
+  it('leaves caller OpenCode files alone when install never ran', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opencode-restore-skip-'))
+    const workspace = join(root, 'workspace')
+    mkdirSync(join(workspace, '.opencode'), { recursive: true })
+    writeFileSync(join(workspace, '.opencode/user.md'), 'keep-me\n')
+    writeFileSync(join(workspace, 'opencode.json'), '{"user":true}\n')
+    const env = {
+      ...process.env,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: join(root, 'tmp'),
+    }
+    try {
+      expect(
+        spawnSync(
+          'bash',
+          [resolve('.github/actions/opencode-code-review/restore-review-project.sh')],
+          { encoding: 'utf8', env },
+        ).status,
+      ).toBe(0)
+      expect(readFileSync(join(workspace, '.opencode/user.md'), 'utf8')).toBe('keep-me\n')
+      expect(readFileSync(join(workspace, 'opencode.json'), 'utf8')).toBe('{"user":true}\n')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('restores the caller OpenCode project files after installing the review-project', () => {
     const root = mkdtempSync(join(tmpdir(), 'opencode-restore-'))
     const workspace = join(root, 'workspace')

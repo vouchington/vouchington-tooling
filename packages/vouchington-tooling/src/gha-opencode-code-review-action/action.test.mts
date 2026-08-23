@@ -38,11 +38,17 @@ describe('opencode-code-review action', () => {
     )
   })
 
-  it('checks out the trusted prompt into runner temp', () => {
+  it('checks out the trusted prompt into a workspace-relative path', () => {
+    expect(stepByName.get('Stash existing trusted prompt directory')?.run).toContain(
+      'stash-trusted-prompt-dir.sh',
+    )
     expect(stepByName.get('Checkout trusted review prompt')?.with).toMatchObject({
       path: '.trusted-review-prompt',
       'persist-credentials': false,
     })
+    expect(stepByName.get('Clean review payload files')?.run).toContain(
+      'restore-trusted-prompt-dir.sh',
+    )
   })
 
   it('materializes PR context with the job token and keeps gh away from the model', () => {
