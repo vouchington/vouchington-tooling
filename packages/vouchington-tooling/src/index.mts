@@ -78,8 +78,10 @@ export type {
 export { prepareVitestReports } from './vitest-blob-manifest/reports.mts'
 export type {
   PrepareVitestReportsOptions,
+  RejectedVitestReportSource,
   SelectedVitestReport,
   VitestReportExpectation,
+  VitestReportRejectionReason,
 } from './vitest-blob-manifest/reports.mts'
 export {
   findWorkspaceLinkMismatches,
