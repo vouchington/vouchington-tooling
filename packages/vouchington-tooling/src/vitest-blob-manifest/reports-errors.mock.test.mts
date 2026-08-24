@@ -18,10 +18,15 @@ import { VitestBlobBundleError } from './bundle-error.mts'
 import { inspectVitestReportSource } from './reports-source.mts'
 import { prepareVitestReports } from './reports.mts'
 
-const mocks = vi.hoisted(() => ({ inspect: vi.fn(), lstat: vi.fn(), rename: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  inspect: vi.fn(),
+  lstat: vi.fn(),
+  rename: vi.fn(),
+  rm: vi.fn(),
+}))
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
-  return { ...actual, lstatSync: mocks.lstat, renameSync: mocks.rename }
+  return { ...actual, lstatSync: mocks.lstat, renameSync: mocks.rename, rmSync: mocks.rm }
 })
 vi.mock('./index.mts', async () => {
   const actual = await vi.importActual<typeof import('./index.mts')>('./index.mts')
@@ -45,15 +50,17 @@ const sourceOptions = {
 
 describe('prepare Vitest report runtime failures', () => {
   let root: string
-  let actualRename: typeof renameSync
+  let actualRename: typeof renameSync, actualRm: typeof rmSync
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'vitest-report-errors-'))
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs')
     const actualManifest = await vi.importActual<typeof import('./index.mts')>('./index.mts')
     actualRename = actualFs.renameSync
+    actualRm = actualFs.rmSync
     vi.mocked(lstatSync).mockImplementation(actualFs.lstatSync)
     vi.mocked(renameSync).mockImplementation(actualRename)
+    vi.mocked(rmSync).mockImplementation(actualRm)
     vi.mocked(inspectVitestBlobBundle).mockImplementation(actualManifest.inspectVitestBlobBundle)
   })
 
@@ -61,7 +68,8 @@ describe('prepare Vitest report runtime failures', () => {
     vi.mocked(inspectVitestBlobBundle).mockReset()
     vi.mocked(lstatSync).mockReset()
     vi.mocked(renameSync).mockReset()
-    rmSync(root, { recursive: true, force: true })
+    vi.mocked(rmSync).mockReset()
+    actualRm(root, { recursive: true, force: true })
   })
 
   function bundle(source: string): void {
@@ -105,6 +113,30 @@ describe('prepare Vitest report runtime failures', () => {
     )
   })
 
+  it.each([true, false])('compares report bytes after identical manifests (%s)', (sameReport) => {
+    const source = join(root, 'source')
+    mkdirSync(join(source, 'one'), { recursive: true })
+    mkdirSync(join(source, 'two'))
+    let call = 0
+    vi.mocked(inspectVitestBlobBundle).mockImplementation((directory) => ({
+      directory,
+      manifest: {
+        version: 'vitest-blob-manifest:v1',
+        suite: identity.suite,
+        repository: identity.repository,
+        revision,
+        run: { id: identity.runId, attempt: 2 },
+        report: { filename: 'tooling.json', byteLength: 2, sha256: 'a'.repeat(64) },
+      },
+      manifestBytes: Buffer.from('same'),
+      reportBytes: Buffer.from(sameReport || call++ === 0 ? 'one' : 'two'),
+    }))
+
+    const inspected = inspectVitestReportSource(source, 'primary', sourceOptions)
+    if (sameReport) expect(inspected.candidates).toHaveLength(2)
+    else expect(inspected.rejected).toEqual({ source: 'primary', reason: 'intra-source-conflict' })
+  })
+
   it.each([false, true])(
     'preserves the prior output backup when publishing fails (restore fails: %s)',
     (restoreFails) => {
@@ -145,6 +177,56 @@ describe('prepare Vitest report runtime failures', () => {
       expect(readFileSync(join(preserved, 'existing.json'), 'utf8')).toBe('preserved')
     },
   )
+
+  it('keeps publication failure terminal when no prior output exists', () => {
+    const primaryDir = join(root, 'primary'),
+      outputDir = join(root, 'output')
+    bundle(primaryDir)
+    vi.mocked(renameSync).mockImplementation((source, destination) => {
+      if (destination === outputDir) throw new Error('publish failed without backup')
+      return actualRename(source, destination)
+    })
+
+    expect(() =>
+      prepareVitestReports({
+        primaryDir,
+        fallbackDir: join(root, 'fallback'),
+        outputDir,
+        expectedSuites: [{ suite: identity.suite, minimumAttempt: 1 }],
+        repository: identity.repository,
+        revision,
+        run: { id: identity.runId, currentAttempt: 2 },
+      }),
+    ).toThrow('publish failed without backup')
+    expect(readdirSync(root).some((entry) => entry.startsWith('.output-backup-'))).toBe(false)
+  })
+
+  it('removes a superseded backup even when temporary cleanup fails', () => {
+    const primaryDir = join(root, 'primary'),
+      outputDir = join(root, 'output')
+    bundle(primaryDir)
+    mkdirSync(outputDir)
+    writeFileSync(join(outputDir, 'existing.json'), 'old')
+    vi.mocked(rmSync).mockImplementation((path, options) => {
+      if (basename(String(path)).startsWith('.output-') && !String(path).includes('-backup-'))
+        throw new Error('temporary cleanup failed')
+      return actualRm(path, options)
+    })
+
+    expect(() =>
+      prepareVitestReports({
+        primaryDir,
+        fallbackDir: join(root, 'fallback'),
+        outputDir,
+        expectedSuites: [{ suite: identity.suite, minimumAttempt: 1 }],
+        repository: identity.repository,
+        revision,
+        run: { id: identity.runId, currentAttempt: 2 },
+      }),
+    ).toThrow('temporary cleanup failed')
+    expect(readdirSync(root).some((entry) => entry.startsWith('.output-backup-'))).toBe(false)
+    expect(readFileSync(join(outputDir, 'tooling.json'), 'utf8')).toBe('{}')
+  })
 
   it.each(['manifest', 'report'] as const)(
     'rejects a bundle missing its declared %s and selects the fallback',
