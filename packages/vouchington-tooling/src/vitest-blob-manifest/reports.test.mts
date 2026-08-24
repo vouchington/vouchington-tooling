@@ -74,10 +74,12 @@ describe('prepareVitestReports', () => {
     mkdirSync(join(root, 'output'))
     writeFileSync(join(root, 'output', 'stale.json'), '{}')
 
-    expect(prepareVitestReports(options(['tooling', identity.suite])).selected).toEqual([
+    const prepared = prepareVitestReports(options(['tooling', identity.suite]))
+    expect(prepared.selected).toEqual([
       { suite: identity.suite, attempt: 2, sources: ['fallback'] },
       { suite: 'tooling', attempt: 2, sources: ['primary'] },
     ])
+    expect(prepared.rejectedSources).toEqual([])
     expect(readdirSync(join(root, 'output'))).toEqual([`${identity.suite}.json`, 'tooling.json'])
     expect(readFileSync(join(root, 'output', `${identity.suite}.json`), 'utf8')).toBe(
       '{"attempt":2}\n',
@@ -91,7 +93,7 @@ describe('prepareVitestReports', () => {
     ])
   })
 
-  it('accepts byte-identical copies and rejects conflicting, missing, duplicate, and unexpected reports', () => {
+  it('accepts byte-identical copies and rejects cross-root conflicts', () => {
     bundle('primary', 'one')
     bundle('fallback', 'two')
     expect(prepareVitestReports(options()).selected[0]).toEqual({
@@ -105,55 +107,127 @@ describe('prepareVitestReports', () => {
     bundle('primary', 'one', identity, '{"primary":true}\n')
     bundle('fallback', 'two', identity, '{"fallback":true}\n')
     expect(() => prepareVitestReports(options())).toThrow('Conflicting Vitest blobs')
+  })
+
+  it('rejects a malformed primary root and uses a valid fallback, symmetrically', () => {
+    bundle('primary', 'owned')
+    writeFileSync(join(root, 'primary', '.invalid-tooling'), 'invalid')
+    bundle('fallback', 'trusted')
+    expect(prepareVitestReports(options())).toEqual({
+      selected: [{ suite: identity.suite, attempt: 2, sources: ['fallback'] }],
+      rejectedSources: [{ source: 'primary', reason: 'invalid-archive' }],
+    })
 
     rmSync(join(root, 'primary'), { recursive: true })
     rmSync(join(root, 'fallback'), { recursive: true })
-    bundle('primary', 'expected')
+    bundle('primary', 'trusted')
+    bundle('fallback', 'owned')
+    writeFileSync(join(root, 'fallback', '.invalid-tooling'), 'invalid')
+    expect(prepareVitestReports(options())).toEqual({
+      selected: [{ suite: identity.suite, attempt: 2, sources: ['primary'] }],
+      rejectedSources: [{ source: 'fallback', reason: 'invalid-archive' }],
+    })
+  })
+
+  it('discards every candidate from a root containing a malformed bundle', () => {
+    bundle('primary', 'valid')
+    const malformed = bundle('primary', 'malformed', { ...identity, suite: 'tooling' })
+    writeFileSync(join(malformed, 'vitest-blob-manifest.json'), '{}')
+    bundle('fallback', 'trusted')
+
+    expect(prepareVitestReports(options())).toEqual({
+      selected: [{ suite: identity.suite, attempt: 2, sources: ['fallback'] }],
+      rejectedSources: [{ source: 'primary', reason: 'invalid-bundle' }],
+    })
+  })
+
+  it('includes deterministic rejected-root context in terminal selection failures', () => {
+    bundle('primary', 'owned')
+    writeFileSync(join(root, 'primary', '.invalid-tooling'), 'invalid')
+    expect(() => prepareVitestReports(options())).toThrow(
+      'Missing expected Vitest suite: backend-shard-1; rejected sources: primary=invalid-archive',
+    )
+
+    bundle('fallback', 'trusted')
     expect(() => prepareVitestReports(options([identity.suite, 'tooling']))).toThrow(
-      'Missing expected',
+      'Missing expected Vitest suite: tooling; rejected sources: primary=invalid-archive',
     )
-    expect(() => prepareVitestReports(options([identity.suite, identity.suite]))).toThrow(
-      'must be unique',
+
+    rmSync(join(root, 'fallback'), { recursive: true })
+    bundle('fallback', 'foreign', { ...identity, repository: 'other/repo' })
+    expect(() => prepareVitestReports(options())).toThrow(
+      'Missing expected Vitest suite: backend-shard-1; rejected sources: primary=invalid-archive, fallback=identity-mismatch',
     )
-    bundle('fallback', 'unexpected', { ...identity, suite: 'tooling' })
-    expect(() => prepareVitestReports(options())).toThrow('Unexpected current-attempt')
+  })
+
+  it('rejects root-local identity, attempt, conflict, and unexpected-suite failures', () => {
+    const cases: Array<{ readonly reason: string; readonly mutate: () => void }> = [
+      {
+        reason: 'identity-mismatch',
+        mutate: () => bundle('primary', 'foreign', { ...identity, repository: 'other/repo' }),
+      },
+      {
+        reason: 'future-attempt',
+        mutate: () => bundle('primary', 'future', { ...identity, runAttempt: 3 }),
+      },
+      {
+        reason: 'intra-source-conflict',
+        mutate: () => {
+          bundle('primary', 'one', identity, '{"one":true}\n')
+          bundle('primary', 'two', identity, '{"two":true}\n')
+        },
+      },
+      {
+        reason: 'unexpected-current-attempt-suite',
+        mutate: () => bundle('primary', 'unexpected', { ...identity, suite: 'tooling' }),
+      },
+    ]
+    for (const testCase of cases) {
+      testCase.mutate()
+      bundle('fallback', 'trusted')
+      expect(prepareVitestReports(options())).toMatchObject({
+        rejectedSources: [{ source: 'primary', reason: testCase.reason }],
+      })
+      rmSync(join(root, 'primary'), { recursive: true, force: true })
+      rmSync(join(root, 'fallback'), { recursive: true, force: true })
+    }
   })
 
   it('fails closed for malformed layouts, bundles, identities, future attempts, and invalid options', () => {
-    const cases: Array<{ readonly message: string; readonly mutate: () => void }> = [
+    const cases: Array<{ readonly reason: string; readonly mutate: () => void }> = [
       {
-        message: 'invalid archive marker',
+        reason: 'invalid-archive',
         mutate: () => {
           bundle('primary', 'owned')
           writeFileSync(join(root, 'primary', '.invalid-tooling'), 'invalid')
         },
       },
       {
-        message: 'unexpected entry',
+        reason: 'unexpected-entry',
         mutate: () => {
           mkdirSync(join(root, 'primary'), { recursive: true })
           writeFileSync(join(root, 'primary', 'unowned'), '')
         },
       },
       {
-        message: 'Invalid Vitest blob bundle',
+        reason: 'invalid-bundle',
         mutate: () => {
           const directory = bundle('primary', 'malformed')
           writeFileSync(join(directory, 'vitest-blob-manifest.json'), '{}')
         },
       },
       {
-        message: 'identity does not match',
+        reason: 'identity-mismatch',
         mutate: () => bundle('primary', 'foreign', { ...identity, repository: 'other/repo' }),
       },
       {
-        message: 'from the future',
+        reason: 'future-attempt',
         mutate: () => bundle('primary', 'future', { ...identity, runAttempt: 3 }),
       },
     ]
     for (const testCase of cases) {
       testCase.mutate()
-      expect(() => prepareVitestReports(options())).toThrow(testCase.message)
+      expect(() => prepareVitestReports(options())).toThrow(`primary=${testCase.reason}`)
       rmSync(join(root, 'primary'), { recursive: true, force: true })
       rmSync(join(root, 'fallback'), { recursive: true, force: true })
     }
@@ -178,20 +252,39 @@ describe('prepareVitestReports', () => {
     expect(() => prepareVitestReports(options([identity.suite], 2, 3))).toThrow(
       'Invalid expected Vitest suite attempt',
     )
+    expect(() => prepareVitestReports(options([identity.suite, identity.suite]))).toThrow(
+      'Expected Vitest suites must be unique',
+    )
   })
 
-  it('accepts empty existing source roots when no suites are expected', () => {
+  it('accepts empty roots and publishes an empty output when no suites are expected', () => {
     const current = options([])
     mkdirSync(current.primaryDir, { recursive: true })
-    expect(prepareVitestReports(current)).toEqual({ selected: [] })
+    writeFileSync(join(root, 'fallback'), 'not a directory')
+    mkdirSync(current.outputDir)
+    writeFileSync(join(current.outputDir, 'stale.json'), '{}')
+    expect(prepareVitestReports(current)).toEqual({
+      selected: [],
+      rejectedSources: [{ source: 'fallback', reason: 'root-not-directory' }],
+    })
     expect(readdirSync(current.outputDir)).toEqual([])
+  })
+
+  it('preserves existing output when rejected roots leave an expected suite missing', () => {
+    mkdirSync(join(root, 'output'))
+    writeFileSync(join(root, 'output', 'existing.json'), '{}')
+    bundle('primary', 'owned')
+    writeFileSync(join(root, 'primary', '.invalid-tooling'), 'invalid')
+
+    expect(() => prepareVitestReports(options())).toThrow('primary=invalid-archive')
+    expect(readdirSync(join(root, 'output'))).toEqual(['existing.json'])
   })
 
   it('rejects symlinked source roots and report entries', () => {
     const target = join(root, 'target')
     mkdirSync(target)
     symlinkSync(target, join(root, 'primary'))
-    expect(() => prepareVitestReports(options())).toThrow('primary root must be a directory')
+    expect(() => prepareVitestReports(options())).toThrow('primary=root-not-directory')
 
     rmSync(join(root, 'primary'))
     const directory = bundle('primary', 'bundle')
@@ -200,6 +293,6 @@ describe('prepareVitestReports', () => {
     writeFileSync(targetReport, readFileSync(report))
     rmSync(report)
     symlinkSync(targetReport, report)
-    expect(() => prepareVitestReports(options())).toThrow('exactly two files')
+    expect(() => prepareVitestReports(options())).toThrow('primary=invalid-bundle')
   })
 })

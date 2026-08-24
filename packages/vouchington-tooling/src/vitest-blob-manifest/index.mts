@@ -10,6 +10,7 @@ import {
 import { basename, join } from 'node:path'
 
 import { VITEST_SUITE_PATTERN } from './constants.mts'
+import { VitestBlobBundleError } from './bundle-error.mts'
 
 export * from './report-attempt.mts'
 export { VITEST_SUITE_PATTERN } from './constants.mts'
@@ -143,9 +144,7 @@ export function writeVitestBlobManifest(directory: string, identity: VitestBlobI
   } finally {
     try {
       unlinkSync(temporaryPath)
-    } catch {
-      // Successful rename removes the temporary path.
-    }
+    } catch {}
   }
   return manifestPath
 }
@@ -160,32 +159,41 @@ export function vitestBlobBundlePaths(directory: string, suite: string): readonl
 }
 
 export function inspectVitestBlobBundle(directory: string): InspectedVitestBlobBundle {
-  const entries = readdirSync(directory, { withFileTypes: true })
+  const entries = readdirSync(directory, { withFileTypes: true }),
+    name = basename(directory)
   if (entries.length !== 2 || entries.some((entry) => !entry.isFile())) {
-    throw new Error(`Vitest blob bundle ${basename(directory)} must contain exactly two files`)
+    throw new VitestBlobBundleError(`Vitest blob bundle ${name} must contain exactly two files`)
   }
   const manifestPath = join(directory, VITEST_BLOB_MANIFEST_FILENAME)
+  if (!entries.some((entry) => entry.name === VITEST_BLOB_MANIFEST_FILENAME))
+    throw new VitestBlobBundleError(`Invalid Vitest blob bundle ${name}`)
   assertRegularFile(manifestPath, 'Vitest blob manifest')
   const manifestBytes = readFileSync(manifestPath)
   let manifest: VitestBlobManifest
   try {
     manifest = parseVitestBlobManifest(JSON.parse(manifestBytes.toString('utf8')) as unknown)
   } catch (error) {
-    throw new Error(`Invalid Vitest blob bundle ${basename(directory)}`, { cause: error })
+    throw new VitestBlobBundleError(`Invalid Vitest blob bundle ${name}`, { cause: error })
   }
   const reportPath = join(directory, manifest.report.filename)
+  if (!entries.some((entry) => entry.name === manifest.report.filename))
+    throw new VitestBlobBundleError(`Invalid Vitest blob bundle ${name}`)
   assertRegularFile(reportPath, 'Vitest blob report')
   const reportBytes = readFileSync(reportPath)
   if (
     reportBytes.byteLength !== manifest.report.byteLength ||
     sha256(reportBytes) !== manifest.report.sha256
   ) {
-    throw new Error(`Vitest blob report integrity check failed for ${manifest.suite}`)
+    throw new VitestBlobBundleError(
+      `Vitest blob report integrity check failed for ${manifest.suite}`,
+    )
   }
   try {
     JSON.parse(reportBytes.toString('utf8'))
   } catch (error) {
-    throw new Error(`Vitest blob report is not valid JSON for ${manifest.suite}`, { cause: error })
+    throw new VitestBlobBundleError(`Vitest blob report is not valid JSON for ${manifest.suite}`, {
+      cause: error,
+    })
   }
   return { directory, manifest, manifestBytes, reportBytes }
 }
