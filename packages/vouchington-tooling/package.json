@@ -1,6 +1,6 @@
 {
   "name": "vouchington-tooling",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "Vouchington CLI and extractable tooling libraries.",
   "homepage": "https://github.com/vouchington/vouchington-tooling/tree/main/packages/vouchington-tooling#readme",
   "bugs": {
