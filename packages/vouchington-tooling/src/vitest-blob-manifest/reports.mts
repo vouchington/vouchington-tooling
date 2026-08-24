@@ -137,8 +137,11 @@ function replaceOutput(outputDir: string, selected: readonly { candidate: Candid
       throw error
     }
   } finally {
-    rmSync(temporary, { recursive: true, force: true })
-    if (backedUp && published) rmSync(backup, { recursive: true, force: true })
+    try {
+      rmSync(temporary, { recursive: true, force: true })
+    } finally {
+      if (backedUp && published) rmSync(backup, { recursive: true, force: true })
+    }
   }
 }
 /** Validates untrusted blob bundles and atomically publishes one newest report per expected suite. */
