@@ -34,7 +34,10 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 function boundedText(value: unknown, fallback: string, limit: number): string {
   if (typeof value !== 'string') return fallback
-  const normalized = value.replace(/\s+/g, ' ').trim()
+  const normalized = value
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   return normalized.length === 0 ? fallback : normalized.slice(0, limit)
 }
 

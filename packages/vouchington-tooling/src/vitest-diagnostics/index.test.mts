@@ -226,14 +226,16 @@ describe('formatDiagnosticReportSummaries', () => {
   it('sanitizes summaries constructed by public API callers', () => {
     const untrusted = {
       ...summarizeDiagnosticReport('report.json', SAMPLE_REPORT),
-      file: `report.json\ninjected=${'x'.repeat(400)}`,
-      heapUsedMB: '1.0\ninjected=true',
+      file: `report.json\n\u001B[2Jinjected=${'x'.repeat(400)}`,
+      heapUsedMB: '1.0\u202Einjected=true',
       threadId: -1,
       topNativeFrameModule: null,
     }
     const output = formatDiagnosticReportSummaries([untrusted])
 
     expect(output).not.toContain('\ninjected')
+    expect(output).not.toContain('\u001B')
+    expect(output).not.toContain('\u202E')
     expect(output).toContain('threadId=unknown')
     expect(output).toContain('topNativeFrameModule=none')
     expect(output.split('\n')).toHaveLength(4)
