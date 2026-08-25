@@ -480,4 +480,16 @@ describe('runBrowserSession', () => {
     )
     expect(child.signals).toEqual(['SIGKILL'])
   })
+
+  it('rejects an unsignalable process group even when direct-child cleanup fails', async () => {
+    const child = new FakeProcess()
+    child.processGroupId = 0
+    child.kill = () => {
+      throw new Error('already exited')
+    }
+
+    await expect(runBrowserSession(options([child]), makeClock().deps)).rejects.toThrow(
+      'processGroupId',
+    )
+  })
 })

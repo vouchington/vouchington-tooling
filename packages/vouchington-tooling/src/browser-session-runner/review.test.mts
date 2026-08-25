@@ -123,4 +123,17 @@ describe('browser-session-runner review regressions', () => {
 
     await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
   })
+
+  it('completes cleanup when descendant draining rejects', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    clock.deps.waitForProcessGroupExit = async () => {
+      throw new Error('group probe failed')
+    }
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
+    expect(process.signals).toEqual(['SIGTERM'])
+  })
 })
