@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { computeTranscriptFacts, runRetrospectiveTranscript } from './index.mts'
+import {
+  computeTranscriptFacts,
+  resolveTranscriptFile,
+  runRetrospectiveTranscript,
+} from './index.mts'
 
 const ROOT_ID = '11111111-1111-1111-1111-111111111111'
 const CHILD_ID = '22222222-2222-2222-2222-222222222222'
@@ -53,6 +57,19 @@ describe('retrospective transcript resilience', () => {
     await expect(
       runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
     ).resolves.toContain('could not resolve a referenced Codex child transcript')
+  })
+
+  it('validates environment identities before using the default Codex session root', async () => {
+    const projectsDir = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+
+    expect(resolveTranscriptFile({ env: { CODEX_THREAD_ID: 'invalid' }, projectsDir })).toEqual({
+      error: 'invalid session id format',
+    })
+    expect(resolveTranscriptFile({ env: { CODEX_THREAD_ID: GRANDCHILD_ID }, projectsDir })).toEqual(
+      {
+        error: `no transcript found for session ${GRANDCHILD_ID}`,
+      },
+    )
   })
 
   it('skips visited Codex identities and propagates a missing nested child', async () => {
