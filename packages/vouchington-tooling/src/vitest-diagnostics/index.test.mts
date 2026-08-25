@@ -118,6 +118,19 @@ describe('summarizeDiagnosticReport', () => {
     expect(summary.event.length).toBeLessThanOrEqual(200)
     expect(summary.topNativeFrameModule?.length).toBeLessThanOrEqual(240)
   })
+
+  it('bounds normalization work and malformed native-symbol scanning', () => {
+    const summary = summarizeDiagnosticReport('report.json', {
+      header: { trigger: `${' '.repeat(1_000_000)}hidden`, event: 'e'.repeat(1_000_000) },
+      nativeStack: [{ symbol: `${'['.repeat(1_000_000)}private-data` }],
+    })
+
+    expect(summary).toMatchObject({
+      trigger: 'unknown',
+      event: 'e'.repeat(200),
+      topNativeFrameModule: null,
+    })
+  })
 })
 
 describe('readDiagnosticReportSummaries', () => {
