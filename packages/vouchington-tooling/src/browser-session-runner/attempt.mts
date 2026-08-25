@@ -91,7 +91,7 @@ export function runAttempt(
       signal('SIGTERM')
     }
     const fail = (error: unknown) => {
-      if (hasFailure) return
+      if (hasFailure || complete) return
       captureFailure(error)
       terminate('exit')
     }
@@ -191,7 +191,7 @@ export function runAttempt(
           if (!childExited) terminate('provider-watchdog')
         },
       })
-      registerWatchdogSetup(setup, watchdog, captureFailure)
+      registerWatchdogSetup(setup, watchdog, fail)
     } catch (error) {
       fail(error)
     }

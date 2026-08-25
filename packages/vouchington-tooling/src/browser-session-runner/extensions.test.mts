@@ -254,6 +254,7 @@ describe('browser-session-runner extension hooks', () => {
     const run = runBrowserSession({ ...options(process), watchdog: () => setup }, testClock.deps)
     reject(new Error('async watchdog setup failed'))
     await Promise.resolve()
+    expect(process.signals).toEqual(['SIGTERM'])
     process.emit('close', null, 'SIGTERM')
 
     await expect(run).rejects.toThrow('async watchdog setup failed')
