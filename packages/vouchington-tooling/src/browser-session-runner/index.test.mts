@@ -425,7 +425,8 @@ describe('runBrowserSession', () => {
 
   it('waits for close after an error event instead of retrying early', async () => {
     const child = new FakeProcess()
-    const run = runBrowserSession({ ...options([child]), attempts: 1 }, makeClock().deps)
+    const clock = makeClock()
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     let settled = false
     void run.then(() => {
       settled = true
@@ -434,9 +435,14 @@ describe('runBrowserSession', () => {
     await Promise.resolve()
     expect(settled).toBe(false)
     expect(child.signals).toEqual(['SIGTERM'])
+    clock.emitSignal('SIGTERM')
+    expect(child.signals).toEqual(['SIGTERM'])
     child.emit('close', null, 'SIGTERM')
 
-    await expect(run).resolves.toMatchObject({ exit: { code: null, signal: 'SIGTERM' } })
+    await expect(run).resolves.toMatchObject({
+      exit: { code: null, signal: 'SIGTERM' },
+      reason: 'parent-signal',
+    })
   })
 
   it('continues direct-child cleanup when process-group signalling throws', async () => {
