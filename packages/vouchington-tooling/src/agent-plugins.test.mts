@@ -138,9 +138,19 @@ describe('vouchington-workflow plugin', () => {
       Promise.all(
         [
           'agent-workflow',
+          'blackboard',
           'git-commit-checklist',
+          'github-issue',
           'github-actions-checklist',
+          'organize-github-issues',
           'package-json-checklist',
+          'planning',
+          'pr-description',
+          'retrospective',
+          'retrospective-distill',
+          'review-ci-logs',
+          'review-github-issue-taxonomy',
+          'revisit-followups',
           'static-analysis-checklist',
         ].map((name) => readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')),
       ),
@@ -174,10 +184,13 @@ describe('vouchington-workflow plugin', () => {
     for (const skill of skills) {
       expect(skill).toContain('AGENTS.md')
       expect(skill).toContain('CLAUDE.md')
-      expect(skill).not.toMatch(/\.agents\/skills|\.github\/workflows\/RUNNERS/i)
-      expect(skill).not.toMatch(/pr-shepherd/i)
+      expect(skill).not.toMatch(/\.agents\/skills|\.github\/workflows\/RUNNERS|filaments|voucha/i)
+      expect(skill).not.toMatch(
+        /pr-shepherd|auto harness|agent hook|coverage (?:tooling|baseline)/i,
+      )
     }
     expect(skills[0]).toContain('every applicable')
     expect(skills[0]).not.toContain('assigned non-main worktree')
+    expect(skills.join('\n')).toContain('consumer wrapper')
   })
 })
