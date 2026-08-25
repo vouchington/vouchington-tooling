@@ -80,6 +80,21 @@ describe('retrospective transcript resilience', () => {
     expect(facts).toMatchObject({ toolCalls: 3, failedToolCalls: 2, pushCommandAttempts: 1 })
   })
 
+  it('extracts shell commands from Codex custom exec calls', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'custom_tool_call',
+          call_id: 'custom-exec',
+          name: 'exec',
+          input: 'await tools.exec_command({cmd: "pnpm exec no-mistakes && git push"})',
+        },
+      }),
+    ])
+    expect(facts).toMatchObject({ toolCalls: 1, noMistakesInvocations: 1, pushCommandAttempts: 1 })
+  })
+
   it('rejects malformed interior records while tolerating a torn final line', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = '88888888-8888-4888-8888-888888888888'
@@ -231,6 +246,15 @@ describe('retrospective transcript resilience', () => {
     const facts = emptyFacts()
     applyCommand('git push\\', facts)
     expect(facts.pushCommandAttempts).toBe(0)
+  })
+
+  it('ignores separator-looking commands inside shell comments', () => {
+    const facts = emptyFacts()
+    applyCommand(
+      'echo done # disabled; git push && pnpm exec no-mistakes\npnpm exec no-mistakes',
+      facts,
+    )
+    expect(facts).toMatchObject({ noMistakesInvocations: 1, pushCommandAttempts: 0 })
   })
 
   it('uses host environment identities when no injected environment is supplied', async () => {

@@ -198,7 +198,7 @@ describe('retrospective transcript', () => {
       failedToolCalls: 2,
       noMistakesInvocations: 1,
       pushCommandAttempts: 1,
-      compactions: 2,
+      compactions: 1,
       tokens: { input: 10, output: 24, cacheRead: 5, cacheCreation: 0 },
     })
   })
@@ -316,6 +316,12 @@ describe('retrospective transcript', () => {
       resolveTranscriptFile({
         ...search,
         env: { CLAUDE_CODE_SESSION_ID: claudeSession },
+      }),
+    ).toEqual({ error: `no transcript found for session ${claudeSession}` })
+    expect(
+      resolveTranscriptFile({
+        ...search,
+        env: { CODEX_THREAD_ID: '', CLAUDE_CODE_SESSION_ID: claudeSession },
       }),
     ).toEqual({ error: `no transcript found for session ${claudeSession}` })
   })

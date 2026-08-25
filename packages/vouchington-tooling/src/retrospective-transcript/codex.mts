@@ -24,9 +24,17 @@ function usage(record: ParsedLine): TokenTotals | undefined {
 }
 
 function command(payload: Record<string, unknown>): string | undefined {
-  if (!['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name))) return undefined
+  const customExec = payload.type === 'custom_tool_call' && payload.name === 'exec'
+  if (!customExec && !['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name)))
+    return undefined
   const raw = payload.type === 'function_call' ? payload.arguments : payload.input
   if (typeof raw !== 'string') return undefined
+  if (customExec) {
+    const match = raw.match(
+      /tools\.exec_command\(\s*\{\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|[\s\S])*?)\1/,
+    )
+    return match?.[2]
+  }
   try {
     const value = asRecord(JSON.parse(raw))
     const candidate = value?.cmd ?? value?.command
@@ -86,17 +94,25 @@ function applyRecords(
   const calls = new Set<string>()
   const failed = new Set<string>()
   let anonymousFailures = 0
+  let previousCompaction: 'top-level' | 'context-event' | undefined
   for (const record of records) {
     const payload = asRecord(record.payload)
     if (!subagent && record.type === 'event_msg' && payload?.type === 'user_message')
       facts.userPrompts++
     if (!subagent && record.type === 'event_msg' && payload?.type === 'agent_message')
       facts.assistantResponses++
-    if (
-      record.type === 'compacted' ||
-      (record.type === 'event_msg' && payload?.type === 'context_compacted')
-    )
+    const compaction =
+      record.type === 'compacted'
+        ? 'top-level'
+        : record.type === 'event_msg' && payload?.type === 'context_compacted'
+          ? 'context-event'
+          : undefined
+    if (compaction && previousCompaction !== undefined && previousCompaction !== compaction)
+      previousCompaction = undefined
+    else if (compaction) {
       facts.compactions++
+      previousCompaction = compaction
+    } else previousCompaction = undefined
     const totals = usage(record)
     if (totals) {
       addDelta(totals, previous, subagent ? facts.subagentTokens : facts.tokens)

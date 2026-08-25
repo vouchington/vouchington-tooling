@@ -45,12 +45,12 @@ export function resolveTranscriptFile(
       path: options.jsonlPath,
       sessionId: options.sessionId ?? sessionLabel(basename(options.jsonlPath, '.jsonl')),
     }
+  const env = options.env ?? process.env
   const sessionId =
     options.sessionId ??
-    (options.env ?? process.env).CODEX_THREAD_ID ??
-    (options.env ?? process.env).CLAUDE_CODE_SESSION_ID ??
-    (options.env ?? process.env).CURSOR_SESSION_ID ??
-    (options.env ?? process.env).GROK_SESSION_ID
+    ['CODEX_THREAD_ID', 'CLAUDE_CODE_SESSION_ID', 'CURSOR_SESSION_ID', 'GROK_SESSION_ID']
+      .map((key) => env[key])
+      .find(Boolean)
   if (!sessionId)
     return {
       error:
@@ -59,7 +59,7 @@ export function resolveTranscriptFile(
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
   const codex = options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions')
   const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
-  const grokHome = (options.env ?? process.env).GROK_HOME || join(homedir(), '.grok')
+  const grokHome = env.GROK_HOME || join(homedir(), '.grok')
   const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
   const encodedCwd = encodeURIComponent(options.cwd ?? process.cwd())
   const grokExact = join(grok, encodedCwd, sessionId, 'updates.jsonl')

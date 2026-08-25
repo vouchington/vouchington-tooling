@@ -82,6 +82,7 @@ function segments(command: string): string[][] {
   let word = ''
   let quote: string | undefined
   let escaped = false
+  let comment = false
   const flush = (): void => {
     if (word) segment.push(word)
     word = ''
@@ -94,15 +95,21 @@ function segments(command: string): string[][] {
   for (let index = 0; index < command.length; index++) {
     const char = command[index]!
     const next = command[index + 1] ?? ''
-    if (escaped) {
+    if (comment) {
+      if (char === '\n') {
+        comment = false
+        end()
+      }
+    } else if (escaped) {
       if (char !== '\n') word += char
       escaped = false
-    } else if (char === '\\' && next !== '' && /[\\'";&|\n]/.test(next)) escaped = true
+    } else if (char === '\\' && next !== '' && /[\\'";#&|\n]/.test(next)) escaped = true
     else if (char === '\\') word += char
     else if (quote) {
       if (char === quote) quote = undefined
       else word += char
     } else if (char === '"' || char === "'") quote = char
+    else if (char === '#' && !word) comment = true
     else if (char === ';' || char === '&' || char === '|' || char === '\n') end()
     else if (/\s/.test(char)) flush()
     else word += char
