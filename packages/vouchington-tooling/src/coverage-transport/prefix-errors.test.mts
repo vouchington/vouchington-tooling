@@ -140,6 +140,39 @@ describe('prefix transport error boundaries', () => {
     expect(() => parseTransportControl(mutate(download()))).toThrow()
   })
 
+  it('rejects a coverage pair whose individually valid objects use different attempts', () => {
+    const older = transportObjectKeysV2(identity, 'web', 2)
+    expect(() =>
+      parseTransportControl({
+        ...download(),
+        coverage: {
+          web: {
+            lcov: { ...download().coverage.web.lcov, key: older.lcov, attempt: 2 },
+            manifest: download().coverage.web.manifest,
+          },
+        },
+      }),
+    ).toThrow(/attempts do not match/)
+  })
+
+  it('selects a matching object after another kind and signs it with the default TTL', async () => {
+    const keys = transportObjectKeysV2(identity, 'web')
+    const signed: number[] = []
+    await discoverDownloadControl(
+      await upload(),
+      {
+        list: async () => ({
+          objects: [
+            { key: keys.manifest, byteLength: 1 },
+            { key: keys.lcov, byteLength: 1 },
+          ],
+        }),
+      },
+      { signGet: async (_key, ttl) => (signed.push(ttl), 'https://storage.example.test/get') },
+    )
+    expect(signed).toHaveLength(2)
+  })
+
   it.each([
     async () => ({
       objects: Array.from({ length: 1025 }, (_, index) => ({ key: `bad-${index}`, byteLength: 1 })),
