@@ -14,6 +14,7 @@ import {
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
+  isProcessGroupAlive,
   lineOfUtf8ByteOffset,
   runnerPortPolicy,
   SELECTED_FILES_ENV_MAX_BYTES,
@@ -22,6 +23,7 @@ import {
   validateOptionalHttpOrigin,
   runPostReview,
   summarizeDiagnosticReport,
+  waitForProcessGroupExit,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -52,5 +54,7 @@ describe('package exports', () => {
     expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
     expect(typeof runPostReview).toBe('function')
     expect(typeof summarizeDiagnosticReport).toBe('function')
+    expect(typeof isProcessGroupAlive).toBe('function')
+    expect(typeof waitForProcessGroupExit).toBe('function')
   })
 })

@@ -16,7 +16,11 @@ export type {
   BrowserSessionWatchdogCleanup,
   BrowserSessionWatchdogController,
 } from './types.mts'
-export { ProcessGroupDrainTimeoutError } from './process-group.mts'
+export {
+  isProcessGroupAlive,
+  ProcessGroupDrainTimeoutError,
+  waitForProcessGroupExit,
+} from './process-group.mts'
 
 const defaultDeps: BrowserSessionDeps = {
   clearInterval,
