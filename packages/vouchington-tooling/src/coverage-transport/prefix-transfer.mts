@@ -29,6 +29,8 @@ export async function uploadPrefixTransport(
   manifestFilename: string,
   options: RequestOptions,
 ): Promise<{ coverage: boolean; blob: boolean }> {
+  if (control.run.controlAttempt !== expectedIdentity.currentAttempt)
+    throw new Error('Prefix transport control attempt does not match the producer attempt')
   if (manifestFilename !== DEFAULT_COVERAGE_MANIFEST_FILENAME)
     throw new Error('Prefix transport requires the default coverage manifest filename')
   const keys = transportObjectKeysV2(identity(control), suite)

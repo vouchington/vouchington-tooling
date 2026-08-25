@@ -152,7 +152,6 @@ describe('prefix transport error boundaries', () => {
         },
       ],
     }),
-    async () => ({ objects: [], continuationToken: '' }),
   ])('rejects invalid discovery pages', async (list) => {
     await expect(
       discoverDownloadControl(await upload(), { list }, { signGet: async () => 'https://x' }),

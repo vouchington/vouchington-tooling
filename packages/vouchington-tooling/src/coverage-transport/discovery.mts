@@ -81,14 +81,14 @@ async function listCandidates(
       if (!parsed) throw new Error('Coverage transport discovery key is invalid')
       result.push({ object, parsed })
     }
-    if (
-      page.continuationToken !== undefined &&
-      (typeof page.continuationToken !== 'string' || !page.continuationToken)
-    )
+    if (page.continuationToken !== undefined && typeof page.continuationToken !== 'string')
       throw new Error('Coverage transport discovery continuation token is invalid')
     continuationToken = page.continuationToken
-    if (continuationToken && (tokens.has(continuationToken) || !tokens.add(continuationToken)))
-      throw new Error('Coverage transport discovery pagination is cyclic')
+    if (continuationToken) {
+      if (tokens.has(continuationToken))
+        throw new Error('Coverage transport discovery pagination is cyclic')
+      tokens.add(continuationToken)
+    }
   } while (continuationToken)
   return result
 }
@@ -130,19 +130,26 @@ export async function discoverDownloadControl(
       options.ttlSeconds ?? DEFAULT_TRANSPORT_TTL_SECONDS,
     ),
   })
-  for (const [suite, entries] of suites) {
-    const attempts = [...new Set(entries.map((entry) => entry.parsed.attempt))].toSorted(
-      (a, b) => b - a,
-    )
-    const pair = attempts
-      .map((attempt) => entries.filter((entry) => entry.parsed.attempt === attempt))
-      .map((entries) => ({ lcov: newest(entries, 'lcov'), manifest: newest(entries, 'manifest') }))
-      .find((pair) => pair.lcov && pair.manifest)
-    if (pair?.lcov && pair.manifest)
-      coverage[suite] = { lcov: await object(pair.lcov), manifest: await object(pair.manifest) }
-    const blob = newest(entries, 'blob')
-    if (blob) blobs[suite] = await object(blob)
-  }
+  await Promise.all(
+    [...suites].map(async ([suite, entries]) => {
+      const attempts = [...new Set(entries.map((entry) => entry.parsed.attempt))].toSorted(
+        (a, b) => b - a,
+      )
+      const pair = attempts
+        .map((attempt) => entries.filter((entry) => entry.parsed.attempt === attempt))
+        .map((entries) => ({
+          lcov: newest(entries, 'lcov'),
+          manifest: newest(entries, 'manifest'),
+        }))
+        .find((pair) => pair.lcov && pair.manifest)
+      if (pair?.lcov && pair.manifest) {
+        const [lcov, manifest] = await Promise.all([object(pair.lcov), object(pair.manifest)])
+        coverage[suite] = { lcov, manifest }
+      }
+      const blob = newest(entries, 'blob')
+      if (blob) blobs[suite] = await object(blob)
+    }),
+  )
   return parseTransportControl({
     version: 2,
     mode: 'discovered-download',
