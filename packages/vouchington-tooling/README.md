@@ -83,6 +83,7 @@ import {
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
+import { runBrowserSession } from 'vouchington-tooling/browser-session-runner'
 import {
   generateSchemaSnapshot,
   renderSchemaMarkdown,
@@ -124,3 +125,7 @@ credentials (job token or a minted Claude GitHub App token).
 `vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
 filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
 native frame symbols. Both structured reads and text rendering have hard report-count limits.
+
+`browser-session-runner` supervises caller-created browser-test processes. Callers supply command
+construction, line classification, retry/outcome policy, and budgets; the library owns process-group
+termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.

@@ -90,6 +90,11 @@
       "import": "./dist/process-line-buffer/index.mjs",
       "default": "./dist/process-line-buffer/index.mjs"
     },
+    "./browser-session-runner": {
+      "types": "./dist/browser-session-runner/index.d.mts",
+      "import": "./dist/browser-session-runner/index.mjs",
+      "default": "./dist/browser-session-runner/index.mjs"
+    },
     "./pg-schema-snapshot": {
       "types": "./dist/pg-schema-snapshot/index.d.mts",
       "import": "./dist/pg-schema-snapshot/index.mjs",
