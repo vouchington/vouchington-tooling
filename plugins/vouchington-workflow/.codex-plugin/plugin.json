@@ -1,7 +1,7 @@
 {
   "name": "vouchington-workflow",
-  "version": "0.1.0",
-  "description": "Portable repository workflow skills for Codex and Claude.",
+  "version": "0.2.0",
+  "description": "Portable implementation, planning, issue, retrospective, CI, and PR workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington",
     "url": "https://github.com/vouchington"
@@ -9,12 +9,21 @@
   "homepage": "https://github.com/vouchington/vouchington-tooling",
   "repository": "https://github.com/vouchington/vouchington-tooling",
   "license": "MIT",
-  "keywords": ["workflow", "git", "github-actions", "static-analysis"],
+  "keywords": [
+    "workflow",
+    "git",
+    "github-actions",
+    "static-analysis",
+    "planning",
+    "issues",
+    "retrospective",
+    "pull-requests"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Workflow foundations",
     "shortDescription": "Portable repository workflow guidance.",
-    "longDescription": "Repository-neutral skills for implementation, commits, Actions, dependency metadata, and static analysis.",
+    "longDescription": "Repository-neutral skills for implementation, commits, Actions, dependency metadata, static analysis, planning, issue management, retrospectives, CI-log review, and pull-request descriptions.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],
