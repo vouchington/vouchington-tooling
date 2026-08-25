@@ -32,6 +32,8 @@ describe('runRetrospectiveTranscriptCommand', () => {
         directory,
         '--codex-sessions-dir',
         directory,
+        '--grok-sessions-dir',
+        directory,
       ]),
     ).resolves.toBe(0)
     expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('User prompts: 1')
@@ -40,5 +42,9 @@ describe('runRetrospectiveTranscriptCommand', () => {
   it('reports invalid arguments without throwing', async () => {
     await expect(runRetrospectiveTranscriptCommand(['--unknown'])).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Unknown option')
+  })
+
+  it('accepts default transcript discovery options', async () => {
+    await expect(runRetrospectiveTranscriptCommand([])).resolves.toBe(0)
   })
 })
