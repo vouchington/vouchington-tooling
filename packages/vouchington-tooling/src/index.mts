@@ -145,7 +145,10 @@ export {
   DEFAULT_TRUNCATED_LINE_MARKER,
   splitCompleteLines,
 } from './process-line-buffer/index.mts'
-export { runBrowserSession } from './browser-session-runner/index.mts'
+export {
+  ProcessGroupDrainTimeoutError,
+  runBrowserSession,
+} from './browser-session-runner/index.mts'
 export type {
   BrowserSessionDeps,
   BrowserSessionEvent,
