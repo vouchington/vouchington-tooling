@@ -1,6 +1,7 @@
 import { createOutputConsumer } from './output.mts'
 import { tailText } from './tail.mts'
 import { TailQueue } from './tail-queue.mts'
+import { createWatchdogLifecycle, registerWatchdogSetup } from './watchdog.mts'
 import type {
   BrowserSessionDeps,
   BrowserSessionExit,
@@ -41,20 +42,18 @@ export function runAttempt(
       reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
-    let killTimer: unknown, stallTimer: unknown, stopWatchdog: (() => void) | undefined
+    let killTimer: unknown, stallTimer: unknown
+    const watchdog = createWatchdogLifecycle()
     const listeners: Array<() => void> = []
+    const captureFailure = (error: unknown) =>
+      !hasFailure && ((failure = error), (hasFailure = true))
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
       complete = true
       deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
       deps.clearTimeout(stallTimer)
-      try {
-        stopWatchdog?.()
-      } catch (error) {
-        failure = error
-        hasFailure = true
-      }
+      watchdog.complete(captureFailure)
       for (const remove of listeners) remove()
       const result = {
         attempts: 0,
@@ -93,8 +92,7 @@ export function runAttempt(
     }
     const fail = (error: unknown) => {
       if (hasFailure) return
-      failure = error
-      hasFailure = true
+      captureFailure(error)
       terminate('exit')
     }
     const drain = () => {
@@ -184,14 +182,16 @@ export function runAttempt(
       if (drainDone || hasFailure) finish(closeExit)
     })
     try {
-      const cleanup = options.watchdog?.({
+      const setup = options.watchdog?.({
         attempt,
         deadline,
         now: () => deps.now(),
         process,
-        terminate: () => terminate('provider-watchdog'),
+        terminate: () => {
+          if (!childExited) terminate('provider-watchdog')
+        },
       })
-      if (cleanup) stopWatchdog = cleanup
+      registerWatchdogSetup(setup, watchdog, captureFailure)
     } catch (error) {
       fail(error)
     }

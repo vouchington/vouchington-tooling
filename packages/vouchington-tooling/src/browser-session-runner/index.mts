@@ -12,6 +12,8 @@ export type {
   BrowserSessionProcess,
   BrowserSessionResult,
   BrowserSessionTerminationReason,
+  BrowserSessionWatchdog,
+  BrowserSessionWatchdogCleanup,
   BrowserSessionWatchdogController,
 } from './types.mts'
 export { ProcessGroupDrainTimeoutError } from './process-group.mts'
@@ -50,7 +52,7 @@ export async function runBrowserSession(
   for (let attempt = 1; attempt <= options.attempts && deps.now() < deadline; attempt += 1) {
     attempts = attempt
     last = { ...(await runAttempt(options, deps, deadline, attempt)), attempts }
-    options.onAttemptComplete?.(last)
+    options.onAttemptComplete?.(snapshotResult(last))
     if (
       last.reason === 'parent-signal' ||
       last.reason === 'deadline' ||
@@ -83,4 +85,8 @@ function validateOptions(options: BrowserSessionOptions): void {
 
 function omitAttempts({ attempts: _attempts, ...result }: BrowserSessionResult) {
   return result
+}
+
+function snapshotResult(result: BrowserSessionResult): BrowserSessionResult {
+  return { ...result, exit: { ...result.exit } }
 }

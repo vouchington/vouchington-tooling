@@ -55,6 +55,10 @@ export type BrowserSessionWatchdogController = {
   process: BrowserSessionProcess
   terminate(reason?: 'provider-watchdog'): void
 }
+export type BrowserSessionWatchdogCleanup = () => void
+export type BrowserSessionWatchdog = (
+  controller: BrowserSessionWatchdogController,
+) => void | BrowserSessionWatchdogCleanup | Promise<void | BrowserSessionWatchdogCleanup>
 export type BrowserSessionOptions = {
   attempts: number
   classifyExit(
@@ -72,5 +76,5 @@ export type BrowserSessionOptions = {
   start(attempt: number): BrowserSessionProcess
   startupStallMs: number
   watchdogIntervalMs?: number
-  watchdog?(controller: BrowserSessionWatchdogController): void | (() => void)
+  watchdog?: BrowserSessionWatchdog
 }

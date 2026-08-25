@@ -200,4 +200,93 @@ describe('browser-session-runner extension hooks', () => {
     await expect(run).resolves.toMatchObject({ attempts: 2, exit: { code: 0 } })
     expect(completed.map((result) => result.attempts)).toEqual([1, 2])
   })
+
+  it('preserves a primary failure when watchdog cleanup also throws', async () => {
+    const process = new Process(),
+      testClock = clock()
+    const primary = new Error('output failed')
+    const cleanup = new Error('cleanup failed')
+    const run = runBrowserSession(
+      {
+        ...options(process),
+        onOutput: () => {
+          throw primary
+        },
+        watchdog: () => () => {
+          throw cleanup
+        },
+      },
+      testClock.deps,
+    )
+    process.stdout.emit('data', 'output')
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).rejects.toBe(primary)
+  })
+
+  it('cleans up an asynchronous watchdog setup that resolves after completion', async () => {
+    const process = new Process(),
+      testClock = clock()
+    let resolve: (cleanup: () => void) => void = () => {}
+    let cleanups = 0
+    const setup = new Promise<() => void>((complete) => {
+      resolve = complete
+    })
+    const run = runBrowserSession({ ...options(process), watchdog: () => setup }, testClock.deps)
+    process.emit('close', 0, null)
+    await run
+    resolve(() => {
+      cleanups += 1
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(cleanups).toBe(1)
+  })
+
+  it('does not let a watchdog reclassify an exited child', async () => {
+    const process = new Process(),
+      testClock = clock()
+    let terminate: (() => void) | undefined
+    const run = runBrowserSession(
+      {
+        ...options(process),
+        watchdog: (controller) => {
+          terminate = () => controller.terminate()
+        },
+      },
+      testClock.deps,
+    )
+    process.emit('exit', 0, null)
+    terminate!()
+    process.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ reason: 'exit' })
+    expect(process.signals).toEqual([])
+  })
+
+  it('isolates completion-observer mutations from retry classification and results', async () => {
+    const first = new Process(),
+      second = new Process(),
+      testClock = clock()
+    const run = runBrowserSession(
+      {
+        ...options(first),
+        attempts: 2,
+        classifyExit: (exit) => (exit.code === 0 ? 'return' : 'retry'),
+        onAttemptComplete: (result) => {
+          result.attempts = 99
+          result.exit.code = 0
+          result.reason = 'parent-signal'
+        },
+        start: (attempt) => (attempt === 1 ? first : second),
+      },
+      testClock.deps,
+    )
+    first.emit('close', 1, null)
+    await Promise.resolve()
+    second.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ attempts: 2, exit: { code: 0 }, reason: 'exit' })
+  })
 })
