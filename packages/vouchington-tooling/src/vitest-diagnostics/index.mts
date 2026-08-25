@@ -50,6 +50,11 @@ function threadId(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
+function nativeModulePath(value: unknown): string | null {
+  const module = boundedText(value, '', PATH_LIMIT)
+  return posix.isAbsolute(module) || win32.isAbsolute(module) ? module : null
+}
+
 function topNativeFrameModule(value: unknown): string | null {
   if (!Array.isArray(value)) return null
   const symbol = objectValue(value[0]).symbol
@@ -58,9 +63,7 @@ function topNativeFrameModule(value: unknown): string | null {
   if (!tail.endsWith(']')) return null
   const opening = tail.lastIndexOf('[')
   if (opening < 0) return null
-  const module = boundedText(tail.slice(opening + 1, -1), '', PATH_LIMIT)
-  if (!posix.isAbsolute(module) && !win32.isAbsolute(module)) return null
-  return module
+  return nativeModulePath(tail.slice(opening + 1, -1))
 }
 
 function reportLimit(value: number | undefined, fallback: number): number {
@@ -74,14 +77,21 @@ function readBoundedRegularFile(path: string): string | undefined {
   try {
     const stats = fstatSync(descriptor)
     if (!stats.isFile() || stats.size > MAX_DIAGNOSTIC_REPORT_BYTES) return undefined
-    const bytes = Buffer.allocUnsafe(MAX_DIAGNOSTIC_REPORT_BYTES + 1)
+    const chunks: Buffer[] = []
     let length = 0
-    while (length < bytes.length) {
-      const read = readSync(descriptor, bytes, length, bytes.length - length, null)
+    while (length <= MAX_DIAGNOSTIC_REPORT_BYTES) {
+      const remaining = MAX_DIAGNOSTIC_REPORT_BYTES + 1 - length
+      const expected =
+        length < stats.size ? stats.size - length : length === stats.size ? 1 : 65_536
+      const bytes = Buffer.allocUnsafe(Math.min(expected, remaining, 65_536))
+      const read = readSync(descriptor, bytes, 0, bytes.length, null)
       if (read === 0) break
+      chunks.push(bytes.subarray(0, read))
       length += read
     }
-    return length > MAX_DIAGNOSTIC_REPORT_BYTES ? undefined : bytes.toString('utf8', 0, length)
+    return length > MAX_DIAGNOSTIC_REPORT_BYTES
+      ? undefined
+      : Buffer.concat(chunks, length).toString('utf8')
   } finally {
     closeSync(descriptor)
   }
@@ -153,7 +163,7 @@ export function formatDiagnosticReportSummaries(
         `heapTotalMB=${boundedText(summary.heapTotalMB, '0.0', TEXT_LIMIT)} ` +
         `heapLimitMB=${boundedText(summary.heapLimitMB, '0.0', TEXT_LIMIT)} ` +
         `maxRssMB=${boundedText(summary.maxRssMB, '0.0', TEXT_LIMIT)} ` +
-        `topNativeFrameModule=${boundedText(summary.topNativeFrameModule, 'none', PATH_LIMIT)}`,
+        `topNativeFrameModule=${nativeModulePath(summary.topNativeFrameModule) ?? 'none'}`,
     )
   }
   if (summaries.length > maxReports) lines.push(`  ... ${summaries.length - maxReports} more`)

@@ -245,7 +245,7 @@ describe('formatDiagnosticReportSummaries', () => {
       file: `report.json\n\u001B[2Jinjected=${'x'.repeat(400)}`,
       heapUsedMB: '1.0\u202Einjected=true',
       threadId: -1,
-      topNativeFrameModule: null,
+      topNativeFrameModule: 'node::SecretFrame() [/opt/node]',
     }
     const output = formatDiagnosticReportSummaries([untrusted])
 
