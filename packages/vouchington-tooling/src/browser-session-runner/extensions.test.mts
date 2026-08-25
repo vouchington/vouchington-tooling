@@ -244,6 +244,36 @@ describe('browser-session-runner extension hooks', () => {
     expect(cleanups).toBe(1)
   })
 
+  it('rejects when asynchronous watchdog setup fails before completion', async () => {
+    const process = new Process(),
+      testClock = clock()
+    let reject: (error: Error) => void = () => {}
+    const setup = new Promise<void>((_resolve, fail) => {
+      reject = fail
+    })
+    const run = runBrowserSession({ ...options(process), watchdog: () => setup }, testClock.deps)
+    reject(new Error('async watchdog setup failed'))
+    await Promise.resolve()
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).rejects.toThrow('async watchdog setup failed')
+  })
+
+  it('ignores asynchronous watchdog setup failure after completion', async () => {
+    const process = new Process(),
+      testClock = clock()
+    let reject: (error: Error) => void = () => {}
+    const setup = new Promise<void>((_resolve, fail) => {
+      reject = fail
+    })
+    const run = runBrowserSession({ ...options(process), watchdog: () => setup }, testClock.deps)
+    process.emit('close', 0, null)
+    await run
+    reject(new Error('late async watchdog setup failure'))
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
   it('does not let a watchdog reclassify an exited child', async () => {
     const process = new Process(),
       testClock = clock()
