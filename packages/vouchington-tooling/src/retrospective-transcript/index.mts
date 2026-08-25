@@ -24,14 +24,21 @@ export type ResolveOptions = {
 }
 
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
+
+function sessionLabel(value: string): string {
+  return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
+}
 
 export function resolveTranscriptFile(
   options: ResolveOptions,
 ): { path: string; sessionId: string } | { error: string } {
+  if (options.sessionId && !SESSION_ID.test(options.sessionId))
+    return { error: 'invalid session id format' }
   if (options.jsonlPath)
     return {
       path: options.jsonlPath,
-      sessionId: options.sessionId ?? basename(options.jsonlPath, '.jsonl'),
+      sessionId: options.sessionId ?? sessionLabel(basename(options.jsonlPath, '.jsonl')),
     }
   const sessionId =
     options.sessionId ?? options.env?.CODEX_THREAD_ID ?? options.env?.CLAUDE_CODE_SESSION_ID
@@ -39,17 +46,16 @@ export function resolveTranscriptFile(
     return {
       error: 'no session id (pass --session-id or set CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID)',
     }
-  if (!SESSION_ID.test(sessionId)) return { error: `invalid session id format: ${sessionId}` }
+  if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
   const codex = options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions')
   const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
-  const codexPath = globSync(
-    join(codex, '**', `rollout-*-${sessionId}.jsonl`).replace(/\\/g, '/'),
-  )[0]
-  const claudePath = globSync(join(claude, '*', `${sessionId}.jsonl`).replace(/\\/g, '/'))[0]
-  const path = codexPath ?? claudePath
-  return path
-    ? { path, sessionId }
-    : { error: `no transcript found for session ${sessionId} under ${codex} or ${claude}` }
+  const codexPaths = globSync(join(codex, '**', `rollout-*-${sessionId}.jsonl`).replace(/\\/g, '/'))
+  const claudePaths = globSync(join(claude, '*', `${sessionId}.jsonl`).replace(/\\/g, '/'))
+  const paths = [...codexPaths, ...claudePaths].sort()
+  if (paths.length > 1) return { error: `multiple transcripts found for session ${sessionId}` }
+  return paths[0]
+    ? { path: paths[0], sessionId }
+    : { error: `no transcript found for session ${sessionId}` }
 }
 
 function schema(lines: string[]): 'claude' | 'codex' | undefined {
@@ -96,7 +102,10 @@ async function readLines(path: string): Promise<string[] | undefined> {
 
 function childPath(threadId: string, sessionsDir: string): string | undefined {
   if (!SESSION_ID.test(threadId)) return undefined
-  return globSync(join(sessionsDir, '**', `rollout-*-${threadId}.jsonl`).replace(/\\/g, '/'))[0]
+  const paths = globSync(
+    join(sessionsDir, '**', `rollout-*-${threadId}.jsonl`).replace(/\\/g, '/'),
+  ).sort()
+  return paths.length === 1 ? paths[0] : undefined
 }
 
 async function codexSubagents(
@@ -125,7 +134,7 @@ async function codexSubagents(
 export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts): string {
   return [
     '=== Transcript Facts ===',
-    `Session: ${sessionId}`,
+    `Session: ${sessionLabel(sessionId)}`,
     `User prompts: ${facts.userPrompts}`,
     `Assistant responses: ${facts.assistantResponses}`,
     `Tool calls: ${facts.toolCalls} (failed: ${facts.failedToolCalls})`,
@@ -140,18 +149,18 @@ export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts)
 }
 
 export const formatUnavailable = (reason: string): string =>
-  `=== Transcript Facts ===\nStatus: unavailable (${reason})\n`
+  `=== Transcript Facts ===\nStatus: unavailable (${reason.replace(/\s+/g, ' ').slice(0, 240)})\n`
 
 export async function runRetrospectiveTranscript(options: ResolveOptions): Promise<string> {
   const resolved = resolveTranscriptFile(options)
   if ('error' in resolved) return formatUnavailable(resolved.error)
   const lines = await readLines(resolved.path)
-  if (!lines) return formatUnavailable(`could not read transcript ${resolved.path}`)
+  if (!lines) return formatUnavailable('could not read transcript')
   const detected = schema(lines)
   if (!detected) return formatUnavailable('unsupported or mixed transcript schema')
   if (detected === 'claude') {
     const directory = join(dirname(resolved.path), basename(resolved.path, '.jsonl'), 'subagents')
-    const subagents = await Promise.all(globSync(join(directory, '*.jsonl')).map(readLines))
+    const subagents = await Promise.all(globSync(join(directory, '*.jsonl')).sort().map(readLines))
     return formatTranscriptFacts(
       resolved.sessionId,
       computeTranscriptFacts(

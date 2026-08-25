@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -104,7 +104,38 @@ describe('retrospective transcript', () => {
 
   it('returns a stable unavailable block for missing transcripts', async () => {
     await expect(runRetrospectiveTranscript({ sessionId: 'not-a-session' })).resolves.toBe(
-      '=== Transcript Facts ===\nStatus: unavailable (invalid session id format: not-a-session)\n',
+      '=== Transcript Facts ===\nStatus: unavailable (invalid session id format)\n',
     )
+  })
+
+  it('rejects ambiguous transcript matches without exposing search paths', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const first = join(directory, 'a')
+    const second = join(directory, 'b')
+    const sessionId = '11111111-1111-1111-1111-111111111111'
+    await mkdir(first)
+    await mkdir(second)
+    await writeFile(join(first, `rollout-a-${sessionId}.jsonl`), '')
+    await writeFile(join(second, `rollout-b-${sessionId}.jsonl`), '')
+
+    const resolved = resolveTranscriptFile({ sessionId, codexSessionsDir: directory })
+    expect(resolved).toEqual({ error: `multiple transcripts found for session ${sessionId}` })
+    expect(JSON.stringify(resolved)).not.toContain(directory)
+  })
+
+  it('sanitizes file-derived labels and unavailable reasons', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const path = join(directory, 'session label.jsonl')
+    await writeFile(path, claudeLines.join('\n'))
+
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'Session: session_label',
+    )
+    await expect(
+      runRetrospectiveTranscript({
+        jsonlPath: join(directory, 'missing.jsonl'),
+        sessionId: '11111111-1111-1111-1111-111111111111',
+      }),
+    ).resolves.toBe('=== Transcript Facts ===\nStatus: unavailable (could not read transcript)\n')
   })
 })
