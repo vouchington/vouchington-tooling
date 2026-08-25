@@ -1,11 +1,14 @@
-import { closeSync, constants, fstatSync, openSync, opendirSync, readSync } from 'node:fs'
+import { opendirSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
+
+import { readBoundedRegularFile } from './read-file.mts'
+
+export { MAX_DIAGNOSTIC_REPORT_BYTES } from './read-file.mts'
 
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100
 export const DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS = 20
 export const HARD_MAX_DIAGNOSTIC_REPORTS = 100
 export const HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES = 10_000
-export const MAX_DIAGNOSTIC_REPORT_BYTES = 5 * 1024 * 1024
 
 export interface DiagnosticReportSummary {
   file: string
@@ -71,34 +74,6 @@ function reportLimit(value: number | undefined, fallback: number): number {
   if (value === undefined) return fallback
   if (!Number.isFinite(value)) return fallback
   return Math.min(Math.max(Math.floor(value), 0), HARD_MAX_DIAGNOSTIC_REPORTS)
-}
-
-function readBoundedRegularFile(path: string): string | undefined {
-  const descriptor = openSync(
-    path,
-    constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW,
-  )
-  try {
-    const stats = fstatSync(descriptor)
-    if (!stats.isFile() || stats.size > MAX_DIAGNOSTIC_REPORT_BYTES) return undefined
-    const chunks: Buffer[] = []
-    let length = 0
-    while (length <= MAX_DIAGNOSTIC_REPORT_BYTES) {
-      const remaining = MAX_DIAGNOSTIC_REPORT_BYTES + 1 - length
-      const expected =
-        length < stats.size ? stats.size - length : length === stats.size ? 1 : 65_536
-      const bytes = Buffer.allocUnsafe(Math.min(expected, remaining, 65_536))
-      const read = readSync(descriptor, bytes, 0, bytes.length, null)
-      if (read === 0) break
-      chunks.push(bytes.subarray(0, read))
-      length += read
-    }
-    return length > MAX_DIAGNOSTIC_REPORT_BYTES
-      ? undefined
-      : Buffer.concat(chunks, length).toString('utf8')
-  } finally {
-    closeSync(descriptor)
-  }
 }
 
 export function summarizeDiagnosticReport(file: string, report: unknown): DiagnosticReportSummary {
