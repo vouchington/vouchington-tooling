@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { runBrowserSession, type BrowserSessionDeps, type BrowserSessionProcess } from './index.mts'
 
 class Process extends EventEmitter implements BrowserSessionProcess {
-  processGroupId = 1
+  processGroupId = 42
   readonly stderr = new EventEmitter()
   readonly stdout = new EventEmitter()
   readonly signals: NodeJS.Signals[] = []
