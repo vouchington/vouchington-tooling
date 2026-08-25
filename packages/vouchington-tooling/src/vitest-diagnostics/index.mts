@@ -97,8 +97,7 @@ export function readDiagnosticReportSummaries(
   }
 
   const summaries: DiagnosticReportSummary[] = []
-  for (const filename of filenames) {
-    if (summaries.length === maxReports) break
+  for (const filename of filenames.slice(0, maxReports)) {
     try {
       if (statSync(join(directory, filename)).size > MAX_DIAGNOSTIC_REPORT_BYTES) continue
       const report: unknown = JSON.parse(readFileSync(join(directory, filename), 'utf8'))

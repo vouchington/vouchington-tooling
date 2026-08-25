@@ -152,6 +152,15 @@ describe('readDiagnosticReportSummaries', () => {
     ])
   })
 
+  it('bounds attempted files even when early candidates are torn', () => {
+    const directory = makeDirectory()
+    writeFileSync(join(directory, 'a-torn.json'), '{')
+    writeFileSync(join(directory, 'b-valid.json'), JSON.stringify(SAMPLE_REPORT))
+
+    expect(readDiagnosticReportSummaries(directory, { maxReports: 1 })).toEqual([])
+    expect(readDiagnosticReportSummaries(directory, { maxReports: 2 })).toHaveLength(1)
+  })
+
   it('skips diagnostic files that exceed the per-report byte limit', () => {
     const directory = makeDirectory()
     const oversized = join(directory, 'oversized.json')
