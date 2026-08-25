@@ -18,6 +18,7 @@ export type BrowserSessionProcess = Pick<ChildProcess, 'kill'> & {
     listener: (code: number | null, signal: NodeJS.Signals | null) => void,
   ): unknown
   on(event: 'error', listener: (error: Error) => void): unknown
+  on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown
   stderr?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
   stdout?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
 }

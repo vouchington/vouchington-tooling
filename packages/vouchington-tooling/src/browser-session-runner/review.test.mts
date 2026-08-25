@@ -136,6 +136,23 @@ describe('browser-session-runner review regressions', () => {
     await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
   })
 
+  it('starts group cleanup at child exit before inherited output streams close', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('exit', 1, null)
+    expect(process.signals).toEqual(['SIGTERM'])
+    clock.tick(100)
+    clock.triggerGrace()
+    expect(process.signals).toEqual(['SIGTERM', 'SIGKILL'])
+
+    process.emit('close', 1, null)
+    await Promise.resolve()
+    clock.release()
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: false, reason: 'exit' })
+  })
+
   it('completes cleanup when descendant draining rejects', async () => {
     const process = new Process(),
       clock = harness(true)

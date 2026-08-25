@@ -35,6 +35,7 @@ export function runAttempt(
       lastSemantic = startedAt
     let failure: unknown,
       hasFailure = false,
+      childExited = false,
       reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
@@ -68,6 +69,7 @@ export function runAttempt(
       } catch {}
     }
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
+      if (nextReason === 'deadline' && childExited) return
       if (nextReason === 'parent-signal' || nextReason === 'deadline') {
         if (reason === 'exit' || reason === 'startup-stall' || reason === 'semantic-stall')
           reason = nextReason
@@ -148,6 +150,10 @@ export function runAttempt(
       listeners.push(() => deps.offParentSignal(value, listener))
     }
     process.on('error', () => terminate('exit'))
+    process.on('exit', () => {
+      childExited = true
+      if (deps.isProcessGroupAlive(process.processGroupId)) terminate('exit')
+    })
     process.on('close', (code, value) => {
       for (const stream of streams)
         try {
@@ -155,7 +161,7 @@ export function runAttempt(
         } catch (error) {
           fail(error)
         }
-      if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
+      if (!childExited && reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
       const exit = { code, signal: value }
       if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(exit)
       terminate(reason)
