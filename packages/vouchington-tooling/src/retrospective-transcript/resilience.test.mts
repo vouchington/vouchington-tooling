@@ -89,8 +89,25 @@ describe('retrospective transcript resilience', () => {
           exitCode: 1,
         },
       }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          call_id: 'array-outcome',
+          name: 'other',
+          arguments: '{}',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call_output',
+          call_id: 'array-outcome',
+          output: [{ status: 'failed' }],
+        },
+      }),
     ])
-    expect(facts).toMatchObject({ toolCalls: 4, failedToolCalls: 3, pushCommandAttempts: 1 })
+    expect(facts).toMatchObject({ toolCalls: 5, failedToolCalls: 4, pushCommandAttempts: 1 })
   })
 
   it('extracts shell commands from Codex custom exec calls', () => {
@@ -101,7 +118,7 @@ describe('retrospective transcript resilience', () => {
           type: 'custom_tool_call',
           call_id: 'custom-exec',
           name: 'exec',
-          input: 'await tools.exec_command({cmd: "pnpm exec no-mistakes && git push"})',
+          input: 'await tools.exec_command({cmd: "echo ok\\ngit push && pnpm exec no-mistakes"})',
         },
       }),
     ])
@@ -131,6 +148,30 @@ describe('retrospective transcript resilience', () => {
     await expect(
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('User prompts: 1')
+  })
+
+  it('rejects malformed interior Claude records while tolerating a torn final line', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const path = join(directory, 'claude.jsonl')
+    await writeFile(
+      path,
+      [
+        JSON.stringify({ type: 'user', message: { content: 'first' } }),
+        '{',
+        JSON.stringify({ type: 'user', message: { content: 'second' } }),
+      ].join('\n'),
+    )
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'Status: unavailable (malformed interior transcript record)',
+    )
+
+    await writeFile(
+      path,
+      [JSON.stringify({ type: 'user', message: { content: 'first' } }), '{'].join('\n'),
+    )
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'User prompts: 1',
+    )
   })
 
   it('accepts Claude subagents supplied as line arrays and ignores blank records', () => {
@@ -244,6 +285,20 @@ describe('retrospective transcript resilience', () => {
     expect(formatTranscriptFacts('session', facts)).toContain('advisor calls: 1')
   })
 
+  it('deduplicates advisor calls in Codex transcripts', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', call_id: 'advisor-1', name: 'advisor', arguments: '{}' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', call_id: 'advisor-1', name: 'advisor', arguments: '{}' },
+      }),
+    ])
+    expect(facts).toMatchObject({ toolCalls: 1, advisorCalls: 1 })
+  })
+
   it('recognizes escaped shell syntax, Windows binaries, and package-manager launchers', () => {
     const facts = emptyFacts()
     applyCommand(
@@ -314,6 +369,39 @@ describe('retrospective transcript resilience', () => {
     await expect(
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('User prompts: 1')
+  })
+
+  it('uses CODEX_HOME for default transcript discovery', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const sessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const sessions = join(directory, 'sessions')
+    await mkdir(sessions)
+    await writeFile(
+      join(sessions, `rollout-root-${sessionId}.jsonl`),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+    )
+    await expect(
+      runRetrospectiveTranscript({ env: { CODEX_HOME: directory, CODEX_THREAD_ID: sessionId } }),
+    ).resolves.toContain('User prompts: 1')
+  })
+
+  it('seeds metadata-free Codex roots to avoid self-child double counting', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const sessionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    await writeFile(
+      join(directory, `rollout-root-${sessionId}.jsonl`),
+      [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+        childActivity(sessionId, '/root/self'),
+        JSON.stringify({
+          type: 'response_item',
+          payload: { type: 'function_call', name: 'other', arguments: '{}' },
+        }),
+      ].join('\n'),
+    )
+    await expect(
+      runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
+    ).resolves.toContain('Subagent tool calls: 0')
   })
 
   it('keeps a leading Codex child event when no child session metadata precedes it', async () => {

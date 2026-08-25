@@ -34,7 +34,6 @@ const MALFORMED_INTERIOR = 'malformed interior transcript record'
 function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
-
 export function resolveTranscriptFile(
   options: ResolveOptions,
 ): { path: string; sessionId: string } | { error: string } {
@@ -57,7 +56,8 @@ export function resolveTranscriptFile(
         'no session id (pass --session-id or set CODEX_THREAD_ID, CLAUDE_CODE_SESSION_ID, CURSOR_SESSION_ID, or GROK_SESSION_ID)',
     }
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
-  const codex = options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions')
+  const codex =
+    options.codexSessionsDir ?? join(env.CODEX_HOME || join(homedir(), '.codex'), 'sessions')
   const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
   const grokHome = env.GROK_HOME || join(homedir(), '.grok')
   const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
@@ -170,8 +170,7 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   if (!lines) return formatUnavailable('could not read transcript')
   const detected = schema(lines)
   if (!detected) return formatUnavailable('unsupported or mixed transcript schema')
-  if (detected === 'codex' && hasMalformedInteriorRecord(lines))
-    return formatUnavailable(MALFORMED_INTERIOR)
+  if (hasMalformedInteriorRecord(lines)) return formatUnavailable(MALFORMED_INTERIOR)
   if (detected === 'claude') {
     const directory = join(dirname(resolved.path), basename(resolved.path, '.jsonl'), 'subagents')
     const subagents = await Promise.all(globSync(join(directory, '*.jsonl')).sort().map(readLines))
@@ -186,9 +185,12 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   const identity = codexIdentity(lines)
   const subagents = await codexSubagents(
     lines,
-    options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions'),
+    options.codexSessionsDir ??
+      join((options.env ?? process.env).CODEX_HOME || join(homedir(), '.codex'), 'sessions'),
     identity.agentPath,
-    new Set(identity.threadId ? [identity.threadId] : []),
+    new Set(
+      [identity.threadId ?? resolved.sessionId].filter((threadId) => SESSION_ID.test(threadId)),
+    ),
   )
   if (!subagents) return formatUnavailable('could not resolve a referenced Codex child transcript')
   return formatTranscriptFacts(

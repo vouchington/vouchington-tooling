@@ -33,7 +33,22 @@ function command(payload: Record<string, unknown>): string | undefined {
     const match = raw.match(
       /tools\.exec_command\(\s*\{\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|[\s\S])*?)\1/,
     )
-    return match?.[2]
+    return match?.[2]?.replace(
+      /\\([\\'"bnrtv])/g,
+      (_, character: string) =>
+        (
+          ({
+            '\\': '\\',
+            "'": "'",
+            '"': '"',
+            b: '\b',
+            n: '\n',
+            r: '\r',
+            t: '\t',
+            v: '\v',
+          }) as Record<string, string>
+        )[character] as string,
+    )
   }
   try {
     const value = asRecord(JSON.parse(raw))
@@ -52,7 +67,10 @@ function callId(payload: Record<string, unknown>): string | undefined {
       : undefined
 }
 
-function hasFailedOutcome(payload: Record<string, unknown>): boolean {
+function hasFailedOutcome(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasFailedOutcome)
+  const payload = asRecord(value)
+  if (!payload) return false
   if (payload.status === 'failed' || payload.status === 'error' || payload.is_error === true)
     return true
   if (
@@ -61,9 +79,7 @@ function hasFailedOutcome(payload: Record<string, unknown>): boolean {
     payload.success === false
   )
     return true
-  return [payload.output, payload.result, payload.metadata]
-    .map(asRecord)
-    .some((value) => value !== undefined && hasFailedOutcome(value))
+  return [payload.output, payload.result, payload.metadata].some(hasFailedOutcome)
 }
 
 function isCall(payload: Record<string, unknown>): boolean {
@@ -125,6 +141,7 @@ function applyRecords(
         facts.toolCalls++
         if (subagent) facts.subagentToolCalls++
         if (id) calls.add(id)
+        if (payload.name === 'advisor') facts.advisorCalls++
         const rawCommand = command(payload)
         if (rawCommand) applyCommand(rawCommand, facts)
       }
