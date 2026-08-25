@@ -39,10 +39,30 @@ describe('late retrospective transcript review regressions', () => {
   it('distinguishes here-strings, unwraps env, and discards unterminated quotes', () => {
     const facts = emptyFacts()
     applyCommand(
-      "cat <<< value\ngit push; env CI=1 no-mistakes; env -i CI=1 no-mistakes; /usr/bin/env -u OLD CI=1 git push; env -- CI=1 git push; git 'push",
+      "cat <<< value\ngit push; env CI=1 no-mistakes; env -i CI=1 no-mistakes; /usr/bin/env -u OLD CI=1 git push; env -- CI=1 git push; echo 'foo\\'; git push; git 'push",
       facts,
     )
-    expect(facts).toMatchObject({ noMistakesInvocations: 2, pushCommandAttempts: 3 })
+    expect(facts).toMatchObject({ noMistakesInvocations: 2, pushCommandAttempts: 4 })
+  })
+
+  it('retains cumulative token high-water marks across temporary decreases', () => {
+    const tokenRecord = (input: number): string =>
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              cached_input_tokens: 0,
+              input_tokens: input,
+              output_tokens: 0,
+            },
+          },
+        },
+      })
+    expect(
+      computeTranscriptFacts([tokenRecord(10), tokenRecord(8), tokenRecord(12)]),
+    ).toMatchObject({ tokens: { input: 12 } })
   })
 
   it('normalizes uppercase session IDs for case-sensitive discovery', async () => {

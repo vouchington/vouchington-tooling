@@ -74,10 +74,16 @@ function isCall(payload: Record<string, unknown>): boolean {
 function isCallOutcome(payload: Record<string, unknown>): boolean {
   return typeof payload.type === 'string' && payload.type.endsWith('_call_output')
 }
-function addDelta(current: TokenTotals, previous: TokenTotals, target: TokenTotals): void {
+function addDelta(current: TokenTotals, previous: TokenTotals, target: TokenTotals): TokenTotals {
   target.input += Math.max(0, current.input - previous.input)
   target.output += Math.max(0, current.output - previous.output)
   target.cacheRead += Math.max(0, current.cacheRead - previous.cacheRead)
+  return {
+    input: Math.max(current.input, previous.input),
+    output: Math.max(current.output, previous.output),
+    cacheRead: Math.max(current.cacheRead, previous.cacheRead),
+    cacheCreation: 0,
+  }
 }
 
 function applyRecords(
@@ -111,8 +117,7 @@ function applyRecords(
     } else previousCompaction = undefined
     const totals = usage(record)
     if (totals) {
-      addDelta(totals, previous, subagent ? facts.subagentTokens : facts.tokens)
-      previous = totals
+      previous = addDelta(totals, previous, subagent ? facts.subagentTokens : facts.tokens)
     }
     if (record.type !== 'response_item' || !payload) continue
     const id =

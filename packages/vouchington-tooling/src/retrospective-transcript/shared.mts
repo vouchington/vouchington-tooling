@@ -83,8 +83,8 @@ function segments(command: string): string[][] {
   let segment: string[] = []
   let word = ''
   let quote: string | undefined
-  let escaped = false
-  let comment = false
+  let escaped = false,
+    comment = false
   const pending: HereDoc[] = []
   let hereDocLine = ''
   const flush = (): void => {
@@ -100,13 +100,13 @@ function segments(command: string): string[][] {
   for (let index = 0; index < command.length; index++) {
     const char = command[index]!
     const next = command[index + 1] ?? ''
+    const canEscape =
+      quote === '"' ? /[\\"$`\n]/.test(next) : quote === undefined && /[\\'";#&|\n]/.test(next)
     if (pending.length) {
       if (char === '\n') {
         const current = pending[0]!
-        if (
-          (current.stripTabs ? hereDocLine.replace(/^\t+/, '') : hereDocLine) === current.delimiter
-        )
-          pending.shift()
+        const line = current.stripTabs ? hereDocLine.replace(/^\t+/, '') : hereDocLine
+        if (line === current.delimiter) pending.shift()
         hereDocLine = ''
       } else hereDocLine += char
     } else if (comment) {
@@ -114,10 +114,13 @@ function segments(command: string): string[][] {
         comment = false
         end(true)
       }
+    } else if (quote === "'") {
+      if (char === quote) quote = undefined
+      else word += char
     } else if (escaped) {
       if (char !== '\n') word += char
       escaped = false
-    } else if (char === '\\' && next !== '' && /[\\'";#&|\n]/.test(next)) escaped = true
+    } else if (char === '\\' && next !== '' && canEscape) escaped = true
     else if (char === '\\') word += char
     else if (quote) {
       if (char === quote) quote = undefined
@@ -155,7 +158,6 @@ function commandAfterAssignments(segment: string[]): string[] {
   }
   return tokens
 }
-
 const NO_MISTAKES = /(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i
 function containsNoMistakesTarget(tokens: string[]): boolean {
   for (let index = 0; index < tokens.length; index++) {
@@ -172,7 +174,6 @@ function containsNoMistakesTarget(tokens: string[]): boolean {
   }
   return false
 }
-
 function isNoMistakes(segment: string[]): boolean {
   const tokens = commandAfterAssignments(segment)
   const [command, second] = tokens
@@ -181,7 +182,6 @@ function isNoMistakes(segment: string[]): boolean {
   const offset = second === 'run' || second === 'exec' || second === 'dlx' ? 2 : 1
   return containsNoMistakesTarget(tokens.slice(offset))
 }
-
 function isPush(segment: string[]): boolean {
   const tokens = commandAfterAssignments(segment)
   if (!/(^|[\\/])git(?:\.exe)?$/i.test(tokens[0] ?? '')) return false
@@ -191,7 +191,6 @@ function isPush(segment: string[]): boolean {
   }
   return false
 }
-
 export function applyCommand(command: string, facts: TranscriptFacts): void {
   for (const segment of segments(command)) {
     if (isNoMistakes(segment)) facts.noMistakesInvocations++
