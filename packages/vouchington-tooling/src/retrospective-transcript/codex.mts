@@ -170,11 +170,6 @@ export function codexIdentity(lines: string[]): { threadId?: string; agentPath: 
   }
 }
 
-export function withoutLeadingSessionMetadata(lines: string[]): string[] {
-  const content = lines.filter(Boolean)
-  return parseLines(content.slice(0, 1))[0]?.type === 'session_meta' ? content.slice(1) : content
-}
-
 export function computeCodex(
   lines: string[],
   subagents: CodexSegment[] = [],
