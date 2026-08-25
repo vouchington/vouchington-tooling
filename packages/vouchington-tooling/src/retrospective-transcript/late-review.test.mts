@@ -10,6 +10,8 @@ import {
 import { applyCommand, emptyFacts } from './shared.mts'
 
 const SESSION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const CHILD_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+const OTHER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 
 describe('late retrospective transcript review regressions', () => {
   it('extracts non-interpolated template-literal commands from custom exec calls', () => {
@@ -32,6 +34,15 @@ describe('late retrospective transcript review regressions', () => {
       facts,
     )
     expect(facts).toMatchObject({ noMistakesInvocations: 5, pushCommandAttempts: 2 })
+  })
+
+  it('distinguishes here-strings, unwraps env, and discards unterminated quotes', () => {
+    const facts = emptyFacts()
+    applyCommand(
+      "cat <<< value\ngit push; env CI=1 no-mistakes; env -i CI=1 no-mistakes; /usr/bin/env -u OLD CI=1 git push; env -- CI=1 git push; git 'push",
+      facts,
+    )
+    expect(facts).toMatchObject({ noMistakesInvocations: 2, pushCommandAttempts: 3 })
   })
 
   it('normalizes uppercase session IDs for case-sensitive discovery', async () => {
@@ -70,6 +81,55 @@ describe('late retrospective transcript review regressions', () => {
     )
     await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
       'Subagent tool calls: 0',
+    )
+  })
+
+  it('rejects structurally invalid interior records', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-late-review-'))
+    const path = join(directory, `rollout-root-${SESSION_ID}.jsonl`)
+    await writeFile(
+      path,
+      [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+        'null',
+        JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
+        '',
+      ].join('\n'),
+    )
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'malformed interior transcript record',
+    )
+  })
+
+  it('rejects a resolved Codex child whose metadata belongs to another identity', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-late-review-'))
+    const root = join(directory, `rollout-root-${SESSION_ID}.jsonl`)
+    await writeFile(
+      root,
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: { id: SESSION_ID, agent_path: '/root' },
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'sub_agent_activity',
+            agent_path: '/root/child',
+            agent_thread_id: CHILD_ID,
+          },
+        }),
+      ].join('\n'),
+    )
+    await writeFile(
+      join(directory, `rollout-child-${CHILD_ID}.jsonl`),
+      JSON.stringify({
+        type: 'session_meta',
+        payload: { id: OTHER_ID, agent_path: '/root/other' },
+      }),
+    )
+    await expect(runRetrospectiveTranscript({ jsonlPath: root })).resolves.toContain(
+      'could not resolve a referenced Codex child transcript',
     )
   })
 })

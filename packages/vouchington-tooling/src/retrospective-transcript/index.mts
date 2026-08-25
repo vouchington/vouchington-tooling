@@ -122,6 +122,13 @@ function childPath(threadId: string, sessionsDir: string): string | undefined {
   const paths = globFrom(sessionsDir, `**/rollout-*-${threadId}.jsonl`).sort()
   return paths.length === 1 ? paths[0] : undefined
 }
+function matchesChildIdentity(lines: string[], threadId: string, agentPath: string): boolean {
+  const first = parseLines(lines.filter(Boolean).slice(0, 1))[0]
+  if (first?.type !== 'session_meta') return true
+  const identity = codexIdentity(lines)
+  const threadMatches = identity.threadId?.toLowerCase() === threadId.toLowerCase()
+  return threadMatches && identity.agentPath.replace(/\/$/, '') === agentPath
+}
 async function codexSubagents(
   lines: string[],
   sessionsDir: string,
@@ -135,7 +142,13 @@ async function codexSubagents(
     const path = childPath(edge.threadId, sessionsDir)
     if (!path || !existsSync(path)) return undefined
     const child = await readLines(path)
-    if (!child || schema(child) !== 'codex' || hasMalformedInteriorRecord(child)) return undefined
+    if (
+      !child ||
+      schema(child) !== 'codex' ||
+      hasMalformedInteriorRecord(child) ||
+      !matchesChildIdentity(child, edge.threadId, edge.agentPath)
+    )
+      return undefined
     const content = withoutLeadingSessionMetadata(child)
     result.push({ lines: content, baseline: emptyTokens() })
     const nested = await codexSubagents(content, sessionsDir, edge.agentPath, visited)

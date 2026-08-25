@@ -17,10 +17,8 @@ export type TranscriptFacts = {
   subagentToolCalls: number
   subagentTokens: TokenTotals
 }
-
 export type ParsedLine = Record<string, unknown>
 export type CodexSegment = { lines: string[]; baseline: TokenTotals }
-
 export const emptyTokens = (): TokenTotals => ({
   input: 0,
   output: 0,
@@ -40,16 +38,13 @@ export const emptyFacts = (): TranscriptFacts => ({
   subagentToolCalls: 0,
   subagentTokens: emptyTokens(),
 })
-
 export function asRecord(value: unknown): ParsedLine | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as ParsedLine)
     : undefined
 }
-
 export const asNumber = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : 0
-
 export function parseLines(lines: string[]): ParsedLine[] {
   const records: ParsedLine[] = []
   for (const line of lines) {
@@ -63,23 +58,21 @@ export function parseLines(lines: string[]): ParsedLine[] {
   }
   return records
 }
-
 export function hasMalformedInteriorRecord(lines: string[]): boolean {
   const nonblank = lines.filter((line) => line.trim())
   const complete = lines.at(-1)?.trim() ? nonblank.slice(0, -1) : nonblank
   return complete.some((line) => {
     try {
-      JSON.parse(line)
-      return false
+      return !asRecord(JSON.parse(line))
     } catch {
       return true
     }
   })
 }
-
 type HereDoc = { delimiter: string; stripTabs: boolean }
 function hereDocs(tokens: string[]): HereDoc[] {
   return tokens.flatMap((token, index) => {
+    if (token.startsWith('<<<')) return []
     const match = token.match(/^<<(-?)(.*)$/)
     const delimiter = match?.[2] || (match ? tokens[index + 1] : undefined)
     return delimiter ? [{ delimiter, stripTabs: match?.[1] === '-' }] : []
@@ -135,13 +128,32 @@ function segments(command: string): string[][] {
     else if (/\s/.test(char)) flush()
     else word += char
   }
-  end()
+  if (!quote) end()
   return result
 }
-
 function commandAfterAssignments(segment: string[]): string[] {
   const index = segment.findIndex((token) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))
-  return index === -1 ? [] : segment.slice(index)
+  let tokens = index === -1 ? [] : segment.slice(index)
+  while (/(^|[\\/])env(?:\.exe)?$/i.test(tokens[0] ?? '')) {
+    let next = 1,
+      options = true
+    while (next < tokens.length) {
+      const token = tokens[next]!
+      if (token === '--') {
+        options = false
+        next++
+      } else if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) next++
+      else if (
+        options &&
+        ['-u', '--unset', '-C', '--chdir', '-S', '--split-string'].includes(token)
+      )
+        next += 2
+      else if (options && token.startsWith('-')) next++
+      else break
+    }
+    tokens = tokens.slice(next)
+  }
+  return tokens
 }
 
 const NO_MISTAKES = /(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i
