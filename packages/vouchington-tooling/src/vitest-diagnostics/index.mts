@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, posix, win32 } from 'node:path'
 
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100
 export const DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS = 20
 export const HARD_MAX_DIAGNOSTIC_REPORTS = 100
+export const MAX_DIAGNOSTIC_REPORT_BYTES = 5 * 1024 * 1024
 
 export interface DiagnosticReportSummary {
   file: string
@@ -51,7 +52,8 @@ function topNativeFrameModule(value: unknown): string | null {
   const symbol = objectValue(value[0]).symbol
   if (typeof symbol !== 'string') return null
   const module = NATIVE_FRAME_MODULE_PATTERN.exec(symbol)?.[1]
-  return module === undefined ? null : boundedText(module, '', PATH_LIMIT) || null
+  if (module === undefined || (!posix.isAbsolute(module) && !win32.isAbsolute(module))) return null
+  return boundedText(module, '', PATH_LIMIT) || null
 }
 
 function reportLimit(value: number | undefined, fallback: number): number {
@@ -98,6 +100,7 @@ export function readDiagnosticReportSummaries(
   for (const filename of filenames) {
     if (summaries.length === maxReports) break
     try {
+      if (statSync(join(directory, filename)).size > MAX_DIAGNOSTIC_REPORT_BYTES) continue
       const report: unknown = JSON.parse(readFileSync(join(directory, filename), 'utf8'))
       summaries.push(summarizeDiagnosticReport(filename, report))
     } catch {
@@ -116,10 +119,15 @@ export function formatDiagnosticReportSummaries(
   if (summaries.length === 0) lines.push('  (none recorded)')
   for (const summary of summaries.slice(0, maxReports)) {
     lines.push(
-      `  - file=${summary.file} trigger=${summary.trigger} event=${summary.event} ` +
-        `threadId=${summary.threadId ?? 'unknown'} heapUsedMB=${summary.heapUsedMB} ` +
-        `heapTotalMB=${summary.heapTotalMB} heapLimitMB=${summary.heapLimitMB} ` +
-        `maxRssMB=${summary.maxRssMB} topNativeFrameModule=${summary.topNativeFrameModule ?? 'none'}`,
+      `  - file=${boundedText(summary.file, 'unknown', PATH_LIMIT)} ` +
+        `trigger=${boundedText(summary.trigger, 'unknown', TEXT_LIMIT)} ` +
+        `event=${boundedText(summary.event, 'unknown', TEXT_LIMIT)} ` +
+        `threadId=${threadId(summary.threadId) ?? 'unknown'} ` +
+        `heapUsedMB=${boundedText(summary.heapUsedMB, '0.0', TEXT_LIMIT)} ` +
+        `heapTotalMB=${boundedText(summary.heapTotalMB, '0.0', TEXT_LIMIT)} ` +
+        `heapLimitMB=${boundedText(summary.heapLimitMB, '0.0', TEXT_LIMIT)} ` +
+        `maxRssMB=${boundedText(summary.maxRssMB, '0.0', TEXT_LIMIT)} ` +
+        `topNativeFrameModule=${boundedText(summary.topNativeFrameModule, 'none', PATH_LIMIT)}`,
     )
   }
   if (summaries.length > maxReports) lines.push(`  ... ${summaries.length - maxReports} more`)

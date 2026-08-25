@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   formatDiagnosticReportSummaries,
+  MAX_DIAGNOSTIC_REPORT_BYTES,
   readDiagnosticReportSummaries,
   summarizeDiagnosticReport,
 } from './index.mts'
@@ -94,6 +95,16 @@ describe('summarizeDiagnosticReport', () => {
     expect(
       summarizeDiagnosticReport('report.json', { nativeStack: [{ symbol: 'frame [   ]' }] }),
     ).toMatchObject({ topNativeFrameModule: null })
+    expect(
+      summarizeDiagnosticReport('report.json', {
+        nativeStack: [{ symbol: 'private frame [private-data]' }],
+      }),
+    ).toMatchObject({ topNativeFrameModule: null })
+    expect(
+      summarizeDiagnosticReport('report.json', {
+        nativeStack: [{ symbol: String.raw`frame [C:\node\node.exe]` }],
+      }),
+    ).toMatchObject({ topNativeFrameModule: String.raw`C:\node\node.exe` })
   })
 
   it('bounds untrusted strings', () => {
@@ -141,6 +152,18 @@ describe('readDiagnosticReportSummaries', () => {
     ])
   })
 
+  it('skips diagnostic files that exceed the per-report byte limit', () => {
+    const directory = makeDirectory()
+    const oversized = join(directory, 'oversized.json')
+    writeFileSync(oversized, '{}')
+    truncateSync(oversized, MAX_DIAGNOSTIC_REPORT_BYTES + 1)
+    writeFileSync(join(directory, 'report.json'), JSON.stringify(SAMPLE_REPORT))
+
+    expect(readDiagnosticReportSummaries(directory).map((summary) => summary.file)).toEqual([
+      'report.json',
+    ])
+  })
+
   it('caps structured output', () => {
     const directory = makeDirectory()
     for (let index = 0; index < 5; index += 1) {
@@ -179,6 +202,22 @@ describe('formatDiagnosticReportSummaries', () => {
     expect(formatDiagnosticReportSummaries([summary])).toContain(
       'threadId=unknown heapUsedMB=0.0 heapTotalMB=0.0 heapLimitMB=0.0 maxRssMB=0.0 topNativeFrameModule=none',
     )
+  })
+
+  it('sanitizes summaries constructed by public API callers', () => {
+    const untrusted = {
+      ...summarizeDiagnosticReport('report.json', SAMPLE_REPORT),
+      file: `report.json\ninjected=${'x'.repeat(400)}`,
+      heapUsedMB: '1.0\ninjected=true',
+      threadId: -1,
+      topNativeFrameModule: null,
+    }
+    const output = formatDiagnosticReportSummaries([untrusted])
+
+    expect(output).not.toContain('\ninjected')
+    expect(output).toContain('threadId=unknown')
+    expect(output).toContain('topNativeFrameModule=none')
+    expect(output.split('\n')).toHaveLength(4)
   })
 
   it('caps formatted output and reports the remainder', () => {
