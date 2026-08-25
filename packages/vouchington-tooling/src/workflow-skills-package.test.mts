@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
 
 import { describe, expect, it } from 'vitest'
 
@@ -14,20 +15,17 @@ describe('workflow skills package contract', () => {
     const output = mkdtempSync(resolve(tmpdir(), 'vouchington-skills-pack-'))
     try {
       execFileSync('pnpm', ['pack', '--pack-destination', output], { cwd: packageRoot })
-      const tarball = execFileSync('find', [output, '-name', '*.tgz', '-print', '-quit'], {
-        encoding: 'utf8',
-      }).trim()
-      const packaged = execFileSync('tar', ['-tf', tarball], { encoding: 'utf8' })
-        .split('\n')
+      const tarball = join(
+        output,
+        readdirSync(output).find((name) => name.endsWith('.tgz'))!,
+      )
+      const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      const canonical = execFileSync('find', [canonicalRoot, '-name', 'SKILL.md'], {
-        encoding: 'utf8',
-      })
-        .split('\n')
-        .filter(Boolean)
-        .map((path) => `package/skills/${path.slice(canonicalRoot.length + 1)}`)
+      const canonical = skillPaths(canonicalRoot)
+        .map((path) => `package/skills/${path}`)
         .sort()
+      expect(packaged).toHaveLength(15)
       expect(packaged).toEqual(canonical)
       expect(
         execFileSync('git', ['ls-files', 'skills'], { cwd: packageRoot, encoding: 'utf8' }),
@@ -37,3 +35,30 @@ describe('workflow skills package contract', () => {
     }
   })
 })
+
+function skillPaths(root: string, path = root): string[] {
+  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const child = join(path, entry.name)
+    if (entry.isDirectory()) return skillPaths(root, child)
+    return entry.name === 'SKILL.md' ? [relative(root, child).replaceAll('\\', '/')] : []
+  })
+}
+
+function tarPaths(archive: Buffer): string[] {
+  const paths: string[] = []
+  for (let offset = 0; offset < archive.length;) {
+    const name = archive
+      .subarray(offset, offset + 100)
+      .toString()
+      .replace(/\0.*$/, '')
+    if (!name) break
+    const prefix = archive
+      .subarray(offset + 345, offset + 500)
+      .toString()
+      .replace(/\0.*$/, '')
+    const size = Number.parseInt(archive.subarray(offset + 124, offset + 136).toString(), 8)
+    paths.push(prefix ? `${prefix}/${name}` : name)
+    offset += 512 + Math.ceil(size / 512) * 512
+  }
+  return paths
+}
