@@ -111,6 +111,36 @@ describe('browser-session-runner extension hooks', () => {
     expect(cleanup).toBe(1)
   })
 
+  it('rejects when provider watchdog setup or cleanup fails', async () => {
+    const setupProcess = new Process(),
+      setupClock = clock()
+    const setup = runBrowserSession(
+      {
+        ...options(setupProcess),
+        watchdog: () => {
+          throw new Error('watchdog setup failed')
+        },
+      },
+      setupClock.deps,
+    )
+    setupProcess.emit('close', null, 'SIGTERM')
+    await expect(setup).rejects.toThrow('watchdog setup failed')
+
+    const cleanupProcess = new Process(),
+      cleanupClock = clock()
+    const cleanup = runBrowserSession(
+      {
+        ...options(cleanupProcess),
+        watchdog: () => () => {
+          throw new Error('watchdog cleanup failed')
+        },
+      },
+      cleanupClock.deps,
+    )
+    cleanupProcess.emit('close', 0, null)
+    await expect(cleanup).rejects.toThrow('watchdog cleanup failed')
+  })
+
   it.each(['SIGINT', 'SIGTERM'] as NodeJS.Signals[])(
     'reports a parent %s outcome to each attempt completion callback',
     async (signal) => {
