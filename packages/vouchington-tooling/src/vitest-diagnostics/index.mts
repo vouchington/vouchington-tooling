@@ -1,9 +1,10 @@
-import { closeSync, constants, fstatSync, openSync, readdirSync, readSync } from 'node:fs'
+import { closeSync, constants, fstatSync, openSync, opendirSync, readSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
 
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100
 export const DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS = 20
 export const HARD_MAX_DIAGNOSTIC_REPORTS = 100
+export const HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES = 10_000
 export const MAX_DIAGNOSTIC_REPORT_BYTES = 5 * 1024 * 1024
 
 export interface DiagnosticReportSummary {
@@ -124,9 +125,19 @@ export function readDiagnosticReportSummaries(
 
   let filenames: string[]
   try {
-    filenames = readdirSync(directory)
-      .filter((filename) => filename.endsWith('.json'))
-      .sort()
+    filenames = []
+    const handle = opendirSync(directory)
+    try {
+      for (let scanned = 0; ; scanned += 1) {
+        const entry = handle.readSync()
+        if (entry === null) break
+        if (scanned >= HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES) return []
+        if (entry.name.endsWith('.json')) filenames.push(entry.name)
+      }
+    } finally {
+      handle.closeSync()
+    }
+    filenames.sort()
   } catch {
     return []
   }
