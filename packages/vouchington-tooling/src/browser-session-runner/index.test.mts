@@ -241,6 +241,26 @@ describe('runBrowserSession', () => {
     await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
+  it('enforces a deadline elapsed while starting the child', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      {
+        ...options([child]),
+        attempts: 1,
+        start: () => {
+          clock.advance(100)
+          return child
+        },
+      },
+      clock.deps,
+    )
+    expect(child.signals).toEqual(['SIGTERM'])
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
+  })
+
   it('terminates the process group when the parent receives a signal', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
@@ -380,6 +400,16 @@ describe('runBrowserSession', () => {
     expect(Buffer.byteLength(result.diagnosticTail)).toBeLessThanOrEqual(5)
   })
 
+  it('keeps a valid diagnostic prefix when the raw tail ends in incomplete UTF-8', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
+    child.stdout.emit('data', Buffer.from([...Buffer.from('complete'), 0xe2]))
+    child.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ diagnosticTail: 'complete' })
+  })
+
   it('classifies a close after the deadline even before the timer callback runs', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
@@ -393,12 +423,20 @@ describe('runBrowserSession', () => {
     await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
-  it('returns an error-event exit instead of leaving an unhandled child error', async () => {
+  it('waits for close after an error event instead of retrying early', async () => {
     const child = new FakeProcess()
     const run = runBrowserSession({ ...options([child]), attempts: 1 }, makeClock().deps)
+    let settled = false
+    void run.then(() => {
+      settled = true
+    })
     child.emit('error', new Error('spawn failed'))
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(child.signals).toEqual(['SIGTERM'])
+    child.emit('close', null, 'SIGTERM')
 
-    await expect(run).resolves.toMatchObject({ exit: { code: null, signal: null } })
+    await expect(run).resolves.toMatchObject({ exit: { code: null, signal: 'SIGTERM' } })
   })
 
   it('continues direct-child cleanup when process-group signalling throws', async () => {

@@ -99,6 +99,7 @@ function runAttempt(
     let reason: BrowserSessionResult['reason'] = 'exit',
       complete = false
     let killTimer: unknown
+    let terminating = false
     const listeners: Array<() => void> = []
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
@@ -127,7 +128,9 @@ function runAttempt(
     }
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
       if (reason !== 'exit') return
-      reason = nextReason
+      if (nextReason !== 'exit') reason = nextReason
+      if (terminating) return
+      terminating = true
       killTimer = deps.setTimeout(() => signal('SIGKILL'), options.graceMs)
       signal('SIGTERM')
     }
@@ -173,16 +176,18 @@ function runAttempt(
       if (startupProgress && now - lastSemantic >= options.semanticStallMs)
         terminate('semantic-stall')
     }, options.watchdogIntervalMs ?? 1000)
+    const remainingDeadlineMs = deadline - deps.now()
     const deadlineTimer = deps.setTimeout(
       () => terminate('deadline'),
-      Math.max(1, deadline - startedAt),
+      Math.max(1, remainingDeadlineMs),
     )
+    if (remainingDeadlineMs <= 0) terminate('deadline')
     for (const value of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
       const listener = () => terminate('parent-signal')
       deps.onParentSignal(value, listener)
       listeners.push(() => deps.offParentSignal(value, listener))
     }
-    process.on('error', () => finish({ code: null, signal: null }))
+    process.on('error', () => terminate('exit'))
     process.on('close', (code, value) => {
       for (const stream of streams) stream?.flush()
       if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
