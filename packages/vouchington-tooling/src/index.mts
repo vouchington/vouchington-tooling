@@ -161,8 +161,10 @@ export {
   splitCompleteLines,
 } from './process-line-buffer/index.mts'
 export {
+  isProcessGroupAlive,
   ProcessGroupDrainTimeoutError,
   runBrowserSession,
+  waitForProcessGroupExit,
 } from './browser-session-runner/index.mts'
 export type {
   BrowserSessionDeps,

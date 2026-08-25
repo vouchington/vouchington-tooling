@@ -90,7 +90,11 @@ import {
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
-import { runBrowserSession } from 'vouchington-tooling/browser-session-runner'
+import {
+  isProcessGroupAlive,
+  runBrowserSession,
+  waitForProcessGroupExit,
+} from 'vouchington-tooling/browser-session-runner'
 import {
   generateSchemaSnapshot,
   renderSchemaMarkdown,
@@ -144,3 +148,5 @@ are terminal. Output is decoded independently per stream; unfinished lines are c
 `diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
 The runner uses monotonic elapsed time, rejects timer budgets above Node's maximum delay, and waits for
 the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.
+`isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
+process-group probe and bounded-drain semantics outside a browser session.

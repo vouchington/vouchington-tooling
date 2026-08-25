@@ -16,7 +16,11 @@ export type {
   BrowserSessionWatchdogCleanup,
   BrowserSessionWatchdogController,
 } from './types.mts'
-export { ProcessGroupDrainTimeoutError } from './process-group.mts'
+export {
+  isProcessGroupAlive,
+  ProcessGroupDrainTimeoutError,
+  waitForProcessGroupExit,
+} from './process-group.mts'
 
 const defaultDeps: BrowserSessionDeps = {
   clearInterval,
@@ -66,6 +70,7 @@ export async function runBrowserSession(
 
 function validateOptions(options: BrowserSessionOptions): void {
   const maxTimerDelay = 2_147_483_647
+  const drainTimeoutMs = options.graceMs + (options.processGroupDrainMs ?? options.graceMs)
   for (const [name, value] of [
     ['attempts', options.attempts],
     ['deadlineMs', options.deadlineMs],
@@ -81,6 +86,8 @@ function validateOptions(options: BrowserSessionOptions): void {
   const tailBytes = options.diagnosticTailBytes ?? 4096
   if (!Number.isSafeInteger(tailBytes) || tailBytes <= 0)
     throw new RangeError('diagnosticTailBytes must be positive')
+  if (!Number.isSafeInteger(drainTimeoutMs) || drainTimeoutMs > maxTimerDelay)
+    throw new RangeError('graceMs + processGroupDrainMs must be a positive Node timer delay')
 }
 
 function omitAttempts({ attempts: _attempts, ...result }: BrowserSessionResult) {

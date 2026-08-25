@@ -45,6 +45,7 @@ describe('browser-session-runner validation', () => {
       ['semanticStallMs', 2_147_483_648],
       ['startupStallMs', 2_147_483_648],
       ['watchdogIntervalMs', 2_147_483_648],
+      ['graceMs', 2_147_483_647],
     ] as const)
       await expect(runBrowserSession({ ...options, [property]: value }, deps)).rejects.toThrow(
         property,
