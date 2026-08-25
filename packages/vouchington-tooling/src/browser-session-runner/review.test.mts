@@ -90,6 +90,18 @@ describe('browser-session-runner review regressions', () => {
     expect(process.signals).toEqual(['SIGTERM'])
   })
 
+  it('keeps the first terminal reason when a different terminal event follows', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(options(process), clock.deps)
+    clock.emitParent()
+    clock.tick(100)
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    expect(process.signals).toEqual(['SIGTERM'])
+  })
+
   it('aggregates decoded stream output without corrupting interleaved UTF-8', async () => {
     const process = new Process(),
       clock = harness()
@@ -154,6 +166,7 @@ describe('browser-session-runner review regressions', () => {
       (error: unknown) => error,
     )
     process.stdout.emit('data', 'bad output\n')
+    process.stderr.emit('data', 'another bad output\n')
     expect(process.signals).toEqual(['SIGTERM'])
     process.emit('close', null, 'SIGTERM')
     await Promise.resolve()
