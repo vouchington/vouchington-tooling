@@ -134,6 +134,50 @@ describe('inherited Codex child transcripts', () => {
     }
   })
 
+  it('treats case-equivalent session ids as standalone', () => {
+    expect(
+      segmentCodex([
+        JSON.stringify({
+          type: 'session_meta',
+          payload: { id: parent.toUpperCase(), session_id: parent },
+        }),
+        JSON.stringify({ type: 'response_item', payload: { name: 'owned' } }),
+      ]),
+    ).toMatchObject({ baseline: { input: 0 }, lines: [expect.stringContaining('owned')] })
+  })
+
+  it('preserves sub-second boundaries and inherited token high-water marks', () => {
+    const timestamp = '2026-07-13T10:00:00.500Z'
+    const task = (startedAt: number) =>
+      JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'task_started', started_at: startedAt },
+      })
+    const token = (input: number, output: number) =>
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: input, output_tokens: output } },
+        },
+      })
+    const segment = segmentCodex([
+      JSON.stringify({
+        type: 'session_meta',
+        payload: { parent_thread_id: parent, timestamp },
+      }),
+      task(Date.parse('2026-07-13T10:00:00.400Z')),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: {} } }),
+      token(100, 20),
+      token(80, 15),
+      task(Date.parse('2026-07-13T10:00:00.600Z')),
+    ])
+    expect(segment).toMatchObject({
+      baseline: { input: 100, output: 20 },
+      lines: [expect.stringContaining(String(Date.parse('2026-07-13T10:00:00.600Z')))],
+    })
+  })
+
   it('fails closed when inherited metadata has no valid owned boundary', () => {
     expect(
       segmentCodex([

@@ -1,4 +1,5 @@
 import {
+  asNumber,
   asRecord,
   emptyTokens,
   parseLines,
@@ -15,27 +16,38 @@ function hasInheritedParent(sessionMeta: ParsedLine): boolean {
     typeof payload?.parent_thread_id === 'string' ||
     (typeof payload?.id === 'string' &&
       typeof payload.session_id === 'string' &&
-      payload.id !== payload.session_id)
+      payload.id.toLowerCase() !== payload.session_id.toLowerCase())
   )
 }
 
-function taskStartedSeconds(record: ParsedLine): number | undefined {
-  if (record.type !== 'event_msg') return undefined
+function isOwnedTaskStart(record: ParsedLine, timestampMs: number): boolean {
+  if (record.type !== 'event_msg') return false
   const payload = asRecord(record.payload)
-  if (payload?.type !== 'task_started' || typeof payload.started_at !== 'number') return undefined
-  return payload.started_at >= 1_000_000_000_000 ? payload.started_at / 1000 : payload.started_at
+  if (payload?.type !== 'task_started' || typeof payload.started_at !== 'number') return false
+  return payload.started_at >= 1_000_000_000_000
+    ? payload.started_at >= timestampMs
+    : payload.started_at >= Math.floor(timestampMs / 1000)
 }
 
 function usage(record: ParsedLine): TokenTotals | undefined {
+  if (record.type !== 'event_msg') return undefined
   const payload = asRecord(record.payload)
+  if (payload?.type !== 'token_count') return undefined
   const totals = asRecord(asRecord(payload?.info)?.total_token_usage)
-  if (record.type !== 'event_msg' || payload?.type !== 'token_count' || !totals) return undefined
-  const number = (value: unknown): number =>
-    typeof value === 'number' && Number.isFinite(value) ? value : 0
+  if (!totals) return undefined
   return {
-    input: number(totals.input_tokens),
-    output: number(totals.output_tokens),
-    cacheRead: number(totals.cached_input_tokens),
+    input: asNumber(totals.input_tokens),
+    output: asNumber(totals.output_tokens),
+    cacheRead: asNumber(totals.cached_input_tokens),
+    cacheCreation: 0,
+  }
+}
+
+function retainHighWater(previous: TokenTotals, current: TokenTotals): TokenTotals {
+  return {
+    input: Math.max(previous.input, current.input),
+    output: Math.max(previous.output, current.output),
+    cacheRead: Math.max(previous.cacheRead, current.cacheRead),
     cacheCreation: 0,
   }
 }
@@ -48,16 +60,16 @@ export function segmentCodex(lines: string[]): CodexSegment | undefined {
   const timestamp = asRecord(sessionMeta.payload)?.timestamp
   const timestampMs = typeof timestamp === 'string' ? Date.parse(timestamp) : Number.NaN
   if (!Number.isFinite(timestampMs)) return undefined
-  const sessionSeconds = Math.floor(timestampMs / 1000)
   const ownedIndex = content.findIndex((line, index) => {
     if (index === 0) return false
     const record = parseLines([line])[0]
-    const startedAt = record ? taskStartedSeconds(record) : undefined
-    return startedAt !== undefined && startedAt >= sessionSeconds
+    return record ? isOwnedTaskStart(record, timestampMs) : false
   })
   if (ownedIndex === -1) return undefined
   let baseline = emptyTokens()
-  for (const record of parseLines(content.slice(1, ownedIndex)))
-    baseline = usage(record) ?? baseline
+  for (const record of parseLines(content.slice(1, ownedIndex))) {
+    const current = usage(record)
+    if (current) baseline = retainHighWater(baseline, current)
+  }
   return { lines: content.slice(ownedIndex), baseline }
 }
