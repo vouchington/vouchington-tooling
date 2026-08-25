@@ -333,3 +333,15 @@ export type {
   ResolvedPin,
   ValidateResolvedPinDeltaOptions,
 } from './swift-resolved-pin-delta/index.mts'
+export {
+  DEFAULT_MAX_DIAGNOSTIC_REPORTS,
+  DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS,
+  formatDiagnosticReportSummaries,
+  HARD_MAX_DIAGNOSTIC_REPORTS,
+  readDiagnosticReportSummaries,
+  summarizeDiagnosticReport,
+} from './vitest-diagnostics/index.mts'
+export type {
+  DiagnosticReportLimitOptions,
+  DiagnosticReportSummary,
+} from './vitest-diagnostics/index.mts'

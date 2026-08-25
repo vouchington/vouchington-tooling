@@ -111,8 +111,16 @@ import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
+import {
+  formatDiagnosticReportSummaries,
+  readDiagnosticReportSummaries,
+} from 'vouchington-tooling/vitest-diagnostics'
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied
 credentials (job token or a minted Claude GitHub App token).
+
+`vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
+filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
+native frame symbols. Both structured reads and text rendering have hard report-count limits.

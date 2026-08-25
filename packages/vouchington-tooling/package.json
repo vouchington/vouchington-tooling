@@ -195,6 +195,11 @@
       "import": "./dist/swift-resolved-pin-delta/index.mjs",
       "default": "./dist/swift-resolved-pin-delta/index.mjs"
     },
+    "./vitest-diagnostics": {
+      "types": "./dist/vitest-diagnostics/index.d.mts",
+      "import": "./dist/vitest-diagnostics/index.mjs",
+      "default": "./dist/vitest-diagnostics/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
