@@ -101,6 +101,9 @@ describe('summarizeDiagnosticReport', () => {
       }),
     ).toMatchObject({ topNativeFrameModule: null })
     expect(
+      summarizeDiagnosticReport('report.json', { nativeStack: [{ symbol: 'frame ]' }] }),
+    ).toMatchObject({ topNativeFrameModule: null })
+    expect(
       summarizeDiagnosticReport('report.json', {
         nativeStack: [{ symbol: String.raw`frame [C:\node\node.exe]` }],
       }),
