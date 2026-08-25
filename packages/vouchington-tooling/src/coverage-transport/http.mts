@@ -66,9 +66,9 @@ interface TransportResponse {
 }
 
 async function request(
-  method: 'GET' | 'PUT',
+  method: 'GET' | 'PUT' | 'POST',
   url: string,
-  body: Buffer | undefined,
+  body: Buffer | undefined | (() => FormData),
   options: RequestOptions,
 ): Promise<TransportResponse | null> {
   for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
@@ -77,7 +77,7 @@ async function request(
     try {
       const response = await fetch(url, {
         method,
-        ...(body ? { body: new Uint8Array(body) } : {}),
+        ...(body ? { body: typeof body === 'function' ? body() : new Uint8Array(body) } : {}),
         signal: controller.signal,
       })
       // A missing presigned object is terminal. Let fetchGet yield null or fetchPut yield false
@@ -118,4 +118,26 @@ export async function fetchGet(url: string, options: RequestOptions = {}): Promi
   if (response?.status === 404) return null
   if (!response?.ok) throw new Error('[coverage-transport] GET exhausted')
   return response.body as Buffer
+}
+
+export async function fetchPost(
+  url: string,
+  fields: Readonly<Record<string, string>>,
+  key: string,
+  body: Buffer,
+  options: RequestOptions = {},
+): Promise<boolean> {
+  const response = await request(
+    'POST',
+    url,
+    () => {
+      const form = new FormData()
+      for (const [name, value] of Object.entries(fields)) form.set(name, value)
+      form.set('key', key)
+      form.set('file', new Blob([new Uint8Array(body).slice().buffer]))
+      return form
+    },
+    options,
+  )
+  return response?.ok === true
 }
