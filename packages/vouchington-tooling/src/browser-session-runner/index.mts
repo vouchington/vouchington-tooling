@@ -25,7 +25,7 @@ const defaultDeps: BrowserSessionDeps = {
   },
   now: () => performance.now(),
   offParentSignal: (signal, listener) => process.off(signal, listener),
-  onParentSignal: (signal, listener) => process.once(signal, listener),
+  onParentSignal: (signal, listener) => process.on(signal, listener),
   setInterval,
   setTimeout,
   waitForProcessGroupExit,

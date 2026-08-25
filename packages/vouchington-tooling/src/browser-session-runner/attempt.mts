@@ -15,10 +15,14 @@ export function runAttempt(
   deadline: number,
   attempt: number,
 ) {
-  return new Promise<BrowserSessionResult>((resolve) => {
+  return new Promise<BrowserSessionResult>((resolve, reject) => {
     const startedAt = deps.now(),
       process = options.start(attempt)
-    if (!Number.isSafeInteger(process.processGroupId) || process.processGroupId <= 0) {
+    if (
+      !Number.isSafeInteger(process.processGroupId) ||
+      process.processGroupId <= 0 ||
+      process.processGroupId > 2_147_483_647
+    ) {
       try {
         process.kill('SIGKILL')
       } catch {}
@@ -29,7 +33,9 @@ export function runAttempt(
       startupProgress = false,
       semanticProgress = false,
       lastSemantic = startedAt
-    let reason: BrowserSessionResult['reason'] = 'exit',
+    let failure: unknown,
+      hasFailure = false,
+      reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
     let killTimer: unknown
@@ -41,7 +47,7 @@ export function runAttempt(
       deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
       for (const remove of listeners) remove()
-      resolve({
+      const result = {
         attempts: 0,
         deadlineExceeded: reason === 'deadline',
         diagnosticTail: tailText(tail, maxTail),
@@ -49,7 +55,9 @@ export function runAttempt(
         reason,
         semanticProgress,
         startupProgress,
-      })
+      }
+      if (hasFailure) reject(failure)
+      else resolve(result)
     }
     const signal = (value: NodeJS.Signals) => {
       try {
@@ -70,6 +78,12 @@ export function runAttempt(
       terminating = true
       killTimer = deps.setTimeout(() => signal('SIGKILL'), options.graceMs)
       signal('SIGTERM')
+    }
+    const fail = (error: unknown) => {
+      if (hasFailure) return
+      failure = error
+      hasFailure = true
+      terminate('exit')
     }
     const consume = () => {
       const decoder = new StringDecoder('utf8')
@@ -107,7 +121,13 @@ export function runAttempt(
       stream ? consume() : undefined,
     )
     for (const [index, stream] of [process.stdout, process.stderr].entries())
-      stream?.on('data', streams[index]!.write)
+      stream?.on('data', (chunk) => {
+        try {
+          streams[index]!.write(chunk)
+        } catch (error) {
+          fail(error)
+        }
+      })
     const watchdog = deps.setInterval(() => {
       const now = deps.now()
       if (now >= deadline) return terminate('deadline')
@@ -129,7 +149,12 @@ export function runAttempt(
     }
     process.on('error', () => terminate('exit'))
     process.on('close', (code, value) => {
-      for (const stream of streams) stream?.flush()
+      for (const stream of streams)
+        try {
+          stream?.flush()
+        } catch (error) {
+          fail(error)
+        }
       if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
       const exit = { code, signal: value }
       if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(exit)

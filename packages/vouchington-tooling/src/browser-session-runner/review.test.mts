@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { runBrowserSession, type BrowserSessionDeps, type BrowserSessionProcess } from './index.mts'
 
@@ -135,5 +135,84 @@ describe('browser-session-runner review regressions', () => {
 
     await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
     expect(process.signals).toEqual(['SIGTERM'])
+  })
+
+  it('rejects a classifier failure only after supervised cleanup completes', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const failure = new Error('unexpected browser output')
+    const outcome = runBrowserSession(
+      {
+        ...options(process),
+        onLine: () => {
+          throw failure
+        },
+      },
+      clock.deps,
+    ).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    process.stdout.emit('data', 'bad output\n')
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', null, 'SIGTERM')
+    await Promise.resolve()
+    clock.release()
+
+    await expect(outcome).resolves.toBe(failure)
+  })
+
+  it('rejects a classifier failure surfaced while flushing a final output line', async () => {
+    const process = new Process(),
+      clock = harness()
+    const failure = new Error('unterminated browser output')
+    const outcome = runBrowserSession(
+      {
+        ...options(process),
+        onLine: () => {
+          throw failure
+        },
+      },
+      clock.deps,
+    ).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    process.stdout.emit('data', 'final output')
+    process.emit('close', 0, null)
+
+    await expect(outcome).resolves.toBe(failure)
+    expect(process.signals).toEqual(['SIGTERM'])
+  })
+
+  it('keeps the default parent handler through repeated signals until cleanup completes', async () => {
+    const process = new Process()
+    const originalListenerCount = globalThis.process.listenerCount('SIGTERM')
+    const kill = vi.spyOn(globalThis.process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+      return true
+    })
+    const run = runBrowserSession(options(process))
+    expect(globalThis.process.listenerCount('SIGTERM')).toBe(originalListenerCount + 1)
+
+    globalThis.process.emit('SIGTERM')
+    globalThis.process.emit('SIGTERM')
+    expect(process.signals).toEqual(['SIGTERM'])
+    expect(globalThis.process.listenerCount('SIGTERM')).toBe(originalListenerCount + 1)
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    expect(globalThis.process.listenerCount('SIGTERM')).toBe(originalListenerCount)
+    kill.mockRestore()
+  })
+
+  it("rejects a process group ID above Node's supported PID range", async () => {
+    const process = new Process()
+    process.processGroupId = 2_147_483_648
+
+    await expect(runBrowserSession(options(process), harness().deps)).rejects.toThrow(
+      'processGroupId',
+    )
+    expect(process.signals).toEqual(['SIGKILL'])
   })
 })
