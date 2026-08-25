@@ -2,6 +2,16 @@ import type { ChildProcess } from 'node:child_process'
 
 export type BrowserSessionEvent = 'startup' | 'semantic'
 export type BrowserSessionExit = { code: number | null; signal: NodeJS.Signals | null }
+export type BrowserSessionOutput = {
+  chunk: string | Buffer
+  source: 'stderr' | 'stdout'
+}
+export type BrowserSessionTerminationReason =
+  | 'deadline'
+  | 'parent-signal'
+  | 'provider-watchdog'
+  | 'semantic-stall'
+  | 'startup-stall'
 type BrowserSessionStream = {
   on(event: 'data', listener: (chunk: string | Buffer) => void): unknown
   on(event: 'error', listener: (error: Error) => void): unknown
@@ -11,7 +21,7 @@ export type BrowserSessionResult = {
   deadlineExceeded: boolean
   diagnosticTail: string
   exit: BrowserSessionExit
-  reason: 'exit' | 'parent-signal' | 'semantic-stall' | 'startup-stall' | 'deadline'
+  reason: 'exit' | BrowserSessionTerminationReason
   startupProgress: boolean
   semanticProgress: boolean
 }
@@ -38,6 +48,17 @@ export type BrowserSessionDeps = {
   setTimeout(callback: () => void, ms: number): unknown
   waitForProcessGroupExit(processGroupId: number, timeoutMs: number): Promise<void>
 }
+export type BrowserSessionWatchdogController = {
+  attempt: number
+  deadline: number
+  now(): number
+  process: BrowserSessionProcess
+  terminate(reason?: 'provider-watchdog'): void
+}
+export type BrowserSessionWatchdogCleanup = () => void
+export type BrowserSessionWatchdog = (
+  controller: BrowserSessionWatchdogController,
+) => void | BrowserSessionWatchdogCleanup | Promise<void | BrowserSessionWatchdogCleanup>
 export type BrowserSessionOptions = {
   attempts: number
   classifyExit(
@@ -48,9 +69,12 @@ export type BrowserSessionOptions = {
   diagnosticTailBytes?: number
   graceMs: number
   onLine(line: string): BrowserSessionEvent | undefined
+  onOutput?(output: BrowserSessionOutput): void
+  onAttemptComplete?(result: BrowserSessionResult): void
   processGroupDrainMs?: number
   semanticStallMs: number
   start(attempt: number): BrowserSessionProcess
   startupStallMs: number
   watchdogIntervalMs?: number
+  watchdog?: BrowserSessionWatchdog
 }

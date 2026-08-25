@@ -169,8 +169,13 @@ export type {
   BrowserSessionEvent,
   BrowserSessionExit,
   BrowserSessionOptions,
+  BrowserSessionOutput,
   BrowserSessionProcess,
   BrowserSessionResult,
+  BrowserSessionTerminationReason,
+  BrowserSessionWatchdog,
+  BrowserSessionWatchdogCleanup,
+  BrowserSessionWatchdogController,
 } from './browser-session-runner/index.mts'
 export {
   buildSchemaSnapshot,

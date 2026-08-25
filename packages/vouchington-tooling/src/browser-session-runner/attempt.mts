@@ -1,8 +1,7 @@
-import { StringDecoder } from 'node:string_decoder'
-
-import { boundPendingLine, splitCompleteLines } from '../process-line-buffer/index.mts'
+import { createOutputConsumer } from './output.mts'
 import { tailText } from './tail.mts'
 import { TailQueue } from './tail-queue.mts'
+import { createWatchdogLifecycle, registerWatchdogSetup } from './watchdog.mts'
 import type {
   BrowserSessionDeps,
   BrowserSessionExit,
@@ -44,13 +43,17 @@ export function runAttempt(
       complete = false,
       terminating = false
     let killTimer: unknown, stallTimer: unknown
+    const watchdog = createWatchdogLifecycle()
     const listeners: Array<() => void> = []
+    const captureFailure = (error: unknown) =>
+      !hasFailure && ((failure = error), (hasFailure = true))
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
       complete = true
       deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
       deps.clearTimeout(stallTimer)
+      watchdog.complete(captureFailure)
       for (const remove of listeners) remove()
       const result = {
         attempts: 0,
@@ -88,9 +91,8 @@ export function runAttempt(
       signal('SIGTERM')
     }
     const fail = (error: unknown) => {
-      if (hasFailure) return
-      failure = error
-      hasFailure = true
+      if (hasFailure || complete) return
+      captureFailure(error)
       terminate('exit')
     }
     const drain = () => {
@@ -111,37 +113,21 @@ export function runAttempt(
       if (stallTimer) deps.clearTimeout(stallTimer)
       stallTimer = deps.setTimeout(() => terminate(nextReason), ms)
     }
-    const consume = () => {
-      const decoder = new StringDecoder('utf8')
-      let pending = ''
-      const line = (value: string) => {
-        const event = options.onLine(value)
-        if (event === 'startup' && !startupProgress) {
-          startupProgress = true
-          if (!childExited) armStall(options.semanticStallMs, 'semantic-stall')
-        }
-        if (event === 'semantic') {
-          semanticProgress = true
-          if (startupProgress && !childExited) armStall(options.semanticStallMs, 'semantic-stall')
-        }
+    const line = (value: string) => {
+      const event = options.onLine(value)
+      if (event === 'startup' && !startupProgress) {
+        startupProgress = true
+        if (!childExited) armStall(options.semanticStallMs, 'semantic-stall')
       }
-      const appendLines = (text: string) => {
-        tail.append(text)
-        const split = splitCompleteLines(pending + text)
-        pending = boundPendingLine(split.pending)
-        for (const value of split.complete) line(value)
-      }
-      return {
-        flush: () => {
-          appendLines(decoder.end())
-          if (pending) line(pending)
-        },
-        write: (chunk: string | Buffer) =>
-          appendLines(decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))),
+      if (event === 'semantic') {
+        semanticProgress = true
+        if (startupProgress && !childExited) armStall(options.semanticStallMs, 'semantic-stall')
       }
     }
-    const streams = [process.stdout, process.stderr].map((stream) =>
-      stream ? consume() : undefined,
+    const streams = [process.stdout, process.stderr].map((stream, index) =>
+      stream
+        ? createOutputConsumer(options, tail, index === 0 ? 'stdout' : 'stderr', line)
+        : undefined,
     )
     for (const [index, stream] of [process.stdout, process.stderr].entries())
       stream?.on('data', (chunk) => {
@@ -195,5 +181,19 @@ export function runAttempt(
       drain()
       if (drainDone || hasFailure) finish(closeExit)
     })
+    try {
+      const setup = options.watchdog?.({
+        attempt,
+        deadline,
+        now: () => deps.now(),
+        process,
+        terminate: () => {
+          if (!childExited) terminate('provider-watchdog')
+        },
+      })
+      registerWatchdogSetup(setup, watchdog, fail)
+    } catch (error) {
+      fail(error)
+    }
   })
 }
