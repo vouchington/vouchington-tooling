@@ -109,12 +109,17 @@ describe('retrospective transcript', () => {
       JSON.stringify({
         type: 'assistant',
         message: {
-          content: ['not an object', { type: 'tool_use', name: 'Read' }, { type: 'other' }],
+          content: [
+            'not an object',
+            { type: 'tool_use', name: 'Read' },
+            { type: 'tool_use', name: 'Bash', input: { command: 1 } },
+            { type: 'other' },
+          ],
         },
       }),
     ])
 
-    expect(facts).toMatchObject({ userPrompts: 0, assistantResponses: 1, toolCalls: 1 })
+    expect(facts).toMatchObject({ userPrompts: 0, assistantResponses: 1, toolCalls: 2 })
   })
 
   it('derives Codex token deltas, command calls, failures, and compactions', () => {
@@ -158,6 +163,14 @@ describe('retrospective transcript', () => {
       }),
       JSON.stringify({
         type: 'response_item',
+        payload: { type: 'function_call', name: 'other', arguments: '{"cmd":"git push"}' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', name: 'shell', arguments: '{"cmd":1}' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
         payload: {
           type: 'function_call',
           call_id: 'failed-once',
@@ -180,7 +193,7 @@ describe('retrospective transcript', () => {
     expect(facts).toMatchObject({
       userPrompts: 1,
       assistantResponses: 1,
-      toolCalls: 4,
+      toolCalls: 6,
       failedToolCalls: 2,
       noMistakesInvocations: 1,
       pushCommandAttempts: 1,
@@ -193,6 +206,15 @@ describe('retrospective transcript', () => {
     const root = [JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } })]
     const child = [
       JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 3, output_tokens: 4, cached_input_tokens: 5 },
+          },
+        },
+      }),
+      JSON.stringify({
         type: 'response_item',
         payload: { type: 'function_call', name: 'Bash', arguments: '{"cmd":"git push"}' },
       }),
@@ -202,7 +224,13 @@ describe('retrospective transcript', () => {
       computeTranscriptFacts(root, [
         { lines: child, baseline: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } },
       ]),
-    ).toMatchObject({ userPrompts: 1, toolCalls: 1, subagentToolCalls: 1, pushCommandAttempts: 1 })
+    ).toMatchObject({
+      userPrompts: 1,
+      toolCalls: 1,
+      subagentToolCalls: 1,
+      pushCommandAttempts: 1,
+      subagentTokens: { input: 3, output: 4, cacheRead: 5 },
+    })
     expect(() => computeTranscriptFacts(root, [child])).toThrow('Codex subagents must be segmented')
   })
 
@@ -252,6 +280,17 @@ describe('retrospective transcript', () => {
         JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
       ]),
     ).toEqual(emptyFacts())
+  })
+
+  it('accepts segmented Claude subagent inputs', () => {
+    const subagent = [
+      JSON.stringify({ type: 'assistant', isSidechain: true, message: { content: [] } }),
+    ]
+    expect(
+      computeTranscriptFacts(claudeLines, [
+        { lines: subagent, baseline: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } },
+      ]),
+    ).toMatchObject({ assistantResponses: 1, subagentTokens: { input: 0 } })
   })
 
   it('reports a stable unavailable block when no session identity is supplied', async () => {
@@ -379,9 +418,21 @@ describe('retrospective transcript', () => {
     ).resolves.toBe('=== Transcript Facts ===\nStatus: unavailable (could not read transcript)\n')
   })
 
+  it('keeps readable Claude transcripts when a discovered subagent path cannot be read', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const path = join(directory, 'parent.jsonl')
+    const subagents = join(directory, 'parent', 'subagents')
+    await mkdir(join(subagents, 'unreadable.jsonl'), { recursive: true })
+    await writeFile(path, claudeLines.join('\n'))
+
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'Assistant responses: 1',
+    )
+  })
+
   it('ignores non-push git commands after their options', () => {
     const facts = emptyFacts()
-    applyCommand('git -C project status', facts)
+    applyCommand('git; git -C project status', facts)
     expect(facts.pushCommandAttempts).toBe(0)
   })
 })
