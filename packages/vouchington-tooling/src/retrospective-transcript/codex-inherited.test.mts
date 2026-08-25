@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { segmentCodex } from './codex-segment.mts'
 import { runRetrospectiveTranscript } from './index.mts'
 
 const directories: string[] = []
@@ -107,5 +108,86 @@ describe('inherited Codex child transcripts', () => {
     expect(output).toContain('User prompts: 1')
     expect(output).toContain('Tokens: input=30 output=7')
     expect(output).toContain('Subagent tool calls: 1')
+  })
+
+  it('recognizes every inherited-parent metadata shape and millisecond task starts', () => {
+    const timestamp = '2026-07-13T10:00:00.000Z'
+    const startedAt = Date.parse(timestamp)
+    for (const payload of [
+      { source: { subagent: {} } },
+      { forked_from_id: parent },
+      { parent_thread_id: parent },
+      { id: child, session_id: parent },
+    ]) {
+      expect(
+        segmentCodex([
+          JSON.stringify({ type: 'session_meta', payload: { ...payload, timestamp } }),
+          '{malformed',
+          JSON.stringify({ type: 'response_item', payload: {} }),
+          JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', started_at: 1 } }),
+          JSON.stringify({
+            type: 'event_msg',
+            payload: { type: 'task_started', started_at: startedAt },
+          }),
+        ]),
+      ).toMatchObject({ lines: [expect.stringContaining('task_started')] })
+    }
+  })
+
+  it('fails closed when inherited metadata has no valid owned boundary', () => {
+    expect(
+      segmentCodex([
+        JSON.stringify({ type: 'session_meta', payload: { parent_thread_id: parent } }),
+      ]),
+    ).toBeUndefined()
+    expect(
+      segmentCodex([
+        JSON.stringify({
+          type: 'session_meta',
+          payload: { parent_thread_id: parent, timestamp: '2026-07-13T10:00:00.000Z' },
+        }),
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('reports unavailable when a root or referenced child cannot be segmented', async () => {
+    const sessionsDir = await mkdtemp(join(tmpdir(), 'retrospective-invalid-segment-'))
+    directories.push(sessionsDir)
+    const rootPath = join(sessionsDir, `rollout-date-${parent}.jsonl`)
+    await writeFile(
+      rootPath,
+      JSON.stringify({
+        type: 'session_meta',
+        payload: { id: parent, parent_thread_id: child },
+      }),
+    )
+    await expect(
+      runRetrospectiveTranscript({ jsonlPath: rootPath, codexSessionsDir: sessionsDir }),
+    ).resolves.toContain('could not segment Codex transcript')
+
+    await writeFile(
+      rootPath,
+      [
+        JSON.stringify({ type: 'session_meta', payload: { id: parent, agent_path: '/root' } }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'sub_agent_activity',
+            agent_thread_id: child,
+            agent_path: '/root/child',
+          },
+        }),
+      ].join('\n'),
+    )
+    await writeFile(
+      join(sessionsDir, `rollout-date-${child}.jsonl`),
+      JSON.stringify({
+        type: 'session_meta',
+        payload: { id: child, agent_path: '/root/child', parent_thread_id: parent },
+      }),
+    )
+    await expect(
+      runRetrospectiveTranscript({ jsonlPath: rootPath, codexSessionsDir: sessionsDir }),
+    ).resolves.toContain('could not resolve a referenced Codex child transcript')
   })
 })
