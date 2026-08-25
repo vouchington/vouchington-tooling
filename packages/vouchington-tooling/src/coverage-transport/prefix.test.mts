@@ -140,8 +140,10 @@ describe('prefix coverage transport', () => {
     const path = join(root, 'control.json')
     writeTransportControl(path, control)
     const original = globalThis.fetch
-    globalThis.fetch = async (url) =>
-      new Response(String(url).endsWith('/lcov') ? 'lcov' : 'manifest')
+    globalThis.fetch = async (url) => {
+      if (!(url instanceof URL) && typeof url !== 'string') throw new Error('Expected URL')
+      return new Response(url.toString().endsWith('/lcov') ? 'lcov' : 'manifest')
+    }
     try {
       const options = {
         expectedIdentity: {
