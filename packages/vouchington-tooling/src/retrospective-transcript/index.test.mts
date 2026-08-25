@@ -91,7 +91,7 @@ describe('retrospective transcript', () => {
     ])
 
     expect(facts).toMatchObject({
-      userPrompts: 1,
+      userPrompts: 0,
       assistantResponses: 1,
       toolCalls: 2,
       failedToolCalls: 1,

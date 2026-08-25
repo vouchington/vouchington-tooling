@@ -129,7 +129,8 @@ describe('retrospective transcript resilience', () => {
           type: 'custom_tool_call',
           call_id: 'custom-exec',
           name: 'exec',
-          input: 'await tools.exec_command({cmd: "echo ok\\ngit push && pnpm exec no-mistakes"})',
+          input:
+            'await tools.exec_command({yield_time_ms: 1, cmd: "echo ok\\ngit push && pnpm exec no-mistakes"})',
         },
       }),
     ])
@@ -144,7 +145,7 @@ describe('retrospective transcript resilience', () => {
           call_id: 'custom-exec',
           name: 'exec',
           input:
-            'await tools.exec_command({cmd: "pnpm exec no-mistakes"}); await tools.exec_command({cmd: "git push"})',
+            "await tools.exec_command({yield_time_ms: 1}); await tools.exec_command({cmd: \"pnpm exec no-mistakes\"}); await tools.exec_command({yield_time_ms: 1, 'cmd': 'git push'})",
         },
       }),
       JSON.stringify({
@@ -178,7 +179,6 @@ describe('retrospective transcript resilience', () => {
     const path = join(directory, `rollout-root-${sessionId}.jsonl`)
     await mkdir(directory)
     await writeFile(path, JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }))
-
     expect(resolveTranscriptFile({ sessionId, codexSessionsDir: directory })).toEqual({
       path,
       sessionId,

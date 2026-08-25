@@ -34,7 +34,8 @@ export function computeClaude(lines: string[][]): TranscriptFacts {
         !subagent &&
         record.type === 'user' &&
         hasPromptContent(message?.content) &&
-        record.isMeta !== true
+        record.isMeta !== true &&
+        record.isCompactSummary !== true
       )
         facts.userPrompts++
       if (record.type === 'assistant') {

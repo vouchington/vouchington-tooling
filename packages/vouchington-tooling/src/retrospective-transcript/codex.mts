@@ -10,7 +10,9 @@ import {
   type TokenTotals,
   type TranscriptFacts,
 } from './shared.mts'
-
+const EXEC_OBJECT =
+  /tools\.exec_command\(\s*(\{(?:(?:\\.|[^{}"'\\])|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')*\})\s*\)/g
+const COMMAND_LITERAL = /(?:[,{])\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/
 function usage(record: ParsedLine): TokenTotals | undefined {
   const payload = asRecord(record.payload)
   const totals = asRecord(asRecord(payload?.info)?.total_token_usage)
@@ -22,7 +24,6 @@ function usage(record: ParsedLine): TokenTotals | undefined {
     cacheCreation: 0,
   }
 }
-
 function commands(payload: Record<string, unknown>): string[] {
   const raw = payload.type === 'function_call' ? payload.arguments : payload.input
   if (payload.type === 'local_shell_call') {
@@ -34,19 +35,20 @@ function commands(payload: Record<string, unknown>): string[] {
     return []
   if (typeof raw !== 'string') return []
   if (customExec) {
-    return [
-      ...raw.matchAll(
-        /tools\.exec_command\(\s*\{\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|[\s\S])*?)\1/g,
-      ),
-    ].map((match) =>
-      match[2]!.replace(
-        /\\([\\'"bnrtv])/g,
-        (_, character: string) =>
-          ({ '\\': '\\', "'": "'", '"': '"', b: '\b', n: '\n', r: '\r', t: '\t', v: '\v' })[
-            character
-          ] as string,
-      ),
-    )
+    return [...raw.matchAll(EXEC_OBJECT)].flatMap((call) => {
+      const match = call[1]!.match(COMMAND_LITERAL)
+      return match
+        ? [
+            match[2]!.replace(
+              /\\([\\'"bnrtv])/g,
+              (_, character: string) =>
+                ({ '\\': '\\', "'": "'", '"': '"', b: '\b', n: '\n', r: '\r', t: '\t', v: '\v' })[
+                  character
+                ] as string,
+            ),
+          ]
+        : []
+    })
   }
   try {
     const value = asRecord(JSON.parse(raw))
@@ -56,7 +58,6 @@ function commands(payload: Record<string, unknown>): string[] {
     return []
   }
 }
-
 function hasFailedOutcome(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasFailedOutcome)
   const payload = asRecord(value)
