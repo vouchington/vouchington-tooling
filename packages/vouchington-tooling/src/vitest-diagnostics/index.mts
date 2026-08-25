@@ -22,7 +22,6 @@ export interface DiagnosticReportLimitOptions {
   maxReports?: number
 }
 
-const NATIVE_FRAME_MODULE_PATTERN = /\[([^\]]+)\]\s*$/
 const TEXT_LIMIT = 200
 const PATH_LIMIT = 240
 
@@ -35,6 +34,7 @@ function objectValue(value: unknown): Record<string, unknown> {
 function boundedText(value: unknown, fallback: string, limit: number): string {
   if (typeof value !== 'string') return fallback
   const normalized = value
+    .slice(0, limit * 4)
     .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -54,9 +54,13 @@ function topNativeFrameModule(value: unknown): string | null {
   if (!Array.isArray(value)) return null
   const symbol = objectValue(value[0]).symbol
   if (typeof symbol !== 'string') return null
-  const module = NATIVE_FRAME_MODULE_PATTERN.exec(symbol)?.[1]
-  if (module === undefined || (!posix.isAbsolute(module) && !win32.isAbsolute(module))) return null
-  return boundedText(module, '', PATH_LIMIT)
+  const tail = symbol.slice(-PATH_LIMIT * 2).trimEnd()
+  if (!tail.endsWith(']')) return null
+  const opening = tail.lastIndexOf('[')
+  if (opening < 0) return null
+  const module = boundedText(tail.slice(opening + 1, -1), '', PATH_LIMIT)
+  if (!posix.isAbsolute(module) && !win32.isAbsolute(module)) return null
+  return module
 }
 
 function reportLimit(value: number | undefined, fallback: number): number {
@@ -68,7 +72,8 @@ function reportLimit(value: number | undefined, fallback: number): number {
 function readBoundedRegularFile(path: string): string | undefined {
   const descriptor = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK)
   try {
-    if (!fstatSync(descriptor).isFile()) return undefined
+    const stats = fstatSync(descriptor)
+    if (!stats.isFile() || stats.size > MAX_DIAGNOSTIC_REPORT_BYTES) return undefined
     const bytes = Buffer.allocUnsafe(MAX_DIAGNOSTIC_REPORT_BYTES + 1)
     let length = 0
     while (length < bytes.length) {
