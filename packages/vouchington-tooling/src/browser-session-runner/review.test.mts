@@ -21,22 +21,20 @@ function harness(alive = false) {
   let watchdog = () => {}
   let grace = () => {}
   const timeouts: Array<{ at: number; callback: () => void }> = []
+  const cancelled = new Set<unknown>()
   const parent = new EventEmitter()
   let release: () => void = () => {}
   const exited = new Promise<void>((resolve) => {
     release = resolve
   })
   const runDue = () => {
-    const due = timeouts.filter((value) => value.at <= now)
+    const due = timeouts.filter((value) => value.at <= now && !cancelled.has(value))
     timeouts.splice(0, timeouts.length, ...timeouts.filter((value) => value.at > now))
     for (const timeout of due) timeout.callback()
   }
   const deps: BrowserSessionDeps = {
     clearInterval: () => {},
-    clearTimeout: (handle) => {
-      const index = timeouts.indexOf(handle as (typeof timeouts)[number])
-      if (index >= 0) timeouts.splice(index, 1)
-    },
+    clearTimeout: (handle) => cancelled.add(handle),
     isProcessGroupAlive: () => alive,
     killProcessGroup: () => {},
     now: () => now,
@@ -144,7 +142,7 @@ describe('browser-session-runner review regressions', () => {
       {
         ...options(process),
         watchdogIntervalMs: 1_000,
-        onLine: (line) => (line === 'ready' ? 'startup' : 'semantic'),
+        onLine: (line) => (line.startsWith('ready') ? 'startup' : 'semantic'),
       },
       clock.deps,
     )
@@ -244,6 +242,58 @@ describe('browser-session-runner review regressions', () => {
     clock.release()
 
     await expect(run).resolves.toMatchObject({ deadlineExceeded: false, reason: 'exit' })
+  })
+
+  it('stops stall supervision after child exit while allowing a parent signal to supersede', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('exit', 0, null)
+    clock.elapse(20)
+    clock.emitParent()
+    process.emit('close', 0, null)
+    clock.release()
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+  })
+
+  it('keeps startup supervision active for semantic output before startup', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(
+      { ...options(process), onLine: () => 'semantic', watchdogIntervalMs: 1_000 },
+      clock.deps,
+    )
+    process.stdout.emit('data', 'output\n')
+    process.stderr.emit('data', 'more output\n')
+    clock.elapse(20)
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({
+      reason: 'startup-stall',
+      semanticProgress: true,
+      startupProgress: false,
+    })
+  })
+
+  it('counts synchronous process creation against the startup budget', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(
+      {
+        ...options(process),
+        watchdogIntervalMs: 1_000,
+        start: () => {
+          clock.advance(20)
+          return process
+        },
+      },
+      clock.deps,
+    )
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'startup-stall' })
   })
 
   it('does not signal a group that has already exited with its direct child', async () => {

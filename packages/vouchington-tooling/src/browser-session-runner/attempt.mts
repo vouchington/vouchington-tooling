@@ -17,7 +17,8 @@ export function runAttempt(
   attempt: number,
 ) {
   return new Promise<BrowserSessionResult>((resolve, reject) => {
-    const process = options.start(attempt)
+    const startedAt = deps.now(),
+      process = options.start(attempt)
     if (
       !Number.isSafeInteger(process.processGroupId) ||
       process.processGroupId <= 0 ||
@@ -122,7 +123,7 @@ export function runAttempt(
         }
         if (event === 'semantic') {
           semanticProgress = true
-          armStall(options.semanticStallMs, 'semantic-stall')
+          if (startupProgress) armStall(options.semanticStallMs, 'semantic-stall')
         }
       }
       const appendLines = (text: string) => {
@@ -160,7 +161,9 @@ export function runAttempt(
       () => terminate('deadline'),
       Math.max(1, remainingDeadlineMs),
     )
-    armStall(options.startupStallMs, 'startup-stall')
+    const remainingStartupMs = options.startupStallMs - (deps.now() - startedAt)
+    armStall(Math.max(1, remainingStartupMs), 'startup-stall')
+    if (remainingStartupMs <= 0) terminate('startup-stall')
     if (remainingDeadlineMs <= 0) terminate('deadline')
     for (const value of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
       const listener = () => terminate('parent-signal')
@@ -171,6 +174,7 @@ export function runAttempt(
     process.on('exit', () => {
       if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
       childExited = true
+      deps.clearTimeout(stallTimer)
       if (deps.isProcessGroupAlive(process.processGroupId)) terminate(reason)
     })
     process.on('close', (code, value) => {
