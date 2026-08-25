@@ -14,6 +14,7 @@ export async function runRetrospectiveTranscriptCommand(args: string[]): Promise
         jsonl: { type: 'string' },
         'projects-dir': { type: 'string' },
         'codex-sessions-dir': { type: 'string' },
+        'grok-sessions-dir': { type: 'string' },
       },
     })
     const options: ResolveOptions = {
@@ -21,6 +22,7 @@ export async function runRetrospectiveTranscriptCommand(args: string[]): Promise
       ...(values.jsonl ? { jsonlPath: values.jsonl } : {}),
       ...(values['projects-dir'] ? { projectsDir: values['projects-dir'] } : {}),
       ...(values['codex-sessions-dir'] ? { codexSessionsDir: values['codex-sessions-dir'] } : {}),
+      ...(values['grok-sessions-dir'] ? { grokSessionsDir: values['grok-sessions-dir'] } : {}),
     }
     process.stdout.write(await runRetrospectiveTranscript(options))
     return 0

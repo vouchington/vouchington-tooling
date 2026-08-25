@@ -10,6 +10,7 @@ export type TranscriptFacts = {
   toolCalls: number
   failedToolCalls: number
   noMistakesInvocations: number
+  advisorCalls: number
   pushCommandAttempts: number
   compactions: number
   tokens: TokenTotals
@@ -32,6 +33,7 @@ export const emptyFacts = (): TranscriptFacts => ({
   toolCalls: 0,
   failedToolCalls: 0,
   noMistakesInvocations: 0,
+  advisorCalls: 0,
   pushCommandAttempts: 0,
   compactions: 0,
   tokens: emptyTokens(),

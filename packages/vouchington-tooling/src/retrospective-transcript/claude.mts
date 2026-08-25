@@ -3,6 +3,7 @@ import { applyCommand, asNumber, asRecord, emptyFacts, type TranscriptFacts } fr
 export function computeClaude(lines: string[][]): TranscriptFacts {
   const facts = emptyFacts()
   const seen = new Set<string>()
+  const advisorIds = new Set<string>()
   for (const group of lines) {
     for (const record of group.flatMap((line) => {
       try {
@@ -40,13 +41,17 @@ export function computeClaude(lines: string[][]): TranscriptFacts {
         if (value.type === 'tool_use' || value.type === 'server_tool_use') {
           facts.toolCalls++
           if (subagent) facts.subagentToolCalls++
+          if (value.name === 'advisor' && typeof value.id === 'string') advisorIds.add(value.id)
           if (value.name === 'Bash' || value.name === 'bash') {
             const command = asRecord(value.input)?.command
             if (typeof command === 'string') applyCommand(command, facts)
           }
         } else if (value.type === 'tool_result' && value.is_error === true) facts.failedToolCalls++
+        else if (value.type === 'advisor_tool_result' && typeof value.tool_use_id === 'string')
+          advisorIds.add(value.tool_use_id)
       }
     }
   }
+  facts.advisorCalls = advisorIds.size
   return facts
 }

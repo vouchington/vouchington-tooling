@@ -1,10 +1,11 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
   computeTranscriptFacts,
+  formatTranscriptFacts,
   resolveTranscriptFile,
   runRetrospectiveTranscript,
 } from './index.mts'
@@ -70,6 +71,70 @@ describe('retrospective transcript resilience', () => {
         error: `no transcript found for session ${GRANDCHILD_ID}`,
       },
     )
+  })
+
+  it('discovers Grok transcripts and Claude-compatible Cursor transcripts from their session ids', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const grokSessionsDir = join(directory, 'grok')
+    const projectsDir = join(directory, 'projects')
+    const grokSession = '44444444-4444-4444-8444-444444444444'
+    const cursorSession = '55555555-5555-4555-8555-555555555555'
+    const cwd = '/workspace/project'
+    const grokPath = join(grokSessionsDir, encodeURIComponent(cwd), grokSession, 'updates.jsonl')
+    const cursorPath = join(projectsDir, 'project', `${cursorSession}.jsonl`)
+    await mkdir(join(grokSessionsDir, encodeURIComponent(cwd), grokSession), { recursive: true })
+    await mkdir(join(projectsDir, 'project'), { recursive: true })
+    await writeFile(grokPath, JSON.stringify({ type: 'user', message: { content: 'Grok' } }))
+    await writeFile(cursorPath, JSON.stringify({ type: 'user', message: { content: 'Cursor' } }))
+
+    expect(
+      resolveTranscriptFile({
+        env: { GROK_SESSION_ID: grokSession },
+        grokSessionsDir,
+        projectsDir,
+        cwd,
+      }),
+    ).toEqual({ path: grokPath, sessionId: grokSession })
+    await expect(
+      runRetrospectiveTranscript({
+        env: { GROK_SESSION_ID: grokSession },
+        grokSessionsDir,
+        projectsDir,
+        cwd,
+      }),
+    ).resolves.toContain('User prompts: 1')
+    expect(
+      resolveTranscriptFile({
+        env: { CURSOR_SESSION_ID: cursorSession },
+        grokSessionsDir,
+        projectsDir,
+      }),
+    ).toEqual({ path: cursorPath, sessionId: cursorSession })
+    await expect(
+      runRetrospectiveTranscript({
+        env: { CURSOR_SESSION_ID: cursorSession },
+        grokSessionsDir,
+        projectsDir,
+      }),
+    ).resolves.toContain('User prompts: 1')
+  })
+
+  it('deduplicates advisor tool calls and preserves them in formatted output', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'user', message: { content: 'review this' } }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', name: 'advisor', id: 'advisor-1' },
+            { type: 'advisor_tool_result', tool_use_id: 'advisor-1' },
+          ],
+        },
+      }),
+    ])
+
+    expect(facts.advisorCalls).toBe(1)
+    expect(formatTranscriptFacts('session', facts)).toContain('advisor calls: 1')
   })
 
   it('skips visited Codex identities and propagates a missing nested child', async () => {

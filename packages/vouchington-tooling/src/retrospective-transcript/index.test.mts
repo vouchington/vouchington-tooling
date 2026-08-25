@@ -28,7 +28,7 @@ describe('retrospective transcript', () => {
     expect(facts).toMatchObject({ userPrompts: 1, assistantResponses: 1, toolCalls: 1 })
     expect(facts.noMistakesInvocations).toBe(1)
     expect(formatTranscriptFacts('session', facts)).toBe(
-      '=== Transcript Facts ===\nSession: session\nUser prompts: 1\nAssistant responses: 1\nTool calls: 1 (failed: 0)\nno-mistakes invocations: 1\nPush commands attempted: 0\nCompactions: 0\nTokens: input=2 output=3 cache_read=4 cache_creation=0\nSubagent tool calls: 0\nSubagent tokens: input=0 output=0 cache_read=0 cache_creation=0\n',
+      '=== Transcript Facts ===\nSession: session\nUser prompts: 1\nAssistant responses: 1\nTool calls: 1 (failed: 0)\nno-mistakes invocations: 1\nadvisor calls: 0\nPush commands attempted: 0\nCompactions: 0\nTokens: input=2 output=3 cache_read=4 cache_creation=0\nSubagent tool calls: 0\nSubagent tokens: input=0 output=0 cache_read=0 cache_creation=0\n',
     )
     expect(formatTranscriptFacts('', emptyFacts())).toContain('Session: transcript')
   })
@@ -296,7 +296,7 @@ describe('retrospective transcript', () => {
 
   it('reports a stable unavailable block when no session identity is supplied', async () => {
     await expect(runRetrospectiveTranscript({ env: {} })).resolves.toBe(
-      '=== Transcript Facts ===\nStatus: unavailable (no session id (pass --session-id or set CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID))\n',
+      '=== Transcript Facts ===\nStatus: unavailable (no session id (pass --session-id or set CODEX_THREAD_ID, CLAUDE_CODE_SESSION_ID, CURSOR_SESSION_ID, or GROK_SESSION_ID))\n',
     )
   })
 

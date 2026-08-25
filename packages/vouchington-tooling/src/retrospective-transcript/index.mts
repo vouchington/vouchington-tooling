@@ -20,6 +20,8 @@ export type ResolveOptions = {
   jsonlPath?: string
   projectsDir?: string
   codexSessionsDir?: string
+  grokSessionsDir?: string
+  cwd?: string
   env?: NodeJS.ProcessEnv
 }
 
@@ -41,17 +43,29 @@ export function resolveTranscriptFile(
       sessionId: options.sessionId ?? sessionLabel(basename(options.jsonlPath, '.jsonl')),
     }
   const sessionId =
-    options.sessionId ?? options.env?.CODEX_THREAD_ID ?? options.env?.CLAUDE_CODE_SESSION_ID
+    options.sessionId ??
+    options.env?.CODEX_THREAD_ID ??
+    options.env?.CLAUDE_CODE_SESSION_ID ??
+    options.env?.CURSOR_SESSION_ID ??
+    options.env?.GROK_SESSION_ID
   if (!sessionId)
     return {
-      error: 'no session id (pass --session-id or set CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID)',
+      error:
+        'no session id (pass --session-id or set CODEX_THREAD_ID, CLAUDE_CODE_SESSION_ID, CURSOR_SESSION_ID, or GROK_SESSION_ID)',
     }
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
   const codex = options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions')
   const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
+  const grokHome = options.env?.GROK_HOME || join(homedir(), '.grok')
+  const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
+  const encodedCwd = encodeURIComponent(options.cwd ?? process.cwd())
+  const grokExact = join(grok, encodedCwd, sessionId, 'updates.jsonl')
+  const grokPaths = existsSync(grokExact)
+    ? [grokExact]
+    : globSync(join(grok, '*', sessionId, 'updates.jsonl').replace(/\\/g, '/'))
   const codexPaths = globSync(join(codex, '**', `rollout-*-${sessionId}.jsonl`).replace(/\\/g, '/'))
   const claudePaths = globSync(join(claude, '*', `${sessionId}.jsonl`).replace(/\\/g, '/'))
-  const paths = [...codexPaths, ...claudePaths].sort()
+  const paths = [...grokPaths, ...codexPaths, ...claudePaths].sort()
   if (paths.length > 1) return { error: `multiple transcripts found for session ${sessionId}` }
   return paths[0]
     ? { path: paths[0], sessionId }
@@ -139,6 +153,7 @@ export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts)
     `Assistant responses: ${facts.assistantResponses}`,
     `Tool calls: ${facts.toolCalls} (failed: ${facts.failedToolCalls})`,
     `no-mistakes invocations: ${facts.noMistakesInvocations}`,
+    `advisor calls: ${facts.advisorCalls}`,
     `Push commands attempted: ${facts.pushCommandAttempts}`,
     `Compactions: ${facts.compactions}`,
     `Tokens: input=${facts.tokens.input} output=${facts.tokens.output} cache_read=${facts.tokens.cacheRead} cache_creation=${facts.tokens.cacheCreation}`,
