@@ -1,57 +1,34 @@
-import type { ChildProcess } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 
 import { boundPendingLine, splitCompleteLines } from '../process-line-buffer/index.mts'
+import { expiredResult } from './result.mts'
+import { tailText } from './tail.mts'
+import type {
+  BrowserSessionDeps,
+  BrowserSessionExit,
+  BrowserSessionOptions,
+  BrowserSessionResult,
+} from './types.mts'
 
-export type BrowserSessionEvent = 'startup' | 'semantic'
-export type BrowserSessionExit = { code: number | null; signal: NodeJS.Signals | null }
-export type BrowserSessionResult = {
-  attempts: number
-  deadlineExceeded: boolean
-  diagnosticTail: string
-  exit: BrowserSessionExit
-  reason: 'exit' | 'parent-signal' | 'semantic-stall' | 'startup-stall' | 'deadline'
-  startupProgress: boolean
-  semanticProgress: boolean
-}
-export type BrowserSessionProcess = Pick<ChildProcess, 'kill'> & {
-  processGroupId: number
-  on(
-    event: 'close',
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
-  ): unknown
-  stderr?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
-  stdout?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
-}
-export type BrowserSessionDeps = {
-  clearInterval(handle: unknown): void
-  clearTimeout(handle: unknown): void
-  killProcessGroup(pid: number, signal: NodeJS.Signals): void
-  now(): number
-  offParentSignal(signal: NodeJS.Signals, listener: () => void): void
-  onParentSignal(signal: NodeJS.Signals, listener: () => void): void
-  setInterval(callback: () => void, ms: number): unknown
-  setTimeout(callback: () => void, ms: number): unknown
-}
-export type BrowserSessionOptions = {
-  attempts: number
-  classifyExit(
-    exit: BrowserSessionExit,
-    result: Omit<BrowserSessionResult, 'attempts'>,
-  ): 'retry' | 'return'
-  deadlineMs: number
-  diagnosticTailBytes?: number
-  graceMs: number
-  onLine(line: string): BrowserSessionEvent | undefined
-  semanticStallMs: number
-  start(attempt: number): BrowserSessionProcess
-  startupStallMs: number
-  watchdogIntervalMs?: number
-}
+export type {
+  BrowserSessionDeps,
+  BrowserSessionEvent,
+  BrowserSessionExit,
+  BrowserSessionOptions,
+  BrowserSessionProcess,
+  BrowserSessionResult,
+} from './types.mts'
 
 const defaultDeps: BrowserSessionDeps = {
   clearInterval,
   clearTimeout,
-  killProcessGroup: (processGroupId, signal) => process.kill(-processGroupId, signal),
+  killProcessGroup: (processGroupId, signal) => {
+    try {
+      process.kill(-processGroupId, signal)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+    }
+  },
   now: Date.now,
   offParentSignal: (signal, listener) => process.off(signal, listener),
   onParentSignal: (signal, listener) => process.once(signal, listener),
@@ -70,15 +47,19 @@ export async function runBrowserSession(
   for (let attempt = 1; attempt <= options.attempts && deps.now() < deadline; attempt += 1) {
     attempts = attempt
     last = await runAttempt(options, deps, deadline, attempt)
-    if (last.reason !== 'exit' || options.classifyExit(last.exit, omitAttempts(last)) !== 'retry')
-      return { ...last, attempts: attempt }
+    if (
+      last.reason === 'parent-signal' ||
+      last.reason === 'deadline' ||
+      options.classifyExit(last.exit, omitAttempts(last)) !== 'retry'
+    )
+      return { ...last, attempts }
   }
   if (attempts === options.attempts) return { ...last!, attempts }
   return { ...(last ?? expiredResult()), attempts, deadlineExceeded: true, reason: 'deadline' }
 }
 
 function validateOptions(options: BrowserSessionOptions): void {
-  const positiveIntegers: Array<[string, number]> = [
+  for (const [name, value] of [
     ['attempts', options.attempts],
     ['deadlineMs', options.deadlineMs],
     ['graceMs', options.graceMs],
@@ -86,27 +67,13 @@ function validateOptions(options: BrowserSessionOptions): void {
     ['startupStallMs', options.startupStallMs],
     ['watchdogIntervalMs', options.watchdogIntervalMs ?? 1000],
     ['diagnosticTailBytes', options.diagnosticTailBytes ?? 4096],
-  ]
-  for (const [name, value] of positiveIntegers) {
+  ] as Array<[string, number]>) {
     if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`${name} must be positive`)
   }
 }
 
-function omitAttempts(result: BrowserSessionResult): Omit<BrowserSessionResult, 'attempts'> {
-  const { attempts: _attempts, ...withoutAttempts } = result
-  return withoutAttempts
-}
-
-function expiredResult(): BrowserSessionResult {
-  return {
-    attempts: 0,
-    deadlineExceeded: true,
-    diagnosticTail: '',
-    exit: { code: null, signal: null },
-    reason: 'deadline',
-    semanticProgress: false,
-    startupProgress: false,
-  }
+function omitAttempts({ attempts: _attempts, ...result }: BrowserSessionResult) {
+  return result
 }
 
 function runAttempt(
@@ -118,72 +85,108 @@ function runAttempt(
   return new Promise<BrowserSessionResult>((resolve) => {
     const startedAt = deps.now()
     const process = options.start(attempt)
-    if (!Number.isSafeInteger(process.processGroupId) || process.processGroupId <= 0)
+    if (!Number.isSafeInteger(process.processGroupId) || process.processGroupId <= 0) {
+      try {
+        process.kill('SIGKILL')
+      } catch {}
       throw new RangeError('processGroupId must be positive')
-    let tail = ''
-    let startupProgress = false
-    let semanticProgress = false
-    let lastProgress = startedAt
-    let reason: BrowserSessionResult['reason'] = 'exit'
-    let complete = false
+    }
+    const maxTail = options.diagnosticTailBytes ?? 4096
+    let tail = Buffer.alloc(0),
+      startupProgress = false,
+      semanticProgress = false,
+      lastSemantic = startedAt
+    let reason: BrowserSessionResult['reason'] = 'exit',
+      complete = false
     let killTimer: unknown
     const listeners: Array<() => void> = []
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
       complete = true
       deps.clearInterval(watchdog)
+      deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
       for (const remove of listeners) remove()
       resolve({
         attempts: 0,
         deadlineExceeded: reason === 'deadline',
-        diagnosticTail: tail,
+        diagnosticTail: tailText(tail, maxTail),
         exit,
         reason,
         semanticProgress,
         startupProgress,
       })
     }
+    const signal = (value: NodeJS.Signals) => {
+      try {
+        deps.killProcessGroup(process.processGroupId, value)
+      } catch {}
+      try {
+        process.kill(value)
+      } catch {}
+    }
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
       if (reason !== 'exit') return
       reason = nextReason
-      killTimer = deps.setTimeout(() => {
-        deps.killProcessGroup(process.processGroupId, 'SIGKILL')
-        process.kill('SIGKILL')
-      }, options.graceMs)
-      deps.killProcessGroup(process.processGroupId, 'SIGTERM')
-      process.kill('SIGTERM')
+      killTimer = deps.setTimeout(() => signal('SIGKILL'), options.graceMs)
+      signal('SIGTERM')
     }
     const consume = () => {
+      const decoder = new StringDecoder('utf8')
       let pending = ''
-      return (chunk: string | Buffer) => {
-        tail = boundPendingLine(
-          (tail + String(chunk)).slice(-(options.diagnosticTailBytes ?? 4096)),
-        )
-        const split = splitCompleteLines(pending + String(chunk))
-        pending = boundPendingLine(split.pending)
-        for (const line of split.complete) {
-          const event = options.onLine(line)
-          if (event === 'startup') startupProgress = true
-          if (event === 'semantic') semanticProgress = true
-          if (event) lastProgress = deps.now()
+      const line = (value: string) => {
+        const event = options.onLine(value)
+        if (event === 'startup' && !startupProgress) {
+          startupProgress = true
+          lastSemantic = deps.now()
+        }
+        if (event === 'semantic') {
+          semanticProgress = true
+          lastSemantic = deps.now()
         }
       }
+      return {
+        flush: () => {
+          const text = decoder.end()
+          if (text) pending = boundPendingLine(pending + text)
+          if (pending) line(pending)
+        },
+        write: (chunk: string | Buffer) => {
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+          tail = Buffer.concat([tail, bytes]).subarray(-maxTail)
+          const split = splitCompleteLines(pending + decoder.write(bytes))
+          pending = boundPendingLine(split.pending)
+          for (const value of split.complete) line(value)
+        },
+      }
     }
-    for (const stream of [process.stdout, process.stderr]) stream?.on('data', consume())
+    const streams = [process.stdout, process.stderr].map((stream) =>
+      stream ? consume() : undefined,
+    )
+    for (const [index, stream] of [process.stdout, process.stderr].entries())
+      stream?.on('data', streams[index]!.write)
     const watchdog = deps.setInterval(() => {
       const now = deps.now()
-      if (now >= deadline - options.graceMs) return terminate('deadline')
+      if (now >= deadline) return terminate('deadline')
       if (!startupProgress && now - startedAt >= options.startupStallMs)
         return terminate('startup-stall')
-      if (startupProgress && now - lastProgress >= options.semanticStallMs)
+      if (startupProgress && now - lastSemantic >= options.semanticStallMs)
         terminate('semantic-stall')
     }, options.watchdogIntervalMs ?? 1000)
-    for (const signal of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
+    const deadlineTimer = deps.setTimeout(
+      () => terminate('deadline'),
+      Math.max(1, deadline - startedAt),
+    )
+    for (const value of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
       const listener = () => terminate('parent-signal')
-      deps.onParentSignal(signal, listener)
-      listeners.push(() => deps.offParentSignal(signal, listener))
+      deps.onParentSignal(value, listener)
+      listeners.push(() => deps.offParentSignal(value, listener))
     }
-    process.on('close', (code, signal) => finish({ code, signal }))
+    process.on('error', () => finish({ code: null, signal: null }))
+    process.on('close', (code, value) => {
+      for (const stream of streams) stream?.flush()
+      if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
+      finish({ code, signal: value })
+    })
   })
 }

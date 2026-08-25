@@ -24,7 +24,7 @@ class FakeProcess extends EventEmitter implements BrowserSessionProcess {
 function makeClock() {
   let now = 0
   const intervals: Array<() => void> = []
-  const timeouts: Array<() => void> = []
+  const timeouts: Array<{ at: number; callback: () => void }> = []
   const clearedIntervals: unknown[] = []
   const clearedTimeouts: unknown[] = []
   const parent = new EventEmitter()
@@ -37,7 +37,11 @@ function makeClock() {
     offParentSignal: (signal, listener) => parent.off(signal, listener),
     onParentSignal: (signal, listener) => parent.once(signal, listener),
     setInterval: (callback) => (intervals.push(callback), callback),
-    setTimeout: (callback) => (timeouts.push(callback), callback),
+    setTimeout: (callback, ms) => {
+      const timeout = { at: now + ms, callback }
+      timeouts.push(timeout)
+      return timeout
+    },
   }
   return {
     deps,
@@ -46,10 +50,10 @@ function makeClock() {
     emitSignal: (signal: NodeJS.Signals) => parent.emit(signal),
     parent,
     processGroups,
-    runTimeouts: () => timeouts.forEach((callback) => callback()),
     tick: (ms: number) => {
       now += ms
       intervals.forEach((callback) => callback())
+      for (const timeout of timeouts.filter((value) => value.at <= now)) timeout.callback()
     },
   }
 }
@@ -72,7 +76,7 @@ describe('runBrowserSession', () => {
   it('buffers complete lines and returns diagnostic tails', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession(options([child]), clock.deps)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     child.stdout.emit('data', 'rea')
     child.stdout.emit('data', 'dy\ntest 1\n')
     child.stderr.emit('data', 'long-tail')
@@ -87,7 +91,7 @@ describe('runBrowserSession', () => {
   it('does not combine partial lines from different streams', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession(options([child]), clock.deps)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     child.stdout.emit('data', 'rea')
     child.stderr.emit('data', 'dy\n')
     child.emit('close', 0, null)
@@ -98,9 +102,9 @@ describe('runBrowserSession', () => {
   it('terminates a startup stall with TERM followed by KILL', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession(options([child]), clock.deps)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     clock.tick(20)
-    clock.runTimeouts()
+    clock.tick(10)
     child.emit('close', null, 'SIGKILL')
     await expect(run).resolves.toMatchObject({ reason: 'startup-stall' })
     expect(clock.processGroups).toEqual(['SIGTERM', 'SIGKILL'])
@@ -110,7 +114,7 @@ describe('runBrowserSession', () => {
   it('terminates a semantic progress stall after startup completes', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession(options([child]), clock.deps)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     child.stdout.emit('data', 'ready\ntest 1\n')
     clock.tick(20)
     child.emit('close', null, 'SIGTERM')
@@ -121,7 +125,7 @@ describe('runBrowserSession', () => {
   it('terminates a semantic stall when startup completes without semantic progress', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession(options([child]), clock.deps)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
     child.stdout.emit('data', 'ready\n')
     clock.tick(20)
     child.emit('close', null, 'SIGTERM')
@@ -131,6 +135,32 @@ describe('runBrowserSession', () => {
       reason: 'semantic-stall',
       startupProgress: true,
     })
+  })
+
+  it('retries a stall when the caller classifies its exit as retryable', async () => {
+    const first = new FakeProcess()
+    const second = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(options([first, second]), clock.deps)
+    clock.tick(20)
+    first.emit('close', null, 'SIGTERM')
+    await Promise.resolve()
+    second.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ attempts: 2, exit: { code: 0 } })
+  })
+
+  it('does not let repeated startup lines delay the semantic watchdog', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
+    child.stdout.emit('data', 'ready\n')
+    clock.tick(10)
+    child.stdout.emit('data', 'ready\n')
+    clock.tick(10)
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'semantic-stall' })
   })
 
   it('shares one deadline across retryable attempts', async () => {
@@ -186,10 +216,23 @@ describe('runBrowserSession', () => {
     const child = new FakeProcess()
     const clock = makeClock()
     const run = runBrowserSession(
-      { ...options([child]), deadlineMs: 30, startupStallMs: 10_000 },
+      { ...options([child]), attempts: 1, deadlineMs: 30, startupStallMs: 10_000 },
       clock.deps,
     )
-    clock.tick(20)
+    clock.tick(30)
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
+  })
+
+  it('enforces the shared deadline without waiting for a slow watchdog', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      { ...options([child]), attempts: 1, watchdogIntervalMs: 1_000 },
+      clock.deps,
+    )
+    clock.tick(100)
     child.emit('close', null, 'SIGTERM')
 
     await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
@@ -223,6 +266,20 @@ describe('runBrowserSession', () => {
     kill.mockRestore()
   })
 
+  it('ignores a vanished default process group during termination', async () => {
+    const child = new FakeProcess()
+    const error = Object.assign(new Error('gone'), { code: 'ESRCH' })
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw error
+    })
+    const run = runBrowserSession({ ...options([child]), attempts: 1 })
+    process.emit('SIGTERM')
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    kill.mockRestore()
+  })
+
   it('cleans up timers and parent listeners after a close', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
@@ -233,7 +290,7 @@ describe('runBrowserSession', () => {
     await run
 
     expect(clock.clearedIntervals).toHaveLength(1)
-    expect(clock.clearedTimeouts).toHaveLength(0)
+    expect(clock.clearedTimeouts).toHaveLength(1)
     expect(clock.parent.listenerCount('SIGINT')).toBe(0)
     expect(clock.parent.listenerCount('SIGTERM')).toBe(0)
   })
@@ -251,6 +308,71 @@ describe('runBrowserSession', () => {
     expect(clock.processGroups).toEqual(['SIGTERM'])
   })
 
+  it('decodes split UTF-8 and flushes each stream pending line on close', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      {
+        ...options([child]),
+        attempts: 1,
+        onLine: (line) => (line.includes('✅ ready') ? 'startup' : undefined),
+      },
+      clock.deps,
+    )
+    const bytes = Buffer.from('✅ ready')
+    child.stdout.emit('data', bytes.subarray(0, 2))
+    child.stdout.emit('data', bytes.subarray(2))
+    child.stderr.emit('data', 'stderr final')
+    child.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({
+      diagnosticTail: '✅ readystderr final',
+      startupProgress: true,
+    })
+  })
+
+  it('returns a UTF-8-safe diagnostic tail within its byte budget', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      { ...options([child]), attempts: 1, diagnosticTailBytes: 5 },
+      clock.deps,
+    )
+    child.stdout.emit('data', 'a😀b')
+    child.emit('close', 0, null)
+
+    const result = await run
+    expect(result.diagnosticTail).toBe('😀b')
+    expect(Buffer.byteLength(result.diagnosticTail)).toBeLessThanOrEqual(5)
+  })
+
+  it('returns an error-event exit instead of leaving an unhandled child error', async () => {
+    const child = new FakeProcess()
+    const run = runBrowserSession({ ...options([child]), attempts: 1 }, makeClock().deps)
+    child.emit('error', new Error('spawn failed'))
+
+    await expect(run).resolves.toMatchObject({ exit: { code: null, signal: null } })
+  })
+
+  it('continues direct-child cleanup when process-group signalling throws', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      { ...options([child]), attempts: 1 },
+      {
+        ...clock.deps,
+        killProcessGroup: () => {
+          throw new Error('group failed')
+        },
+      },
+    )
+    clock.emitSignal('SIGTERM')
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    expect(child.signals).toEqual(['SIGTERM'])
+  })
+
   it('rejects a process whose process group cannot be signalled independently', async () => {
     const child = new FakeProcess()
     child.processGroupId = 0
@@ -258,6 +380,7 @@ describe('runBrowserSession', () => {
     await expect(runBrowserSession(options([child]), makeClock().deps)).rejects.toThrow(
       'processGroupId',
     )
+    expect(child.signals).toEqual(['SIGKILL'])
   })
 
   it('rejects invalid lifecycle budgets before starting a process', async () => {

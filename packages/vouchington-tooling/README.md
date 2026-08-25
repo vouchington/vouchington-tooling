@@ -131,3 +131,6 @@ construction, line classification, retry/outcome policy, and budgets; the librar
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
 The returned process must identify a dedicated process group, such as a child spawned with
 `detached: true`; its `processGroupId` is signalled without assuming the child PID is a group ID.
+Stall exits use the caller's `classifyExit` policy, while parent signals and shared-deadline expiration
+are terminal. Output is decoded independently per stream; unfinished lines are classified at close and
+`diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
