@@ -2,17 +2,12 @@ import { existsSync, globSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import {
-  codexChildren,
-  codexIdentity,
-  computeCodex,
-  withoutLeadingSessionMetadata,
-} from './codex.mts'
+import { codexChildren, codexIdentity, computeCodex } from './codex.mts'
+import { segmentCodex } from './codex-segment.mts'
 import { computeClaude } from './claude.mts'
 import { formatTranscriptFacts, formatUnavailable, sessionLabel } from './format.mts'
 import {
   emptyFacts,
-  emptyTokens,
   hasMalformedInteriorRecord,
   parseLines,
   type CodexSegment,
@@ -149,9 +144,10 @@ async function codexSubagents(
       !matchesChildIdentity(child, edge.threadId, edge.agentPath)
     )
       return undefined
-    const content = withoutLeadingSessionMetadata(child)
-    result.push({ lines: content, baseline: emptyTokens() })
-    const nested = await codexSubagents(content, sessionsDir, edge.agentPath, visited)
+    const segment = segmentCodex(child)
+    if (!segment) return undefined
+    result.push(segment)
+    const nested = await codexSubagents(segment.lines, sessionsDir, edge.agentPath, visited)
     if (!nested) return undefined
     result.push(...nested)
   }
@@ -180,9 +176,11 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
     )
   }
   const identity = codexIdentity(lines)
+  const root = segmentCodex(lines)
+  if (!root) return formatUnavailable('could not segment Codex transcript')
   const codexHome = (options.env ?? process.env).CODEX_HOME
   const subagents = await codexSubagents(
-    lines,
+    root.lines,
     options.codexSessionsDir ??
       (options.jsonlPath ? dirname(resolved.path) : undefined) ??
       join(codexHome || join(homedir(), '.codex'), 'sessions'),
@@ -194,6 +192,6 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   if (!subagents) return formatUnavailable('could not resolve a referenced Codex child transcript')
   return formatTranscriptFacts(
     resolved.sessionId,
-    computeTranscriptFacts(withoutLeadingSessionMetadata(lines), subagents),
+    computeCodex(root.lines, subagents, root.baseline),
   )
 }
