@@ -144,17 +144,35 @@ function commandAfterAssignments(segment: string[]): string[] {
   return index === -1 ? [] : segment.slice(index)
 }
 
+const NO_MISTAKES = /(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i
+function containsNoMistakesTarget(tokens: string[]): boolean {
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index]!
+    if (token === '--') continue
+    if (token === '-c' || token === '--call')
+      return segments(tokens[index + 1] ?? '').some(isNoMistakes)
+    if (token === '--package' || token === '-p') {
+      index++
+      continue
+    }
+    if (token.startsWith('-')) continue
+    return NO_MISTAKES.test(token)
+  }
+  return false
+}
+
 function isNoMistakes(segment: string[]): boolean {
-  const [command, second, third, fourth] = commandAfterAssignments(segment)
-  if (/(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i.test(command ?? '')) return true
+  const tokens = commandAfterAssignments(segment)
+  const [command, second] = tokens
+  if (NO_MISTAKES.test(command ?? '')) return true
   if (!['npm', 'npx', 'pnpm', 'pnpx', 'yarn'].includes(command ?? '')) return false
-  const target = second === 'run' || second === 'exec' || second === 'dlx' ? third : second
-  return (target === '--' ? fourth : target) === 'no-mistakes'
+  const offset = second === 'run' || second === 'exec' || second === 'dlx' ? 2 : 1
+  return containsNoMistakesTarget(tokens.slice(offset))
 }
 
 function isPush(segment: string[]): boolean {
   const tokens = commandAfterAssignments(segment)
-  if (tokens[0] !== 'git' && !tokens[0]?.endsWith('/git')) return false
+  if (!/(^|[\\/])git(?:\.exe)?$/i.test(tokens[0] ?? '')) return false
   for (let index = 1; index < tokens.length; index++) {
     if (['-C', '-c', '--git-dir', '--work-tree'].includes(tokens[index]!)) index++
     else if (!tokens[index]?.startsWith('-')) return tokens[index] === 'push'

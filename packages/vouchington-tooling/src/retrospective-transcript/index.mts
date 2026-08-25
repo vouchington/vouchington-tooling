@@ -9,6 +9,7 @@ import {
   withoutLeadingSessionMetadata,
 } from './codex.mts'
 import { computeClaude } from './claude.mts'
+import { formatTranscriptFacts, formatUnavailable, sessionLabel } from './format.mts'
 import {
   emptyFacts,
   emptyTokens,
@@ -19,6 +20,7 @@ import {
 } from './shared.mts'
 export type { TokenTotals, TranscriptFacts } from './shared.mts'
 export { codexChildren, codexIdentity } from './codex.mts'
+export { formatTranscriptFacts, formatUnavailable } from './format.mts'
 export type ResolveOptions = {
   sessionId?: string
   jsonlPath?: string
@@ -29,23 +31,24 @@ export type ResolveOptions = {
   env?: NodeJS.ProcessEnv
 }
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
 const MALFORMED_INTERIOR = 'malformed interior transcript record'
 type TranscriptResolution = { path: string; sessionId: string } | { error: string }
-function sessionLabel(value: string): string {
-  return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
-}
 function globFrom(root: string, pattern: string): string[] {
   return globSync(pattern, { cwd: root }).map((path) => join(root, path))
 }
 export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolution {
   if (options.sessionId && !SESSION_ID.test(options.sessionId))
     return { error: 'invalid session id format' }
-  if (options.jsonlPath)
+  if (options.jsonlPath) {
+    const filename = basename(options.jsonlPath, '.jsonl')
+    const fileSessionId = filename.slice(-36)
     return {
       path: options.jsonlPath,
-      sessionId: options.sessionId ?? sessionLabel(basename(options.jsonlPath, '.jsonl')),
+      sessionId:
+        options.sessionId?.toLowerCase() ??
+        (SESSION_ID.test(fileSessionId) ? fileSessionId.toLowerCase() : sessionLabel(filename)),
     }
+  }
   const env = options.env ?? process.env
   const sessionId =
     options.sessionId ??
@@ -58,6 +61,7 @@ export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolu
         'no session id (pass --session-id or set CODEX_THREAD_ID, CLAUDE_CODE_SESSION_ID, CURSOR_SESSION_ID, or GROK_SESSION_ID)',
     }
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
+  const normalizedSessionId = sessionId.toLowerCase()
   const codex =
     options.codexSessionsDir ?? join(env.CODEX_HOME || join(homedir(), '.codex'), 'sessions')
   const claude =
@@ -65,17 +69,18 @@ export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolu
   const grokHome = env.GROK_HOME || join(homedir(), '.grok')
   const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
   const encodedCwd = encodeURIComponent(options.cwd ?? process.cwd())
-  const grokExact = join(grok, encodedCwd, sessionId, 'updates.jsonl')
+  const grokExact = join(grok, encodedCwd, normalizedSessionId, 'updates.jsonl')
   const grokPaths = existsSync(grokExact)
     ? [grokExact]
-    : globFrom(grok, `*/${sessionId}/updates.jsonl`)
-  const codexPaths = globFrom(codex, `**/rollout-*-${sessionId}.jsonl`)
-  const claudePaths = globFrom(claude, `*/${sessionId}.jsonl`)
+    : globFrom(grok, `*/${normalizedSessionId}/updates.jsonl`)
+  const codexPaths = globFrom(codex, `**/rollout-*-${normalizedSessionId}.jsonl`)
+  const claudePaths = globFrom(claude, `*/${normalizedSessionId}.jsonl`)
   const paths = [...grokPaths, ...codexPaths, ...claudePaths].sort()
-  if (paths.length > 1) return { error: `multiple transcripts found for session ${sessionId}` }
+  if (paths.length > 1)
+    return { error: `multiple transcripts found for session ${normalizedSessionId}` }
   return paths[0]
-    ? { path: paths[0], sessionId }
-    : { error: `no transcript found for session ${sessionId}` }
+    ? { path: paths[0], sessionId: normalizedSessionId }
+    : { error: `no transcript found for session ${normalizedSessionId}` }
 }
 function schema(lines: string[]): 'claude' | 'codex' | undefined {
   const records = parseLines(lines)
@@ -139,25 +144,6 @@ async function codexSubagents(
   }
   return result
 }
-export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts): string {
-  return [
-    '=== Transcript Facts ===',
-    `Session: ${sessionLabel(sessionId)}`,
-    `User prompts: ${facts.userPrompts}`,
-    `Assistant responses: ${facts.assistantResponses}`,
-    `Tool calls: ${facts.toolCalls} (failed: ${facts.failedToolCalls})`,
-    `no-mistakes invocations: ${facts.noMistakesInvocations}`,
-    `advisor calls: ${facts.advisorCalls}`,
-    `Push commands attempted: ${facts.pushCommandAttempts}`,
-    `Compactions: ${facts.compactions}`,
-    `Tokens: input=${facts.tokens.input} output=${facts.tokens.output} cache_read=${facts.tokens.cacheRead} cache_creation=${facts.tokens.cacheCreation}`,
-    `Subagent tool calls: ${facts.subagentToolCalls}`,
-    `Subagent tokens: input=${facts.subagentTokens.input} output=${facts.subagentTokens.output} cache_read=${facts.subagentTokens.cacheRead} cache_creation=${facts.subagentTokens.cacheCreation}`,
-    '',
-  ].join('\n')
-}
-export const formatUnavailable = (reason: string): string =>
-  `=== Transcript Facts ===\nStatus: unavailable (${reason.replace(/\s+/g, ' ').slice(0, 240)})\n`
 export async function runRetrospectiveTranscript(options: ResolveOptions): Promise<string> {
   const resolved = resolveTranscriptFile(options)
   if ('error' in resolved) return formatUnavailable(resolved.error)

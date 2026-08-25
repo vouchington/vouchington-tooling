@@ -10,9 +10,7 @@ import {
   type TokenTotals,
   type TranscriptFacts,
 } from './shared.mts'
-const EXEC_OBJECT =
-  /tools\.exec_command\(\s*(\{(?:(?:\\.|[^{}"'\\])|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')*\})\s*\)/g
-const COMMAND_LITERAL = /(?:[,{])\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/
+import { customExecCommands } from './javascript-command.mts'
 function usage(record: ParsedLine): TokenTotals | undefined {
   const payload = asRecord(record.payload)
   const totals = asRecord(asRecord(payload?.info)?.total_token_usage)
@@ -37,22 +35,7 @@ function commands(payload: Record<string, unknown>): string[] {
   if (!customExec && !['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name)))
     return []
   if (typeof raw !== 'string') return []
-  if (customExec) {
-    return [...raw.matchAll(EXEC_OBJECT)].flatMap((call) => {
-      const match = call[1]!.match(COMMAND_LITERAL)
-      return match
-        ? [
-            match[2]!.replace(
-              /\\([\\'"bnrtv])/g,
-              (_, character: string) =>
-                ({ '\\': '\\', "'": "'", '"': '"', b: '\b', n: '\n', r: '\r', t: '\t', v: '\v' })[
-                  character
-                ] as string,
-            ),
-          ]
-        : []
-    })
-  }
+  if (customExec) return customExecCommands(raw)
   try {
     const value = asRecord(JSON.parse(raw))
     const candidate = value?.cmd ?? value?.command
