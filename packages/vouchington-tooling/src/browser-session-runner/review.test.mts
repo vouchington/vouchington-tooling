@@ -153,6 +153,17 @@ describe('browser-session-runner review regressions', () => {
     await expect(run).resolves.toMatchObject({ deadlineExceeded: false, reason: 'exit' })
   })
 
+  it('does not signal a group that has already exited with its direct child', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('exit', 0, null)
+    expect(process.signals).toEqual([])
+    process.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ exit: { code: 0 }, reason: 'exit' })
+  })
+
   it('completes cleanup when descendant draining rejects', async () => {
     const process = new Process(),
       clock = harness(true)
