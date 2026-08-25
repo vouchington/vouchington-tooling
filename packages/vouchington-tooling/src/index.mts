@@ -146,6 +146,18 @@ export {
   splitCompleteLines,
 } from './process-line-buffer/index.mts'
 export {
+  ProcessGroupDrainTimeoutError,
+  runBrowserSession,
+} from './browser-session-runner/index.mts'
+export type {
+  BrowserSessionDeps,
+  BrowserSessionEvent,
+  BrowserSessionExit,
+  BrowserSessionOptions,
+  BrowserSessionProcess,
+  BrowserSessionResult,
+} from './browser-session-runner/index.mts'
+export {
   buildSchemaSnapshot,
   detectRenamedIndexes,
   generateSchemaSnapshot,

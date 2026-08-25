@@ -83,6 +83,7 @@ import {
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
+import { runBrowserSession } from 'vouchington-tooling/browser-session-runner'
 import {
   generateSchemaSnapshot,
   renderSchemaMarkdown,
@@ -124,3 +125,14 @@ credentials (job token or a minted Claude GitHub App token).
 `vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
 filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
 native frame symbols. Both structured reads and text rendering have hard report-count limits.
+
+`browser-session-runner` supervises caller-created browser-test processes. Callers supply command
+construction, line classification, retry/outcome policy, and budgets; the library owns process-group
+termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
+The returned process must identify a dedicated process group, such as a child spawned with
+`detached: true`; its `processGroupId` is signalled without assuming the child PID is a group ID.
+Stall exits use the caller's `classifyExit` policy, while parent signals and shared-deadline expiration
+are terminal. Output is decoded independently per stream; unfinished lines are classified at close and
+`diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
+The runner uses monotonic elapsed time, rejects timer budgets above Node's maximum delay, and waits for
+the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.
