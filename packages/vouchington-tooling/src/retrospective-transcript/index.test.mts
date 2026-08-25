@@ -8,6 +8,8 @@ import {
   resolveTranscriptFile,
   runRetrospectiveTranscript,
 } from './index.mts'
+import { codexChildren, codexIdentity } from './codex.mts'
+import { applyCommand, emptyFacts } from './shared.mts'
 
 const claudeLines = [
   JSON.stringify({ type: 'user', message: { content: 'hello' } }),
@@ -48,6 +50,190 @@ describe('retrospective transcript', () => {
     ])
     expect(facts.noMistakesInvocations).toBe(0)
     expect(facts.pushCommandAttempts).toBe(1)
+  })
+
+  it('tolerates torn Claude input while excluding metadata and deduplicating records', () => {
+    const duplicate = {
+      uuid: 'same-message',
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'server_tool_use',
+            name: 'bash',
+            input: { command: 'NO=1 pnpm run no-mistakes' },
+          },
+          { type: 'tool_result', is_error: true },
+        ],
+        usage: {
+          input_tokens: 5,
+          output_tokens: 6,
+          cache_read_input_tokens: 7,
+          cache_creation_input_tokens: 8,
+        },
+      },
+    }
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'user', isMeta: true, message: { content: 'hidden' } }),
+      JSON.stringify({ type: 'user', isCompactSummary: true, message: { content: 'summary' } }),
+      JSON.stringify(duplicate),
+      JSON.stringify(duplicate),
+      JSON.stringify({
+        type: 'assistant',
+        isSidechain: true,
+        message: {
+          content: [{ type: 'tool_use', name: 'Bash', input: { command: 'git push' } }],
+          usage: { input_tokens: 9, output_tokens: 10 },
+        },
+      }),
+      '{',
+    ])
+
+    expect(facts).toMatchObject({
+      userPrompts: 1,
+      assistantResponses: 1,
+      toolCalls: 2,
+      failedToolCalls: 1,
+      noMistakesInvocations: 1,
+      pushCommandAttempts: 1,
+      compactions: 1,
+      tokens: { input: 5, output: 6, cacheRead: 7, cacheCreation: 8 },
+      subagentToolCalls: 1,
+      subagentTokens: { input: 9, output: 10 },
+    })
+  })
+
+  it('derives Codex token deltas, command calls, failures, and compactions', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'session_meta', payload: { id: 'root' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
+      JSON.stringify({ type: 'compacted', payload: {} }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'context_compacted' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 10, output_tokens: 20, cached_input_tokens: 3 },
+          },
+        },
+      }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 8, output_tokens: 24, cached_input_tokens: 5 },
+          },
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          call_id: 'failed-once',
+          status: 'failed',
+          name: 'exec_command',
+          arguments: '{"cmd":"git -C project push"}',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          call_id: 'failed-once',
+          is_error: true,
+          name: 'bash',
+          input: '{}',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'custom_tool_call',
+          is_error: true,
+          name: 'shell',
+          input: '{"command":"pnpm exec no-mistakes"}',
+        },
+      }),
+    ])
+
+    expect(facts).toMatchObject({
+      userPrompts: 1,
+      assistantResponses: 1,
+      toolCalls: 3,
+      failedToolCalls: 2,
+      noMistakesInvocations: 1,
+      pushCommandAttempts: 1,
+      compactions: 2,
+      tokens: { input: 10, output: 24, cacheRead: 5, cacheCreation: 0 },
+    })
+  })
+
+  it('accounts for segmented Codex children and rejects unsegmented child input', () => {
+    const root = [JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } })]
+    const child = [
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', name: 'Bash', arguments: '{"cmd":"git push"}' },
+      }),
+    ]
+
+    expect(
+      computeTranscriptFacts(root, [
+        { lines: child, baseline: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } },
+      ]),
+    ).toMatchObject({ userPrompts: 1, toolCalls: 1, subagentToolCalls: 1, pushCommandAttempts: 1 })
+    expect(() => computeTranscriptFacts(root, [child])).toThrow('Codex subagents must be segmented')
+  })
+
+  it('recognizes only direct Codex descendants and uses safe identity defaults', () => {
+    const root = '11111111-1111-1111-1111-111111111111'
+    const child = '22222222-2222-2222-2222-222222222222'
+    const lines = [
+      JSON.stringify({ type: 'session_meta', payload: { id: root, agent_path: '/root/' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'sub_agent_activity', agent_thread_id: child, agent_path: '/root/child/' },
+      }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'sub_agent_activity',
+          agent_thread_id: 'ignored',
+          agent_path: '/root/child/grandchild',
+        },
+      }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'sub_agent_activity', agent_path: '/root/no-id' },
+      }),
+    ]
+
+    expect(codexIdentity(lines)).toEqual({ threadId: root, agentPath: '/root/' })
+    expect(codexIdentity(['{'])).toEqual({ agentPath: '/root' })
+    expect(codexChildren(lines)).toEqual([{ threadId: child, agentPath: '/root/child' }])
+  })
+
+  it('normalizes shell command separators, assignments, and quotes', () => {
+    const facts = emptyFacts()
+    applyCommand(
+      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push",
+      facts,
+    )
+    expect(facts.noMistakesInvocations).toBe(2)
+    expect(facts.pushCommandAttempts).toBe(2)
+  })
+
+  it('returns no facts for unsupported and mixed schemas', () => {
+    expect(computeTranscriptFacts(['{', JSON.stringify({ type: 'other' })])).toEqual(emptyFacts())
+    expect(
+      computeTranscriptFacts([
+        JSON.stringify({ type: 'user', message: { content: 'Claude' } }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      ]),
+    ).toEqual(emptyFacts())
   })
 
   it('resolves Codex transcripts and confines traversal to direct descendants', async () => {
@@ -106,6 +292,36 @@ describe('retrospective transcript', () => {
     await expect(runRetrospectiveTranscript({ sessionId: 'not-a-session' })).resolves.toBe(
       '=== Transcript Facts ===\nStatus: unavailable (invalid session id format)\n',
     )
+  })
+
+  it('returns unavailable when a referenced Codex child is missing or malformed', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const root = '11111111-1111-1111-1111-111111111111'
+    const child = '22222222-2222-2222-2222-222222222222'
+    await writeFile(
+      join(directory, `rollout-2026-${root}.jsonl`),
+      [
+        JSON.stringify({ type: 'session_meta', payload: { id: root, agent_path: '/root' } }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'sub_agent_activity',
+            agent_thread_id: child,
+            agent_path: '/root/child',
+          },
+        }),
+      ].join('\n'),
+    )
+
+    await expect(
+      runRetrospectiveTranscript({ sessionId: root, codexSessionsDir: directory }),
+    ).resolves.toBe(
+      '=== Transcript Facts ===\nStatus: unavailable (could not resolve a referenced Codex child transcript)\n',
+    )
+    await writeFile(join(directory, `rollout-2026-${child}.jsonl`), 'not json')
+    await expect(
+      runRetrospectiveTranscript({ sessionId: root, codexSessionsDir: directory }),
+    ).resolves.toContain('Status: unavailable')
   })
 
   it('rejects ambiguous transcript matches without exposing search paths', async () => {
