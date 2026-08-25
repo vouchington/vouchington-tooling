@@ -76,6 +76,16 @@ describe('coverage transport outcome guards', () => {
     expect(lines.join('\n')).not.toMatch(/https?:/)
   })
 
+  it('does not warn that S3 is degraded when the coverage primary step never ran', () => {
+    const lines: string[] = []
+    expect(
+      assertCoverageTransportOutcome('fixture', 'skipped', 'success', 'skipped', (line) =>
+        lines.push(line),
+      ),
+    ).toBe(true)
+    expect(lines).toEqual([])
+  })
+
   it('writes blob=true|false to $GITHUB_OUTPUT and is a no-op without a path', () => {
     const root = mkdtempSync(join(tmpdir(), 'coverage-output-'))
     const outputPath = join(root, 'github-output')

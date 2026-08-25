@@ -40,9 +40,11 @@ export function assertCoverageTransportOutcome(
     return true
   }
   if (artifactSucceeded) {
-    emit(
-      `::warning::Coverage persisted only to GitHub artifacts for suite=${suite}; S3 primary is degraded.`,
-    )
+    if (primary !== 'skipped') {
+      emit(
+        `::warning::Coverage persisted only to GitHub artifacts for suite=${suite}; S3 primary is degraded.`,
+      )
+    }
     return true
   }
   emit(
