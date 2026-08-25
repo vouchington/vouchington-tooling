@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import { parseTransportControl, writeTransportControl } from './control.mts'
 import { parseTransportObjectKey, transportObjectKeysV2, transportPrefix } from './keys.mts'
-import { cmdUpload } from './lib.mts'
+import { cmdDownloadCoverage, cmdDownloadVitestBlobs, cmdUpload } from './lib.mts'
 import { discoverDownloadControl } from './discovery.mts'
 import { mintPrefixUploadControl } from './prefix.mts'
 
@@ -107,6 +107,91 @@ describe('prefix coverage transport', () => {
       transportObjectKeysV2(identity, 'web').lcov,
       transportObjectKeysV2(identity, 'web').manifest,
     ])
+  })
+
+  it('downloads only the exact objects named by a discovered control', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'prefix-download-'))
+    const keys = transportObjectKeysV2(identity, 'web')
+    const control = {
+      version: 2 as const,
+      mode: 'discovered-download' as const,
+      repository: identity.repository,
+      revision: identity.revision,
+      run: { id: identity.runId, controlAttempt: identity.controlAttempt },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      coverage: {
+        web: {
+          lcov: {
+            key: keys.lcov,
+            url: 'https://storage.example.test/lcov',
+            attempt: 3,
+            byteLength: 4,
+          },
+          manifest: {
+            key: keys.manifest,
+            url: 'https://storage.example.test/manifest',
+            attempt: 3,
+            byteLength: 5,
+          },
+        },
+      },
+      blobs: {},
+    }
+    const path = join(root, 'control.json')
+    writeTransportControl(path, control)
+    const original = globalThis.fetch
+    globalThis.fetch = async (url) =>
+      new Response(String(url).endsWith('/lcov') ? 'lcov' : 'manifest')
+    try {
+      const options = {
+        expectedIdentity: {
+          repository: identity.repository,
+          revision: identity.revision,
+          runId: identity.runId,
+          currentAttempt: identity.controlAttempt,
+        },
+      }
+      await cmdDownloadCoverage(path, join(root, 'coverage'), options)
+      await cmdDownloadVitestBlobs(path, join(root, 'blobs'), options)
+    } finally {
+      globalThis.fetch = original
+    }
+    expect(readFileSync(join(root, 'coverage/coverage-web/lcov.info'), 'utf8')).toBe('lcov')
+    expect(readFileSync(join(root, 'coverage/coverage-web/coverage-manifest.json'), 'utf8')).toBe(
+      'manifest',
+    )
+  })
+
+  it('rejects controls in the wrong producer or consumer role', async () => {
+    const source = await mintPrefixUploadControl(identity, {
+      signPost: async (keyPrefix) => ({
+        url: 'https://storage.example.test/upload',
+        fields: {},
+        keyPrefix,
+        maxObjectBytes: 32,
+      }),
+    })
+    const root = mkdtempSync(join(tmpdir(), 'prefix-role-'))
+    const path = join(root, 'control.json')
+    writeTransportControl(path, source)
+    const options = {
+      expectedIdentity: {
+        repository: identity.repository,
+        revision: identity.revision,
+        runId: identity.runId,
+        currentAttempt: identity.controlAttempt,
+      },
+    }
+    await expect(cmdDownloadCoverage(path, root, options)).rejects.toThrow(/upload control/)
+    const download = await discoverDownloadControl(
+      source,
+      { list: async () => ({ objects: [] }) },
+      { signGet: async () => 'https://storage.example.test/get' },
+    )
+    writeTransportControl(path, download)
+    await expect(cmdUpload(path, 'web', { cwd: root, ...options })).rejects.toThrow(
+      /download control/,
+    )
   })
 
   it('paginates and selects the newest complete coverage pair but keeps older valid producers', async () => {
