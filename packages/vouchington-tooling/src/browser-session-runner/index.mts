@@ -11,6 +11,7 @@ export type {
   BrowserSessionProcess,
   BrowserSessionResult,
 } from './types.mts'
+export { ProcessGroupDrainTimeoutError } from './process-group.mts'
 
 const defaultDeps: BrowserSessionDeps = {
   clearInterval,
@@ -59,6 +60,7 @@ function validateOptions(options: BrowserSessionOptions): void {
     ['attempts', options.attempts],
     ['deadlineMs', options.deadlineMs],
     ['graceMs', options.graceMs],
+    ['processGroupDrainMs', options.processGroupDrainMs ?? options.graceMs],
     ['semanticStallMs', options.semanticStallMs],
     ['startupStallMs', options.startupStallMs],
     ['watchdogIntervalMs', options.watchdogIntervalMs ?? 1000],

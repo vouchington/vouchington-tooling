@@ -2,6 +2,7 @@ import { StringDecoder } from 'node:string_decoder'
 
 import { boundPendingLine, splitCompleteLines } from '../process-line-buffer/index.mts'
 import { tailText } from './tail.mts'
+import { TailQueue } from './tail-queue.mts'
 import type {
   BrowserSessionDeps,
   BrowserSessionExit,
@@ -29,13 +30,16 @@ export function runAttempt(
       throw new RangeError('processGroupId must be positive')
     }
     const maxTail = options.diagnosticTailBytes ?? 4096
-    let tail = Buffer.alloc(0),
-      startupProgress = false,
+    const tail = new TailQueue(maxTail)
+    let startupProgress = false,
       semanticProgress = false,
       lastSemantic = startedAt
     let failure: unknown,
       hasFailure = false,
       childExited = false,
+      closeExit: BrowserSessionExit | undefined,
+      killSent = false,
+      draining = false,
       reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
@@ -51,7 +55,7 @@ export function runAttempt(
       const result = {
         attempts: 0,
         deadlineExceeded: reason === 'deadline',
-        diagnosticTail: tailText(tail, maxTail),
+        diagnosticTail: tailText(tail.toBuffer(), maxTail),
         exit,
         reason,
         semanticProgress,
@@ -78,7 +82,11 @@ export function runAttempt(
       else if (nextReason !== 'exit') reason = nextReason
       if (terminating) return
       terminating = true
-      killTimer = deps.setTimeout(() => signal('SIGKILL'), options.graceMs)
+      killTimer = deps.setTimeout(() => {
+        killSent = true
+        signal('SIGKILL')
+        drain()
+      }, options.graceMs)
       signal('SIGTERM')
     }
     const fail = (error: unknown) => {
@@ -87,12 +95,26 @@ export function runAttempt(
       hasFailure = true
       terminate('exit')
     }
+    const drain = () => {
+      if (!closeExit || !killSent || draining) return
+      draining = true
+      void deps
+        .waitForProcessGroupExit(
+          process.processGroupId,
+          options.processGroupDrainMs ?? options.graceMs,
+        )
+        .then(
+          () => finish(closeExit!),
+          (error) => {
+            fail(error)
+            finish(closeExit!)
+          },
+        )
+    }
     const consume = () => {
       const decoder = new StringDecoder('utf8')
       let pending = ''
-      const append = (text: string) => {
-        tail = Buffer.concat([tail, Buffer.from(text)]).subarray(-maxTail)
-      }
+      const append = (text: string) => tail.append(text)
       const line = (value: string) => {
         const event = options.onLine(value)
         if (event === 'startup' && !startupProgress) {
@@ -163,13 +185,10 @@ export function runAttempt(
           fail(error)
         }
       if (!childExited && reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
-      const exit = { code, signal: value }
-      if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(exit)
+      closeExit = { code, signal: value }
+      if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(closeExit)
       terminate(reason)
-      void deps.waitForProcessGroupExit(process.processGroupId).then(
-        () => finish(exit),
-        () => finish(exit),
-      )
+      drain()
     })
   })
 }

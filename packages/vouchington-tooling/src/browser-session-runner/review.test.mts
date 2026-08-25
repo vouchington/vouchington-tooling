@@ -151,6 +151,7 @@ describe('browser-session-runner review regressions', () => {
 
     process.emit('close', 1, null)
     await Promise.resolve()
+    clock.triggerGrace()
     clock.release()
 
     await expect(run).resolves.toMatchObject({ deadlineExceeded: false, reason: 'exit' })
@@ -176,22 +177,29 @@ describe('browser-session-runner review regressions', () => {
     expect(process.signals).toEqual(['SIGTERM'])
     process.emit('close', 1, null)
     await Promise.resolve()
+    clock.triggerGrace()
     clock.release()
 
     await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
-  it('completes cleanup when descendant draining rejects', async () => {
+  it('rejects after a bounded descendant drain cannot clear the group', async () => {
     const process = new Process(),
       clock = harness(true)
-    clock.deps.waitForProcessGroupExit = async () => {
-      throw new Error('group probe failed')
+    const failure = new Error('group drain timed out')
+    clock.deps.waitForProcessGroupExit = async (_processGroupId, timeoutMs) => {
+      expect(timeoutMs).toBe(10)
+      throw failure
     }
-    const run = runBrowserSession(options(process), clock.deps)
+    const outcome = runBrowserSession(options(process), clock.deps).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
     process.emit('close', 0, null)
+    clock.triggerGrace()
 
-    await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
-    expect(process.signals).toEqual(['SIGTERM'])
+    await expect(outcome).resolves.toBe(failure)
+    expect(process.signals).toEqual(['SIGTERM', 'SIGKILL'])
   })
 
   it('rejects a classifier failure only after supervised cleanup completes', async () => {
@@ -215,6 +223,7 @@ describe('browser-session-runner review regressions', () => {
     expect(process.signals).toEqual(['SIGTERM'])
     process.emit('close', null, 'SIGTERM')
     await Promise.resolve()
+    clock.triggerGrace()
     clock.release()
 
     await expect(outcome).resolves.toBe(failure)

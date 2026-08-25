@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { isProcessGroupAlive, waitForProcessGroupExit } from './process-group.mts'
+import {
+  isProcessGroupAlive,
+  ProcessGroupDrainTimeoutError,
+  waitForProcessGroupExit,
+} from './process-group.mts'
 
 describe('process-group lifecycle', () => {
   it('treats only a missing process group as exited', () => {
@@ -30,11 +34,23 @@ describe('process-group lifecycle', () => {
       return true
     })
 
-    const wait = waitForProcessGroupExit(42)
+    const wait = waitForProcessGroupExit(42, 20)
     await vi.advanceTimersByTimeAsync(20)
     await expect(wait).resolves.toBeUndefined()
     expect(probes).toBe(3)
 
+    kill.mockRestore()
+    vi.useRealTimers()
+  })
+
+  it('rejects when a group remains observable after the drain budget', async () => {
+    vi.useFakeTimers()
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true)
+    const wait = waitForProcessGroupExit(42, 20)
+    const rejection = expect(wait).rejects.toBeInstanceOf(ProcessGroupDrainTimeoutError)
+    await vi.advanceTimersByTimeAsync(20)
+
+    await rejection
     kill.mockRestore()
     vi.useRealTimers()
   })

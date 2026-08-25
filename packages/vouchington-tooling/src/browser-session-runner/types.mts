@@ -32,7 +32,7 @@ export type BrowserSessionDeps = {
   onParentSignal(signal: NodeJS.Signals, listener: () => void): void
   setInterval(callback: () => void, ms: number): unknown
   setTimeout(callback: () => void, ms: number): unknown
-  waitForProcessGroupExit(processGroupId: number): Promise<void>
+  waitForProcessGroupExit(processGroupId: number, timeoutMs: number): Promise<void>
 }
 export type BrowserSessionOptions = {
   attempts: number
@@ -44,6 +44,7 @@ export type BrowserSessionOptions = {
   diagnosticTailBytes?: number
   graceMs: number
   onLine(line: string): BrowserSessionEvent | undefined
+  processGroupDrainMs?: number
   semanticStallMs: number
   start(attempt: number): BrowserSessionProcess
   startupStallMs: number
