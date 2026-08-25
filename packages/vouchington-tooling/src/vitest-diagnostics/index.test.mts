@@ -64,6 +64,35 @@ describe('summarizeDiagnosticReport', () => {
     })
   })
 
+  it('uses fallbacks for empty text and non-object report sections', () => {
+    expect(summarizeDiagnosticReport(' \n ', [])).toMatchObject({
+      file: 'unknown',
+      trigger: 'unknown',
+      event: 'unknown',
+      threadId: null,
+      topNativeFrameModule: null,
+    })
+    expect(
+      summarizeDiagnosticReport('report.json', {
+        header: { trigger: '  ', event: '' },
+        nativeStack: [{ symbol: 42 }],
+      }),
+    ).toMatchObject({ trigger: 'unknown', event: 'unknown', topNativeFrameModule: null })
+  })
+
+  it('extracts a bounded module only from the first native frame', () => {
+    expect(
+      summarizeDiagnosticReport('report.json', {
+        nativeStack: [{ symbol: 'first frame [/first]' }, { symbol: 'second frame [/second]' }],
+      }).topNativeFrameModule,
+    ).toBe('/first')
+    expect(summarizeDiagnosticReport('report.json', { nativeStack: 'not-an-array' })).toMatchObject(
+      {
+        topNativeFrameModule: null,
+      },
+    )
+  })
+
   it('bounds untrusted strings', () => {
     const summary = summarizeDiagnosticReport(`${'f'.repeat(400)}.json`, {
       header: { trigger: 't'.repeat(400), event: 'e'.repeat(400) },
@@ -119,6 +148,16 @@ describe('readDiagnosticReportSummaries', () => {
     expect(readDiagnosticReportSummaries(directory, { maxReports: 10_000 })).toHaveLength(5)
     expect(readDiagnosticReportSummaries(directory, { maxReports: 0 })).toEqual([])
   })
+
+  it('uses the bounded default for non-finite report limits', () => {
+    const directory = makeDirectory()
+    writeFileSync(join(directory, 'report.json'), JSON.stringify([]))
+
+    expect(readDiagnosticReportSummaries(directory, { maxReports: Number.NaN })).toHaveLength(1)
+    expect(
+      readDiagnosticReportSummaries(directory, { maxReports: Number.POSITIVE_INFINITY }),
+    ).toHaveLength(1)
+  })
 })
 
 describe('formatDiagnosticReportSummaries', () => {
@@ -148,6 +187,17 @@ describe('formatDiagnosticReportSummaries', () => {
     expect(formatDiagnosticReportSummaries(summaries, { maxReports: 1 })).toContain('... 149 more')
     expect(formatDiagnosticReportSummaries(summaries, { maxReports: 10_000 })).not.toContain(
       'report-100.json',
+    )
+  })
+
+  it('formats no summaries when the caller cap is zero but retains the remainder count', () => {
+    const summaries = [summarizeDiagnosticReport('report.json', SAMPLE_REPORT)]
+
+    expect(formatDiagnosticReportSummaries(summaries, { maxReports: 0 })).toBe(
+      '[vitest-diagnostics]\nreports provided: 1\n  ... 1 more\n',
+    )
+    expect(formatDiagnosticReportSummaries(summaries, { maxReports: Number.NaN })).toContain(
+      'report.json',
     )
   })
 })
