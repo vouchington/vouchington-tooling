@@ -74,7 +74,10 @@ function reportLimit(value: number | undefined, fallback: number): number {
 }
 
 function readBoundedRegularFile(path: string): string | undefined {
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK)
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW,
+  )
   try {
     const stats = fstatSync(descriptor)
     if (!stats.isFile() || stats.size > MAX_DIAGNOSTIC_REPORT_BYTES) return undefined
