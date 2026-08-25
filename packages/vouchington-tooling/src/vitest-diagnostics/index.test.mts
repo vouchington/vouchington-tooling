@@ -239,6 +239,14 @@ describe('formatDiagnosticReportSummaries', () => {
     expect(output.split('\n')).toHaveLength(4)
   })
 
+  it('uses fallbacks for malformed summary entries', () => {
+    const output = formatDiagnosticReportSummaries([null, 'invalid'])
+
+    expect(output).toContain('reports provided: 2')
+    expect(output.match(/file=unknown/g)).toHaveLength(2)
+    expect(output).toContain('threadId=unknown')
+  })
+
   it('caps formatted output and reports the remainder', () => {
     const summaries = Array.from({ length: 25 }, (_, index) =>
       summarizeDiagnosticReport(`report-${index}.json`, SAMPLE_REPORT),

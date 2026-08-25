@@ -128,13 +128,14 @@ export function readDiagnosticReportSummaries(
 }
 
 export function formatDiagnosticReportSummaries(
-  summaries: readonly DiagnosticReportSummary[],
+  summaries: readonly unknown[],
   options: DiagnosticReportLimitOptions = {},
 ): string {
   const maxReports = reportLimit(options.maxReports, DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS)
   const lines = ['[vitest-diagnostics]', `reports provided: ${summaries.length}`]
   if (summaries.length === 0) lines.push('  (none recorded)')
-  for (const summary of summaries.slice(0, maxReports)) {
+  for (const value of summaries.slice(0, maxReports)) {
+    const summary = objectValue(value)
     lines.push(
       `  - file=${boundedText(summary.file, 'unknown', PATH_LIMIT)} ` +
         `trigger=${boundedText(summary.trigger, 'unknown', TEXT_LIMIT)} ` +
