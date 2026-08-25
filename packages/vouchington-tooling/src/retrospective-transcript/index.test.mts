@@ -103,6 +103,20 @@ describe('retrospective transcript', () => {
     })
   })
 
+  it('counts supported Claude tools while ignoring malformed and unrelated content blocks', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'user', message: { content: ['not a string'] } }),
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: ['not an object', { type: 'tool_use', name: 'Read' }, { type: 'other' }],
+        },
+      }),
+    ])
+
+    expect(facts).toMatchObject({ userPrompts: 0, assistantResponses: 1, toolCalls: 1 })
+  })
+
   it('derives Codex token deltas, command calls, failures, and compactions', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({ type: 'session_meta', payload: { id: 'root' } }),
@@ -140,6 +154,10 @@ describe('retrospective transcript', () => {
       }),
       JSON.stringify({
         type: 'response_item',
+        payload: { type: 'function_call', name: 'shell', arguments: '{' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
         payload: {
           type: 'function_call',
           call_id: 'failed-once',
@@ -162,7 +180,7 @@ describe('retrospective transcript', () => {
     expect(facts).toMatchObject({
       userPrompts: 1,
       assistantResponses: 1,
-      toolCalls: 3,
+      toolCalls: 4,
       failedToolCalls: 2,
       noMistakesInvocations: 1,
       pushCommandAttempts: 1,
@@ -234,6 +252,12 @@ describe('retrospective transcript', () => {
         JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
       ]),
     ).toEqual(emptyFacts())
+  })
+
+  it('reports a stable unavailable block when no session identity is supplied', async () => {
+    await expect(runRetrospectiveTranscript({ env: {} })).resolves.toBe(
+      '=== Transcript Facts ===\nStatus: unavailable (no session id (pass --session-id or set CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID))\n',
+    )
   })
 
   it('resolves Codex transcripts and confines traversal to direct descendants', async () => {
@@ -353,5 +377,11 @@ describe('retrospective transcript', () => {
         sessionId: '11111111-1111-1111-1111-111111111111',
       }),
     ).resolves.toBe('=== Transcript Facts ===\nStatus: unavailable (could not read transcript)\n')
+  })
+
+  it('ignores non-push git commands after their options', () => {
+    const facts = emptyFacts()
+    applyCommand('git -C project status', facts)
+    expect(facts.pushCommandAttempts).toBe(0)
   })
 })
