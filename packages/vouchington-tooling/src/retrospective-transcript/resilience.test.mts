@@ -76,8 +76,21 @@ describe('retrospective transcript resilience', () => {
         type: 'response_item',
         payload: { type: 'local_shell_call_output', call_id: 'local-1', exit_code: 1 },
       }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', call_id: 'object-input', name: 'shell', arguments: {} },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call_output',
+          call_id: 'object-input',
+          exit_code: 0,
+          exitCode: 1,
+        },
+      }),
     ])
-    expect(facts).toMatchObject({ toolCalls: 3, failedToolCalls: 2, pushCommandAttempts: 1 })
+    expect(facts).toMatchObject({ toolCalls: 4, failedToolCalls: 3, pushCommandAttempts: 1 })
   })
 
   it('extracts shell commands from Codex custom exec calls', () => {

@@ -114,7 +114,6 @@ function segments(command: string): string[][] {
     else if (/\s/.test(char)) flush()
     else word += char
   }
-  if (escaped) word += '\\'
   end()
   return result
 }
