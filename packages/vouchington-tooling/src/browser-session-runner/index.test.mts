@@ -10,7 +10,7 @@ import {
 } from './index.mts'
 
 class FakeProcess extends EventEmitter implements BrowserSessionProcess {
-  pid = 42
+  processGroupId = 42
   readonly stderr = new EventEmitter()
   readonly stdout = new EventEmitter()
   readonly signals: NodeJS.Signals[] = []
@@ -69,13 +69,25 @@ describe('runBrowserSession', () => {
     const clock = makeClock()
     const run = runBrowserSession(options([child]), clock.deps)
     child.stdout.emit('data', 'rea')
-    child.stderr.emit('data', 'dy\ntest 1\nlong-tail')
+    child.stdout.emit('data', 'dy\ntest 1\n')
+    child.stderr.emit('data', 'long-tail')
     child.emit('close', 0, null)
     await expect(run).resolves.toMatchObject({
       diagnosticTail: 'ready\ntest 1\nlong-tail',
       semanticProgress: true,
       startupProgress: true,
     })
+  })
+
+  it('does not combine partial lines from different streams', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(options([child]), clock.deps)
+    child.stdout.emit('data', 'rea')
+    child.stderr.emit('data', 'dy\n')
+    child.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ startupProgress: false })
   })
 
   it('terminates a startup stall with TERM followed by KILL', async () => {
@@ -99,6 +111,21 @@ describe('runBrowserSession', () => {
     child.emit('close', null, 'SIGTERM')
     await expect(run).resolves.toMatchObject({ reason: 'semantic-stall' })
     expect(clock.processGroups).toEqual(['SIGTERM'])
+  })
+
+  it('terminates a semantic stall when startup completes without semantic progress', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(options([child]), clock.deps)
+    child.stdout.emit('data', 'ready\n')
+    clock.tick(20)
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({
+      semanticProgress: false,
+      reason: 'semantic-stall',
+      startupProgress: true,
+    })
   })
 
   it('shares one deadline across retryable attempts', async () => {
@@ -125,5 +152,11 @@ describe('runBrowserSession', () => {
     child.emit('close', null, 'SIGTERM')
     await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
     expect(clock.processGroups).toEqual(['SIGTERM'])
+  })
+
+  it('rejects invalid lifecycle budgets before starting a process', async () => {
+    await expect(
+      runBrowserSession({ ...options([]), attempts: 0 }, makeClock().deps),
+    ).rejects.toThrow('attempts')
   })
 })

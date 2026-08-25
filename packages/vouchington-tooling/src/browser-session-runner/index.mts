@@ -13,7 +13,8 @@ export type BrowserSessionResult = {
   startupProgress: boolean
   semanticProgress: boolean
 }
-export type BrowserSessionProcess = Pick<ChildProcess, 'kill' | 'pid'> & {
+export type BrowserSessionProcess = Pick<ChildProcess, 'kill'> & {
+  processGroupId: number
   on(
     event: 'close',
     listener: (code: number | null, signal: NodeJS.Signals | null) => void,
@@ -50,7 +51,7 @@ export type BrowserSessionOptions = {
 const defaultDeps: BrowserSessionDeps = {
   clearInterval,
   clearTimeout,
-  killProcessGroup: (pid, signal) => process.kill(-pid, signal),
+  killProcessGroup: (processGroupId, signal) => process.kill(-processGroupId, signal),
   now: Date.now,
   offParentSignal: (signal, listener) => process.off(signal, listener),
   onParentSignal: (signal, listener) => process.once(signal, listener),
@@ -62,6 +63,7 @@ export async function runBrowserSession(
   options: BrowserSessionOptions,
   deps: BrowserSessionDeps = defaultDeps,
 ): Promise<BrowserSessionResult> {
+  validateOptions(options)
   const deadline = deps.now() + options.deadlineMs
   let last: BrowserSessionResult | undefined
   let attempts = 0
@@ -73,6 +75,21 @@ export async function runBrowserSession(
   }
   if (attempts === options.attempts) return { ...last!, attempts }
   return { ...(last ?? expiredResult()), attempts, deadlineExceeded: true, reason: 'deadline' }
+}
+
+function validateOptions(options: BrowserSessionOptions): void {
+  const positiveIntegers: Array<[string, number]> = [
+    ['attempts', options.attempts],
+    ['deadlineMs', options.deadlineMs],
+    ['graceMs', options.graceMs],
+    ['semanticStallMs', options.semanticStallMs],
+    ['startupStallMs', options.startupStallMs],
+    ['watchdogIntervalMs', options.watchdogIntervalMs ?? 1000],
+    ['diagnosticTailBytes', options.diagnosticTailBytes ?? 4096],
+  ]
+  for (const [name, value] of positiveIntegers) {
+    if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`${name} must be positive`)
+  }
 }
 
 function omitAttempts(result: BrowserSessionResult): Omit<BrowserSessionResult, 'attempts'> {
@@ -101,7 +118,8 @@ function runAttempt(
   return new Promise<BrowserSessionResult>((resolve) => {
     const startedAt = deps.now()
     const process = options.start(attempt)
-    let pending = ''
+    if (!Number.isSafeInteger(process.processGroupId) || process.processGroupId <= 0)
+      throw new RangeError('processGroupId must be positive')
     let tail = ''
     let startupProgress = false
     let semanticProgress = false
@@ -129,31 +147,36 @@ function runAttempt(
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
       if (reason !== 'exit') return
       reason = nextReason
-      if (process.pid != null) deps.killProcessGroup(process.pid, 'SIGTERM')
+      deps.killProcessGroup(process.processGroupId, 'SIGTERM')
       process.kill('SIGTERM')
       killTimer = deps.setTimeout(() => {
-        if (process.pid != null) deps.killProcessGroup(process.pid, 'SIGKILL')
+        deps.killProcessGroup(process.processGroupId, 'SIGKILL')
         process.kill('SIGKILL')
       }, options.graceMs)
     }
-    const consume = (chunk: string | Buffer) => {
-      tail = boundPendingLine((tail + String(chunk)).slice(-(options.diagnosticTailBytes ?? 4096)))
-      const split = splitCompleteLines(pending + String(chunk))
-      pending = boundPendingLine(split.pending)
-      for (const line of split.complete) {
-        const event = options.onLine(line)
-        if (event === 'startup') startupProgress = true
-        if (event === 'semantic') semanticProgress = true
-        if (event) lastProgress = deps.now()
+    const consume = () => {
+      let pending = ''
+      return (chunk: string | Buffer) => {
+        tail = boundPendingLine(
+          (tail + String(chunk)).slice(-(options.diagnosticTailBytes ?? 4096)),
+        )
+        const split = splitCompleteLines(pending + String(chunk))
+        pending = boundPendingLine(split.pending)
+        for (const line of split.complete) {
+          const event = options.onLine(line)
+          if (event === 'startup') startupProgress = true
+          if (event === 'semantic') semanticProgress = true
+          if (event) lastProgress = deps.now()
+        }
       }
     }
-    for (const stream of [process.stdout, process.stderr]) stream?.on('data', consume)
+    for (const stream of [process.stdout, process.stderr]) stream?.on('data', consume())
     const watchdog = deps.setInterval(() => {
       const now = deps.now()
       if (now >= deadline - options.graceMs) return terminate('deadline')
       if (!startupProgress && now - startedAt >= options.startupStallMs)
         return terminate('startup-stall')
-      if (semanticProgress && now - lastProgress >= options.semanticStallMs)
+      if (startupProgress && now - lastProgress >= options.semanticStallMs)
         terminate('semantic-stall')
     }, options.watchdogIntervalMs ?? 1000)
     for (const signal of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {

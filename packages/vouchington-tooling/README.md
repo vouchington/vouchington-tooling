@@ -129,3 +129,5 @@ native frame symbols. Both structured reads and text rendering have hard report-
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
+The returned process must identify a dedicated process group, such as a child spawned with
+`detached: true`; its `processGroupId` is signalled without assuming the child PID is a group ID.
