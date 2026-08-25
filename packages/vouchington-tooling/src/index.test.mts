@@ -21,6 +21,7 @@ import {
   normalizeSwiftSource,
   validateOptionalHttpOrigin,
   runPostReview,
+  summarizeDiagnosticReport,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -50,5 +51,6 @@ describe('package exports', () => {
     expect(typeof validateNugetUpdate).toBe('function')
     expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
     expect(typeof runPostReview).toBe('function')
+    expect(typeof summarizeDiagnosticReport).toBe('function')
   })
 })
