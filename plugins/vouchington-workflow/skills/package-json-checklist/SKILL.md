@@ -11,8 +11,9 @@ age/version policy, registry, release process, and package layout.
 
 1. Identify the owning package and every consumer of the changed script, dependency, export, or
    binary. Prefer existing workspace utilities before adding a dependency.
-2. Change package metadata and its lockfile together using the repository's package manager. Keep
-   peer, optional, development, and runtime dependencies in their intended sections.
+2. Use the repository's package manager for dependency changes. Update the lockfile when it records
+   the affected metadata; avoid lockfile churn for metadata-only edits it does not record. Keep peer,
+   optional, development, and runtime dependencies in their intended sections.
 3. For a published package, verify exports, types, files, binaries, and build output match the
    package's supported import and installation paths.
 4. Run the package manager's integrity check, focused tests, typecheck, build, and local policy
