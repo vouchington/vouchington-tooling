@@ -109,6 +109,20 @@ describe('prefix transport error boundaries', () => {
         { maxObjectBytes: DEFAULT_MAX_BODY_BYTES + 1 },
       ),
     ).rejects.toThrow(/size limit/)
+    await expect(
+      mintPrefixUploadControl(
+        identity,
+        {
+          signPost: async (keyPrefix) => ({
+            url: 'https://x',
+            fields: {},
+            keyPrefix,
+            maxObjectBytes: 2,
+          }),
+        },
+        { maxObjectBytes: 1 },
+      ),
+    ).rejects.toThrow(/signer size/)
   })
 
   it.each([
