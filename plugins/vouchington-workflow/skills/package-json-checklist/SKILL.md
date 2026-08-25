@@ -23,4 +23,5 @@ dependency age/version policy, registry, release process, and package layout.
 5. Review the lockfile and generated metadata for unrelated churn before committing.
 
 This skill supplies no version range, workspace topology, registry, package-manager command, or
-release convention. Put those repository-specific choices in local instructions or a wrapper.
+release convention. Put those repository-specific choices in local instructions or a consumer
+wrapper.
