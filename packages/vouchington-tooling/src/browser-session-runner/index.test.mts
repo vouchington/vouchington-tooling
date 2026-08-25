@@ -346,8 +346,8 @@ describe('runBrowserSession', () => {
 
   it('supports processes with no output streams while retaining group lifecycle control', async () => {
     const child = new FakeProcess()
-    Reflect.deleteProperty(child, 'stdout')
-    Reflect.deleteProperty(child, 'stderr')
+    Reflect.set(child, 'stdout', null)
+    Reflect.set(child, 'stderr', null)
     const clock = makeClock()
     const run = runBrowserSession(options([child]), clock.deps)
     clock.emitSignal('SIGINT')

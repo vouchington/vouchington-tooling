@@ -103,7 +103,7 @@ export function runAttempt(
         },
         (error) => {
           fail(error)
-          if (closeExit) finish(closeExit)
+          finish(closeExit ?? { code: null, signal: null })
         },
       )
     }
@@ -151,6 +151,7 @@ export function runAttempt(
           fail(error)
         }
       })
+    for (const stream of [process.stdout, process.stderr]) stream?.on('error', fail)
     const remainingDeadlineMs = deadline - deps.now()
     const deadlineTimer = deps.setTimeout(
       () => terminate('deadline'),

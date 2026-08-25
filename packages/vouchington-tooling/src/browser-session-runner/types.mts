@@ -2,6 +2,10 @@ import type { ChildProcess } from 'node:child_process'
 
 export type BrowserSessionEvent = 'startup' | 'semantic'
 export type BrowserSessionExit = { code: number | null; signal: NodeJS.Signals | null }
+type BrowserSessionStream = {
+  on(event: 'data', listener: (chunk: string | Buffer) => void): unknown
+  on(event: 'error', listener: (error: Error) => void): unknown
+}
 export type BrowserSessionResult = {
   attempts: number
   deadlineExceeded: boolean
@@ -19,8 +23,8 @@ export type BrowserSessionProcess = Pick<ChildProcess, 'kill'> & {
   ): unknown
   on(event: 'error', listener: (error: Error) => void): unknown
   on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown
-  stderr?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
-  stdout?: { on(event: 'data', listener: (chunk: string | Buffer) => void): unknown }
+  stderr?: BrowserSessionStream | null
+  stdout?: BrowserSessionStream | null
 }
 export type BrowserSessionDeps = {
   clearInterval(handle: unknown): void

@@ -373,7 +373,7 @@ describe('browser-session-runner review regressions', () => {
     await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
-  it('rejects after a bounded descendant drain cannot clear the group', async () => {
+  it('rejects a bounded exit-triggered drain even when inherited streams never close', async () => {
     const process = new Process(),
       clock = harness(true)
     const failure = new Error('group drain timed out')
@@ -385,11 +385,26 @@ describe('browser-session-runner review regressions', () => {
       () => undefined,
       (error: unknown) => error,
     )
-    process.emit('close', 0, null)
+    process.emit('exit', 0, null)
     clock.triggerGrace()
 
     await expect(outcome).resolves.toBe(failure)
     expect(process.signals).toEqual(['SIGTERM', 'SIGKILL'])
+  })
+
+  it('routes output stream errors through supervised process cleanup', async () => {
+    const process = new Process(),
+      clock = harness()
+    const failure = new Error('stdout failed')
+    const outcome = runBrowserSession(options(process), clock.deps).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    process.stdout.emit('error', failure)
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(outcome).resolves.toBe(failure)
   })
 
   it('rejects a classifier failure only after supervised cleanup completes', async () => {
