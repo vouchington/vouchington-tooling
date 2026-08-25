@@ -173,6 +173,8 @@ export type {
   BrowserSessionProcess,
   BrowserSessionResult,
   BrowserSessionTerminationReason,
+  BrowserSessionWatchdog,
+  BrowserSessionWatchdogCleanup,
   BrowserSessionWatchdogController,
 } from './browser-session-runner/index.mts'
 export {
