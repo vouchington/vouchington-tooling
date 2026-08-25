@@ -49,7 +49,8 @@ vouchington stage-review-payload optional|required <source> <destination>
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
 layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discovery at a nondefault
-Grok session root.
+Grok session root. Without `--session-id`, it reads those session identities from the host
+environment.
 
 Host-lock environment:
 
