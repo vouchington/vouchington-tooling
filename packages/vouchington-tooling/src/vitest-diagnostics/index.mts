@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { closeSync, constants, fstatSync, openSync, readdirSync, readSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
 
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100
@@ -62,6 +62,23 @@ function reportLimit(value: number | undefined, fallback: number): number {
   return Math.min(Math.max(Math.floor(value), 0), HARD_MAX_DIAGNOSTIC_REPORTS)
 }
 
+function readBoundedRegularFile(path: string): string | undefined {
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK)
+  try {
+    if (!fstatSync(descriptor).isFile()) return undefined
+    const bytes = Buffer.allocUnsafe(MAX_DIAGNOSTIC_REPORT_BYTES + 1)
+    let length = 0
+    while (length < bytes.length) {
+      const read = readSync(descriptor, bytes, length, bytes.length - length, null)
+      if (read === 0) break
+      length += read
+    }
+    return length > MAX_DIAGNOSTIC_REPORT_BYTES ? undefined : bytes.toString('utf8', 0, length)
+  } finally {
+    closeSync(descriptor)
+  }
+}
+
 export function summarizeDiagnosticReport(file: string, report: unknown): DiagnosticReportSummary {
   const root = objectValue(report)
   const header = objectValue(root.header)
@@ -99,8 +116,9 @@ export function readDiagnosticReportSummaries(
   const summaries: DiagnosticReportSummary[] = []
   for (const filename of filenames.slice(0, maxReports)) {
     try {
-      if (statSync(join(directory, filename)).size > MAX_DIAGNOSTIC_REPORT_BYTES) continue
-      const report: unknown = JSON.parse(readFileSync(join(directory, filename), 'utf8'))
+      const contents = readBoundedRegularFile(join(directory, filename))
+      if (contents === undefined) continue
+      const report: unknown = JSON.parse(contents)
       summaries.push(summarizeDiagnosticReport(filename, report))
     } catch {
       // Node can leave a partial report if the process exits while writing it.

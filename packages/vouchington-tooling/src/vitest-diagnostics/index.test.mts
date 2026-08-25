@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -166,6 +166,16 @@ describe('readDiagnosticReportSummaries', () => {
     const oversized = join(directory, 'oversized.json')
     writeFileSync(oversized, '{}')
     truncateSync(oversized, MAX_DIAGNOSTIC_REPORT_BYTES + 1)
+    writeFileSync(join(directory, 'report.json'), JSON.stringify(SAMPLE_REPORT))
+
+    expect(readDiagnosticReportSummaries(directory).map((summary) => summary.file)).toEqual([
+      'report.json',
+    ])
+  })
+
+  it('skips non-regular directory entries without reading them', () => {
+    const directory = makeDirectory()
+    mkdirSync(join(directory, 'not-a-report.json'))
     writeFileSync(join(directory, 'report.json'), JSON.stringify(SAMPLE_REPORT))
 
     expect(readDiagnosticReportSummaries(directory).map((summary) => summary.file)).toEqual([
