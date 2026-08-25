@@ -35,6 +35,10 @@ describe('retrospective transcript resilience', () => {
         type: 'user',
         message: { content: [{ type: 'tool_result', content: 'ok' }] },
       }),
+      JSON.stringify({
+        type: 'user',
+        message: { content: { type: 'text', text: 'not a block list' } },
+      }),
       'null',
     ])
     expect(facts.userPrompts).toBe(2)
@@ -58,14 +62,22 @@ describe('retrospective transcript resilience', () => {
       }),
       JSON.stringify({
         type: 'response_item',
-        payload: { type: 'web_search_call', call_id: 'search-1' },
+        payload: { type: 'web_search_call', id: 'search-1' },
       }),
       JSON.stringify({
         type: 'response_item',
-        payload: { type: 'web_search_call', call_id: 'search-1' },
+        payload: { type: 'web_search_call', id: 'search-1' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'local_shell_call', call_id: 'local-1', input: { command: 'ignored' } },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'local_shell_call_output', call_id: 'local-1', exit_code: 1 },
       }),
     ])
-    expect(facts).toMatchObject({ toolCalls: 2, failedToolCalls: 1, pushCommandAttempts: 1 })
+    expect(facts).toMatchObject({ toolCalls: 3, failedToolCalls: 2, pushCommandAttempts: 1 })
   })
 
   it('rejects malformed interior records while tolerating a torn final line', async () => {
@@ -213,6 +225,12 @@ describe('retrospective transcript resilience', () => {
 
     expect(facts.noMistakesInvocations).toBe(3)
     expect(facts.pushCommandAttempts).toBe(1)
+  })
+
+  it('does not treat a shell token ending in an escape as a completed command', () => {
+    const facts = emptyFacts()
+    applyCommand('git push\\', facts)
+    expect(facts.pushCommandAttempts).toBe(0)
   })
 
   it('uses host environment identities when no injected environment is supplied', async () => {

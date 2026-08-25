@@ -92,7 +92,7 @@ function segments(command: string): string[][] {
     segment = []
   }
   for (let index = 0; index < command.length; index++) {
-    const char = command[index] ?? ''
+    const char = command[index]!
     const next = command[index + 1] ?? ''
     if (escaped) {
       if (char !== '\n') word += char
