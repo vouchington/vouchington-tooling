@@ -53,7 +53,7 @@ function topNativeFrameModule(value: unknown): string | null {
   if (typeof symbol !== 'string') return null
   const module = NATIVE_FRAME_MODULE_PATTERN.exec(symbol)?.[1]
   if (module === undefined || (!posix.isAbsolute(module) && !win32.isAbsolute(module))) return null
-  return boundedText(module, '', PATH_LIMIT) || null
+  return boundedText(module, '', PATH_LIMIT)
 }
 
 function reportLimit(value: number | undefined, fallback: number): number {
