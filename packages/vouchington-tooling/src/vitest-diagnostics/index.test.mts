@@ -91,6 +91,9 @@ describe('summarizeDiagnosticReport', () => {
         topNativeFrameModule: null,
       },
     )
+    expect(
+      summarizeDiagnosticReport('report.json', { nativeStack: [{ symbol: 'frame [   ]' }] }),
+    ).toMatchObject({ topNativeFrameModule: null })
   })
 
   it('bounds untrusted strings', () => {
@@ -164,6 +167,17 @@ describe('formatDiagnosticReportSummaries', () => {
   it('formats a stable empty result', () => {
     expect(formatDiagnosticReportSummaries([])).toBe(
       '[vitest-diagnostics]\nreports provided: 0\n  (none recorded)\n',
+    )
+  })
+
+  it('labels unavailable thread and native-frame details explicitly', () => {
+    const summary = summarizeDiagnosticReport('empty.json', {
+      header: { threadId: 'invalid' },
+      nativeStack: [{ symbol: 'frame_without_a_module_suffix' }],
+    })
+
+    expect(formatDiagnosticReportSummaries([summary])).toContain(
+      'threadId=unknown heapUsedMB=0.0 heapTotalMB=0.0 heapLimitMB=0.0 maxRssMB=0.0 topNativeFrameModule=none',
     )
   })
 
