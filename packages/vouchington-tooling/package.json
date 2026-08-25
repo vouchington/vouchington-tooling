@@ -35,6 +35,11 @@
       "import": "./dist/runner-port-policy/index.mjs",
       "default": "./dist/runner-port-policy/index.mjs"
     },
+    "./retrospective-transcript": {
+      "types": "./dist/retrospective-transcript/index.d.mts",
+      "import": "./dist/retrospective-transcript/index.mjs",
+      "default": "./dist/retrospective-transcript/index.mjs"
+    },
     "./sql-ast": {
       "types": "./dist/sql-ast/index.d.mts",
       "import": "./dist/sql-ast/index.mjs",

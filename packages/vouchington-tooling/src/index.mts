@@ -1,6 +1,21 @@
 /* eslint-disable max-lines -- package entry point enumerates the supported public API. */
 
 export {
+  codexChildren,
+  codexIdentity,
+  computeTranscriptFacts,
+  formatTranscriptFacts,
+  formatUnavailable,
+  resolveTranscriptFile,
+  runRetrospectiveTranscript,
+} from './retrospective-transcript/index.mts'
+export type {
+  ResolveOptions,
+  TokenTotals,
+  TranscriptFacts,
+} from './retrospective-transcript/index.mts'
+
+export {
   EphemeralListenerAttemptsExhaustedError,
   isRunnerReservedPort,
   listenOnRunnerUnreservedEphemeralPort,

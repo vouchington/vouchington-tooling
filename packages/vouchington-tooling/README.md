@@ -37,6 +37,7 @@ vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
 vouchington materialize-pr-context
 vouchington wait-for-apt-locks
+vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
@@ -44,6 +45,12 @@ vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
+
+`retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
+Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
+layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discovery at a nondefault
+Grok session root. Without `--session-id`, it reads those session identities from the host
+environment.
 
 Host-lock environment:
 
@@ -116,6 +123,7 @@ import {
   formatDiagnosticReportSummaries,
   readDiagnosticReportSummaries,
 } from 'vouchington-tooling/vitest-diagnostics'
+import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
