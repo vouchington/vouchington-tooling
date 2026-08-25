@@ -31,7 +31,10 @@ function makeClock() {
   const processGroups: NodeJS.Signals[] = []
   const deps: BrowserSessionDeps = {
     clearInterval: (handle) => clearedIntervals.push(handle),
-    clearTimeout: (handle) => clearedTimeouts.push(handle),
+    clearTimeout: (handle) => (
+      clearedTimeouts.push(handle),
+      timeouts.splice(timeouts.indexOf(handle as never), 1)
+    ),
     isProcessGroupAlive: () => false,
     killProcessGroup: (_pid, signal) => processGroups.push(signal),
     now: () => now,
@@ -107,7 +110,10 @@ describe('runBrowserSession', () => {
   it('terminates a startup stall with TERM followed by KILL', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
-    const run = runBrowserSession({ ...options([child]), attempts: 1 }, clock.deps)
+    const run = runBrowserSession(
+      { ...options([child]), attempts: 1 },
+      { ...clock.deps, isProcessGroupAlive: () => true },
+    )
     clock.tick(20)
     clock.tick(10)
     child.emit('close', null, 'SIGKILL')
@@ -189,7 +195,6 @@ describe('runBrowserSession', () => {
     const clock = makeClock()
     const run = runBrowserSession({ ...options([child]), classifyExit: () => 'return' }, clock.deps)
     child.emit('close', 2, null)
-
     await expect(run).resolves.toMatchObject({ attempts: 1, exit: { code: 2, signal: null } })
   })
 
@@ -334,7 +339,7 @@ describe('runBrowserSession', () => {
     await run
 
     expect(clock.clearedIntervals).toHaveLength(1)
-    expect(clock.clearedTimeouts).toHaveLength(1)
+    expect(clock.clearedTimeouts).toHaveLength(2)
     expect(clock.parent.listenerCount('SIGINT')).toBe(0)
     expect(clock.parent.listenerCount('SIGTERM')).toBe(0)
   })

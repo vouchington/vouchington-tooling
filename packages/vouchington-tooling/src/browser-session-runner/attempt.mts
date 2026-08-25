@@ -17,8 +17,7 @@ export function runAttempt(
   attempt: number,
 ) {
   return new Promise<BrowserSessionResult>((resolve, reject) => {
-    const startedAt = deps.now(),
-      process = options.start(attempt)
+    const process = options.start(attempt)
     if (
       !Number.isSafeInteger(process.processGroupId) ||
       process.processGroupId <= 0 ||
@@ -32,18 +31,16 @@ export function runAttempt(
     const maxTail = options.diagnosticTailBytes ?? 4096
     const tail = new TailQueue(maxTail)
     let startupProgress = false,
-      semanticProgress = false,
-      lastSemantic = startedAt
+      semanticProgress = false
     let failure: unknown,
       hasFailure = false,
       childExited = false,
       closeExit: BrowserSessionExit | undefined,
-      killSent = false,
       draining = false,
       reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
-    let killTimer: unknown
+    let killTimer: unknown, stallTimer: unknown
     const listeners: Array<() => void> = []
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
@@ -51,6 +48,7 @@ export function runAttempt(
       deps.clearInterval(watchdog)
       deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
+      deps.clearTimeout(stallTimer)
       for (const remove of listeners) remove()
       const result = {
         attempts: 0,
@@ -83,9 +81,7 @@ export function runAttempt(
       if (terminating) return
       terminating = true
       killTimer = deps.setTimeout(() => {
-        killSent = true
-        signal('SIGKILL')
-        drain()
+        if (deps.isProcessGroupAlive(process.processGroupId)) signal('SIGKILL')
       }, options.graceMs)
       signal('SIGTERM')
     }
@@ -96,12 +92,12 @@ export function runAttempt(
       terminate('exit')
     }
     const drain = () => {
-      if (!closeExit || !killSent || draining) return
+      if (!closeExit || draining) return
       draining = true
       void deps
         .waitForProcessGroupExit(
           process.processGroupId,
-          options.processGroupDrainMs ?? options.graceMs,
+          options.graceMs + (options.processGroupDrainMs ?? options.graceMs),
         )
         .then(
           () => finish(closeExit!),
@@ -111,23 +107,26 @@ export function runAttempt(
           },
         )
     }
+    const armStall = (ms: number, nextReason: 'semantic-stall' | 'startup-stall') => {
+      if (stallTimer) deps.clearTimeout(stallTimer)
+      stallTimer = deps.setTimeout(() => terminate(nextReason), ms)
+    }
     const consume = () => {
       const decoder = new StringDecoder('utf8')
       let pending = ''
-      const append = (text: string) => tail.append(text)
       const line = (value: string) => {
         const event = options.onLine(value)
         if (event === 'startup' && !startupProgress) {
           startupProgress = true
-          lastSemantic = deps.now()
+          armStall(options.semanticStallMs, 'semantic-stall')
         }
         if (event === 'semantic') {
           semanticProgress = true
-          lastSemantic = deps.now()
+          armStall(options.semanticStallMs, 'semantic-stall')
         }
       }
       const appendLines = (text: string) => {
-        append(text)
+        tail.append(text)
         const split = splitCompleteLines(pending + text)
         pending = boundPendingLine(split.pending)
         for (const value of split.complete) line(value)
@@ -155,16 +154,13 @@ export function runAttempt(
     const watchdog = deps.setInterval(() => {
       const now = deps.now()
       if (now >= deadline) return terminate('deadline')
-      if (!startupProgress && now - startedAt >= options.startupStallMs)
-        return terminate('startup-stall')
-      if (startupProgress && now - lastSemantic >= options.semanticStallMs)
-        terminate('semantic-stall')
     }, options.watchdogIntervalMs ?? 1000)
     const remainingDeadlineMs = deadline - deps.now()
     const deadlineTimer = deps.setTimeout(
       () => terminate('deadline'),
       Math.max(1, remainingDeadlineMs),
     )
+    armStall(options.startupStallMs, 'startup-stall')
     if (remainingDeadlineMs <= 0) terminate('deadline')
     for (const value of ['SIGINT', 'SIGTERM'] as NodeJS.Signals[]) {
       const listener = () => terminate('parent-signal')
@@ -184,7 +180,13 @@ export function runAttempt(
         } catch (error) {
           fail(error)
         }
-      if (!childExited && reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
+      if (
+        !childExited &&
+        deps.now() >= deadline &&
+        reason !== 'parent-signal' &&
+        reason !== 'deadline'
+      )
+        reason = 'deadline'
       closeExit = { code, signal: value }
       if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(closeExit)
       terminate(reason)

@@ -20,14 +20,23 @@ function harness(alive = false) {
   let now = 0
   let watchdog = () => {}
   let grace = () => {}
+  const timeouts: Array<{ at: number; callback: () => void }> = []
   const parent = new EventEmitter()
   let release: () => void = () => {}
   const exited = new Promise<void>((resolve) => {
     release = resolve
   })
+  const runDue = () => {
+    const due = timeouts.filter((value) => value.at <= now)
+    timeouts.splice(0, timeouts.length, ...timeouts.filter((value) => value.at > now))
+    for (const timeout of due) timeout.callback()
+  }
   const deps: BrowserSessionDeps = {
     clearInterval: () => {},
-    clearTimeout: () => {},
+    clearTimeout: (handle) => {
+      const index = timeouts.indexOf(handle as (typeof timeouts)[number])
+      if (index >= 0) timeouts.splice(index, 1)
+    },
     isProcessGroupAlive: () => alive,
     killProcessGroup: () => {},
     now: () => now,
@@ -35,8 +44,16 @@ function harness(alive = false) {
     onParentSignal: (signal, listener) => parent.once(signal, listener),
     setInterval: (callback) => ((watchdog = callback), callback),
     setTimeout: (callback, ms) => {
-      if (ms === 10) grace = callback
-      return callback
+      const timeout = {
+        at: now + ms,
+        callback: () => {
+          callback()
+          if (ms === 10) grace = () => {}
+        },
+      }
+      if (ms === 10) grace = timeout.callback
+      timeouts.push(timeout)
+      return timeout
     },
     waitForProcessGroupExit: () => exited,
   }
@@ -47,9 +64,14 @@ function harness(alive = false) {
     deps,
     emitParent: () => parent.emit('SIGTERM'),
     release: () => release(),
+    elapse: (ms: number) => {
+      now += ms
+      runDue()
+    },
     tick: (ms: number) => {
       now += ms
       watchdog()
+      runDue()
     },
     triggerGrace: () => grace(),
   }
@@ -93,6 +115,51 @@ describe('browser-session-runner review regressions', () => {
     expect(process.signals).toEqual(['SIGTERM'])
   })
 
+  it('promotes a stalled close that arrives after an overdue deadline', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(options(process), clock.deps)
+    clock.elapse(20)
+    clock.advance(80)
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
+  })
+
+  it('enforces startup stalls without waiting for a slow watchdog tick', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession({ ...options(process), watchdogIntervalMs: 1_000 }, clock.deps)
+    clock.elapse(20)
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'startup-stall' })
+  })
+
+  it('resets the direct semantic stall timer after progress', async () => {
+    const process = new Process(),
+      clock = harness()
+    const run = runBrowserSession(
+      {
+        ...options(process),
+        watchdogIntervalMs: 1_000,
+        onLine: (line) => (line === 'ready' ? 'startup' : 'semantic'),
+      },
+      clock.deps,
+    )
+    process.stdout.emit('data', 'ready\n')
+    clock.elapse(10)
+    process.stdout.emit('data', 'progress\n')
+    clock.elapse(19)
+    expect(process.signals).toEqual([])
+    clock.elapse(1)
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'semantic-stall' })
+  })
+
   it('keeps the first terminal reason when a different terminal event follows', async () => {
     const process = new Process(),
       clock = harness()
@@ -132,9 +199,29 @@ describe('browser-session-runner review regressions', () => {
     await Promise.resolve()
     expect(settled).toBe(false)
     expect(process.signals).toEqual(['SIGTERM'])
-    clock.triggerGrace()
-    expect(process.signals).toEqual(['SIGTERM', 'SIGKILL'])
     clock.release()
+
+    await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
+    expect(process.signals).toEqual(['SIGTERM'])
+  })
+
+  it('starts only one group drain while a close is being finalized', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    let calls = 0
+    let release: () => void = () => {}
+    const drained = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    clock.deps.waitForProcessGroupExit = () => {
+      calls += 1
+      return drained
+    }
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('close', 0, null)
+    process.emit('close', 0, null)
+    expect(calls).toBe(1)
+    release()
 
     await expect(run).resolves.toMatchObject({ exit: { code: 0 } })
   })
@@ -142,11 +229,13 @@ describe('browser-session-runner review regressions', () => {
   it('starts group cleanup at child exit before inherited output streams close', async () => {
     const process = new Process(),
       clock = harness(true)
-    const run = runBrowserSession(options(process), clock.deps)
+    const run = runBrowserSession(
+      { ...options(process), semanticStallMs: 10_000, startupStallMs: 10_000 },
+      clock.deps,
+    )
     process.emit('exit', 1, null)
     expect(process.signals).toEqual(['SIGTERM'])
     clock.tick(100)
-    clock.triggerGrace()
     expect(process.signals).toEqual(['SIGTERM', 'SIGKILL'])
 
     process.emit('close', 1, null)
@@ -188,7 +277,7 @@ describe('browser-session-runner review regressions', () => {
       clock = harness(true)
     const failure = new Error('group drain timed out')
     clock.deps.waitForProcessGroupExit = async (_processGroupId, timeoutMs) => {
-      expect(timeoutMs).toBe(10)
+      expect(timeoutMs).toBe(20)
       throw failure
     }
     const outcome = runBrowserSession(options(process), clock.deps).then(
