@@ -105,6 +105,7 @@ describe('prefix transport error boundaries', () => {
 
   it.each([
     (control: ReturnType<typeof download>) => ({ ...control, run: {} }),
+    (control: ReturnType<typeof download>) => ({ ...control, repository: 1 }),
     (control: ReturnType<typeof download>) => ({ ...control, repository: 'bad/repo/extra' }),
     (control: ReturnType<typeof download>) => ({
       ...control,
@@ -168,6 +169,16 @@ describe('prefix transport error boundaries', () => {
     ).rejects.toThrow(/cyclic/)
   })
 
+  it('rejects non-string discovery continuation tokens', async () => {
+    await expect(
+      discoverDownloadControl(
+        await upload(),
+        { list: async () => ({ objects: [], continuationToken: 1 as unknown as string }) },
+        { signGet: async () => 'https://x' },
+      ),
+    ).rejects.toThrow(/continuation/)
+  })
+
   it('rejects unsupported filenames and handles incomplete remote pairs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'prefix-errors-'))
     const control = download()
@@ -226,6 +237,25 @@ describe('prefix transport error boundaries', () => {
     } finally {
       globalThis.fetch = original
     }
+  })
+
+  it('rejects an upload control from a different attempt', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'prefix-attempt-'))
+    await expect(
+      uploadPrefixTransport(
+        await upload(),
+        'web',
+        root,
+        {
+          repository: identity.repository,
+          revision: identity.revision,
+          runId: identity.runId,
+          currentAttempt: 2,
+        },
+        'coverage-manifest.json',
+        {},
+      ),
+    ).rejects.toThrow(/attempt/)
   })
 
   it('maps discovered blobs to their exact GET URL', async () => {
