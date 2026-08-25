@@ -3,6 +3,8 @@ import { chmodSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSyn
 
 import { VITEST_SUITE_PATTERN } from '../vitest-blob-manifest/index.mts'
 
+import { parseTransportControlV2, type TransportControlV2 } from './control-v2.mts'
+
 export interface PresignedCoverageUrls {
   lcovPut: string
   lcovGet: string
@@ -34,7 +36,10 @@ export interface FallbackOnlyTransportControl extends TransportControlBase {
   readonly reason: string
 }
 
-export type TransportControl = PresignedTransportControl | FallbackOnlyTransportControl
+export type TransportControl =
+  | PresignedTransportControl
+  | FallbackOnlyTransportControl
+  | TransportControlV2
 
 export interface ExpectedTransportIdentity {
   readonly repository: string
@@ -83,9 +88,12 @@ function assertUrlMap(
 }
 
 export function parseTransportControl(raw: unknown): TransportControl {
-  if (!isRecord(raw) || raw.version !== 1 || !isRecord(raw.run)) {
+  if (!isRecord(raw)) {
     throw new Error('Coverage transport control has an unsupported schema')
   }
+  if (raw.version === 2) return parseTransportControlV2(raw)
+  if (raw.version !== 1 || !isRecord(raw.run))
+    throw new Error('Coverage transport control has an unsupported schema')
   if (
     typeof raw.repository !== 'string' ||
     !raw.repository ||
@@ -174,7 +182,7 @@ export function readTransportControl(
   ) {
     throw new Error('Coverage transport control identity does not match this run')
   }
-  if (control.mode === 'presigned' && Date.parse(control.expiresAt) <= Date.now()) {
+  if (control.mode !== 'fallback-only' && Date.parse(control.expiresAt) <= Date.now()) {
     throw new Error('Coverage transport control has expired')
   }
   return control

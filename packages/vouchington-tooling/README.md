@@ -95,7 +95,11 @@ import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
 import { runPostReview } from 'vouchington-tooling/gha-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
-import { cmdUpload, mintPresignedControl } from 'vouchington-tooling/coverage-transport'
+import {
+  cmdUpload,
+  discoverDownloadControl,
+  mintPrefixUploadControl,
+} from 'vouchington-tooling/coverage-transport'
 import { pruneDeployedRuntimeDeps } from 'vouchington-tooling/pnpm-deploy'
 import { parseDockerfileRuntimeImages } from 'vouchington-tooling/dockerfile-parse'
 import { checkSccComplexity } from 'vouchington-tooling/scc-complexity'

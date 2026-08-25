@@ -13,6 +13,11 @@ import {
   type RequestOptions,
 } from './control.mts'
 import { fetchGet, fetchPut, logTransport } from './http.mts'
+import {
+  downloadPrefixBlobs,
+  downloadPrefixCoverage,
+  uploadPrefixTransport,
+} from './prefix-transfer.mts'
 import { downloadVitestBlobBundles, packVitestBlobBundle } from './vitest-blob-transport.mts'
 
 export { DEFAULT_COVERAGE_MANIFEST_FILENAME } from './constants.mts'
@@ -44,6 +49,18 @@ export async function cmdUpload(
   const cwd = options.cwd ?? process.cwd()
   const manifestFilename = options.coverageManifestFilename ?? DEFAULT_COVERAGE_MANIFEST_FILENAME
   assertCoverageManifestFilename(manifestFilename)
+  if (control.mode === 'prefix-upload') {
+    return uploadPrefixTransport(
+      control,
+      suite,
+      cwd,
+      options.expectedIdentity,
+      manifestFilename,
+      options,
+    )
+  }
+  if (control.mode === 'discovered-download')
+    throw new Error('Coverage transport download control cannot upload')
   const coverageUrls = control.coverage[suite]
   const lcovPath = join(cwd, 'coverage', 'lcov.info')
   const manifestPath = join(cwd, 'coverage', manifestFilename)
@@ -98,6 +115,11 @@ export async function cmdDownloadCoverage(
   }
   const manifestFilename = options.coverageManifestFilename ?? DEFAULT_COVERAGE_MANIFEST_FILENAME
   assertCoverageManifestFilename(manifestFilename)
+  if (control.mode === 'prefix-upload')
+    throw new Error('Coverage transport upload control cannot download')
+  if (control.mode === 'discovered-download') {
+    return downloadPrefixCoverage(control, destinationRoot, manifestFilename, options)
+  }
   await Promise.all(
     Object.entries(control.coverage).map(async ([suite, urls]) => {
       const [lcov, manifest] = await Promise.all([
@@ -127,5 +149,9 @@ export async function cmdDownloadVitestBlobs(
     logTransport(options, '[coverage-transport] S3 unavailable; artifact fallback required')
     return
   }
+  if (control.mode === 'prefix-upload')
+    throw new Error('Coverage transport upload control cannot download')
+  if (control.mode === 'discovered-download')
+    return downloadPrefixBlobs(control, destinationRoot, options)
   await downloadVitestBlobBundles(control.blobs, destinationRoot, options)
 }

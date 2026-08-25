@@ -16,7 +16,7 @@ const identity = {
 describe('parseTransportControl', () => {
   it('rejects unsupported schemas and identity fields', () => {
     expect(() => parseTransportControl(null)).toThrow(/unsupported schema/)
-    expect(() => parseTransportControl({ version: 2, run: {} })).toThrow(/unsupported schema/)
+    expect(() => parseTransportControl({ version: 2, run: {} })).toThrow(/invalid identity/)
     expect(() => parseTransportControl({ ...identity, run: 'nope' })).toThrow(/unsupported schema/)
     expect(() =>
       parseTransportControl({ ...identity, repository: '', mode: 'fallback-only', reason: 'x' }),
