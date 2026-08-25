@@ -125,6 +125,57 @@ describe('retrospective transcript resilience', () => {
     expect(facts).toMatchObject({ toolCalls: 1, noMistakesInvocations: 1, pushCommandAttempts: 1 })
   })
 
+  it('extracts every custom exec command and parses textual failed outcomes', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'custom_tool_call',
+          call_id: 'custom-exec',
+          name: 'exec',
+          input:
+            'await tools.exec_command({cmd: "pnpm exec no-mistakes"}); await tools.exec_command({cmd: "git push"})',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'custom_tool_call_output',
+          call_id: 'custom-exec',
+          output: [{ type: 'input_text', text: '{"exit_code":1}' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'custom_tool_call_output',
+          call_id: 'ignored-text',
+          output: [{ type: 'input_text', text: '{' }],
+        },
+      }),
+    ])
+    expect(facts).toMatchObject({
+      toolCalls: 1,
+      failedToolCalls: 1,
+      noMistakesInvocations: 1,
+      pushCommandAttempts: 1,
+    })
+  })
+
+  it('treats configured transcript roots literally', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const directory = join(parent, 'sessions[1]')
+    const sessionId = '88888888-8888-4888-8888-888888888888'
+    const path = join(directory, `rollout-root-${sessionId}.jsonl`)
+    await mkdir(directory)
+    await writeFile(path, JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }))
+
+    expect(resolveTranscriptFile({ sessionId, codexSessionsDir: directory })).toEqual({
+      path,
+      sessionId,
+    })
+  })
+
   it('rejects malformed interior records while tolerating a torn final line', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = '88888888-8888-4888-8888-888888888888'

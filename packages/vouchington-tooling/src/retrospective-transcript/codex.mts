@@ -23,39 +23,33 @@ function usage(record: ParsedLine): TokenTotals | undefined {
   }
 }
 
-function command(payload: Record<string, unknown>): string | undefined {
+function commands(payload: Record<string, unknown>): string[] {
   const customExec = payload.type === 'custom_tool_call' && payload.name === 'exec'
   if (!customExec && !['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name)))
-    return undefined
+    return []
   const raw = payload.type === 'function_call' ? payload.arguments : payload.input
-  if (typeof raw !== 'string') return undefined
+  if (typeof raw !== 'string') return []
   if (customExec) {
-    const match = raw.match(
-      /tools\.exec_command\(\s*\{\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|[\s\S])*?)\1/,
-    )
-    return match?.[2]?.replace(
-      /\\([\\'"bnrtv])/g,
-      (_, character: string) =>
-        (
-          ({
-            '\\': '\\',
-            "'": "'",
-            '"': '"',
-            b: '\b',
-            n: '\n',
-            r: '\r',
-            t: '\t',
-            v: '\v',
-          }) as Record<string, string>
-        )[character] as string,
+    return [
+      ...raw.matchAll(
+        /tools\.exec_command\(\s*\{\s*(?:cmd|['"]cmd['"])\s*:\s*(['"])((?:\\.|[\s\S])*?)\1/g,
+      ),
+    ].map((match) =>
+      match[2]!.replace(
+        /\\([\\'"bnrtv])/g,
+        (_, character: string) =>
+          ({ '\\': '\\', "'": "'", '"': '"', b: '\b', n: '\n', r: '\r', t: '\t', v: '\v' })[
+            character
+          ] as string,
+      ),
     )
   }
   try {
     const value = asRecord(JSON.parse(raw))
     const candidate = value?.cmd ?? value?.command
-    return typeof candidate === 'string' ? candidate : undefined
+    return typeof candidate === 'string' ? [candidate] : []
   } catch {
-    return undefined
+    return []
   }
 }
 
@@ -71,6 +65,13 @@ function hasFailedOutcome(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasFailedOutcome)
   const payload = asRecord(value)
   if (!payload) return false
+  if (payload.type === 'input_text' && typeof payload.text === 'string') {
+    try {
+      return hasFailedOutcome(JSON.parse(payload.text))
+    } catch {
+      return false
+    }
+  }
   if (payload.status === 'failed' || payload.status === 'error' || payload.is_error === true)
     return true
   if (
@@ -142,8 +143,7 @@ function applyRecords(
         if (subagent) facts.subagentToolCalls++
         if (id) calls.add(id)
         if (payload.name === 'advisor') facts.advisorCalls++
-        const rawCommand = command(payload)
-        if (rawCommand) applyCommand(rawCommand, facts)
+        for (const rawCommand of commands(payload)) applyCommand(rawCommand, facts)
       }
     }
     if ((isCall(payload) || isCallOutcome(payload)) && hasFailedOutcome(payload)) {

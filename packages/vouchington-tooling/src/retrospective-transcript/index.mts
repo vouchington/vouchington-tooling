@@ -34,6 +34,9 @@ const MALFORMED_INTERIOR = 'malformed interior transcript record'
 function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
+function globFrom(root: string, pattern: string): string[] {
+  return globSync(pattern, { cwd: root }).map((path) => join(root, path))
+}
 export function resolveTranscriptFile(
   options: ResolveOptions,
 ): { path: string; sessionId: string } | { error: string } {
@@ -65,16 +68,15 @@ export function resolveTranscriptFile(
   const grokExact = join(grok, encodedCwd, sessionId, 'updates.jsonl')
   const grokPaths = existsSync(grokExact)
     ? [grokExact]
-    : globSync(join(grok, '*', sessionId, 'updates.jsonl').replace(/\\/g, '/'))
-  const codexPaths = globSync(join(codex, '**', `rollout-*-${sessionId}.jsonl`).replace(/\\/g, '/'))
-  const claudePaths = globSync(join(claude, '*', `${sessionId}.jsonl`).replace(/\\/g, '/'))
+    : globFrom(grok, `*/${sessionId}/updates.jsonl`)
+  const codexPaths = globFrom(codex, `**/rollout-*-${sessionId}.jsonl`)
+  const claudePaths = globFrom(claude, `*/${sessionId}.jsonl`)
   const paths = [...grokPaths, ...codexPaths, ...claudePaths].sort()
   if (paths.length > 1) return { error: `multiple transcripts found for session ${sessionId}` }
   return paths[0]
     ? { path: paths[0], sessionId }
     : { error: `no transcript found for session ${sessionId}` }
 }
-
 function schema(lines: string[]): 'claude' | 'codex' | undefined {
   const records = parseLines(lines)
   const kinds = new Set(
@@ -115,9 +117,7 @@ async function readLines(path: string): Promise<string[] | undefined> {
 
 function childPath(threadId: string, sessionsDir: string): string | undefined {
   if (!SESSION_ID.test(threadId)) return undefined
-  const paths = globSync(
-    join(sessionsDir, '**', `rollout-*-${threadId}.jsonl`).replace(/\\/g, '/'),
-  ).sort()
+  const paths = globFrom(sessionsDir, `**/rollout-*-${threadId}.jsonl`).sort()
   return paths.length === 1 ? paths[0] : undefined
 }
 
@@ -173,7 +173,7 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   if (hasMalformedInteriorRecord(lines)) return formatUnavailable(MALFORMED_INTERIOR)
   if (detected === 'claude') {
     const directory = join(dirname(resolved.path), basename(resolved.path, '.jsonl'), 'subagents')
-    const subagents = await Promise.all(globSync(join(directory, '*.jsonl')).sort().map(readLines))
+    const subagents = await Promise.all(globFrom(directory, '*.jsonl').sort().map(readLines))
     return formatTranscriptFacts(
       resolved.sessionId,
       computeTranscriptFacts(
