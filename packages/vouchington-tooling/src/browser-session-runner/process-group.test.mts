@@ -30,7 +30,7 @@ describe('process-group lifecycle', () => {
     expect(() => isProcessGroupAlive(42)).toThrow('unsupported on Windows')
     await expect(waitForProcessGroupExit(42, 20)).rejects.toThrow('unsupported on Windows')
     platform.mockRestore()
-    for (const processGroupId of [0, -1, 1.5, Infinity, 2_147_483_648])
+    for (const processGroupId of [0, 1, -1, 1.5, Infinity, 2_147_483_648])
       expect(() => isProcessGroupAlive(processGroupId)).toThrow('processGroupId')
     for (const timeoutMs of [0, -1, 1.5, Infinity, 2_147_483_648])
       await expect(waitForProcessGroupExit(42, timeoutMs)).rejects.toThrow('timeoutMs')

@@ -41,7 +41,7 @@ function assertSupportedPlatform(): void {
 function validateProcessGroupId(processGroupId: number): void {
   if (
     !Number.isSafeInteger(processGroupId) ||
-    processGroupId <= 0 ||
+    processGroupId <= 1 ||
     processGroupId > 2_147_483_647
   )
     throw new RangeError('processGroupId must be a positive supported PID')
