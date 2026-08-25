@@ -24,12 +24,14 @@ export type BrowserSessionProcess = Pick<ChildProcess, 'kill'> & {
 export type BrowserSessionDeps = {
   clearInterval(handle: unknown): void
   clearTimeout(handle: unknown): void
+  isProcessGroupAlive(processGroupId: number): boolean
   killProcessGroup(processGroupId: number, signal: NodeJS.Signals): void
   now(): number
   offParentSignal(signal: NodeJS.Signals, listener: () => void): void
   onParentSignal(signal: NodeJS.Signals, listener: () => void): void
   setInterval(callback: () => void, ms: number): unknown
   setTimeout(callback: () => void, ms: number): unknown
+  waitForProcessGroupExit(processGroupId: number): Promise<void>
 }
 export type BrowserSessionOptions = {
   attempts: number

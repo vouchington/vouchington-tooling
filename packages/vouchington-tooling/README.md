@@ -134,3 +134,5 @@ The returned process must identify a dedicated process group, such as a child sp
 Stall exits use the caller's `classifyExit` policy, while parent signals and shared-deadline expiration
 are terminal. Output is decoded independently per stream; unfinished lines are classified at close and
 `diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
+The runner uses monotonic elapsed time, rejects timer budgets above Node's maximum delay, and waits for
+the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.

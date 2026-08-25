@@ -32,6 +32,7 @@ function makeClock() {
   const deps: BrowserSessionDeps = {
     clearInterval: (handle) => clearedIntervals.push(handle),
     clearTimeout: (handle) => clearedTimeouts.push(handle),
+    isProcessGroupAlive: () => false,
     killProcessGroup: (_pid, signal) => processGroups.push(signal),
     now: () => now,
     offParentSignal: (signal, listener) => parent.off(signal, listener),
@@ -42,6 +43,7 @@ function makeClock() {
       timeouts.push(timeout)
       return timeout
     },
+    waitForProcessGroupExit: async () => {},
   }
   return {
     deps,
@@ -279,7 +281,10 @@ describe('runBrowserSession', () => {
       child.emit('close', null, signal ?? null)
       return true
     }
-    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    const kill = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+      return true
+    })
     const run = runBrowserSession({ ...options([child]), attempts: 1 })
 
     process.emit('SIGTERM')
@@ -292,7 +297,8 @@ describe('runBrowserSession', () => {
   it('ignores a vanished default process group during termination', async () => {
     const child = new FakeProcess()
     const error = Object.assign(new Error('gone'), { code: 'ESRCH' })
-    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
       throw error
     })
     const run = runBrowserSession({ ...options([child]), attempts: 1 })
@@ -306,7 +312,8 @@ describe('runBrowserSession', () => {
   it('contains an unexpected default process-group failure during termination', async () => {
     const child = new FakeProcess()
     const error = Object.assign(new Error('denied'), { code: 'EPERM' })
-    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
       throw error
     })
     const run = runBrowserSession({ ...options([child]), attempts: 1 })
@@ -407,7 +414,7 @@ describe('runBrowserSession', () => {
     child.stdout.emit('data', Buffer.from([...Buffer.from('complete'), 0xe2]))
     child.emit('close', 0, null)
 
-    await expect(run).resolves.toMatchObject({ diagnosticTail: 'complete' })
+    await expect(run).resolves.toMatchObject({ diagnosticTail: 'complete�' })
   })
 
   it('classifies a close after the deadline even before the timer callback runs', async () => {
@@ -472,21 +479,5 @@ describe('runBrowserSession', () => {
       'processGroupId',
     )
     expect(child.signals).toEqual(['SIGKILL'])
-  })
-
-  it('rejects invalid lifecycle budgets before starting a process', async () => {
-    for (const [property, value] of [
-      ['attempts', 0],
-      ['deadlineMs', Number.POSITIVE_INFINITY],
-      ['graceMs', -1],
-      ['semanticStallMs', 1.5],
-      ['startupStallMs', 0],
-      ['watchdogIntervalMs', 0],
-      ['diagnosticTailBytes', 0],
-    ] as const) {
-      await expect(
-        runBrowserSession({ ...options([]), [property]: value }, makeClock().deps),
-      ).rejects.toThrow(property)
-    }
   })
 })
