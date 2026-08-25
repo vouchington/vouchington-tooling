@@ -200,6 +200,7 @@ describe('runBrowserSession', () => {
     const clock = makeClock()
     const run = runBrowserSession(options([child]), clock.deps)
     clock.emitSignal('SIGTERM')
+    clock.emitSignal('SIGINT')
     child.emit('close', null, 'SIGTERM')
     await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
     expect(clock.processGroups).toEqual(['SIGTERM'])
@@ -226,7 +227,9 @@ describe('runBrowserSession', () => {
     const child = new FakeProcess()
     const clock = makeClock()
     const run = runBrowserSession(options([child]), clock.deps)
+    clock.tick(1)
     child.emit('close', 0, null)
+    child.emit('close', 1, null)
     await run
 
     expect(clock.clearedIntervals).toHaveLength(1)
