@@ -61,7 +61,8 @@ export function resolveTranscriptFile(
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
   const codex =
     options.codexSessionsDir ?? join(env.CODEX_HOME || join(homedir(), '.codex'), 'sessions')
-  const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
+  const claude =
+    options.projectsDir ?? join(env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'projects')
   const grokHome = env.GROK_HOME || join(homedir(), '.grok')
   const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
   const encodedCwd = encodeURIComponent(options.cwd ?? process.cwd())
@@ -95,7 +96,6 @@ function schema(lines: string[]): 'claude' | 'codex' | undefined {
   )
   return kinds.size === 1 ? ([...kinds][0] as 'claude' | 'codex') : undefined
 }
-
 export function computeTranscriptFacts(
   lines: string[],
   subagents: Array<string[] | CodexSegment> = [],
@@ -110,17 +110,14 @@ export function computeTranscriptFacts(
   if (subagents.some(Array.isArray)) throw new TypeError('Codex subagents must be segmented')
   return computeCodex(lines, subagents as CodexSegment[])
 }
-
 async function readLines(path: string): Promise<string[] | undefined> {
   return (await readFile(path, 'utf8').catch(() => undefined))?.split('\n')
 }
-
 function childPath(threadId: string, sessionsDir: string): string | undefined {
   if (!SESSION_ID.test(threadId)) return undefined
   const paths = globFrom(sessionsDir, `**/rollout-*-${threadId}.jsonl`).sort()
   return paths.length === 1 ? paths[0] : undefined
 }
-
 async function codexSubagents(
   lines: string[],
   sessionsDir: string,
@@ -143,7 +140,6 @@ async function codexSubagents(
   }
   return result
 }
-
 export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts): string {
   return [
     '=== Transcript Facts ===',
@@ -178,7 +174,10 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
       resolved.sessionId,
       computeTranscriptFacts(
         lines,
-        subagents.filter((value): value is string[] => value !== undefined),
+        subagents.filter(
+          (value): value is string[] =>
+            value !== undefined && schema(value) === 'claude' && !hasMalformedInteriorRecord(value),
+        ),
       ),
     )
   }

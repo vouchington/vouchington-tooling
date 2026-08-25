@@ -43,7 +43,6 @@ describe('retrospective transcript resilience', () => {
     ])
     expect(facts.userPrompts).toBe(2)
   })
-
   it('correlates failed Codex outcomes and deduplicates hosted calls', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
@@ -70,11 +69,19 @@ describe('retrospective transcript resilience', () => {
       }),
       JSON.stringify({
         type: 'response_item',
-        payload: { type: 'local_shell_call', call_id: 'local-1', input: { command: 'ignored' } },
+        payload: {
+          type: 'local_shell_call',
+          call_id: 'local-1',
+          input: { command: 'pnpm exec no-mistakes && git push' },
+        },
       }),
       JSON.stringify({
         type: 'response_item',
         payload: { type: 'local_shell_call_output', call_id: 'local-1', exit_code: 1 },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'local_shell_call', call_id: 'local-empty', input: {} },
       }),
       JSON.stringify({
         type: 'response_item',
@@ -107,9 +114,13 @@ describe('retrospective transcript resilience', () => {
         },
       }),
     ])
-    expect(facts).toMatchObject({ toolCalls: 5, failedToolCalls: 4, pushCommandAttempts: 1 })
+    expect(facts).toMatchObject({
+      toolCalls: 6,
+      failedToolCalls: 4,
+      noMistakesInvocations: 1,
+      pushCommandAttempts: 2,
+    })
   })
-
   it('extracts shell commands from Codex custom exec calls', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({
@@ -124,7 +135,6 @@ describe('retrospective transcript resilience', () => {
     ])
     expect(facts).toMatchObject({ toolCalls: 1, noMistakesInvocations: 1, pushCommandAttempts: 1 })
   })
-
   it('extracts every custom exec command and parses textual failed outcomes', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({
@@ -161,7 +171,6 @@ describe('retrospective transcript resilience', () => {
       pushCommandAttempts: 1,
     })
   })
-
   it('treats configured transcript roots literally', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const directory = join(parent, 'sessions[1]')
@@ -175,7 +184,6 @@ describe('retrospective transcript resilience', () => {
       sessionId,
     })
   })
-
   it('rejects malformed interior records while tolerating a torn final line', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = '88888888-8888-4888-8888-888888888888'
@@ -200,7 +208,6 @@ describe('retrospective transcript resilience', () => {
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('User prompts: 1')
   })
-
   it('rejects malformed interior Claude records while tolerating a torn final line', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const path = join(directory, 'claude.jsonl')
@@ -224,7 +231,6 @@ describe('retrospective transcript resilience', () => {
       'User prompts: 1',
     )
   })
-
   it('accepts Claude subagents supplied as line arrays and ignores blank records', () => {
     const parent = [JSON.stringify({ type: 'user', message: { content: 'parent' } })]
     const child = [
@@ -245,7 +251,6 @@ describe('retrospective transcript resilience', () => {
     })
     expect(computeTranscriptFacts([''])).toMatchObject({ userPrompts: 0, toolCalls: 0 })
   })
-
   it('rejects a direct Codex child with an invalid thread identity', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const rootPath = join(directory, `rollout-root-${ROOT_ID}.jsonl`)
@@ -258,7 +263,6 @@ describe('retrospective transcript resilience', () => {
       runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
     ).resolves.toContain('could not resolve a referenced Codex child transcript')
   })
-
   it('validates environment identities before using the default Codex session root', async () => {
     const projectsDir = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
 
@@ -271,7 +275,6 @@ describe('retrospective transcript resilience', () => {
       },
     )
   })
-
   it('discovers Grok transcripts and Claude-compatible Cursor transcripts from their session ids', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const grokSessionsDir = join(directory, 'grok')
@@ -317,7 +320,6 @@ describe('retrospective transcript resilience', () => {
       }),
     ).resolves.toContain('User prompts: 1')
   })
-
   it('deduplicates advisor tool calls and preserves them in formatted output', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({ type: 'user', message: { content: 'review this' } }),
@@ -335,7 +337,6 @@ describe('retrospective transcript resilience', () => {
     expect(facts.advisorCalls).toBe(1)
     expect(formatTranscriptFacts('session', facts)).toContain('advisor calls: 1')
   })
-
   it('deduplicates advisor calls in Codex transcripts', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({
@@ -349,7 +350,6 @@ describe('retrospective transcript resilience', () => {
     ])
     expect(facts).toMatchObject({ toolCalls: 1, advisorCalls: 1 })
   })
-
   it('recognizes escaped shell syntax, Windows binaries, and package-manager launchers', () => {
     const facts = emptyFacts()
     applyCommand(
@@ -360,13 +360,11 @@ describe('retrospective transcript resilience', () => {
     expect(facts.noMistakesInvocations).toBe(3)
     expect(facts.pushCommandAttempts).toBe(1)
   })
-
   it('does not treat a shell token ending in an escape as a completed command', () => {
     const facts = emptyFacts()
     applyCommand('git push\\', facts)
     expect(facts.pushCommandAttempts).toBe(0)
   })
-
   it('ignores separator-looking commands inside shell comments', () => {
     const facts = emptyFacts()
     applyCommand(
@@ -375,7 +373,6 @@ describe('retrospective transcript resilience', () => {
     )
     expect(facts).toMatchObject({ noMistakesInvocations: 1, pushCommandAttempts: 0 })
   })
-
   it('uses host environment identities when no injected environment is supplied', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = '66666666-6666-4666-8666-666666666666'
@@ -408,7 +405,6 @@ describe('retrospective transcript resilience', () => {
       else process.env.GROK_SESSION_ID = originalGrok
     }
   })
-
   it('keeps a leading Codex event when no session metadata precedes it', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = '77777777-7777-4777-8777-777777777777'
@@ -421,8 +417,7 @@ describe('retrospective transcript resilience', () => {
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('User prompts: 1')
   })
-
-  it('uses CODEX_HOME for default transcript discovery', async () => {
+  it('uses configured agent homes for default transcript discovery', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const sessions = join(directory, 'sessions')
@@ -434,8 +429,18 @@ describe('retrospective transcript resilience', () => {
     await expect(
       runRetrospectiveTranscript({ env: { CODEX_HOME: directory, CODEX_THREAD_ID: sessionId } }),
     ).resolves.toContain('User prompts: 1')
+    const projects = join(directory, 'projects')
+    await mkdir(join(projects, 'project'), { recursive: true })
+    await writeFile(
+      join(projects, 'project', `${sessionId}.jsonl`),
+      JSON.stringify({ type: 'user', message: { content: 'Claude' } }),
+    )
+    await expect(
+      runRetrospectiveTranscript({
+        env: { CLAUDE_CONFIG_DIR: directory, CLAUDE_CODE_SESSION_ID: sessionId },
+      }),
+    ).resolves.toContain('User prompts: 1')
   })
-
   it('seeds metadata-free Codex roots to avoid self-child double counting', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     const sessionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -454,7 +459,6 @@ describe('retrospective transcript resilience', () => {
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('Subagent tool calls: 0')
   })
-
   it('keeps a leading Codex child event when no child session metadata precedes it', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     await writeFile(
@@ -468,12 +472,10 @@ describe('retrospective transcript resilience', () => {
         payload: { type: 'function_call', name: 'shell', arguments: '{"cmd":"git push"}' },
       }),
     )
-
     await expect(
       runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
     ).resolves.toContain('Subagent tool calls: 1')
   })
-
   it('skips visited Codex identities and propagates a missing nested child', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
     await writeFile(
@@ -491,7 +493,6 @@ describe('retrospective transcript resilience', () => {
         childActivity(GRANDCHILD_ID, '/root/child/grandchild'),
       ].join('\n'),
     )
-
     await expect(
       runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
     ).resolves.toContain('could not resolve a referenced Codex child transcript')

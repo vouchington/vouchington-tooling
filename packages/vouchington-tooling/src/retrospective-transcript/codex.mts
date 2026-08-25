@@ -24,10 +24,14 @@ function usage(record: ParsedLine): TokenTotals | undefined {
 }
 
 function commands(payload: Record<string, unknown>): string[] {
+  const raw = payload.type === 'function_call' ? payload.arguments : payload.input
+  if (payload.type === 'local_shell_call') {
+    const value = asRecord(raw)?.command
+    return typeof value === 'string' ? [value] : []
+  }
   const customExec = payload.type === 'custom_tool_call' && payload.name === 'exec'
   if (!customExec && !['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name)))
     return []
-  const raw = payload.type === 'function_call' ? payload.arguments : payload.input
   if (typeof raw !== 'string') return []
   if (customExec) {
     return [
@@ -51,14 +55,6 @@ function commands(payload: Record<string, unknown>): string[] {
   } catch {
     return []
   }
-}
-
-function callId(payload: Record<string, unknown>): string | undefined {
-  return typeof payload.call_id === 'string'
-    ? payload.call_id
-    : typeof payload.id === 'string'
-      ? payload.id
-      : undefined
 }
 
 function hasFailedOutcome(value: unknown): boolean {
@@ -85,8 +81,7 @@ function hasFailedOutcome(value: unknown): boolean {
 
 function isCall(payload: Record<string, unknown>): boolean {
   return (
-    payload.type === 'function_call' ||
-    payload.type === 'custom_tool_call' ||
+    ['function_call', 'custom_tool_call'].includes(String(payload.type)) ||
     (typeof payload.type === 'string' && payload.type.endsWith('_call'))
   )
 }
@@ -136,7 +131,12 @@ function applyRecords(
       previous = totals
     }
     if (record.type !== 'response_item' || !payload) continue
-    const id = callId(payload)
+    const id =
+      typeof payload.call_id === 'string'
+        ? payload.call_id
+        : typeof payload.id === 'string'
+          ? payload.id
+          : undefined
     if (isCall(payload)) {
       if (!id || !calls.has(id)) {
         facts.toolCalls++

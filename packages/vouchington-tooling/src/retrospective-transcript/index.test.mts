@@ -455,17 +455,14 @@ describe('retrospective transcript', () => {
     await mkdir(second)
     await writeFile(join(first, `rollout-a-${sessionId}.jsonl`), '')
     await writeFile(join(second, `rollout-b-${sessionId}.jsonl`), '')
-
     const resolved = resolveTranscriptFile({ sessionId, codexSessionsDir: directory })
     expect(resolved).toEqual({ error: `multiple transcripts found for session ${sessionId}` })
     expect(JSON.stringify(resolved)).not.toContain(directory)
   })
-
   it('sanitizes file-derived labels and unavailable reasons', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
     const path = join(directory, 'session label.jsonl')
     await writeFile(path, claudeLines.join('\n'))
-
     await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
       'Session: session_label',
     )
@@ -476,19 +473,25 @@ describe('retrospective transcript', () => {
       }),
     ).resolves.toBe('=== Transcript Facts ===\nStatus: unavailable (could not read transcript)\n')
   })
-
-  it('keeps readable Claude transcripts when a discovered subagent path cannot be read', async () => {
+  it('keeps readable Claude transcripts when discovered subagents are invalid', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
     const path = join(directory, 'parent.jsonl')
     const subagents = join(directory, 'parent', 'subagents')
     await mkdir(join(subagents, 'unreadable.jsonl'), { recursive: true })
+    await writeFile(
+      join(subagents, 'malformed.jsonl'),
+      [JSON.stringify({ type: 'assistant', message: { content: [] } }), '{', '{}'].join('\n'),
+    )
+    await writeFile(
+      join(subagents, 'valid.jsonl'),
+      JSON.stringify({ type: 'assistant', isSidechain: true, message: { content: [] } }),
+    )
     await writeFile(path, claudeLines.join('\n'))
 
     await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
       'Assistant responses: 1',
     )
   })
-
   it('ignores non-push git commands after their options', () => {
     const facts = emptyFacts()
     applyCommand('git; git -C project status', facts)
