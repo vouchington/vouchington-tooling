@@ -9,6 +9,7 @@ import {
   resolveTranscriptFile,
   runRetrospectiveTranscript,
 } from './index.mts'
+import { applyCommand, emptyFacts } from './shared.mts'
 
 const ROOT_ID = '11111111-1111-1111-1111-111111111111'
 const CHILD_ID = '22222222-2222-2222-2222-222222222222'
@@ -135,6 +136,82 @@ describe('retrospective transcript resilience', () => {
 
     expect(facts.advisorCalls).toBe(1)
     expect(formatTranscriptFacts('session', facts)).toContain('advisor calls: 1')
+  })
+
+  it('recognizes escaped shell syntax, Windows binaries, and package-manager launchers', () => {
+    const facts = emptyFacts()
+    applyCommand(
+      'pnpm dlx no-mistakes; npm exec no-mistakes; C:\\tools\\no-mistakes.cmd; git commit -m "fix: \\"quote\\""; git \\\n+push; git push \\; echo ignored',
+      facts,
+    )
+
+    expect(facts.noMistakesInvocations).toBe(3)
+    expect(facts.pushCommandAttempts).toBe(1)
+  })
+
+  it('uses host environment identities when no injected environment is supplied', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const sessionId = '66666666-6666-4666-8666-666666666666'
+    const project = join(directory, 'project')
+    const original = process.env.CURSOR_SESSION_ID
+    const originalCodex = process.env.CODEX_THREAD_ID
+    const originalClaude = process.env.CLAUDE_CODE_SESSION_ID
+    const originalGrok = process.env.GROK_SESSION_ID
+    await mkdir(project, { recursive: true })
+    await writeFile(
+      join(project, `${sessionId}.jsonl`),
+      JSON.stringify({ type: 'user', message: { content: 'Cursor' } }),
+    )
+    delete process.env.CODEX_THREAD_ID
+    delete process.env.CLAUDE_CODE_SESSION_ID
+    delete process.env.GROK_SESSION_ID
+    process.env.CURSOR_SESSION_ID = sessionId
+    try {
+      await expect(runRetrospectiveTranscript({ projectsDir: directory })).resolves.toContain(
+        'User prompts: 1',
+      )
+    } finally {
+      if (original === undefined) delete process.env.CURSOR_SESSION_ID
+      else process.env.CURSOR_SESSION_ID = original
+      if (originalCodex === undefined) delete process.env.CODEX_THREAD_ID
+      else process.env.CODEX_THREAD_ID = originalCodex
+      if (originalClaude === undefined) delete process.env.CLAUDE_CODE_SESSION_ID
+      else process.env.CLAUDE_CODE_SESSION_ID = originalClaude
+      if (originalGrok === undefined) delete process.env.GROK_SESSION_ID
+      else process.env.GROK_SESSION_ID = originalGrok
+    }
+  })
+
+  it('keeps a leading Codex event when no session metadata precedes it', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const sessionId = '77777777-7777-4777-8777-777777777777'
+    await writeFile(
+      join(directory, `rollout-root-${sessionId}.jsonl`),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+    )
+
+    await expect(
+      runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
+    ).resolves.toContain('User prompts: 1')
+  })
+
+  it('keeps a leading Codex child event when no child session metadata precedes it', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    await writeFile(
+      join(directory, `rollout-root-${ROOT_ID}.jsonl`),
+      [sessionMeta(ROOT_ID, '/root'), childActivity(CHILD_ID, '/root/child')].join('\n'),
+    )
+    await writeFile(
+      join(directory, `rollout-child-${CHILD_ID}.jsonl`),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call', name: 'shell', arguments: '{"cmd":"git push"}' },
+      }),
+    )
+
+    await expect(
+      runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
+    ).resolves.toContain('Subagent tool calls: 1')
   })
 
   it('skips visited Codex identities and propagates a missing nested child', async () => {

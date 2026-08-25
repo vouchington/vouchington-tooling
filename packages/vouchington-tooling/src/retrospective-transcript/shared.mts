@@ -69,6 +69,7 @@ function segments(command: string): string[][] {
   let segment: string[] = []
   let word = ''
   let quote: string | undefined
+  let escaped = false
   const flush = (): void => {
     if (word) segment.push(word)
     word = ''
@@ -78,8 +79,15 @@ function segments(command: string): string[][] {
     if (segment.length) result.push(segment)
     segment = []
   }
-  for (const char of command) {
-    if (quote) {
+  for (let index = 0; index < command.length; index++) {
+    const char = command[index] ?? ''
+    const next = command[index + 1] ?? ''
+    if (escaped) {
+      if (char !== '\n') word += char
+      escaped = false
+    } else if (char === '\\' && next !== '' && /[\\'";&|\n]/.test(next)) escaped = true
+    else if (char === '\\') word += char
+    else if (quote) {
       if (char === quote) quote = undefined
       else word += char
     } else if (char === '"' || char === "'") quote = char
@@ -87,6 +95,7 @@ function segments(command: string): string[][] {
     else if (/\s/.test(char)) flush()
     else word += char
   }
+  if (escaped) word += '\\'
   end()
   return result
 }
@@ -98,9 +107,11 @@ function commandAfterAssignments(segment: string[]): string[] {
 
 function isNoMistakes(segment: string[]): boolean {
   const [command, second, third] = commandAfterAssignments(segment)
-  if (command === 'no-mistakes' || command?.endsWith('/no-mistakes')) return true
-  if (!['npx', 'pnpm', 'pnpx', 'yarn'].includes(command ?? '')) return false
-  return (second === 'run' || second === 'exec' ? third : second) === 'no-mistakes'
+  if (/(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i.test(command ?? '')) return true
+  if (!['npm', 'npx', 'pnpm', 'pnpx', 'yarn'].includes(command ?? '')) return false
+  return (
+    (second === 'run' || second === 'exec' || second === 'dlx' ? third : second) === 'no-mistakes'
+  )
 }
 
 function isPush(segment: string[]): boolean {

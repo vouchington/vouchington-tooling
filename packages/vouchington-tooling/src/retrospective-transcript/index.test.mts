@@ -269,7 +269,7 @@ describe('retrospective transcript', () => {
       "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push",
       facts,
     )
-    expect(facts.noMistakesInvocations).toBe(4)
+    expect(facts.noMistakesInvocations).toBe(5)
     expect(facts.pushCommandAttempts).toBe(3)
   })
 

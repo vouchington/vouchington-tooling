@@ -2,7 +2,12 @@ import { existsSync, globSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { codexChildren, codexIdentity, computeCodex } from './codex.mts'
+import {
+  codexChildren,
+  codexIdentity,
+  computeCodex,
+  withoutLeadingSessionMetadata,
+} from './codex.mts'
 import { computeClaude } from './claude.mts'
 import {
   emptyFacts,
@@ -11,10 +16,8 @@ import {
   type CodexSegment,
   type TranscriptFacts,
 } from './shared.mts'
-
 export type { TokenTotals, TranscriptFacts } from './shared.mts'
 export { codexChildren, codexIdentity } from './codex.mts'
-
 export type ResolveOptions = {
   sessionId?: string
   jsonlPath?: string
@@ -24,10 +27,8 @@ export type ResolveOptions = {
   cwd?: string
   env?: NodeJS.ProcessEnv
 }
-
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
-
 function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
@@ -44,10 +45,10 @@ export function resolveTranscriptFile(
     }
   const sessionId =
     options.sessionId ??
-    options.env?.CODEX_THREAD_ID ??
-    options.env?.CLAUDE_CODE_SESSION_ID ??
-    options.env?.CURSOR_SESSION_ID ??
-    options.env?.GROK_SESSION_ID
+    (options.env ?? process.env).CODEX_THREAD_ID ??
+    (options.env ?? process.env).CLAUDE_CODE_SESSION_ID ??
+    (options.env ?? process.env).CURSOR_SESSION_ID ??
+    (options.env ?? process.env).GROK_SESSION_ID
   if (!sessionId)
     return {
       error:
@@ -56,7 +57,7 @@ export function resolveTranscriptFile(
   if (!SESSION_ID.test(sessionId)) return { error: 'invalid session id format' }
   const codex = options.codexSessionsDir ?? join(homedir(), '.codex', 'sessions')
   const claude = options.projectsDir ?? join(homedir(), '.claude', 'projects')
-  const grokHome = options.env?.GROK_HOME || join(homedir(), '.grok')
+  const grokHome = (options.env ?? process.env).GROK_HOME || join(homedir(), '.grok')
   const grok = options.grokSessionsDir ?? join(grokHome, 'sessions')
   const encodedCwd = encodeURIComponent(options.cwd ?? process.cwd())
   const grokExact = join(grok, encodedCwd, sessionId, 'updates.jsonl')
@@ -136,7 +137,7 @@ async function codexSubagents(
     if (!path || !existsSync(path)) return undefined
     const child = await readLines(path)
     if (!child || schema(child) !== 'codex') return undefined
-    const content = child.filter(Boolean).slice(1)
+    const content = withoutLeadingSessionMetadata(child)
     result.push({ lines: content, baseline: emptyTokens() })
     const nested = await codexSubagents(content, sessionsDir, edge.agentPath, visited)
     if (!nested) return undefined
@@ -194,6 +195,6 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   if (!subagents) return formatUnavailable('could not resolve a referenced Codex child transcript')
   return formatTranscriptFacts(
     resolved.sessionId,
-    computeTranscriptFacts(lines.filter(Boolean).slice(1), subagents),
+    computeTranscriptFacts(withoutLeadingSessionMetadata(lines), subagents),
   )
 }
