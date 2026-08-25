@@ -19,4 +19,5 @@ local configuration edits or live taxonomy mutation; read local `AGENTS.md` and 
 5. Re-fetch current state immediately before any explicitly authorized mutation.
 
 Do not create or change labels, milestones, issues, or local files for a recommendation-only
-request. This skill does not define a repository's taxonomy or automation file locations.
+request. This skill does not define a repository's taxonomy or automation file locations; a
+consumer wrapper supplies those integrations and local mechanics.

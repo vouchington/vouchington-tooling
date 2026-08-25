@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises'
+import { access, readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -126,6 +126,27 @@ describe('vouchington-workflow plugin', () => {
   })
 
   it('is listed in both marketplaces with portable skills and installation instructions', async () => {
+    const skillNames = (await readdir(join(workflowPlugin, 'skills'), { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+    expect(skillNames).toEqual([
+      'agent-workflow',
+      'blackboard',
+      'git-commit-checklist',
+      'github-actions-checklist',
+      'github-issue',
+      'organize-github-issues',
+      'package-json-checklist',
+      'planning',
+      'pr-description',
+      'retrospective',
+      'retrospective-distill',
+      'review-ci-logs',
+      'review-github-issue-taxonomy',
+      'revisit-followups',
+      'static-analysis-checklist',
+    ])
     const [codex, claude, readme, manifests, skills] = await Promise.all([
       readJson(join(root, '.agents/plugins/marketplace.json')),
       readJson(join(root, '.claude-plugin/marketplace.json')),
@@ -136,23 +157,9 @@ describe('vouchington-workflow plugin', () => {
         ),
       ),
       Promise.all(
-        [
-          'agent-workflow',
-          'blackboard',
-          'git-commit-checklist',
-          'github-issue',
-          'github-actions-checklist',
-          'organize-github-issues',
-          'package-json-checklist',
-          'planning',
-          'pr-description',
-          'retrospective',
-          'retrospective-distill',
-          'review-ci-logs',
-          'review-github-issue-taxonomy',
-          'revisit-followups',
-          'static-analysis-checklist',
-        ].map((name) => readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')),
+        skillNames.map((name) =>
+          readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8'),
+        ),
       ),
     ])
 
@@ -188,9 +195,9 @@ describe('vouchington-workflow plugin', () => {
       expect(skill).not.toMatch(
         /pr-shepherd|auto harness|agent hook|coverage (?:tooling|baseline)/i,
       )
+      expect(skill).toMatch(/consumer\s+wrapper/i)
     }
     expect(skills[0]).toContain('every applicable')
     expect(skills[0]).not.toContain('assigned non-main worktree')
-    expect(skills.join('\n')).toContain('consumer wrapper')
   })
 })

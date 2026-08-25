@@ -15,7 +15,8 @@ The repository also publishes the public [`security-triage`](./plugins/security-
 [`vouchington-workflow`](./plugins/vouchington-workflow) agent plugins. `security-triage` has one
 repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
 commit, GitHub Actions, package-metadata, static-analysis, planning, issue-management,
-retrospective, CI-log review, and pull-request-description skills. Both plugins use one canonical
+blackboard journaling, retrospective and follow-up review, CI-log review, and
+pull-request-description skills. Both plugins use one canonical
 `skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in
 `AGENTS.md`, `CLAUDE.md`, or thin wrapper skills.
 
