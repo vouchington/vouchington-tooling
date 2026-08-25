@@ -266,11 +266,11 @@ describe('retrospective transcript', () => {
   it('normalizes shell command separators, assignments, and quotes', () => {
     const facts = emptyFacts()
     applyCommand(
-      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push\ncat <<EOF\ngit push\npnpm exec no-mistakes\nEOF\ncat << EOF\ngit push\nEOF\ncat <<-TAB\n\tpnpm exec no-mistakes\n\tTAB\npnpm exec no-mistakes",
+      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push\ncat <<EOF\ngit push\npnpm exec no-mistakes\nEOF\ncat << EOF\ngit push\nEOF\ncat <<-TAB\n\tpnpm exec no-mistakes\n\tTAB\npnpm exec no-mistakes; npm exec -- no-mistakes; pnpm exec -- no-mistakes; git --git-dir repo --work-tree work push; git --git-dir push status",
       facts,
     )
-    expect(facts.noMistakesInvocations).toBe(6)
-    expect(facts.pushCommandAttempts).toBe(3)
+    expect(facts.noMistakesInvocations).toBe(8)
+    expect(facts.pushCommandAttempts).toBe(4)
   })
 
   it('returns no facts for unsupported and mixed schemas', () => {

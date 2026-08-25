@@ -21,7 +21,6 @@ function childActivity(threadId: string, agentPath: string): string {
     payload: { type: 'sub_agent_activity', agent_thread_id: threadId, agent_path: agentPath },
   })
 }
-
 describe('retrospective transcript resilience', () => {
   it('counts structured Claude prompts while excluding tool-result-only records and null JSON', () => {
     const facts = computeTranscriptFacts([
@@ -199,7 +198,15 @@ describe('retrospective transcript resilience', () => {
     await expect(
       runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
     ).resolves.toContain('Status: unavailable (malformed interior transcript record)')
-
+    await writeFile(
+      transcript,
+      [JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }), '{', ''].join(
+        '\n',
+      ),
+    )
+    await expect(
+      runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
+    ).resolves.toContain('Status: unavailable (malformed interior transcript record)')
     await writeFile(
       transcript,
       [JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }), '{'].join('\n'),
@@ -222,7 +229,6 @@ describe('retrospective transcript resilience', () => {
     await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
       'Status: unavailable (malformed interior transcript record)',
     )
-
     await writeFile(
       path,
       [JSON.stringify({ type: 'user', message: { content: 'first' } }), '{'].join('\n'),
@@ -243,7 +249,6 @@ describe('retrospective transcript resilience', () => {
         },
       }),
     ]
-
     expect(computeTranscriptFacts(parent, [child])).toMatchObject({
       userPrompts: 1,
       pushCommandAttempts: 1,
@@ -258,14 +263,12 @@ describe('retrospective transcript resilience', () => {
       rootPath,
       [sessionMeta(ROOT_ID, '/root'), childActivity('invalid', '/root/bad')].join('\n'),
     )
-
     await expect(
       runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
     ).resolves.toContain('could not resolve a referenced Codex child transcript')
   })
   it('validates environment identities before using the default Codex session root', async () => {
     const projectsDir = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
-
     expect(resolveTranscriptFile({ env: { CODEX_THREAD_ID: 'invalid' }, projectsDir })).toEqual({
       error: 'invalid session id format',
     })
@@ -288,7 +291,6 @@ describe('retrospective transcript resilience', () => {
     await mkdir(join(projectsDir, 'project'), { recursive: true })
     await writeFile(grokPath, JSON.stringify({ type: 'user', message: { content: 'Grok' } }))
     await writeFile(cursorPath, JSON.stringify({ type: 'user', message: { content: 'Cursor' } }))
-
     expect(
       resolveTranscriptFile({
         env: { GROK_SESSION_ID: grokSession },
@@ -333,7 +335,6 @@ describe('retrospective transcript resilience', () => {
         },
       }),
     ])
-
     expect(facts.advisorCalls).toBe(1)
     expect(formatTranscriptFacts('session', facts)).toContain('advisor calls: 1')
   })
@@ -356,7 +357,6 @@ describe('retrospective transcript resilience', () => {
       'pnpm dlx no-mistakes; npm exec no-mistakes; C:\\tools\\no-mistakes.cmd; git commit -m "fix: \\"quote\\""; git \\\n+push; git push \\; echo ignored',
       facts,
     )
-
     expect(facts.noMistakesInvocations).toBe(3)
     expect(facts.pushCommandAttempts).toBe(1)
   })

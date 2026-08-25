@@ -66,7 +66,8 @@ export function parseLines(lines: string[]): ParsedLine[] {
 
 export function hasMalformedInteriorRecord(lines: string[]): boolean {
   const nonblank = lines.filter((line) => line.trim())
-  return nonblank.slice(0, -1).some((line) => {
+  const complete = lines.at(-1)?.trim() ? nonblank.slice(0, -1) : nonblank
+  return complete.some((line) => {
     try {
       JSON.parse(line)
       return false
@@ -144,19 +145,18 @@ function commandAfterAssignments(segment: string[]): string[] {
 }
 
 function isNoMistakes(segment: string[]): boolean {
-  const [command, second, third] = commandAfterAssignments(segment)
+  const [command, second, third, fourth] = commandAfterAssignments(segment)
   if (/(^|[\\/])no-mistakes(?:\.(?:cmd|exe|bat))?$/i.test(command ?? '')) return true
   if (!['npm', 'npx', 'pnpm', 'pnpx', 'yarn'].includes(command ?? '')) return false
-  return (
-    (second === 'run' || second === 'exec' || second === 'dlx' ? third : second) === 'no-mistakes'
-  )
+  const target = second === 'run' || second === 'exec' || second === 'dlx' ? third : second
+  return (target === '--' ? fourth : target) === 'no-mistakes'
 }
 
 function isPush(segment: string[]): boolean {
   const tokens = commandAfterAssignments(segment)
   if (tokens[0] !== 'git' && !tokens[0]?.endsWith('/git')) return false
   for (let index = 1; index < tokens.length; index++) {
-    if (tokens[index] === '-C' || tokens[index] === '-c') index++
+    if (['-C', '-c', '--git-dir', '--work-tree'].includes(tokens[index]!)) index++
     else if (!tokens[index]?.startsWith('-')) return tokens[index] === 'push'
   }
   return false
