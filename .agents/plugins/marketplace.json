@@ -15,6 +15,18 @@
         "authentication": "ON_USE"
       },
       "category": "Security"
+    },
+    {
+      "name": "vouchington-workflow",
+      "source": {
+        "source": "local",
+        "path": "./plugins/vouchington-workflow"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }

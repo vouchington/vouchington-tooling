@@ -1,0 +1,9 @@
+{
+  "name": "vouchington-workflow",
+  "version": "0.1.0",
+  "description": "Portable repository workflow skills for Codex and Claude.",
+  "author": {
+    "name": "Vouchington"
+  },
+  "skills": "./skills/"
+}
