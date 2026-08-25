@@ -47,4 +47,24 @@ describe('runRetrospectiveTranscriptCommand', () => {
   it('accepts default transcript discovery options', async () => {
     await expect(runRetrospectiveTranscriptCommand([])).resolves.toBe(0)
   })
+
+  it('uses the CLI process environment for default session discovery', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-cli-'))
+    const sessionId = '99999999-9999-4999-8999-999999999999'
+    const original = process.env.CODEX_THREAD_ID
+    await writeFile(
+      join(directory, `rollout-root-${sessionId}.jsonl`),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+    )
+    process.env.CODEX_THREAD_ID = sessionId
+    try {
+      await expect(
+        runRetrospectiveTranscriptCommand(['--codex-sessions-dir', directory]),
+      ).resolves.toBe(0)
+      expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('User prompts: 1')
+    } finally {
+      if (original === undefined) delete process.env.CODEX_THREAD_ID
+      else process.env.CODEX_THREAD_ID = original
+    }
+  })
 })

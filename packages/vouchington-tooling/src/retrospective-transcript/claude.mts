@@ -1,17 +1,29 @@
-import { applyCommand, asNumber, asRecord, emptyFacts, type TranscriptFacts } from './shared.mts'
+import {
+  applyCommand,
+  asNumber,
+  asRecord,
+  emptyFacts,
+  parseLines,
+  type TranscriptFacts,
+} from './shared.mts'
+
+function hasPromptContent(content: unknown): boolean {
+  if (typeof content === 'string') return true
+  if (!Array.isArray(content)) return false
+  return content.some((block) => {
+    const value = asRecord(block)
+    return (
+      value !== undefined && value.type !== 'tool_result' && value.type !== 'advisor_tool_result'
+    )
+  })
+}
 
 export function computeClaude(lines: string[][]): TranscriptFacts {
   const facts = emptyFacts()
   const seen = new Set<string>()
   const advisorIds = new Set<string>()
   for (const group of lines) {
-    for (const record of group.flatMap((line) => {
-      try {
-        return [JSON.parse(line) as Record<string, unknown>]
-      } catch {
-        return []
-      }
-    })) {
+    for (const record of parseLines(group)) {
       if (typeof record.uuid === 'string' && (seen.has(record.uuid) || !seen.add(record.uuid)))
         continue
       const subagent = record.isSidechain === true
@@ -21,7 +33,7 @@ export function computeClaude(lines: string[][]): TranscriptFacts {
       if (
         !subagent &&
         record.type === 'user' &&
-        typeof message?.content === 'string' &&
+        hasPromptContent(message?.content) &&
         record.isMeta !== true
       )
         facts.userPrompts++

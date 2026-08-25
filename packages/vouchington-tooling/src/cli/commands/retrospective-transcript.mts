@@ -23,6 +23,7 @@ export async function runRetrospectiveTranscriptCommand(args: string[]): Promise
       ...(values['projects-dir'] ? { projectsDir: values['projects-dir'] } : {}),
       ...(values['codex-sessions-dir'] ? { codexSessionsDir: values['codex-sessions-dir'] } : {}),
       ...(values['grok-sessions-dir'] ? { grokSessionsDir: values['grok-sessions-dir'] } : {}),
+      env: process.env,
     }
     process.stdout.write(await runRetrospectiveTranscript(options))
     return 0

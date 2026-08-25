@@ -27,6 +27,72 @@ function childActivity(threadId: string, agentPath: string): string {
 }
 
 describe('retrospective transcript resilience', () => {
+  it('counts structured Claude prompts while excluding tool-result-only records and null JSON', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'hello' }] } }),
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'image' }] } }),
+      JSON.stringify({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', content: 'ok' }] },
+      }),
+      'null',
+    ])
+    expect(facts.userPrompts).toBe(2)
+  })
+
+  it('correlates failed Codex outcomes and deduplicates hosted calls', () => {
+    const facts = computeTranscriptFacts([
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          call_id: 'shell-1',
+          name: 'shell',
+          arguments: '{"cmd":"git push"}',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call_output', call_id: 'shell-1', output: { exit_code: 1 } },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'web_search_call', call_id: 'search-1' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'web_search_call', call_id: 'search-1' },
+      }),
+    ])
+    expect(facts).toMatchObject({ toolCalls: 2, failedToolCalls: 1, pushCommandAttempts: 1 })
+  })
+
+  it('rejects malformed interior records while tolerating a torn final line', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-resilience-'))
+    const sessionId = '88888888-8888-4888-8888-888888888888'
+    const transcript = join(directory, `rollout-root-${sessionId}.jsonl`)
+    await writeFile(
+      transcript,
+      [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+        '{',
+        JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
+      ].join('\n'),
+    )
+    await expect(
+      runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
+    ).resolves.toContain('Status: unavailable (malformed interior transcript record)')
+
+    await writeFile(
+      transcript,
+      [JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }), '{'].join('\n'),
+    )
+    await expect(
+      runRetrospectiveTranscript({ sessionId, codexSessionsDir: directory }),
+    ).resolves.toContain('User prompts: 1')
+  })
+
   it('accepts Claude subagents supplied as line arrays and ignores blank records', () => {
     const parent = [JSON.stringify({ type: 'user', message: { content: 'parent' } })]
     const child = [

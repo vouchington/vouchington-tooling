@@ -64,6 +64,18 @@ export function parseLines(lines: string[]): ParsedLine[] {
   return records
 }
 
+export function hasMalformedInteriorRecord(lines: string[]): boolean {
+  const nonblank = lines.filter((line) => line.trim())
+  return nonblank.slice(0, -1).some((line) => {
+    try {
+      JSON.parse(line)
+      return false
+    } catch {
+      return true
+    }
+  })
+}
+
 function segments(command: string): string[][] {
   const result: string[][] = []
   let segment: string[] = []

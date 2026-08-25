@@ -36,6 +36,40 @@ function command(payload: Record<string, unknown>): string | undefined {
   }
 }
 
+function callId(payload: Record<string, unknown>): string | undefined {
+  return typeof payload.call_id === 'string'
+    ? payload.call_id
+    : typeof payload.id === 'string'
+      ? payload.id
+      : undefined
+}
+
+function hasFailedOutcome(payload: Record<string, unknown>): boolean {
+  if (payload.status === 'failed' || payload.status === 'error' || payload.is_error === true)
+    return true
+  if (
+    (typeof payload.exit_code === 'number' && payload.exit_code !== 0) ||
+    (typeof payload.exitCode === 'number' && payload.exitCode !== 0) ||
+    payload.success === false
+  )
+    return true
+  return [payload.output, payload.result, payload.metadata]
+    .map(asRecord)
+    .some((value) => value !== undefined && hasFailedOutcome(value))
+}
+
+function isCall(payload: Record<string, unknown>): boolean {
+  return (
+    payload.type === 'function_call' ||
+    payload.type === 'custom_tool_call' ||
+    (typeof payload.type === 'string' && payload.type.endsWith('_call'))
+  )
+}
+
+function isCallOutcome(payload: Record<string, unknown>): boolean {
+  return typeof payload.type === 'string' && payload.type.endsWith('_call_output')
+}
+
 function addDelta(current: TokenTotals, previous: TokenTotals, target: TokenTotals): void {
   target.input += Math.max(0, current.input - previous.input)
   target.output += Math.max(0, current.output - previous.output)
@@ -49,7 +83,9 @@ function applyRecords(
   baseline = emptyTokens(),
 ): void {
   let previous = baseline
+  const calls = new Set<string>()
   const failed = new Set<string>()
+  let anonymousFailures = 0
   for (const record of records) {
     const payload = asRecord(record.payload)
     if (!subagent && record.type === 'event_msg' && payload?.type === 'user_message')
@@ -67,19 +103,22 @@ function applyRecords(
       previous = totals
     }
     if (record.type !== 'response_item' || !payload) continue
-    const isCall = payload.type === 'function_call' || payload.type === 'custom_tool_call'
-    if (isCall) {
-      facts.toolCalls++
-      if (subagent) facts.subagentToolCalls++
-      const id = typeof payload.call_id === 'string' ? payload.call_id : ''
-      if ((payload.status === 'failed' || payload.is_error === true) && (!id || !failed.has(id))) {
-        facts.failedToolCalls++
-        if (id) failed.add(id)
+    const id = callId(payload)
+    if (isCall(payload)) {
+      if (!id || !calls.has(id)) {
+        facts.toolCalls++
+        if (subagent) facts.subagentToolCalls++
+        if (id) calls.add(id)
+        const rawCommand = command(payload)
+        if (rawCommand) applyCommand(rawCommand, facts)
       }
-      const rawCommand = command(payload)
-      if (rawCommand) applyCommand(rawCommand, facts)
+    }
+    if ((isCall(payload) || isCallOutcome(payload)) && hasFailedOutcome(payload)) {
+      if (id) failed.add(id)
+      else anonymousFailures++
     }
   }
+  facts.failedToolCalls += [...failed].filter((id) => calls.has(id)).length + anonymousFailures
 }
 
 export function codexChildren(

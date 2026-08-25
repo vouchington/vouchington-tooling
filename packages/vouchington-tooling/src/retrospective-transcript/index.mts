@@ -12,6 +12,7 @@ import { computeClaude } from './claude.mts'
 import {
   emptyFacts,
   emptyTokens,
+  hasMalformedInteriorRecord,
   parseLines,
   type CodexSegment,
   type TranscriptFacts,
@@ -29,6 +30,7 @@ export type ResolveOptions = {
 }
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
+const MALFORMED_INTERIOR = 'malformed interior transcript record'
 function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
@@ -108,11 +110,7 @@ export function computeTranscriptFacts(
 }
 
 async function readLines(path: string): Promise<string[] | undefined> {
-  try {
-    return (await readFile(path, 'utf8')).split('\n')
-  } catch {
-    return undefined
-  }
+  return (await readFile(path, 'utf8').catch(() => undefined))?.split('\n')
 }
 
 function childPath(threadId: string, sessionsDir: string): string | undefined {
@@ -136,7 +134,7 @@ async function codexSubagents(
     const path = childPath(edge.threadId, sessionsDir)
     if (!path || !existsSync(path)) return undefined
     const child = await readLines(path)
-    if (!child || schema(child) !== 'codex') return undefined
+    if (!child || schema(child) !== 'codex' || hasMalformedInteriorRecord(child)) return undefined
     const content = withoutLeadingSessionMetadata(child)
     result.push({ lines: content, baseline: emptyTokens() })
     const nested = await codexSubagents(content, sessionsDir, edge.agentPath, visited)
@@ -163,10 +161,8 @@ export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts)
     '',
   ].join('\n')
 }
-
 export const formatUnavailable = (reason: string): string =>
   `=== Transcript Facts ===\nStatus: unavailable (${reason.replace(/\s+/g, ' ').slice(0, 240)})\n`
-
 export async function runRetrospectiveTranscript(options: ResolveOptions): Promise<string> {
   const resolved = resolveTranscriptFile(options)
   if ('error' in resolved) return formatUnavailable(resolved.error)
@@ -174,6 +170,8 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   if (!lines) return formatUnavailable('could not read transcript')
   const detected = schema(lines)
   if (!detected) return formatUnavailable('unsupported or mixed transcript schema')
+  if (detected === 'codex' && hasMalformedInteriorRecord(lines))
+    return formatUnavailable(MALFORMED_INTERIOR)
   if (detected === 'claude') {
     const directory = join(dirname(resolved.path), basename(resolved.path, '.jsonl'), 'subagents')
     const subagents = await Promise.all(globSync(join(directory, '*.jsonl')).sort().map(readLines))
