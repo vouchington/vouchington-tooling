@@ -1,6 +1,6 @@
-import { opendirSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
 
+import { isDiagnosticReportDirectoryCurrent, readDiagnosticReportDirectory } from './directory.mts'
 import { readBoundedRegularFile } from './read-file.mts'
 
 export { MAX_DIAGNOSTIC_REPORT_BYTES } from './read-file.mts'
@@ -8,7 +8,7 @@ export { MAX_DIAGNOSTIC_REPORT_BYTES } from './read-file.mts'
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100
 export const DEFAULT_MAX_FORMATTED_DIAGNOSTIC_REPORTS = 20
 export const HARD_MAX_DIAGNOSTIC_REPORTS = 100
-export const HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES = 10_000
+export { HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES } from './directory.mts'
 
 export interface DiagnosticReportSummary {
   file: string
@@ -101,29 +101,17 @@ export function readDiagnosticReportSummaries(
   const maxReports = reportLimit(options.maxReports, DEFAULT_MAX_DIAGNOSTIC_REPORTS)
   if (maxReports === 0) return []
 
-  let filenames: string[]
-  try {
-    filenames = []
-    const handle = opendirSync(directory)
-    try {
-      for (let scanned = 0; ; scanned += 1) {
-        const entry = handle.readSync()
-        if (entry === null) break
-        if (scanned >= HARD_MAX_DIAGNOSTIC_DIRECTORY_ENTRIES) return []
-        if (entry.name.endsWith('.json')) filenames.push(entry.name)
-      }
-    } finally {
-      handle.closeSync()
-    }
-    filenames.sort()
-  } catch {
-    return []
-  }
+  const reportsDirectory = readDiagnosticReportDirectory(directory)
+  if (reportsDirectory === undefined) return []
+  const filenames = reportsDirectory.filenames.sort()
+  const selected = filenames.slice(-maxReports)
 
   const summaries: DiagnosticReportSummary[] = []
-  for (const filename of filenames.slice(0, maxReports)) {
+  for (const filename of selected) {
     try {
+      if (!isDiagnosticReportDirectoryCurrent(directory, reportsDirectory.identity)) return []
       const contents = readBoundedRegularFile(join(directory, filename))
+      if (!isDiagnosticReportDirectoryCurrent(directory, reportsDirectory.identity)) return []
       if (contents === undefined) continue
       const report: unknown = JSON.parse(contents)
       summaries.push(summarizeDiagnosticReport(filename, report))

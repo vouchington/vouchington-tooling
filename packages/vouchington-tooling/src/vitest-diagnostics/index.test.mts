@@ -170,11 +170,26 @@ describe('readDiagnosticReportSummaries', () => {
 
   it('bounds attempted files even when early candidates are torn', () => {
     const directory = makeDirectory()
-    writeFileSync(join(directory, 'a-torn.json'), '{')
-    writeFileSync(join(directory, 'b-valid.json'), JSON.stringify(SAMPLE_REPORT))
+    writeFileSync(join(directory, 'a-valid.json'), JSON.stringify(SAMPLE_REPORT))
+    writeFileSync(join(directory, 'z-torn.json'), '{')
 
     expect(readDiagnosticReportSummaries(directory, { maxReports: 1 })).toEqual([])
     expect(readDiagnosticReportSummaries(directory, { maxReports: 2 })).toHaveLength(1)
+  })
+
+  it('selects the newest timestamped reports before capping attempts', () => {
+    const directory = makeDirectory()
+    for (const name of [
+      'report.20250101.010101.1.0.001.json',
+      'report.20250102.010101.1.0.001.json',
+      'report.20250103.010101.1.0.001.json',
+    ]) {
+      writeFileSync(join(directory, name), JSON.stringify(SAMPLE_REPORT))
+    }
+
+    expect(
+      readDiagnosticReportSummaries(directory, { maxReports: 2 }).map(({ file }) => file),
+    ).toEqual(['report.20250102.010101.1.0.001.json', 'report.20250103.010101.1.0.001.json'])
   })
 
   it('skips diagnostic files that exceed the per-report byte limit', () => {
