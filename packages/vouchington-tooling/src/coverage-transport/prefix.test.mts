@@ -69,6 +69,8 @@ describe('prefix coverage transport', () => {
     mkdirSync(join(root, 'coverage'))
     writeFileSync(join(root, 'coverage/lcov.info'), 'SF:src/a.ts\nend_of_record\n')
     writeFileSync(join(root, 'coverage/coverage-manifest.json'), '{"version":2}\n')
+    mkdirSync(join(root, '.vitest-reports'))
+    writeFileSync(join(root, '.vitest-reports/web.json'), '{}')
     const control = await mintPrefixUploadControl(identity, {
       signPost: async (keyPrefix) => ({
         url: 'https://storage.example.test/upload',
@@ -99,13 +101,14 @@ describe('prefix coverage transport', () => {
             currentAttempt: identity.controlAttempt,
           },
         }),
-      ).resolves.toEqual({ coverage: true, blob: false })
+      ).resolves.toEqual({ coverage: true, blob: true })
     } finally {
       globalThis.fetch = original
     }
     expect(submitted).toEqual([
       transportObjectKeysV2(identity, 'web').lcov,
       transportObjectKeysV2(identity, 'web').manifest,
+      transportObjectKeysV2(identity, 'web').blob,
     ])
   })
 
@@ -185,6 +188,7 @@ describe('prefix coverage transport', () => {
       },
     }
     await expect(cmdDownloadCoverage(path, root, options)).rejects.toThrow(/upload control/)
+    await expect(cmdDownloadVitestBlobs(path, root, options)).rejects.toThrow(/upload control/)
     const download = await discoverDownloadControl(
       source,
       { list: async () => ({ objects: [] }) },

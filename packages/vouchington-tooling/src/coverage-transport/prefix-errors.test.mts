@@ -7,7 +7,12 @@ import { describe, expect, it } from 'vitest'
 import { parseTransportControl } from './control.mts'
 import { DEFAULT_MAX_BODY_BYTES } from './constants.mts'
 import { discoverDownloadControl } from './discovery.mts'
-import { assertPrefixTransportIdentity, transportObjectKeysV2, transportPrefix } from './keys.mts'
+import {
+  assertPrefixTransportIdentity,
+  parseTransportObjectKey,
+  transportObjectKeysV2,
+  transportPrefix,
+} from './keys.mts'
 import {
   downloadPrefixBlobs,
   downloadPrefixCoverage,
@@ -76,6 +81,9 @@ describe('prefix transport error boundaries', () => {
     expect(() => transportPrefix(identity, 0)).toThrow(/attempt/)
     expect(() => transportPrefix(identity, 4)).toThrow(/attempt/)
     expect(() => transportObjectKeysV2(identity, '../web')).toThrow(/suite/)
+    expect(
+      parseTransportObjectKey(`${transportPrefix(identity)}/not-an-object`, identity),
+    ).toBeNull()
     expect(() => transportExpiresAt({ ttlSeconds: 0 })).toThrow(/TTL/)
     await expect(
       mintPrefixUploadControl(identity, {

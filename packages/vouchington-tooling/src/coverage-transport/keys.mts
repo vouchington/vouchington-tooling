@@ -70,7 +70,5 @@ export function parseTransportObjectKey(
   if (coverageSuite) {
     return { attempt, suite: coverageSuite, kind: match[3] === 'lcov.info' ? 'lcov' : 'manifest' }
   }
-  const blobSuite = match[4]
-  if (!blobSuite) return null
-  return { attempt, suite: blobSuite, kind: 'blob' }
+  return { attempt, suite: match[4]!, kind: 'blob' }
 }

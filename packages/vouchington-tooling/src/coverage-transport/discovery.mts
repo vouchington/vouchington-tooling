@@ -97,9 +97,15 @@ function newest(
   candidates: readonly Candidate[],
   kind: TransportObjectKey['kind'],
 ): Candidate | undefined {
-  return candidates
-    .filter((candidate) => candidate.parsed.kind === kind)
-    .toSorted((a, b) => b.parsed.attempt - a.parsed.attempt)[0]
+  let selected: Candidate | undefined
+  for (const candidate of candidates) {
+    if (
+      candidate.parsed.kind === kind &&
+      (!selected || candidate.parsed.attempt > selected.parsed.attempt)
+    )
+      selected = candidate
+  }
+  return selected
 }
 
 export async function discoverDownloadControl(
