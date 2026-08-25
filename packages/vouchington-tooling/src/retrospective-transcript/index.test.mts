@@ -30,6 +30,7 @@ describe('retrospective transcript', () => {
     expect(formatTranscriptFacts('session', facts)).toBe(
       '=== Transcript Facts ===\nSession: session\nUser prompts: 1\nAssistant responses: 1\nTool calls: 1 (failed: 0)\nno-mistakes invocations: 1\nPush commands attempted: 0\nCompactions: 0\nTokens: input=2 output=3 cache_read=4 cache_creation=0\nSubagent tool calls: 0\nSubagent tokens: input=0 output=0 cache_read=0 cache_creation=0\n',
     )
+    expect(formatTranscriptFacts('', emptyFacts())).toContain('Session: transcript')
   })
 
   it('counts only shell command positions', () => {
@@ -265,11 +266,11 @@ describe('retrospective transcript', () => {
   it('normalizes shell command separators, assignments, and quotes', () => {
     const facts = emptyFacts()
     applyCommand(
-      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push",
+      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push",
       facts,
     )
-    expect(facts.noMistakesInvocations).toBe(2)
-    expect(facts.pushCommandAttempts).toBe(2)
+    expect(facts.noMistakesInvocations).toBe(4)
+    expect(facts.pushCommandAttempts).toBe(3)
   })
 
   it('returns no facts for unsupported and mixed schemas', () => {
@@ -297,6 +298,26 @@ describe('retrospective transcript', () => {
     await expect(runRetrospectiveTranscript({ env: {} })).resolves.toBe(
       '=== Transcript Facts ===\nStatus: unavailable (no session id (pass --session-id or set CODEX_THREAD_ID or CLAUDE_CODE_SESSION_ID))\n',
     )
+  })
+
+  it('resolves session identity from either supported agent environment', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const codexSession = '11111111-1111-1111-1111-111111111111'
+    const claudeSession = '22222222-2222-2222-2222-222222222222'
+    const search = { codexSessionsDir: directory, projectsDir: directory }
+
+    expect(
+      resolveTranscriptFile({
+        ...search,
+        env: { CODEX_THREAD_ID: codexSession },
+      }),
+    ).toEqual({ error: `no transcript found for session ${codexSession}` })
+    expect(
+      resolveTranscriptFile({
+        ...search,
+        env: { CLAUDE_CODE_SESSION_ID: claudeSession },
+      }),
+    ).toEqual({ error: `no transcript found for session ${claudeSession}` })
   })
 
   it('resolves Codex transcripts and confines traversal to direct descendants', async () => {
@@ -354,6 +375,38 @@ describe('retrospective transcript', () => {
   it('returns a stable unavailable block for missing transcripts', async () => {
     await expect(runRetrospectiveTranscript({ sessionId: 'not-a-session' })).resolves.toBe(
       '=== Transcript Facts ===\nStatus: unavailable (invalid session id format)\n',
+    )
+  })
+
+  it('reports a mixed transcript passed by path without leaking its contents', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const path = join(directory, 'mixed.jsonl')
+    await writeFile(
+      path,
+      [
+        JSON.stringify({ type: 'user', message: { content: 'Claude' } }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      ].join('\n'),
+    )
+
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toBe(
+      '=== Transcript Facts ===\nStatus: unavailable (unsupported or mixed transcript schema)\n',
+    )
+  })
+
+  it('handles a Codex transcript with no recorded identity or children', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-'))
+    const path = join(directory, 'codex.jsonl')
+    await writeFile(
+      path,
+      [
+        JSON.stringify({ type: 'response_item', payload: { type: 'message' } }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      ].join('\n'),
+    )
+
+    await expect(runRetrospectiveTranscript({ jsonlPath: path })).resolves.toContain(
+      'User prompts: 1',
     )
   })
 
