@@ -127,6 +127,13 @@ describe('inherited Codex child transcripts', () => {
           JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', started_at: 1 } }),
           JSON.stringify({
             type: 'event_msg',
+            payload: {
+              type: 'token_count',
+              info: { total_token_usage: { input_tokens: 0, output_tokens: 0 } },
+            },
+          }),
+          JSON.stringify({
+            type: 'event_msg',
             payload: { type: 'task_started', started_at: startedAt },
           }),
         ]),
@@ -189,6 +196,18 @@ describe('inherited Codex child transcripts', () => {
         JSON.stringify({
           type: 'session_meta',
           payload: { parent_thread_id: parent, timestamp: '2026-07-13T10:00:00.000Z' },
+        }),
+      ]),
+    ).toBeUndefined()
+    expect(
+      segmentCodex([
+        JSON.stringify({
+          type: 'session_meta',
+          payload: { parent_thread_id: parent, timestamp: '2026-07-13T10:00:00.000Z' },
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'task_started', started_at: Date.parse('2026-07-13T10:00:00.000Z') },
         }),
       ]),
     ).toBeUndefined()

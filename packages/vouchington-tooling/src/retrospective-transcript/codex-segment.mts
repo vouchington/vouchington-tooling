@@ -66,10 +66,11 @@ export function segmentCodex(lines: string[]): CodexSegment | undefined {
     return record ? isOwnedTaskStart(record, timestampMs) : false
   })
   if (ownedIndex === -1) return undefined
-  let baseline = emptyTokens()
+  let baseline: TokenTotals | undefined
   for (const record of parseLines(content.slice(1, ownedIndex))) {
     const current = usage(record)
-    if (current) baseline = retainHighWater(baseline, current)
+    if (current) baseline = retainHighWater(baseline ?? emptyTokens(), current)
   }
+  if (!baseline) return undefined
   return { lines: content.slice(ownedIndex), baseline }
 }
