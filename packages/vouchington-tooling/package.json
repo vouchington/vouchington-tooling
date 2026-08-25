@@ -19,6 +19,7 @@
   "files": [
     "dist",
     "skills",
+    "scripts",
     "README.md"
   ],
   "type": "module",
