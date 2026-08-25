@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   runBrowserSession,
@@ -203,6 +203,23 @@ describe('runBrowserSession', () => {
     child.emit('close', null, 'SIGTERM')
     await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
     expect(clock.processGroups).toEqual(['SIGTERM'])
+  })
+
+  it('uses the default process-group and parent-signal hooks', async () => {
+    const child = new FakeProcess()
+    child.kill = (signal?: NodeJS.Signals) => {
+      if (signal) child.signals.push(signal)
+      child.emit('close', null, signal ?? null)
+      return true
+    }
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    const run = runBrowserSession({ ...options([child]), attempts: 1 })
+
+    process.emit('SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    expect(kill).toHaveBeenCalledWith(-child.processGroupId, 'SIGTERM')
+    kill.mockRestore()
   })
 
   it('cleans up timers and parent listeners after a close', async () => {
