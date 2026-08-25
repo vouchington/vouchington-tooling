@@ -93,21 +93,6 @@ async function listCandidates(
   return result
 }
 
-function newest(
-  candidates: readonly Candidate[],
-  kind: TransportObjectKey['kind'],
-): Candidate | undefined {
-  let selected: Candidate | undefined
-  for (const candidate of candidates) {
-    if (
-      candidate.parsed.kind === kind &&
-      (!selected || candidate.parsed.attempt > selected.parsed.attempt)
-    )
-      selected = candidate
-  }
-  return selected
-}
-
 export async function discoverDownloadControl(
   source: PrefixUploadTransportControl,
   lister: TransportObjectLister,
@@ -145,15 +130,19 @@ export async function discoverDownloadControl(
       const pair = attempts
         .map((attempt) => entries.filter((entry) => entry.parsed.attempt === attempt))
         .map((entries) => ({
-          lcov: newest(entries, 'lcov'),
-          manifest: newest(entries, 'manifest'),
+          lcov: entries.find((entry) => entry.parsed.kind === 'lcov'),
+          manifest: entries.find((entry) => entry.parsed.kind === 'manifest'),
         }))
         .find((pair) => pair.lcov && pair.manifest)
       if (pair?.lcov && pair.manifest) {
         const [lcov, manifest] = await Promise.all([object(pair.lcov), object(pair.manifest)])
         coverage[suite] = { lcov, manifest }
       }
-      const blob = newest(entries, 'blob')
+      const blob = attempts
+        .map((attempt) =>
+          entries.find((entry) => entry.parsed.attempt === attempt && entry.parsed.kind === 'blob'),
+        )
+        .find(Boolean)
       if (blob) blobs[suite] = await object(blob)
     }),
   )
