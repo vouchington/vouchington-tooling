@@ -6,6 +6,7 @@ const packageRoot = new URL('..', import.meta.url)
 const dist = new URL('../dist', import.meta.url)
 
 await rm(dist, { recursive: true, force: true })
+await rm(new URL('../skills', import.meta.url), { recursive: true, force: true })
 execFileSync('tsc', ['--project', 'tsconfig.build.json'], {
   stdio: 'inherit',
   cwd: fileURLToPath(packageRoot),
@@ -17,7 +18,7 @@ await copyFile(
 )
 await cp(
   new URL('../../../plugins/vouchington-workflow/skills', import.meta.url),
-  new URL('../skills/vouchington-workflow', import.meta.url),
+  new URL('../skills', import.meta.url),
   { recursive: true },
 )
 await chmod(new URL('../dist/cli/index.mjs', import.meta.url), 0o755)

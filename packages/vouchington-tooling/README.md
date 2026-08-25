@@ -154,7 +154,7 @@ process-group probe and bounded-drain semantics outside a browser session.
 ## Workflow skills outside plugins
 
 The package ships the canonical Vouchington workflow skill tree at
-`skills/vouchington-workflow/<skill>/SKILL.md`. This stable installed path supports agents that do not
+`skills/<skill>/SKILL.md`. This stable installed path supports agents that do not
 load Claude or Codex plugins. The Claude and Codex plugin manifests continue to reference the same
 canonical source tree under `plugins/vouchington-workflow/skills`; package build materializes that tree
 without hand-copying skill content.
