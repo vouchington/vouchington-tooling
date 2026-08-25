@@ -69,7 +69,7 @@ export function runAttempt(
       } catch {}
     }
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
-      if (nextReason === 'deadline' && childExited) return
+      if (nextReason === 'deadline' && childExited && reason === 'exit') return
       if (nextReason === 'parent-signal' || nextReason === 'deadline') {
         if (reason === 'exit' || reason === 'startup-stall' || reason === 'semantic-stall')
           reason = nextReason
@@ -151,8 +151,9 @@ export function runAttempt(
     }
     process.on('error', () => terminate('exit'))
     process.on('exit', () => {
+      if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
       childExited = true
-      if (deps.isProcessGroupAlive(process.processGroupId)) terminate('exit')
+      if (deps.isProcessGroupAlive(process.processGroupId)) terminate(reason)
     })
     process.on('close', (code, value) => {
       for (const stream of streams)

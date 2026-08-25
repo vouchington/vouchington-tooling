@@ -41,6 +41,9 @@ function harness(alive = false) {
     waitForProcessGroupExit: () => exited,
   }
   return {
+    advance: (ms: number) => {
+      now += ms
+    },
     deps,
     emitParent: () => parent.emit('SIGTERM'),
     release: () => release(),
@@ -162,6 +165,20 @@ describe('browser-session-runner review regressions', () => {
     process.emit('close', 0, null)
 
     await expect(run).resolves.toMatchObject({ exit: { code: 0 }, reason: 'exit' })
+  })
+
+  it('classifies a child exit after an overdue deadline before its timer runs', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const run = runBrowserSession(options(process), clock.deps)
+    clock.advance(100)
+    process.emit('exit', 1, null)
+    expect(process.signals).toEqual(['SIGTERM'])
+    process.emit('close', 1, null)
+    await Promise.resolve()
+    clock.release()
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
   it('completes cleanup when descendant draining rejects', async () => {
