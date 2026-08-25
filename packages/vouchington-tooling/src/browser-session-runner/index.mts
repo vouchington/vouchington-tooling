@@ -37,6 +37,10 @@ export async function runBrowserSession(
   deps: BrowserSessionDeps = defaultDeps,
 ): Promise<BrowserSessionResult> {
   validateOptions(options)
+  if (deps === defaultDeps && process.platform === 'win32')
+    throw new Error(
+      'browser-session-runner default process-group control is unsupported on Windows',
+    )
   const deadline = deps.now() + options.deadlineMs
   let last: BrowserSessionResult | undefined
   let attempts = 0

@@ -244,6 +244,57 @@ describe('browser-session-runner review regressions', () => {
     await expect(run).resolves.toMatchObject({ deadlineExceeded: false, reason: 'exit' })
   })
 
+  it('keeps exit-triggered drain bounds active while inherited output delays close', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const run = runBrowserSession(options(process), clock.deps)
+    process.emit('exit', 0, null)
+    clock.release()
+    await Promise.resolve()
+    process.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ reason: 'exit' })
+  })
+
+  it('does not rearm stalls or finish a drain failure before close flushes', async () => {
+    const process = new Process(),
+      clock = harness(true)
+    const failure = new Error('drain failed')
+    clock.deps.waitForProcessGroupExit = async () => {
+      throw failure
+    }
+    const outcome = runBrowserSession(
+      { ...options(process), onLine: () => 'startup' },
+      clock.deps,
+    ).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    process.emit('exit', 0, null)
+    process.stdout.emit('data', 'late startup\n')
+    await Promise.resolve()
+    process.emit('close', 0, null)
+
+    await expect(outcome).resolves.toBe(failure)
+  })
+
+  it('rejects default process-group control on Windows before starting a child', async () => {
+    const process = new Process()
+    let started = false
+    const platform = vi.spyOn(globalThis.process, 'platform', 'get').mockReturnValue('win32')
+    await expect(
+      runBrowserSession({
+        ...options(process),
+        start: () => {
+          started = true
+          return process
+        },
+      }),
+    ).rejects.toThrow('unsupported on Windows')
+    expect(started).toBe(false)
+    platform.mockRestore()
+  })
+
   it('stops stall supervision after child exit while allowing a parent signal to supersede', async () => {
     const process = new Process(),
       clock = harness(true)

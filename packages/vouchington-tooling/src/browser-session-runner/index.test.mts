@@ -338,7 +338,7 @@ describe('runBrowserSession', () => {
     child.emit('close', 1, null)
     await run
 
-    expect(clock.clearedIntervals).toHaveLength(1)
+    expect(clock.clearedIntervals).toHaveLength(0)
     expect(clock.clearedTimeouts).toHaveLength(2)
     expect(clock.parent.listenerCount('SIGINT')).toBe(0)
     expect(clock.parent.listenerCount('SIGTERM')).toBe(0)

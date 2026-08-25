@@ -30,6 +30,7 @@ export function runAttempt(
       throw new RangeError('processGroupId must be positive')
     }
     const maxTail = options.diagnosticTailBytes ?? 4096
+    const drainTimeoutMs = options.graceMs + (options.processGroupDrainMs ?? options.graceMs)
     const tail = new TailQueue(maxTail)
     let startupProgress = false,
       semanticProgress = false
@@ -38,6 +39,7 @@ export function runAttempt(
       childExited = false,
       closeExit: BrowserSessionExit | undefined,
       draining = false,
+      drainDone = false,
       reason: BrowserSessionResult['reason'] = 'exit',
       complete = false,
       terminating = false
@@ -46,7 +48,6 @@ export function runAttempt(
     const finish = (exit: BrowserSessionExit) => {
       if (complete) return
       complete = true
-      deps.clearInterval(watchdog)
       deps.clearTimeout(deadlineTimer)
       if (killTimer) deps.clearTimeout(killTimer)
       deps.clearTimeout(stallTimer)
@@ -93,20 +94,18 @@ export function runAttempt(
       terminate('exit')
     }
     const drain = () => {
-      if (!closeExit || draining) return
+      if (draining) return
       draining = true
-      void deps
-        .waitForProcessGroupExit(
-          process.processGroupId,
-          options.graceMs + (options.processGroupDrainMs ?? options.graceMs),
-        )
-        .then(
-          () => finish(closeExit!),
-          (error) => {
-            fail(error)
-            finish(closeExit!)
-          },
-        )
+      void deps.waitForProcessGroupExit(process.processGroupId, drainTimeoutMs).then(
+        () => {
+          drainDone = true
+          if (closeExit) finish(closeExit)
+        },
+        (error) => {
+          fail(error)
+          if (closeExit) finish(closeExit)
+        },
+      )
     }
     const armStall = (ms: number, nextReason: 'semantic-stall' | 'startup-stall') => {
       if (stallTimer) deps.clearTimeout(stallTimer)
@@ -119,11 +118,11 @@ export function runAttempt(
         const event = options.onLine(value)
         if (event === 'startup' && !startupProgress) {
           startupProgress = true
-          armStall(options.semanticStallMs, 'semantic-stall')
+          if (!childExited) armStall(options.semanticStallMs, 'semantic-stall')
         }
         if (event === 'semantic') {
           semanticProgress = true
-          if (startupProgress) armStall(options.semanticStallMs, 'semantic-stall')
+          if (startupProgress && !childExited) armStall(options.semanticStallMs, 'semantic-stall')
         }
       }
       const appendLines = (text: string) => {
@@ -152,10 +151,6 @@ export function runAttempt(
           fail(error)
         }
       })
-    const watchdog = deps.setInterval(() => {
-      const now = deps.now()
-      if (now >= deadline) return terminate('deadline')
-    }, options.watchdogIntervalMs ?? 1000)
     const remainingDeadlineMs = deadline - deps.now()
     const deadlineTimer = deps.setTimeout(
       () => terminate('deadline'),
@@ -175,7 +170,9 @@ export function runAttempt(
       if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
       childExited = true
       deps.clearTimeout(stallTimer)
-      if (deps.isProcessGroupAlive(process.processGroupId)) terminate(reason)
+      if (!deps.isProcessGroupAlive(process.processGroupId)) return
+      terminate(reason)
+      drain()
     })
     process.on('close', (code, value) => {
       for (const stream of streams)
@@ -195,6 +192,7 @@ export function runAttempt(
       if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(closeExit)
       terminate(reason)
       drain()
+      if (drainDone || hasFailure) finish(closeExit)
     })
   })
 }
