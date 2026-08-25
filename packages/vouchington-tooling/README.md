@@ -37,6 +37,7 @@ vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
 vouchington materialize-pr-context
 vouchington wait-for-apt-locks
+vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
@@ -116,6 +117,7 @@ import {
   formatDiagnosticReportSummaries,
   readDiagnosticReportSummaries,
 } from 'vouchington-tooling/vitest-diagnostics'
+import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 ```
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their

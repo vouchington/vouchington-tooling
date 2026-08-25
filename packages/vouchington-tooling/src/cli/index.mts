@@ -14,6 +14,7 @@ import { runPostReviewCommand } from './commands/post-review.mts'
 import { runStageReviewPayloadCommand } from './commands/stage-review-payload.mts'
 import { runSwiftSemanticEqualCommand } from './commands/swift-semantic-equal.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
+import { runRetrospectiveTranscriptCommand } from './commands/retrospective-transcript.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
@@ -94,6 +95,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':
       return runGhaArtifactsCleanup(parsed)
+    case 'retrospective-transcript':
+      return runRetrospectiveTranscriptCommand(parsed.args)
   }
 }
 

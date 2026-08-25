@@ -138,6 +138,7 @@ vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
 vouchington materialize-pr-context
 vouchington wait-for-apt-locks
+vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
@@ -191,6 +192,7 @@ import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
+import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.

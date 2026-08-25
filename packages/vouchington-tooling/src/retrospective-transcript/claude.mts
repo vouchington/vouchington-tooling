@@ -1,0 +1,52 @@
+import { applyCommand, asNumber, asRecord, emptyFacts, type TranscriptFacts } from './shared.mts'
+
+export function computeClaude(lines: string[][]): TranscriptFacts {
+  const facts = emptyFacts()
+  const seen = new Set<string>()
+  for (const group of lines) {
+    for (const record of group.flatMap((line) => {
+      try {
+        return [JSON.parse(line) as Record<string, unknown>]
+      } catch {
+        return []
+      }
+    })) {
+      if (typeof record.uuid === 'string' && (seen.has(record.uuid) || !seen.add(record.uuid)))
+        continue
+      const subagent = record.isSidechain === true
+      const message = asRecord(record.message)
+      if (!subagent && record.type === 'user' && record.isCompactSummary === true)
+        facts.compactions++
+      if (
+        !subagent &&
+        record.type === 'user' &&
+        typeof message?.content === 'string' &&
+        record.isMeta !== true
+      )
+        facts.userPrompts++
+      if (record.type === 'assistant') {
+        if (!subagent) facts.assistantResponses++
+        const usage = asRecord(message?.usage)
+        const totals = subagent ? facts.subagentTokens : facts.tokens
+        totals.input += asNumber(usage?.input_tokens)
+        totals.output += asNumber(usage?.output_tokens)
+        totals.cacheRead += asNumber(usage?.cache_read_input_tokens)
+        totals.cacheCreation += asNumber(usage?.cache_creation_input_tokens)
+      }
+      const blocks = Array.isArray(message?.content) ? message.content : []
+      for (const block of blocks) {
+        const value = asRecord(block)
+        if (!value) continue
+        if (value.type === 'tool_use' || value.type === 'server_tool_use') {
+          facts.toolCalls++
+          if (subagent) facts.subagentToolCalls++
+          if (value.name === 'Bash' || value.name === 'bash') {
+            const command = asRecord(value.input)?.command
+            if (typeof command === 'string') applyCommand(command, facts)
+          }
+        } else if (value.type === 'tool_result' && value.is_error === true) facts.failedToolCalls++
+      }
+    }
+  }
+  return facts
+}

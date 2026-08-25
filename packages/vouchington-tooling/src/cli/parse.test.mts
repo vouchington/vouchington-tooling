@@ -248,6 +248,12 @@ describe('parseCli', () => {
     })
   })
 
+  it('forwards retrospective transcript options', () => {
+    expect(
+      parseCli(['node', 'vouchington', 'retrospective-transcript', '--session-id', 'session']),
+    ).toEqual({ kind: 'retrospective-transcript', args: ['--session-id', 'session'] })
+  })
+
   it('parses gha-artifacts-cleanup subcommands', () => {
     expect(
       parseCli([
