@@ -59,7 +59,11 @@ export function computeClaude(lines: string[][]): TranscriptFacts {
             const command = asRecord(value.input)?.command
             if (typeof command === 'string') applyCommand(command, facts)
           }
-        } else if (value.type === 'tool_result' && value.is_error === true) facts.failedToolCalls++
+        } else if (
+          (value.type === 'tool_result' && value.is_error === true) ||
+          (typeof value.type === 'string' && value.type.endsWith('_tool_result_error'))
+        )
+          facts.failedToolCalls++
         else if (value.type === 'advisor_tool_result' && typeof value.tool_use_id === 'string')
           advisorIds.add(value.tool_use_id)
       }

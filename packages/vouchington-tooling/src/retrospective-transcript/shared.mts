@@ -76,6 +76,14 @@ export function hasMalformedInteriorRecord(lines: string[]): boolean {
   })
 }
 
+type HereDoc = { delimiter: string; stripTabs: boolean }
+function hereDocs(tokens: string[]): HereDoc[] {
+  return tokens.flatMap((token, index) => {
+    const match = token.match(/^<<(-?)(.*)$/)
+    const delimiter = match?.[2] || (match ? tokens[index + 1] : undefined)
+    return delimiter ? [{ delimiter, stripTabs: match?.[1] === '-' }] : []
+  })
+}
 function segments(command: string): string[][] {
   const result: string[][] = []
   let segment: string[] = []
@@ -83,22 +91,34 @@ function segments(command: string): string[][] {
   let quote: string | undefined
   let escaped = false
   let comment = false
+  const pending: HereDoc[] = []
+  let hereDocLine = ''
   const flush = (): void => {
     if (word) segment.push(word)
     word = ''
   }
-  const end = (): void => {
+  const end = (newline = false): void => {
     flush()
+    if (newline) pending.push(...hereDocs(segment))
     if (segment.length) result.push(segment)
     segment = []
   }
   for (let index = 0; index < command.length; index++) {
     const char = command[index]!
     const next = command[index + 1] ?? ''
-    if (comment) {
+    if (pending.length) {
+      if (char === '\n') {
+        const current = pending[0]!
+        if (
+          (current.stripTabs ? hereDocLine.replace(/^\t+/, '') : hereDocLine) === current.delimiter
+        )
+          pending.shift()
+        hereDocLine = ''
+      } else hereDocLine += char
+    } else if (comment) {
       if (char === '\n') {
         comment = false
-        end()
+        end(true)
       }
     } else if (escaped) {
       if (char !== '\n') word += char
@@ -110,7 +130,7 @@ function segments(command: string): string[][] {
       else word += char
     } else if (char === '"' || char === "'") quote = char
     else if (char === '#' && !word) comment = true
-    else if (char === ';' || char === '&' || char === '|' || char === '\n') end()
+    else if (char === ';' || char === '&' || char === '|' || char === '\n') end(char === '\n')
     else if (/\s/.test(char)) flush()
     else word += char
   }

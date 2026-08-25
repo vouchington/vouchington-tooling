@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-
 import {
   computeTranscriptFacts,
   formatTranscriptFacts,
@@ -10,15 +9,12 @@ import {
   runRetrospectiveTranscript,
 } from './index.mts'
 import { applyCommand, emptyFacts } from './shared.mts'
-
 const ROOT_ID = '11111111-1111-1111-1111-111111111111'
 const CHILD_ID = '22222222-2222-2222-2222-222222222222'
 const GRANDCHILD_ID = '33333333-3333-3333-3333-333333333333'
-
 function sessionMeta(id: string, agentPath: string): string {
   return JSON.stringify({ type: 'session_meta', payload: { id, agent_path: agentPath } })
 }
-
 function childActivity(threadId: string, agentPath: string): string {
   return JSON.stringify({
     type: 'event_msg',
@@ -39,9 +35,13 @@ describe('retrospective transcript resilience', () => {
         type: 'user',
         message: { content: { type: 'text', text: 'not a block list' } },
       }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'web_search_tool_result_error' }] },
+      }),
       'null',
     ])
-    expect(facts.userPrompts).toBe(2)
+    expect(facts).toMatchObject({ userPrompts: 2, failedToolCalls: 1 })
   })
   it('correlates failed Codex outcomes and deduplicates hosted calls', () => {
     const facts = computeTranscriptFacts([

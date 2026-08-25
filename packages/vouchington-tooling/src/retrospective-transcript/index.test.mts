@@ -266,10 +266,10 @@ describe('retrospective transcript', () => {
   it('normalizes shell command separators, assignments, and quotes', () => {
     const facts = emptyFacts()
     applyCommand(
-      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push",
+      "FLAG=yes npx no-mistakes && 'git' push | pnpm exec no-mistakes\ngit -c user.name=x push; FLAG=yes; /usr/local/bin/no-mistakes; yarn no-mistakes; npm exec no-mistakes; git --quiet push\ncat <<EOF\ngit push\npnpm exec no-mistakes\nEOF\ncat << EOF\ngit push\nEOF\ncat <<-TAB\n\tpnpm exec no-mistakes\n\tTAB\npnpm exec no-mistakes",
       facts,
     )
-    expect(facts.noMistakesInvocations).toBe(5)
+    expect(facts.noMistakesInvocations).toBe(6)
     expect(facts.pushCommandAttempts).toBe(3)
   })
 
