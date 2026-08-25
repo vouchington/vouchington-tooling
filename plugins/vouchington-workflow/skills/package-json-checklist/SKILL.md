@@ -6,8 +6,9 @@ description: Use when changing JavaScript package metadata, dependencies, script
 # Package metadata checklist
 
 Use before changing `package.json`, a lockfile, workspace metadata, or a package entrypoint. Read
-the nearest `AGENTS.md` and `CLAUDE.md` first; they own package-manager version, dependency
-age/version policy, registry, release process, and package layout.
+every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the owning package,
+applying the closest file only when rules conflict. Those instructions own package-manager version,
+dependency age/version policy, registry, release process, and package layout.
 
 1. Identify the owning package and every consumer of the changed script, dependency, export, or
    binary. Prefer existing workspace utilities before adding a dependency.

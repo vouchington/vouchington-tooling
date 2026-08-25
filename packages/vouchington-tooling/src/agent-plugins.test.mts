@@ -49,6 +49,11 @@ describe('security-triage plugin', () => {
     ])
 
     expect(codex.name).toBe('vouchington')
+    expect(codex.plugins).toHaveLength(2)
+    expect((codex.plugins as Array<{ name: string }>).map(({ name }) => name)).toEqual([
+      'security-triage',
+      'vouchington-workflow',
+    ])
     expect(codex.plugins).toContainEqual(
       expect.objectContaining({
         name: 'security-triage',
@@ -56,6 +61,11 @@ describe('security-triage plugin', () => {
       }),
     )
     expect(claude.name).toBe('vouchington')
+    expect(claude.plugins).toHaveLength(2)
+    expect((claude.plugins as Array<{ name: string }>).map(({ name }) => name)).toEqual([
+      'security-triage',
+      'vouchington-workflow',
+    ])
     expect(claude.plugins).toContainEqual(
       expect.objectContaining({ name: 'security-triage', source: './plugins/security-triage' }),
     )
@@ -110,6 +120,7 @@ describe('vouchington-workflow plugin', () => {
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
+    expect(agent.skills).toBe('./skills/')
     expect(agent.$schema).toBe('https://agent-plugins.org/schemas/1.0.0/plugin.schema.json')
     await expect(access(join(workflowPlugin, '.grok-plugin/plugin.json'))).rejects.toThrow()
   })
@@ -139,6 +150,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'vouchington-workflow',
         source: { source: 'local', path: './plugins/vouchington-workflow' },
+        policy: { installation: 'AVAILABLE', authentication: 'ON_USE' },
       }),
     )
     expect(claude.plugins).toContainEqual(
@@ -149,6 +161,11 @@ describe('vouchington-workflow plugin', () => {
     )
     expect(readme).toContain('vouchington-workflow@vouchington')
     expect(readme).toContain('plugins/vouchington-workflow')
+    expect(readme).toContain(
+      'grok plugin install vouchington/vouchington-tooling#plugins/security-triage',
+    )
+    expect(readme).toContain('~/.cursor/plugins/local/security-triage')
+    expect(readme).toContain('~/.cursor/plugins/local/vouchington-workflow')
     await expect(access(workflowPlugin)).resolves.toBeUndefined()
 
     for (const artifact of [...manifests, ...skills]) {
@@ -160,5 +177,7 @@ describe('vouchington-workflow plugin', () => {
       expect(skill).not.toMatch(/\.agents\/skills|\.github\/workflows\/RUNNERS/i)
       expect(skill).not.toMatch(/pr-shepherd/i)
     }
+    expect(skills[0]).toContain('every applicable')
+    expect(skills[0]).not.toContain('assigned non-main worktree')
   })
 })

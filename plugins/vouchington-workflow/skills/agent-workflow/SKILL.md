@@ -9,10 +9,11 @@ Use this skill before implementation work. It supplies portable defaults; the re
 `AGENTS.md`, `CLAUDE.md`, contribution guide, and CI configuration define the actual commands,
 branching, review, and release policy.
 
-1. Work from the assigned non-main worktree. Inspect its status and compare with the current base
-   branch without discarding local work.
-2. Read the nearest applicable `AGENTS.md` and `CLAUDE.md`, then relevant documentation and tests
-   before changing code. Treat local instructions as higher priority than this skill.
+1. Inspect the current checkout and its status without discarding local work. Follow the consumer
+   repository's instructions for branch and worktree topology; do not create either implicitly.
+2. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through each changed
+   file, then relevant documentation and tests. Apply the closest instruction only when rules
+   conflict, and treat all applicable local instructions as higher priority than this skill.
 3. Confirm the accepted task's boundary. Reuse existing ownership and utilities; ask before
    widening scope or making an irreversible external change.
 4. Write a focused test first when behavior can be tested. Keep source, tests, docs, and generated

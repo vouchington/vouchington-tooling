@@ -8,8 +8,9 @@ description: Use when editing GitHub Actions workflows or composite actions to k
 Use before editing a workflow or composite action. Repository-local instructions own runners,
 approved action pinning, concurrency naming, secrets, permissions, and workflow-only PR rules.
 
-1. Read the workflow's nearest `AGENTS.md` or `CLAUDE.md`, relevant CI documentation, and callers
-   before editing. Identify trusted and untrusted inputs and every credential boundary.
+1. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the workflow,
+   plus relevant CI documentation and callers. Apply the closest instruction only when rules
+   conflict. Identify trusted and untrusted inputs and every credential boundary.
 2. Give each job the least permissions it needs. Keep untrusted pull-request content out of shell
    interpolation, privileged tokens, and write-capable steps.
 3. Use the repository's pinned-action and runner policy. Keep checkout refs, artifact boundaries,

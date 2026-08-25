@@ -39,14 +39,15 @@ claude plugin install security-triage@vouchington
 claude plugin install vouchington-workflow@vouchington
 ```
 
-Claude-compatible clients that support direct plugin installation can use either plugin directory:
+Grok:
 
 ```bash
-<client> plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow
+grok plugin install vouchington/vouchington-tooling#plugins/security-triage
+grok plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow
 ```
 
-Replace `vouchington-workflow` with `security-triage` to install the security-finding workflow
-directly instead.
+Other Claude-compatible clients that support the same direct-install syntax can select either
+plugin directory.
 
 Cursor loads local Agent Plugins. Clone the source once and link its plugin directory into Cursor's
 local plugin root, then restart Cursor or reload the window:
@@ -57,13 +58,12 @@ git clone --depth 1 https://github.com/vouchington/vouchington-tooling.git \
   ~/.cursor/plugins/sources/vouchington-tooling
 ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-workflow \
   ~/.cursor/plugins/local/vouchington-workflow
+ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/security-triage \
+  ~/.cursor/plugins/local/security-triage
 ```
 
 The clone and symlink commands intentionally fail if either target already exists, preventing an
 update from overwriting or nesting an existing local plugin.
-
-To link `security-triage` instead, replace both occurrences of `vouchington-workflow` in the two
-Cursor paths with `security-triage`.
 
 Centralized Cursor marketplace publication is not part of this repository change.
 
