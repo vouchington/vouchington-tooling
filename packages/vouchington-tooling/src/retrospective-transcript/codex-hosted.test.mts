@@ -34,4 +34,20 @@ describe('hosted Codex transcripts', () => {
       runRetrospectiveTranscript({ sessionId: SESSION_ID, env: { CODEX_HOME: codexHome } }),
     ).resolves.toContain('User prompts: 1')
   })
+
+  it('falls back to the user Codex home when an empty environment root is supplied', async () => {
+    const projectsDir = await mkdtemp(join(tmpdir(), 'retrospective-transcript-hosted-'))
+    const project = join(projectsDir, 'project')
+    await mkdir(project)
+    await writeFile(
+      join(project, `${SESSION_ID}.jsonl`),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+    )
+    await expect(
+      runRetrospectiveTranscript({
+        env: { CODEX_HOME: '', CODEX_THREAD_ID: SESSION_ID },
+        projectsDir,
+      }),
+    ).resolves.toContain('User prompts: 1')
+  })
 })

@@ -181,11 +181,12 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
     )
   }
   const identity = codexIdentity(lines)
+  const codexHome = (options.env ?? process.env).CODEX_HOME
   const subagents = await codexSubagents(
     lines,
     options.codexSessionsDir ??
       (options.jsonlPath ? dirname(resolved.path) : undefined) ??
-      join((options.env ?? process.env).CODEX_HOME || join(homedir(), '.codex'), 'sessions'),
+      join(codexHome || join(homedir(), '.codex'), 'sessions'),
     identity.agentPath,
     new Set(
       [identity.threadId ?? resolved.sessionId].filter((threadId) => SESSION_ID.test(threadId)),
