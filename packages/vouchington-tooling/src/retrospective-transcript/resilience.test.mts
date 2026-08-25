@@ -71,7 +71,7 @@ describe('retrospective transcript resilience', () => {
         payload: {
           type: 'local_shell_call',
           call_id: 'local-1',
-          input: { command: 'pnpm exec no-mistakes && git push' },
+          input: { action: { type: 'exec', command: ['pnpm exec no-mistakes', '&&', 'git push'] } },
         },
       }),
       JSON.stringify({
@@ -264,7 +264,7 @@ describe('retrospective transcript resilience', () => {
       [sessionMeta(ROOT_ID, '/root'), childActivity('invalid', '/root/bad')].join('\n'),
     )
     await expect(
-      runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
+      runRetrospectiveTranscript({ jsonlPath: join(directory, `rollout-root-${ROOT_ID}.jsonl`) }),
     ).resolves.toContain('could not resolve a referenced Codex child transcript')
   })
   it('validates environment identities before using the default Codex session root', async () => {
@@ -473,7 +473,7 @@ describe('retrospective transcript resilience', () => {
       }),
     )
     await expect(
-      runRetrospectiveTranscript({ sessionId: ROOT_ID, codexSessionsDir: directory }),
+      runRetrospectiveTranscript({ jsonlPath: join(directory, `rollout-root-${ROOT_ID}.jsonl`) }),
     ).resolves.toContain('Subagent tool calls: 1')
   })
   it('skips visited Codex identities and propagates a missing nested child', async () => {

@@ -31,15 +31,14 @@ export type ResolveOptions = {
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
 const MALFORMED_INTERIOR = 'malformed interior transcript record'
+type TranscriptResolution = { path: string; sessionId: string } | { error: string }
 function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
 function globFrom(root: string, pattern: string): string[] {
   return globSync(pattern, { cwd: root }).map((path) => join(root, path))
 }
-export function resolveTranscriptFile(
-  options: ResolveOptions,
-): { path: string; sessionId: string } | { error: string } {
+export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolution {
   if (options.sessionId && !SESSION_ID.test(options.sessionId))
     return { error: 'invalid session id format' }
   if (options.jsonlPath)
@@ -185,7 +184,9 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
   const subagents = await codexSubagents(
     lines,
     options.codexSessionsDir ??
-      join((options.env ?? process.env).CODEX_HOME || join(homedir(), '.codex'), 'sessions'),
+      (options.jsonlPath
+        ? dirname(resolved.path)
+        : join((options.env ?? process.env).CODEX_HOME || join(homedir(), '.codex'), 'sessions')),
     identity.agentPath,
     new Set(
       [identity.threadId ?? resolved.sessionId].filter((threadId) => SESSION_ID.test(threadId)),

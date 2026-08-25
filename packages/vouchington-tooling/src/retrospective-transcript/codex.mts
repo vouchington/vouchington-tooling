@@ -27,8 +27,11 @@ function usage(record: ParsedLine): TokenTotals | undefined {
 function commands(payload: Record<string, unknown>): string[] {
   const raw = payload.type === 'function_call' ? payload.arguments : payload.input
   if (payload.type === 'local_shell_call') {
-    const value = asRecord(raw)?.command
-    return typeof value === 'string' ? [value] : []
+    const input = asRecord(raw)
+    const value = asRecord(input?.action)?.command ?? input?.command
+    if (typeof value === 'string') return [value]
+    if (!Array.isArray(value)) return []
+    return value.every((item) => typeof item === 'string') ? [value.join(' ')] : []
   }
   const customExec = payload.type === 'custom_tool_call' && payload.name === 'exec'
   if (!customExec && !['exec_command', 'bash', 'shell', 'Bash'].includes(String(payload.name)))
@@ -79,18 +82,15 @@ function hasFailedOutcome(value: unknown): boolean {
     return true
   return [payload.output, payload.result, payload.metadata].some(hasFailedOutcome)
 }
-
 function isCall(payload: Record<string, unknown>): boolean {
   return (
     ['function_call', 'custom_tool_call'].includes(String(payload.type)) ||
     (typeof payload.type === 'string' && payload.type.endsWith('_call'))
   )
 }
-
 function isCallOutcome(payload: Record<string, unknown>): boolean {
   return typeof payload.type === 'string' && payload.type.endsWith('_call_output')
 }
-
 function addDelta(current: TokenTotals, previous: TokenTotals, target: TokenTotals): void {
   target.input += Math.max(0, current.input - previous.input)
   target.output += Math.max(0, current.output - previous.output)
