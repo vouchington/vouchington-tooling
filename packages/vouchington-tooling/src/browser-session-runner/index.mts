@@ -147,12 +147,12 @@ function runAttempt(
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
       if (reason !== 'exit') return
       reason = nextReason
-      deps.killProcessGroup(process.processGroupId, 'SIGTERM')
-      process.kill('SIGTERM')
       killTimer = deps.setTimeout(() => {
         deps.killProcessGroup(process.processGroupId, 'SIGKILL')
         process.kill('SIGKILL')
       }, options.graceMs)
+      deps.killProcessGroup(process.processGroupId, 'SIGTERM')
+      process.kill('SIGTERM')
     }
     const consume = () => {
       let pending = ''
