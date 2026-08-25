@@ -179,6 +179,21 @@ describe('prefix transport error boundaries', () => {
     ).rejects.toThrow(/continuation/)
   })
 
+  it('rejects non-object discovered maps and selects no pair from a lone lcov object', async () => {
+    expect(() => parseTransportControl({ ...download(), coverage: null })).toThrow(/map/)
+    await expect(
+      discoverDownloadControl(
+        await upload(),
+        {
+          list: async () => ({
+            objects: [{ key: transportObjectKeysV2(identity, 'web').lcov, byteLength: 1 }],
+          }),
+        },
+        { signGet: async () => 'https://x' },
+      ),
+    ).resolves.toMatchObject({ coverage: {} })
+  })
+
   it('rejects unsupported filenames and handles incomplete remote pairs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'prefix-errors-'))
     const control = download()
@@ -256,6 +271,25 @@ describe('prefix transport error boundaries', () => {
         {},
       ),
     ).rejects.toThrow(/attempt/)
+  })
+
+  it('returns an unpersisted outcome when local coverage files are absent', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'prefix-missing-'))
+    await expect(
+      uploadPrefixTransport(
+        await upload(),
+        'web',
+        root,
+        {
+          repository: identity.repository,
+          revision: identity.revision,
+          runId: identity.runId,
+          currentAttempt: 3,
+        },
+        'coverage-manifest.json',
+        {},
+      ),
+    ).resolves.toEqual({ coverage: false, blob: false })
   })
 
   it('maps discovered blobs to their exact GET URL', async () => {
