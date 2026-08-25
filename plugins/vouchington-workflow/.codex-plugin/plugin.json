@@ -1,0 +1,23 @@
+{
+  "name": "vouchington-workflow",
+  "version": "0.1.0",
+  "description": "Portable repository workflow skills for Codex and Claude.",
+  "author": {
+    "name": "Vouchington",
+    "url": "https://github.com/vouchington"
+  },
+  "homepage": "https://github.com/vouchington/vouchington-tooling",
+  "repository": "https://github.com/vouchington/vouchington-tooling",
+  "license": "MIT",
+  "keywords": ["workflow", "git", "github-actions", "static-analysis"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Workflow foundations",
+    "shortDescription": "Portable repository workflow guidance.",
+    "longDescription": "Repository-neutral skills for implementation, commits, Actions, dependency metadata, and static analysis.",
+    "developerName": "Vouchington",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Use the repository's local instructions to guide this workflow change."]
+  }
+}

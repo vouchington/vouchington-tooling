@@ -11,10 +11,15 @@ Both packages are published to npm. Releases go through the `Release` workflow (
 
 ## Agent plugins
 
-The repository also publishes the public [`security-triage`](./plugins/security-triage) agent
-plugin. Its single `triage-codex-security` skill is packaged for Codex, Claude, Grok, and Cursor.
-It is intentionally repository-neutral: it analyzes findings and returns a versioned handoff,
-while each consuming repository owns issue taxonomy and issue creation.
+The repository also publishes the public [`security-triage`](./plugins/security-triage) and
+[`vouchington-workflow`](./plugins/vouchington-workflow) agent plugins. `security-triage` has one
+repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
+commit, GitHub Actions, package-metadata, and static-analysis skill foundations. Both plugins use
+one canonical `skills/` tree for Codex and Claude; consumer repositories add their local policy in
+`AGENTS.md`, `CLAUDE.md`, or thin wrapper skills.
+
+`security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
+handoff, while each consuming repository owns issue taxonomy and issue creation.
 
 ### Install
 
@@ -23,6 +28,7 @@ Codex:
 ```bash
 codex plugin marketplace add vouchington/vouchington-tooling --ref main
 codex plugin add security-triage@vouchington
+codex plugin add vouchington-workflow@vouchington
 ```
 
 Claude:
@@ -30,16 +36,18 @@ Claude:
 ```bash
 claude plugin marketplace add vouchington/vouchington-tooling --sparse .claude-plugin plugins
 claude plugin install security-triage@vouchington
+claude plugin install vouchington-workflow@vouchington
 ```
 
-Grok can install the public plugin directly from its subdirectory:
+Grok:
 
 ```bash
 grok plugin install vouchington/vouchington-tooling#plugins/security-triage
+grok plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow
 ```
 
-Grok also consumes the Claude-compatible plugin package when installed through a compatible
-marketplace flow.
+Other Claude-compatible clients that support the same direct-install syntax can select either
+plugin directory.
 
 Cursor loads local Agent Plugins. Clone the source once and link its plugin directory into Cursor's
 local plugin root, then restart Cursor or reload the window:
@@ -48,6 +56,8 @@ local plugin root, then restart Cursor or reload the window:
 mkdir -p ~/.cursor/plugins/sources ~/.cursor/plugins/local
 git clone --depth 1 https://github.com/vouchington/vouchington-tooling.git \
   ~/.cursor/plugins/sources/vouchington-tooling
+ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-workflow \
+  ~/.cursor/plugins/local/vouchington-workflow
 ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/security-triage \
   ~/.cursor/plugins/local/security-triage
 ```

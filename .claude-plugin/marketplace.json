@@ -13,6 +13,13 @@
       "source": "./plugins/security-triage",
       "category": "security",
       "homepage": "https://github.com/vouchington/vouchington-tooling"
+    },
+    {
+      "name": "vouchington-workflow",
+      "description": "Repository-neutral workflow foundations for implementation and CI changes.",
+      "source": "./plugins/vouchington-workflow",
+      "category": "productivity",
+      "homepage": "https://github.com/vouchington/vouchington-tooling"
     }
   ]
 }
