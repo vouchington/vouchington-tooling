@@ -14,8 +14,9 @@ Both packages are published to npm. Releases go through the `Release` workflow (
 The repository also publishes the public [`security-triage`](./plugins/security-triage) and
 [`vouchington-workflow`](./plugins/vouchington-workflow) agent plugins. `security-triage` has one
 repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
-commit, GitHub Actions, package-metadata, and static-analysis skill foundations. Both plugins use
-one canonical `skills/` tree for Codex and Claude; consumer repositories add their local policy in
+commit, GitHub Actions, package-metadata, static-analysis, planning, issue-management,
+retrospective, CI-log review, and pull-request-description skills. Both plugins use one canonical
+`skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in
 `AGENTS.md`, `CLAUDE.md`, or thin wrapper skills.
 
 `security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
