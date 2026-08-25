@@ -47,6 +47,9 @@ function makeClock() {
     deps,
     clearedIntervals,
     clearedTimeouts,
+    advance: (ms: number) => {
+      now += ms
+    },
     emitSignal: (signal: NodeJS.Signals) => parent.emit(signal),
     parent,
     processGroups,
@@ -280,6 +283,20 @@ describe('runBrowserSession', () => {
     kill.mockRestore()
   })
 
+  it('contains an unexpected default process-group failure during termination', async () => {
+    const child = new FakeProcess()
+    const error = Object.assign(new Error('denied'), { code: 'EPERM' })
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw error
+    })
+    const run = runBrowserSession({ ...options([child]), attempts: 1 })
+    process.emit('SIGTERM')
+    child.emit('close', null, 'SIGTERM')
+
+    await expect(run).resolves.toMatchObject({ reason: 'parent-signal' })
+    kill.mockRestore()
+  })
+
   it('cleans up timers and parent listeners after a close', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
@@ -331,6 +348,23 @@ describe('runBrowserSession', () => {
     })
   })
 
+  it('classifies a decoder-end replacement from an incomplete UTF-8 sequence', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      {
+        ...options([child]),
+        attempts: 1,
+        onLine: (line) => (line.includes('�') ? 'startup' : undefined),
+      },
+      clock.deps,
+    )
+    child.stdout.emit('data', Buffer.from([0xe2]))
+    child.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ startupProgress: true })
+  })
+
   it('returns a UTF-8-safe diagnostic tail within its byte budget', async () => {
     const child = new FakeProcess()
     const clock = makeClock()
@@ -344,6 +378,19 @@ describe('runBrowserSession', () => {
     const result = await run
     expect(result.diagnosticTail).toBe('😀b')
     expect(Buffer.byteLength(result.diagnosticTail)).toBeLessThanOrEqual(5)
+  })
+
+  it('classifies a close after the deadline even before the timer callback runs', async () => {
+    const child = new FakeProcess()
+    const clock = makeClock()
+    const run = runBrowserSession(
+      { ...options([child]), attempts: 1, watchdogIntervalMs: 1_000 },
+      clock.deps,
+    )
+    clock.advance(100)
+    child.emit('close', 0, null)
+
+    await expect(run).resolves.toMatchObject({ deadlineExceeded: true, reason: 'deadline' })
   })
 
   it('returns an error-event exit instead of leaving an unhandled child error', async () => {
