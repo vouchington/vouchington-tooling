@@ -35,6 +35,8 @@ export async function mintPrefixUploadControl(
   )
     throw new Error('Coverage transport size limit is invalid')
   const upload = await signer.signPost(`${transportPrefix(value)}/`, ttlSeconds, maxObjectBytes)
+  if (upload.maxObjectBytes > maxObjectBytes)
+    throw new Error('Coverage transport signer size limit is invalid')
   return parseTransportControl({
     version: 2,
     mode: 'prefix-upload',

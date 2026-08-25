@@ -115,6 +115,7 @@ export async function discoverDownloadControl(
   options: MintPrefixUploadOptions = {},
 ): Promise<DiscoveredDownloadTransportControl> {
   const value = identity(source)
+  const expiresAt = transportExpiresAt(options)
   const candidates = await listCandidates(value, lister)
   const suites = new Map<string, Candidate[]>()
   for (const candidate of candidates) {
@@ -162,7 +163,7 @@ export async function discoverDownloadControl(
     repository: value.repository,
     revision: value.revision,
     run: { id: value.runId, controlAttempt: value.controlAttempt },
-    expiresAt: transportExpiresAt(options),
+    expiresAt,
     coverage,
     blobs,
   }) as DiscoveredDownloadTransportControl

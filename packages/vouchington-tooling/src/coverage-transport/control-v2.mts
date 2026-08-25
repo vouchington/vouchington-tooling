@@ -122,8 +122,10 @@ function parseDownloadMap(
     else if (!isRecord(value) || !exactKeys(value, ['lcov', 'manifest']))
       throw new Error('Discovered coverage pair is invalid')
     else {
-      parseObject(value.lcov, expected, suite, 'lcov')
-      parseObject(value.manifest, expected, suite, 'manifest')
+      const lcov = parseObject(value.lcov, expected, suite, 'lcov')
+      const manifest = parseObject(value.manifest, expected, suite, 'manifest')
+      if (lcov.attempt !== manifest.attempt)
+        throw new Error('Discovered coverage pair attempts do not match')
     }
   }
   return raw

@@ -34,16 +34,20 @@ export async function uploadPrefixTransport(
   if (manifestFilename !== DEFAULT_COVERAGE_MANIFEST_FILENAME)
     throw new Error('Prefix transport requires the default coverage manifest filename')
   const keys = transportObjectKeysV2(identity(control), suite)
+  const maxObjectBytes = Math.min(
+    control.upload.maxObjectBytes,
+    options.maxBodyBytes ?? control.upload.maxObjectBytes,
+  )
   const lcovPath = join(cwd, 'coverage', 'lcov.info')
   const manifestPath = join(cwd, 'coverage', manifestFilename)
   const lcov = existsSync(lcovPath) && existsSync(manifestPath) ? await readFile(lcovPath) : null
   const manifest = lcov === null ? null : await readFile(manifestPath)
   const storedLcov =
-    lcov !== null && lcov.byteLength <= control.upload.maxObjectBytes
+    lcov !== null && lcov.byteLength <= maxObjectBytes
       ? await fetchPost(control.upload.url, control.upload.fields, keys.lcov, lcov, options)
       : false
   const coverage =
-    storedLcov && manifest !== null && manifest.byteLength <= control.upload.maxObjectBytes
+    storedLcov && manifest !== null && manifest.byteLength <= maxObjectBytes
       ? await fetchPost(control.upload.url, control.upload.fields, keys.manifest, manifest, options)
       : false
   if (lcov !== null)
@@ -56,7 +60,7 @@ export async function uploadPrefixTransport(
   const blobData = packVitestBlobBundle(cwd, suite, expectedIdentity, options)
   const blob = Boolean(
     blobData &&
-    blobData.byteLength <= control.upload.maxObjectBytes &&
+    blobData.byteLength <= maxObjectBytes &&
     (await fetchPost(control.upload.url, control.upload.fields, keys.blob, blobData, options)),
   )
   if (blob) logTransport(options, `[coverage-transport] Uploaded vitest blob for ${suite}`)
