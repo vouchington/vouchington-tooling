@@ -36,7 +36,7 @@ describe('final code review workflow', () => {
   it('uses a non-cancelling label-triggered lane and a stable gate', () => {
     expect(finalReview.concurrency?.['cancel-in-progress']).toBe(false)
     expect(finalReview.jobs?.['code-reviewed']?.name).toContain('Publish final review result')
-    expect(finalReview.jobs?.['code-reviewed']?.name).not.toContain("|| 'Code Reviewed'")
+    expect(finalReview.jobs?.['code-reviewed']?.name).not.toMatch(/['"]Code Reviewed['"]/)
     expect(finalReview.jobs?.['code-reviewed']?.needs).toEqual(
       expect.arrayContaining([
         'validate-review-settings',
