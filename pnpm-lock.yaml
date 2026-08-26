@@ -64,8 +64,8 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
       csv-stringify:
-        specifier: 6.8.2
-        version: 6.8.2
+        specifier: 6.8.3
+        version: 6.8.3
       dockerfile-ast:
         specifier: 0.7.1
         version: 0.7.1
@@ -1127,8 +1127,8 @@ packages:
   csv-parse@7.0.2:
     resolution: {integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA==}
 
-  csv-stringify@6.8.2:
-    resolution: {integrity: sha512-V0md5rBGlZb5WOfUmBWM8tr1+vvbe00EC2+ZhIYPKypA1GLvGuh0NzWEK0L+yRplocH7r37YGoT9uK0r1TtqBQ==}
+  csv-stringify@6.8.3:
+    resolution: {integrity: sha512-gIeSCvq5F4VtXV3naV3VAewLhBkiZBz+PPhTOA8H3Y8h/ELa+R1ml0GZck/4/Nzo9ep2lvOluilJ6MJlbZsKMA==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -2802,7 +2802,7 @@ snapshots:
 
   csv-parse@7.0.2: {}
 
-  csv-stringify@6.8.2: {}
+  csv-stringify@6.8.3: {}
 
   debug@4.4.3(supports-color@7.2.0):
     dependencies:
