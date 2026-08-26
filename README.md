@@ -123,7 +123,9 @@ after the `tests` fan-in succeeds on a ready-for-review, same-repository pull re
 Dependabot, and Renovate never receive review secrets and instead receive a pass-through
 `Code Reviewed` gate after tests. A non-cancelling label workflow records the once-per-PR state with
 `final-code-review:requested` and `final-code-review:complete`; removing the complete label requests
-a fresh review.
+a fresh review. A complete label is accepted only when a prior PR commit has a successful
+GitHub-Actions-owned `Code Reviewed` check, preventing a manually applied label from bypassing the
+first review.
 
 The setup expects these organization Actions variables and fails when any is missing or malformed:
 

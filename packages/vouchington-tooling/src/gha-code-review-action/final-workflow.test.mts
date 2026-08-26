@@ -52,6 +52,10 @@ describe('final code review workflow', () => {
     expect(script).toContain('--commit "$head_sha" --event pull_request')
     expect(script).toContain('.name == "tests" and .conclusion == "success"')
     expect(script).toContain('if [ "$is_draft" = true ]; then')
+    expect(selector?.permissions?.checks).toBe('read')
+    expect(script).toContain('commits/$commit_sha/check-runs')
+    expect(script).toContain('.app.slug == "github-actions"')
+    expect(script).toContain('gate_status invalid-complete')
   })
 
   it('fails closed when organization settings are absent', () => {
