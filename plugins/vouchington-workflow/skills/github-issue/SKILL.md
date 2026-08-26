@@ -35,19 +35,23 @@ draft without mutation. Never fall back silently or to an unverified repository.
 
 1. Search open and relevant closed issues in the selected destination; return a likely duplicate
    rather than filing one. Verify paths and current behavior named in the issue.
-2. Write a self-contained issue with the problem, desired outcome, ownership boundaries, concrete
+2. Before editing, commenting, relating, closing, or otherwise changing state, refetch the issue and
+   its current discussion. Verify the requested mutation is still authorized and supported by that
+   evidence. Close only when the documented outcome and acceptance evidence show the work is
+   resolved; otherwise leave state unchanged and report the gap.
+3. Write a self-contained issue with the problem, desired outcome, ownership boundaries, concrete
    areas, validation, and external context. A discovered blocker does not widen implementation scope.
-3. Fetch the complete live taxonomy. Apply matching existing labels and a selected existing milestone
+4. Fetch the complete live taxonomy. Apply matching existing labels and a selected existing milestone
    without separate approval. Omit a missing optional milestone; a missing required milestone blocks
    the issue, and milestone creation is a separately authorized taxonomy operation. For a
    missing label, use [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain
    explicit approval for its exact repository, name, description, and color before creating it.
    Omit a declined optional label; a missing required label blocks the issue.
-4. Refetch the created or updated issue and verify its metadata. Report a partial failure without
+5. Refetch the created or updated issue and verify its metadata. Report a partial failure without
    retrying creation. Preserve history and report the action, URL, labels, and milestone.
-5. Link a pull request with a closing reference only when it fully resolves the issue. Keep
+6. Link a pull request with a closing reference only when it fully resolves the issue. Keep
    cross-repository references fully qualified; PR creation authority remains separate.
-6. Use native sub-issues only for real hierarchy, blocked-by relationships only for genuine known
+7. Use native sub-issues only for real hierarchy, blocked-by relationships only for genuine known
    dependencies, and prose links for merely related work. Read every created relationship back.
 
 For batch creation, preflight every entry before writing any issue and fail the whole batch when one

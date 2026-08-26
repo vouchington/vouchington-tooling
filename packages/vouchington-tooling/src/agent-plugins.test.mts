@@ -231,6 +231,8 @@ describe('vouchington-workflow plugin', () => {
       /less-restricted destination.*remove private repository identity/i,
     )
     expect(normalizedIssue).toMatch(/If no tracker passes, return the draft without mutation/i)
+    expect(normalizedIssue).toMatch(/before editing.*refetch the issue and its current discussion/i)
+    expect(normalizedIssue).toMatch(/close only when.*acceptance evidence.*resolved/i)
     expect(normalizedIssue).toMatch(/matching existing labels.*without separate approval/i)
     expect(normalizedIssue).toMatch(/selected existing milestone.*without separate approval/i)
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
