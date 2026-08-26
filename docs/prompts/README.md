@@ -14,3 +14,6 @@ path explicitly.
 Provider models and enablement flags are organization Actions variables. Prompt paths, trust
 boundaries, payload limits, tool permissions, and installer digests remain version-controlled
 security policy rather than mutable organization settings.
+
+The default-branch request workflow owns the narrow write boundary for PR labels and final-workflow
+dispatch. Provider jobs remain read-only; only trusted poster jobs can write review comments.
