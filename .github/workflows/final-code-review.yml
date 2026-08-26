@@ -200,6 +200,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       agent_outcome: ${{ steps.review.outputs.agent_outcome }}
@@ -248,6 +249,18 @@ jobs:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
+      - name: Require the selected PR head before posting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
+          [ "$current_head_sha" = "$SELECTED_HEAD_SHA" ] || {
+            echo "::error::PR head changed from $SELECTED_HEAD_SHA to $current_head_sha before posting."
+            exit 1
+          }
       - name: Post OpenCode OpenRouter review
         id: poster
         uses: ./.trusted-review-action/.github/actions/code-review-poster
@@ -269,6 +282,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       agent_outcome: ${{ steps.review.outputs.agent_outcome }}
@@ -317,6 +331,18 @@ jobs:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
+      - name: Require the selected PR head before posting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
+          [ "$current_head_sha" = "$SELECTED_HEAD_SHA" ] || {
+            echo "::error::PR head changed from $SELECTED_HEAD_SHA to $current_head_sha before posting."
+            exit 1
+          }
       - name: Post OpenCode Zen review
         id: poster
         uses: ./.trusted-review-action/.github/actions/code-review-poster
@@ -341,12 +367,16 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     steps:
       - name: Validate final review outcome
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
           GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
           REVIEW_REQUIRED: ${{ vars.CODE_REVIEW_REQUIRED }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
           OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
@@ -367,6 +397,12 @@ jobs:
             review) ;;
             *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
           esac
+
+          current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
+          [ "$current_head_sha" = "$SELECTED_HEAD_SHA" ] || {
+            echo "::error::PR head changed from $SELECTED_HEAD_SHA to $current_head_sha before completion."
+            exit 1
+          }
 
           provider_failed() {
             [ "$1" = success ] || return 0

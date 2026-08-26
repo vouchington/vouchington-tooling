@@ -1,23 +1,12 @@
 name: CI request final code review
 
 on:
-  workflow_call:
-    inputs:
-      pr-number:
-        required: true
-        type: number
-      tested-head-sha:
-        required: true
-        type: string
-      trusted-secret-context:
-        required: true
-        type: boolean
-    secrets:
-      CODE_REVIEW_TRIGGER_TOKEN:
-        required: false
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 concurrency:
-  group: ci-request-final-code-review-${{ github.run_id }}
+  group: ci-request-final-code-review-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
 
 permissions: {}
@@ -27,40 +16,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: write
       contents: read
+      issues: write
       pull-requests: read
     steps:
       - name: Request final code review
         env:
           GH_TOKEN: ${{ github.token }}
-          TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}
-          PR_NUMBER: ${{ inputs.pr-number }}
-          TESTED_HEAD_SHA: ${{ inputs.tested-head-sha }}
-          TRUSTED_SECRET_CONTEXT: ${{ inputs.trusted-secret-context }}
+          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          TESTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           REQUESTED_LABEL: final-code-review:requested
         run: |
           set -euo pipefail
 
-          case "$TRUSTED_SECRET_CONTEXT" in
-            true|false) ;;
-            *)
-              echo "::error::trusted-secret-context must be exactly true or false"
-              exit 1
-              ;;
-          esac
-
-          if [ "$TRUSTED_SECRET_CONTEXT" != true ]; then
-            echo "Skipping the secret-backed review request for an untrusted PR."
+          if [ "$SOURCE_EVENT" != pull_request ] || [ -z "$PR_NUMBER" ]; then
+            echo 'Ignoring a CI run that is not associated with a pull request.'
             exit 0
           fi
-          if [ -z "$TRIGGER_TOKEN" ]; then
-            echo "::error::CODE_REVIEW_TRIGGER_TOKEN is required for trusted PRs."
-            exit 1
+          tests_passed="$(gh run view "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs \
+            --jq '[.jobs[] | select(.name == "tests" and .conclusion == "success")] | length')"
+          if [ "$tests_passed" -eq 0 ]; then
+            echo "Skipping final review because run $SOURCE_RUN_ID did not pass the tests fan-in."
+            exit 0
           fi
 
-          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid,isDraft)"
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid,isDraft,isCrossRepository,author)"
           current_head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
           is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
+          is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
+          actor="$(jq -r '.author.login' <<< "$pr_json")"
+          if [ "$is_cross_repository" = true ] || [ "$actor" = 'dependabot[bot]' ] || \
+            [ "$actor" = 'renovate[bot]' ]; then
+            echo 'Skipping the provider review request for an untrusted PR.'
+            exit 0
+          fi
           if [ "$is_draft" = true ]; then
             echo "Skipping final code review because PR #$PR_NUMBER is a draft."
             exit 0
@@ -71,10 +65,14 @@ jobs:
           fi
 
           encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
-          env GH_TOKEN="$TRIGGER_TOKEN" gh api --method DELETE \
+          gh api --method DELETE \
             "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
             --silent || true
-          env GH_TOKEN="$TRIGGER_TOKEN" gh api --method POST \
+          gh api --method POST \
             "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
             -f "labels[]=$REQUESTED_LABEL" \
             --silent
+          gh workflow run final-code-review.yml --repo "$GITHUB_REPOSITORY" \
+            --ref "$DEFAULT_BRANCH" \
+            -f "pr_number=$PR_NUMBER" \
+            -f "reason=CI tests passed for $TESTED_HEAD_SHA"

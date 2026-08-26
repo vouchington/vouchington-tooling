@@ -166,7 +166,7 @@ if [ -n "$EXPECTED_SHA256" ] || [ "$NO_CHECKSUM" != 1 ]; then
     expected="$EXPECTED_SHA256"
   elif [ -n "$checksums_name" ]; then
     curl -fsSL -o "${archive}.checksums" "${base_url}/${checksums_name}"
-    expected=$(grep -F "$asset_name" "${archive}.checksums" | awk '{print $1}')
+    expected=$(awk -v file="$asset_name" '$2 == file || $2 == "*" file { print $1 }' "${archive}.checksums")
     rm "${archive}.checksums"
   else
     curl -fsSL -o "${archive}.sha256" "${base_url}/${asset_name}.sha256"

@@ -12,6 +12,7 @@ type Job = {
   steps?: Array<{
     env?: Record<string, string>
     if?: string
+    name?: string
     run?: string
     uses?: string
     with?: Record<string, string>
@@ -27,6 +28,9 @@ const finalReview = load(
   readFileSync('.github/workflows/final-code-review.yml', 'utf8'),
 ) as Workflow
 const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8')) as Workflow
+const requestReview = load(
+  readFileSync('.github/workflows/ci-request-final-code-review.yml', 'utf8'),
+) as Workflow
 
 describe('final code review workflow', () => {
   it('uses a non-cancelling label-triggered lane and a stable gate', () => {
@@ -68,7 +72,7 @@ describe('final code review workflow', () => {
     const job = finalReview.jobs?.[jobName]
     expect(job?.['continue-on-error']).toBe(true)
     expect(job?.permissions?.['pull-requests']).toBe('read')
-    expect(job?.permissions?.issues).toBeUndefined()
+    expect(job?.permissions?.issues).toBe('read')
     const reviewStep = job?.steps?.find((step) => step.uses?.includes('opencode-code-review'))
     expect(reviewStep?.uses).toBe('./.trusted-review-action/.github/actions/opencode-code-review')
     expect(reviewStep?.with?.model).toBe(`\${{ vars.${model} }}`)
@@ -80,6 +84,9 @@ describe('final code review workflow', () => {
     for (const jobName of ['opencode-code-review-poster', 'opencode-zen-code-review-poster']) {
       const job = finalReview.jobs?.[jobName]
       expect(job?.permissions?.['pull-requests']).toBe('write')
+      expect(
+        job?.steps?.some((step) => step.name === 'Require the selected PR head before posting'),
+      ).toBe(true)
       const poster = job?.steps?.find((step) => step.uses?.includes('code-review-poster'))
       expect(poster?.uses).toBe('./.trusted-review-action/.github/actions/code-review-poster')
       expect(poster?.with?.token_source).toBe('github-token')
@@ -94,10 +101,19 @@ describe('CI final review fan-in', () => {
     expect(ci.jobs?.tests?.needs).toEqual(['test', 'actionlint'])
   })
 
-  it('requests review only after tests and passes untrusted PRs separately', () => {
-    expect(ci.jobs?.['request-final-code-review']?.needs).toEqual(['tests'])
-    expect(ci.jobs?.['request-final-code-review']?.if).toContain("needs.tests.result == 'success'")
+  it('passes untrusted PRs separately from the privileged request workflow', () => {
+    expect(ci.jobs?.['request-final-code-review']).toBeUndefined()
     expect(ci.jobs?.['untrusted-code-reviewed']?.name).toContain('Code Reviewed')
     expect(ci.jobs?.['untrusted-code-reviewed']?.needs).toEqual(['tests'])
+  })
+
+  it('uses default-branch workflow_run code and GITHUB_TOKEN to request trusted reviews', () => {
+    const job = requestReview.jobs?.['request-final-code-review']
+    expect(job?.permissions).toMatchObject({ actions: 'write', issues: 'write' })
+    const script = job?.steps?.at(0)?.run ?? ''
+    expect(script).toContain('gh run view "$SOURCE_RUN_ID"')
+    expect(script).toContain('.name == "tests" and .conclusion == "success"')
+    expect(script).toContain('gh workflow run final-code-review.yml')
+    expect(script).not.toContain('CODE_REVIEW_TRIGGER_TOKEN')
   })
 })

@@ -130,10 +130,9 @@ The setup expects these organization Actions variables and fails when any is mis
 - `OPENCODE_ZEN_CODE_REVIEW_MODEL`
 - `CODE_REVIEW_REQUIRED` (`true` or `false`)
 
-It also expects `OPENROUTER_FREE_API_KEY`, `OPENCODE_FREE_API_KEY`, and
-`CODE_REVIEW_TRIGGER_TOKEN` as organization Actions secrets. The trigger token is a fine-grained
-token scoped to this repository with only Issues read/write (plus implicit Metadata read); normal
-PR reads and all final state updates use `GITHUB_TOKEN`.
+It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
+secrets. A default-branch `workflow_run` applies the request label and dispatches the final workflow
+with a scoped `GITHUB_TOKEN`; no long-lived trigger token is required.
 
 ## CLI
 
