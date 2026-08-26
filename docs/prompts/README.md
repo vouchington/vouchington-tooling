@@ -22,6 +22,10 @@ The request and completion jobs use `pull-requests: write` for label transitions
 those pull-request label mutations when the workflow token has only `issues: write`, even though the
 labels API is exposed under the issues endpoint.
 
+The ruleset-facing `Code Reviewed` context is an explicit check attached to the selected PR head.
+The workflow job that publishes it has a different name so GitHub cannot satisfy the required
+context with the automatic job check.
+
 To request another provider review after the initial review completes, remove the
 `final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
 still has a successful `tests` fan-in before running the providers again and restores the
