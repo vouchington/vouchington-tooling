@@ -365,11 +365,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      checks: write
       contents: read
       issues: write
       pull-requests: read
     steps:
       - name: Validate final review outcome
+        id: gate
+        continue-on-error: true
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
@@ -424,7 +427,11 @@ jobs:
           fi
 
       - name: Mark final review complete
-        if: needs.select-final-review.outputs.gate_status == 'review'
+        id: mark_complete
+        if: >-
+          steps.gate.outcome == 'success' &&
+          needs.select-final-review.outputs.gate_status == 'review'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
@@ -440,7 +447,11 @@ jobs:
             --silent || true
 
       - name: Clear a redundant request label
-        if: needs.select-final-review.outputs.gate_status == 'complete'
+        id: clear_request
+        if: >-
+          steps.gate.outcome == 'success' &&
+          needs.select-final-review.outputs.gate_status == 'complete'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
@@ -451,3 +462,51 @@ jobs:
           gh api --method DELETE \
             "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
             --silent || true
+
+      - name: Publish Code Reviewed on the PR head
+        id: publish_check
+        if: >-
+          always() &&
+          needs.select-final-review.outputs.gate_status != 'ignore' &&
+          needs.select-final-review.outputs.gate_status != 'untrusted'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+          MARK_OUTCOME: ${{ steps.mark_complete.outcome }}
+          CLEAR_OUTCOME: ${{ steps.clear_request.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SELECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::Cannot publish Code Reviewed without the selected PR head SHA.'
+            exit 1
+          fi
+          conclusion=success
+          if [ "$GATE_OUTCOME" != success ]; then conclusion=failure; fi
+          if [ "$GATE_STATUS" = review ] && [ "$MARK_OUTCOME" != success ]; then conclusion=failure; fi
+          if [ "$GATE_STATUS" = complete ] && [ "$CLEAR_OUTCOME" != success ]; then conclusion=failure; fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name='Code Reviewed' \
+            -f "head_sha=$SELECTED_HEAD_SHA" \
+            -f status=completed \
+            -f "conclusion=$conclusion" \
+            --silent
+          echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+          [ "$conclusion" = success ]
+
+      - name: Require the published gate outcome
+        if: always()
+        env:
+          GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish_check.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$GATE_STATUS" = ignore ] || [ "$GATE_STATUS" = untrusted ]; then
+            [ "$GATE_OUTCOME" = success ]
+            exit
+          fi
+          [ "$GATE_OUTCOME" = success ]
+          [ "$PUBLISH_OUTCOME" = success ]

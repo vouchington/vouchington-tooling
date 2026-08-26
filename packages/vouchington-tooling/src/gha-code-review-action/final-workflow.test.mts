@@ -92,6 +92,20 @@ describe('final code review workflow', () => {
       expect(poster?.with?.token_source).toBe('github-token')
     }
   })
+
+  it('publishes the stable gate as an explicit check run on the selected PR head', () => {
+    const gate = finalReview.jobs?.['code-reviewed']
+    expect(gate?.permissions?.checks).toBe('write')
+    const publish = gate?.steps?.find(
+      (step) => step.name === 'Publish Code Reviewed on the PR head',
+    )
+    expect(publish?.env?.SELECTED_HEAD_SHA).toBe(
+      '${{ needs.select-final-review.outputs.head_sha }}',
+    )
+    expect(publish?.run).toContain('repos/$GITHUB_REPOSITORY/check-runs')
+    expect(publish?.run).toContain("-f name='Code Reviewed'")
+    expect(publish?.run).toContain('-f "head_sha=$SELECTED_HEAD_SHA"')
+  })
 })
 
 describe('CI final review fan-in', () => {
@@ -105,6 +119,9 @@ describe('CI final review fan-in', () => {
     expect(ci.jobs?.['request-final-code-review']).toBeUndefined()
     expect(ci.jobs?.['untrusted-code-reviewed']?.name).toContain('Code Reviewed')
     expect(ci.jobs?.['untrusted-code-reviewed']?.needs).toEqual(['tests'])
+    const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
+    expect(ciText).toContain('github.event.pull_request.user.login')
+    expect(ciText).not.toContain("github.actor == 'dependabot[bot]'")
   })
 
   it('uses default-branch workflow_run code and GITHUB_TOKEN to request trusted reviews', () => {

@@ -16,6 +16,8 @@ import { describe, expect, it } from 'vitest'
 const buildPrompt = resolve('.github/actions/opencode-code-review/build-prompt.sh')
 const installCli = resolve('.github/actions/opencode-code-review/install-opencode-cli.sh')
 const installText = readFileSync(installCli, 'utf8')
+const actionText = readFileSync('.github/actions/opencode-code-review/action.yml', 'utf8')
+const pinnedVersion = /OPENCODE_VERSION: '([^']+)'/u.exec(actionText)?.[1]
 
 describe('opencode-code-review scripts', () => {
   it('rejects extra_prompt unless the caller is private and writes a file-only prompt', () => {
@@ -65,6 +67,11 @@ describe('opencode-code-review scripts', () => {
     expect(installText).toContain('anomalyco/opencode')
     expect(installText).toContain('install-github-release.sh')
     expect(installText).toContain('--expected-sha256')
+    expect(pinnedVersion).toMatch(/^\d+\.\d+\.\d+$/u)
+    expect(installText).toContain(`${pinnedVersion}-Linux-x86_64`)
+    expect(installText).toContain(`${pinnedVersion}-Linux-aarch64`)
+    expect(installText).toContain(`${pinnedVersion}-Darwin-x86_64`)
+    expect(installText).toContain(`${pinnedVersion}-Darwin-arm64`)
     expect(installText).toContain(
       'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
     )
@@ -120,7 +127,7 @@ describe('opencode-code-review scripts', () => {
           PATH: `${stubUnames}:${process.env.PATH ?? ''}`,
           GITHUB_ACTION_PATH: actionPath,
           GITHUB_OUTPUT: output,
-          OPENCODE_VERSION: 'ci-fixture',
+          OPENCODE_VERSION: pinnedVersion,
           OPENCODE_HOME: join(root, 'home'),
         },
       })
@@ -131,7 +138,7 @@ describe('opencode-code-review scripts', () => {
         'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
       )
       expect(readFileSync(output, 'utf8')).toContain(
-        `bin=${join(root, 'home/opencode-vci-fixture/bin/opencode')}`,
+        `bin=${join(root, `home/opencode-v${pinnedVersion}/bin/opencode`)}`,
       )
     } finally {
       rmSync(root, { recursive: true, force: true })

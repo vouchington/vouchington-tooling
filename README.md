@@ -76,8 +76,11 @@ Centralized Cursor marketplace publication is not part of this repository change
 
 Pin by commit SHA. The public actions never take a free-text `prompt` input. Prompt text comes from
 trusted files on `trusted_prompt_ref`. `extra_prompt` is rejected unless the calling repository is
-private. The default prompts live in [`docs/prompts/code-review.md`](./docs/prompts/code-review.md)
-and [`docs/prompts/code-review-inline-comments.md`](./docs/prompts/code-review-inline-comments.md).
+private. This repository's automatic review pins its prompts to
+[`docs/prompts/code-review.md`](./docs/prompts/code-review.md) and
+[`docs/prompts/code-review-inline-comments.md`](./docs/prompts/code-review-inline-comments.md);
+the public actions retain the caller-owned `.agents/skills/agent-workflow/code-review-prompt.md`
+default for compatibility.
 The payload contract requires every finding to be an inline comment so repository rules can require
 thread resolution. There is no `@claude` mention workflow.
 
