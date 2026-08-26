@@ -22,7 +22,8 @@ The request and completion jobs use `pull-requests: write` for label transitions
 those pull-request label mutations when the workflow token has only `issues: write`, even though the
 labels API is exposed under the issues endpoint.
 
-To request another provider review after the once-per-PR review completes, remove the
-`final-code-review:complete` label. The label workflow rechecks that the current head passed `tests`
-before running the providers again and restores the complete label only after the configured gate
-succeeds.
+To request another provider review after the initial review completes, remove the
+`final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
+still has a successful `tests` fan-in before running the providers again and restores the
+`final-code-review:complete` label only after the `Code Reviewed` gate, including any required
+providers, succeeds.
