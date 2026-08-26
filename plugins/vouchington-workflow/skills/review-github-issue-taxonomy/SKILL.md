@@ -15,8 +15,12 @@ local configuration edits or live taxonomy mutation; read local `AGENTS.md` and 
 3. Audit aliases, ambiguity, unused labels, missing descriptions, color consistency, milestone
    overlap, delivery gaps, and path-label coverage.
 4. Return exact recommendations with migration impact and separate safe cleanup from decisions that
-   require product or scheduling judgment.
-5. Re-fetch current state immediately before any explicitly authorized mutation.
+   require product or scheduling judgment. Applying an existing label is not taxonomy creation and
+   needs no separate approval from the authorized issue operation.
+5. Before creating a label, stop for explicit approval naming its exact repository, name,
+   description, and color. Re-fetch current state and enforce the repository gate from
+   [github-issue](../github-issue/SKILL.md) immediately before the approved mutation; approval for an
+   issue or another label does not transfer.
 
 Do not create or change labels, milestones, issues, or local files for a recommendation-only
 request. This skill does not define a repository's taxonomy or automation file locations; a

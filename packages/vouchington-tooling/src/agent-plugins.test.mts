@@ -116,7 +116,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.2.0')
+      expect(manifest.version).toBe('0.2.1')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -199,5 +199,41 @@ describe('vouchington-workflow plugin', () => {
     }
     expect(skills[0]).toContain('every applicable')
     expect(skills[0]).not.toContain('assigned non-main worktree')
+  })
+
+  it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
+    const readSkill = (name: string): Promise<string> =>
+      readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
+    const [issue, organize, taxonomy, revisit, distill] = await Promise.all([
+      readSkill('github-issue'),
+      readSkill('organize-github-issues'),
+      readSkill('review-github-issue-taxonomy'),
+      readSkill('revisit-followups'),
+      readSkill('retrospective-distill'),
+    ])
+    const normalizedIssue = issue.replaceAll(/\s+/g, ' ')
+
+    expect(normalizedIssue).toMatch(/before every write.*canonical identity still matches/i)
+    expect(normalizedIssue).toMatch(/issues are enabled.*it is not archived/i)
+    expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
+    expect(normalizedIssue).toMatch(/Creation additionally.*`viewerCanCreateIssues`/i)
+    expect(normalizedIssue).toMatch(/`READ`, `NONE`.*hard deny.*approval cannot override/i)
+    expect(normalizedIssue).toMatch(/external creation target is denied.*tracking issue/i)
+    expect(normalizedIssue).toMatch(/copy-ready report/i)
+    expect(normalizedIssue).toMatch(/authorization to file the external issue.*tracking fallback/i)
+    expect(normalizedIssue).toMatch(/Refetch that tracker.*same gate immediately before its write/i)
+    expect(normalizedIssue).toMatch(/If no tracker passes, return the draft without mutation/i)
+    expect(normalizedIssue).toMatch(/matching existing labels without separate approval/i)
+    expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
+    expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
+    expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
+    expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
+    expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')
+    for (const skill of [issue, organize, taxonomy, revisit, distill]) {
+      expect(skill).not.toMatch(/filaments|voucha|jonathanong|vouchington\//i)
+    }
   })
 })
