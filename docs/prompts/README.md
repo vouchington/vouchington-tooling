@@ -17,3 +17,7 @@ security policy rather than mutable organization settings.
 
 The default-branch request workflow owns the narrow write boundary for PR labels and final-workflow
 dispatch. Provider jobs remain read-only; only trusted poster jobs can write review comments.
+
+The request and completion jobs use `pull-requests: write` for label transitions. GitHub rejects
+those pull-request label mutations when the workflow token has only `issues: write`, even though the
+labels API is exposed under the issues endpoint.
