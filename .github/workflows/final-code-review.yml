@@ -373,7 +373,7 @@ jobs:
           token_source: github-token
 
   code-reviewed:
-    name: ${{ needs.select-final-review.outputs.gate_status == 'ignore' && 'Ignored Final Code Review' || 'Code Reviewed' }}
+    name: ${{ needs.select-final-review.outputs.gate_status == 'ignore' && 'Ignored Final Code Review' || 'Publish final review result' }}
     needs:
       - select-final-review
       - validate-review-settings
