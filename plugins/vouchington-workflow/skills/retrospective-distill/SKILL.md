@@ -14,7 +14,9 @@ Use when completed retrospectives or journals should become durable follow-up wo
 3. Verify each candidate against the current base and search existing issues and open changes before
    drafting. Skip work that is complete, explicitly rejected, or already covered.
 4. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
-   evidence embedded in the body. Follow local approval and taxonomy policy before creating them.
+   evidence embedded in the body. Route every authorized creation through
+   [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
+   denied-external tracking behavior.
 5. Archive only records that were fully processed under the repository's retention rules; report
    created, updated, skipped, and deferred themes with reasons.
 

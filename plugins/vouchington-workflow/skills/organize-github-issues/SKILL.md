@@ -9,11 +9,14 @@ Use for issue hygiene, priority normalization, and milestone assignment. Read lo
 `CLAUDE.md`, and live taxonomy guidance before acting.
 
 1. Confirm repository identity and fetch the live labels, milestone descriptions, and all required
-   in-scope issue or pull-request evidence before mutating anything.
+   in-scope issue or pull-request evidence. Before mutating, enforce the operation-specific gate from
+   [github-issue](../github-issue/SKILL.md); pull-request metadata does not require issues to be
+   enabled.
 2. Classify from the permitted metadata and discussion evidence, not implementation guesses. Keep
    automation, ownership, and provenance labels unless local policy explicitly permits changes.
-3. Apply only existing labels and milestones. Do not create taxonomy, close work, rewrite bodies,
-   or alter titles unless the caller separately authorizes that scope.
+3. Apply only existing labels and milestones without requesting separate label approval. Do not
+   create taxonomy, close work, rewrite bodies, or alter titles unless the caller separately
+   authorizes that scope.
 4. In review mode, report the exact proposed metadata changes without mutating. In apply mode, make
    only necessary, idempotent updates.
 5. Refetch every touched item and verify the requested metadata changed while protected metadata

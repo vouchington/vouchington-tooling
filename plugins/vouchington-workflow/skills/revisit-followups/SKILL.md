@@ -17,8 +17,10 @@ issue policy, and review-record conventions first.
 4. Group related candidates into self-contained issue drafts that preserve the original evidence and
    explain why the work remains needed.
 5. Remain read-only unless the caller or consumer wrapper explicitly authorizes issue creation. If
-   authorized, create only the approved candidates, then clean up temporary collection artifacts
-   and report skipped, covered, and created items.
+   authorized, route every candidate through
+   [github-issue](../github-issue/SKILL.md), including its denied-external tracking behavior; do not
+   duplicate repository or label authorization. Then clean up temporary collection artifacts and
+   report skipped, covered, and created items.
 
 Do not assume a review journal format, default lookback, hosting provider, repository, issue
 taxonomy, or confirmation mechanism. Consumer wrappers own those integrations.

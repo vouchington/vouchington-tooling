@@ -18,7 +18,10 @@ commit, GitHub Actions, package-metadata, static-analysis, planning, issue-manag
 blackboard journaling, retrospective and follow-up review, CI-log review, and
 pull-request-description skills. Both plugins use one canonical
 `skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in
-`AGENTS.md`, `CLAUDE.md`, or thin wrapper skills.
+`AGENTS.md`, `CLAUDE.md`, or thin wrapper skills. The portable issue workflow verifies live
+collaborator authority before creation, routes denied external work to a verified consumer tracker,
+uses existing labels without extra approval, and requires explicit approval before creating labels.
+Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
 
 `security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
 handoff, while each consuming repository owns issue taxonomy and issue creation.
