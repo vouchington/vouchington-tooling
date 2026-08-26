@@ -2,7 +2,6 @@ export {
   MAX_REVIEW_COMMENTS,
   MAX_REVIEW_PAYLOAD_BYTES,
   ReviewPayloadError,
-  bodyOnlyReviewFallback,
   parseReviewPayload,
   reviewCommentSubject,
 } from './payload.mts'

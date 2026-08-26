@@ -76,7 +76,13 @@ Centralized Cursor marketplace publication is not part of this repository change
 
 Pin by commit SHA. The public actions never take a free-text `prompt` input. Prompt text comes from
 trusted files on `trusted_prompt_ref`. `extra_prompt` is rejected unless the calling repository is
-private. There is no `@claude` mention workflow.
+private. This repository's automatic review pins its prompts to
+[`docs/prompts/code-review.md`](./docs/prompts/code-review.md) and
+[`docs/prompts/code-review-inline-comments.md`](./docs/prompts/code-review-inline-comments.md);
+the public actions retain the caller-owned `.agents/skills/agent-workflow/code-review-prompt.md`
+default for compatibility.
+The payload contract requires every finding to be an inline comment so repository rules can require
+thread resolution. There is no `@claude` mention workflow.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/code-review@<sha>
@@ -111,6 +117,27 @@ jobs:
     secrets:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
+
+This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen only
+after the `tests` fan-in succeeds on a ready-for-review, same-repository pull request. Forks,
+Dependabot, and Renovate never receive review secrets and instead receive a pass-through
+`Code Reviewed` gate after tests. A non-cancelling label workflow records the once-per-PR state with
+`final-code-review:requested` and `final-code-review:complete`; removing the complete label requests
+a fresh review. A complete label is accepted only when a prior PR commit has a successful
+GitHub-Actions-owned `Code Reviewed` check, preventing a manually applied label from bypassing the
+first review.
+
+The setup expects these organization Actions variables and fails when any is missing or malformed:
+
+- `OPENCODE_CODE_REVIEW_ENABLED` (`true` or `false`)
+- `OPENCODE_CODE_REVIEW_MODEL`
+- `OPENCODE_ZEN_CODE_REVIEW_ENABLED` (`true` or `false`)
+- `OPENCODE_ZEN_CODE_REVIEW_MODEL`
+- `CODE_REVIEW_REQUIRED` (`true` or `false`)
+
+It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
+secrets. A default-branch `workflow_run` applies the request label and dispatches the final workflow
+with a scoped `GITHUB_TOKEN`; no long-lived trigger token is required.
 
 ## CLI
 

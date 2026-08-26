@@ -135,7 +135,7 @@ describe('runPostReview', () => {
     expect(removed).toEqual([PAYLOAD_PATH])
   })
 
-  it('keeps the first 15 comments and lists the rest in the body', () => {
+  it('rejects payloads with more than 15 inline comments', () => {
     const comments = Array.from({ length: MAX_COMMENTS + 1 }, (_, index) =>
       makeComment({ line: index + 1, path: `src/${index + 1}.mts`, body: `Finding ${index + 1}` }),
     )
@@ -143,36 +143,24 @@ describe('runPostReview', () => {
       file: JSON.stringify({ body: 'Verdict.', comments }),
     })
 
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
-    expect(posts[0]?.comments).toHaveLength(MAX_COMMENTS)
-    expect(posts[0]?.body).toContain('Verdict.')
-    expect(posts[0]?.body).toContain('src/16.mts:16')
-    expect(posts[0]?.body).toContain('Finding 16')
+    expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow(
+      `more than ${MAX_COMMENTS} inline comments`,
+    )
+    expect(posts).toEqual([])
   })
 
-  it('retries once as body-only COMMENT after a 422', () => {
+  it('does not retry a rejected inline review as a body-only review', () => {
     const { io, posts } = makeIo({
       file: JSON.stringify({
         body: 'Verdict.',
         comments: [makeComment({ path: 'src/bad.mts', line: 3, body: 'Invalid line' })],
       }),
-      posts: [
-        { ok: false, status: 422, body: 'Validation Failed' },
-        { ok: true, status: 201, body: '' },
-      ],
+      posts: [{ ok: false, status: 422, body: 'Validation Failed' }],
     })
 
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
-    expect(posts).toHaveLength(2)
+    expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow('GitHub review POST failed (HTTP 422)')
+    expect(posts).toHaveLength(1)
     expect(posts[0]?.comments).toHaveLength(1)
-    expect(posts[1]).toMatchObject({
-      event: 'COMMENT',
-      commit_id: HEAD_SHA,
-      comments: [],
-    })
-    expect(posts[1]?.body).toContain('src/bad.mts:3')
-    expect(posts[1]?.body).toContain('Invalid line')
-    expect(posts[1]?.body).toContain('HTTP 422')
   })
 
   it('does not retry a non-422 failure and still removes the file', () => {
@@ -183,19 +171,6 @@ describe('runPostReview', () => {
 
     expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow(PostReviewError)
     expect(posts).toHaveLength(1)
-    expect(removed).toEqual([PAYLOAD_PATH])
-  })
-
-  it('throws when the 422 fallback POST also fails', () => {
-    const { io, posts, removed } = makeIo({
-      file: JSON.stringify({ body: 'Verdict.', comments: [] }),
-      posts: [
-        { ok: false, status: 422, body: 'Validation Failed' },
-        { ok: false, status: 500, body: 'still bad' },
-      ],
-    })
-    expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow('GitHub review POST retry failed')
-    expect(posts).toHaveLength(2)
     expect(removed).toEqual([PAYLOAD_PATH])
   })
 
@@ -226,31 +201,6 @@ describe('runPostReview', () => {
     )
   })
 
-  it('lists remapped comments on the last-resort 422 body retry', () => {
-    const { io, posts } = makeIo({
-      file: JSON.stringify({
-        body: 'Verdict.',
-        comments: [makeComment({ path: 'src/hook.ts', line: 40, body: 'out of hunk' })],
-      }),
-      files: [
-        {
-          filename: 'src/hook.ts',
-          patch: `@@ -9,24 +9,24 @@\n${Array.from({ length: 24 }, () => ' unchanged').join('\n')}\n`,
-        },
-      ],
-      posts: [
-        { ok: false, status: 422, body: 'Validation Failed' },
-        { ok: true, status: 201, body: '' },
-      ],
-    })
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
-    expect(posts[0]?.comments.map((entry) => entry.line)).toEqual([32])
-    expect(posts[1]?.comments).toEqual([])
-    expect(posts[1]?.body).toContain('src/hook.ts:32')
-    expect(posts[1]?.body).toContain(snapNote('src/hook.ts', 40))
-    expect(posts[1]?.body).toContain('HTTP 422')
-  })
-
   it('falls back to posting the parsed payload when listPullFiles throws', () => {
     const { io, posts } = makeIo({
       file: JSON.stringify({
@@ -267,7 +217,7 @@ describe('runPostReview', () => {
     ])
   })
 
-  it('drops comments that are missing start_side or a usable body', () => {
+  it('rejects comments that are missing start_side or a usable body', () => {
     const { io, posts } = makeIo({
       file: JSON.stringify({
         body: 'Verdict.',
@@ -279,7 +229,9 @@ describe('runPostReview', () => {
       }),
     })
 
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
-    expect(posts[0]?.comments).toEqual([makeComment({ path: 'src/c.mts', line: 9, body: 'kept' })])
+    expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow(
+      'Every finding must be a valid inline comment',
+    )
+    expect(posts).toEqual([])
   })
 })

@@ -16,6 +16,8 @@ import { describe, expect, it } from 'vitest'
 const buildPrompt = resolve('.github/actions/opencode-code-review/build-prompt.sh')
 const installCli = resolve('.github/actions/opencode-code-review/install-opencode-cli.sh')
 const installText = readFileSync(installCli, 'utf8')
+const actionText = readFileSync('.github/actions/opencode-code-review/action.yml', 'utf8')
+const pinnedVersion = /OPENCODE_VERSION: '([^']+)'/u.exec(actionText)?.[1]
 
 describe('opencode-code-review scripts', () => {
   it('rejects extra_prompt unless the caller is private and writes a file-only prompt', () => {
@@ -64,8 +66,24 @@ describe('opencode-code-review scripts', () => {
   it('pins OpenCode releases and delegates install to the packaged GitHub-release helper', () => {
     expect(installText).toContain('anomalyco/opencode')
     expect(installText).toContain('install-github-release.sh')
-    expect(installText).toContain('--no-checksum')
-    expect(installText).toContain('# integrity-check: skip reason=opencode-releases-no-checksums')
+    expect(installText).toContain('--expected-sha256')
+    expect(pinnedVersion).toMatch(/^\d+\.\d+\.\d+$/u)
+    expect(installText).toContain(`${pinnedVersion}-Linux-x86_64`)
+    expect(installText).toContain(`${pinnedVersion}-Linux-aarch64`)
+    expect(installText).toContain(`${pinnedVersion}-Darwin-x86_64`)
+    expect(installText).toContain(`${pinnedVersion}-Darwin-arm64`)
+    expect(installText).toContain(
+      'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
+    )
+    expect(installText).toContain(
+      'd30d2cba74617f4e7b96e25563c9572ffe453f9eae70fc0df16286813537ee72',
+    )
+    expect(installText).toContain(
+      '405559e5873a9131ff6bcafc413f46d4f199b4401f232d00bcd301d97ea7cdfc',
+    )
+    expect(installText).toContain(
+      '72f4b6029af185eb030995cfa062d038914e3142c9aa38f714fe56448e6e87d2',
+    )
     expect(installText).toContain('opencode-linux-x64.tar.gz')
     const root = mkdtempSync(join(tmpdir(), 'opencode-install-'))
     const actionPath = join(root, '.github/actions/opencode-code-review')
@@ -109,15 +127,18 @@ describe('opencode-code-review scripts', () => {
           PATH: `${stubUnames}:${process.env.PATH ?? ''}`,
           GITHUB_ACTION_PATH: actionPath,
           GITHUB_OUTPUT: output,
-          OPENCODE_VERSION: 'ci-fixture',
+          OPENCODE_VERSION: pinnedVersion,
           OPENCODE_HOME: join(root, 'home'),
         },
       })
       expect({ status: result.status, stderr: result.stderr }).toMatchObject({ status: 0 })
       expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain('anomalyco/opencode')
       expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain('opencode-linux-x64.tar.gz')
+      expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain(
+        'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
+      )
       expect(readFileSync(output, 'utf8')).toContain(
-        `bin=${join(root, 'home/opencode-vci-fixture/bin/opencode')}`,
+        `bin=${join(root, `home/opencode-v${pinnedVersion}/bin/opencode`)}`,
       )
     } finally {
       rmSync(root, { recursive: true, force: true })

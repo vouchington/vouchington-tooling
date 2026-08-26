@@ -72,7 +72,7 @@ check-cache-size <path> <max-bytes> <label>
 make-shard-matrix <total>
 load-runner-env
 clean-workspace
-install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name [--tag-prefix PREFIX] [--no-checksum] [--checksums-asset NAME] [--version-flag FLAG] [--bin-dir DIR]
+install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name [--tag-prefix PREFIX] [--expected-sha256 SHA256] [--no-checksum] [--checksums-asset NAME] [--version-flag FLAG] [--bin-dir DIR]
 run-with-timeout <timeout-seconds> <kill-after-seconds> <command...>
 lint-links [--offline] [--config PATH] [--glob PATTERN] [files...]
 materialize-pr-context

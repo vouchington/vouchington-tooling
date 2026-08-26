@@ -4,7 +4,6 @@ import {
   MAX_REVIEW_COMMENTS,
   MAX_REVIEW_PAYLOAD_BYTES,
   ReviewPayloadError,
-  bodyOnlyReviewFallback,
   parseReviewPayload,
 } from './payload.mts'
 
@@ -40,12 +39,7 @@ describe('parseReviewPayload', () => {
           commit_id: 'attacker-controlled',
           extra: 'dropped',
           body: 'Verdict.',
-          comments: [
-            comment(1, { extra: 'dropped', start_line: 1, start_side: 'RIGHT' }),
-            comment(2, { path: 'bad\u0000path' }),
-            comment(3, { line: 0 }),
-            comment(4, { start_line: 5, start_side: 'RIGHT' }),
-          ],
+          comments: [comment(1, { extra: 'dropped', start_line: 1, start_side: 'RIGHT' })],
         }),
       ),
       COMMIT_ID,
@@ -67,7 +61,7 @@ describe('parseReviewPayload', () => {
     })
   })
 
-  it('drops every malformed comment shape and defaults non-array comments', () => {
+  it('rejects malformed comments and non-array comments', () => {
     const malformed = [
       null,
       'comment',
@@ -82,38 +76,59 @@ describe('parseReviewPayload', () => {
       { path: 'x', line: 1, side: 'RIGHT', body: 'x', start_line: 2, start_side: 'RIGHT' },
       { path: 'x', line: 1, side: 'RIGHT', body: 'x', start_line: 1, start_side: 'MIDDLE' },
     ]
-    expect(
+    for (const malformedComment of malformed) {
+      expect(() =>
+        parseReviewPayload(
+          Buffer.from(JSON.stringify({ body: 'summary', comments: [malformedComment] })),
+          COMMIT_ID,
+        ),
+      ).toThrow('Every finding must be a valid inline comment')
+    }
+    expect(() =>
       parseReviewPayload(
-        Buffer.from(JSON.stringify({ body: 'fallback', comments: malformed })),
+        Buffer.from(JSON.stringify({ body: 'summary', comments: 'wrong' })),
         COMMIT_ID,
       ),
-    ).toEqual({ event: 'COMMENT', commit_id: COMMIT_ID, body: 'fallback', comments: [] })
-    expect(
+    ).toThrow('comments must be an array')
+  })
+
+  it('rejects findings over the inline comment cap', () => {
+    expect(() =>
       parseReviewPayload(
-        Buffer.from(JSON.stringify({ body: 'no comments', comments: 'wrong' })),
+        Buffer.from(
+          JSON.stringify({
+            comments: Array.from({ length: MAX_REVIEW_COMMENTS + 1 }, (_, i) => comment(i + 1)),
+          }),
+        ),
         COMMIT_ID,
       ),
-    ).toEqual({ event: 'COMMENT', commit_id: COMMIT_ID, body: 'no comments', comments: [] })
+    ).toThrow(`more than ${MAX_REVIEW_COMMENTS} inline comments`)
   })
 
-  it('keeps the first comment cap and records valid overflow in the body', () => {
-    const parsed = parseReviewPayload(
-      Buffer.from(
-        JSON.stringify({
-          comments: Array.from({ length: MAX_REVIEW_COMMENTS + 1 }, (_, i) => comment(i + 1)),
-        }),
-      ),
-      COMMIT_ID,
-    )
-    expect(parsed.comments).toHaveLength(MAX_REVIEW_COMMENTS)
-    expect(parsed.body).toContain(`## Comments over the ${MAX_REVIEW_COMMENTS}-comment cap`)
-    expect(parsed.body).toContain(`src/${MAX_REVIEW_COMMENTS + 1}.mts:${MAX_REVIEW_COMMENTS + 1}`)
-  })
-
-  it('rejects a payload with neither a body nor valid comments', () => {
+  it('rejects a payload with malformed findings and no summary', () => {
     expect(() =>
       parseReviewPayload(Buffer.from(JSON.stringify({ body: '', comments: [{}] })), COMMIT_ID),
-    ).toThrow('no review body and no valid comments')
+    ).toThrow('Every finding must be a valid inline comment')
+  })
+
+  it('accepts a body-only no-findings summary', () => {
+    expect(
+      parseReviewPayload(
+        Buffer.from(JSON.stringify({ body: 'No findings.', comments: [] })),
+        COMMIT_ID,
+      ),
+    ).toEqual({
+      event: 'COMMENT',
+      commit_id: COMMIT_ID,
+      body: 'No findings.',
+      comments: [],
+    })
+  })
+
+  it('rejects a payload without a verdict or inline findings', () => {
+    expect(() => parseReviewPayload(Buffer.from('{}'), COMMIT_ID)).toThrow(
+      'Payload has no review body and no valid comments',
+    )
   })
 
   it('uses the inline-only body when comments are valid but the body is absent', () => {
@@ -122,21 +137,7 @@ describe('parseReviewPayload', () => {
     ).toMatchObject({ body: 'Inline findings only.', comments: [comment(1)] })
   })
 })
-
-describe('bodyOnlyReviewFallback', () => {
-  it('preserves findings as body text and strips all inline comments', () => {
-    const review = parseReviewPayload(
-      Buffer.from(JSON.stringify({ body: 'Verdict.', comments: [comment(1)] })),
-      COMMIT_ID,
-    )
-    expect(bodyOnlyReviewFallback(review, 422)).toEqual({
-      event: 'COMMENT',
-      commit_id: COMMIT_ID,
-      body: expect.stringContaining('HTTP 422'),
-      comments: [],
-    })
-  })
-
+describe('trusted commit identity', () => {
   it('requires the trusted commit identity to be a full lowercase SHA', () => {
     for (const commitId of [
       '',
@@ -149,19 +150,5 @@ describe('bodyOnlyReviewFallback', () => {
         '40-character lowercase hexadecimal',
       )
     }
-  })
-
-  it('uses a status-only fallback when there is no original body or comments', () => {
-    expect(
-      bodyOnlyReviewFallback(
-        { event: 'COMMENT', commit_id: COMMIT_ID, body: '', comments: [] },
-        422,
-      ),
-    ).toEqual({
-      event: 'COMMENT',
-      commit_id: COMMIT_ID,
-      body: 'Inline findings not posted (HTTP 422).',
-      comments: [],
-    })
   })
 })
