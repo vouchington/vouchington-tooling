@@ -27,6 +27,7 @@ selected at `select-final-review` time and revalidated before publishing. For tr
 PRs, the `final-code-review` job that publishes it has a different display name, so only the explicit
 GitHub-Actions-owned check satisfies the context. Fork and bot PRs instead receive a mutually
 exclusive `Code Reviewed` pass-through job from CI after tests, without access to review secrets.
+The main-branch ruleset pins both `tests` and `Code Reviewed` to the GitHub Actions integration.
 
 To request another provider review after the initial review completes, remove the
 `final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
