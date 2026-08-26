@@ -226,6 +226,8 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/matching existing labels without separate approval/i)
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
+    expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
+    expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)

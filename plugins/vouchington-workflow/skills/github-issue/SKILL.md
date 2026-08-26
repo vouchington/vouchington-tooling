@@ -40,6 +40,12 @@ repository.
    retrying creation. Preserve history and report the action, URL, labels, and milestone.
 5. Link a pull request with a closing reference only when it fully resolves the issue. Keep
    cross-repository references fully qualified; PR creation authority remains separate.
+6. Use native sub-issues only for real hierarchy, blocked-by relationships only for genuine known
+   dependencies, and prose links for merely related work. Read every created relationship back.
+
+For batch creation, preflight every entry before writing any issue and fail the whole batch when one
+entry is invalid. A partial transport failure stops further creation and reports every issue already
+created; never retry successful entries.
 
 This skill supplies no repository allowlist, taxonomy, issue template, credential, or CLI wrapper.
 Consumer wrappers define local defaults and may impose stricter policy, but may not weaken this gate.
