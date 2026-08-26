@@ -21,3 +21,9 @@ dispatch. Provider jobs remain read-only; only trusted poster jobs can write rev
 The request and completion jobs use `pull-requests: write` for label transitions. GitHub rejects
 those pull-request label mutations when the workflow token has only `issues: write`, even though the
 labels API is exposed under the issues endpoint.
+
+To request another provider review after the initial review completes, remove the
+`final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
+still has a successful `tests` fan-in before running the providers again and restores the
+`final-code-review:complete` label only after the `Code Reviewed` gate, including any required
+providers, succeeds.
