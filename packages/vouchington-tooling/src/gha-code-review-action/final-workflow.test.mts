@@ -130,7 +130,11 @@ describe('CI final review fan-in', () => {
 
   it('uses default-branch workflow_run code and GITHUB_TOKEN to request trusted reviews', () => {
     const job = requestReview.jobs?.['request-final-code-review']
-    expect(job?.permissions).toMatchObject({ actions: 'write', issues: 'write' })
+    expect(job?.permissions).toMatchObject({
+      actions: 'write',
+      issues: 'write',
+      'pull-requests': 'write',
+    })
     const script = job?.steps?.at(0)?.run ?? ''
     expect(script).toContain('gh run view "$SOURCE_RUN_ID"')
     expect(script).toContain('.name == "tests" and .conclusion == "success"')
