@@ -100,6 +100,8 @@ describe('final code review workflow', () => {
   it('publishes the stable gate as an explicit check run on the selected PR head', () => {
     const gate = finalReview.jobs?.['code-reviewed']
     expect(gate?.permissions?.checks).toBe('write')
+    expect(gate?.permissions?.issues).toBeUndefined()
+    expect(gate?.permissions?.['pull-requests']).toBe('write')
     const publish = gate?.steps?.find(
       (step) => step.name === 'Publish Code Reviewed on the PR head',
     )
@@ -132,9 +134,9 @@ describe('CI final review fan-in', () => {
     const job = requestReview.jobs?.['request-final-code-review']
     expect(job?.permissions).toMatchObject({
       actions: 'write',
-      issues: 'write',
       'pull-requests': 'write',
     })
+    expect(job?.permissions?.issues).toBeUndefined()
     const script = job?.steps?.at(0)?.run ?? ''
     expect(script).toContain('gh run view "$SOURCE_RUN_ID"')
     expect(script).toContain('.name == "tests" and .conclusion == "success"')

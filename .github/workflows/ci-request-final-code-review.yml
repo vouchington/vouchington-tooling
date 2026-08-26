@@ -18,7 +18,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-      issues: write
       pull-requests: write
     steps:
       - name: Request final code review
