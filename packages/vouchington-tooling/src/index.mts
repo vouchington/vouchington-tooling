@@ -231,7 +231,6 @@ export type { ReadResponseBodyOptions } from './http-body/index.mts'
 export { parseAstGrepRuleArgs, runAstGrepRule } from './ast-grep-rule/index.mts'
 export type { AstGrepRuleInvocation, RunAstGrepRuleOptions } from './ast-grep-rule/index.mts'
 export {
-  bodyOnlyReviewFallback,
   indexReviewFiles,
   MAX_REVIEW_COMMENTS,
   MAX_REVIEW_PAYLOAD_BYTES,

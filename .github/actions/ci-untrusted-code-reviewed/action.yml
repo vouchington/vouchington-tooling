@@ -1,0 +1,25 @@
+name: CI untrusted code-reviewed gate
+description: Passes the required Code Reviewed check only for untrusted pull-request contexts.
+
+inputs:
+  trusted-secret-context:
+    description: Whether the pull request runs in the trusted secret context.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate trusted secret context
+      shell: bash
+      env:
+        TRUSTED_SECRET_CONTEXT: ${{ inputs.trusted-secret-context }}
+      run: bash "$GITHUB_ACTION_PATH/validate-context.sh"
+    - name: Pass final code review for untrusted PR
+      if: inputs.trusted-secret-context != 'true'
+      shell: bash
+      run: echo "Final code review is unavailable for untrusted PR contexts; passing Code Reviewed."
+    - name: Trusted PR uses final-code-review.yml
+      if: inputs.trusted-secret-context == 'true'
+      shell: bash
+      run: >-
+        echo "Trusted PR: the Code Reviewed gate comes from final-code-review.yml; this job is a no-op named 'Untrusted Code Reviewed (skipped)'."

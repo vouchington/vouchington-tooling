@@ -1,6 +1,5 @@
 import {
   ReviewPayloadError,
-  bodyOnlyReviewFallback,
   indexReviewFiles,
   parseReviewPayload,
   remapReviewComments,
@@ -42,14 +41,7 @@ export function runPostReview(payloadPath: string, io: PostReviewIo): { posted: 
     }
     const first = io.postReview(review)
     if (first.ok) return { posted: true }
-    if (first.status !== 422) {
-      throw new ReviewPayloadError(`GitHub review POST failed (HTTP ${first.status}).`)
-    }
-    const retry = io.postReview(bodyOnlyReviewFallback(review, first.status))
-    if (!retry.ok) {
-      throw new ReviewPayloadError(`GitHub review POST retry failed (HTTP ${retry.status}).`)
-    }
-    return { posted: true }
+    throw new ReviewPayloadError(`GitHub review POST failed (HTTP ${first.status}).`)
   } finally {
     io.removeFile(payloadPath)
   }

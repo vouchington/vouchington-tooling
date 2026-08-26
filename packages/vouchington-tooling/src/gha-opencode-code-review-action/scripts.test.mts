@@ -64,8 +64,19 @@ describe('opencode-code-review scripts', () => {
   it('pins OpenCode releases and delegates install to the packaged GitHub-release helper', () => {
     expect(installText).toContain('anomalyco/opencode')
     expect(installText).toContain('install-github-release.sh')
-    expect(installText).toContain('--no-checksum')
-    expect(installText).toContain('# integrity-check: skip reason=opencode-releases-no-checksums')
+    expect(installText).toContain('--expected-sha256')
+    expect(installText).toContain(
+      'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
+    )
+    expect(installText).toContain(
+      'd30d2cba74617f4e7b96e25563c9572ffe453f9eae70fc0df16286813537ee72',
+    )
+    expect(installText).toContain(
+      '405559e5873a9131ff6bcafc413f46d4f199b4401f232d00bcd301d97ea7cdfc',
+    )
+    expect(installText).toContain(
+      '72f4b6029af185eb030995cfa062d038914e3142c9aa38f714fe56448e6e87d2',
+    )
     expect(installText).toContain('opencode-linux-x64.tar.gz')
     const root = mkdtempSync(join(tmpdir(), 'opencode-install-'))
     const actionPath = join(root, '.github/actions/opencode-code-review')
@@ -116,6 +127,9 @@ describe('opencode-code-review scripts', () => {
       expect({ status: result.status, stderr: result.stderr }).toMatchObject({ status: 0 })
       expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain('anomalyco/opencode')
       expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain('opencode-linux-x64.tar.gz')
+      expect(readFileSync(join(root, 'args.txt'), 'utf8')).toContain(
+        'd910c3ed7613bb5791a328904615d41cc25b7d3a6b470e3199ab0426a995b38a',
+      )
       expect(readFileSync(output, 'utf8')).toContain(
         `bin=${join(root, 'home/opencode-vci-fixture/bin/opencode')}`,
       )

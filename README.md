@@ -76,7 +76,10 @@ Centralized Cursor marketplace publication is not part of this repository change
 
 Pin by commit SHA. The public actions never take a free-text `prompt` input. Prompt text comes from
 trusted files on `trusted_prompt_ref`. `extra_prompt` is rejected unless the calling repository is
-private. There is no `@claude` mention workflow.
+private. The default prompts live in [`docs/prompts/code-review.md`](./docs/prompts/code-review.md)
+and [`docs/prompts/code-review-inline-comments.md`](./docs/prompts/code-review-inline-comments.md).
+The payload contract requires every finding to be an inline comment so repository rules can require
+thread resolution. There is no `@claude` mention workflow.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/code-review@<sha>
@@ -111,6 +114,26 @@ jobs:
     secrets:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
+
+This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen only
+after the `tests` fan-in succeeds on a ready-for-review, same-repository pull request. Forks,
+Dependabot, and Renovate never receive review secrets and instead receive a pass-through
+`Code Reviewed` gate after tests. A non-cancelling label workflow records the once-per-PR state with
+`final-code-review:requested` and `final-code-review:complete`; removing the complete label requests
+a fresh review.
+
+The setup expects these organization Actions variables and fails when any is missing or malformed:
+
+- `OPENCODE_CODE_REVIEW_ENABLED` (`true` or `false`)
+- `OPENCODE_CODE_REVIEW_MODEL`
+- `OPENCODE_ZEN_CODE_REVIEW_ENABLED` (`true` or `false`)
+- `OPENCODE_ZEN_CODE_REVIEW_MODEL`
+- `CODE_REVIEW_REQUIRED` (`true` or `false`)
+
+It also expects `OPENROUTER_FREE_API_KEY`, `OPENCODE_FREE_API_KEY`, and
+`CODE_REVIEW_TRIGGER_TOKEN` as organization Actions secrets. The trigger token is a fine-grained
+token scoped to this repository with only Issues read/write (plus implicit Metadata read); normal
+PR reads and all final state updates use `GITHUB_TOKEN`.
 
 ## CLI
 

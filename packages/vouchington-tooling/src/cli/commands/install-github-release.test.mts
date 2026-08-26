@@ -82,6 +82,23 @@ describe('install-github-release', () => {
     expect(skipped.status).toBe(99)
   })
 
+  it('validates an explicit SHA-256 digest before downloading', () => {
+    const required = [
+      '--repo',
+      'anomalyco/opencode',
+      '--version',
+      '1.18.21',
+      '--asset',
+      'opencode-linux-x64.tar.gz',
+      '--bin',
+      'opencode',
+    ]
+    const invalid = runHelper([...required, '--expected-sha256', 'not-a-digest'])
+    expect(invalid.status).toBe(2)
+    expect(invalid.stderr).toContain('64-character hexadecimal SHA-256 digest')
+    expect(invalid.stderr).not.toContain('curl should not run')
+  })
+
   it('skips the download when a matching binary is already installed', () => {
     const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-skip-'))
     temporaryDirectories.push(temporaryDirectory)

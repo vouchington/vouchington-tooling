@@ -1,0 +1,417 @@
+name: Final Code Review
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+      reason:
+        description: Optional reason for the manual final review
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: >-
+    final-code-review-${{ github.event.pull_request.number || inputs.pr_number || github.sha }}-${{
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'final-code-review:requested') ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'final-code-review:complete')) &&
+      'review' || 'ignore'
+      }}
+  cancel-in-progress: false
+
+jobs:
+  select-final-review:
+    name: Select final review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      should_review: ${{ steps.select.outputs.should_review }}
+      gate_status: ${{ steps.select.outputs.gate_status }}
+      pr_number: ${{ steps.select.outputs.pr_number }}
+      head_sha: ${{ steps.select.outputs.head_sha }}
+      base_sha: ${{ steps.select.outputs.base_sha }}
+    steps:
+      - name: Select final review
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action || '' }}
+          EVENT_LABEL: ${{ github.event.label.name || '' }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          EVENT_HAD_COMPLETE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'final-code-review:complete') }}
+          REQUESTED_LABEL: final-code-review:requested
+          COMPLETE_LABEL: final-code-review:complete
+        run: |
+          set -euo pipefail
+          output() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
+          output pr_number "$PR_NUMBER"
+
+          should_handle=false
+          force_review=false
+          bypass_live_complete=false
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            should_handle=true
+          elif [ "$EVENT_ACTION" = labeled ] && [ "$EVENT_LABEL" = "$REQUESTED_LABEL" ]; then
+            should_handle=true
+            if [ "$EVENT_HAD_COMPLETE_LABEL" != true ]; then
+              bypass_live_complete=true
+            fi
+          elif [ "$EVENT_ACTION" = unlabeled ] && [ "$EVENT_LABEL" = "$COMPLETE_LABEL" ]; then
+            should_handle=true
+            force_review=true
+          fi
+
+          if [ "$should_handle" != true ]; then
+            output should_review false
+            output gate_status ignore
+            echo 'Ignoring an unrelated label event.'
+            exit 0
+          fi
+
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid,baseRefOid,isDraft,labels,isCrossRepository,author)"
+          head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
+          base_sha="$(jq -r '.baseRefOid' <<< "$pr_json")"
+          is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
+          is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
+          actor="$(jq -r '.author.login' <<< "$pr_json")"
+          has_complete="$(jq -r --arg label "$COMPLETE_LABEL" \
+            'any(.labels[]?.name; . == $label)' <<< "$pr_json")"
+
+          if [ "$is_cross_repository" = true ] || [ "$actor" = 'dependabot[bot]' ] || \
+            [ "$actor" = 'renovate[bot]' ]; then
+            output should_review false
+            output gate_status untrusted
+            echo 'Secret-backed review is unavailable for this PR context.'
+            exit 0
+          fi
+          if [ -n "$EVENT_HEAD_SHA" ] && [ "$EVENT_HEAD_SHA" != "$head_sha" ]; then
+            output should_review false
+            output gate_status stale
+            echo "::error::Event head $EVENT_HEAD_SHA no longer matches PR head $head_sha."
+            exit 0
+          fi
+          if [ "$is_draft" = true ]; then
+            output should_review false
+            output gate_status deferred
+            echo 'Final code review is deferred while the PR is a draft.'
+            exit 0
+          fi
+          if [ "$has_complete" = true ] && [ "$force_review" != true ] && \
+            [ "$bypass_live_complete" != true ]; then
+            output should_review false
+            output gate_status complete
+            output head_sha "$head_sha"
+            output base_sha "$base_sha"
+            echo 'Final code review already completed once for this PR.'
+            exit 0
+          fi
+          if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::PR head and base refs must resolve to full commit SHAs.'
+            exit 1
+          fi
+
+          tests_passed=false
+          for attempt in 1 2 3; do
+            while IFS= read -r run_id; do
+              [ -n "$run_id" ] || continue
+              if [ "$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json jobs \
+                --jq '[.jobs[] | select(.name == "tests" and .conclusion == "success")] | length')" -gt 0 ]; then
+                tests_passed=true
+                break
+              fi
+            done < <(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+              --commit "$head_sha" --event pull_request --limit 20 \
+              --json databaseId --jq '.[].databaseId')
+            [ "$tests_passed" = true ] && break
+            if [ "$attempt" -lt 3 ]; then sleep 5; fi
+          done
+          if [ "$tests_passed" != true ]; then
+            output should_review false
+            output gate_status untested
+            output head_sha "$head_sha"
+            output base_sha "$base_sha"
+            echo "::error::No successful tests fan-in exists for PR head $head_sha."
+            exit 0
+          fi
+
+          output should_review true
+          output gate_status review
+          output head_sha "$head_sha"
+          output base_sha "$base_sha"
+          echo "Selected PR #$PR_NUMBER at $head_sha for final review."
+
+  validate-review-settings:
+    name: Validate code review settings
+    needs: [select-final-review]
+    if: >-
+      always() &&
+      needs.select-final-review.result == 'success' &&
+      needs.select-final-review.outputs.gate_status != 'ignore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Validate required organization variables
+        env:
+          OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
+          OPENROUTER_MODEL: ${{ vars.OPENCODE_CODE_REVIEW_MODEL }}
+          ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
+          ZEN_MODEL: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
+          REVIEW_REQUIRED: ${{ vars.CODE_REVIEW_REQUIRED }}
+        run: |
+          set -euo pipefail
+          validate_boolean() {
+            case "$2" in true|false) ;; *) echo "::error::$1 must be exactly true or false"; exit 1;; esac
+          }
+          validate_boolean OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
+          validate_boolean OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
+          validate_boolean CODE_REVIEW_REQUIRED "$REVIEW_REQUIRED"
+          [ -n "$OPENROUTER_MODEL" ] || { echo '::error::OPENCODE_CODE_REVIEW_MODEL is required'; exit 1; }
+          [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
+
+  opencode-code-review:
+    name: OpenCode OpenRouter Review
+    needs: [select-final-review, validate-review-settings]
+    if: >-
+      needs.select-final-review.outputs.should_review == 'true' &&
+      vars.OPENCODE_CODE_REVIEW_ENABLED == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      agent_outcome: ${{ steps.review.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.head_sha }}
+          persist-credentials: false
+      - name: Remove untrusted action path
+        run: rm -rf .trusted-review-action
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.base_sha }}
+          path: .trusted-review-action
+          persist-credentials: false
+      - name: Run OpenCode OpenRouter review
+        id: review
+        uses: ./.trusted-review-action/.github/actions/opencode-code-review
+        with:
+          pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+          provider_name: OpenCode OpenRouter
+          trusted_prompt_ref: ${{ needs.select-final-review.outputs.base_sha }}
+          prompt_path: docs/prompts/code-review.md
+          inline_prompt_path: docs/prompts/code-review-inline-comments.md
+          model: ${{ vars.OPENCODE_CODE_REVIEW_MODEL }}
+          payload_artifact_name: opencode-openrouter
+          openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+
+  opencode-code-review-poster:
+    name: OpenCode OpenRouter Review Poster
+    needs: [select-final-review, opencode-code-review]
+    if: always() && needs.opencode-code-review.outputs.payload_artifact_id != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    outputs:
+      poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.base_sha }}
+          path: .trusted-review-action
+          persist-credentials: false
+      - name: Post OpenCode OpenRouter review
+        id: poster
+        uses: ./.trusted-review-action/.github/actions/code-review-poster
+        with:
+          pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+          artifact_id: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
+          provider_name: OpenCode OpenRouter
+          token_source: github-token
+
+  opencode-zen-code-review:
+    name: OpenCode Zen Review
+    needs: [select-final-review, validate-review-settings]
+    if: >-
+      needs.select-final-review.outputs.should_review == 'true' &&
+      vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      agent_outcome: ${{ steps.review.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.head_sha }}
+          persist-credentials: false
+      - name: Remove untrusted action path
+        run: rm -rf .trusted-review-action
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.base_sha }}
+          path: .trusted-review-action
+          persist-credentials: false
+      - name: Run OpenCode Zen review
+        id: review
+        uses: ./.trusted-review-action/.github/actions/opencode-code-review
+        with:
+          pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+          provider_name: OpenCode Zen
+          trusted_prompt_ref: ${{ needs.select-final-review.outputs.base_sha }}
+          prompt_path: docs/prompts/code-review.md
+          inline_prompt_path: docs/prompts/code-review-inline-comments.md
+          model: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
+          payload_artifact_name: opencode-zen
+          opencode_api_key: ${{ secrets.OPENCODE_FREE_API_KEY }}
+
+  opencode-zen-code-review-poster:
+    name: OpenCode Zen Review Poster
+    needs: [select-final-review, opencode-zen-code-review]
+    if: always() && needs.opencode-zen-code-review.outputs.payload_artifact_id != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    outputs:
+      poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.select-final-review.outputs.base_sha }}
+          path: .trusted-review-action
+          persist-credentials: false
+      - name: Post OpenCode Zen review
+        id: poster
+        uses: ./.trusted-review-action/.github/actions/code-review-poster
+        with:
+          pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+          artifact_id: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
+          provider_name: OpenCode Zen
+          token_source: github-token
+
+  code-reviewed:
+    name: ${{ needs.select-final-review.outputs.gate_status == 'ignore' && 'Ignored Final Code Review' || 'Code Reviewed' }}
+    needs:
+      - select-final-review
+      - validate-review-settings
+      - opencode-code-review
+      - opencode-code-review-poster
+      - opencode-zen-code-review
+      - opencode-zen-code-review-poster
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Validate final review outcome
+        env:
+          SELECT_RESULT: ${{ needs.select-final-review.result }}
+          SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
+          GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
+          REVIEW_REQUIRED: ${{ vars.CODE_REVIEW_REQUIRED }}
+          OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
+          OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
+          OPENROUTER_ARTIFACT: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
+          OPENROUTER_POSTER: ${{ needs.opencode-code-review-poster.outputs.poster_outcome }}
+          ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
+          ZEN_AGENT: ${{ needs.opencode-zen-code-review.outputs.agent_outcome }}
+          ZEN_ARTIFACT: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
+          ZEN_POSTER: ${{ needs.opencode-zen-code-review-poster.outputs.poster_outcome }}
+        run: |
+          set -euo pipefail
+          [ "$SELECT_RESULT" = success ] || { echo '::error::Review selection failed'; exit 1; }
+          if [ "$GATE_STATUS" = ignore ]; then exit 0; fi
+          [ "$SETTINGS_RESULT" = success ] || { echo '::error::Review settings are invalid'; exit 1; }
+          case "$GATE_STATUS" in
+            complete|untrusted) exit 0 ;;
+            deferred|stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
+            review) ;;
+            *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
+          esac
+
+          provider_failed() {
+            [ "$1" = success ] || return 0
+            [ -z "$2" ] || [ "$3" = success ] || return 0
+            return 1
+          }
+          failures=0
+          if [ "$OPENROUTER_ENABLED" = true ] && provider_failed "$OPENROUTER_AGENT" "$OPENROUTER_ARTIFACT" "$OPENROUTER_POSTER"; then
+            echo '::warning::OpenCode OpenRouter review did not complete successfully.'
+            failures=$((failures + 1))
+          fi
+          if [ "$ZEN_ENABLED" = true ] && provider_failed "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER"; then
+            echo '::warning::OpenCode Zen review did not complete successfully.'
+            failures=$((failures + 1))
+          fi
+          if [ "$REVIEW_REQUIRED" = true ] && [ "$failures" -gt 0 ]; then
+            echo '::error::A required code review provider failed.'
+            exit 1
+          fi
+
+      - name: Mark final review complete
+        if: needs.select-final-review.outputs.gate_status == 'review'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          REQUESTED_LABEL: final-code-review:requested
+          COMPLETE_LABEL: final-code-review:complete
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f "labels[]=$COMPLETE_LABEL" --silent
+          encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
+            --silent || true
+
+      - name: Clear a redundant request label
+        if: needs.select-final-review.outputs.gate_status == 'complete'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          REQUESTED_LABEL: final-code-review:requested
+        run: |
+          set -euo pipefail
+          encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
+            --silent || true

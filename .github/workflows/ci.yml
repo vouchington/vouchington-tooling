@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,6 +22,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
           version: 11.22.0
@@ -41,6 +48,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
           version: 11.22.0
@@ -50,3 +59,70 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run actionlint
+
+  tests:
+    name: tests
+    if: ${{ !cancelled() }}
+    needs: [test, actionlint]
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require all tests
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
+        run: |
+          set -euo pipefail
+          [ "$TEST_RESULT" = success ]
+          [ "$ACTIONLINT_RESULT" = success ]
+
+  request-final-code-review:
+    needs: [tests]
+    if: >-
+      !cancelled() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      needs.tests.result == 'success'
+    uses: ./.github/workflows/ci-request-final-code-review.yml
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+      tested-head-sha: ${{ github.event.pull_request.head.sha }}
+      trusted-secret-context: ${{
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]' &&
+        github.actor != 'renovate[bot]'
+        }}
+    permissions:
+      contents: read
+      pull-requests: read
+    secrets:
+      CODE_REVIEW_TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}
+
+  untrusted-code-reviewed:
+    name: ${{
+      (github.event.pull_request.head.repo.full_name != github.repository ||
+      github.actor == 'dependabot[bot]' ||
+      github.actor == 'renovate[bot]') &&
+      'Code Reviewed' || 'Untrusted Code Reviewed (skipped)'
+      }}
+    needs: [tests]
+    if: >-
+      !cancelled() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      needs.tests.result == 'success'
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ci-untrusted-code-reviewed
+        with:
+          trusted-secret-context: ${{
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]' &&
+            github.actor != 'renovate[bot]'
+            }}

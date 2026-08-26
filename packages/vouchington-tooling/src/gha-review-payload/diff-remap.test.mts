@@ -92,7 +92,7 @@ describe('diff indexing', () => {
 })
 
 describe('remapReviewComments', () => {
-  it('remaps renames, strips invalid ranges, snaps nearest lines, and lists dropped paths', () => {
+  it('remaps renames, strips invalid ranges, and snaps nearest lines', () => {
     const index = indexReviewFiles([
       { filename: 'src/new.mts', previous_filename: 'src/old.mts', patch: contextPatch(1, 10) },
     ])
@@ -102,7 +102,6 @@ describe('remapReviewComments', () => {
         comment({ path: 'src/new.mts', line: 5, start_line: 99, start_side: 'RIGHT' }),
         comment({ path: 'src/new.mts', line: 6, start_line: 1 }),
         comment({ path: 'src/new.mts', line: 50, start_line: 1, start_side: 'RIGHT' }),
-        comment({ path: 'missing.mts', line: 3 }),
       ]),
       index,
     )
@@ -110,7 +109,8 @@ describe('remapReviewComments', () => {
     expect(remapped.comments[1]?.start_line).toBeUndefined()
     expect(remapped.comments[2]?.start_line).toBeUndefined()
     expect(remapped.comments[3]?.start_line).toBeUndefined()
-    expect(remapped.body).toContain('missing.mts:3')
+    expect(remapped.comments).toHaveLength(4)
+    expect(remapped.body).toBe('Verdict.')
     expect(
       nearestReviewLine(
         [
@@ -136,7 +136,7 @@ describe('remapReviewComments', () => {
     expect(remapped.comments[1]?.body).toContain(snapReviewNote('src/new.mts', 50))
   })
 
-  it('breaks equal-distance ties toward changed lines and drops unplaceable comments', () => {
+  it('breaks equal-distance ties toward changed lines and rejects unplaceable comments', () => {
     expect(
       nearestReviewLine(
         [
@@ -173,18 +173,18 @@ describe('remapReviewComments', () => {
         5,
       ),
     ).toEqual({ line: 6, kind: 'context' })
-    const remapped = remapReviewComments(
-      review(
-        [
-          comment({ path: 'src/empty.mts', line: 9 }),
-          comment({ path: 'src/empty.mts', line: 50, side: 'RIGHT' }),
-        ],
-        '',
+    expect(() =>
+      remapReviewComments(
+        review([comment({ path: 'src/empty.mts', line: 9 })]),
+        indexReviewFiles([{ filename: 'src/empty.mts', patch: '@@ -1,0 +1,0 @@\n' }]),
       ),
-      indexReviewFiles([{ filename: 'src/empty.mts', patch: '@@ -1,0 +1,0 @@\n' }]),
-    )
-    expect(remapped.comments).toEqual([])
-    expect(remapped.body).toContain('Inline findings not posted')
+    ).toThrow('Inline finding cannot be placed')
+    expect(() =>
+      remapReviewComments(
+        review([comment({ path: 'src/missing.mts', line: 9 })]),
+        indexReviewFiles([{ filename: 'src/other.mts', patch: '@@ -0,0 +1 @@\n+one\n' }]),
+      ),
+    ).toThrow('Inline finding cannot be placed')
     const snapped = remapReviewComments(
       review([comment({ path: 'src/add.mts', line: 50, side: 'RIGHT' })]),
       indexReviewFiles([{ filename: 'src/add.mts', patch: '@@ -0,0 +1,2 @@\n+one\n+two\n' }]),

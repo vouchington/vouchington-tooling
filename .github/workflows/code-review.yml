@@ -15,7 +15,7 @@ on:
       prompt_path:
         required: false
         type: string
-        default: .agents/skills/agent-workflow/code-review-prompt.md
+        default: docs/prompts/code-review.md
       inline_prompt_path:
         required: false
         type: string
@@ -124,7 +124,7 @@ jobs:
           pr_number: ${{ inputs.pr_number }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}
           trusted_prompt_ref: ${{ inputs.trusted_prompt_ref || github.sha }}
-          prompt_path: ${{ inputs.prompt_path || '.agents/skills/agent-workflow/code-review-prompt.md' }}
+          prompt_path: ${{ inputs.prompt_path || 'docs/prompts/code-review.md' }}
           inline_prompt_path: ${{ inputs.inline_prompt_path || 'docs/prompts/code-review-inline-comments.md' }}
           extra_prompt: ${{ inputs.extra_prompt || '' }}
           model: ${{ inputs.model }}

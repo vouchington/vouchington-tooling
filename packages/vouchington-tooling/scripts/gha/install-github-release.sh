@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: install-github-release.sh --repo owner/name --version VERSION --asset TEMPLATE --bin NAME [--tag-prefix PREFIX] [--strip-components N] [--bin-dir DIR] [--version-flag FLAG] [--checksums-asset NAME] [--no-checksum]" >&2
+  echo "usage: install-github-release.sh --repo owner/name --version VERSION --asset TEMPLATE --bin NAME [--tag-prefix PREFIX] [--strip-components N] [--bin-dir DIR] [--version-flag FLAG] [--checksums-asset NAME] [--expected-sha256 SHA256] [--no-checksum]" >&2
 }
 
 REPO="${REPO:-}"
@@ -14,6 +14,7 @@ STRIP_COMPONENTS="${STRIP_COMPONENTS:-1}"
 BIN_DIR="${INSTALL_BIN_DIR:-}"
 VERSION_FLAG="${VERSION_FLAG:---version}"
 CHECKSUMS_ASSET="${CHECKSUMS_ASSET:-}"
+EXPECTED_SHA256="${EXPECTED_SHA256:-}"
 NO_CHECKSUM="${NO_CHECKSUM:-0}"
 
 if [ -n "${RELEASE_OWNER:-}" ] && [ -n "${RELEASE_REPO:-}" ]; then
@@ -67,6 +68,11 @@ while [ "${#}" -gt 0 ]; do
       CHECKSUMS_ASSET="$2"
       shift 2
       ;;
+    --expected-sha256)
+      [ "${#}" -ge 2 ] || { usage; exit 2; }
+      EXPECTED_SHA256="$2"
+      shift 2
+      ;;
     --no-checksum)
       NO_CHECKSUM=1
       shift
@@ -94,6 +100,11 @@ fi
 
 if ! [[ "$STRIP_COMPONENTS" =~ ^[0-9]+$ ]]; then
   echo "install-github-release.sh: --strip-components must be a non-negative integer" >&2
+  exit 2
+fi
+
+if [ -n "$EXPECTED_SHA256" ] && ! [[ "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
+  echo "install-github-release.sh: --expected-sha256 must be a 64-character hexadecimal SHA-256 digest" >&2
   exit 2
 fi
 
@@ -150,8 +161,10 @@ extract_dir="${work}-extract"
 rm -rf "$extract_dir"
 mkdir -p "$extract_dir"
 curl -fsSL -o "$archive" "${base_url}/${asset_name}"
-if [ "$NO_CHECKSUM" != 1 ]; then
-  if [ -n "$checksums_name" ]; then
+if [ -n "$EXPECTED_SHA256" ] || [ "$NO_CHECKSUM" != 1 ]; then
+  if [ -n "$EXPECTED_SHA256" ]; then
+    expected="$EXPECTED_SHA256"
+  elif [ -n "$checksums_name" ]; then
     curl -fsSL -o "${archive}.checksums" "${base_url}/${checksums_name}"
     expected=$(grep -F "$asset_name" "${archive}.checksums" | awk '{print $1}')
     rm "${archive}.checksums"

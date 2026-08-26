@@ -27,7 +27,7 @@ inputs:
   prompt_path:
     description: Relative path to the trusted review prompt file
     required: false
-    default: .agents/skills/agent-workflow/code-review-prompt.md
+    default: docs/prompts/code-review.md
   inline_prompt_path:
     description: Relative path to the trusted inline-comment overlay prompt
     required: false

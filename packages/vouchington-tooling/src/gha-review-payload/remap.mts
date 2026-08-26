@@ -1,4 +1,4 @@
-import { reviewCommentSubject, type ReviewComment, type SanitizedReview } from './payload.mts'
+import { ReviewPayloadError, type ReviewComment, type SanitizedReview } from './payload.mts'
 import type { CommentableIndex, LineKind } from './diff.mts'
 
 export function snapReviewNote(path: string, line: number): string {
@@ -74,30 +74,24 @@ function placeComment(comment: ReviewComment, index: CommentableIndex): ReviewCo
   return null
 }
 
-/** Places comments on commentable diff lines, remapping renames and recording dropped findings. */
+/** Places every finding on a commentable diff line and fails if any finding cannot be placed. */
 export function remapReviewComments(
   review: SanitizedReview,
   index: CommentableIndex,
 ): SanitizedReview {
   const kept: ReviewComment[] = []
-  const dropped: ReviewComment[] = []
   for (const comment of review.comments) {
     const placed = placeComment(comment, index)
-    if (placed) kept.push(placed)
-    else dropped.push(comment)
+    if (!placed) {
+      throw new ReviewPayloadError(
+        `Inline finding cannot be placed on the pull request diff: ${comment.path}:${comment.line}.`,
+      )
+    }
+    kept.push(placed)
   }
-  const extras =
-    dropped.length === 0
-      ? []
-      : [
-          '## Inline findings not posted',
-          'These comments could not be placed on a diff hunk:',
-          ...dropped.map((comment) => `- ${reviewCommentSubject(comment)}`),
-        ]
-  const body = [review.body, ...extras].filter((part) => part.length > 0).join('\n\n')
   return {
     ...review,
-    body: body.length > 0 ? body : 'Inline findings only.',
+    body: review.body.length > 0 ? review.body : 'Inline findings only.',
     comments: kept,
   }
 }

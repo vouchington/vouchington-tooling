@@ -1,0 +1,80 @@
+name: CI request final code review
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+      tested-head-sha:
+        required: true
+        type: string
+      trusted-secret-context:
+        required: true
+        type: boolean
+    secrets:
+      CODE_REVIEW_TRIGGER_TOKEN:
+        required: false
+
+concurrency:
+  group: ci-request-final-code-review-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  request-final-code-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Request final code review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          TESTED_HEAD_SHA: ${{ inputs.tested-head-sha }}
+          TRUSTED_SECRET_CONTEXT: ${{ inputs.trusted-secret-context }}
+          REQUESTED_LABEL: final-code-review:requested
+        run: |
+          set -euo pipefail
+
+          case "$TRUSTED_SECRET_CONTEXT" in
+            true|false) ;;
+            *)
+              echo "::error::trusted-secret-context must be exactly true or false"
+              exit 1
+              ;;
+          esac
+
+          if [ "$TRUSTED_SECRET_CONTEXT" != true ]; then
+            echo "Skipping the secret-backed review request for an untrusted PR."
+            exit 0
+          fi
+          if [ -z "$TRIGGER_TOKEN" ]; then
+            echo "::error::CODE_REVIEW_TRIGGER_TOKEN is required for trusted PRs."
+            exit 1
+          fi
+
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid,isDraft)"
+          current_head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
+          is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
+          if [ "$is_draft" = true ]; then
+            echo "Skipping final code review because PR #$PR_NUMBER is a draft."
+            exit 0
+          fi
+          if [ "$current_head_sha" != "$TESTED_HEAD_SHA" ]; then
+            echo "Skipping stale CI result for $TESTED_HEAD_SHA; PR head is $current_head_sha."
+            exit 0
+          fi
+
+          encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
+          env GH_TOKEN="$TRIGGER_TOKEN" gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
+            --silent || true
+          env GH_TOKEN="$TRIGGER_TOKEN" gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f "labels[]=$REQUESTED_LABEL" \
+            --silent

@@ -67,7 +67,7 @@ export function reviewCommentSubject(comment: ReviewComment): string {
 
 /**
  * Parses untrusted JSON into the exact review wire shape accepted by the caller's poster.
- * Unknown fields and malformed comments are dropped; the supplied commit id always wins.
+ * Unknown fields are ignored, malformed findings fail closed, and the supplied commit id wins.
  */
 export function parseReviewPayload(bytes: Buffer, commitId: string): SanitizedReview {
   if (!isCommitId(commitId)) {
@@ -91,47 +91,25 @@ export function parseReviewPayload(bytes: Buffer, commitId: string): SanitizedRe
   }
   const record = parsed as Record<string, unknown>
   const body = typeof record.body === 'string' ? record.body : ''
-  const rawComments = Array.isArray(record.comments) ? record.comments : []
-  const valid = rawComments.flatMap((comment) => {
-    const sanitized = sanitizeComment(comment)
-    return sanitized ? [sanitized] : []
-  })
-  const kept = valid.slice(0, MAX_REVIEW_COMMENTS)
-  const overflow = valid.slice(MAX_REVIEW_COMMENTS)
-  const parts = [body]
-  if (overflow.length > 0) {
-    parts.push(
-      `## Comments over the ${MAX_REVIEW_COMMENTS}-comment cap`,
-      ...overflow.map((comment) => `- ${reviewCommentSubject(comment)}`),
-    )
+  if (record.comments !== undefined && !Array.isArray(record.comments)) {
+    throw new ReviewPayloadError('comments must be an array when provided.')
   }
-  const reviewBody = parts.filter((part) => part.length > 0).join('\n\n')
-  if (reviewBody.length === 0 && kept.length === 0) {
+  const rawComments = record.comments ?? []
+  if (rawComments.length > MAX_REVIEW_COMMENTS) {
+    throw new ReviewPayloadError(`Payload has more than ${MAX_REVIEW_COMMENTS} inline comments.`)
+  }
+  const comments = rawComments.map((comment) => {
+    const sanitized = sanitizeComment(comment)
+    if (!sanitized) throw new ReviewPayloadError('Every finding must be a valid inline comment.')
+    return sanitized
+  })
+  if (body.length === 0 && comments.length === 0) {
     throw new ReviewPayloadError('Payload has no review body and no valid comments.')
   }
   return {
     event: 'COMMENT',
     commit_id: commitId,
-    body: reviewBody.length > 0 ? reviewBody : 'Inline findings only.',
-    comments: kept,
-  }
-}
-
-/** Builds the body-only fallback used when inline review placement is rejected. */
-export function bodyOnlyReviewFallback(review: SanitizedReview, status: number): SanitizedReview {
-  const listed =
-    review.comments.length === 0
-      ? []
-      : [
-          '## Inline findings not posted',
-          `The inline comments were rejected (HTTP ${status}). The findings were:`,
-          ...review.comments.map((comment) => `- ${reviewCommentSubject(comment)}`),
-        ]
-  const body = [review.body, ...listed].filter((part) => part.length > 0).join('\n\n')
-  return {
-    event: 'COMMENT',
-    commit_id: review.commit_id,
-    body: body.length > 0 ? body : `Inline findings not posted (HTTP ${status}).`,
-    comments: [],
+    body: body.length > 0 ? body : 'Inline findings only.',
+    comments,
   }
 }
