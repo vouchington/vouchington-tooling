@@ -1,5 +1,5 @@
-import { lstatSync, readFileSync, readdirSync } from 'node:fs'
-import { rm, rmdir } from 'node:fs/promises'
+import { lstatSync, readFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { isOutputIdentity, removeOwnedOutput, type OutputIdentity } from './output-identity.mts'
 import { ownerIsAlive } from './process-liveness.mts'
@@ -41,25 +41,14 @@ export async function recoverIncompletePublish(
   const marker = publishMarkerPath(destination)
   if (!outputExists(marker)) return
   const markerStat = lstatSync(marker, { bigint: true })
-  if (!markerStat.isFile()) {
-    if (markerStat.isSymbolicLink()) await rm(marker, { force: true })
-    else if (markerStat.isDirectory()) {
-      if (readdirSync(marker).length > 0)
-        throw new Error('incomplete publish marker directory is not empty')
-      await rmdir(marker)
-    } else throw new Error('incomplete publish marker has unsupported type')
-    return
-  }
+  if (!markerStat.isFile()) throw new Error('incomplete publish marker has unsupported type')
   const markerIdentity: OutputIdentity = {
     dev: String(markerStat.dev),
     ino: String(markerStat.ino),
     type: 'file',
   }
   const parsed = readMarker(marker)
-  if (!parsed) {
-    await removeOwnedOutput(marker, markerIdentity, unlinkOutput)
-    return
-  }
+  if (!parsed) throw new Error('incomplete publish marker is malformed')
   if (parsed.destination !== destination || parsed.metadata !== metadata)
     throw new Error('incomplete publish marker does not match requested outputs')
   if (now() - parsed.createdAt < MAX_ACTIVE_MARKER_AGE_MS && isOwnerAlive(parsed.owner))

@@ -176,6 +176,7 @@ if [ "${DEEPEN}" = "true" ]; then
   fetch_git_config=(-c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30)
   if [ -n "${GITHUB_TOKEN:-}" ]; then
     fetch_git_config+=(
+      -c credential.helper=
       -c 'credential.helper=!f() { printf "username=x-access-token\npassword=%s\n" "${GITHUB_TOKEN}"; }; f'
     )
   fi

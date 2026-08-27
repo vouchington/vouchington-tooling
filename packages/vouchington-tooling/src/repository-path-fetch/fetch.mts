@@ -1,5 +1,5 @@
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { dirname, posix } from 'node:path'
+import { dirname } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
 import type { ValidatedApiTreeEntry } from './api-types.mts'
@@ -14,6 +14,7 @@ import {
 import { gitBlobSha } from './git-object.mts'
 import { serializeFetchMetadata } from './metadata.mts'
 import { recordGitMode } from './modes.mts'
+import { rejectPortableOutputCollisions, selectedDestination } from './selected-output.mts'
 import { validateOutputPaths } from './output-paths.mts'
 import { outputExists, publishBundle, recoverIncompletePublish } from './publish.mts'
 import { prepareStagedFile, temporaryPath } from './staged-path.mts'
@@ -77,6 +78,11 @@ export async function fetchRepositoryPaths(options: {
       throw new Error('selected repository blobs exceed aggregate limit')
     return { blobs, mapping }
   })
+  rejectPortableOutputCollisions(
+    selections.flatMap(({ blobs, mapping }) =>
+      blobs.map((entry) => selectedDestination(mapping, entry.path)),
+    ),
+  )
   await mkdir(dirname(options.destination), { recursive: true })
   await mkdir(dirname(options.metadata), { recursive: true })
   const stagedBundle = temporaryPath(options.destination)
@@ -135,10 +141,7 @@ async function writeBlob(
   root: string,
   token: string,
 ): Promise<string> {
-  const destination =
-    entry.path === mapping.source
-      ? mapping.destination
-      : posix.join(mapping.destination, posix.relative(mapping.source, entry.path))
+  const destination = selectedDestination(mapping, entry.path)
   validateRelativePath(destination)
   const blob = await getGithubJson<ApiBlob>(
     api,

@@ -96,7 +96,7 @@ function parseMapping(value: unknown, seen: Set<string>): RepositoryPathMapping 
   return { destination: value.destination, source: value.source }
 }
 
-function portableFilesystemIdentity(value: string): string {
+export function portableFilesystemIdentity(value: string): string {
   return value.normalize('NFC').toLowerCase()
 }
 

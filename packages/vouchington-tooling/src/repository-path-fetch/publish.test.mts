@@ -446,7 +446,7 @@ describe('publishBundle', () => {
       version: 1,
     }),
     'x'.repeat(4097),
-  ])('removes malformed recovery marker %j without deleting outputs', async (contents) => {
+  ])('preserves malformed recovery marker %j without deleting outputs', async (contents) => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
       const destination = join(root, 'bundle')
@@ -455,16 +455,18 @@ describe('publishBundle', () => {
       mkdirSync(destination)
       writeFileSync(metadataDestination, '{}')
       writeFileSync(marker, contents)
-      await recoverIncompletePublish(destination, metadataDestination)
+      await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
+        'incomplete publish marker is malformed',
+      )
       expect(existsSync(destination)).toBe(true)
       expect(existsSync(metadataDestination)).toBe(true)
-      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(marker)).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
   })
 
-  it('removes a malformed marker symlink without deleting its target or outputs', async () => {
+  it('preserves a malformed marker symlink without deleting its target or outputs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
       const destination = join(root, 'bundle')
@@ -475,9 +477,11 @@ describe('publishBundle', () => {
       writeFileSync(metadataDestination, '{}')
       writeFileSync(target, 'preserve')
       symlinkSync(target, marker)
-      await recoverIncompletePublish(destination, metadataDestination)
+      await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
+        'incomplete publish marker has unsupported type',
+      )
       expect(readFileSync(target, 'utf8')).toBe('preserve')
-      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(marker)).toBe(true)
       expect(existsSync(destination)).toBe(true)
       expect(existsSync(metadataDestination)).toBe(true)
     } finally {

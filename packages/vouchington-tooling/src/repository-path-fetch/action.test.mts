@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest'
 
 const fetchAction = readFileSync('.github/actions/fetch-repository-paths/action.yml', 'utf8')
 const cleanAction = readFileSync('.github/actions/clean-workspace/action.yml', 'utf8')
+const cleanWorkspace = readFileSync(
+  'packages/vouchington-tooling/scripts/gha/clean-workspace.sh',
+  'utf8',
+)
 
 describe('repository path fetch action', () => {
   it('invokes the CLI with the locked contract and returns immutable metadata', () => {
@@ -38,6 +42,7 @@ describe('repository path fetch action', () => {
     expect(cleanAction).toContain(
       "GITHUB_TOKEN: ${{ inputs.deepen == 'true' && inputs.token || '' }}",
     )
+    expect(cleanWorkspace).toContain('-c credential.helper=')
   })
 
   it('loads the fetch action entrypoint without node_modules', () => {

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { recoverIncompletePublish } from './publish.mts'
 
 describe('publish recovery malformed marker directories', () => {
-  it('removes an empty directory malformed marker without deleting outputs', async () => {
+  it('preserves an empty directory malformed marker without deleting outputs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
       const destination = join(root, 'bundle')
@@ -15,10 +15,12 @@ describe('publish recovery malformed marker directories', () => {
       mkdirSync(destination)
       writeFileSync(metadataDestination, '{}')
       mkdirSync(marker)
-      await recoverIncompletePublish(destination, metadataDestination)
+      await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
+        'incomplete publish marker has unsupported type',
+      )
       expect(existsSync(destination)).toBe(true)
       expect(existsSync(metadataDestination)).toBe(true)
-      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(marker)).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -35,7 +37,7 @@ describe('publish recovery malformed marker directories', () => {
       mkdirSync(marker)
       writeFileSync(join(marker, 'preserve'), 'concurrent')
       await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
-        'marker directory is not empty',
+        'marker has unsupported type',
       )
       expect(readFileSync(join(marker, 'preserve'), 'utf8')).toBe('concurrent')
       expect(existsSync(destination)).toBe(true)

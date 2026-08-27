@@ -89,6 +89,24 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
+  it('rejects portable selected-output collisions before downloading blobs', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      mockApi({
+        tree: [
+          { mode: '100644', path: 'source/Foo', sha, type: 'blob' },
+          { mode: '100644', path: 'source/foo', sha, type: 'blob' },
+        ],
+      })
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'selected output path collision: target/foo',
+      )
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects a tree entry whose declared blob size exceeds the per-blob limit', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
