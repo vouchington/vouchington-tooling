@@ -1,19 +1,8 @@
 name: Final Code Review
 
 on:
-  pull_request:
-    types: [labeled, unlabeled]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: Pull request number to review
-        required: true
-        type: number
-      reason:
-        description: Optional reason for the manual final review
-        required: false
-        type: string
-        default: ''
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
   actions: read
@@ -21,25 +10,18 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: >-
-    final-code-review-${{ github.event.pull_request.number || inputs.pr_number || github.sha }}-${{
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'final-code-review:requested') ||
-      (github.event.action == 'unlabeled' && github.event.label.name == 'final-code-review:complete')) &&
-      'review' || 'ignore'
-      }}
+  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
   select-final-review:
     name: Select final review
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 35
     permissions:
       actions: read
       checks: read
       contents: read
-      issues: read
       pull-requests: read
     outputs:
       should_review: ${{ steps.select.outputs.should_review }}
@@ -52,63 +34,41 @@ jobs:
         id: select
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action || '' }}
-          EVENT_LABEL: ${{ github.event.label.name || '' }}
-          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-          EVENT_HAD_COMPLETE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'final-code-review:complete') }}
-          REQUESTED_LABEL: final-code-review:requested
-          COMPLETE_LABEL: final-code-review:complete
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TESTS_WAIT_ATTEMPTS: '180'
+          TESTS_WAIT_SECONDS: '10'
         run: |
           set -euo pipefail
           output() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
           output pr_number "$PR_NUMBER"
 
-          should_handle=false
-          force_review=false
-          bypass_live_complete=false
-          if [ "$EVENT_NAME" = workflow_dispatch ]; then
-            should_handle=true
-          elif [ "$EVENT_ACTION" = labeled ] && [ "$EVENT_LABEL" = "$REQUESTED_LABEL" ]; then
-            should_handle=true
-            if [ "$EVENT_HAD_COMPLETE_LABEL" != true ]; then
-              bypass_live_complete=true
-            fi
-          elif [ "$EVENT_ACTION" = unlabeled ] && [ "$EVENT_LABEL" = "$COMPLETE_LABEL" ]; then
-            should_handle=true
-            force_review=true
-          fi
-
-          if [ "$should_handle" != true ]; then
-            output should_review false
-            output gate_status ignore
-            echo 'Ignoring an unrelated label event.'
-            exit 0
-          fi
+          [ "$EVENT_NAME" = pull_request_target ] || {
+            echo '::error::Final Code Review requires a pull_request_target event.'
+            exit 1
+          }
 
           pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json headRefOid,baseRefOid,isDraft,labels,isCrossRepository,author)"
+            --json headRefOid,baseRefOid,isDraft,isCrossRepository,author)"
           head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
           base_sha="$(jq -r '.baseRefOid' <<< "$pr_json")"
           is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
           is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
           actor="$(jq -r '.author.login' <<< "$pr_json")"
-          has_complete="$(jq -r --arg label "$COMPLETE_LABEL" \
-            'any(.labels[]?.name; . == $label)' <<< "$pr_json")"
-
-          is_dependency_bot() {
-            case "$1" in
-              dependabot|'dependabot[bot]'|app/dependabot|renovate|'renovate[bot]'|app/renovate) return 0 ;;
-              *) return 1 ;;
-            esac
-          }
-          if [ "$is_cross_repository" = true ] || is_dependency_bot "$actor"; then
-            output should_review false
-            output gate_status untrusted
-            echo 'Secret-backed review is unavailable for this PR context.'
-            exit 0
+          if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::PR head and base refs must resolve to full commit SHAs.'
+            exit 1
           fi
+          output head_sha "$head_sha"
+          output base_sha "$base_sha"
+
+          is_untrusted=false
+          case "$actor" in
+            dependabot|'dependabot[bot]'|app/dependabot|renovate|'renovate[bot]'|app/renovate)
+              is_untrusted=true ;;
+          esac
+          if [ "$is_cross_repository" = true ]; then is_untrusted=true; fi
           if [ -n "$EVENT_HEAD_SHA" ] && [ "$EVENT_HEAD_SHA" != "$head_sha" ]; then
             output should_review false
             output gate_status stale
@@ -121,41 +81,17 @@ jobs:
             echo 'Final code review is deferred while the PR is a draft.'
             exit 0
           fi
-          if [ "$has_complete" = true ] && [ "$force_review" != true ] && \
-            [ "$bypass_live_complete" != true ]; then
-            prior_review=false
-            while IFS= read -r commit_sha; do
-              [ -n "$commit_sha" ] || continue
-              successful_checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit_sha/check-runs" \
-                --jq '[.check_runs[] | select(.name == "Code Reviewed" and .conclusion == "success" and .app.slug == "github-actions")] | length')"
-              if [ "$successful_checks" -gt 0 ]; then
-                prior_review=true
-                break
-              fi
-            done < <(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" \
-              --paginate --jq '.[].sha')
-            if [ "$prior_review" != true ]; then
+          tests_passed=false
+          attempt=1
+          while [ "$attempt" -le "$TESTS_WAIT_ATTEMPTS" ]; do
+            current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --json headRefOid --jq .headRefOid)"
+            if [ "$current_head_sha" != "$head_sha" ]; then
               output should_review false
-              output gate_status invalid-complete
-              output head_sha "$head_sha"
-              output base_sha "$base_sha"
-              echo '::error::The complete label has no prior successful Code Reviewed check.'
+              output gate_status stale
+              echo "::error::PR head changed from $head_sha to $current_head_sha while waiting for tests."
               exit 0
             fi
-            output should_review false
-            output gate_status complete
-            output head_sha "$head_sha"
-            output base_sha "$base_sha"
-            echo 'Final code review already completed once for this PR.'
-            exit 0
-          fi
-          if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo '::error::PR head and base refs must resolve to full commit SHAs.'
-            exit 1
-          fi
-
-          tests_passed=false
-          for attempt in 1 2 3; do
             while IFS= read -r run_id; do
               [ -n "$run_id" ] || continue
               if [ "$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json jobs \
@@ -163,25 +99,31 @@ jobs:
                 tests_passed=true
                 break
               fi
-            done < <(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
-              --commit "$head_sha" --event pull_request --limit 20 \
-              --json databaseId --jq '.[].databaseId')
+            done < <(gh api --method GET \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f "head_sha=$head_sha" -f event=pull_request -f status=completed -f per_page=20 | \
+              jq -r --argjson pr "$PR_NUMBER" \
+                '.workflow_runs[] | select(any(.pull_requests[]?; .number == $pr)) | .id')
             [ "$tests_passed" = true ] && break
-            if [ "$attempt" -lt 3 ]; then sleep 5; fi
+            sleep "$TESTS_WAIT_SECONDS"
+            attempt=$((attempt + 1))
           done
           if [ "$tests_passed" != true ]; then
             output should_review false
             output gate_status untested
-            output head_sha "$head_sha"
-            output base_sha "$base_sha"
-            echo "::error::No successful tests fan-in exists for PR head $head_sha."
+            echo "::error::No successful tests fan-in arrived for PR head $head_sha."
+            exit 0
+          fi
+
+          if [ "$is_untrusted" = true ]; then
+            output should_review false
+            output gate_status untrusted
+            echo 'Secret-backed review is unavailable for this PR context after exact-head tests passed.'
             exit 0
           fi
 
           output should_review true
           output gate_status review
-          output head_sha "$head_sha"
-          output base_sha "$base_sha"
           echo "Selected PR #$PR_NUMBER at $head_sha for final review."
 
   validate-review-settings:
@@ -190,7 +132,8 @@ jobs:
     if: >-
       always() &&
       needs.select-final-review.result == 'success' &&
-      needs.select-final-review.outputs.gate_status != 'ignore'
+      needs.select-final-review.outputs.gate_status != 'untrusted' &&
+      needs.select-final-review.outputs.gate_status != 'stale'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
@@ -376,7 +319,7 @@ jobs:
           token_source: github-token
 
   code-reviewed:
-    name: ${{ needs.select-final-review.outputs.gate_status == 'ignore' && 'Ignored Final Code Review' || 'Publish final review result' }}
+    name: Code Reviewed
     needs:
       - select-final-review
       - validate-review-settings
@@ -388,13 +331,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      checks: write
       contents: read
-      pull-requests: write
+      pull-requests: read
     steps:
       - name: Validate final review outcome
-        id: gate
-        continue-on-error: true
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
@@ -413,14 +353,13 @@ jobs:
         run: |
           set -euo pipefail
           [ "$SELECT_RESULT" = success ] || { echo '::error::Review selection failed'; exit 1; }
-          if [ "$GATE_STATUS" = ignore ]; then exit 0; fi
-          [ "$SETTINGS_RESULT" = success ] || { echo '::error::Review settings are invalid'; exit 1; }
           case "$GATE_STATUS" in
-            complete|untrusted) exit 0 ;;
-            deferred|invalid-complete|stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
+            untrusted) exit 0 ;;
+            deferred|stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
             review) ;;
             *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
           esac
+          [ "$SETTINGS_RESULT" = success ] || { echo '::error::Review settings are invalid'; exit 1; }
 
           current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
           [ "$current_head_sha" = "$SELECTED_HEAD_SHA" ] || {
@@ -439,88 +378,3 @@ jobs:
           if [ "$ZEN_ENABLED" = true ] && provider_failed "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER"; then
             echo '::warning::OpenCode Zen review did not complete successfully.'
           fi
-
-      - name: Mark final review complete
-        id: mark_complete
-        if: >-
-          steps.gate.outcome == 'success' &&
-          needs.select-final-review.outputs.gate_status == 'review'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
-          REQUESTED_LABEL: final-code-review:requested
-          COMPLETE_LABEL: final-code-review:complete
-        run: |
-          set -euo pipefail
-          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
-            -f "labels[]=$COMPLETE_LABEL" --silent
-          encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
-          gh api --method DELETE \
-            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
-            --silent || true
-
-      - name: Clear a redundant request label
-        id: clear_request
-        if: >-
-          steps.gate.outcome == 'success' &&
-          needs.select-final-review.outputs.gate_status == 'complete'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
-          REQUESTED_LABEL: final-code-review:requested
-        run: |
-          set -euo pipefail
-          encoded_label="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
-          gh api --method DELETE \
-            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded_label" \
-            --silent || true
-
-      - name: Publish Code Reviewed on the PR head
-        id: publish_check
-        if: >-
-          always() &&
-          needs.select-final-review.outputs.gate_status != 'ignore' &&
-          needs.select-final-review.outputs.gate_status != 'untrusted'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
-          GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
-          GATE_OUTCOME: ${{ steps.gate.outcome }}
-          MARK_OUTCOME: ${{ steps.mark_complete.outcome }}
-          CLEAR_OUTCOME: ${{ steps.clear_request.outcome }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$SELECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo '::error::Cannot publish Code Reviewed without the selected PR head SHA.'
-            exit 1
-          fi
-          conclusion=success
-          if [ "$GATE_OUTCOME" != success ]; then conclusion=failure; fi
-          if [ "$GATE_STATUS" = review ] && [ "$MARK_OUTCOME" != success ]; then conclusion=failure; fi
-          if [ "$GATE_STATUS" = complete ] && [ "$CLEAR_OUTCOME" != success ]; then conclusion=failure; fi
-          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
-            -f name='Code Reviewed' \
-            -f "head_sha=$SELECTED_HEAD_SHA" \
-            -f status=completed \
-            -f "conclusion=$conclusion" \
-            --silent
-          echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
-          [ "$conclusion" = success ]
-
-      - name: Require the published gate outcome
-        if: always()
-        env:
-          GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
-          GATE_OUTCOME: ${{ steps.gate.outcome }}
-          PUBLISH_OUTCOME: ${{ steps.publish_check.outcome }}
-        run: |
-          set -euo pipefail
-          if [ "$GATE_STATUS" = ignore ] || [ "$GATE_STATUS" = untrusted ]; then
-            [ "$GATE_OUTCOME" = success ]
-            exit
-          fi
-          [ "$GATE_OUTCOME" = success ]
-          [ "$PUBLISH_OUTCOME" = success ]

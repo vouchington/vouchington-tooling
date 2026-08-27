@@ -76,39 +76,3 @@ jobs:
           set -euo pipefail
           [ "$TEST_RESULT" = success ]
           [ "$ACTIONLINT_RESULT" = success ]
-
-  untrusted-code-reviewed:
-    name: ${{
-      (github.event.pull_request.head.repo.full_name != github.repository ||
-      github.event.pull_request.user.login == 'dependabot' ||
-      github.event.pull_request.user.login == 'dependabot[bot]' ||
-      github.event.pull_request.user.login == 'app/dependabot' ||
-      github.event.pull_request.user.login == 'renovate' ||
-      github.event.pull_request.user.login == 'renovate[bot]' ||
-      github.event.pull_request.user.login == 'app/renovate') &&
-      'Code Reviewed' || 'Untrusted Code Reviewed (skipped)'
-      }}
-    needs: [tests]
-    if: >-
-      !cancelled() &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false &&
-      needs.tests.result == 'success'
-    runs-on: ubuntu-slim
-    timeout-minutes: 2
-    permissions: {}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/ci-untrusted-code-reviewed
-        with:
-          trusted-secret-context: ${{
-            github.event.pull_request.head.repo.full_name == github.repository &&
-            github.event.pull_request.user.login != 'dependabot' &&
-            github.event.pull_request.user.login != 'dependabot[bot]' &&
-            github.event.pull_request.user.login != 'app/dependabot' &&
-            github.event.pull_request.user.login != 'renovate' &&
-            github.event.pull_request.user.login != 'renovate[bot]' &&
-            github.event.pull_request.user.login != 'app/renovate'
-            }}

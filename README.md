@@ -118,14 +118,12 @@ jobs:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
-This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen only
-after the `tests` fan-in succeeds on a ready-for-review, same-repository pull request. Forks,
-Dependabot, and Renovate never receive review secrets and instead receive a pass-through
-`Code Reviewed` gate after tests. A non-cancelling label workflow records the once-per-PR state with
-`final-code-review:requested` and `final-code-review:complete`; removing the complete label requests
-a fresh review. A complete label is accepted only when a prior PR commit has a successful
-GitHub-Actions-owned `Code Reviewed` check, preventing a manually applied label from bypassing the
-first review.
+This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
+parallel only after the exact pull request head has a successful `tests` fan-in. A trusted
+default-branch `pull_request_target` workflow creates the native
+`Final Code Review / Code Reviewed` job for every pull request head. Forks, Dependabot, and Renovate
+never receive review secrets or a provider checkout; that same native job passes only after their
+exact-head tests succeed.
 
 The setup expects these organization Actions variables and fails when any is missing or malformed:
 
@@ -136,10 +134,9 @@ The setup expects these organization Actions variables and fails when any is mis
 
 It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
 secrets. Provider execution and review-comment posting are advisory: failures are reported as
-warnings but do not fail `Code Reviewed`. Selection, settings, head validation, label transitions,
-and explicit check publication remain fail-closed. A default-branch `workflow_run` applies the
-request label and dispatches the final workflow with a scoped `GITHUB_TOKEN`; no long-lived trigger
-token is required.
+warnings but do not fail `Code Reviewed`. Workflow selection, settings, exact-test provenance, and
+live-head validation remain fail-closed. There is no label router, manual dispatcher, or synthetic
+check publisher for the required context.
 
 ## CLI
 
