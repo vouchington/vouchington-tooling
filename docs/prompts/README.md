@@ -15,24 +15,17 @@ Provider models and enablement flags are organization Actions variables. Prompt 
 boundaries, payload limits, tool permissions, and installer digests remain version-controlled
 security policy rather than mutable organization settings.
 
-The default-branch request workflow owns the narrow write boundary for PR labels and final-workflow
-dispatch. Provider jobs remain read-only; only trusted poster jobs can write review comments.
+The trusted default-branch `pull_request_target` workflow owns orchestration and the narrow review
+comment write boundary. Provider jobs remain read-only; only trusted poster jobs can write review
+comments.
 
-The request and completion jobs use `pull-requests: write` for label transitions. GitHub rejects
-those pull-request label mutations when the workflow token has only `issues: write`, even though the
-labels API is exposed under the issues endpoint.
-
-The ruleset-facing `Code Reviewed` context is an explicit check attached to the exact head SHA
-selected at `select-final-review` time and revalidated before publishing. For trusted same-repository
-PRs, the `final-code-review` job that publishes it has a different display name, so only the explicit
-GitHub-Actions-owned check satisfies the context. Fork and bot PRs instead receive a mutually
-exclusive `Code Reviewed` pass-through job from CI after tests, without access to review secrets.
+The ruleset-facing context is the native `Final Code Review / Code Reviewed` job created for every
+pull request head. Its selector accepts only a successful `tests` job from the exact `ci.yml` run,
+head SHA, event, and pull request. Fork and bot PRs use that same native job after tests, without
+provider secrets or a provider checkout.
 The [main-branch ruleset](https://github.com/vouchington/vouchington-tooling/rules/21224701) pins both
 `tests` and `Code Reviewed` to the GitHub Actions integration.
 
-To request another provider review after the initial review completes, remove the
-`final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
-still has a successful `tests` fan-in before running the providers again and restores the
-`final-code-review:complete` label after every enabled provider has been attempted. Provider and
-poster failures remain advisory; orchestration and explicit-check publication failures remain
-blocking.
+Each new commit creates another native gate and review attempt. Reopening a pull request or marking
+a draft ready also retriggers the default-branch workflow. Provider and poster failures remain
+advisory; orchestration, settings, exact-test provenance, and live-head failures remain blocking.
