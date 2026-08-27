@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_REPOSITORY_PATH_MAPPINGS,
   parseRepositoryPathFetchConfig,
   validateDestination,
   validateRelativePath,
@@ -94,6 +95,20 @@ describe('parseRepositoryPathFetch', () => {
     },
   ])('rejects malformed config %#', (config) => {
     expect(() => parseRepositoryPathFetchConfig(config)).toThrow()
+  })
+
+  it('bounds mapping selection work', () => {
+    expect(() =>
+      parseRepositoryPathFetchConfig({
+        paths: Array.from({ length: MAX_REPOSITORY_PATH_MAPPINGS + 1 }, (_, index) => ({
+          destination: `destination-${index}`,
+          source: `source-${index}`,
+        })),
+        ref: 'main',
+        repository: 'owner/repository',
+        schemaVersion: 1,
+      }),
+    ).toThrow(`paths must contain at most ${MAX_REPOSITORY_PATH_MAPPINGS} mappings`)
   })
 
   it.each(['relative', '/', '/tmp/../tmp/output', '/tmp/output/'])(

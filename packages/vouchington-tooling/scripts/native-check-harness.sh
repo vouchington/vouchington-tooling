@@ -93,8 +93,8 @@ native_check_run() {
     echo "native_check_run requires a command" >&2
     return 2
   }
-  local started output status finished classification lines max_output_kib capture pipeline
-  started="$(date +%s)"
+  local started output status finished duration classification lines max_output_kib capture pipeline
+  started="$(node -p 'process.hrtime.bigint().toString()')" || return 1
   output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
@@ -117,7 +117,11 @@ native_check_run() {
     return "${pipeline[1]}"
   fi
   status="${pipeline[0]}"
-  finished="$(date +%s)"
+  finished="$(node -p 'process.hrtime.bigint().toString()')" || {
+    rm -f "${output}"
+    return 1
+  }
+  duration="$(((finished - started) / 1000000000))"
   classification="$(native_check_classify "${status}")"
   lines="${NATIVE_CHECK_TAIL_LINES:-80}"
   case "${lines}" in *[!0-9]*|'') lines=80 ;; esac
@@ -128,7 +132,7 @@ native_check_run() {
     if [ "${lines}" -eq 0 ]; then lines=80; fi
     if [ "${lines}" -gt 1000 ]; then lines=1000; fi
   fi
-  if ! printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "$((finished - started))" >>"${NATIVE_CHECK_SUMMARY_FILE}"; then
+  if ! printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "${duration}" >>"${NATIVE_CHECK_SUMMARY_FILE}"; then
     rm -f "${output}"
     return 1
   fi
@@ -146,7 +150,7 @@ native_check_run() {
       exitCode: Number(process.argv[4]),
       name: process.argv[2],
     })}\n`)
-  ' _ "${name}" "${classification}" "${status}" "$((finished - started))" >>"${NATIVE_CHECK_JSONL_FILE}"; then
+  ' _ "${name}" "${classification}" "${status}" "${duration}" >>"${NATIVE_CHECK_JSONL_FILE}"; then
     rm -f "${output}"
     return 1
   fi
@@ -173,21 +177,15 @@ native_check_publish_summary() {
       destination="${NATIVE_CHECK_SUMMARY_FILE}"
       local staged_summary
       staged_summary="$(mktemp "${destination}.publish.XXXXXX")"
-      {
+      if ! {
         printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
-        cat "${NATIVE_CHECK_SUMMARY_FILE}"
-        cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
-      } >"${staged_summary}"
-      mv "${staged_summary}" "${destination}"
+        cat "${NATIVE_CHECK_SUMMARY_FILE}" && cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
+      } >"${staged_summary}"; then rm -f "${staged_summary}"; return 1; fi
+      mv "${staged_summary}" "${destination}" || { rm -f "${staged_summary}"; return 1; }
       return
     fi
-    {
-        printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
-      cat "${NATIVE_CHECK_SUMMARY_FILE}"
-      cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
-    } >>"${destination}"
+    if ! { printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n' && cat "${NATIVE_CHECK_SUMMARY_FILE}" && cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"; } >>"${destination}"; then return 1; fi
   else
-    cat "${NATIVE_CHECK_SUMMARY_FILE}"
-    cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
+    cat "${NATIVE_CHECK_SUMMARY_FILE}" && cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
   fi
 }

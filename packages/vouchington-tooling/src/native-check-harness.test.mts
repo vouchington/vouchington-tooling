@@ -256,6 +256,54 @@ describe('native-check-harness', () => {
     }
   })
 
+  it('uses the monotonic clock for check duration', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const shim = join(directory, 'node')
+      writeFileSync(
+        shim,
+        `#!/usr/bin/env bash\nif [ "$1" = -p ]; then if [ -f ${JSON.stringify(join(directory, 'clock'))} ]; then echo 4000000000; else touch ${JSON.stringify(join(directory, 'clock'))}; echo 1000000000; fi; else exec "$REAL_NODE" "$@"; fi\n`,
+        { mode: 0o755 },
+      )
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}; native_check_run pass -- bash -c 'exit 0'`,
+        ],
+        {
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            REAL_NODE: process.execPath,
+          },
+        },
+      )
+      expect(result.status).toBe(0)
+      expect(readFileSync(summary, 'utf8')).toContain('| pass | passed | 0 | 3s |')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it.each(['summary.md', 'summary.md.diagnostics'])(
+    'fails when report %s cannot be read',
+    (missing) => {
+      const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+      try {
+        const summary = join(directory, 'summary.md')
+        const jsonl = join(directory, 'summary.jsonl')
+        const destination = join(directory, 'published.md')
+        const script = `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}; rm -f ${JSON.stringify(join(directory, missing))}; native_check_publish_summary ${JSON.stringify(destination)}`
+        expect(spawnSync('bash', ['-c', script]).status).toBe(1)
+      } finally {
+        rmSync(directory, { force: true, recursive: true })
+      }
+    },
+  )
+
   it('rejects unsafe names and bounds output while the command runs', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {

@@ -22,6 +22,7 @@ export interface RepositoryPathMapping {
 
 const repositoryPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/
 const refPattern = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
+export const MAX_REPOSITORY_PATH_MAPPINGS = 64
 
 export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFetchConfig {
   if (!isRecord(input)) throw new Error('config must be an object')
@@ -42,6 +43,8 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
     throw new Error('ref contains unsupported characters')
   }
   if (!Array.isArray(paths) || paths.length === 0) throw new Error('paths must not be empty')
+  if (paths.length > MAX_REPOSITORY_PATH_MAPPINGS)
+    throw new Error(`paths must contain at most ${MAX_REPOSITORY_PATH_MAPPINGS} mappings`)
   const seen = new Set<string>()
   const mappings = paths.map((path) => parseMapping(path, seen))
   for (const mapping of mappings) {
