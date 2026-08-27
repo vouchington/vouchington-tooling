@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -328,7 +329,7 @@ describe('publishBundle', () => {
       mkdirSync(destination)
       writeFileSync(metadataDestination, '{}')
       writeFileSync(marker, markerContents(destination, metadataDestination))
-      rmSync(destination, { recursive: true })
+      renameSync(destination, join(root, 'original-bundle'))
       mkdirSync(destination)
       writeFileSync(join(destination, 'replacement'), 'keep')
 
