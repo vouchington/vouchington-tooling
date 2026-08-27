@@ -8,32 +8,65 @@ const SESSION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
 describe('hosted Codex transcripts', () => {
   it('counts current conversation roles while ignoring non-conversation messages', () => {
-    const message = (role: string): string =>
-      JSON.stringify({ type: 'response_item', payload: { type: 'message', role, content: [] } })
+    const message = (role: string, text?: string): string =>
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role,
+          content: text === undefined ? [] : [{ type: 'input_text', text }],
+        },
+      })
     const facts = computeTranscriptFacts([
       message('user'),
       message('assistant'),
       message('developer'),
       message('system'),
       message('tool'),
+      message('user', '# AGENTS.md instructions for /workspace'),
+      message('user', '<environment_context>injected</environment_context>'),
+      message('user', '<skill>injected</skill>'),
       JSON.stringify({ type: 'response_item', payload: { type: 'reasoning', role: 'assistant' } }),
     ])
 
     expect(facts).toMatchObject({ userPrompts: 1, assistantResponses: 1 })
   })
 
-  it('prefers current messages over duplicate legacy events', () => {
+  it('preserves unmatched turns while pairing adjacent mixed-schema records', () => {
+    const current = (role: string, timestamp: string): string =>
+      JSON.stringify({
+        timestamp,
+        type: 'response_item',
+        payload: { type: 'message', role, content: [] },
+      })
+    const legacy = (type: string, timestamp: string): string =>
+      JSON.stringify({ timestamp, type: 'event_msg', payload: { type } })
+    const facts = computeTranscriptFacts([
+      legacy('user_message', '2026-01-01T00:00:00.000Z'),
+      legacy('agent_message', '2026-01-01T00:00:01.000Z'),
+      current('user', '2026-01-01T00:01:00.000Z'),
+      legacy('user_message', '2026-01-01T00:01:00.001Z'),
+      legacy('agent_message', '2026-01-01T00:01:01.000Z'),
+      current('assistant', '2026-01-01T00:01:01.002Z'),
+      current('user', '2026-01-01T00:02:00.000Z'),
+      current('assistant', '2026-01-01T00:02:01.000Z'),
+    ])
+
+    expect(facts).toMatchObject({ userPrompts: 3, assistantResponses: 3 })
+  })
+
+  it('deduplicates adjacent current and legacy message representations', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({
         type: 'response_item',
         payload: { type: 'message', role: 'user', content: [] },
       }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
       JSON.stringify({
         type: 'response_item',
         payload: { type: 'message', role: 'assistant', content: [] },
       }),
-      JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
-      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
     ])
 
     expect(facts).toMatchObject({ userPrompts: 1, assistantResponses: 1 })
@@ -50,11 +83,11 @@ describe('hosted Codex transcripts', () => {
     ])
     const currentAssistant = computeTranscriptFacts([
       JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }),
+      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
       JSON.stringify({
         type: 'response_item',
         payload: { type: 'message', role: 'assistant', content: [] },
       }),
-      JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message' } }),
     ])
 
     expect(currentUser).toMatchObject({ userPrompts: 1, assistantResponses: 1 })
