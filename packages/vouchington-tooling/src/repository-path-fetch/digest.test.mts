@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { comparePaths, digestEntries } from './digest.mts'
+import { bundleEntries, comparePaths, digestEntries } from './digest.mts'
 import { bundleDigest } from './index.mts'
 
 describe('bundleDigest', () => {
@@ -16,6 +16,21 @@ describe('bundleDigest', () => {
       await expect(bundleDigest(root)).resolves.toBe(initial)
       writeFileSync(join(root, 'b.txt'), 'changed')
       await expect(bundleDigest(root)).resolves.not.toBe(initial)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('orders flattened paths with the canonical byte comparator', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
+    try {
+      mkdirSync(join(root, 'a'))
+      writeFileSync(join(root, 'a/file'), 'nested')
+      writeFileSync(join(root, 'a.txt'), 'sibling')
+      await expect(bundleEntries(root)).resolves.toEqual([
+        expect.objectContaining({ destination: 'a.txt' }),
+        expect.objectContaining({ destination: 'a/file' }),
+      ])
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

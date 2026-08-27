@@ -1,5 +1,6 @@
 import { readRepositoryPathFetchConfig } from './config.mts'
 import { fetchRepositoryPaths } from './fetch.mts'
+import { isMainModule } from './main-module.mts'
 import { outputExists, recoverIncompletePublish } from './publish.mts'
 import { parseRepositoryPathFetchConfig, validateDestination } from './validation.mts'
 
@@ -63,5 +64,5 @@ function parseArgs(args: readonly string[]): {
 }
 
 /* v8 ignore next 2 -- exercised as the executable composite-action entrypoint */
-if (process.argv[1]?.endsWith('/repository-path-fetch/cli.mts'))
+if (isMainModule(import.meta.url, process.argv[1]))
   process.exitCode = await runRepositoryPathFetch(process.argv.slice(2))

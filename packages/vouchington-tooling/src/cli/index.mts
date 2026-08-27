@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, realpathSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { readPackageVersion } from '../package-version.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
@@ -17,6 +15,7 @@ import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mt
 import { runRetrospectiveTranscriptCommand } from './commands/retrospective-transcript.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { runRepositoryPathFetch } from '../repository-path-fetch/cli.mts'
+import { isMainModule } from '../repository-path-fetch/main-module.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
 import { printUsage } from './usage.mts'
@@ -109,14 +108,7 @@ function readInstalledVersion(): string {
   )
 }
 
-export function isMainModule(metaUrl: string, argv1: string | undefined): boolean {
-  if (argv1 === undefined) return false
-  try {
-    return metaUrl === pathToFileURL(realpathSync(argv1)).href
-  } catch {
-    return metaUrl === pathToFileURL(resolve(argv1)).href
-  }
-}
+export { isMainModule }
 
 /* v8 ignore next 8 */
 if (isMainModule(import.meta.url, process.argv[1])) {

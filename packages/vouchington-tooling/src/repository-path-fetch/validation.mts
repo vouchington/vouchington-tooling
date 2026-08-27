@@ -1,4 +1,4 @@
-import { isAbsolute, normalize, relative } from 'node:path'
+import { isAbsolute, normalize, posix } from 'node:path'
 
 export interface RepositoryPathFetchConfig {
   paths: readonly RepositoryPathMapping[]
@@ -82,13 +82,13 @@ function filesystemIdentity(value: string): string {
 
 export function validateRelativePath(path: string): void {
   if (
-    isAbsolute(path) ||
+    posix.isAbsolute(path) ||
     path.includes('\\') ||
     path === '.' ||
     path.endsWith('/') ||
     path.startsWith('-') ||
-    normalize(path) !== path ||
-    relative('.', path).startsWith('..')
+    posix.normalize(path) !== path ||
+    posix.relative('.', path).startsWith('..')
   ) {
     throw new Error(`unsafe path: ${path}`)
   }

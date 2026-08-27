@@ -36,10 +36,10 @@ describe('native-check-harness', () => {
       const jsonl = join(directory, 'summary.jsonl')
       const script = join(directory, 'run.sh')
       const failure = join(directory, 'failure.sh')
-      writeFileSync(failure, "printf first\nprintf '\\n%s\\nlast\\n' '```'\nexit 9\n")
+      writeFileSync(failure, "printf first\nprintf '\\n%s\\nlast' '```'\nexit 9\n")
       writeFileSync(
         script,
-        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nnative_check_run fail -- bash ${JSON.stringify(failure)} || true\nnative_check_publish_summary ${JSON.stringify(`${summary}.published`)}\n`,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run fail -- bash ${JSON.stringify(failure)} || true\nnative_check_run pass -- bash -c 'exit 0'\nnative_check_publish_summary ${JSON.stringify(`${summary}.published`)}\n`,
       )
       execFileSync('bash', [script], { env: { ...process.env, NATIVE_CHECK_TAIL_LINES: '2' } })
       const published = readFileSync(`${summary}.published`, 'utf8')
@@ -49,6 +49,9 @@ describe('native-check-harness', () => {
       expect(published).not.toContain('first')
       expect(published).toContain('    ```')
       expect(published).not.toContain('```text')
+      expect(published.indexOf('| fail |')).toBeLessThan(published.indexOf('| pass |'))
+      expect(published.indexOf('| pass |')).toBeLessThan(published.indexOf('### fail'))
+      expect(published).toContain('    last\n')
       expect(readFileSync(jsonl, 'utf8')).toContain('"classification":"failed"')
     } finally {
       rmSync(directory, { force: true, recursive: true })
@@ -71,7 +74,7 @@ describe('native-check-harness', () => {
         stdio: 'pipe',
       })
       expect(readFileSync(summary, 'utf8')).toContain('| bounded |')
-      expect(readFileSync(summary, 'utf8')).toContain('exit 9')
+      expect(readFileSync(`${summary}.diagnostics`, 'utf8')).toContain('exit 9')
       expect(readFileSync(summary, 'utf8').length).toBeLessThan(2048)
       expect(readFileSync(jsonl, 'utf8')).not.toContain('unsafe|name')
       expect(statSync(artifact).size).toBe(8192)
@@ -97,10 +100,33 @@ describe('native-check-harness', () => {
           NATIVE_CHECK_TAIL_LINES: '1001',
         },
       })
-      const rendered = readFileSync(summary, 'utf8')
+      const rendered = readFileSync(`${summary}.diagnostics`, 'utf8')
       expect(rendered).not.toContain('line-1\n')
       expect(rendered).toContain('line-2\n')
       expect(rendered).toContain('line-1001\n')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('interprets zero-padded capture limits as decimal', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const script = join(directory, 'run.sh')
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run padded -- node -e 'process.stdout.write("prefix" + "x".repeat(9000)); process.exitCode = 9' || true\n`,
+      )
+      execFileSync('bash', [script], {
+        env: {
+          ...process.env,
+          NATIVE_CHECK_MAX_OUTPUT_KIB: '010',
+          NATIVE_CHECK_TAIL_LINES: '01',
+        },
+      })
+      expect(readFileSync(`${summary}.diagnostics`, 'utf8')).toContain('prefix')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }
@@ -114,12 +140,13 @@ describe('native-check-harness', () => {
       const script = join(directory, 'run.sh')
       writeFileSync(
         script,
-        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nGITHUB_STEP_SUMMARY=${JSON.stringify(summary)} native_check_publish_summary\n`,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run fail -- bash -c 'printf diagnostic; exit 9' || true\nGITHUB_STEP_SUMMARY=${JSON.stringify(summary)} native_check_publish_summary\n`,
       )
       execFileSync('bash', [script])
       const published = readFileSync(summary, 'utf8')
       expect(published).toContain('## Check summary')
-      expect(published).toContain('| pass | passed | 0 |')
+      expect(published).toContain('| fail | failed | 9 |')
+      expect(published).toContain('    diagnostic\n')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

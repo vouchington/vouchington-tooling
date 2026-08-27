@@ -18,7 +18,7 @@ export async function bundleEntries(root: string): Promise<BundleEntry[]> {
       sha256: await fileSha256(join(root, destination)),
     })
   }
-  return entries
+  return entries.sort(comparePaths)
 }
 
 export async function bundleDigest(root: string): Promise<string> {

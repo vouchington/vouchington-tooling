@@ -9,8 +9,10 @@ native_check_init() {
   : "${2:?native_check_init requires a JSONL result path}"
   NATIVE_CHECK_SUMMARY_FILE="$1"
   NATIVE_CHECK_JSONL_FILE="$2"
+  NATIVE_CHECK_DIAGNOSTICS_FILE="${NATIVE_CHECK_SUMMARY_FILE}.diagnostics"
   : >"${NATIVE_CHECK_SUMMARY_FILE}"
   : >"${NATIVE_CHECK_JSONL_FILE}"
+  : >"${NATIVE_CHECK_DIAGNOSTICS_FILE}"
 }
 
 native_check_classify() {
@@ -46,7 +48,12 @@ native_check_run() {
   output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
-  if [ "${#max_output_kib}" -gt 5 ] || [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
+  if [ "${#max_output_kib}" -gt 5 ]; then
+    max_output_kib=10240
+  else
+    max_output_kib="$((10#${max_output_kib}))"
+    if [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
+  fi
   capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
   if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
     pipeline=("${PIPESTATUS[@]}")
@@ -63,14 +70,22 @@ native_check_run() {
   classification="$(native_check_classify "${status}")"
   lines="${NATIVE_CHECK_TAIL_LINES:-80}"
   case "${lines}" in *[!0-9]*|'') lines=80 ;; esac
-  if [ "${#lines}" -gt 4 ] || [ "${lines}" -gt 1000 ]; then lines=1000; fi
+  if [ "${#lines}" -gt 4 ]; then
+    lines=1000
+  else
+    lines="$((10#${lines}))"
+    if [ "${lines}" -gt 1000 ]; then lines=1000; fi
+  fi
   {
     printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "$((finished - started))"
-    if [ "${status}" -ne 0 ]; then
+  } >>"${NATIVE_CHECK_SUMMARY_FILE}"
+  if [ "${status}" -ne 0 ]; then
+    {
       printf '\n### %s (%s, exit %s)\n\n' "${name}" "${classification}" "${status}"
       tail -n "${lines}" "${output}" | sed 's/^/    /'
-    fi
-  } >>"${NATIVE_CHECK_SUMMARY_FILE}"
+      printf '\n'
+    } >>"${NATIVE_CHECK_DIAGNOSTICS_FILE}"
+  fi
   node --input-type=module -e '
     process.stdout.write(`${JSON.stringify({
       classification: process.argv[3],
@@ -94,15 +109,18 @@ native_check_publish_summary() {
       {
         printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- | --- |\n'
         cat "${NATIVE_CHECK_SUMMARY_FILE}"
+        cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
       } >"${staged_summary}"
       mv "${staged_summary}" "${destination}"
       return
     fi
     {
-      printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
+        printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
       cat "${NATIVE_CHECK_SUMMARY_FILE}"
+      cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
     } >>"${destination}"
   else
     cat "${NATIVE_CHECK_SUMMARY_FILE}"
+    cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
   fi
 }
