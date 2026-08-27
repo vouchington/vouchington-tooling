@@ -10,6 +10,7 @@ import {
   type TokenTotals,
   type TranscriptFacts,
 } from './shared.mts'
+import { CodexMessageCounter } from './codex-messages.mts'
 import { customExecCommands } from './javascript-command.mts'
 function usage(record: ParsedLine): TokenTotals | undefined {
   const payload = asRecord(record.payload)
@@ -95,14 +96,12 @@ function applyRecords(
   let previous = baseline
   const calls = new Set<string>()
   const failed = new Set<string>()
+  const messages = new CodexMessageCounter()
   let anonymousFailures = 0
   let previousCompaction: 'top-level' | 'context-event' | undefined
   for (const record of records) {
     const payload = asRecord(record.payload)
-    if (!subagent && record.type === 'event_msg' && payload?.type === 'user_message')
-      facts.userPrompts++
-    if (!subagent && record.type === 'event_msg' && payload?.type === 'agent_message')
-      facts.assistantResponses++
+    if (!subagent) messages.add(record, payload)
     const compaction =
       record.type === 'compacted'
         ? 'top-level'
@@ -139,6 +138,11 @@ function applyRecords(
       if (id) failed.add(id)
       else anonymousFailures++
     }
+  }
+  if (!subagent) {
+    const [userPrompts, assistantResponses] = messages.totals()
+    facts.userPrompts += userPrompts
+    facts.assistantResponses += assistantResponses
   }
   facts.failedToolCalls += [...failed].filter((id) => calls.has(id)).length + anonymousFailures
 }
