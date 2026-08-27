@@ -213,6 +213,27 @@ describe('publishBundle', () => {
     }
   })
 
+  it('propagates unexpected marker creation failures', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const failure = Object.assign(new Error('permission denied'), { code: 'EACCES' })
+      await expect(
+        publishBundle(
+          join(root, 'staged-bundle'),
+          join(root, 'bundle'),
+          join(root, 'staged-metadata'),
+          join(root, 'metadata'),
+          rename,
+          async () => {
+            throw failure
+          },
+        ),
+      ).rejects.toBe(failure)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('recovers a marker left by process termination between publish boundaries', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
