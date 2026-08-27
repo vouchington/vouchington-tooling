@@ -2,7 +2,7 @@ name: Final Code Review
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [labeled, ready_for_review]
 
 permissions:
   actions: read
@@ -10,12 +10,16 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.event.action }}-${{ github.event.label.name || 'none' }}
   cancel-in-progress: false
 
 jobs:
   select-final-review:
     name: Select final review
+    if: >-
+      (github.event.action == 'ready_for_review' ||
+      github.event.label.name == 'final-code-review:requested') &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -35,8 +39,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ACTION: ${{ github.event.action }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          READY_AT: ${{ github.event.pull_request.updated_at }}
           TESTS_WAIT_ATTEMPTS: '180'
           TESTS_WAIT_SECONDS: '10'
         run: |
@@ -50,8 +56,10 @@ jobs:
           }
 
           pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json headRefOid,baseRefOid,isDraft,isCrossRepository,author)"
+            --json headRefOid,headRefName,headRepository,baseRefOid,isDraft,isCrossRepository,author)"
           head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
+          head_ref="$(jq -r '.headRefName' <<< "$pr_json")"
+          head_repository="$(jq -r '.headRepository.nameWithOwner' <<< "$pr_json")"
           base_sha="$(jq -r '.baseRefOid' <<< "$pr_json")"
           is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
           is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
@@ -102,8 +110,11 @@ jobs:
             done < <(gh api --method GET \
               "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
               -f "head_sha=$head_sha" -f event=pull_request -f status=completed -f per_page=20 | \
-              jq -r --argjson pr "$PR_NUMBER" \
-                '.workflow_runs[] | select(any(.pull_requests[]?; .number == $pr)) | .id')
+              jq -r --argjson pr "$PR_NUMBER" --arg head_repo "$head_repository" --arg head_ref "$head_ref" --arg action "$EVENT_ACTION" --arg ready_at "$READY_AT" \
+                '.workflow_runs[] | select(
+                  (any(.pull_requests[]?; .number == $pr) or
+                   ((.pull_requests | length) == 0 and .head_repository.full_name == $head_repo and .head_branch == $head_ref)) and
+                  ($action != "ready_for_review" or .created_at >= $ready_at)) | .id')
             [ "$tests_passed" = true ] && break
             sleep "$TESTS_WAIT_SECONDS"
             attempt=$((attempt + 1))
@@ -319,7 +330,8 @@ jobs:
           token_source: github-token
 
   code-reviewed:
-    name: Code Reviewed
+    name: >-
+      ${{ (github.event.action == 'ready_for_review' || github.event.label.name == 'final-code-review:requested') && github.event.pull_request.draft == false && 'Code Reviewed' || 'Ignore final review request' }}
     needs:
       - select-final-review
       - validate-review-settings
@@ -327,7 +339,10 @@ jobs:
       - opencode-code-review-poster
       - opencode-zen-code-review
       - opencode-zen-code-review-poster
-    if: always()
+    if: >-
+      always() && (github.event.action == 'ready_for_review' ||
+      github.event.label.name == 'final-code-review:requested') &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -355,7 +370,11 @@ jobs:
           [ "$SELECT_RESULT" = success ] || { echo '::error::Review selection failed'; exit 1; }
           case "$GATE_STATUS" in
             untrusted) exit 0 ;;
-            deferred|stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
+            deferred)
+              live_draft="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+              [ "$live_draft" = true ] && { echo 'Final code review stopped because the PR became a draft.'; exit 0; }
+              echo '::error::Final code review is unexpectedly deferred.'; exit 1 ;;
+            stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
             review) ;;
             *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
           esac
