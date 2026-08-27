@@ -10,7 +10,6 @@ import {
   type TokenTotals,
   type TranscriptFacts,
 } from './shared.mts'
-import { codexMessageCounts } from './codex-messages.mts'
 import { customExecCommands } from './javascript-command.mts'
 function usage(record: ParsedLine): TokenTotals | undefined {
   const payload = asRecord(record.payload)
@@ -96,15 +95,23 @@ function applyRecords(
   let previous = baseline
   const calls = new Set<string>()
   const failed = new Set<string>()
-  if (!subagent) {
-    const [userPrompts, assistantResponses] = codexMessageCounts(records)
-    facts.userPrompts += userPrompts
-    facts.assistantResponses += assistantResponses
-  }
+  let currentUser = 0
+  let currentAssistant = 0
+  let legacyUser = 0
+  let legacyAssistant = 0
   let anonymousFailures = 0
   let previousCompaction: 'top-level' | 'context-event' | undefined
   for (const record of records) {
     const payload = asRecord(record.payload)
+    if (!subagent) {
+      if (record.type === 'response_item' && payload?.type === 'message') {
+        if (payload.role === 'user') currentUser++
+        else if (payload.role === 'assistant') currentAssistant++
+      } else if (record.type === 'event_msg') {
+        if (payload?.type === 'user_message') legacyUser++
+        else if (payload?.type === 'agent_message') legacyAssistant++
+      }
+    }
     const compaction =
       record.type === 'compacted'
         ? 'top-level'
@@ -141,6 +148,10 @@ function applyRecords(
       if (id) failed.add(id)
       else anonymousFailures++
     }
+  }
+  if (!subagent) {
+    facts.userPrompts += currentUser || legacyUser
+    facts.assistantResponses += currentAssistant || legacyAssistant
   }
   facts.failedToolCalls += [...failed].filter((id) => calls.has(id)).length + anonymousFailures
 }
