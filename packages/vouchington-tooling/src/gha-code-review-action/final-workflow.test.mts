@@ -21,30 +21,32 @@ type Job = {
 type Workflow = {
   concurrency?: { 'cancel-in-progress'?: boolean; group?: string }
   jobs?: Record<string, Job>
-  on?: { pull_request_target?: { types?: string[] } }
+  on?: {
+    pull_request_target?: { types?: string[] }
+    workflow_run?: { types?: string[]; workflows?: string[] }
+  }
 }
 
 const finalReviewText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
 const finalReview = load(finalReviewText) as Workflow
 const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8')) as Workflow
+const routerText = readFileSync('.github/workflows/ci-request-final-code-review.yml', 'utf8')
+const router = load(routerText) as Workflow
 
 describe('final code review workflow', () => {
   it('creates the native required gate from trusted default-branch code for every PR head', () => {
-    expect(finalReview.on?.pull_request_target?.types).toEqual([
-      'opened',
-      'reopened',
-      'synchronize',
-      'ready_for_review',
-    ])
+    expect(finalReview.on?.pull_request_target?.types).toEqual(['labeled', 'ready_for_review'])
     expect(finalReview.concurrency).toEqual({
       group:
-        'final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}',
+        "final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.event.action }}-${{ github.event.label.name || 'none' }}",
       'cancel-in-progress': false,
     })
 
     const gate = finalReview.jobs?.['code-reviewed']
-    expect(gate?.name).toBe('Code Reviewed')
-    expect(gate?.if).toBe('always()')
+    expect(gate?.name).toContain("&& 'Code Reviewed'")
+    expect(gate?.name).toContain("|| 'Ignore final review request'")
+    expect(gate?.if).toContain("github.event.label.name == 'final-code-review:requested'")
+    expect(gate?.if).toContain('github.event.pull_request.draft == false')
     expect(gate?.permissions?.checks).toBeUndefined()
     expect(finalReviewText).not.toContain('repos/$GITHUB_REPOSITORY/check-runs')
   })
@@ -123,12 +125,22 @@ describe('final code review workflow', () => {
     expect(Object.values(reviewStep?.with ?? {})).toContain(`\${{ secrets.${secret} }}`)
   })
 
-  it('has no CI or manual-router producer for the required context', () => {
+  it('routes a successful exact ready-head CI fan-in into the native gate', () => {
     expect(ci.jobs).not.toHaveProperty('untrusted-code-reviewed')
     expect(ci.jobs).not.toHaveProperty('request-final-code-review')
     expect(finalReviewText).not.toContain('workflow_dispatch')
-    expect(finalReviewText).not.toContain('final-code-review:requested')
-    expect(finalReviewText).not.toContain('final-code-review:complete')
+    expect(router.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
+    expect(routerText).toContain('github.event.workflow_run.head_sha')
+    expect(routerText).toContain('commits/$TESTED_HEAD_SHA/pulls')
+    expect(routerText).toContain('.head.repo.full_name == $head_repo')
+    expect(routerText).toContain('.path == ".github/workflows/final-code-review.yml"')
+    expect(routerText).toContain('cancel-in-progress: false')
+    expect(routerText).toContain('.base.ref == $base')
+    expect(routerText).toContain('.name == "tests"')
+    expect(routerText).toContain('sort_by(.run_attempt, .id)')
+    expect(routerText).toContain('[ "$is_draft" = true ]')
+    expect(routerText).toContain('final_state')
+    expect(routerText).toContain('-f "labels[]=$REQUESTED_LABEL"')
   })
 })
 
