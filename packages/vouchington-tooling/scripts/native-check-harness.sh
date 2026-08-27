@@ -87,6 +87,16 @@ native_check_publish_summary() {
   : "${NATIVE_CHECK_JSONL_FILE:?call native_check_init first}"
   local destination="${1:-${GITHUB_STEP_SUMMARY:-}}"
   if [ -n "${destination}" ]; then
+    if [ "${destination}" = "${NATIVE_CHECK_SUMMARY_FILE}" ]; then
+      local staged_summary
+      staged_summary="$(mktemp "${destination}.publish.XXXXXX")"
+      {
+        printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- | --- |\n'
+        cat "${NATIVE_CHECK_SUMMARY_FILE}"
+      } >"${staged_summary}"
+      mv "${staged_summary}" "${destination}"
+      return
+    fi
     {
       printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
       cat "${NATIVE_CHECK_SUMMARY_FILE}"

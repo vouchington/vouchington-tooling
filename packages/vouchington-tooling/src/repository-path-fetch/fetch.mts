@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, relative } from 'node:path'
+import { basename, dirname, join, posix } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import {
@@ -119,7 +119,7 @@ async function writeBlob(
   const destination =
     entry.path === mapping.source
       ? mapping.destination
-      : join(mapping.destination, relative(mapping.source, entry.path))
+      : posix.join(mapping.destination, posix.relative(mapping.source, entry.path))
   validateRelativePath(destination)
   const blob = await getJson<ApiBlob>(api, `repos/${repository}/git/blobs/${entry.sha}`, token)
   if (blob.encoding !== 'base64' || typeof blob.content !== 'string')

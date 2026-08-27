@@ -62,4 +62,23 @@ describe('native-check-harness', () => {
       rmSync(directory, { force: true, recursive: true })
     }
   })
+
+  it('publishes safely when the summary source is also the destination', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const script = join(directory, 'run.sh')
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nGITHUB_STEP_SUMMARY=${JSON.stringify(summary)} native_check_publish_summary\n`,
+      )
+      execFileSync('bash', [script])
+      const published = readFileSync(summary, 'utf8')
+      expect(published).toContain('## Check summary')
+      expect(published).toContain('| pass | passed | 0 |')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
 })

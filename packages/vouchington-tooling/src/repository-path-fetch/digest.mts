@@ -59,7 +59,7 @@ function list(root: string, current = root): string[] {
     if (stat.isSymbolicLink())
       throw new Error(`symbolic link in bundle: ${relative(root, absolute)}`)
     if (stat.isDirectory()) entries.push(...list(root, absolute))
-    else if (stat.isFile()) entries.push(relative(root, absolute))
+    else if (stat.isFile()) entries.push(relative(root, absolute).replaceAll('\\', '/'))
     /* v8 ignore start -- staged bundles contain only validated regular Git blobs */ else
       throw new Error(`unsupported bundle entry: ${relative(root, absolute)}`)
     /* v8 ignore stop */
