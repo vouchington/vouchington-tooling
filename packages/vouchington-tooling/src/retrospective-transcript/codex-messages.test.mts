@@ -21,9 +21,36 @@ describe('Codex message pairing', () => {
           ],
         },
       }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: '<environment_context>ordinary prompt' }],
+        },
+      }),
     ])
 
-    expect(facts.userPrompts).toBe(2)
+    expect(facts.userPrompts).toBe(3)
+  })
+
+  it('recognizes complete injected envelopes across hosted formatting variants', () => {
+    const injected = (text: string): string =>
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] },
+      })
+    const facts = computeTranscriptFacts([
+      injected(
+        '# AGENTS.md instructions for /workspace\r\n\r\n<INSTRUCTIONS scope="repo">rules</INSTRUCTIONS>',
+      ),
+      injected(
+        '<environment_context source="hosted">\r\n<cwd>/workspace</cwd>\r\n</environment_context>',
+      ),
+      injected('<skill source="hosted">\r\nrules\r\n</skill>'),
+    ])
+
+    expect(facts.userPrompts).toBe(0)
   })
 
   it('keeps inverse schema orders as distinct messages', () => {

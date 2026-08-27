@@ -5,21 +5,13 @@ type Message = { role: Role; schema: 'current' | 'legacy' }
 
 function isInjectedBlock(raw: string): boolean {
   const text = raw.trim()
+  // Hosted metadata occupies complete input blocks; inner fields can vary by runtime version.
   const agents =
-    text.startsWith('# AGENTS.md instructions for ') &&
-    text.includes('\n<INSTRUCTIONS>') &&
-    text.endsWith('</INSTRUCTIONS>')
-  const environment =
-    text.startsWith('<environment_context>') &&
-    ['<cwd>', '<shell>', '<current_date>', '<timezone>', '<filesystem>'].every((tag) =>
-      text.includes(tag),
-    ) &&
-    text.endsWith('</environment_context>')
-  const skill =
-    text.startsWith('<skill>') &&
-    text.includes('\n<name>') &&
-    text.includes('\n<path>') &&
-    text.endsWith('</skill>')
+    /^# AGENTS\.md instructions for [^\r\n]+(?:\r?\n)+<INSTRUCTIONS(?:\s[^>]*)?>[\s\S]*<\/INSTRUCTIONS>$/.test(
+      text,
+    )
+  const environment = /^<environment_context(?:\s[^>]*)?>[\s\S]*<\/environment_context>$/.test(text)
+  const skill = /^<skill(?:\s[^>]*)?>[\s\S]*<\/skill>$/.test(text)
   return agents || environment || skill
 }
 
@@ -44,7 +36,8 @@ function message(record: ParsedLine, payload: ParsedLine | undefined): Message |
 }
 
 function isDuplicate(previous: Message | undefined, current: Message): boolean {
-  // Hosted rollouts emit user duplicates current→legacy and assistant duplicates legacy→current.
+  // Hosted rollouts currently emit user as current→legacy and assistant as legacy→current;
+  // keep directional to avoid merging inverse-order distinct turns (see pairing tests).
   return (
     (current.role === 'user' && previous?.schema === 'current' && current.schema === 'legacy') ||
     (current.role === 'assistant' && previous?.schema === 'legacy' && current.schema === 'current')
@@ -67,6 +60,7 @@ export class CodexMessageCounter {
       this.previous = undefined
       return
     }
+    // Injected records are transparent because hosted metadata can split a duplicate pair.
     if (injected) return
     if (this.previous?.role === current.role && isDuplicate(this.previous, current)) {
       this.previous = undefined
