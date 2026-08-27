@@ -29,8 +29,11 @@ export async function bundleEntries(
   return entries.sort(comparePaths)
 }
 
-export async function bundleDigest(root: string): Promise<string> {
-  return digestEntries(await bundleEntries(root))
+export async function bundleDigest(
+  root: string,
+  expectedModes: ReadonlyMap<string, string>,
+): Promise<string> {
+  return digestEntries(await bundleEntries(root, expectedModes))
 }
 
 async function fileSha256(path: string): Promise<string> {

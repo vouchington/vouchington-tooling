@@ -1,11 +1,20 @@
 import { randomUUID } from 'node:crypto'
-import { constants, lstatSync, readFileSync } from 'node:fs'
-import { chmod, copyFile, lstat, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { lstatSync, readFileSync } from 'node:fs'
+import { rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
+import {
+  isOutputIdentity,
+  moveAtomic,
+  outputIdentity,
+  removeOwnedOutput,
+  type OutputIdentity,
+} from './output-identity.mts'
 
 interface PublishMarker {
+  bundleIdentity: OutputIdentity
   destination: string
   metadata: string
+  metadataIdentity: OutputIdentity
   owner: number
   token: string
   version: 1
@@ -31,10 +40,12 @@ async function discardFailedPublish(
   marker: string,
   publishedBundle: boolean,
   publishedMetadata: boolean,
+  bundleIdentity: OutputIdentity,
+  metadataIdentity: OutputIdentity,
   removeOutput: (path: string) => Promise<void>,
 ): Promise<void> {
-  if (publishedBundle) await removeOutput(destination)
-  if (publishedMetadata) await removeOutput(metadata)
+  if (publishedBundle) await removeOwnedOutput(destination, bundleIdentity, removeOutput)
+  if (publishedMetadata) await removeOwnedOutput(metadata, metadataIdentity, removeOutput)
   await rm(marker, { force: true })
 }
 
@@ -54,8 +65,12 @@ export async function recoverIncompletePublish(
     throw new Error('incomplete publish marker does not match requested outputs')
   }
   if (isOwnerAlive(parsed.owner)) throw new Error('repository bundle publication is in progress')
-  await rm(destination, { force: true, recursive: true })
-  await rm(metadata, { force: true, recursive: true })
+  await removeOwnedOutput(destination, parsed.bundleIdentity, async (path) => {
+    await rm(path, { force: true, recursive: true })
+  })
+  await removeOwnedOutput(metadata, parsed.metadataIdentity, async (path) => {
+    await rm(path, { force: true, recursive: true })
+  })
   await rm(marker, { force: true })
 }
 
@@ -64,7 +79,7 @@ export async function publishBundle(
   destination: string,
   metadata: string,
   metadataDestination: string,
-  move: (from: string, to: string) => Promise<void> = moveNoReplace,
+  move: (from: string, to: string) => Promise<void> = moveAtomic,
   writeMarker: (path: string, contents: string) => Promise<void> = async (path, contents) => {
     await writeFile(path, contents, { flag: 'wx', mode: 0o600 })
   },
@@ -76,10 +91,17 @@ export async function publishBundle(
   },
 ): Promise<void> {
   const marker = publishMarkerPath(destination)
+  const bundleIdentity = await outputIdentity(bundle)
+  const metadataIdentity = await outputIdentity(metadata)
   if (outputExists(destination) || outputExists(metadataDestination))
     throw new Error('output already exists')
   try {
-    await writeMarker(marker, `${JSON.stringify(markerRecord(destination, metadataDestination))}\n`)
+    await writeMarker(
+      marker,
+      `${JSON.stringify(
+        markerRecord(destination, metadataDestination, bundleIdentity, metadataIdentity),
+      )}\n`,
+    )
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('output already exists')
     throw error
@@ -102,55 +124,29 @@ export async function publishBundle(
       marker,
       publishedBundle,
       publishedMetadata,
+      bundleIdentity,
+      metadataIdentity,
       removeOutput,
     )
     throw error
   }
 }
 
-async function moveNoReplace(from: string, to: string): Promise<void> {
-  let created = false
-  try {
-    const stat = await lstat(from)
-    if (stat.isDirectory()) {
-      await mkdir(to, { mode: 0o700 })
-      created = true
-      await copyDirectoryContents(from, to)
-      await chmod(to, stat.mode & 0o777)
-    } else if (stat.isFile()) {
-      await copyFile(from, to, constants.COPYFILE_EXCL)
-      created = true
-      await chmod(to, stat.mode & 0o777)
-    } else {
-      throw new Error('unsupported staged output')
-    }
-    await rm(from, { recursive: stat.isDirectory() })
-  } catch (error) {
-    if (created) await rm(to, { force: true, recursive: true })
-    throw error
+function markerRecord(
+  destination: string,
+  metadata: string,
+  bundleIdentity: OutputIdentity,
+  metadataIdentity: OutputIdentity,
+): PublishMarker {
+  return {
+    bundleIdentity,
+    destination,
+    metadata,
+    metadataIdentity,
+    owner: process.pid,
+    token: randomUUID(),
+    version: 1,
   }
-}
-
-async function copyDirectoryContents(from: string, to: string): Promise<void> {
-  for (const entry of await readdir(from, { withFileTypes: true })) {
-    const source = join(from, entry.name)
-    const destination = join(to, entry.name)
-    const stat = await lstat(source)
-    if (entry.isDirectory()) {
-      await mkdir(destination, { mode: 0o700 })
-      await copyDirectoryContents(source, destination)
-      await chmod(destination, stat.mode & 0o777)
-    } else if (entry.isFile()) {
-      await copyFile(source, destination, constants.COPYFILE_EXCL)
-      await chmod(destination, stat.mode & 0o777)
-    } else {
-      throw new Error('unsupported staged output')
-    }
-  }
-}
-
-function markerRecord(destination: string, metadata: string): PublishMarker {
-  return { destination, metadata, owner: process.pid, token: randomUUID(), version: 1 }
 }
 function readMarker(path: string): PublishMarker | undefined {
   try {
@@ -168,8 +164,10 @@ function isMarker(value: unknown): value is PublishMarker {
   const marker = value as Partial<PublishMarker>
   return (
     marker.version === 1 &&
+    isOutputIdentity(marker.bundleIdentity) &&
     typeof marker.destination === 'string' &&
     typeof marker.metadata === 'string' &&
+    isOutputIdentity(marker.metadataIdentity) &&
     typeof marker.owner === 'number' &&
     Number.isSafeInteger(marker.owner) &&
     marker.owner > 0 &&

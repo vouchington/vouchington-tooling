@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import {
+  existsSync,
   mkdirSync,
   linkSync,
   mkdtempSync,
@@ -85,6 +86,25 @@ describe('native-check-harness', () => {
         `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
       ])
       expect(result.status).toBe(2)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('handles case-only missing-path aliases according to filesystem semantics', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const probe = join(directory, 'case-probe')
+      writeFileSync(probe, 'probe')
+      const caseInsensitive = existsSync(join(directory, 'CASE-PROBE'))
+      rmSync(probe)
+      const summary = join(directory, 'summary')
+      const jsonl = join(directory, 'SUMMARY')
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).toBe(caseInsensitive ? 2 : 0)
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

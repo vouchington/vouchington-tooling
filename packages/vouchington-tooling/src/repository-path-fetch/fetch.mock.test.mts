@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { bundleDigest } from './digest.mts'
 import { fetchRepositoryPaths } from './fetch.mts'
 
 function blobSha(content: string): string {
@@ -59,6 +60,12 @@ describe('fetchRepositoryPaths', () => {
       expect(result.files).toEqual([
         { destination: 'target/file.txt', mode: '0755', sha256: expect.any(String) },
       ])
+      await expect(
+        bundleDigest(
+          destination,
+          new Map(result.files.map((entry) => [entry.destination, entry.mode])),
+        ),
+      ).resolves.toBe(result.digest)
       expect(readFileSync(join(destination, 'target/file.txt'), 'utf8')).toBe('content')
       expect(statSync(destination).mode & 0o077).toBe(0)
       expect(JSON.parse(readFileSync(join(root, 'bundle.json'), 'utf8'))).toMatchObject(result)

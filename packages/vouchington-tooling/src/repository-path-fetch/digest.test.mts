@@ -12,10 +12,14 @@ describe('bundleDigest', () => {
       mkdirSync(join(root, 'nested'))
       writeFileSync(join(root, 'nested/a.txt'), 'a')
       writeFileSync(join(root, 'b.txt'), 'b')
-      const initial = await bundleDigest(root)
-      await expect(bundleDigest(root)).resolves.toBe(initial)
+      const modes = new Map([
+        ['b.txt', '0644'],
+        ['nested/a.txt', '0644'],
+      ])
+      const initial = await bundleDigest(root, modes)
+      await expect(bundleDigest(root, modes)).resolves.toBe(initial)
       writeFileSync(join(root, 'b.txt'), 'changed')
-      await expect(bundleDigest(root)).resolves.not.toBe(initial)
+      await expect(bundleDigest(root, modes)).resolves.not.toBe(initial)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -72,7 +76,15 @@ describe('bundleDigest', () => {
     try {
       writeFileSync(join(root, 'target'), 'content')
       symlinkSync('target', join(root, 'link'))
-      await expect(bundleDigest(root)).rejects.toThrow('symbolic link')
+      await expect(
+        bundleDigest(
+          root,
+          new Map([
+            ['link', '0644'],
+            ['target', '0644'],
+          ]),
+        ),
+      ).rejects.toThrow('symbolic link')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

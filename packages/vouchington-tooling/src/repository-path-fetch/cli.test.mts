@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -132,9 +132,11 @@ describe('runRepositoryPathFetch', () => {
       const marker = join(root, '.bundle.fetch-incomplete')
       mkdirSync(destination)
       writeFileSync(metadata, '{}')
+      const destinationStat = lstatSync(destination, { bigint: true })
+      const metadataStat = lstatSync(metadata, { bigint: true })
       writeFileSync(
         marker,
-        `${JSON.stringify({ destination, metadata, owner: 2147483647, token: '00000000-0000-4000-8000-000000000000', version: 1 })}\n`,
+        `${JSON.stringify({ bundleIdentity: { dev: String(destinationStat.dev), ino: String(destinationStat.ino), type: 'directory' }, destination, metadata, metadataIdentity: { dev: String(metadataStat.dev), ino: String(metadataStat.ino), type: 'file' }, owner: 2147483647, token: '00000000-0000-4000-8000-000000000000', version: 1 })}\n`,
       )
       const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       await expect(runRepositoryPathFetch(args(root))).resolves.toBe(1)

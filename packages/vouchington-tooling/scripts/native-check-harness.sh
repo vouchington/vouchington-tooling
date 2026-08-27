@@ -7,7 +7,23 @@
 native_check_path_identity() {
   node --input-type=module -e '
     import { lstatSync, readlinkSync, realpathSync, statSync } from "node:fs"
-    import { basename, dirname, join, resolve } from "node:path"
+    import { basename, dirname, resolve } from "node:path"
+    function isCaseInsensitive(parent) {
+      if (process.platform === "win32") return true
+      const parentStat = statSync(parent, { bigint: true })
+      for (let index = parent.length - 1; index >= 0; index -= 1) {
+        const character = parent[index]
+        if (!/[A-Za-z]/.test(character)) continue
+        const toggled = `${parent.slice(0, index)}${character === character.toLowerCase() ? character.toUpperCase() : character.toLowerCase()}${parent.slice(index + 1)}`
+        try {
+          const toggledStat = statSync(toggled, { bigint: true })
+          return toggledStat.dev === parentStat.dev && toggledStat.ino === parentStat.ino
+        } catch {
+          return false
+        }
+      }
+      return false
+    }
     function identity(target, seen = new Set()) {
       const absolute = resolve(target)
       if (seen.has(absolute)) throw new Error("path contains a symbolic-link cycle")
@@ -24,7 +40,10 @@ native_check_path_identity() {
       } catch (error) {
         if (error?.code !== "ENOENT") throw error
       }
-      return `path:${join(realpathSync.native(dirname(absolute)), basename(absolute))}`
+      const parent = realpathSync.native(dirname(absolute))
+      const parentStat = statSync(parent, { bigint: true })
+      const name = basename(absolute).normalize("NFC")
+      return `path:${parentStat.dev}:${parentStat.ino}:${isCaseInsensitive(parent) ? name.toLowerCase() : name}`
     }
     process.stdout.write(identity(process.argv[1]))
   ' "$1"
