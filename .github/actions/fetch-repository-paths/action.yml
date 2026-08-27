@@ -1,0 +1,48 @@
+name: Fetch Repository Paths
+description: Fetch a validated allowlisted repository bundle through the vouchington CLI.
+
+inputs:
+  config:
+    description: Absolute path to a schemaVersion-1 repository-path-fetch JSON configuration.
+    required: true
+  destination:
+    description: Absolute destination path, which must not already exist.
+    required: true
+  metadata:
+    description: Absolute path for resolved-SHA and deterministic-digest metadata.
+    required: true
+  token:
+    description: Read-only token for the configured repository.
+    required: true
+outputs:
+  resolved_sha:
+    description: Immutable commit SHA resolved from the requested ref.
+    value: ${{ steps.fetch.outputs.resolved_sha }}
+  digest:
+    description: Deterministic SHA-256 bundle digest.
+    value: ${{ steps.fetch.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - id: fetch
+      shell: bash
+      env:
+        FETCH_REPOSITORY_PATHS_CONFIG: ${{ inputs.config }}
+        FETCH_REPOSITORY_PATHS_DESTINATION: ${{ inputs.destination }}
+        FETCH_REPOSITORY_PATHS_METADATA: ${{ inputs.metadata }}
+        FETCH_REPOSITORY_PATHS_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/cli/index.mts" \
+          fetch-repository-paths \
+          --config "$FETCH_REPOSITORY_PATHS_CONFIG" \
+          --destination "$FETCH_REPOSITORY_PATHS_DESTINATION" \
+          --metadata "$FETCH_REPOSITORY_PATHS_METADATA" \
+          --token-env FETCH_REPOSITORY_PATHS_TOKEN
+        node --input-type=module -e '
+          import { readFileSync } from "node:fs"
+          const metadata = JSON.parse(readFileSync(process.argv[1], "utf8"))
+          process.stdout.write(`resolved_sha=${metadata.resolvedSha}\ndigest=${metadata.digest}\n`)
+        ' "$FETCH_REPOSITORY_PATHS_METADATA" >> "$GITHUB_OUTPUT"

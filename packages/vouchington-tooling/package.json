@@ -211,6 +211,12 @@
       "import": "./dist/vitest-diagnostics/index.mjs",
       "default": "./dist/vitest-diagnostics/index.mjs"
     },
+    "./repository-path-fetch": {
+      "types": "./dist/repository-path-fetch/index.d.mts",
+      "import": "./dist/repository-path-fetch/index.mjs",
+      "default": "./dist/repository-path-fetch/index.mjs"
+    },
+    "./native-check-harness.sh": "./scripts/native-check-harness.sh",
     "./package.json": "./package.json"
   },
   "publishConfig": {

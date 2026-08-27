@@ -19,6 +19,7 @@ export type ParsedCli =
   | { kind: 'stage-review-payload'; args: string[] }
   | { kind: 'http-origin'; field: string; value: string }
   | { kind: 'retrospective-transcript'; args: string[] }
+  | { kind: 'fetch-repository-paths'; args: string[] }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
 
@@ -81,6 +82,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'http-origin') return parseHttpOrigin(rest)
   if (command === 'retrospective-transcript')
     return { kind: 'retrospective-transcript', args: rest }
+  if (command === 'fetch-repository-paths') return { kind: 'fetch-repository-paths', args: rest }
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }

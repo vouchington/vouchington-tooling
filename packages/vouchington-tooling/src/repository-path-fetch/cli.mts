@@ -1,0 +1,61 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { fetchRepositoryPaths } from './fetch.mts'
+import { parseRepositoryPathFetchConfig, validateDestination } from './validation.mts'
+
+export async function runRepositoryPathFetch(args: readonly string[]): Promise<number> {
+  try {
+    const options = parseArgs(args)
+    validateDestination(options.destination)
+    validateDestination(options.metadata)
+    if (existsSync(options.destination)) throw new Error('destination already exists')
+    const token = process.env[options.tokenEnv]
+    if (!token) throw new Error(`token environment variable is empty: ${options.tokenEnv}`)
+    const config = parseRepositoryPathFetchConfig(JSON.parse(readFileSync(options.config, 'utf8')))
+    const metadata = await fetchRepositoryPaths({
+      apiUrl: process.env.GITHUB_API_URL ?? 'https://api.github.com/',
+      config,
+      destination: options.destination,
+      metadata: options.metadata,
+      token,
+    })
+    process.stdout.write(`${JSON.stringify(metadata)}\n`)
+    return 0
+  } catch (error) {
+    process.stderr.write(
+      `fetch-repository-paths: ${error instanceof Error ? error.message : String(error)}\n`,
+    )
+    return 1
+  }
+}
+
+function parseArgs(args: readonly string[]): {
+  config: string
+  destination: string
+  metadata: string
+  tokenEnv: string
+} {
+  const values = new Map<string, string>()
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index]
+    const value = args[index + 1]
+    if (
+      !['--config', '--destination', '--metadata', '--token-env'].includes(flag ?? '') ||
+      value === undefined ||
+      values.has(flag!)
+    )
+      throw new Error('expected --config --destination --metadata --token-env')
+    values.set(flag!, value)
+  }
+  const tokenEnv = values.get('--token-env')
+  if (!tokenEnv || !/^[A-Z][A-Z0-9_]*$/.test(tokenEnv))
+    throw new Error('token environment variable name is invalid')
+  const config = values.get('--config')
+  const destination = values.get('--destination')
+  const metadata = values.get('--metadata')
+  if (!config || !destination || !metadata)
+    throw new Error('expected --config --destination --metadata --token-env')
+  return { config, destination, metadata, tokenEnv }
+}
+
+if (process.argv[1]?.endsWith('/repository-path-fetch/cli.mts'))
+  process.exitCode = await runRepositoryPathFetch(process.argv.slice(2))

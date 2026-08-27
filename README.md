@@ -162,6 +162,7 @@ vouchington check-cache-size /tmp/cache 1048576 node-modules
 vouchington make-shard-matrix 4
 vouchington load-runner-env
 vouchington clean-workspace
+vouchington fetch-repository-paths --config ./bundle.json --destination "$RUNNER_TEMP/bundle" --metadata "$RUNNER_TEMP/bundle.json" --token-env BUNDLE_TOKEN
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
@@ -222,6 +223,7 @@ import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { bundleDigest } from 'vouchington-tooling/repository-path-fetch'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.

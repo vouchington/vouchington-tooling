@@ -16,6 +16,7 @@ import { runSwiftSemanticEqualCommand } from './commands/swift-semantic-equal.mt
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runRetrospectiveTranscriptCommand } from './commands/retrospective-transcript.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
+import { runRepositoryPathFetch } from '../repository-path-fetch/cli.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
 import { printUsage } from './usage.mts'
@@ -97,6 +98,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runGhaArtifactsCleanup(parsed)
     case 'retrospective-transcript':
       return runRetrospectiveTranscriptCommand(parsed.args)
+    case 'fetch-repository-paths':
+      return runRepositoryPathFetch(parsed.args)
   }
 }
 

@@ -1,0 +1,35 @@
+name: Clean Workspace
+description: Run the canonical persistent-runner workspace cleanup safely.
+
+inputs:
+  preserve_node_modules:
+    description: Preserve dependency trees for trusted runs.
+    required: false
+    default: 'true'
+  extra_keep:
+    description: Whitespace-separated git-clean exclusion patterns for trusted runs.
+    required: false
+    default: ''
+  deepen:
+    description: Deepen the repository after cleanup.
+    required: false
+    default: 'false'
+  base_ref:
+    description: Base branch used when deepening.
+    required: false
+    default: main
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        BASE_REF: ${{ inputs.base_ref }}
+        DEEPEN: ${{ inputs.deepen }}
+        EXTRA_KEEP: ${{ inputs.extra_keep }}
+        PRESERVE_NODE_MODULES: ${{ inputs.preserve_node_modules }}
+      run: |
+        set -euo pipefail
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/cli/index.mts" \
+          clean-workspace

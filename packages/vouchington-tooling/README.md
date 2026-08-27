@@ -32,6 +32,7 @@ vouchington check-cache-size /tmp/cache 1048576 node-modules
 vouchington make-shard-matrix 4
 vouchington load-runner-env
 vouchington clean-workspace
+vouchington fetch-repository-paths --config ./bundle.json --destination "$RUNNER_TEMP/bundle" --metadata "$RUNNER_TEMP/bundle.json" --token-env BUNDLE_TOKEN
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
@@ -45,6 +46,25 @@ vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
+
+### Repository path fetch
+
+`fetch-repository-paths` requires Node 24+, fetches only the schemaVersion-1 config's mapped paths, resolves the requested ref to an immutable SHA, verifies every selected Git blob, and creates private staged output before publishing. Destination and metadata must not already exist. Metadata contains the resolved SHA, sorted file hashes, and deterministic bundle digest.
+
+Use it only from a trusted `pull_request_target` job: configuration, requested ref, and pinned action SHA must come from trusted base content, never the pull-request head. Keep the read token solely in that trusted job; pass only its fetched artifact to untrusted test jobs.
+
+The same implementation is available to workflows through the pinned composite action:
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/fetch-repository-paths@<sha>
+  with:
+    config: ${{ runner.temp }}/bundle.json
+    destination: ${{ runner.temp }}/bundle
+    metadata: ${{ runner.temp }}/bundle-metadata.json
+    token: ${{ steps.token.outputs.token }}
+```
+
+Source the reusable check reporting library with `source "$(node -p \"require.resolve('vouchington-tooling/native-check-harness.sh')\")"`, then call `native_check_init <markdown> <jsonl>`; it writes stable machine JSONL beside Markdown while consumer scripts retain their own check commands.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session

@@ -31,6 +31,7 @@ Commands:
   post-review                   Post one COMMENT review from a staged payload file
   stage-review-payload          Validate a review payload file into a staging directory
   retrospective-transcript      Format facts from Claude-compatible, Codex, or Grok transcripts
+  fetch-repository-paths        Fetch an allowlisted repository bundle atomically
 
 Options:
   -h, --help       Show this help
@@ -84,6 +85,7 @@ swift-semantic-equal <base> <head> <file.swift>
 post-review
 stage-review-payload optional|required <source> <destination>
 retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
+fetch-repository-paths --config <json> --destination <dir> --metadata <json> --token-env <ENV_NAME>
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {
