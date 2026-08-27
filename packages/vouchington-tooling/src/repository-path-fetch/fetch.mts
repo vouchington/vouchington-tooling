@@ -182,8 +182,8 @@ function ensureDistinctOutputs(destination: string, metadata: string): void {
   )
     throw new Error('destination and metadata overlap')
 }
-function filesystemIdentity(path: string): string {
-  return path.normalize('NFC').toLowerCase()
+function filesystemIdentity(value: string): string {
+  return value.normalize('NFC').toLowerCase()
 }
 function requireSha(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))

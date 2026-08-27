@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readRepositoryPathFetchConfig } from './config.mts'
 import { fetchRepositoryPaths } from './fetch.mts'
 import { outputExists, recoverIncompletePublish } from './publish.mts'
 import { parseRepositoryPathFetchConfig, validateDestination } from './validation.mts'
@@ -13,7 +13,9 @@ export async function runRepositoryPathFetch(args: readonly string[]): Promise<n
       throw new Error('output already exists')
     const token = process.env[options.tokenEnv]
     if (!token) throw new Error(`token environment variable is empty: ${options.tokenEnv}`)
-    const config = parseRepositoryPathFetchConfig(JSON.parse(readFileSync(options.config, 'utf8')))
+    const config = parseRepositoryPathFetchConfig(
+      JSON.parse(await readRepositoryPathFetchConfig(options.config)),
+    )
     const metadata = await fetchRepositoryPaths({
       apiUrl: process.env.GITHUB_API_URL ?? 'https://api.github.com/',
       config,

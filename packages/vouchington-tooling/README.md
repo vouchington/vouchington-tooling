@@ -49,7 +49,7 @@ vouchington stage-review-payload optional|required <source> <destination>
 
 ### Repository path fetch
 
-`fetch-repository-paths` requires Node 24+, fetches only the schemaVersion-1 config's mapped paths, resolves the requested ref to an immutable SHA, verifies every selected Git blob, and creates private staged output before publishing. Destination and metadata must not already exist. Metadata contains the resolved SHA, sorted file hashes, and deterministic bundle digest.
+`fetch-repository-paths` requires Node 24+, accepts a regular JSON config up to 256 KiB, fetches only the schemaVersion-1 config's mapped paths, resolves the requested ref to an immutable SHA, verifies every selected Git blob, and creates private staged output before publishing. Destination and metadata must not already exist. Metadata contains the resolved SHA, sorted file hashes, and deterministic bundle digest.
 
 Use it only from a trusted `pull_request_target` job: configuration, requested ref, and pinned action SHA must come from trusted base content, never the pull-request head. Keep the read token solely in that trusted job; pass only its fetched artifact to untrusted test jobs.
 

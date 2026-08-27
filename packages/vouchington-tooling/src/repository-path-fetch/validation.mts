@@ -76,8 +76,8 @@ function parseMapping(value: unknown, seen: Set<string>): RepositoryPathMapping 
   return { destination: value.destination, source: value.source }
 }
 
-function filesystemIdentity(path: string): string {
-  return path.normalize('NFC').toLowerCase()
+function filesystemIdentity(value: string): string {
+  return value.normalize('NFC').toLowerCase()
 }
 
 export function validateRelativePath(path: string): void {

@@ -38,4 +38,25 @@ describe('getGithubJson', () => {
       'has no body',
     )
   })
+
+  it('passes a timeout signal through fetch and propagates its abort', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>().mockImplementation((_url, init) => {
+          const signal = init?.signal
+          return new Promise((_, reject) =>
+            signal?.addEventListener('abort', () => reject(signal.reason)),
+          )
+        }),
+      )
+      const pending = getGithubJson(new URL('https://api.example/'), 'value', 'token', 10, 1)
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+      expect(vi.mocked(fetch).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

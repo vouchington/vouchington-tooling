@@ -1,12 +1,14 @@
 const MAX_COMMIT_BYTES = 1024 * 1024
 export const MAX_TREE_BYTES = 32 * 1024 * 1024
 export const MAX_BLOB_BYTES = 4 * 1024 * 1024
+export const GITHUB_REQUEST_TIMEOUT_MS = 15_000
 
 export async function getGithubJson<T>(
   api: URL,
   path: string,
   token: string,
   limit = MAX_COMMIT_BYTES,
+  timeoutMs = GITHUB_REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('response limit must be positive')
   const response = await fetch(new URL(path, api), {
@@ -15,6 +17,7 @@ export async function getGithubJson<T>(
       Authorization: `Bearer ${token}`,
       'User-Agent': 'vouchington-tooling',
     },
+    signal: AbortSignal.timeout(timeoutMs),
   })
   if (!response.ok) throw new Error(`GitHub API request failed: ${response.status}`)
   const length = Number(response.headers.get('content-length'))
