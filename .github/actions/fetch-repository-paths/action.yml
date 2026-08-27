@@ -44,12 +44,17 @@ runs:
           --destination "$FETCH_REPOSITORY_PATHS_DESTINATION" \
           --metadata "$FETCH_REPOSITORY_PATHS_METADATA" \
           --token-env FETCH_REPOSITORY_PATHS_TOKEN
-        node --input-type=module -e '
-          import { readFileSync } from "node:fs"
+        node --experimental-strip-types --input-type=module -e '
+          import { readFileSync, statSync } from "node:fs"
+          import { pathToFileURL } from "node:url"
           let metadata
+          const stat = statSync(process.argv[1])
+          const { MAX_FETCH_METADATA_BYTES } = await import(pathToFileURL(process.argv[2]).href)
+          if (!stat.isFile() || stat.size > MAX_FETCH_METADATA_BYTES)
+            throw new Error("fetch-repository-paths metadata exceeds size limit")
           try { metadata = JSON.parse(readFileSync(process.argv[1], "utf8")) }
           catch { throw new Error("fetch-repository-paths metadata is invalid JSON") }
           if (!metadata || typeof metadata !== "object" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(metadata.resolvedSha) || !/^[0-9a-f]{64}$/i.test(metadata.digest))
             throw new Error("fetch-repository-paths metadata has invalid resolvedSha or digest")
           process.stdout.write(`resolved_sha=${metadata.resolvedSha}\ndigest=${metadata.digest}\n`)
-        ' "$FETCH_REPOSITORY_PATHS_METADATA" >> "$GITHUB_OUTPUT"
+        ' "$FETCH_REPOSITORY_PATHS_METADATA" "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/repository-path-fetch/metadata.mts" >> "$GITHUB_OUTPUT"

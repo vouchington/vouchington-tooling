@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, readdirSync, lstatSync } from 'node:fs'
+import { constants, lstatSync, readdirSync } from 'node:fs'
+import { lstat, open } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 
 export interface BundleEntry {
@@ -17,7 +18,7 @@ export async function bundleEntries(
     entries.push({
       destination,
       mode: expectedModes?.get(destination) ?? '0644',
-      sha256: await fileSha256(join(root, destination)),
+      sha256: await sha256RegularFile(join(root, destination)),
     })
   }
   if (
@@ -36,10 +37,36 @@ export async function bundleDigest(
   return digestEntries(await bundleEntries(root, expectedModes))
 }
 
-async function fileSha256(path: string): Promise<string> {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk)
-  return hash.digest('hex')
+export async function sha256RegularFile(
+  path: string,
+  openFile: typeof open = open,
+  lstatFile: typeof lstat = lstat,
+): Promise<string> {
+  const before = await lstatFile(path)
+  if (before.isSymbolicLink() || !before.isFile())
+    throw new Error(`unsupported bundle entry: ${path}`)
+  const flags =
+    process.platform === 'win32' ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW
+  const file = await openFile(path, flags)
+  try {
+    const opened = await file.stat()
+    const after = await lstatFile(path)
+    if (
+      !opened.isFile() ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino ||
+      after.isSymbolicLink() ||
+      !after.isFile() ||
+      after.dev !== opened.dev ||
+      after.ino !== opened.ino
+    )
+      throw new Error('bundle file changed while opening')
+    const hash = createHash('sha256')
+    for await (const chunk of file.createReadStream()) hash.update(chunk)
+    return hash.digest('hex')
+  } finally {
+    await file.close()
+  }
 }
 
 export function digestEntries(entries: readonly BundleEntry[]): string {

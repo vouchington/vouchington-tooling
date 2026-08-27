@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fetchRepositoryPaths } from './fetch.mts'
+import { MAX_FETCH_METADATA_BYTES } from './metadata.mts'
 
 const sha = 'a'.repeat(40)
 const config = {
@@ -48,6 +49,29 @@ function mockApi(tree: unknown, blob: unknown = {}): void {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('fetchRepositoryPaths failure boundaries', () => {
+  it('rejects oversized metadata before publishing either output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      const content = 'content'
+      const blob = gitBlobSha(content)
+      mockApi(
+        { tree: [{ mode: '100644', path: 'source/file', sha: blob, type: 'blob' }] },
+        { content: Buffer.from(content).toString('base64'), encoding: 'base64' },
+      )
+      const request = options(root)
+      await expect(
+        fetchRepositoryPaths({
+          ...request,
+          config: { ...config, ref: 'r'.repeat(MAX_FETCH_METADATA_BYTES) },
+        }),
+      ).rejects.toThrow('repository metadata exceeds size limit')
+      expect(existsSync(request.destination)).toBe(false)
+      expect(existsSync(request.metadata)).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it.each([
     ['same', 'same'],
     ['bundle', 'bundle/metadata.json'],
@@ -113,6 +137,17 @@ describe('fetchRepositoryPaths failure boundaries', () => {
       await expect(
         fetchRepositoryPaths({ ...options(root), apiUrl: 'http://api.example/' }),
       ).rejects.toThrow('api URL must use https')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects API URLs containing credentials', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      await expect(
+        fetchRepositoryPaths({ ...options(root), apiUrl: 'https://user:secret@api.example/' }),
+      ).rejects.toThrow('api URL must not contain credentials')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

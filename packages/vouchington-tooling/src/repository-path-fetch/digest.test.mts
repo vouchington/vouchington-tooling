@@ -1,8 +1,17 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  constants,
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { Readable } from 'node:stream'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { bundleEntries, comparePaths, digestEntries } from './digest.mts'
+import { describe, expect, it, vi } from 'vitest'
+import { bundleEntries, comparePaths, digestEntries, sha256RegularFile } from './digest.mts'
 import { bundleDigest } from './index.mts'
 
 describe('bundleDigest', () => {
@@ -107,5 +116,71 @@ describe('bundleDigest', () => {
         .sort(comparePaths)
         .map((entry) => entry.destination),
     ).toEqual(['z', 'ä'])
+  })
+
+  it('rejects a file path swapped after opening before hashing its descriptor', async () => {
+    const file = {
+      close: vi.fn().mockResolvedValue(undefined),
+      createReadStream: vi.fn(() => Readable.from(['content'])),
+      stat: async () => ({ dev: 1, ino: 1, isFile: () => true }),
+    }
+    const openFile = vi
+      .fn()
+      .mockResolvedValue(file) as unknown as typeof import('node:fs/promises').open
+    const lstatFile = vi
+      .fn()
+      .mockResolvedValueOnce({ dev: 1, ino: 1, isFile: () => true, isSymbolicLink: () => false })
+      .mockResolvedValueOnce({ dev: 1, ino: 2, isFile: () => true, isSymbolicLink: () => false })
+
+    await expect(sha256RegularFile('/bundle/file', openFile, lstatFile)).rejects.toThrow(
+      'bundle file changed while opening',
+    )
+    expect(file.createReadStream).not.toHaveBeenCalled()
+    expect(file.close).toHaveBeenCalledOnce()
+    expect(openFile).toHaveBeenCalledWith(
+      '/bundle/file',
+      process.platform === 'win32' ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW,
+    )
+  })
+
+  it('rejects a symbolic link before opening it for hashing', async () => {
+    const openFile = vi.fn() as unknown as typeof import('node:fs/promises').open
+    const lstatFile = vi.fn().mockResolvedValue({
+      dev: 1,
+      ino: 1,
+      isFile: () => false,
+      isSymbolicLink: () => true,
+    })
+
+    await expect(sha256RegularFile('/bundle/link', openFile, lstatFile)).rejects.toThrow(
+      'unsupported bundle entry: /bundle/link',
+    )
+    expect(openFile).not.toHaveBeenCalled()
+  })
+
+  it('does not request no-follow on Windows', async () => {
+    const file = {
+      close: vi.fn().mockResolvedValue(undefined),
+      createReadStream: vi.fn(() => Readable.from(['content'])),
+      stat: vi.fn().mockResolvedValue({ dev: 1, ino: 1, isFile: () => true }),
+    }
+    const openFile = vi
+      .fn()
+      .mockResolvedValue(file) as unknown as typeof import('node:fs/promises').open
+    const lstatFile = vi.fn().mockResolvedValue({
+      dev: 1,
+      ino: 1,
+      isFile: () => true,
+      isSymbolicLink: () => false,
+    })
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+    if (descriptor === undefined) throw new Error('expected process.platform descriptor')
+    Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' })
+    try {
+      await sha256RegularFile('/bundle/file', openFile, lstatFile)
+    } finally {
+      Object.defineProperty(process, 'platform', descriptor)
+    }
+    expect(openFile).toHaveBeenCalledWith('/bundle/file', constants.O_RDONLY)
   })
 })

@@ -23,6 +23,8 @@ describe('repository path fetch action', () => {
     expect(fetchAction).not.toContain('--config "${{ inputs.config }}"')
     expect(fetchAction).toContain('resolved_sha')
     expect(fetchAction).toContain('digest')
+    expect(fetchAction).toContain('MAX_FETCH_METADATA_BYTES')
+    expect(fetchAction).toContain('repository-path-fetch/metadata.mts')
   })
 
   it('runs workspace cleanup without the package CLI', () => {

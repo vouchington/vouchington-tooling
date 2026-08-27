@@ -5,9 +5,11 @@ import { mapBounded } from './concurrency.mts'
 import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
+import { serializeFetchMetadata } from './metadata.mts'
 import { recordGitMode } from './modes.mts'
 import { validateOutputPaths } from './output-paths.mts'
 import { outputExists, publishBundle, recoverIncompletePublish } from './publish.mts'
+import { prepareStagedFile } from './staged-path.mts'
 import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
 export interface FetchMetadata {
   digest: string
@@ -31,6 +33,7 @@ export async function fetchRepositoryPaths(options: {
     throw new Error('output already exists')
   const api = new URL(options.apiUrl.endsWith('/') ? options.apiUrl : `${options.apiUrl}/`)
   if (api.protocol !== 'https:') throw new Error('api URL must use https')
+  if (api.username || api.password) throw new Error('api URL must not contain credentials')
   const commit = await getGithubJson<ApiCommit>(
     api,
     `repos/${options.config.repository}/commits/${encodeURIComponent(options.config.ref)}`,
@@ -84,7 +87,7 @@ export async function fetchRepositoryPaths(options: {
       schemaVersion: 1,
       sourcePaths: [...options.config.paths].sort(comparePaths),
     }
-    await writeFile(stagedMetadata, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 })
+    await writeFile(stagedMetadata, serializeFetchMetadata(metadata), { mode: 0o600 })
     await publishBundle(stagedBundle, options.destination, stagedMetadata, options.metadata)
     return metadata
   } catch (error) {
@@ -135,9 +138,9 @@ async function writeBlob(
   ) {
     throw new Error(`blob integrity mismatch: ${entry.path}`)
   }
-  const absolute = join(root, destination)
-  await mkdir(dirname(absolute), { recursive: true })
+  const absolute = await prepareStagedFile(root, destination)
   await writeFile(absolute, content, {
+    flag: 'wx',
     mode: Number.parseInt(entry.mode, 8) & 0o777,
   })
   await chmod(absolute, Number.parseInt(entry.mode, 8) & 0o777)

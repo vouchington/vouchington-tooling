@@ -6,6 +6,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { rename } from 'node:fs/promises'
@@ -458,6 +459,27 @@ describe('publishBundle', () => {
       expect(existsSync(destination)).toBe(true)
       expect(existsSync(metadataDestination)).toBe(true)
       expect(existsSync(marker)).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('removes a malformed marker symlink without deleting its target or outputs', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const destination = join(root, 'bundle')
+      const metadataDestination = join(root, 'metadata')
+      const marker = join(root, '.bundle.fetch-incomplete')
+      const target = join(root, 'marker-target')
+      mkdirSync(destination)
+      writeFileSync(metadataDestination, '{}')
+      writeFileSync(target, 'preserve')
+      symlinkSync(target, marker)
+      await recoverIncompletePublish(destination, metadataDestination)
+      expect(readFileSync(target, 'utf8')).toBe('preserve')
+      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(destination)).toBe(true)
+      expect(existsSync(metadataDestination)).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
