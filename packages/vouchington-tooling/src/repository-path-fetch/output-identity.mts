@@ -85,6 +85,6 @@ export function isOutputIdentity(value: unknown): value is OutputIdentity {
   )
 }
 
-function sameIdentity(left: OutputIdentity, right: OutputIdentity): boolean {
+export function sameIdentity(left: OutputIdentity, right: OutputIdentity): boolean {
   return left.dev === right.dev && left.ino === right.ino && left.type === right.type
 }

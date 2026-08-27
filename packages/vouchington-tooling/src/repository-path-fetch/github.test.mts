@@ -7,7 +7,7 @@ describe('getGithubJson', () => {
   it('budgets for base64 expansion and JSON framing around a maximum-size blob', () => {
     expect(MAX_BLOB_RESPONSE_BYTES).toBeGreaterThan(Math.ceil((MAX_BLOB_BYTES * 4) / 3))
   })
-  it.each(['', 'token\n', 'token value', 'token\u0000'])(
+  it.each(['', 'token\n', 'token value', 'token\u0000', 'token%0d%0aheader', 'x'.repeat(1025)])(
     'rejects unsafe token %j',
     async (token) => {
       await expect(getGithubJson(new URL('https://api.example/'), 'value', token)).rejects.toThrow(

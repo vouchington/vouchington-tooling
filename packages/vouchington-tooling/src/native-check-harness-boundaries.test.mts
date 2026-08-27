@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -52,6 +52,23 @@ describe('native-check-harness boundaries', () => {
       const script = `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nTMPDIR=${JSON.stringify(missingTmp)} native_check_run check -- touch ${JSON.stringify(sideEffect)}`
       expect(spawnSync('bash', ['-c', script]).status).toBe(1)
       expect(existsSync(sideEffect)).toBe(false)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('preserves a failing check status when output capture also fails', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const localHarness = join(directory, 'native-check-harness.sh')
+      cpSync(harness, localHarness)
+      writeFileSync(join(directory, 'native-check-capture.mjs'), 'process.exit(2)\n')
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const script = `source ${JSON.stringify(localHarness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run check -- bash -c 'exit 9'`
+      const result = spawnSync('bash', ['-c', script], { encoding: 'utf8' })
+      expect(result.status).toBe(9)
+      expect(result.stderr).toContain('output capture failed with 2')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

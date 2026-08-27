@@ -54,7 +54,7 @@ runs:
             throw new Error("fetch-repository-paths metadata exceeds size limit")
           try { metadata = JSON.parse(content.toString("utf8")) }
           catch { throw new Error("fetch-repository-paths metadata is invalid JSON") }
-          if (!metadata || typeof metadata !== "object" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(metadata.resolvedSha) || !/^[0-9a-f]{64}$/i.test(metadata.digest))
-            throw new Error("fetch-repository-paths metadata has invalid resolvedSha or digest")
+          if (!metadata || typeof metadata !== "object" || metadata.schemaVersion !== 1 || typeof metadata.repository !== "string" || typeof metadata.requestedRef !== "string" || !Array.isArray(metadata.files) || !Array.isArray(metadata.sourcePaths) || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(metadata.resolvedSha) || !/^[0-9a-f]{64}$/i.test(metadata.digest))
+            throw new Error("fetch-repository-paths metadata does not match schema")
           process.stdout.write(`resolved_sha=${metadata.resolvedSha}\ndigest=${metadata.digest}\n`)
         ' "$FETCH_REPOSITORY_PATHS_METADATA" "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/repository-path-fetch/metadata.mts" >> "$GITHUB_OUTPUT"

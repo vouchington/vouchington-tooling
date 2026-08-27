@@ -75,4 +75,37 @@ describe('publishBundle input boundaries', () => {
       rmSync(root, { force: true, recursive: true })
     }
   })
+
+  it('does not adopt a marker replaced after exclusive creation', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const metadata = join(root, 'staged-metadata')
+      const destination = join(root, 'bundle')
+      const metadataDestination = join(root, 'metadata')
+      const marker = join(root, '.bundle.fetch-incomplete')
+      mkdirSync(bundle)
+      writeFileSync(join(bundle, 'file'), 'content')
+      writeFileSync(metadata, '{}')
+      await expect(
+        publishBundle(
+          bundle,
+          destination,
+          metadata,
+          metadataDestination,
+          undefined,
+          async (path, contents) => {
+            writeFileSync(path, contents)
+            rmSync(path)
+            writeFileSync(path, 'foreign')
+          },
+        ),
+      ).rejects.toThrow('incomplete publish marker changed after creation')
+      expect(existsSync(destination)).toBe(false)
+      expect(existsSync(metadataDestination)).toBe(false)
+      expect(existsSync(marker)).toBe(true)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
 })

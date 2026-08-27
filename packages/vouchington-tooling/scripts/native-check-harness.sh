@@ -148,6 +148,7 @@ native_check_run() {
   if [ "${pipeline[1]}" -ne 0 ]; then
     echo "native_check_run: output capture failed with ${pipeline[1]}" >&2
     rm -f "${output}"
+    if [ "${pipeline[0]}" -ne 0 ]; then return "${pipeline[0]}"; fi
     return "${pipeline[1]}"
   fi
   status="${pipeline[0]}"

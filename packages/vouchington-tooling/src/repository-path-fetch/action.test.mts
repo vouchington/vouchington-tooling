@@ -32,6 +32,8 @@ describe('repository path fetch action', () => {
     expect(fetchAction).toContain('const content = readFileSync(process.argv[1])')
     expect(fetchAction).toContain('content.length > MAX_FETCH_METADATA_BYTES')
     expect(fetchAction).not.toContain('statSync(process.argv[1])')
+    expect(fetchAction).toContain('metadata.schemaVersion !== 1')
+    expect(fetchAction).toContain('!Array.isArray(metadata.files)')
   })
 
   it('runs workspace cleanup without the package CLI', () => {

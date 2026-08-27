@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { rm } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { writeMarkerAtomic } from './marker-write.mts'
 import {
   moveAtomic,
   outputIdentity,
   removeOwnedOutput,
+  sameIdentity,
   type OutputIdentity,
 } from './output-identity.mts'
 import { outputExists, publishMarkerPath } from './publish-recovery.mts'
@@ -61,6 +62,12 @@ export async function publishBundle(
     throw error
   }
   const markerIdentity = await outputIdentity(marker)
+  const [verifiedContents, verifiedIdentity] = await Promise.all([
+    readFile(marker, 'utf8'),
+    outputIdentity(marker),
+  ])
+  if (verifiedContents !== markerContents || !sameIdentity(markerIdentity, verifiedIdentity))
+    throw new Error('incomplete publish marker changed after creation')
   let publishedBundle = false
   let publishedMetadata = false
   try {
