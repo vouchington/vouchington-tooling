@@ -80,8 +80,12 @@ jobs:
   untrusted-code-reviewed:
     name: ${{
       (github.event.pull_request.head.repo.full_name != github.repository ||
+      github.event.pull_request.user.login == 'dependabot' ||
       github.event.pull_request.user.login == 'dependabot[bot]' ||
-      github.event.pull_request.user.login == 'renovate[bot]') &&
+      github.event.pull_request.user.login == 'app/dependabot' ||
+      github.event.pull_request.user.login == 'renovate' ||
+      github.event.pull_request.user.login == 'renovate[bot]' ||
+      github.event.pull_request.user.login == 'app/renovate') &&
       'Code Reviewed' || 'Untrusted Code Reviewed (skipped)'
       }}
     needs: [tests]
@@ -101,6 +105,10 @@ jobs:
         with:
           trusted-secret-context: ${{
             github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.user.login != 'dependabot' &&
             github.event.pull_request.user.login != 'dependabot[bot]' &&
-            github.event.pull_request.user.login != 'renovate[bot]'
+            github.event.pull_request.user.login != 'app/dependabot' &&
+            github.event.pull_request.user.login != 'renovate' &&
+            github.event.pull_request.user.login != 'renovate[bot]' &&
+            github.event.pull_request.user.login != 'app/renovate'
             }}

@@ -140,6 +140,17 @@ describe('CI final review fan-in', () => {
     expect(ci.jobs?.['untrusted-code-reviewed']?.needs).toEqual(['tests'])
     const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
     expect(ciText).toContain('github.event.pull_request.user.login')
+    for (const login of [
+      'dependabot',
+      'dependabot[bot]',
+      'app/dependabot',
+      'renovate',
+      'renovate[bot]',
+      'app/renovate',
+    ]) {
+      expect(ciText).toContain(`github.event.pull_request.user.login == '${login}'`)
+      expect(ciText).toContain(`github.event.pull_request.user.login != '${login}'`)
+    }
     expect(ciText).not.toContain("github.actor == 'dependabot[bot]'")
   })
 
