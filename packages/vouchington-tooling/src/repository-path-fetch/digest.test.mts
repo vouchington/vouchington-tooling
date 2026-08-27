@@ -5,27 +5,27 @@ import { describe, expect, it } from 'vitest'
 import { bundleDigest, digestEntries } from './digest.mts'
 
 describe('bundleDigest', () => {
-  it('is independent of directory traversal order and changes with content', () => {
+  it('streams file contents independently of traversal order', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
     try {
       mkdirSync(join(root, 'nested'))
       writeFileSync(join(root, 'nested/a.txt'), 'a')
       writeFileSync(join(root, 'b.txt'), 'b')
-      const initial = bundleDigest(root)
-      expect(bundleDigest(root)).toBe(initial)
+      const initial = await bundleDigest(root)
+      await expect(bundleDigest(root)).resolves.toBe(initial)
       writeFileSync(join(root, 'b.txt'), 'changed')
-      expect(bundleDigest(root)).not.toBe(initial)
+      await expect(bundleDigest(root)).resolves.not.toBe(initial)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
   })
 
-  it('rejects symbolic links', () => {
+  it('rejects symbolic links', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
     try {
       writeFileSync(join(root, 'target'), 'content')
       symlinkSync('target', join(root, 'link'))
-      expect(() => bundleDigest(root)).toThrow('symbolic link')
+      await expect(bundleDigest(root)).rejects.toThrow('symbolic link')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

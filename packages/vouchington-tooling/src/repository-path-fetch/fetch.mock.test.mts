@@ -190,4 +190,66 @@ describe('fetchRepositoryPaths', () => {
       rmSync(root, { force: true, recursive: true })
     }
   })
+
+  it('fetches and writes no more than ten blobs at once', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-'))
+    try {
+      const resolved = 'a'.repeat(40)
+      const tree = 'b'.repeat(40)
+      const contents = Array.from({ length: 11 }, (_, index) => `content-${index}`)
+      const blobs = contents.map(blobSha)
+      let active = 0
+      let maximum = 0
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>().mockImplementation(async (input) => {
+          const path =
+            typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+          if (path.endsWith('/commits/main'))
+            return new Response(JSON.stringify({ commit: { tree: { sha: tree } }, sha: resolved }))
+          if (path.includes('/git/trees/')) {
+            return new Response(
+              JSON.stringify({
+                tree: blobs.map((sha, index) => ({
+                  mode: '100644',
+                  path: `source/${index}.txt`,
+                  sha,
+                  type: 'blob',
+                })),
+              }),
+            )
+          }
+          active += 1
+          maximum = Math.max(maximum, active)
+          await new Promise<void>((resolve) => setImmediate(resolve))
+          active -= 1
+          const index = blobs.indexOf(path.split('/').at(-1)!)
+          return new Response(
+            JSON.stringify({
+              content: Buffer.from(contents[index]!).toString('base64'),
+              encoding: 'base64',
+            }),
+          )
+        }),
+      )
+      const result = await fetchRepositoryPaths({
+        apiUrl: 'https://api.github.com/',
+        config: {
+          paths: [{ destination: 'target', source: 'source' }],
+          ref: 'main',
+          repository: 'owner/repository',
+          schemaVersion: 1,
+        },
+        destination: join(root, 'bundle'),
+        metadata: join(root, 'bundle.json'),
+        token: 'secret',
+      })
+      expect(maximum).toBe(10)
+      expect(result.files.map((file) => file.destination)).toEqual(
+        Array.from({ length: 11 }, (_, index) => `target/${index}.txt`).sort(),
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
 })

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
+import { mapBounded } from './concurrency.mts'
 import { bundleEntries, digestEntries, type BundleEntry } from './digest.mts'
 import { publishBundle, recoverIncompletePublish } from './publish.mts'
 import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
@@ -24,7 +25,6 @@ interface ApiBlob {
   content?: string
   encoding?: string
 }
-
 export interface FetchMetadata {
   digest: string
   files: BundleEntry[]
@@ -74,15 +74,13 @@ export async function fetchRepositoryPaths(options: {
         )
         .map(validateApiEntry)
         .sort((left, right) => left.path.localeCompare(right.path))
-      let blobs = 0
-      for (const entry of selected) {
-        if (entry.type === 'tree') continue
-        blobs += 1
-        await writeBlob(api, options.config.repository, mapping, entry, stagedBundle, options.token)
-      }
-      if (blobs === 0) throw new Error(`source path contains no files: ${mapping.source}`)
+      const blobs = selected.filter((entry) => entry.type === 'blob')
+      if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
+      await mapBounded(blobs, 10, (entry) =>
+        writeBlob(api, options.config.repository, mapping, entry, stagedBundle, options.token),
+      )
     }
-    const files = bundleEntries(stagedBundle)
+    const files = await bundleEntries(stagedBundle)
     const metadata: FetchMetadata = {
       digest: digestEntries(files),
       files,

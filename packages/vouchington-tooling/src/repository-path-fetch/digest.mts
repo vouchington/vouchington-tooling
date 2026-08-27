@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, lstatSync } from 'node:fs'
+import { createReadStream, readdirSync, lstatSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 export interface BundleEntry {
@@ -8,21 +8,27 @@ export interface BundleEntry {
   sha256: string
 }
 
-export function bundleEntries(root: string): BundleEntry[] {
-  return list(root).map((destination) => {
+export async function bundleEntries(root: string): Promise<BundleEntry[]> {
+  const entries: BundleEntry[] = []
+  for (const destination of list(root)) {
     const stat = lstatSync(join(root, destination))
-    return {
+    entries.push({
       destination,
       mode: (stat.mode & 0o777).toString(8).padStart(4, '0'),
-      sha256: createHash('sha256')
-        .update(readFileSync(join(root, destination)))
-        .digest('hex'),
-    }
-  })
+      sha256: await fileSha256(join(root, destination)),
+    })
+  }
+  return entries
 }
 
-export function bundleDigest(root: string): string {
-  return digestEntries(bundleEntries(root))
+export async function bundleDigest(root: string): Promise<string> {
+  return digestEntries(await bundleEntries(root))
+}
+
+async function fileSha256(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
 }
 
 export function digestEntries(entries: readonly BundleEntry[]): string {
