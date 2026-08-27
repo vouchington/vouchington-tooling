@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -98,8 +106,9 @@ describe('publishBundle input boundaries', () => {
           async (path, contents) => {
             writeFileSync(path, contents)
             const identity = await outputIdentity(path)
-            rmSync(path)
-            writeFileSync(path, 'foreign')
+            const foreign = `${path}.foreign`
+            writeFileSync(foreign, 'foreign')
+            renameSync(foreign, path)
             return identity
           },
         ),
