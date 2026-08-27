@@ -11,6 +11,18 @@ function publishMarkerPath(destination: string): string {
   return join(dirname(destination), `.${basename(destination)}.fetch-incomplete`)
 }
 
+async function discardFailedPublish(
+  destination: string,
+  metadata: string,
+  marker: string,
+): Promise<void> {
+  await Promise.all([
+    rm(destination, { force: true, recursive: true }),
+    rm(metadata, { force: true, recursive: true }),
+    rm(marker, { force: true }),
+  ])
+}
+
 export async function recoverIncompletePublish(
   destination: string,
   metadata: string,
@@ -37,7 +49,12 @@ export async function publishBundle(
   await writeFile(marker, `${JSON.stringify({ destination, metadata: metadataDestination })}\n`, {
     mode: 0o600,
   })
-  await move(bundle, destination)
-  await move(metadata, metadataDestination)
-  await rm(marker, { force: true })
+  try {
+    await move(bundle, destination)
+    await move(metadata, metadataDestination)
+    await rm(marker, { force: true })
+  } catch (error) {
+    await discardFailedPublish(destination, metadataDestination, marker)
+    throw error
+  }
 }
