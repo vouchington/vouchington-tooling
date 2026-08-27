@@ -64,10 +64,22 @@ describe('final code review workflow', () => {
     expect(settingsStep?.env).toMatchObject({
       OPENROUTER_ENABLED: '${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}',
       OPENROUTER_MODEL: '${{ vars.OPENCODE_CODE_REVIEW_MODEL }}',
-      REVIEW_REQUIRED: '${{ vars.CODE_REVIEW_REQUIRED }}',
       ZEN_ENABLED: '${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}',
       ZEN_MODEL: '${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}',
     })
+    expect(settingsStep?.env).not.toHaveProperty('REVIEW_REQUIRED')
+  })
+
+  it('keeps provider failures advisory while preserving orchestration failures', () => {
+    const gate = finalReview.jobs?.['code-reviewed']
+    const validate = gate?.steps?.find((step) => step.name === 'Validate final review outcome')
+    const script = validate?.run ?? ''
+
+    expect(script).toContain('Review selection failed')
+    expect(script).toContain('Review settings are invalid')
+    expect(script).toContain('review did not complete successfully')
+    expect(script).not.toContain('REVIEW_REQUIRED')
+    expect(script).not.toContain('A required code review provider failed')
   })
 
   it.each([
@@ -143,5 +155,17 @@ describe('CI final review fan-in', () => {
     expect(script).toContain('.name == "tests" and .conclusion == "success"')
     expect(script).toContain('gh workflow run final-code-review.yml')
     expect(script).not.toContain('CODE_REVIEW_TRIGGER_TOKEN')
+  })
+
+  it('recognizes REST and GraphQL dependency-bot identities', () => {
+    const requestScript = requestReview.jobs?.['request-final-code-review']?.steps?.at(0)?.run ?? ''
+    const selectScript = finalReview.jobs?.['select-final-review']?.steps?.at(0)?.run ?? ''
+
+    for (const script of [requestScript, selectScript]) {
+      expect(script).toContain('dependabot[bot]')
+      expect(script).toContain('app/dependabot')
+      expect(script).toContain('renovate[bot]')
+      expect(script).toContain('app/renovate')
+    }
   })
 })

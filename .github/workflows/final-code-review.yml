@@ -97,8 +97,13 @@ jobs:
           has_complete="$(jq -r --arg label "$COMPLETE_LABEL" \
             'any(.labels[]?.name; . == $label)' <<< "$pr_json")"
 
-          if [ "$is_cross_repository" = true ] || [ "$actor" = 'dependabot[bot]' ] || \
-            [ "$actor" = 'renovate[bot]' ]; then
+          is_dependency_bot() {
+            case "$1" in
+              dependabot|'dependabot[bot]'|app/dependabot|renovate|'renovate[bot]'|app/renovate) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          if [ "$is_cross_repository" = true ] || is_dependency_bot "$actor"; then
             output should_review false
             output gate_status untrusted
             echo 'Secret-backed review is unavailable for this PR context.'
@@ -196,7 +201,6 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENCODE_CODE_REVIEW_MODEL }}
           ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
           ZEN_MODEL: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
-          REVIEW_REQUIRED: ${{ vars.CODE_REVIEW_REQUIRED }}
         run: |
           set -euo pipefail
           validate_boolean() {
@@ -204,7 +208,6 @@ jobs:
           }
           validate_boolean OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
           validate_boolean OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
-          validate_boolean CODE_REVIEW_REQUIRED "$REVIEW_REQUIRED"
           [ -n "$OPENROUTER_MODEL" ] || { echo '::error::OPENCODE_CODE_REVIEW_MODEL is required'; exit 1; }
           [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
 
@@ -399,7 +402,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
           SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
-          REVIEW_REQUIRED: ${{ vars.CODE_REVIEW_REQUIRED }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
           OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
           OPENROUTER_ARTIFACT: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
@@ -431,18 +433,11 @@ jobs:
             [ -z "$2" ] || [ "$3" = success ] || return 0
             return 1
           }
-          failures=0
           if [ "$OPENROUTER_ENABLED" = true ] && provider_failed "$OPENROUTER_AGENT" "$OPENROUTER_ARTIFACT" "$OPENROUTER_POSTER"; then
             echo '::warning::OpenCode OpenRouter review did not complete successfully.'
-            failures=$((failures + 1))
           fi
           if [ "$ZEN_ENABLED" = true ] && provider_failed "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER"; then
             echo '::warning::OpenCode Zen review did not complete successfully.'
-            failures=$((failures + 1))
-          fi
-          if [ "$REVIEW_REQUIRED" = true ] && [ "$failures" -gt 0 ]; then
-            echo '::error::A required code review provider failed.'
-            exit 1
           fi
 
       - name: Mark final review complete

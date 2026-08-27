@@ -49,8 +49,13 @@ jobs:
           is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
           is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
           actor="$(jq -r '.author.login' <<< "$pr_json")"
-          if [ "$is_cross_repository" = true ] || [ "$actor" = 'dependabot[bot]' ] || \
-            [ "$actor" = 'renovate[bot]' ]; then
+          is_dependency_bot() {
+            case "$1" in
+              dependabot|'dependabot[bot]'|app/dependabot|renovate|'renovate[bot]'|app/renovate) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          if [ "$is_cross_repository" = true ] || is_dependency_bot "$actor"; then
             echo 'Skipping the provider review request for an untrusted PR.'
             exit 0
           fi
