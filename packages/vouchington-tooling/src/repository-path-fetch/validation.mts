@@ -22,7 +22,15 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
   if (typeof repository !== 'string' || !repositoryPattern.test(repository)) {
     throw new Error('repository must be owner/name')
   }
-  if (typeof ref !== 'string' || !refPattern.test(ref) || ref.includes('..') || ref.endsWith('/')) {
+  if (
+    typeof ref !== 'string' ||
+    !refPattern.test(ref) ||
+    ref.includes('..') ||
+    ref.includes('//') ||
+    ref.endsWith('/') ||
+    ref.endsWith('.') ||
+    ref.split('/').some((component) => component.startsWith('.') || component.endsWith('.lock'))
+  ) {
     throw new Error('ref contains unsupported characters')
   }
   if (!Array.isArray(paths) || paths.length === 0) throw new Error('paths must not be empty')
@@ -30,10 +38,11 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
   const mappings = paths.map((path) => parseMapping(path, seen))
   for (const mapping of mappings) {
     if (
-      mappings.some(
-        (candidate) =>
-          candidate !== mapping && candidate.destination.startsWith(`${mapping.destination}/`),
-      )
+      mappings.some((candidate) => {
+        const destination = filesystemIdentity(mapping.destination)
+        const candidateDestination = filesystemIdentity(candidate.destination)
+        return candidate !== mapping && candidateDestination.startsWith(`${destination}/`)
+      })
     ) {
       throw new Error(`overlapping destination: ${mapping.destination}`)
     }
@@ -42,7 +51,12 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
 }
 
 export function validateDestination(destination: string): void {
-  if (!isAbsolute(destination) || destination === '/' || normalize(destination) !== destination)
+  if (
+    !isAbsolute(destination) ||
+    destination === '/' ||
+    destination.endsWith('/') ||
+    normalize(destination) !== destination
+  )
     throw new Error('destination must be a normalized non-root absolute path')
 }
 
@@ -56,9 +70,14 @@ function parseMapping(value: unknown, seen: Set<string>): RepositoryPathMapping 
   }
   validateRelativePath(value.source)
   validateRelativePath(value.destination)
-  if (seen.has(value.destination)) throw new Error(`duplicate destination: ${value.destination}`)
-  seen.add(value.destination)
+  const identity = filesystemIdentity(value.destination)
+  if (seen.has(identity)) throw new Error(`duplicate destination: ${value.destination}`)
+  seen.add(identity)
   return { destination: value.destination, source: value.source }
+}
+
+function filesystemIdentity(path: string): string {
+  return path.normalize('NFC').toLowerCase()
 }
 
 export function validateRelativePath(path: string): void {

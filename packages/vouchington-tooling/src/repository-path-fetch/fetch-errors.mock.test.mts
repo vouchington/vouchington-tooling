@@ -67,6 +67,34 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
+  it('rejects metadata that collides with the publication marker', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      await expect(
+        fetchRepositoryPaths({
+          ...options(root),
+          metadata: join(root, '.bundle.fetch-incomplete'),
+        }),
+      ).rejects.toThrow('destination and metadata overlap')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects metadata below the publication marker path', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      await expect(
+        fetchRepositoryPaths({
+          ...options(root),
+          metadata: join(root, '.bundle.fetch-incomplete', 'nested'),
+        }),
+      ).rejects.toThrow('destination and metadata overlap')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it.each(['destination', 'metadata'])('rejects an existing %s', async (existing) => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
@@ -124,6 +152,10 @@ describe('fetchRepositoryPaths failure boundaries', () => {
   it.each([
     [{ mode: '100644', path: 'source/file', sha: 'bad', type: 'blob' }, 'invalid tree entry SHA'],
     [{ mode: '100600', path: 'source/file', sha, type: 'blob' }, 'unsupported source entry'],
+    [
+      { mode: '100644', path: 'source/file', sha: 'a'.repeat(41), type: 'blob' },
+      'invalid tree entry SHA',
+    ],
   ])('rejects malformed selected tree entries', async (entry, message) => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
@@ -146,6 +178,26 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     try {
       mockApi({ tree: [{ mode: '100644', path: 'source/file', sha, type: 'blob' }] }, blob)
       await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(message)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('accepts CRLF-wrapped base64 content', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      const content = 'content'
+      const blob = gitBlobSha(content)
+      mockApi(
+        { tree: [{ mode: '100644', path: 'source/file', sha: blob, type: 'blob' }] },
+        {
+          content: `${Buffer.from(content).toString('base64').slice(0, 4)}\r\n${Buffer.from(content).toString('base64').slice(4)}`,
+          encoding: 'base64',
+        },
+      )
+      await expect(fetchRepositoryPaths(options(root))).resolves.toMatchObject({
+        files: [{ destination: 'target/file' }],
+      })
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

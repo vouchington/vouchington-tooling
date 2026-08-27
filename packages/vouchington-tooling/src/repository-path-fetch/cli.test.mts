@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -109,7 +109,7 @@ describe('runRepositoryPathFetch', () => {
 
       mkdirSync(join(root, 'bundle'))
       await expect(runRepositoryPathFetch(validArgs)).resolves.toBe(1)
-      expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('destination already exists')
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('output already exists')
       rmSync(join(root, 'bundle'), { recursive: true })
 
       await expect(runRepositoryPathFetch(validArgs)).resolves.toBe(1)
@@ -119,6 +119,28 @@ describe('runRepositoryPathFetch', () => {
       writeFileSync(join(root, 'config.json'), '{')
       await expect(runRepositoryPathFetch(validArgs)).resolves.toBe(1)
       expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Expected property name')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('recovers a valid interrupted marker before failing fast on output checks', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-cli-'))
+    try {
+      const destination = join(root, 'bundle')
+      const metadata = join(root, 'metadata.json')
+      const marker = join(root, '.bundle.fetch-incomplete')
+      mkdirSync(destination)
+      writeFileSync(metadata, '{}')
+      writeFileSync(
+        marker,
+        `${JSON.stringify({ destination, metadata, owner: 2147483647, token: '00000000-0000-4000-8000-000000000000', version: 1 })}\n`,
+      )
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+      await expect(runRepositoryPathFetch(args(root))).resolves.toBe(1)
+      expect(existsSync(destination)).toBe(false)
+      expect(existsSync(metadata)).toBe(false)
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('environment variable is empty')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

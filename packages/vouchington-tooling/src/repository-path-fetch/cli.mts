@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { fetchRepositoryPaths } from './fetch.mts'
+import { outputExists, recoverIncompletePublish } from './publish.mts'
 import { parseRepositoryPathFetchConfig, validateDestination } from './validation.mts'
 
 export async function runRepositoryPathFetch(args: readonly string[]): Promise<number> {
@@ -7,7 +8,9 @@ export async function runRepositoryPathFetch(args: readonly string[]): Promise<n
     const options = parseArgs(args)
     validateDestination(options.destination)
     validateDestination(options.metadata)
-    if (existsSync(options.destination)) throw new Error('destination already exists')
+    await recoverIncompletePublish(options.destination, options.metadata)
+    if (outputExists(options.destination) || outputExists(options.metadata))
+      throw new Error('output already exists')
     const token = process.env[options.tokenEnv]
     if (!token) throw new Error(`token environment variable is empty: ${options.tokenEnv}`)
     const config = parseRepositoryPathFetchConfig(JSON.parse(readFileSync(options.config, 'utf8')))

@@ -31,6 +31,11 @@ describe('parseRepositoryPathFetch', () => {
   it.each([
     ['owner/repository/extra', 'main', 'api'],
     ['owner/repository', '../main', 'api'],
+    ['owner/repository', 'branch//nested', 'api'],
+    ['owner/repository', 'branch.', 'api'],
+    ['owner/repository', 'branch.lock', 'api'],
+    ['owner/repository', 'branch/nested.lock', 'api'],
+    ['owner/repository', 'branch/.hidden', 'api'],
     ['owner/repository', 'main', '../api'],
     ['owner/repository', 'main', '/api'],
   ])('rejects unsafe input %s %s %s', (repository, ref, path) => {
@@ -63,6 +68,24 @@ describe('parseRepositoryPathFetch', () => {
       repository: 'owner/repository',
       ref: 'main',
       paths: [
+        { destination: 'Swift', source: 'one' },
+        { destination: 'swift', source: 'two' },
+      ],
+      schemaVersion: 1,
+    },
+    {
+      repository: 'owner/repository',
+      ref: 'main',
+      paths: [
+        { destination: 'Cafe\u0301', source: 'one' },
+        { destination: 'Café', source: 'two' },
+      ],
+      schemaVersion: 1,
+    },
+    {
+      repository: 'owner/repository',
+      ref: 'main',
+      paths: [
         { destination: 'parent', source: 'one' },
         { destination: 'parent/child', source: 'two' },
       ],
@@ -72,9 +95,12 @@ describe('parseRepositoryPathFetch', () => {
     expect(() => parseRepositoryPathFetchConfig(config)).toThrow()
   })
 
-  it.each(['relative', '/', '/tmp/../tmp/output'])('rejects unsafe output %s', (path) => {
-    expect(() => validateDestination(path)).toThrow('normalized non-root absolute path')
-  })
+  it.each(['relative', '/', '/tmp/../tmp/output', '/tmp/output/'])(
+    'rejects unsafe output %s',
+    (path) => {
+      expect(() => validateDestination(path)).toThrow('normalized non-root absolute path')
+    },
+  )
 
   it.each(['.', '-flag', 'a\\b', 'a/../b'])('rejects unsafe relative path %s', (path) => {
     expect(() => validateRelativePath(path)).toThrow('unsafe path')

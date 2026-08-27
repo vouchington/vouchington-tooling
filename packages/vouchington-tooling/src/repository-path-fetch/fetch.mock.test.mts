@@ -67,6 +67,47 @@ describe('fetchRepositoryPaths', () => {
     }
   })
 
+  it('preserves a GitHub Enterprise API path prefix without a trailing slash', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-'))
+    try {
+      const sha = 'a'.repeat(40)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>().mockImplementation((input) => {
+          const path =
+            typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+          expect(path).toContain('/api/v3/repos/owner/repository/')
+          const body = path.includes('/commits/')
+            ? { commit: { tree: { sha } }, sha }
+            : path.includes('/git/trees/')
+              ? {
+                  tree: [
+                    { mode: '100644', path: 'source/file', sha: blobSha('content'), type: 'blob' },
+                  ],
+                }
+              : { content: Buffer.from('content').toString('base64'), encoding: 'base64' }
+          return Promise.resolve(new Response(JSON.stringify(body)))
+        }),
+      )
+      await expect(
+        fetchRepositoryPaths({
+          apiUrl: 'https://github.example/api/v3',
+          config: {
+            paths: [{ destination: 'target', source: 'source' }],
+            ref: 'main',
+            repository: 'owner/repository',
+            schemaVersion: 1 as const,
+          },
+          destination: join(root, 'bundle'),
+          metadata: join(root, 'bundle.json'),
+          token: 'secret',
+        }),
+      ).resolves.toMatchObject({ resolvedSha: sha })
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects unsafe API paths and modes without publishing outputs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-'))
     try {

@@ -1,12 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import { bundleEntries, digestEntries, type BundleEntry } from './digest.mts'
-import { publishBundle, recoverIncompletePublish } from './publish.mts'
+import {
+  outputExists,
+  publishBundle,
+  publishMarkerPath,
+  recoverIncompletePublish,
+} from './publish.mts'
 import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
-
 interface ApiCommit {
   commit?: { tree?: { sha?: string } }
   sha?: string
@@ -34,7 +37,6 @@ export interface FetchMetadata {
   schemaVersion: 1
   sourcePaths: readonly { destination: string; source: string }[]
 }
-
 export async function fetchRepositoryPaths(options: {
   apiUrl: string
   config: RepositoryPathFetchConfig
@@ -44,9 +46,9 @@ export async function fetchRepositoryPaths(options: {
 }): Promise<FetchMetadata> {
   ensureDistinctOutputs(options.destination, options.metadata)
   await recoverIncompletePublish(options.destination, options.metadata)
-  if (existsSync(options.destination) || existsSync(options.metadata))
+  if (outputExists(options.destination) || outputExists(options.metadata))
     throw new Error('output already exists')
-  const api = new URL(options.apiUrl)
+  const api = new URL(options.apiUrl.endsWith('/') ? options.apiUrl : `${options.apiUrl}/`)
   if (api.protocol !== 'https:') throw new Error('api URL must use https')
   const commit = await getJson<ApiCommit>(
     api,
@@ -116,7 +118,7 @@ async function writeBlob(
   const blob = await getJson<ApiBlob>(api, `repos/${repository}/git/blobs/${entry.sha}`, token)
   if (blob.encoding !== 'base64' || typeof blob.content !== 'string')
     throw new Error(`invalid blob: ${entry.path}`)
-  const encoded = blob.content.replaceAll('\n', '')
+  const encoded = blob.content.replaceAll('\r\n', '').replaceAll('\n', '')
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
     throw new Error(`invalid blob encoding: ${entry.path}`)
   }
@@ -154,12 +156,21 @@ function temporaryPath(target: string): string {
   return join(dirname(target), `.${basename(target)}.fetch-${randomUUID()}`)
 }
 function ensureDistinctOutputs(destination: string, metadata: string): void {
+  const destinationIdentity = filesystemIdentity(destination)
+  const metadataIdentity = filesystemIdentity(metadata)
+  const markerIdentity = filesystemIdentity(publishMarkerPath(destination))
   if (
-    destination === metadata ||
-    metadata.startsWith(`${destination}/`) ||
-    destination.startsWith(`${metadata}/`)
+    destinationIdentity === metadataIdentity ||
+    metadataIdentity.startsWith(`${destinationIdentity}/`) ||
+    destinationIdentity.startsWith(`${metadataIdentity}/`) ||
+    metadataIdentity === markerIdentity ||
+    metadataIdentity.startsWith(`${markerIdentity}/`) ||
+    markerIdentity.startsWith(`${metadataIdentity}/`)
   )
     throw new Error('destination and metadata overlap')
+}
+function filesystemIdentity(path: string): string {
+  return path.normalize('NFC').toLowerCase()
 }
 function compareMappings(
   left: { destination: string; source: string },
@@ -179,7 +190,7 @@ async function getJson<T>(api: URL, path: string, token: string): Promise<T> {
   return (await response.json()) as T
 }
 function requireSha(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !/^[0-9a-f]{40,64}$/i.test(value))
+  if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))
     throw new Error(`invalid ${label}`)
   return value
 }

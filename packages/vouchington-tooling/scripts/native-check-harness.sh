@@ -27,6 +27,10 @@ native_check_run() {
   : "${NATIVE_CHECK_SUMMARY_FILE:?call native_check_init first}"
   : "${NATIVE_CHECK_JSONL_FILE:?call native_check_init first}"
   local name="${1:?native_check_run requires a name}"
+  case "${name}" in ''|*[!A-Za-z0-9._-]*)
+    echo "native_check_run name must contain only letters, digits, dots, underscores, and hyphens" >&2
+    return 2
+  esac
   shift
   [ "${1:-}" = '--' ] || {
     echo "native_check_run requires -- before the command" >&2
@@ -37,13 +41,16 @@ native_check_run() {
     echo "native_check_run requires a command" >&2
     return 2
   }
-  local started output status finished classification lines
+  local started output status finished classification lines max_output_kib capture
   started="$(date +%s)"
   output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
-  if "$@" >"${output}" 2>&1; then
-    status=0
+  max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
+  case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
+  capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
+  if "$@" 2>&1 | node "${capture}" "${output}" "$((max_output_kib * 1024))"; then
+    status="${PIPESTATUS[0]}"
   else
-    status=$?
+    status="${PIPESTATUS[0]}"
   fi
   finished="$(date +%s)"
   classification="$(native_check_classify "${status}")"
