@@ -1,4 +1,4 @@
-import { createWriteStream } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 
 const [output, limitText] = process.argv.slice(2)
 const limit = Number.parseInt(limitText, 10)
@@ -17,6 +17,4 @@ for await (const chunk of process.stdin) {
   size += data.length
   while (size > limit) size -= chunks.shift().length
 }
-const stream = createWriteStream(output)
-stream.end(Buffer.concat(chunks))
-await new Promise((resolve, reject) => stream.once('close', resolve).once('error', reject))
+await writeFile(output, Buffer.concat(chunks))
