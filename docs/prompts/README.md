@@ -33,5 +33,6 @@ The [main-branch ruleset](https://github.com/vouchington/vouchington-tooling/rul
 To request another provider review after the initial review completes, remove the
 `final-code-review:complete` label. The `final-code-review` workflow rechecks that the exact head SHA
 still has a successful `tests` fan-in before running the providers again and restores the
-`final-code-review:complete` label only after the `Code Reviewed` gate, including any required
-providers, succeeds.
+`final-code-review:complete` label after every enabled provider has been attempted. Provider and
+poster failures remain advisory; orchestration and explicit-check publication failures remain
+blocking.

@@ -133,11 +133,13 @@ The setup expects these organization Actions variables and fails when any is mis
 - `OPENCODE_CODE_REVIEW_MODEL`
 - `OPENCODE_ZEN_CODE_REVIEW_ENABLED` (`true` or `false`)
 - `OPENCODE_ZEN_CODE_REVIEW_MODEL`
-- `CODE_REVIEW_REQUIRED` (`true` or `false`)
 
 It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
-secrets. A default-branch `workflow_run` applies the request label and dispatches the final workflow
-with a scoped `GITHUB_TOKEN`; no long-lived trigger token is required.
+secrets. Provider execution and review-comment posting are advisory: failures are reported as
+warnings but do not fail `Code Reviewed`. Selection, settings, head validation, label transitions,
+and explicit check publication remain fail-closed. A default-branch `workflow_run` applies the
+request label and dispatches the final workflow with a scoped `GITHUB_TOKEN`; no long-lived trigger
+token is required.
 
 ## CLI
 
