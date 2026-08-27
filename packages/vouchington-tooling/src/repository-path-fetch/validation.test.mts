@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { parseRepositoryPathFetchConfig } from './validation.mts'
+import {
+  parseRepositoryPathFetchConfig,
+  validateDestination,
+  validateRelativePath,
+} from './validation.mts'
 
 describe('parseRepositoryPathFetch', () => {
   it('accepts a repository, ref, absolute destination, and distinct relative paths', () => {
@@ -38,5 +42,41 @@ describe('parseRepositoryPathFetch', () => {
         schemaVersion: 1,
       }),
     ).toThrow()
+  })
+
+  it.each([
+    null,
+    [],
+    { repository: 'owner/repository', ref: 'main', paths: [], schemaVersion: 2 },
+    { repository: 'owner/repository', ref: 'main', paths: [], schemaVersion: 1 },
+    { repository: 'owner/repository', ref: 'main', paths: [null], schemaVersion: 1 },
+    {
+      repository: 'owner/repository',
+      ref: 'main',
+      paths: [
+        { destination: 'same', source: 'one' },
+        { destination: 'same', source: 'two' },
+      ],
+      schemaVersion: 1,
+    },
+    {
+      repository: 'owner/repository',
+      ref: 'main',
+      paths: [
+        { destination: 'parent', source: 'one' },
+        { destination: 'parent/child', source: 'two' },
+      ],
+      schemaVersion: 1,
+    },
+  ])('rejects malformed config %#', (config) => {
+    expect(() => parseRepositoryPathFetchConfig(config)).toThrow()
+  })
+
+  it.each(['relative', '/', '/tmp/../tmp/output'])('rejects unsafe output %s', (path) => {
+    expect(() => validateDestination(path)).toThrow('normalized non-root absolute path')
+  })
+
+  it.each(['.', '-flag', 'a\\b', 'a/../b'])('rejects unsafe relative path %s', (path) => {
+    expect(() => validateRelativePath(path)).toThrow('unsafe path')
   })
 })

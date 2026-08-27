@@ -79,4 +79,21 @@ describe('publishBundle', () => {
       rmSync(root, { force: true, recursive: true })
     }
   })
+
+  it('rejects a recovery marker bound to different outputs', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const destination = join(root, 'bundle')
+      const metadataDestination = join(root, 'metadata')
+      writeFileSync(
+        join(root, '.bundle.fetch-incomplete'),
+        `${JSON.stringify({ destination: join(root, 'other'), metadata: metadataDestination })}\n`,
+      )
+      await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
+        'marker does not match',
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
 })

@@ -109,6 +109,7 @@ describe('runCli', () => {
     expect(runCli(['node', 'vouchington', 'nuget-central-version', 'a'])).toBe(1)
     expect(runCli(['node', 'vouchington', 'stage-review-payload', 'maybe'])).toBe(1)
     await expect(runCli(['node', 'vouchington', 'post-review'])).resolves.toBe(1)
+    await expect(runCli(['node', 'vouchington', 'fetch-repository-paths'])).resolves.toBe(1)
   })
 
   it('writes usage to an explicit stream', () => {

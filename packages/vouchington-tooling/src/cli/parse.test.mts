@@ -254,6 +254,23 @@ describe('parseCli', () => {
     ).toEqual({ kind: 'retrospective-transcript', args: ['--session-id', 'session'] })
   })
 
+  it('forwards repository path fetch options', () => {
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'fetch-repository-paths',
+        '--config',
+        'config.json',
+        '--destination',
+        '/tmp/bundle',
+      ]),
+    ).toEqual({
+      kind: 'fetch-repository-paths',
+      args: ['--config', 'config.json', '--destination', '/tmp/bundle'],
+    })
+  })
+
   it('parses gha-artifacts-cleanup subcommands', () => {
     expect(
       parseCli([

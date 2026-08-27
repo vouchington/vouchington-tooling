@@ -57,5 +57,6 @@ function parseArgs(args: readonly string[]): {
   return { config, destination, metadata, tokenEnv }
 }
 
+/* v8 ignore next 2 -- exercised as the executable composite-action entrypoint */
 if (process.argv[1]?.endsWith('/repository-path-fetch/cli.mts'))
   process.exitCode = await runRepositoryPathFetch(process.argv.slice(2))

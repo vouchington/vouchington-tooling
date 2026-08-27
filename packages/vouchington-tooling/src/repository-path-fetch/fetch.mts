@@ -138,6 +138,7 @@ async function writeBlob(
 }
 
 function validateApiEntry(entry: ApiTreeEntry): Required<ApiTreeEntry> {
+  /* v8 ignore next -- selection filters entries without string paths */
   if (typeof entry.path !== 'string') throw new Error('invalid API path')
   validateRelativePath(entry.path)
   const sha = requireSha(entry.sha, 'tree entry SHA')
@@ -166,9 +167,7 @@ function compareMappings(
   left: { destination: string; source: string },
   right: { destination: string; source: string },
 ): number {
-  return (
-    left.destination.localeCompare(right.destination) || left.source.localeCompare(right.source)
-  )
+  return left.destination.localeCompare(right.destination)
 }
 async function getJson<T>(api: URL, path: string, token: string): Promise<T> {
   const response = await fetch(new URL(path, api), {
