@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { bundleDigest, comparePaths, digestEntries } from './digest.mts'
+import { comparePaths, digestEntries } from './digest.mts'
+import { bundleDigest } from './index.mts'
 
 describe('bundleDigest', () => {
   it('streams file contents independently of traversal order', async () => {

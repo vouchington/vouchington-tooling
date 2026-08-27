@@ -15,9 +15,9 @@ export function publishMarkerPath(destination: string): string {
   return join(dirname(destination), `.${basename(destination)}.fetch-incomplete`)
 }
 
-export function outputExists(path: string): boolean {
+export function outputExists(path: string, stat: typeof lstatSync = lstatSync): boolean {
   try {
-    lstatSync(path)
+    stat(path)
     return true
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
@@ -68,14 +68,17 @@ export async function publishBundle(
   metadata: string,
   metadataDestination: string,
   move: (from: string, to: string) => Promise<void> = rename,
+  writeMarker: (path: string, contents: string) => Promise<void> = async (path, contents) => {
+    await writeFile(path, contents, { flag: 'wx', mode: 0o600 })
+  },
+  removeMarker: (path: string) => Promise<void> = async (path) => {
+    await rm(path, { force: true })
+  },
 ): Promise<void> {
   const marker = publishMarkerPath(destination)
   if (outputExists(destination) || outputExists(metadataDestination))
     throw new Error('output already exists')
-  await writeFile(marker, `${JSON.stringify(markerRecord(destination, metadataDestination))}\n`, {
-    flag: 'wx',
-    mode: 0o600,
-  })
+  await writeMarker(marker, `${JSON.stringify(markerRecord(destination, metadataDestination))}\n`)
   let publishedBundle = false
   let publishedMetadata = false
   try {
@@ -86,7 +89,7 @@ export async function publishBundle(
     if (outputExists(metadataDestination)) throw new Error('output already exists')
     await move(metadata, metadataDestination)
     publishedMetadata = true
-    await rm(marker, { force: true })
+    await removeMarker(marker)
   } catch (error) {
     await discardFailedPublish(
       destination,
