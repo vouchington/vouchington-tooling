@@ -7,7 +7,7 @@ let size = 0
 for await (const chunk of process.stdin) {
   const data = Buffer.from(chunk)
   if (data.length >= limit) {
-    data.copy(buffer, 0, data.length - limit)
+    data.copy(buffer, 0, data.length - limit, data.length)
     offset = 0
     size = limit
     continue

@@ -115,11 +115,11 @@ native_check_run() {
     if [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
   fi
   capture="$(native_check_harness_dir)/native-check-capture.mjs"
-  if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
-    pipeline=("${PIPESTATUS[@]}")
-  else
-    pipeline=("${PIPESTATUS[@]}")
-  fi
+  local restore_errexit=false
+  case "$-" in *e*) restore_errexit=true; set +e ;; esac
+  "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"
+  pipeline=("${PIPESTATUS[@]}")
+  if [ "${restore_errexit}" = true ]; then set -e; fi
   if [ "${pipeline[1]}" -ne 0 ]; then
     echo "native_check_run: output capture failed with ${pipeline[1]}" >&2
     rm -f "${output}"

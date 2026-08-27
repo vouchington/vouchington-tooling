@@ -36,6 +36,7 @@ export async function fetchRepositoryPaths(options: {
   const api = new URL(options.apiUrl.endsWith('/') ? options.apiUrl : `${options.apiUrl}/`)
   if (api.protocol !== 'https:') throw new Error('api URL must use https')
   if (api.username || api.password) throw new Error('api URL must not contain credentials')
+  if (api.search || api.hash) throw new Error('api URL must not contain query or fragment')
   const commit = await getGithubJson<ApiCommit>(
     api,
     `repos/${options.config.repository}/commits/${encodeURIComponent(options.config.ref)}`,

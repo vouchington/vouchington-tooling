@@ -153,6 +153,20 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
+  it.each(['https://api.example/?query=value', 'https://api.example/#fragment'])(
+    'rejects an API URL with extra components: %s',
+    async (apiUrl) => {
+      const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+      try {
+        await expect(fetchRepositoryPaths({ ...options(root), apiUrl })).rejects.toThrow(
+          'api URL must not contain query or fragment',
+        )
+      } finally {
+        rmSync(root, { force: true, recursive: true })
+      }
+    },
+  )
+
   it.each([
     [{ sha: 'bad', commit: { tree: { sha } } }, 'invalid commit SHA'],
     [{ sha, commit: { tree: { sha: 'bad' } } }, 'invalid tree SHA'],
