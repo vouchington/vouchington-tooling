@@ -47,7 +47,7 @@ native_check_run() {
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
   capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
-  if "$@" 2>&1 | node "${capture}" "${output}" "$((max_output_kib * 1024))"; then
+  if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
     status="${PIPESTATUS[0]}"
   else
     status="${PIPESTATUS[0]}"
