@@ -17,3 +17,10 @@ export interface ApiBlob {
   content?: string
   encoding?: string
 }
+export interface ValidatedApiTreeEntry {
+  mode: string
+  path: string
+  sha: string
+  size: number | undefined
+  type: string
+}

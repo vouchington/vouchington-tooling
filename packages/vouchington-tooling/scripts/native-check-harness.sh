@@ -121,7 +121,10 @@ native_check_run() {
   }
   local started output status finished duration classification lines max_output_kib capture pipeline
   started="$(node -p 'process.hrtime.bigint().toString()')" || return 1
-  output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
+  output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")" || {
+    echo "native_check_run: could not create output capture" >&2
+    return 1
+  }
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
   if [ "${#max_output_kib}" -gt 5 ]; then

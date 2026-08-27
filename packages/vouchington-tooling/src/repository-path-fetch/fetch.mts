@@ -2,8 +2,15 @@ import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, posix } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
+import type { ValidatedApiTreeEntry } from './api-types.mts'
+import { decodeBlobContent } from './blob-content.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
-import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
+import {
+  getGithubJson,
+  MAX_BLOB_BYTES,
+  MAX_BLOB_RESPONSE_BYTES,
+  MAX_TREE_BYTES,
+} from './github.mts'
 import { gitBlobSha } from './git-object.mts'
 import { serializeFetchMetadata } from './metadata.mts'
 import { recordGitMode } from './modes.mts'
@@ -25,13 +32,6 @@ const MAX_CONCURRENT_BLOBS = 10
 export const MAX_SELECTED_BLOBS = 4096
 const MAX_SELECTED_BLOB_BYTES = 256 * 1024 * 1024
 
-interface ValidatedApiTreeEntry {
-  mode: string
-  path: string
-  sha: string
-  size: number | undefined
-  type: string
-}
 export async function fetchRepositoryPaths(options: {
   apiUrl: string
   config: RepositoryPathFetchConfig
@@ -144,15 +144,12 @@ async function writeBlob(
     api,
     `repos/${repository}/git/blobs/${entry.sha}`,
     token,
-    MAX_BLOB_BYTES,
+    MAX_BLOB_RESPONSE_BYTES,
   )
   if (blob.encoding !== 'base64' || typeof blob.content !== 'string')
     throw new Error(`invalid blob: ${entry.path}`)
   const encoded = blob.content.replaceAll('\r', '').replaceAll('\n', '')
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
-    throw new Error(`invalid blob encoding: ${entry.path}`)
-  }
-  const content = Buffer.from(encoded, 'base64')
+  const content = decodeBlobContent(encoded, entry.path)
   if (
     content.toString('base64') !== encoded ||
     gitBlobSha(content, entry.sha.length).toLowerCase() !== entry.sha.toLowerCase()

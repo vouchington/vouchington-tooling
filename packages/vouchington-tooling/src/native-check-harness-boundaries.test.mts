@@ -41,4 +41,19 @@ describe('native-check-harness boundaries', () => {
     expect(result.status).toBe(0)
     expect(result.stdout).toBe('12345678')
   })
+
+  it('does not execute the check when output capture creation fails', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const sideEffect = join(directory, 'executed')
+      const missingTmp = join(directory, 'missing')
+      const script = `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nTMPDIR=${JSON.stringify(missingTmp)} native_check_run check -- touch ${JSON.stringify(sideEffect)}`
+      expect(spawnSync('bash', ['-c', script]).status).toBe(1)
+      expect(existsSync(sideEffect)).toBe(false)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
 })

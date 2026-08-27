@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getGithubJson } from './github.mts'
+import { getGithubJson, MAX_BLOB_BYTES, MAX_BLOB_RESPONSE_BYTES } from './github.mts'
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('getGithubJson', () => {
+  it('budgets for base64 expansion and JSON framing around a maximum-size blob', () => {
+    expect(MAX_BLOB_RESPONSE_BYTES).toBeGreaterThan(Math.ceil((MAX_BLOB_BYTES * 4) / 3))
+  })
   it.each(['', 'token\n', 'token value', 'token\u0000'])(
     'rejects unsafe token %j',
     async (token) => {

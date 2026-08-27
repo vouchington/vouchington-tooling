@@ -1,6 +1,7 @@
 import {
   constants,
   chmodSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -94,6 +95,42 @@ describe('bundleDigest', () => {
           ]),
         ),
       ).rejects.toThrow('symbolic link')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a symbolic link used as the bundle root', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
+    try {
+      const bundle = join(root, 'bundle')
+      mkdirSync(bundle)
+      writeFileSync(join(bundle, 'file'), 'content')
+      const link = join(root, 'link')
+      symlinkSync(bundle, link)
+      await expect(bundleEntries(link)).rejects.toThrow('bundle root is not a real directory')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a bundle root whose identity changes while hashing', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
+    try {
+      writeFileSync(join(root, 'file'), 'content')
+      const original = lstatSync(root, { bigint: true })
+      const statRoot = vi
+        .fn()
+        .mockReturnValueOnce(original)
+        .mockReturnValueOnce({
+          dev: original.dev,
+          ino: original.ino + 1n,
+          isDirectory: () => true,
+          isSymbolicLink: () => false,
+        })
+      await expect(bundleEntries(root, undefined, statRoot)).rejects.toThrow(
+        'bundle root changed while hashing',
+      )
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

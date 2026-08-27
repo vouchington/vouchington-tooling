@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { constants, lstatSync, readdirSync } from 'node:fs'
+import { constants, lstatSync, readdirSync, type BigIntStats } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 
@@ -12,7 +12,11 @@ export interface BundleEntry {
 export async function bundleEntries(
   root: string,
   expectedModes?: ReadonlyMap<string, string>,
+  statRoot: (path: string, options: { bigint: true }) => BigIntStats = lstatSync,
 ): Promise<BundleEntry[]> {
+  const before = statRoot(root, { bigint: true })
+  if (before.isSymbolicLink() || !before.isDirectory())
+    throw new Error(`bundle root is not a real directory: ${root}`)
   const entries: BundleEntry[] = []
   for (const destination of list(root)) {
     entries.push({
@@ -27,6 +31,14 @@ export async function bundleEntries(
       entries.some((entry) => !expectedModes.has(entry.destination)))
   )
     throw new Error('bundle files do not match validated Git tree')
+  const after = statRoot(root, { bigint: true })
+  if (
+    after.isSymbolicLink() ||
+    !after.isDirectory() ||
+    after.dev !== before.dev ||
+    after.ino !== before.ino
+  )
+    throw new Error('bundle root changed while hashing')
   return entries.sort(comparePaths)
 }
 
