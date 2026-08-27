@@ -33,9 +33,7 @@ async function fileSha256(path: string): Promise<string> {
 
 export function digestEntries(entries: readonly BundleEntry[]): string {
   const digest = createHash('sha256')
-  for (const entry of [...entries].sort((left, right) =>
-    left.destination.localeCompare(right.destination),
-  )) {
+  for (const entry of [...entries].sort(comparePaths)) {
     digest.update(entry.destination)
     digest.update('\0')
     digest.update(entry.mode)
@@ -44,6 +42,13 @@ export function digestEntries(entries: readonly BundleEntry[]): string {
     digest.update('\n')
   }
   return digest.digest('hex')
+}
+
+export function comparePaths(
+  left: { destination: string },
+  right: { destination: string },
+): number {
+  return Buffer.compare(Buffer.from(left.destination), Buffer.from(right.destination))
 }
 
 function list(root: string, current = root): string[] {

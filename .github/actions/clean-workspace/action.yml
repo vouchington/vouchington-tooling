@@ -30,6 +30,4 @@ runs:
         PRESERVE_NODE_MODULES: ${{ inputs.preserve_node_modules }}
       run: |
         set -euo pipefail
-        node --experimental-strip-types \
-          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/cli/index.mts" \
-          clean-workspace
+        bash "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/clean-workspace.sh"

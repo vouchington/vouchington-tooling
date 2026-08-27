@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import { mapBounded } from './concurrency.mts'
-import { bundleEntries, digestEntries, type BundleEntry } from './digest.mts'
+import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import {
   outputExists,
   publishBundle,
@@ -75,7 +75,7 @@ export async function fetchRepositoryPaths(options: {
           (entry) => typeof entry.path === 'string' && selectedPath(entry.path, mapping.source),
         )
         .map(validateApiEntry)
-        .sort((left, right) => left.path.localeCompare(right.path))
+        .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
       const blobs = selected.filter((entry) => entry.type === 'blob')
       if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
       await mapBounded(blobs, 10, (entry) =>
@@ -90,7 +90,7 @@ export async function fetchRepositoryPaths(options: {
       requestedRef: options.config.ref,
       resolvedSha,
       schemaVersion: 1,
-      sourcePaths: [...options.config.paths].sort(compareMappings),
+      sourcePaths: [...options.config.paths].sort(comparePaths),
     }
     await writeFile(stagedMetadata, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 })
     await publishBundle(stagedBundle, options.destination, stagedMetadata, options.metadata)
@@ -171,12 +171,6 @@ function ensureDistinctOutputs(destination: string, metadata: string): void {
 }
 function filesystemIdentity(path: string): string {
   return path.normalize('NFC').toLowerCase()
-}
-function compareMappings(
-  left: { destination: string; source: string },
-  right: { destination: string; source: string },
-): number {
-  return left.destination.localeCompare(right.destination)
 }
 async function getJson<T>(api: URL, path: string, token: string): Promise<T> {
   const response = await fetch(new URL(path, api), {

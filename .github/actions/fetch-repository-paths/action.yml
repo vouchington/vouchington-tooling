@@ -35,8 +35,7 @@ runs:
       run: |
         set -euo pipefail
         node --experimental-strip-types \
-          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/cli/index.mts" \
-          fetch-repository-paths \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/repository-path-fetch/cli.mts" \
           --config "$FETCH_REPOSITORY_PATHS_CONFIG" \
           --destination "$FETCH_REPOSITORY_PATHS_DESTINATION" \
           --metadata "$FETCH_REPOSITORY_PATHS_METADATA" \

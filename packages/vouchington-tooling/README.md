@@ -32,7 +32,7 @@ vouchington check-cache-size /tmp/cache 1048576 node-modules
 vouchington make-shard-matrix 4
 vouchington load-runner-env
 vouchington clean-workspace
-vouchington fetch-repository-paths --config ./bundle.json --destination "$RUNNER_TEMP/bundle" --metadata "$RUNNER_TEMP/bundle.json" --token-env BUNDLE_TOKEN
+vouchington fetch-repository-paths --config ./bundle.json --destination "${RUNNER_TEMP}/bundle" --metadata "${RUNNER_TEMP}/bundle.json" --token-env BUNDLE_TOKEN
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
@@ -64,7 +64,7 @@ The same implementation is available to workflows through the pinned composite a
     token: ${{ steps.token.outputs.token }}
 ```
 
-Source the reusable check reporting library with `source "$(node -p \"require.resolve('vouchington-tooling/native-check-harness.sh')\")"`, then call `native_check_init <markdown> <jsonl>`; it writes stable machine JSONL beside Markdown while consumer scripts retain their own check commands. Check names are limited to letters, digits, dots, underscores, and hyphens. Failure diagnostics retain the last 1 MiB by default without limiting artifacts created by the command; override that bound with a positive `NATIVE_CHECK_MAX_OUTPUT_KIB` value and the displayed tail with `NATIVE_CHECK_TAIL_LINES`.
+Source the reusable check reporting library with `source "$(node -p "require.resolve('vouchington-tooling/native-check-harness.sh')")"`, then call `native_check_init <markdown> <jsonl>`; it writes stable machine JSONL beside Markdown while consumer scripts retain their own check commands. Check names are limited to letters, digits, dots, underscores, and hyphens. Failure diagnostics retain the last 1 MiB by default without limiting artifacts created by the command; override that bound with a positive `NATIVE_CHECK_MAX_OUTPUT_KIB` value and the displayed tail with `NATIVE_CHECK_TAIL_LINES`.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session

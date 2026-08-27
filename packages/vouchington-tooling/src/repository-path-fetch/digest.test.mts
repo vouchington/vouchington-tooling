@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { bundleDigest, digestEntries } from './digest.mts'
+import { bundleDigest, comparePaths, digestEntries } from './digest.mts'
 
 describe('bundleDigest', () => {
   it('streams file contents independently of traversal order', async () => {
@@ -40,5 +40,13 @@ describe('bundleDigest', () => {
     expect(digestEntries(entries)).not.toBe(
       digestEntries([{ ...entries[0]!, sha256: 'c'.repeat(64) }, entries[1]!]),
     )
+  })
+
+  it('orders non-ASCII paths by UTF-8 bytes rather than locale', () => {
+    expect(
+      [{ destination: 'z' }, { destination: 'ä' }]
+        .sort(comparePaths)
+        .map((entry) => entry.destination),
+    ).toEqual(['z', 'ä'])
   })
 })
