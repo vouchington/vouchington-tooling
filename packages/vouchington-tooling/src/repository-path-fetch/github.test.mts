@@ -34,10 +34,18 @@ describe('getGithubJson', () => {
   })
 
   it('rejects an oversized streamed body without a Content-Length', async () => {
-    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response('{}')))
+    const cancel = vi.fn()
+    const body = new ReadableStream<Uint8Array>({
+      cancel,
+      start(controller) {
+        controller.enqueue(Buffer.from('{}'))
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(body)))
     await expect(
       getGithubJson(new URL('https://api.example/'), 'value', 'token', 1),
     ).rejects.toThrow('exceeds size limit')
+    expect(cancel).toHaveBeenCalledOnce()
   })
 
   it('rejects successful responses without a readable body', async () => {

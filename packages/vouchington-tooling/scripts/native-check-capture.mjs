@@ -17,7 +17,7 @@ for await (const chunk of process.stdin) {
   tail.copy(buffer, offset, 0, first)
   if (first < tail.length) tail.copy(buffer, 0, first, tail.length)
   offset = (offset + tail.length) % limit
-  size = Math.min(limit, size + data.length)
+  size = Math.min(limit, size + tail.length)
 }
 if (size < limit) {
   process.stdout.write(buffer.subarray(0, size))

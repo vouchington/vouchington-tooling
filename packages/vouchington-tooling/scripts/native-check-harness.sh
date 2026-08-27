@@ -14,18 +14,35 @@ native_check_harness_dir() {
 
 native_check_path_identity() {
   node --input-type=module -e '
-    import { lstatSync, readlinkSync, realpathSync, statSync } from "node:fs"
-    import { basename, dirname, resolve } from "node:path"
+    import { closeSync, lstatSync, openSync, readlinkSync, realpathSync, statSync, unlinkSync } from "node:fs"
+    import { basename, dirname, join, resolve } from "node:path"
+    import { randomUUID } from "node:crypto"
     function isCaseInsensitive(parent) {
       if (process.platform === "win32") return true
-      const parentStat = statSync(parent, { bigint: true })
-      for (let index = parent.length - 1; index >= 0; index -= 1) {
-        const character = parent[index]
-        if (!/[A-Za-z]/.test(character)) continue
-        const toggled = `${parent.slice(0, index)}${character === character.toLowerCase() ? character.toUpperCase() : character.toLowerCase()}${parent.slice(index + 1)}`
-        try { const toggledStat = statSync(toggled, { bigint: true }); return toggledStat.dev === parentStat.dev && toggledStat.ino === parentStat.ino } catch { return false }
+      const name = `.native-check-case-${randomUUID()}`
+      const probe = join(parent, name)
+      let descriptor, probeStat
+      try {
+        descriptor = openSync(probe, "wx", 0o600)
+        closeSync(descriptor)
+        descriptor = undefined
+        probeStat = lstatSync(probe, { bigint: true })
+        try {
+          const toggledStat = statSync(join(parent, name.toUpperCase()), { bigint: true })
+          return toggledStat.dev === probeStat.dev && toggledStat.ino === probeStat.ino
+        } catch (error) {
+          if (error?.code === "ENOENT") return false
+          throw error
+        }
+      } finally {
+        if (descriptor !== undefined) closeSync(descriptor)
+        if (probeStat !== undefined) {
+          const current = lstatSync(probe, { bigint: true })
+          if (current.dev !== probeStat.dev || current.ino !== probeStat.ino)
+            throw new Error("native-check case probe changed before cleanup")
+          unlinkSync(probe)
+        }
       }
-      return false
     }
     function identity(target, seen = new Set()) {
       const absolute = resolve(target)
@@ -115,10 +132,15 @@ native_check_run() {
     if [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
   fi
   capture="$(native_check_harness_dir)/native-check-capture.mjs"
-  local restore_errexit=false
+  local restore_errexit=false restore_pipefail=false
   case "$-" in *e*) restore_errexit=true; set +e ;; esac
+  if set -o | grep -Eq '^pipefail[[:space:]]+on$'; then
+    restore_pipefail=true
+    set +o pipefail
+  fi
   "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"
   pipeline=("${PIPESTATUS[@]}")
+  if [ "${restore_pipefail}" = true ]; then set -o pipefail; fi
   if [ "${restore_errexit}" = true ]; then set -e; fi
   if [ "${pipeline[1]}" -ne 0 ]; then
     echo "native_check_run: output capture failed with ${pipeline[1]}" >&2
