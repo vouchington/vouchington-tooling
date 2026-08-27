@@ -30,7 +30,9 @@ export async function getGithubJson<T>(
       if (done) break
       size += value.length
       if (size > limit) {
-        await reader.cancel().catch(() => undefined)
+        try {
+          await reader.cancel()
+        } catch {}
         throw new Error('GitHub API response exceeds size limit')
       }
       chunks.push(value)

@@ -4,6 +4,15 @@ import { getGithubJson } from './github.mts'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('getGithubJson', () => {
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects an invalid response limit: %s',
+    async (limit) => {
+      await expect(
+        getGithubJson(new URL('https://api.example/'), 'value', 'token', limit),
+      ).rejects.toThrow('response limit must be positive')
+    },
+  )
+
   it('rejects an oversized Content-Length before reading the body', async () => {
     vi.stubGlobal(
       'fetch',
