@@ -1,5 +1,14 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  linkSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -12,6 +21,122 @@ describe('native-check-harness', () => {
     const result = spawnSync('node', [capture, '4'], { encoding: 'utf8', input: '0123456789' })
     expect(result.status).toBe(0)
     expect(result.stdout).toBe('6789')
+  })
+
+  it.each(['same', 'normalized'])('rejects %s summary and JSONL aliases', (kind) => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      const jsonl = kind === 'same' ? summary : join(directory, 'nested', '..', 'summary')
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).toBe(2)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects symlinked summary and JSONL aliases', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      const jsonl = join(directory, 'summary-link')
+      writeFileSync(summary, 'preserve')
+      symlinkSync(summary, jsonl)
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).toBe(2)
+      expect(readFileSync(summary, 'utf8')).toBe('preserve')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects hard-linked summary and JSONL aliases', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      const jsonl = join(directory, 'summary-link')
+      writeFileSync(summary, 'preserve')
+      linkSync(summary, jsonl)
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).toBe(2)
+      expect(readFileSync(summary, 'utf8')).toBe('preserve')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a dangling JSONL symlink that aliases the summary path', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      const jsonl = join(directory, 'summary-link')
+      symlinkSync(summary, jsonl)
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).toBe(2)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a JSONL path reserved for diagnostics', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(`${summary}.diagnostics`)}`,
+      ])
+      expect(result.status).toBe(2)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a diagnostics symlink that aliases the summary', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary')
+      writeFileSync(summary, 'preserve')
+      symlinkSync(summary, `${summary}.diagnostics`)
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(join(directory, 'summary.jsonl'))}`,
+      ])
+      expect(result.status).toBe(2)
+      expect(readFileSync(summary, 'utf8')).toBe('preserve')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('propagates JSONL append failures and removes temporary capture output', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const captures = join(directory, 'captures')
+      const script = join(directory, 'run.sh')
+      mkdirSync(captures)
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nrm -f ${JSON.stringify(jsonl)}\nmkdir ${JSON.stringify(jsonl)}\nstatus=0\nTMPDIR=${JSON.stringify(captures)} native_check_run pass -- bash -c 'exit 0' || status=$?\n[ "$status" -eq 1 ]\n[ -z "$(find ${JSON.stringify(captures)} -type f -name 'native-check-*' -print -quit)" ]\n`,
+      )
+      expect(spawnSync('bash', [script]).status).toBe(0)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('rejects capture allocations above the hard limit', () => {
@@ -109,7 +234,7 @@ describe('native-check-harness', () => {
     }
   })
 
-  it('interprets zero-padded capture limits as decimal', () => {
+  it.each(['010', '00'])('interprets zero-padded capture limit %s as decimal', (limit) => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {
       const summary = join(directory, 'summary.md')
@@ -122,7 +247,7 @@ describe('native-check-harness', () => {
       execFileSync('bash', [script], {
         env: {
           ...process.env,
-          NATIVE_CHECK_MAX_OUTPUT_KIB: '010',
+          NATIVE_CHECK_MAX_OUTPUT_KIB: limit,
           NATIVE_CHECK_TAIL_LINES: '01',
         },
       })
@@ -147,6 +272,48 @@ describe('native-check-harness', () => {
       expect(published).toContain('## Check summary')
       expect(published).toContain('| fail | failed | 9 |')
       expect(published).toContain('    diagnostic\n')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it.each(['normalized', 'symlink'])('publishes safely through a %s summary alias', (kind) => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const alias =
+        kind === 'normalized'
+          ? join(directory, 'nested', '..', 'summary.md')
+          : join(directory, 'link')
+      const script = join(directory, 'run.sh')
+      if (kind === 'symlink') {
+        writeFileSync(summary, '')
+        symlinkSync(summary, alias)
+      }
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nnative_check_publish_summary ${JSON.stringify(alias)}\n`,
+      )
+      expect(spawnSync('bash', [script]).status).toBe(0)
+      expect(readFileSync(summary, 'utf8')).toContain('| pass | passed | 0 |')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a publish destination that aliases machine output', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const script = join(directory, 'run.sh')
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nnative_check_publish_summary ${JSON.stringify(jsonl)}\n`,
+      )
+      expect(spawnSync('bash', [script]).status).toBe(2)
+      expect(readFileSync(jsonl, 'utf8')).toContain('"classification":"passed"')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

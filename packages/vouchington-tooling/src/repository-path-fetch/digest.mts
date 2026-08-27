@@ -8,16 +8,24 @@ export interface BundleEntry {
   sha256: string
 }
 
-export async function bundleEntries(root: string): Promise<BundleEntry[]> {
+export async function bundleEntries(
+  root: string,
+  expectedModes?: ReadonlyMap<string, string>,
+): Promise<BundleEntry[]> {
   const entries: BundleEntry[] = []
   for (const destination of list(root)) {
-    const stat = lstatSync(join(root, destination))
     entries.push({
       destination,
-      mode: (stat.mode & 0o777).toString(8).padStart(4, '0'),
+      mode: expectedModes?.get(destination) ?? '0644',
       sha256: await fileSha256(join(root, destination)),
     })
   }
+  if (
+    expectedModes &&
+    (entries.length !== expectedModes.size ||
+      entries.some((entry) => !expectedModes.has(entry.destination)))
+  )
+    throw new Error('bundle files do not match validated Git tree')
   return entries.sort(comparePaths)
 }
 

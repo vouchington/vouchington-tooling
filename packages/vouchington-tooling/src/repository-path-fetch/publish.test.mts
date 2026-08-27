@@ -1,9 +1,11 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -74,6 +76,64 @@ describe('publishBundle', () => {
         publishBundle(bundle, destination, metadata, join(root, 'metadata')),
       ).rejects.toThrow('output already exists')
       expect(existsSync(destination)).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('preserves directory modes under a restrictive umask', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    const previousUmask = process.umask(0o077)
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const nested = join(bundle, 'nested')
+      const metadata = join(root, 'staged-metadata')
+      const destination = join(root, 'bundle')
+      mkdirSync(nested, { mode: 0o751, recursive: true })
+      chmodSync(bundle, 0o755)
+      chmodSync(nested, 0o751)
+      writeFileSync(join(nested, 'file'), 'content')
+      writeFileSync(metadata, '{}')
+      await publishBundle(bundle, destination, metadata, join(root, 'metadata'))
+      expect(statSync(destination).mode & 0o777).toBe(0o755)
+      expect(statSync(join(destination, 'nested')).mode & 0o777).toBe(0o751)
+    } finally {
+      process.umask(previousUmask)
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a non-file staged output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const metadata = join(root, 'staged-metadata')
+      symlinkSync(join(root, 'missing'), bundle)
+      writeFileSync(metadata, '{}')
+      await expect(
+        publishBundle(bundle, join(root, 'bundle'), metadata, join(root, 'metadata')),
+      ).rejects.toThrow('unsupported staged output')
+      expect(existsSync(join(root, '.bundle.fetch-incomplete'))).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('removes a partially copied bundle when it contains an unsupported entry', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const metadata = join(root, 'staged-metadata')
+      const destination = join(root, 'bundle')
+      mkdirSync(join(bundle, 'nested'), { recursive: true })
+      writeFileSync(join(bundle, 'nested/file'), 'content')
+      symlinkSync('nested/file', join(bundle, 'link'))
+      writeFileSync(metadata, '{}')
+      await expect(
+        publishBundle(bundle, destination, metadata, join(root, 'metadata')),
+      ).rejects.toThrow('unsupported staged output')
+      expect(existsSync(destination)).toBe(false)
+      expect(existsSync(join(root, '.bundle.fetch-incomplete'))).toBe(false)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -162,6 +222,52 @@ describe('publishBundle', () => {
     }
   })
 
+  it.each(['destination', 'metadata'])(
+    'retains the marker when %s rollback fails',
+    async (failed) => {
+      const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+      try {
+        const bundle = join(root, 'staged-bundle')
+        const metadata = join(root, 'staged-metadata')
+        const destination = join(root, 'bundle')
+        const metadataDestination = join(root, 'metadata')
+        const marker = join(root, '.bundle.fetch-incomplete')
+        mkdirSync(bundle)
+        writeFileSync(metadata, '{}')
+        await expect(
+          publishBundle(
+            bundle,
+            destination,
+            metadata,
+            metadataDestination,
+            rename,
+            async (path, contents) => writeFileSync(path, contents),
+            async () => {
+              throw new Error('marker removal failed')
+            },
+            async (path) => {
+              if (
+                (failed === 'destination' && path === destination) ||
+                (failed === 'metadata' && path === metadataDestination)
+              ) {
+                throw new Error(`${failed} rollback failed`)
+              }
+              rmSync(path, { force: true, recursive: true })
+            },
+          ),
+        ).rejects.toThrow(`${failed} rollback failed`)
+        expect(existsSync(marker)).toBe(true)
+
+        await recoverIncompletePublish(destination, metadataDestination, () => false)
+        expect(existsSync(destination)).toBe(false)
+        expect(existsSync(metadataDestination)).toBe(false)
+        expect(existsSync(marker)).toBe(false)
+      } finally {
+        rmSync(root, { force: true, recursive: true })
+      }
+    },
+  )
+
   it('rejects an output created after acquiring the publication marker', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
@@ -177,7 +283,7 @@ describe('publishBundle', () => {
           destination,
           metadata,
           metadataDestination,
-          rename,
+          undefined,
           async (path, contents) => {
             writeFileSync(path, contents)
             mkdirSync(destination)

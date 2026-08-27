@@ -2,8 +2,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix } from 'node:path'
 import { mapBounded } from './concurrency.mts'
+import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
+import { recordGitMode } from './modes.mts'
+import { pathsOverlap } from './path-overlap.mts'
 import {
   outputExists,
   publishBundle,
@@ -15,24 +18,6 @@ import {
   validateRelativePath,
   type RepositoryPathFetchConfig,
 } from './validation.mts'
-interface ApiCommit {
-  commit?: { tree?: { sha?: string } }
-  sha?: string
-}
-interface ApiTreeEntry {
-  mode?: string
-  path?: string
-  sha?: string
-  type?: string
-}
-interface ApiTree {
-  truncated?: boolean
-  tree?: ApiTreeEntry[]
-}
-interface ApiBlob {
-  content?: string
-  encoding?: string
-}
 export interface FetchMetadata {
   digest: string
   files: BundleEntry[]
@@ -70,6 +55,7 @@ export async function fetchRepositoryPaths(options: {
     MAX_TREE_BYTES,
   )
   if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('repository tree is incomplete')
+  rejectDuplicateTreePaths(tree.tree)
   await mkdir(dirname(options.destination), { recursive: true })
   await mkdir(dirname(options.metadata), { recursive: true })
   const stagedBundle = temporaryPath(options.destination)
@@ -77,6 +63,7 @@ export async function fetchRepositoryPaths(options: {
   await mkdir(stagedBundle, { mode: 0o700 })
   await chmod(stagedBundle, 0o700)
   try {
+    const expectedModes = new Map<string, string>()
     for (const mapping of options.config.paths) {
       const selected = tree.tree
         .filter(
@@ -86,11 +73,19 @@ export async function fetchRepositoryPaths(options: {
         .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
       const blobs = selected.filter((entry) => entry.type === 'blob')
       if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
-      await mapBounded(blobs, 10, (entry) =>
-        writeBlob(api, options.config.repository, mapping, entry, stagedBundle, options.token),
-      )
+      await mapBounded(blobs, 10, async (entry) => {
+        const destination = await writeBlob(
+          api,
+          options.config.repository,
+          mapping,
+          entry,
+          stagedBundle,
+          options.token,
+        )
+        recordGitMode(expectedModes, destination, entry.mode)
+      })
     }
-    const files = await bundleEntries(stagedBundle)
+    const files = await bundleEntries(stagedBundle, expectedModes)
     const metadata: FetchMetadata = {
       digest: digestEntries(files),
       files,
@@ -110,6 +105,15 @@ export async function fetchRepositoryPaths(options: {
   }
 }
 
+function rejectDuplicateTreePaths(entries: readonly ApiTreeEntry[]): void {
+  const paths = new Set<string>()
+  for (const entry of entries) {
+    if (typeof entry.path !== 'string') continue
+    if (paths.has(entry.path)) throw new Error(`duplicate repository tree path: ${entry.path}`)
+    paths.add(entry.path)
+  }
+}
+
 async function writeBlob(
   api: URL,
   repository: string,
@@ -117,7 +121,7 @@ async function writeBlob(
   entry: Required<ApiTreeEntry>,
   root: string,
   token: string,
-): Promise<void> {
+): Promise<string> {
   const destination =
     entry.path === mapping.source
       ? mapping.destination
@@ -148,6 +152,7 @@ async function writeBlob(
     mode: Number.parseInt(entry.mode, 8) & 0o777,
   })
   await chmod(absolute, Number.parseInt(entry.mode, 8) & 0o777)
+  return destination
 }
 
 function validateApiEntry(entry: ApiTreeEntry): Required<ApiTreeEntry> {
@@ -169,21 +174,8 @@ function temporaryPath(target: string): string {
   return join(dirname(target), `.${basename(target)}.fetch-${randomUUID()}`)
 }
 function ensureDistinctOutputs(destination: string, metadata: string): void {
-  const destinationIdentity = filesystemIdentity(destination)
-  const metadataIdentity = filesystemIdentity(metadata)
-  const markerIdentity = filesystemIdentity(publishMarkerPath(destination))
-  if (
-    destinationIdentity === metadataIdentity ||
-    metadataIdentity.startsWith(`${destinationIdentity}/`) ||
-    destinationIdentity.startsWith(`${metadataIdentity}/`) ||
-    metadataIdentity === markerIdentity ||
-    metadataIdentity.startsWith(`${markerIdentity}/`) ||
-    markerIdentity.startsWith(`${metadataIdentity}/`)
-  )
+  if (pathsOverlap(destination, metadata) || pathsOverlap(publishMarkerPath(destination), metadata))
     throw new Error('destination and metadata overlap')
-}
-function filesystemIdentity(value: string): string {
-  return value.normalize('NFC').toLowerCase()
 }
 function requireSha(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -31,6 +31,37 @@ describe('bundleDigest', () => {
         expect.objectContaining({ destination: 'a.txt' }),
         expect.objectContaining({ destination: 'a/file' }),
       ])
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('normalizes standalone file modes independently of the host filesystem', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
+    try {
+      writeFileSync(join(root, 'executable'), 'content')
+      chmodSync(join(root, 'executable'), 0o755)
+      await expect(bundleEntries(root)).resolves.toEqual([
+        expect.objectContaining({ destination: 'executable', mode: '0644' }),
+      ])
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects Git mode ownership that does not exactly cover the bundle', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-path-fetch-'))
+    try {
+      writeFileSync(join(root, 'file'), 'content')
+      await expect(
+        bundleEntries(
+          root,
+          new Map([
+            ['file', '0644'],
+            ['missing', '0755'],
+          ]),
+        ),
+      ).rejects.toThrow('bundle files do not match validated Git tree')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

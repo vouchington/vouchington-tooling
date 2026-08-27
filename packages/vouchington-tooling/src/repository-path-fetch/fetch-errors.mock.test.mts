@@ -166,6 +166,33 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
+  it('rejects duplicate repository tree paths before fetching blobs', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+        const body = url.includes('/commits/')
+          ? { commit: { tree: { sha } }, sha }
+          : {
+              tree: [
+                { mode: '100644', sha, type: 'blob' },
+                { mode: '100644', path: 'source/file', sha, type: 'blob' },
+                { mode: '100755', path: 'source/file', sha, type: 'blob' },
+              ],
+            }
+        return Promise.resolve(new Response(JSON.stringify(body)))
+      })
+      vi.stubGlobal('fetch', fetchMock)
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'duplicate repository tree path: source/file',
+      )
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it.each([
     [{ content: 'YQ==', encoding: 'utf8' }, 'invalid blob'],
     [{ content: 1, encoding: 'base64' }, 'invalid blob'],
