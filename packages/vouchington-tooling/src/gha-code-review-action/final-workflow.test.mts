@@ -133,7 +133,11 @@ describe('final code review workflow', () => {
     expect(routerText).toContain('github.event.workflow_run.head_sha')
     expect(routerText).toContain('GH_TOKEN: ${{ github.token }}')
     expect(routerText).toContain('TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}')
-    expect(routerText).toContain('GH_TOKEN="$TRIGGER_TOKEN" gh_retry 404 gh api --method DELETE')
+    const labelDeletes = routerText
+      .split('\n')
+      .filter((line) => line.includes('gh_retry 404 gh api --method DELETE'))
+    expect(labelDeletes).toHaveLength(3)
+    expect(labelDeletes.every((line) => line.includes('GH_TOKEN="$TRIGGER_TOKEN"'))).toBe(true)
     expect(routerText).toContain('GH_TOKEN="$TRIGGER_TOKEN" gh_retry none gh api --method POST')
     expect(router.jobs?.['request-final-code-review']?.permissions).toEqual({
       actions: 'read',
