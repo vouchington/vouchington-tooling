@@ -131,6 +131,21 @@ describe('final code review workflow', () => {
     expect(finalReviewText).not.toContain('workflow_dispatch')
     expect(router.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
     expect(routerText).toContain('github.event.workflow_run.head_sha')
+    expect(routerText).toContain('GH_TOKEN: ${{ github.token }}')
+    expect(routerText).toContain('TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}')
+    const labelDeletes = routerText
+      .split('\n')
+      .filter((line) => line.includes('gh_retry 404 gh api --method DELETE'))
+    expect(labelDeletes).toHaveLength(3)
+    expect(labelDeletes.every((line) => line.includes('GH_TOKEN="$TRIGGER_TOKEN"'))).toBe(true)
+    expect(routerText).toContain('GH_TOKEN="$TRIGGER_TOKEN" gh_retry none gh api --method POST')
+    expect(router.jobs?.['request-final-code-review']?.permissions).toEqual({
+      actions: 'read',
+      checks: 'read',
+      contents: 'read',
+      'pull-requests': 'read',
+    })
+    expect(routerText).not.toContain('GH_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}')
     expect(routerText).toContain('commits/$TESTED_HEAD_SHA/pulls')
     expect(routerText).toContain('.head.repo.full_name == $head_repo')
     expect(routerText).toContain('.path == ".github/workflows/final-code-review.yml"')
