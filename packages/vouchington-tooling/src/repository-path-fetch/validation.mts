@@ -102,6 +102,7 @@ function portableFilesystemIdentity(value: string): string {
 export function validateRelativePath(path: string): void {
   if (
     posix.isAbsolute(path) ||
+    path.includes('\0') ||
     path.includes('\\') ||
     path === '.' ||
     path.endsWith('/') ||

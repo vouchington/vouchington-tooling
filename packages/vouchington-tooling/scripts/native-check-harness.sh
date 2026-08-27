@@ -146,11 +146,9 @@ native_check_run() {
     return 1
   fi
   if [ "${status}" -ne 0 ]; then
-    {
-      printf '\n### %s (%s, exit %s)\n\n' "${name}" "${classification}" "${status}"
-      tail -n "${lines}" "${output}" | sed 's/^/    /'
-      printf '\n'
-    } >>"${NATIVE_CHECK_DIAGNOSTICS_FILE}"
+    if ! printf '\n### %s (%s, exit %s)\n\n' "${name}" "${classification}" "${status}" >>"${NATIVE_CHECK_DIAGNOSTICS_FILE}" ||
+      ! tail -n "${lines}" "${output}" | sed 's/^/    /' >>"${NATIVE_CHECK_DIAGNOSTICS_FILE}" ||
+      ! printf '\n' >>"${NATIVE_CHECK_DIAGNOSTICS_FILE}"; then rm -f "${output}"; return 1; fi
   fi
   if ! node --input-type=module -e '
     process.stdout.write(`${JSON.stringify({

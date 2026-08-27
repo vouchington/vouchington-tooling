@@ -36,7 +36,12 @@ export async function readRepositoryPathFetchConfig(
       offset += bytesRead
     }
     const after = await file.stat()
-    if (after.size !== before.size) throw new Error('config changed while reading')
+    if (
+      after.size !== before.size ||
+      after.mtimeMs !== before.mtimeMs ||
+      after.ctimeMs !== before.ctimeMs
+    )
+      throw new Error('config changed while reading')
     return buffer.toString('utf8')
   } finally {
     await file.close()

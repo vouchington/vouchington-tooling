@@ -125,7 +125,7 @@ describe('parseRepositoryPathFetch', () => {
     expect(() => validateDestination(path, win32)).toThrow('normalized non-root absolute path')
   })
 
-  it.each(['.', '-flag', 'a\\b', 'a/../b', 'foo/../../bar', 'directory/'])(
+  it.each(['.', '-flag', 'a\0b', 'a\\b', 'a/../b', 'foo/../../bar', 'directory/'])(
     'rejects unsafe relative path %s',
     (path) => {
       expect(() => validateRelativePath(path)).toThrow('unsafe path')

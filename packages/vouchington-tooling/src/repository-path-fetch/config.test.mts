@@ -122,6 +122,45 @@ describe('readRepositoryPathFetchConfig', () => {
     expect(file.close).toHaveBeenCalledOnce()
   })
 
+  it('rejects a same-size in-place rewrite and closes its descriptor', async () => {
+    const file = {
+      close: vi.fn().mockResolvedValue(undefined),
+      read: vi.fn(async (buffer: Buffer) => {
+        Buffer.from('{}').copy(buffer)
+        return { buffer, bytesRead: 2 }
+      }),
+      stat: vi
+        .fn()
+        .mockResolvedValueOnce({
+          ctimeMs: 1,
+          dev: 1,
+          ino: 1,
+          isFile: () => true,
+          mtimeMs: 1,
+          size: 2,
+        })
+        .mockResolvedValueOnce({
+          ctimeMs: 2,
+          dev: 1,
+          ino: 1,
+          isFile: () => true,
+          mtimeMs: 2,
+          size: 2,
+        }),
+    }
+    const lstatFile = vi
+      .fn()
+      .mockResolvedValue({ dev: 1, ino: 1, isFile: () => true, isSymbolicLink: () => false })
+    await expect(
+      readRepositoryPathFetchConfig(
+        '/config.json',
+        vi.fn().mockResolvedValue(file) as unknown as typeof import('node:fs/promises').open,
+        lstatFile,
+      ),
+    ).rejects.toThrow('config changed while reading')
+    expect(file.close).toHaveBeenCalledOnce()
+  })
+
   it('closes a non-regular opened descriptor', async () => {
     const file = {
       close: vi.fn().mockResolvedValue(undefined),
