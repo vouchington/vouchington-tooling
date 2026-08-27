@@ -42,6 +42,10 @@ runs:
           --token-env FETCH_REPOSITORY_PATHS_TOKEN
         node --input-type=module -e '
           import { readFileSync } from "node:fs"
-          const metadata = JSON.parse(readFileSync(process.argv[1], "utf8"))
+          let metadata
+          try { metadata = JSON.parse(readFileSync(process.argv[1], "utf8")) }
+          catch { throw new Error("fetch-repository-paths metadata is invalid JSON") }
+          if (!metadata || typeof metadata !== "object" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(metadata.resolvedSha) || !/^[0-9a-f]{64}$/i.test(metadata.digest))
+            throw new Error("fetch-repository-paths metadata has invalid resolvedSha or digest")
           process.stdout.write(`resolved_sha=${metadata.resolvedSha}\ndigest=${metadata.digest}\n`)
         ' "$FETCH_REPOSITORY_PATHS_METADATA" >> "$GITHUB_OUTPUT"

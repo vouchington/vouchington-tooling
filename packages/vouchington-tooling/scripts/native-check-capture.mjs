@@ -1,18 +1,20 @@
 const [limitText] = process.argv.slice(2)
 const limit = Number.parseInt(limitText, 10)
 if (!Number.isSafeInteger(limit) || limit < 1) process.exit(2)
-const chunks = []
+const buffer = Buffer.alloc(limit)
+let offset = 0
 let size = 0
 for await (const chunk of process.stdin) {
   const data = Buffer.from(chunk)
-  if (data.length >= limit) {
-    chunks.length = 0
-    chunks.push(data.subarray(data.length - limit))
-    size = limit
-    continue
-  }
-  chunks.push(data)
-  size += data.length
-  while (size > limit) size -= chunks.shift().length
+  const tail = data.subarray(Math.max(0, data.length - limit))
+  const first = Math.min(tail.length, limit - offset)
+  tail.copy(buffer, offset, 0, first)
+  tail.copy(buffer, 0, first)
+  offset = (offset + tail.length) % limit
+  size = Math.min(limit, size + tail.length)
 }
-process.stdout.write(Buffer.concat(chunks))
+process.stdout.write(
+  size < limit
+    ? buffer.subarray(0, size)
+    : Buffer.concat([buffer.subarray(offset), buffer.subarray(0, offset)]),
+)

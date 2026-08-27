@@ -36,6 +36,7 @@ describe('parseRepositoryPathFetch', () => {
     ['owner/repository', 'branch.lock', 'api'],
     ['owner/repository', 'branch/nested.lock', 'api'],
     ['owner/repository', 'branch/.hidden', 'api'],
+    ['owner/repository', 'branch%name', 'api'],
     ['owner/repository', 'main', '../api'],
     ['owner/repository', 'main', '/api'],
   ])('rejects unsafe input %s %s %s', (repository, ref, path) => {

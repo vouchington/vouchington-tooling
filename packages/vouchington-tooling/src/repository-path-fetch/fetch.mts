@@ -9,7 +9,11 @@ import {
   publishMarkerPath,
   recoverIncompletePublish,
 } from './publish.mts'
-import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
+import {
+  validateDestination,
+  validateRelativePath,
+  type RepositoryPathFetchConfig,
+} from './validation.mts'
 interface ApiCommit {
   commit?: { tree?: { sha?: string } }
   sha?: string
@@ -44,6 +48,8 @@ export async function fetchRepositoryPaths(options: {
   metadata: string
   token: string
 }): Promise<FetchMetadata> {
+  validateDestination(options.destination)
+  validateDestination(options.metadata)
   ensureDistinctOutputs(options.destination, options.metadata)
   await recoverIncompletePublish(options.destination, options.metadata)
   if (outputExists(options.destination) || outputExists(options.metadata))

@@ -78,7 +78,12 @@ export async function publishBundle(
   const marker = publishMarkerPath(destination)
   if (outputExists(destination) || outputExists(metadataDestination))
     throw new Error('output already exists')
-  await writeMarker(marker, `${JSON.stringify(markerRecord(destination, metadataDestination))}\n`)
+  try {
+    await writeMarker(marker, `${JSON.stringify(markerRecord(destination, metadataDestination))}\n`)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('output already exists')
+    throw error
+  }
   let publishedBundle = false
   let publishedMetadata = false
   try {

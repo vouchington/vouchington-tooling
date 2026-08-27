@@ -1,12 +1,19 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const harness = join(process.cwd(), 'packages/vouchington-tooling/scripts/native-check-harness.sh')
+const capture = join(process.cwd(), 'packages/vouchington-tooling/scripts/native-check-capture.mjs')
 
 describe('native-check-harness', () => {
+  it('retains the exact byte tail with bounded storage', () => {
+    const result = spawnSync('node', [capture, '4'], { encoding: 'utf8', input: '0123456789' })
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('6789')
+  })
+
   it('records classifications, durations, and bounded failure output', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {

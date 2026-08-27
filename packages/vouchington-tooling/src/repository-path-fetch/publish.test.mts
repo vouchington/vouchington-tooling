@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -177,6 +185,28 @@ describe('publishBundle', () => {
         ),
       ).rejects.toThrow('output already exists')
       expect(existsSync(destination)).toBe(true)
+      expect(existsSync(metadataDestination)).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('reports an exclusive marker collision without deleting the winner marker', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const metadata = join(root, 'staged-metadata')
+      const destination = join(root, 'bundle')
+      const metadataDestination = join(root, 'metadata')
+      const marker = join(root, '.bundle.fetch-incomplete')
+      mkdirSync(bundle)
+      writeFileSync(metadata, '{}')
+      writeFileSync(marker, 'winner')
+      await expect(
+        publishBundle(bundle, destination, metadata, metadataDestination),
+      ).rejects.toThrow('output already exists')
+      expect(readFileSync(marker, 'utf8')).toBe('winner')
+      expect(existsSync(destination)).toBe(false)
       expect(existsSync(metadataDestination)).toBe(false)
     } finally {
       rmSync(root, { force: true, recursive: true })

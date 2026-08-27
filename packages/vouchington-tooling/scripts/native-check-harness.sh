@@ -41,17 +41,23 @@ native_check_run() {
     echo "native_check_run requires a command" >&2
     return 2
   }
-  local started output status finished classification lines max_output_kib capture
+  local started output status finished classification lines max_output_kib capture pipeline
   started="$(date +%s)"
   output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
   capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
   if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
-    status="${PIPESTATUS[0]}"
+    pipeline=("${PIPESTATUS[@]}")
   else
-    status="${PIPESTATUS[0]}"
+    pipeline=("${PIPESTATUS[@]}")
   fi
+  if [ "${pipeline[1]}" -ne 0 ]; then
+    echo "native_check_run: output capture failed with ${pipeline[1]}" >&2
+    rm -f "${output}"
+    return "${pipeline[1]}"
+  fi
+  status="${pipeline[0]}"
   finished="$(date +%s)"
   classification="$(native_check_classify "${status}")"
   lines="${NATIVE_CHECK_TAIL_LINES:-80}"
