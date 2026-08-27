@@ -46,6 +46,7 @@ native_check_run() {
   output="$(mktemp "${TMPDIR:-/tmp}/native-check-${name//[^A-Za-z0-9._-]/_}.XXXXXX")"
   max_output_kib="${NATIVE_CHECK_MAX_OUTPUT_KIB:-1024}"
   case "${max_output_kib}" in 0|*[!0-9]*|'') max_output_kib=1024 ;; esac
+  if [ "${#max_output_kib}" -gt 5 ] || [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
   capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
   if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
     pipeline=("${PIPESTATUS[@]}")
@@ -62,12 +63,12 @@ native_check_run() {
   classification="$(native_check_classify "${status}")"
   lines="${NATIVE_CHECK_TAIL_LINES:-80}"
   case "${lines}" in *[!0-9]*|'') lines=80 ;; esac
+  if [ "${#lines}" -gt 4 ] || [ "${lines}" -gt 1000 ]; then lines=1000; fi
   {
     printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "$((finished - started))"
     if [ "${status}" -ne 0 ]; then
-      printf '\n### %s (%s, exit %s)\n\n```text\n' "${name}" "${classification}" "${status}"
-      tail -n "${lines}" "${output}"
-      printf '\n```\n'
+      printf '\n### %s (%s, exit %s)\n\n' "${name}" "${classification}" "${status}"
+      tail -n "${lines}" "${output}" | sed 's/^/    /'
     fi
   } >>"${NATIVE_CHECK_SUMMARY_FILE}"
   node --input-type=module -e '

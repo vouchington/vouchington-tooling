@@ -3,6 +3,8 @@ export async function mapBounded<T>(
   limit: number,
   action: (value: T) => Promise<void>,
 ): Promise<void> {
+  if (!Number.isSafeInteger(limit) || limit < 1)
+    throw new Error('concurrency limit must be positive')
   let next = 0
   let failure: unknown
   await Promise.all(

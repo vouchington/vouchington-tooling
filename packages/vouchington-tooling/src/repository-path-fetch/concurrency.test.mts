@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { mapBounded } from './concurrency.mts'
 
 describe('mapBounded', () => {
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects an invalid limit: %s',
+    async (limit) => {
+      await expect(mapBounded([], limit, async () => {})).rejects.toThrow('concurrency limit')
+    },
+  )
+
   it('limits concurrent actions', async () => {
     let active = 0
     let maximum = 0

@@ -85,6 +85,7 @@ export function validateRelativePath(path: string): void {
     isAbsolute(path) ||
     path.includes('\\') ||
     path === '.' ||
+    path.endsWith('/') ||
     path.startsWith('-') ||
     normalize(path) !== path ||
     relative('.', path).startsWith('..')

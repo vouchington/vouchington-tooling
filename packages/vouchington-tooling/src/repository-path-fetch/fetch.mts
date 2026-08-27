@@ -3,6 +3,7 @@ import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
+import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
 import {
   outputExists,
   publishBundle,
@@ -56,16 +57,17 @@ export async function fetchRepositoryPaths(options: {
     throw new Error('output already exists')
   const api = new URL(options.apiUrl.endsWith('/') ? options.apiUrl : `${options.apiUrl}/`)
   if (api.protocol !== 'https:') throw new Error('api URL must use https')
-  const commit = await getJson<ApiCommit>(
+  const commit = await getGithubJson<ApiCommit>(
     api,
     `repos/${options.config.repository}/commits/${encodeURIComponent(options.config.ref)}`,
     options.token,
   )
   const resolvedSha = requireSha(commit.sha, 'commit SHA')
-  const tree = await getJson<ApiTree>(
+  const tree = await getGithubJson<ApiTree>(
     api,
     `repos/${options.config.repository}/git/trees/${requireSha(commit.commit?.tree?.sha, 'tree SHA')}?recursive=1`,
     options.token,
+    MAX_TREE_BYTES,
   )
   if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('repository tree is incomplete')
   await mkdir(dirname(options.destination), { recursive: true })
@@ -121,7 +123,12 @@ async function writeBlob(
       ? mapping.destination
       : posix.join(mapping.destination, posix.relative(mapping.source, entry.path))
   validateRelativePath(destination)
-  const blob = await getJson<ApiBlob>(api, `repos/${repository}/git/blobs/${entry.sha}`, token)
+  const blob = await getGithubJson<ApiBlob>(
+    api,
+    `repos/${repository}/git/blobs/${entry.sha}`,
+    token,
+    MAX_BLOB_BYTES,
+  )
   if (blob.encoding !== 'base64' || typeof blob.content !== 'string')
     throw new Error(`invalid blob: ${entry.path}`)
   const encoded = blob.content.replaceAll('\r\n', '').replaceAll('\n', '')
@@ -177,17 +184,6 @@ function ensureDistinctOutputs(destination: string, metadata: string): void {
 }
 function filesystemIdentity(path: string): string {
   return path.normalize('NFC').toLowerCase()
-}
-async function getJson<T>(api: URL, path: string, token: string): Promise<T> {
-  const response = await fetch(new URL(path, api), {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'vouchington-tooling',
-    },
-  })
-  if (!response.ok) throw new Error(`GitHub API request failed: ${response.status}`)
-  return (await response.json()) as T
 }
 function requireSha(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))

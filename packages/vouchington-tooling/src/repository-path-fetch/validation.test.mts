@@ -103,7 +103,10 @@ describe('parseRepositoryPathFetch', () => {
     },
   )
 
-  it.each(['.', '-flag', 'a\\b', 'a/../b'])('rejects unsafe relative path %s', (path) => {
-    expect(() => validateRelativePath(path)).toThrow('unsafe path')
-  })
+  it.each(['.', '-flag', 'a\\b', 'a/../b', 'foo/../../bar', 'directory/'])(
+    'rejects unsafe relative path %s',
+    (path) => {
+      expect(() => validateRelativePath(path)).toThrow('unsafe path')
+    },
+  )
 })

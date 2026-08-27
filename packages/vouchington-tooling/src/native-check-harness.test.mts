@@ -14,6 +14,21 @@ describe('native-check-harness', () => {
     expect(result.stdout).toBe('6789')
   })
 
+  it('rejects capture allocations above the hard limit', () => {
+    const result = spawnSync('node', [capture, String(10 * 1024 * 1024 + 1)], { input: 'value' })
+    expect(result.status).toBe(2)
+  })
+
+  it('retains the exact byte tail when separate chunks wrap the buffer', () => {
+    const result = spawnSync(
+      'bash',
+      ['-c', `{ printf abc; sleep 0.05; printf de; } | node ${JSON.stringify(capture)} 4`],
+      { encoding: 'utf8' },
+    )
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('bcde')
+  })
+
   it('records classifications, durations, and bounded failure output', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {
@@ -21,17 +36,19 @@ describe('native-check-harness', () => {
       const jsonl = join(directory, 'summary.jsonl')
       const script = join(directory, 'run.sh')
       const failure = join(directory, 'failure.sh')
-      writeFileSync(failure, 'printf first\nprintf "\\nlast\\n"\nexit 9\n')
+      writeFileSync(failure, "printf first\nprintf '\\n%s\\nlast\\n' '```'\nexit 9\n")
       writeFileSync(
         script,
         `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nnative_check_run fail -- bash ${JSON.stringify(failure)} || true\nnative_check_publish_summary ${JSON.stringify(`${summary}.published`)}\n`,
       )
-      execFileSync('bash', [script], { env: { ...process.env, NATIVE_CHECK_TAIL_LINES: '1' } })
+      execFileSync('bash', [script], { env: { ...process.env, NATIVE_CHECK_TAIL_LINES: '2' } })
       const published = readFileSync(`${summary}.published`, 'utf8')
       expect(published).toContain('| pass | passed | 0 |')
       expect(published).toContain('| fail | failed | 9 |')
       expect(published).toContain('last')
       expect(published).not.toContain('first')
+      expect(published).toContain('    ```')
+      expect(published).not.toContain('```text')
       expect(readFileSync(jsonl, 'utf8')).toContain('"classification":"failed"')
     } finally {
       rmSync(directory, { force: true, recursive: true })
@@ -58,6 +75,32 @@ describe('native-check-harness', () => {
       expect(readFileSync(summary, 'utf8').length).toBeLessThan(2048)
       expect(readFileSync(jsonl, 'utf8')).not.toContain('unsafe|name')
       expect(statSync(artifact).size).toBe(8192)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('clamps configured capture and summary limits', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const script = join(directory, 'run.sh')
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run bounded -- bash -c 'for value in {1..1001}; do printf "line-%s\\n" "$value"; done; exit 9' || true\n`,
+      )
+      execFileSync('bash', [script], {
+        env: {
+          ...process.env,
+          NATIVE_CHECK_MAX_OUTPUT_KIB: '10241',
+          NATIVE_CHECK_TAIL_LINES: '1001',
+        },
+      })
+      const rendered = readFileSync(summary, 'utf8')
+      expect(rendered).not.toContain('line-1\n')
+      expect(rendered).toContain('line-2\n')
+      expect(rendered).toContain('line-1001\n')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

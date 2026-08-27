@@ -1,0 +1,42 @@
+const MAX_COMMIT_BYTES = 1024 * 1024
+export const MAX_TREE_BYTES = 32 * 1024 * 1024
+export const MAX_BLOB_BYTES = 4 * 1024 * 1024
+
+export async function getGithubJson<T>(
+  api: URL,
+  path: string,
+  token: string,
+  limit = MAX_COMMIT_BYTES,
+): Promise<T> {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('response limit must be positive')
+  const response = await fetch(new URL(path, api), {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'User-Agent': 'vouchington-tooling',
+    },
+  })
+  if (!response.ok) throw new Error(`GitHub API request failed: ${response.status}`)
+  const length = Number(response.headers.get('content-length'))
+  if (Number.isSafeInteger(length) && length > limit)
+    throw new Error('GitHub API response exceeds size limit')
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('GitHub API response has no body')
+  try {
+    const chunks: Uint8Array[] = []
+    let size = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.length
+      if (size > limit) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error('GitHub API response exceeds size limit')
+      }
+      chunks.push(value)
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T
+  } finally {
+    reader.releaseLock()
+  }
+}
