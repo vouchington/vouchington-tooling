@@ -183,4 +183,40 @@ describe('bundleDigest', () => {
     }
     expect(openFile).toHaveBeenCalledWith('/bundle/file', constants.O_RDONLY)
   })
+
+  it('rejects a same-size descriptor rewrite during hashing and closes it', async () => {
+    const file = {
+      close: vi.fn().mockResolvedValue(undefined),
+      createReadStream: vi.fn(() => Readable.from(['content'])),
+      stat: vi
+        .fn()
+        .mockResolvedValueOnce({
+          ctimeMs: 1,
+          dev: 1,
+          ino: 1,
+          isFile: () => true,
+          mtimeMs: 1,
+          size: 7,
+        })
+        .mockResolvedValueOnce({
+          ctimeMs: 2,
+          dev: 1,
+          ino: 1,
+          isFile: () => true,
+          mtimeMs: 2,
+          size: 7,
+        }),
+    }
+    const lstatFile = vi
+      .fn()
+      .mockResolvedValue({ dev: 1, ino: 1, isFile: () => true, isSymbolicLink: () => false })
+    await expect(
+      sha256RegularFile(
+        '/bundle/file',
+        vi.fn().mockResolvedValue(file) as unknown as typeof import('node:fs/promises').open,
+        lstatFile,
+      ),
+    ).rejects.toThrow('bundle file changed while hashing')
+    expect(file.close).toHaveBeenCalledOnce()
+  })
 })

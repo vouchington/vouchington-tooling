@@ -62,7 +62,14 @@ export async function sha256RegularFile(
     )
       throw new Error('bundle file changed while opening')
     const hash = createHash('sha256')
-    for await (const chunk of file.createReadStream()) hash.update(chunk)
+    for await (const chunk of file.createReadStream({ autoClose: false })) hash.update(chunk)
+    const completed = await file.stat()
+    if (
+      completed.size !== opened.size ||
+      completed.mtimeMs !== opened.mtimeMs ||
+      completed.ctimeMs !== opened.ctimeMs
+    )
+      throw new Error('bundle file changed while hashing')
     return hash.digest('hex')
   } finally {
     await file.close()

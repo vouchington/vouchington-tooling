@@ -1,15 +1,15 @@
-import { createHash, randomUUID } from 'node:crypto'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, posix } from 'node:path'
+import { dirname, posix } from 'node:path'
 import { mapBounded } from './concurrency.mts'
 import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
+import { gitBlobSha } from './git-object.mts'
 import { serializeFetchMetadata } from './metadata.mts'
 import { recordGitMode } from './modes.mts'
 import { validateOutputPaths } from './output-paths.mts'
 import { outputExists, publishBundle, recoverIncompletePublish } from './publish.mts'
-import { prepareStagedFile } from './staged-path.mts'
+import { prepareStagedFile, temporaryPath } from './staged-path.mts'
 import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
 export interface FetchMetadata {
   digest: string
@@ -22,6 +22,16 @@ export interface FetchMetadata {
 }
 
 const MAX_CONCURRENT_BLOBS = 10
+export const MAX_SELECTED_BLOBS = 4096
+const MAX_SELECTED_BLOB_BYTES = 256 * 1024 * 1024
+
+interface ValidatedApiTreeEntry {
+  mode: string
+  path: string
+  sha: string
+  size: number | undefined
+  type: string
+}
 export async function fetchRepositoryPaths(options: {
   apiUrl: string
   config: RepositoryPathFetchConfig
@@ -50,7 +60,23 @@ export async function fetchRepositoryPaths(options: {
     MAX_TREE_BYTES,
   )
   if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('repository tree is incomplete')
-  rejectDuplicateTreePaths(tree.tree)
+  const treeEntries = tree.tree
+  rejectDuplicateTreePaths(treeEntries)
+  let selectedBlobCount = 0
+  let selectedBlobBytes = 0
+  const selections = options.config.paths.map((mapping) => {
+    const selected = treeEntries
+      .filter((entry) => typeof entry.path === 'string' && selectedPath(entry.path, mapping.source))
+      .map(validateApiEntry)
+      .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
+    const blobs = selected.filter((entry) => entry.type === 'blob')
+    if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
+    selectedBlobCount += blobs.length
+    selectedBlobBytes += blobs.reduce((total, entry) => total + (entry.size ?? MAX_BLOB_BYTES), 0)
+    if (selectedBlobCount > MAX_SELECTED_BLOBS || selectedBlobBytes > MAX_SELECTED_BLOB_BYTES)
+      throw new Error('selected repository blobs exceed aggregate limit')
+    return { blobs, mapping }
+  })
   await mkdir(dirname(options.destination), { recursive: true })
   await mkdir(dirname(options.metadata), { recursive: true })
   const stagedBundle = temporaryPath(options.destination)
@@ -59,15 +85,7 @@ export async function fetchRepositoryPaths(options: {
   await chmod(stagedBundle, 0o700)
   try {
     const expectedModes = new Map<string, string>()
-    for (const mapping of options.config.paths) {
-      const selected = tree.tree
-        .filter(
-          (entry) => typeof entry.path === 'string' && selectedPath(entry.path, mapping.source),
-        )
-        .map(validateApiEntry)
-        .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
-      const blobs = selected.filter((entry) => entry.type === 'blob')
-      if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
+    for (const { blobs, mapping } of selections) {
       await mapBounded(blobs, MAX_CONCURRENT_BLOBS, async (entry) => {
         const destination = await writeBlob(
           api,
@@ -113,7 +131,7 @@ async function writeBlob(
   api: URL,
   repository: string,
   mapping: RepositoryPathFetchConfig['paths'][number],
-  entry: Required<ApiTreeEntry>,
+  entry: ValidatedApiTreeEntry,
   root: string,
   token: string,
 ): Promise<string> {
@@ -141,6 +159,8 @@ async function writeBlob(
   ) {
     throw new Error(`blob integrity mismatch: ${entry.path}`)
   }
+  if (entry.size !== undefined && content.length !== entry.size)
+    throw new Error(`blob size does not match repository tree: ${entry.path}`)
   const absolute = await prepareStagedFile(root, destination)
   await writeFile(absolute, content, {
     flag: 'wx',
@@ -150,30 +170,30 @@ async function writeBlob(
   return destination
 }
 
-function validateApiEntry(entry: ApiTreeEntry): Required<ApiTreeEntry> {
+function validateApiEntry(entry: ApiTreeEntry): ValidatedApiTreeEntry {
   /* v8 ignore next -- selection filters entries without string paths */
   if (typeof entry.path !== 'string') throw new Error('invalid API path')
   validateRelativePath(entry.path)
   const sha = requireSha(entry.sha, 'tree entry SHA')
   if (entry.type === 'tree' && entry.mode === '040000')
-    return { mode: entry.mode, path: entry.path, sha, type: entry.type }
-  if (entry.type === 'blob' && (entry.mode === '100644' || entry.mode === '100755'))
-    return { mode: entry.mode, path: entry.path, sha, type: entry.type }
+    return { mode: entry.mode, path: entry.path, sha, size: 0, type: entry.type }
+  if (entry.type === 'blob' && (entry.mode === '100644' || entry.mode === '100755')) {
+    const size =
+      typeof entry.size === 'number' && Number.isSafeInteger(entry.size) && entry.size >= 0
+        ? entry.size
+        : undefined
+    if (size !== undefined && size > MAX_BLOB_BYTES)
+      throw new Error(`source blob exceeds size limit: ${entry.path}`)
+    return { mode: entry.mode, path: entry.path, sha, size, type: entry.type }
+  }
   throw new Error(`unsupported source entry: ${entry.path}`)
 }
 
 function selectedPath(path: string, source: string): boolean {
   return path === source || path.startsWith(`${source}/`)
 }
-function temporaryPath(target: string): string {
-  return join(dirname(target), `.${basename(target)}.fetch-${randomUUID()}`)
-}
 function requireSha(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))
     throw new Error(`invalid ${label}`)
   return value
-}
-function gitBlobSha(content: Buffer, length: number): string {
-  const algorithm = length === 40 ? 'sha1' : 'sha256'
-  return createHash(algorithm).update(`blob ${content.length}\0`).update(content).digest('hex')
 }

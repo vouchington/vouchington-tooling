@@ -125,11 +125,25 @@ describe('parseRepositoryPathFetch', () => {
     expect(() => validateDestination(path, win32)).toThrow('normalized non-root absolute path')
   })
 
-  it.each(['.', '-flag', 'a\0b', 'a\\b', 'a/./b', 'a/../b', 'foo/../../bar', 'directory/'])(
-    'rejects unsafe relative path %s',
-    (path) => {
-      expect(() => validateRelativePath(path)).toThrow('unsafe path')
-    },
-  )
+  it.each([
+    '.',
+    '-flag',
+    'a\0b',
+    'a\\b',
+    'a/./b',
+    'a/../b',
+    'foo/../../bar',
+    'directory/',
+    'out/CON',
+    'out/con.txt',
+    'out/COM¹',
+    'out/lpt³.log',
+    'out/a:b',
+    'out/star*',
+    'out/trailing.',
+    'out/trailing ',
+  ])('rejects unsafe relative path %s', (path) => {
+    expect(() => validateRelativePath(path)).toThrow('unsafe path')
+  })
 })
 import { win32 } from 'node:path'

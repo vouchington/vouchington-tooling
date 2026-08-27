@@ -1,4 +1,5 @@
-import { realpathSync, statSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { closeSync, lstatSync, openSync, realpathSync, unlinkSync } from 'node:fs'
 import * as nativePath from 'node:path'
 
 interface PathOperations {
@@ -34,24 +35,53 @@ export function canonicalizeNearestExistingPath(
 
 export function isCaseInsensitivePath(
   path: string,
-  statPath: (path: string) => { dev: bigint; ino: bigint } = (candidate) =>
-    statSync(candidate, { bigint: true }),
+  probeDirectory: (path: string) => boolean = probeDirectoryCaseSensitivity,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
   if (platform === 'win32') return true
-  const identity = statPath(path)
-  for (let index = path.length - 1; index >= 0; index -= 1) {
-    const character = path[index]!
-    if (!/[A-Za-z]/.test(character)) continue
-    const toggledCharacter =
-      character === character.toLowerCase() ? character.toUpperCase() : character.toLowerCase()
-    const toggled = `${path.slice(0, index)}${toggledCharacter}${path.slice(index + 1)}`
-    try {
-      const toggledIdentity = statPath(toggled)
-      return toggledIdentity.dev === identity.dev && toggledIdentity.ino === identity.ino
-    } catch {
-      return false
-    }
+  try {
+    return probeDirectory(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOTDIR') throw error
+    return probeDirectory(nativePath.dirname(path))
   }
-  return false
+}
+
+export function probeDirectoryCaseSensitivity(
+  directory: string,
+  createProbe: (path: string) => void = (path) => closeSync(openSync(path, 'wx', 0o600)),
+  identity: (path: string) => { dev: bigint; ino: bigint } = (path) =>
+    lstatSync(path, { bigint: true }),
+  removeProbe: (path: string) => void = unlinkSync,
+  name = `.vouchington-case-${randomUUID()}`,
+): boolean {
+  const probe = nativePath.join(directory, name)
+  const toggled = nativePath.join(directory, name.replace('v', 'V'))
+  createProbe(probe)
+  let original: { dev: bigint; ino: bigint } | undefined
+  try {
+    original = identity(probe)
+    try {
+      const alias = identity(toggled)
+      return alias.dev === original.dev && alias.ino === original.ino
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+      throw error
+    }
+  } finally {
+    removeOwnedProbe(probe, original, identity, removeProbe)
+  }
+}
+
+function removeOwnedProbe(
+  probe: string,
+  original: { dev: bigint; ino: bigint } | undefined,
+  identity: (path: string) => { dev: bigint; ino: bigint },
+  removeProbe: (path: string) => void,
+): void {
+  if (original === undefined) throw new Error('case probe identity unavailable during cleanup')
+  const current = identity(probe)
+  if (current.dev !== original.dev || current.ino !== original.ino)
+    throw new Error('case probe changed before cleanup')
+  removeProbe(probe)
 }

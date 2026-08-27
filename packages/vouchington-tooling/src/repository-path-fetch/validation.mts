@@ -22,6 +22,7 @@ export interface RepositoryPathMapping {
 
 const repositoryPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/
 const refPattern = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
+const windowsReservedName = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i
 export const MAX_REPOSITORY_PATH_MAPPINGS = 64
 
 export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFetchConfig {
@@ -102,8 +103,8 @@ function portableFilesystemIdentity(value: string): string {
 export function validateRelativePath(path: string): void {
   if (
     posix.isAbsolute(path) ||
-    path.includes('\0') ||
     path.includes('\\') ||
+    path.split('/').some(isWindowsIncompatibleComponent) ||
     path === '.' ||
     path.endsWith('/') ||
     path.startsWith('-') ||
@@ -112,6 +113,22 @@ export function validateRelativePath(path: string): void {
   ) {
     throw new Error(`unsafe path: ${path}`)
   }
+}
+
+function isWindowsIncompatibleComponent(component: string): boolean {
+  return (
+    /[<>:"|?*]/u.test(component) ||
+    hasControlCharacter(component) ||
+    component.endsWith('.') ||
+    component.endsWith(' ') ||
+    windowsReservedName.test(component)
+  )
+}
+
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1)
+    if (value.charCodeAt(index) <= 0x1f) return true
+  return false
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

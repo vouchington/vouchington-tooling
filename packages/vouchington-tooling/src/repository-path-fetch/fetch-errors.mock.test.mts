@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchRepositoryPaths } from './fetch.mts'
+import { fetchRepositoryPaths, MAX_SELECTED_BLOBS } from './fetch.mts'
+import { MAX_BLOB_BYTES } from './github.mts'
 import { MAX_FETCH_METADATA_BYTES } from './metadata.mts'
 
 const sha = 'a'.repeat(40)
@@ -49,6 +50,67 @@ function mockApi(tree: unknown, blob: unknown = {}): void {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('fetchRepositoryPaths failure boundaries', () => {
+  it('rejects an aggregate blob count before downloading', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      mockApi({
+        tree: Array.from({ length: MAX_SELECTED_BLOBS + 1 }, (_, index) => ({
+          mode: '100644',
+          path: `source/file-${index}`,
+          sha,
+          size: 0,
+          type: 'blob',
+        })),
+      })
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'selected repository blobs exceed aggregate limit',
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects an aggregate conservative byte estimate before downloading', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      mockApi({
+        tree: Array.from({ length: 65 }, (_, index) => ({
+          mode: '100644',
+          path: `source/file-${index}`,
+          sha,
+          type: 'blob',
+        })),
+      })
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'selected repository blobs exceed aggregate limit',
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a tree entry whose declared blob size exceeds the per-blob limit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      mockApi({
+        tree: [
+          {
+            mode: '100644',
+            path: 'source/file',
+            sha,
+            size: MAX_BLOB_BYTES + 1,
+            type: 'blob',
+          },
+        ],
+      })
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'source blob exceeds size limit: source/file',
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects oversized metadata before publishing either output', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
@@ -254,6 +316,23 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     try {
       mockApi({ tree: [{ mode: '100644', path: 'source/file', sha, type: 'blob' }] }, blob)
       await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(message)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it('rejects a blob whose decoded size exceeds its tree declaration', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      const content = 'content'
+      const blob = gitBlobSha(content)
+      mockApi(
+        { tree: [{ mode: '100644', path: 'source/file', sha: blob, size: 0, type: 'blob' }] },
+        { content: Buffer.from(content).toString('base64'), encoding: 'base64' },
+      )
+      await expect(fetchRepositoryPaths(options(root))).rejects.toThrow(
+        'blob size does not match repository tree: source/file',
+      )
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

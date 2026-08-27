@@ -1,5 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
+
+export function temporaryPath(target: string): string {
+  return join(dirname(target), `.${basename(target)}.fetch-${randomUUID()}`)
+}
 
 export async function prepareStagedFile(
   root: string,
