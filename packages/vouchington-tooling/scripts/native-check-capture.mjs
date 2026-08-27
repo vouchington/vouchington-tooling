@@ -13,8 +13,9 @@ for await (const chunk of process.stdin) {
   offset = (offset + tail.length) % limit
   size = Math.min(limit, size + tail.length)
 }
-process.stdout.write(
-  size < limit
-    ? buffer.subarray(0, size)
-    : Buffer.concat([buffer.subarray(offset), buffer.subarray(0, offset)]),
-)
+if (size < limit) {
+  process.stdout.write(buffer.subarray(0, size))
+} else {
+  process.stdout.write(buffer.subarray(offset))
+  process.stdout.write(buffer.subarray(0, offset))
+}
