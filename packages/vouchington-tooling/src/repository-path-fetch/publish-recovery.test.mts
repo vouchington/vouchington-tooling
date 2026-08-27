@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -40,6 +41,27 @@ describe('publish recovery malformed marker directories', () => {
       expect(existsSync(destination)).toBe(true)
       expect(existsSync(metadataDestination)).toBe(true)
     } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('rejects an unsupported marker type', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    const server = createServer()
+    try {
+      const destination = join(root, 'bundle')
+      const metadataDestination = join(root, 'metadata')
+      const marker = join(root, '.bundle.fetch-incomplete')
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(marker, resolve)
+      })
+      await expect(recoverIncompletePublish(destination, metadataDestination)).rejects.toThrow(
+        'marker has unsupported type',
+      )
+      expect(existsSync(marker)).toBe(true)
+    } finally {
+      if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()))
       rmSync(root, { force: true, recursive: true })
     }
   })

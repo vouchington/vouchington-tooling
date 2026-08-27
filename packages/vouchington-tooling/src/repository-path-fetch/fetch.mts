@@ -129,7 +129,7 @@ async function writeBlob(
   )
   if (blob.encoding !== 'base64' || typeof blob.content !== 'string')
     throw new Error(`invalid blob: ${entry.path}`)
-  const encoded = blob.content.replaceAll('\r\n', '').replaceAll('\n', '')
+  const encoded = blob.content.replaceAll('\r', '').replaceAll('\n', '')
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) {
     throw new Error(`invalid blob encoding: ${entry.path}`)
   }

@@ -42,11 +42,12 @@ export async function recoverIncompletePublish(
   if (!outputExists(marker)) return
   const markerStat = lstatSync(marker, { bigint: true })
   if (!markerStat.isFile()) {
-    if (markerStat.isDirectory()) {
+    if (markerStat.isSymbolicLink()) await rm(marker, { force: true })
+    else if (markerStat.isDirectory()) {
       if (readdirSync(marker).length > 0)
         throw new Error('incomplete publish marker directory is not empty')
       await rmdir(marker)
-    } else await rm(marker, { force: true })
+    } else throw new Error('incomplete publish marker has unsupported type')
     return
   }
   const markerIdentity: OutputIdentity = {

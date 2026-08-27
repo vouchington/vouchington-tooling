@@ -38,7 +38,12 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
     ref.includes('//') ||
     ref.endsWith('/') ||
     ref.endsWith('.') ||
-    ref.split('/').some((component) => component.startsWith('.') || component.endsWith('.lock'))
+    ref
+      .split('/')
+      .some(
+        (component) =>
+          component.startsWith('.') || component.endsWith('.') || component.endsWith('.lock'),
+      )
   ) {
     throw new Error('ref contains unsupported characters')
   }

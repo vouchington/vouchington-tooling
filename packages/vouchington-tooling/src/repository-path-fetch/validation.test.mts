@@ -34,6 +34,7 @@ describe('parseRepositoryPathFetch', () => {
     ['owner/repository', '../main', 'api'],
     ['owner/repository', 'branch//nested', 'api'],
     ['owner/repository', 'branch.', 'api'],
+    ['owner/repository', 'branch./nested', 'api'],
     ['owner/repository', 'branch.lock', 'api'],
     ['owner/repository', 'branch/nested.lock', 'api'],
     ['owner/repository', 'branch/foo.lock/nested', 'api'],

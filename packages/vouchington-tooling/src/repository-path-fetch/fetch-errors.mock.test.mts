@@ -245,7 +245,7 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
-  it('accepts CRLF-wrapped base64 content', async () => {
+  it.each(['\r\n', '\r'])('accepts %j-wrapped base64 content', async (lineEnding) => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
       const content = 'content'
@@ -253,7 +253,7 @@ describe('fetchRepositoryPaths failure boundaries', () => {
       mockApi(
         { tree: [{ mode: '100644', path: 'source/file', sha: blob, type: 'blob' }] },
         {
-          content: `${Buffer.from(content).toString('base64').slice(0, 4)}\r\n${Buffer.from(content).toString('base64').slice(4)}`,
+          content: `${Buffer.from(content).toString('base64').slice(0, 4)}${lineEnding}${Buffer.from(content).toString('base64').slice(4)}`,
           encoding: 'base64',
         },
       )

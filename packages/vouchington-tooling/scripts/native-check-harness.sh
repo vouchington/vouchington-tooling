@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-
 # Source this library from a consumer-owned check script. The consumer supplies
 # command names and commands; this library records stable timing and diagnostics.
-
 native_check_harness_dir() {
   local source="${BASH_SOURCE[0]}" directory target
   while [ -h "${source}" ]; do
@@ -35,10 +33,21 @@ native_check_path_identity() {
       seen.add(absolute)
       try { const stat = statSync(absolute, { bigint: true }); return `inode:${stat.dev}:${stat.ino}` } catch (error) { if (error?.code !== "ENOENT") throw error }
       try { if (lstatSync(absolute).isSymbolicLink()) return identity(resolve(dirname(absolute), readlinkSync(absolute)), seen) } catch (error) { if (error?.code !== "ENOENT") throw error }
-      const parent = realpathSync.native(dirname(absolute))
-      const parentStat = statSync(parent, { bigint: true })
-      const name = basename(absolute).normalize("NFC")
-      return `path:${parentStat.dev}:${parentStat.ino}:${isCaseInsensitive(parent) ? name.toLowerCase() : name}`
+      const suffix = []
+      let ancestor = absolute
+      for (;;) {
+        try {
+          ancestor = realpathSync.native(ancestor)
+          const ancestorStat = statSync(ancestor, { bigint: true })
+          const normalize = isCaseInsensitive(ancestor) ? (name) => name.normalize("NFC").toLowerCase() : (name) => name.normalize("NFC")
+          return `path:${ancestorStat.dev}:${ancestorStat.ino}:${suffix.map(normalize).join("/")}`
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error
+          const parent = dirname(ancestor)
+          if (parent === ancestor) throw error
+          suffix.unshift(basename(ancestor)); ancestor = parent
+        }
+      }
     }
     process.stdout.write(identity(process.argv[1]))
   ' "$1"

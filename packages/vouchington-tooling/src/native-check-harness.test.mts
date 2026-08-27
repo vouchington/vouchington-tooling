@@ -110,6 +110,31 @@ describe('native-check-harness', () => {
     }
   })
 
+  it('identifies nested missing parents using the ancestor volume semantics', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const probe = join(directory, 'case-probe')
+      writeFileSync(probe, 'probe')
+      const caseInsensitive = existsSync(join(directory, 'CASE-PROBE'))
+      rmSync(probe)
+      const first = join(directory, 'missing', 'deep', 'summary')
+      const second = join(directory, 'MISSING', 'DEEP', 'SUMMARY')
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          `source ${JSON.stringify(harness)}; native_check_path_identity ${JSON.stringify(first)}; printf '\\n'; native_check_path_identity ${JSON.stringify(second)}`,
+        ],
+        { encoding: 'utf8' },
+      )
+      expect(result.status).toBe(0)
+      const [left, right] = result.stdout.trim().split('\n')
+      expect(left === right).toBe(caseInsensitive)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
   it('rejects a JSONL path reserved for diagnostics', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {
