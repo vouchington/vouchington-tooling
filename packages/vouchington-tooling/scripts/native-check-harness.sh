@@ -174,7 +174,6 @@ native_check_publish_summary() {
       return 2
     fi
     if [ "${destination_identity}" = "${summary_identity}" ]; then
-      destination="${NATIVE_CHECK_SUMMARY_FILE}"
       local staged_summary
       staged_summary="$(mktemp "${destination}.publish.XXXXXX")"
       if ! {

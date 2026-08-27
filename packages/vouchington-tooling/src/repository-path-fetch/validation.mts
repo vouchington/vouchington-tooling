@@ -50,8 +50,8 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
   for (const mapping of mappings) {
     if (
       mappings.some((candidate) => {
-        const destination = filesystemIdentity(mapping.destination)
-        const candidateDestination = filesystemIdentity(candidate.destination)
+        const destination = portableFilesystemIdentity(mapping.destination)
+        const candidateDestination = portableFilesystemIdentity(candidate.destination)
         return candidate !== mapping && candidateDestination.startsWith(`${destination}/`)
       })
     ) {
@@ -84,13 +84,13 @@ function parseMapping(value: unknown, seen: Set<string>): RepositoryPathMapping 
   }
   validateRelativePath(value.source)
   validateRelativePath(value.destination)
-  const identity = filesystemIdentity(value.destination)
+  const identity = portableFilesystemIdentity(value.destination)
   if (seen.has(identity)) throw new Error(`duplicate destination: ${value.destination}`)
   seen.add(identity)
   return { destination: value.destination, source: value.source }
 }
 
-function filesystemIdentity(value: string): string {
+function portableFilesystemIdentity(value: string): string {
   return value.normalize('NFC').toLowerCase()
 }
 

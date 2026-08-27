@@ -227,6 +227,16 @@ describe('native-check-harness', () => {
     expect(result.stdout).toBe('bcde')
   })
 
+  it('keeps the final ring tail when a later chunk exceeds the capture limit', () => {
+    const result = spawnSync(
+      'bash',
+      ['-c', `{ printf xx; sleep 0.05; printf abcdef; } | node ${JSON.stringify(capture)} 4`],
+      { encoding: 'utf8' },
+    )
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('cdef')
+  })
+
   it('records classifications, durations, and bounded failure output', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {
@@ -420,6 +430,24 @@ describe('native-check-harness', () => {
       )
       expect(spawnSync('bash', [script]).status).toBe(0)
       expect(readFileSync(summary, 'utf8')).toContain('| pass | passed | 0 |')
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('publishes to a requested hard-link destination', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const destination = join(directory, 'summary-link.md')
+      const script = join(directory, 'run.sh')
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nnative_check_run pass -- bash -c 'exit 0'\nln ${JSON.stringify(summary)} ${JSON.stringify(destination)}\nnative_check_publish_summary ${JSON.stringify(destination)}\n`,
+      )
+      expect(spawnSync('bash', [script]).status).toBe(0)
+      expect(readFileSync(destination, 'utf8')).toContain('## Check summary')
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

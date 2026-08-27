@@ -20,6 +20,8 @@ export interface FetchMetadata {
   schemaVersion: 1
   sourcePaths: readonly { destination: string; source: string }[]
 }
+
+const MAX_CONCURRENT_BLOBS = 10
 export async function fetchRepositoryPaths(options: {
   apiUrl: string
   config: RepositoryPathFetchConfig
@@ -65,7 +67,7 @@ export async function fetchRepositoryPaths(options: {
         .sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)))
       const blobs = selected.filter((entry) => entry.type === 'blob')
       if (blobs.length === 0) throw new Error(`source path contains no files: ${mapping.source}`)
-      await mapBounded(blobs, 10, async (entry) => {
+      await mapBounded(blobs, MAX_CONCURRENT_BLOBS, async (entry) => {
         const destination = await writeBlob(
           api,
           options.config.repository,
