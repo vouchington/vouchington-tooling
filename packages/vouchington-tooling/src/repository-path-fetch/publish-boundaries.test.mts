@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { outputIdentity } from './output-identity.mts'
 import { outputExists, publishBundle } from './publish.mts'
 
 describe('publishBundle input boundaries', () => {
@@ -96,8 +97,10 @@ describe('publishBundle input boundaries', () => {
           undefined,
           async (path, contents) => {
             writeFileSync(path, contents)
+            const identity = await outputIdentity(path)
             rmSync(path)
             writeFileSync(path, 'foreign')
+            return identity
           },
         ),
       ).rejects.toThrow('incomplete publish marker changed after creation')

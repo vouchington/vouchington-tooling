@@ -9,7 +9,18 @@ describe('writeMarkerAtomic', () => {
     const write = vi.fn(async () => {})
     const createLink = vi.fn(async () => {})
     const removeStaged = vi.fn(async () => {})
-    await writeMarkerAtomic('/marker', 'contents', write, createLink, removeStaged)
+    const identity = { dev: '1', ino: '2', type: 'file' as const }
+    await expect(
+      writeMarkerAtomic(
+        '/marker',
+        'contents',
+        write,
+        createLink,
+        removeStaged,
+        undefined,
+        async () => identity,
+      ),
+    ).resolves.toEqual(identity)
     expect(write).toHaveBeenCalledWith(expect.stringContaining('/marker.write-'), 'contents')
     expect(createLink).toHaveBeenCalledWith(expect.stringContaining('/marker.write-'), '/marker')
     expect(removeStaged).toHaveBeenCalledWith(expect.stringContaining('/marker.write-'))
@@ -45,6 +56,7 @@ describe('writeMarkerAtomic', () => {
           throw failure
         },
         removePublished,
+        async () => ({ dev: '1', ino: '2', type: 'file' }),
       ),
     ).rejects.toBe(failure)
     expect(removePublished).toHaveBeenCalledWith('/marker')

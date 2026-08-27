@@ -37,7 +37,10 @@ export async function publishBundle(
   metadata: string,
   metadataDestination: string,
   move: (from: string, to: string) => Promise<void> = moveAtomic,
-  writeMarker: (path: string, contents: string) => Promise<void> = writeMarkerAtomic,
+  writeMarker: (
+    path: string,
+    contents: string,
+  ) => Promise<OutputIdentity | void> = writeMarkerAtomic,
   removeMarker: (path: string) => Promise<void> = async (path) => {
     await rm(path, { force: true })
   },
@@ -55,19 +58,26 @@ export async function publishBundle(
     throw new Error('output paths are too long for recovery metadata')
   if (outputExists(destination) || outputExists(metadataDestination))
     throw new Error('output already exists')
+  let markerIdentity: OutputIdentity
   try {
-    await writeMarker(marker, markerContents)
+    markerIdentity = (await writeMarker(marker, markerContents)) ?? (await outputIdentity(marker))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('output already exists')
     throw error
   }
-  const markerIdentity = await outputIdentity(marker)
-  const [verifiedContents, verifiedIdentity] = await Promise.all([
-    readFile(marker, 'utf8'),
-    outputIdentity(marker),
-  ])
-  if (verifiedContents !== markerContents || !sameIdentity(markerIdentity, verifiedIdentity))
-    throw new Error('incomplete publish marker changed after creation')
+  try {
+    const [verifiedContents, verifiedIdentity] = await Promise.all([
+      readFile(marker, 'utf8'),
+      outputIdentity(marker),
+    ])
+    if (verifiedContents !== markerContents || !sameIdentity(markerIdentity, verifiedIdentity))
+      throw new Error('incomplete publish marker changed after creation')
+  } catch (error) {
+    try {
+      await removeOwnedOutput(marker, markerIdentity, removeMarker)
+    } catch {}
+    throw error
+  }
   let publishedBundle = false
   let publishedMetadata = false
   try {

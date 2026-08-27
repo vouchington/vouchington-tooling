@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { link, rm, writeFile } from 'node:fs/promises'
+import { outputIdentity, type OutputIdentity } from './output-identity.mts'
 
 export async function writeMarkerAtomic(
   path: string,
@@ -14,7 +15,8 @@ export async function writeMarkerAtomic(
   removePublished: (path: string) => Promise<void> = async (target) => {
     await rm(target, { force: true })
   },
-): Promise<void> {
+  identify: (path: string) => Promise<OutputIdentity> = outputIdentity,
+): Promise<OutputIdentity> {
   const staged = `${path}.write-${randomUUID()}`
   await write(staged, contents)
   try {
@@ -23,10 +25,12 @@ export async function writeMarkerAtomic(
     await removeStaged(staged)
     throw error
   }
+  const identity = await identify(staged)
   try {
     await removeStaged(staged)
   } catch (error) {
     await removePublished(path)
     throw error
   }
+  return identity
 }
