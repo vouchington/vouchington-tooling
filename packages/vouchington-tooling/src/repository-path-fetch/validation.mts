@@ -117,6 +117,7 @@ export function validateRelativePath(path: string): void {
 
 function isWindowsIncompatibleComponent(component: string): boolean {
   return (
+    Buffer.byteLength(component) > 255 ||
     /[<>:"|?*]/u.test(component) ||
     hasControlCharacter(component) ||
     component.endsWith('.') ||

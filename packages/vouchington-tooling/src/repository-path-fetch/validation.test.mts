@@ -142,6 +142,7 @@ describe('parseRepositoryPathFetch', () => {
     'out/star*',
     'out/trailing.',
     'out/trailing ',
+    `out/${'a'.repeat(256)}`,
   ])('rejects unsafe relative path %s', (path) => {
     expect(() => validateRelativePath(path)).toThrow('unsafe path')
   })

@@ -5,7 +5,8 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('getGithubJson', () => {
   it('budgets for base64 expansion and JSON framing around a maximum-size blob', () => {
-    expect(MAX_BLOB_RESPONSE_BYTES).toBeGreaterThan(Math.ceil((MAX_BLOB_BYTES * 4) / 3))
+    const base64Bytes = Math.ceil((MAX_BLOB_BYTES * 4) / 3)
+    expect(MAX_BLOB_RESPONSE_BYTES).toBeGreaterThan(base64Bytes + Math.ceil(base64Bytes / 60) * 2)
   })
   it.each(['', 'token\n', 'token value', 'token\u0000', 'token%0d%0aheader', 'x'.repeat(1025)])(
     'rejects unsafe token %j',

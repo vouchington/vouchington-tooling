@@ -1,7 +1,9 @@
 const MAX_COMMIT_BYTES = 1024 * 1024
 export const MAX_TREE_BYTES = 32 * 1024 * 1024
 export const MAX_BLOB_BYTES = 4 * 1024 * 1024
-export const MAX_BLOB_RESPONSE_BYTES = Math.ceil((MAX_BLOB_BYTES * 4) / 3) + 64 * 1024
+const MAX_BLOB_BASE64_BYTES = Math.ceil((MAX_BLOB_BYTES * 4) / 3)
+export const MAX_BLOB_RESPONSE_BYTES =
+  MAX_BLOB_BASE64_BYTES + Math.ceil(MAX_BLOB_BASE64_BYTES / 60) * 2 + 1024
 const GITHUB_REQUEST_TIMEOUT_MS = 15_000
 
 export async function getGithubJson<T>(
