@@ -25,6 +25,10 @@ describe('repository path fetch action', () => {
     expect(cleanAction).toContain('clean-workspace')
     expect(cleanAction).toContain('scripts/gha/clean-workspace.sh')
     expect(cleanAction).not.toContain('src/cli/index.mts')
+    expect(cleanAction).toContain('Token used only when deepen is true')
+    expect(cleanAction).toContain(
+      "GITHUB_TOKEN: ${{ inputs.deepen == 'true' && inputs.token || '' }}",
+    )
   })
 
   it('loads the fetch action entrypoint without node_modules', () => {

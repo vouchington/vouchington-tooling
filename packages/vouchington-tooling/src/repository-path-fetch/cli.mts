@@ -1,14 +1,14 @@
 import { readRepositoryPathFetchConfig } from './config.mts'
 import { fetchRepositoryPaths } from './fetch.mts'
 import { isMainModule } from './main-module.mts'
+import { validateOutputPaths } from './output-paths.mts'
 import { outputExists, recoverIncompletePublish } from './publish.mts'
-import { parseRepositoryPathFetchConfig, validateDestination } from './validation.mts'
+import { parseRepositoryPathFetchConfig } from './validation.mts'
 
 export async function runRepositoryPathFetch(args: readonly string[]): Promise<number> {
   try {
     const options = parseArgs(args)
-    validateDestination(options.destination)
-    validateDestination(options.metadata)
+    validateOutputPaths(options.destination, options.metadata)
     await recoverIncompletePublish(options.destination, options.metadata)
     if (outputExists(options.destination) || outputExists(options.metadata))
       throw new Error('output already exists')

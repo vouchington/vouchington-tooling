@@ -5,6 +5,6 @@ export function recordGitMode(
 ): void {
   const mode = sourceMode === '100755' ? '0755' : '0644'
   const previous = modes.get(destination)
-  if (previous && previous !== mode) throw new Error(`conflicting Git modes: ${destination}`)
+  if (previous) throw new Error(`duplicate bundle destination: ${destination}`)
   modes.set(destination, mode)
 }

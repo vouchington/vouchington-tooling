@@ -11,8 +11,8 @@ export function pathsOverlap(
   right: string,
   operations: PathOperations = nativePath,
 ): boolean {
-  const leftIdentity = filesystemIdentity(left)
-  const rightIdentity = filesystemIdentity(right)
+  const leftIdentity = filesystemIdentity(left, operations)
+  const rightIdentity = filesystemIdentity(right, operations)
   return (
     contains(leftIdentity, rightIdentity, operations) ||
     contains(rightIdentity, leftIdentity, operations)
@@ -27,6 +27,7 @@ function contains(parent: string, candidate: string, operations: PathOperations)
   )
 }
 
-function filesystemIdentity(value: string): string {
-  return value.normalize('NFC').toLowerCase()
+function filesystemIdentity(value: string, operations: PathOperations): string {
+  const normalized = value.normalize('NFC')
+  return operations.sep === '\\' ? normalized.toLowerCase() : normalized
 }

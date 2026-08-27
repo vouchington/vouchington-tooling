@@ -14,6 +14,10 @@ inputs:
     description: Deepen the repository after cleanup.
     required: false
     default: 'false'
+  token:
+    description: Token used only when deepen is true to authenticate the fetch.
+    required: false
+    default: ''
   base_ref:
     description: Base branch used when deepening.
     required: false
@@ -27,6 +31,7 @@ runs:
         BASE_REF: ${{ inputs.base_ref }}
         DEEPEN: ${{ inputs.deepen }}
         EXTRA_KEEP: ${{ inputs.extra_keep }}
+        GITHUB_TOKEN: ${{ inputs.deepen == 'true' && inputs.token || '' }}
         PRESERVE_NODE_MODULES: ${{ inputs.preserve_node_modules }}
       run: |
         set -euo pipefail

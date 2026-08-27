@@ -14,6 +14,7 @@ describe('pathsOverlap', () => {
 
   it.each([
     ['/tmp/bundle', '/tmp/bundle.json', posix],
+    ['/tmp/Bundle', '/tmp/bundle', posix],
     ['C:\\temp\\bundle', 'C:\\temp\\bundle.json', win32],
     ['C:\\temp\\bundle', 'D:\\temp\\bundle', win32],
   ])('keeps distinct paths %s and %s separate', (left, right, operations) => {

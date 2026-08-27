@@ -1,4 +1,12 @@
-import { isAbsolute, normalize, posix } from 'node:path'
+import * as nativePath from 'node:path'
+import { posix } from 'node:path'
+
+interface DestinationPathOperations {
+  isAbsolute(path: string): boolean
+  normalize(path: string): string
+  parse(path: string): { root: string }
+  sep: string
+}
 
 export interface RepositoryPathFetchConfig {
   paths: readonly RepositoryPathMapping[]
@@ -50,12 +58,15 @@ export function parseRepositoryPathFetchConfig(input: unknown): RepositoryPathFe
   return { paths: mappings, ref, repository, schemaVersion: 1 }
 }
 
-export function validateDestination(destination: string): void {
+export function validateDestination(
+  destination: string,
+  operations: DestinationPathOperations = nativePath,
+): void {
   if (
-    !isAbsolute(destination) ||
-    destination === '/' ||
-    destination.endsWith('/') ||
-    normalize(destination) !== destination
+    !operations.isAbsolute(destination) ||
+    operations.parse(destination).root === destination ||
+    destination.endsWith(operations.sep) ||
+    operations.normalize(destination) !== destination
   )
     throw new Error('destination must be a normalized non-root absolute path')
 }

@@ -103,6 +103,10 @@ describe('parseRepositoryPathFetch', () => {
     },
   )
 
+  it.each(['C:\\', '\\\\server\\share\\'])('rejects Windows filesystem root %s', (path) => {
+    expect(() => validateDestination(path, win32)).toThrow('normalized non-root absolute path')
+  })
+
   it.each(['.', '-flag', 'a\\b', 'a/../b', 'foo/../../bar', 'directory/'])(
     'rejects unsafe relative path %s',
     (path) => {
@@ -110,3 +114,4 @@ describe('parseRepositoryPathFetch', () => {
     },
   )
 })
+import { win32 } from 'node:path'

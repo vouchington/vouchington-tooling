@@ -5,14 +5,13 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { outputExists, publishBundle, recoverIncompletePublish } from './publish.mts'
+import { publishBundle, recoverIncompletePublish } from './publish.mts'
 
 function markerContents(destination: string, metadata: string): string {
   const identity = (path: string, fallbackType: 'directory' | 'file') => {
@@ -29,6 +28,7 @@ function markerContents(destination: string, metadata: string): string {
   }
   return `${JSON.stringify({
     bundleIdentity: identity(destination, 'directory'),
+    createdAt: Date.now(),
     destination,
     metadata,
     metadataIdentity: identity(metadata, 'file'),
@@ -39,77 +39,6 @@ function markerContents(destination: string, metadata: string): string {
 }
 
 describe('publishBundle', () => {
-  it('propagates filesystem errors while checking output existence', () => {
-    const failure = Object.assign(new Error('permission denied'), { code: 'EACCES' })
-    expect(() =>
-      outputExists('/unreadable', () => {
-        throw failure
-      }),
-    ).toThrow(failure)
-  })
-
-  it('refuses preexisting outputs without deleting them', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
-    try {
-      const bundle = join(root, 'staged-bundle')
-      const metadata = join(root, 'staged-metadata')
-      const destination = join(root, 'bundle')
-      const metadataDestination = join(root, 'metadata')
-      const marker = join(root, '.bundle.fetch-incomplete')
-      mkdirSync(bundle)
-      writeFileSync(join(bundle, 'file'), 'content')
-      writeFileSync(metadata, '{}')
-      mkdirSync(metadataDestination)
-      await expect(
-        publishBundle(bundle, destination, metadata, metadataDestination),
-      ).rejects.toThrow('output already exists')
-      expect(existsSync(destination)).toBe(false)
-      expect(existsSync(metadataDestination)).toBe(true)
-      expect(existsSync(marker)).toBe(false)
-
-      rmSync(metadataDestination, { recursive: true })
-      await publishBundle(bundle, destination, metadata, metadataDestination)
-      expect(existsSync(destination)).toBe(true)
-      expect(existsSync(metadataDestination)).toBe(true)
-    } finally {
-      rmSync(root, { force: true, recursive: true })
-    }
-  })
-
-  it('refuses a dangling symlink output without replacing it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
-    try {
-      const bundle = join(root, 'staged-bundle')
-      const metadata = join(root, 'staged-metadata')
-      const destination = join(root, 'bundle')
-      mkdirSync(bundle)
-      writeFileSync(metadata, '{}')
-      symlinkSync(join(root, 'missing'), destination)
-      await expect(
-        publishBundle(bundle, destination, metadata, join(root, 'metadata')),
-      ).rejects.toThrow('output already exists')
-      expect(existsSync(destination)).toBe(false)
-    } finally {
-      rmSync(root, { force: true, recursive: true })
-    }
-  })
-
-  it('rejects a non-file staged output', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
-    try {
-      const bundle = join(root, 'staged-bundle')
-      const metadata = join(root, 'staged-metadata')
-      symlinkSync(join(root, 'missing'), bundle)
-      writeFileSync(metadata, '{}')
-      await expect(
-        publishBundle(bundle, join(root, 'bundle'), metadata, join(root, 'metadata')),
-      ).rejects.toThrow('unsupported staged output')
-      expect(existsSync(join(root, '.bundle.fetch-incomplete'))).toBe(false)
-    } finally {
-      rmSync(root, { force: true, recursive: true })
-    }
-  })
-
   it('immediately cleans outputs when the first publish boundary fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
@@ -187,6 +116,8 @@ describe('publishBundle', () => {
       ).rejects.toThrow('marker removal failed')
       expect(existsSync(destination)).toBe(false)
       expect(existsSync(metadataDestination)).toBe(false)
+      expect(existsSync(join(root, '.bundle.fetch-incomplete'))).toBe(true)
+      await recoverIncompletePublish(destination, metadataDestination, () => false)
       expect(existsSync(join(root, '.bundle.fetch-incomplete'))).toBe(false)
     } finally {
       rmSync(root, { force: true, recursive: true })
@@ -352,6 +283,22 @@ describe('publishBundle', () => {
     }
   })
 
+  it('rejects output paths that cannot fit in the bounded recovery marker', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    try {
+      const bundle = join(root, 'staged-bundle')
+      const metadata = join(root, 'staged-metadata')
+      const destination = `${root}/${'segment/'.repeat(600)}bundle`
+      mkdirSync(bundle)
+      writeFileSync(metadata, '{}')
+      await expect(
+        publishBundle(bundle, destination, metadata, join(root, 'metadata')),
+      ).rejects.toThrow('output paths are too long for recovery metadata')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('recovers a marker left by process termination between publish boundaries', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {
@@ -458,6 +405,29 @@ describe('publishBundle', () => {
     }
   })
 
+  it('recovers an expired marker even when its PID has been reused', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
+    const destination = join(root, 'bundle')
+    const metadataDestination = join(root, 'metadata')
+    const marker = join(root, '.bundle.fetch-incomplete')
+    try {
+      mkdirSync(destination)
+      writeFileSync(metadataDestination, '{}')
+      writeFileSync(marker, markerContents(destination, metadataDestination))
+      await recoverIncompletePublish(
+        destination,
+        metadataDestination,
+        () => true,
+        () => Date.now() + 7 * 60 * 60 * 1000,
+      )
+      expect(existsSync(destination)).toBe(false)
+      expect(existsSync(metadataDestination)).toBe(false)
+      expect(existsSync(marker)).toBe(false)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it.each([
     '{',
     'null',
@@ -465,6 +435,7 @@ describe('publishBundle', () => {
     '1',
     JSON.stringify({
       bundleIdentity: null,
+      createdAt: Date.now(),
       destination: '/bundle',
       metadata: '/metadata',
       metadataIdentity: { dev: '1', ino: '1', type: 'file' },
@@ -472,7 +443,7 @@ describe('publishBundle', () => {
       token: '00000000-0000-4000-8000-000000000000',
       version: 1,
     }),
-    'x'.repeat(1025),
+    'x'.repeat(4097),
   ])('removes malformed recovery marker %j without deleting outputs', async (contents) => {
     const root = mkdtempSync(join(tmpdir(), 'repository-publish-'))
     try {

@@ -6,18 +6,9 @@ import type { ApiBlob, ApiCommit, ApiTree, ApiTreeEntry } from './api-types.mts'
 import { bundleEntries, comparePaths, digestEntries, type BundleEntry } from './digest.mts'
 import { getGithubJson, MAX_BLOB_BYTES, MAX_TREE_BYTES } from './github.mts'
 import { recordGitMode } from './modes.mts'
-import { pathsOverlap } from './path-overlap.mts'
-import {
-  outputExists,
-  publishBundle,
-  publishMarkerPath,
-  recoverIncompletePublish,
-} from './publish.mts'
-import {
-  validateDestination,
-  validateRelativePath,
-  type RepositoryPathFetchConfig,
-} from './validation.mts'
+import { validateOutputPaths } from './output-paths.mts'
+import { outputExists, publishBundle, recoverIncompletePublish } from './publish.mts'
+import { validateRelativePath, type RepositoryPathFetchConfig } from './validation.mts'
 export interface FetchMetadata {
   digest: string
   files: BundleEntry[]
@@ -34,9 +25,7 @@ export async function fetchRepositoryPaths(options: {
   metadata: string
   token: string
 }): Promise<FetchMetadata> {
-  validateDestination(options.destination)
-  validateDestination(options.metadata)
-  ensureDistinctOutputs(options.destination, options.metadata)
+  validateOutputPaths(options.destination, options.metadata)
   await recoverIncompletePublish(options.destination, options.metadata)
   if (outputExists(options.destination) || outputExists(options.metadata))
     throw new Error('output already exists')
@@ -172,10 +161,6 @@ function selectedPath(path: string, source: string): boolean {
 }
 function temporaryPath(target: string): string {
   return join(dirname(target), `.${basename(target)}.fetch-${randomUUID()}`)
-}
-function ensureDistinctOutputs(destination: string, metadata: string): void {
-  if (pathsOverlap(destination, metadata) || pathsOverlap(publishMarkerPath(destination), metadata))
-    throw new Error('destination and metadata overlap')
 }
 function requireSha(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value))

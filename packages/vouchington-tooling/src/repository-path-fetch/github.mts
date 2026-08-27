@@ -11,6 +11,8 @@ export async function getGithubJson<T>(
   timeoutMs = GITHUB_REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('response limit must be positive')
+  if (!token || tokenContainsUnsafeCharacter(token))
+    throw new Error('token contains whitespace or control characters')
   const response = await fetch(new URL(path, api), {
     headers: {
       Accept: 'application/vnd.github+json',
@@ -44,4 +46,12 @@ export async function getGithubJson<T>(
   } finally {
     reader.releaseLock()
   }
+}
+
+function tokenContainsUnsafeCharacter(token: string): boolean {
+  for (const character of token) {
+    const code = character.codePointAt(0)!
+    if (/\s/u.test(character) || code <= 31 || code === 127) return true
+  }
+  return false
 }

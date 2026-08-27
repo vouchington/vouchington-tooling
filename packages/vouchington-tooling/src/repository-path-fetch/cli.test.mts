@@ -136,7 +136,7 @@ describe('runRepositoryPathFetch', () => {
       const metadataStat = lstatSync(metadata, { bigint: true })
       writeFileSync(
         marker,
-        `${JSON.stringify({ bundleIdentity: { dev: String(destinationStat.dev), ino: String(destinationStat.ino), type: 'directory' }, destination, metadata, metadataIdentity: { dev: String(metadataStat.dev), ino: String(metadataStat.ino), type: 'file' }, owner: 2147483647, token: '00000000-0000-4000-8000-000000000000', version: 1 })}\n`,
+        `${JSON.stringify({ bundleIdentity: { dev: String(destinationStat.dev), ino: String(destinationStat.ino), type: 'directory' }, createdAt: Date.now(), destination, metadata, metadataIdentity: { dev: String(metadataStat.dev), ino: String(metadataStat.ino), type: 'file' }, owner: 2147483647, token: '00000000-0000-4000-8000-000000000000', version: 1 })}\n`,
       )
       const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
       await expect(runRepositoryPathFetch(args(root))).resolves.toBe(1)

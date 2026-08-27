@@ -9,9 +9,11 @@ import {
   removeOwnedOutput,
   type OutputIdentity,
 } from './output-identity.mts'
+import { ownerIsAlive } from './process-liveness.mts'
 
 interface PublishMarker {
   bundleIdentity: OutputIdentity
+  createdAt: number
   destination: string
   metadata: string
   metadataIdentity: OutputIdentity
@@ -19,6 +21,9 @@ interface PublishMarker {
   token: string
   version: 1
 }
+
+const MAX_MARKER_BYTES = 4096
+const MAX_ACTIVE_MARKER_AGE_MS = 6 * 60 * 60 * 1000
 
 export function publishMarkerPath(destination: string): string {
   return join(dirname(destination), `.${basename(destination)}.fetch-incomplete`)
@@ -42,36 +47,41 @@ async function discardFailedPublish(
   publishedMetadata: boolean,
   bundleIdentity: OutputIdentity,
   metadataIdentity: OutputIdentity,
+  markerIdentity: OutputIdentity,
+  removeMarker: (path: string) => Promise<void>,
   removeOutput: (path: string) => Promise<void>,
 ): Promise<void> {
   if (publishedBundle) await removeOwnedOutput(destination, bundleIdentity, removeOutput)
   if (publishedMetadata) await removeOwnedOutput(metadata, metadataIdentity, removeOutput)
-  await rm(marker, { force: true })
+  await removeOwnedOutput(marker, markerIdentity, removeMarker)
 }
 
 export async function recoverIncompletePublish(
   destination: string,
   metadata: string,
   isOwnerAlive: (owner: number) => boolean = ownerIsAlive,
+  now: () => number = Date.now,
 ): Promise<void> {
   const marker = publishMarkerPath(destination)
   if (!outputExists(marker)) return
+  const markerIdentity = await outputIdentity(marker)
   const parsed = readMarker(marker)
   if (!parsed) {
-    await rm(marker, { force: true })
+    await removeOwnedOutput(marker, markerIdentity, unlinkOutput)
     return
   }
   if (parsed.destination !== destination || parsed.metadata !== metadata) {
     throw new Error('incomplete publish marker does not match requested outputs')
   }
-  if (isOwnerAlive(parsed.owner)) throw new Error('repository bundle publication is in progress')
+  if (now() - parsed.createdAt < MAX_ACTIVE_MARKER_AGE_MS && isOwnerAlive(parsed.owner))
+    throw new Error('repository bundle publication is in progress')
   await removeOwnedOutput(destination, parsed.bundleIdentity, async (path) => {
     await rm(path, { force: true, recursive: true })
   })
   await removeOwnedOutput(metadata, parsed.metadataIdentity, async (path) => {
     await rm(path, { force: true, recursive: true })
   })
-  await rm(marker, { force: true })
+  await removeOwnedOutput(marker, markerIdentity, unlinkOutput)
 }
 
 export async function publishBundle(
@@ -93,19 +103,20 @@ export async function publishBundle(
   const marker = publishMarkerPath(destination)
   const bundleIdentity = await outputIdentity(bundle)
   const metadataIdentity = await outputIdentity(metadata)
+  const markerContents = `${JSON.stringify(
+    markerRecord(destination, metadataDestination, bundleIdentity, metadataIdentity),
+  )}\n`
+  if (Buffer.byteLength(markerContents) > MAX_MARKER_BYTES)
+    throw new Error('output paths are too long for recovery metadata')
   if (outputExists(destination) || outputExists(metadataDestination))
     throw new Error('output already exists')
   try {
-    await writeMarker(
-      marker,
-      `${JSON.stringify(
-        markerRecord(destination, metadataDestination, bundleIdentity, metadataIdentity),
-      )}\n`,
-    )
+    await writeMarker(marker, markerContents)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('output already exists')
     throw error
   }
+  const markerIdentity = await outputIdentity(marker)
   let publishedBundle = false
   let publishedMetadata = false
   try {
@@ -116,7 +127,7 @@ export async function publishBundle(
     if (outputExists(metadataDestination)) throw new Error('output already exists')
     await move(metadata, metadataDestination)
     publishedMetadata = true
-    await removeMarker(marker)
+    await removeOwnedOutput(marker, markerIdentity, removeMarker)
   } catch (error) {
     await discardFailedPublish(
       destination,
@@ -126,6 +137,8 @@ export async function publishBundle(
       publishedMetadata,
       bundleIdentity,
       metadataIdentity,
+      markerIdentity,
+      removeMarker,
       removeOutput,
     )
     throw error
@@ -140,6 +153,7 @@ function markerRecord(
 ): PublishMarker {
   return {
     bundleIdentity,
+    createdAt: Date.now(),
     destination,
     metadata,
     metadataIdentity,
@@ -151,7 +165,7 @@ function markerRecord(
 function readMarker(path: string): PublishMarker | undefined {
   try {
     const stat = lstatSync(path)
-    if (!stat.isFile() || stat.size > 1024) return undefined
+    if (!stat.isFile() || stat.size > MAX_MARKER_BYTES) return undefined
     const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
     if (!isMarker(value)) return undefined
     return value
@@ -165,6 +179,9 @@ function isMarker(value: unknown): value is PublishMarker {
   return (
     marker.version === 1 &&
     isOutputIdentity(marker.bundleIdentity) &&
+    typeof marker.createdAt === 'number' &&
+    Number.isSafeInteger(marker.createdAt) &&
+    marker.createdAt > 0 &&
     typeof marker.destination === 'string' &&
     typeof marker.metadata === 'string' &&
     isOutputIdentity(marker.metadataIdentity) &&
@@ -175,14 +192,6 @@ function isMarker(value: unknown): value is PublishMarker {
     /^[0-9a-f-]{36}$/i.test(marker.token)
   )
 }
-function ownerIsAlive(owner: number): boolean {
-  try {
-    process.kill(owner, 0)
-    return true
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'ESRCH') return false
-    if (code === 'EPERM') return true
-    throw error
-  }
+async function unlinkOutput(path: string): Promise<void> {
+  await rm(path, { force: true })
 }

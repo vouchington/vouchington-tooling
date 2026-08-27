@@ -4,6 +4,14 @@ import { getGithubJson } from './github.mts'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('getGithubJson', () => {
+  it.each(['', 'token\n', 'token value', 'token\u0000'])(
+    'rejects unsafe token %j',
+    async (token) => {
+      await expect(getGithubJson(new URL('https://api.example/'), 'value', token)).rejects.toThrow(
+        'token contains whitespace or control characters',
+      )
+    },
+  )
   it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects an invalid response limit: %s',
     async (limit) => {

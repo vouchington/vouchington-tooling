@@ -4,6 +4,16 @@
 # Source this library from a consumer-owned check script. The consumer supplies
 # command names and commands; this library records stable timing and diagnostics.
 
+native_check_harness_dir() {
+  local source="${BASH_SOURCE[0]}" directory target
+  while [ -h "${source}" ]; do
+    directory="$(cd -P "$(dirname "${source}")" && pwd)"
+    target="$(readlink "${source}")"
+    case "${target}" in /*) source="${target}" ;; *) source="${directory}/${target}" ;; esac
+  done
+  cd -P "$(dirname "${source}")" && pwd
+}
+
 native_check_path_identity() {
   node --input-type=module -e '
     import { lstatSync, readlinkSync, realpathSync, statSync } from "node:fs"
@@ -15,12 +25,7 @@ native_check_path_identity() {
         const character = parent[index]
         if (!/[A-Za-z]/.test(character)) continue
         const toggled = `${parent.slice(0, index)}${character === character.toLowerCase() ? character.toUpperCase() : character.toLowerCase()}${parent.slice(index + 1)}`
-        try {
-          const toggledStat = statSync(toggled, { bigint: true })
-          return toggledStat.dev === parentStat.dev && toggledStat.ino === parentStat.ino
-        } catch {
-          return false
-        }
+        try { const toggledStat = statSync(toggled, { bigint: true }); return toggledStat.dev === parentStat.dev && toggledStat.ino === parentStat.ino } catch { return false }
       }
       return false
     }
@@ -28,18 +33,8 @@ native_check_path_identity() {
       const absolute = resolve(target)
       if (seen.has(absolute)) throw new Error("path contains a symbolic-link cycle")
       seen.add(absolute)
-      try {
-        const stat = statSync(absolute, { bigint: true })
-        return `inode:${stat.dev}:${stat.ino}`
-      } catch (error) {
-        if (error?.code !== "ENOENT") throw error
-      }
-      try {
-        if (lstatSync(absolute).isSymbolicLink())
-          return identity(resolve(dirname(absolute), readlinkSync(absolute)), seen)
-      } catch (error) {
-        if (error?.code !== "ENOENT") throw error
-      }
+      try { const stat = statSync(absolute, { bigint: true }); return `inode:${stat.dev}:${stat.ino}` } catch (error) { if (error?.code !== "ENOENT") throw error }
+      try { if (lstatSync(absolute).isSymbolicLink()) return identity(resolve(dirname(absolute), readlinkSync(absolute)), seen) } catch (error) { if (error?.code !== "ENOENT") throw error }
       const parent = realpathSync.native(dirname(absolute))
       const parentStat = statSync(parent, { bigint: true })
       const name = basename(absolute).normalize("NFC")
@@ -65,9 +60,9 @@ native_check_init() {
     echo "native_check_init summary, JSONL, and diagnostics paths must differ" >&2
     return 2
   fi
-  : >"${NATIVE_CHECK_SUMMARY_FILE}"
-  : >"${NATIVE_CHECK_JSONL_FILE}"
-  : >"${NATIVE_CHECK_DIAGNOSTICS_FILE}"
+  : >"${NATIVE_CHECK_SUMMARY_FILE}" || return 1
+  : >"${NATIVE_CHECK_JSONL_FILE}" || return 1
+  : >"${NATIVE_CHECK_DIAGNOSTICS_FILE}" || return 1
 }
 
 native_check_classify() {
@@ -110,7 +105,7 @@ native_check_run() {
     if [ "${max_output_kib}" -eq 0 ]; then max_output_kib=1024; fi
     if [ "${max_output_kib}" -gt 10240 ]; then max_output_kib=10240; fi
   fi
-  capture="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/native-check-capture.mjs"
+  capture="$(native_check_harness_dir)/native-check-capture.mjs"
   if "$@" 2>&1 | node "${capture}" "$((max_output_kib * 1024))" >"${output}"; then
     pipeline=("${PIPESTATUS[@]}")
   else
@@ -133,9 +128,10 @@ native_check_run() {
     if [ "${lines}" -eq 0 ]; then lines=80; fi
     if [ "${lines}" -gt 1000 ]; then lines=1000; fi
   fi
-  {
-    printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "$((finished - started))"
-  } >>"${NATIVE_CHECK_SUMMARY_FILE}"
+  if ! printf '| %s | %s | %s | %ss |\n' "${name}" "${classification}" "${status}" "$((finished - started))" >>"${NATIVE_CHECK_SUMMARY_FILE}"; then
+    rm -f "${output}"
+    return 1
+  fi
   if [ "${status}" -ne 0 ]; then
     {
       printf '\n### %s (%s, exit %s)\n\n' "${name}" "${classification}" "${status}"

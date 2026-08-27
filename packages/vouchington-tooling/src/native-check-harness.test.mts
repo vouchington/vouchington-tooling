@@ -124,6 +124,23 @@ describe('native-check-harness', () => {
     }
   })
 
+  it.each(['summary', 'jsonl', 'diagnostics'])('propagates %s truncation failures', (target) => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, target === 'summary' ? 'summary' : 'summary.md')
+      const jsonl = join(directory, target === 'jsonl' ? 'jsonl' : 'summary.jsonl')
+      const diagnostics = `${summary}.diagnostics`
+      mkdirSync(target === 'diagnostics' ? diagnostics : target === 'summary' ? summary : jsonl)
+      const result = spawnSync('bash', [
+        '-c',
+        `source ${JSON.stringify(harness)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}`,
+      ])
+      expect(result.status).not.toBe(0)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
   it('rejects a diagnostics symlink that aliases the summary', () => {
     const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
     try {
@@ -154,6 +171,42 @@ describe('native-check-harness', () => {
         `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nrm -f ${JSON.stringify(jsonl)}\nmkdir ${JSON.stringify(jsonl)}\nstatus=0\nTMPDIR=${JSON.stringify(captures)} native_check_run pass -- bash -c 'exit 0' || status=$?\n[ "$status" -eq 1 ]\n[ -z "$(find ${JSON.stringify(captures)} -type f -name 'native-check-*' -print -quit)" ]\n`,
       )
       expect(spawnSync('bash', [script]).status).toBe(0)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('propagates summary-row append failures and removes temporary capture output', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      const captures = join(directory, 'captures')
+      const script = join(directory, 'run.sh')
+      mkdirSync(captures)
+      writeFileSync(
+        script,
+        `source ${JSON.stringify(harness)}\nnative_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}\nrm -f ${JSON.stringify(summary)}\nmkdir ${JSON.stringify(summary)}\nstatus=0\nTMPDIR=${JSON.stringify(captures)} native_check_run pass -- bash -c 'exit 0' || status=$?\n[ "$status" -eq 1 ]\n[ -z "$(find ${JSON.stringify(captures)} -type f -name 'native-check-*' -print -quit)" ]\n`,
+      )
+      expect(spawnSync('bash', [script]).status).toBe(0)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('locates the capture helper when sourced through a symlink', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-check-harness-'))
+    try {
+      const alias = join(directory, 'harness.sh')
+      const summary = join(directory, 'summary.md')
+      const jsonl = join(directory, 'summary.jsonl')
+      symlinkSync(harness, alias)
+      expect(
+        spawnSync('bash', [
+          '-c',
+          `source ${JSON.stringify(alias)}; native_check_init ${JSON.stringify(summary)} ${JSON.stringify(jsonl)}; native_check_run pass -- bash -c 'exit 0'`,
+        ]).status,
+      ).toBe(0)
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }
