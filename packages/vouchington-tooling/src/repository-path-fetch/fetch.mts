@@ -131,7 +131,7 @@ async function writeBlob(
   const content = Buffer.from(encoded, 'base64')
   if (
     content.toString('base64') !== encoded ||
-    gitBlobSha(content, entry.sha.length) !== entry.sha
+    gitBlobSha(content, entry.sha.length).toLowerCase() !== entry.sha.toLowerCase()
   ) {
     throw new Error(`blob integrity mismatch: ${entry.path}`)
   }

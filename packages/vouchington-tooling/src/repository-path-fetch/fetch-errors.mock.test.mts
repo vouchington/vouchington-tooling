@@ -230,6 +230,23 @@ describe('fetchRepositoryPaths failure boundaries', () => {
     }
   })
 
+  it('accepts an uppercase hexadecimal blob SHA', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
+    try {
+      const content = 'content'
+      const blob = gitBlobSha(content).toUpperCase()
+      mockApi(
+        { tree: [{ mode: '100644', path: 'source/file', sha: blob, type: 'blob' }] },
+        { content: Buffer.from(content).toString('base64'), encoding: 'base64' },
+      )
+      await expect(fetchRepositoryPaths(options(root))).resolves.toMatchObject({
+        files: [{ destination: 'target/file' }],
+      })
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('supports SHA-256 repositories and a source mapping that selects one file', async () => {
     const root = mkdtempSync(join(tmpdir(), 'repository-fetch-errors-'))
     try {
