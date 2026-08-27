@@ -9,10 +9,11 @@ export function codexMessageCounts(records: ParsedLine[]): [number, number] {
     const payload = asRecord(record.payload)
     if (record.type === 'response_item' && payload?.type === 'message') {
       if (payload.role === 'user') currentUser++
-      if (payload.role === 'assistant') currentAssistant++
+      else if (payload.role === 'assistant') currentAssistant++
+    } else if (record.type === 'event_msg') {
+      if (payload?.type === 'user_message') legacyUser++
+      else if (payload?.type === 'agent_message') legacyAssistant++
     }
-    if (record.type === 'event_msg' && payload?.type === 'user_message') legacyUser++
-    if (record.type === 'event_msg' && payload?.type === 'agent_message') legacyAssistant++
   }
   return [currentUser || legacyUser, currentAssistant || legacyAssistant]
 }
