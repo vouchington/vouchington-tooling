@@ -6,7 +6,7 @@ const current = (role: string): string =>
 const legacy = (type: string): string => JSON.stringify({ type: 'event_msg', payload: { type } })
 
 describe('Codex message pairing', () => {
-  it('counts unstructured messages while ignoring injection in any content block', () => {
+  it('counts unstructured and mixed-content user messages', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user' } }),
       JSON.stringify({
@@ -23,7 +23,7 @@ describe('Codex message pairing', () => {
       }),
     ])
 
-    expect(facts.userPrompts).toBe(1)
+    expect(facts.userPrompts).toBe(2)
   })
 
   it('keeps inverse schema orders as distinct messages', () => {
@@ -59,7 +59,12 @@ describe('Codex message pairing', () => {
       payload: {
         type: 'message',
         role: 'user',
-        content: [{ type: 'input_text', text: '<skill>injected</skill>' }],
+        content: [
+          {
+            type: 'input_text',
+            text: '<skill>\n<name>x</name>\n<path>/x</path>\nrules\n</skill>',
+          },
+        ],
       },
     })
     const user = computeTranscriptFacts([current('user'), injected, legacy('user_message')])

@@ -3,15 +3,31 @@ import { asRecord, type ParsedLine } from './shared.mts'
 type Role = 'user' | 'assistant'
 type Message = { role: Role; schema: 'current' | 'legacy' }
 
+function isInjectedBlock(raw: string): boolean {
+  const text = raw.trim()
+  const agents =
+    text.startsWith('# AGENTS.md instructions for ') &&
+    text.includes('\n<INSTRUCTIONS>') &&
+    text.endsWith('</INSTRUCTIONS>')
+  const environment =
+    text.startsWith('<environment_context>') &&
+    ['<cwd>', '<shell>', '<current_date>', '<timezone>', '<filesystem>'].every((tag) =>
+      text.includes(tag),
+    ) &&
+    text.endsWith('</environment_context>')
+  const skill =
+    text.startsWith('<skill>') &&
+    text.includes('\n<name>') &&
+    text.includes('\n<path>') &&
+    text.endsWith('</skill>')
+  return agents || environment || skill
+}
+
 function isInjectedUser(payload: ParsedLine): boolean {
-  if (!Array.isArray(payload.content)) return false
-  return payload.content.map(asRecord).some((item) => {
-    if (item?.type !== 'input_text' || typeof item.text !== 'string') return false
-    const text = item.text.trimStart()
+  if (!Array.isArray(payload.content) || payload.content.length === 0) return false
+  return payload.content.map(asRecord).every((item) => {
     return (
-      text.startsWith('# AGENTS.md instructions for ') ||
-      text.startsWith('<environment_context>') ||
-      text.startsWith('<skill>')
+      item?.type === 'input_text' && typeof item.text === 'string' && isInjectedBlock(item.text)
     )
   })
 }

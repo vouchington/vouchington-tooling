@@ -23,9 +23,15 @@ describe('hosted Codex transcripts', () => {
       message('developer'),
       message('system'),
       message('tool'),
-      message('user', '# AGENTS.md instructions for /workspace'),
-      message('user', '<environment_context>injected</environment_context>'),
-      message('user', '<skill>injected</skill>'),
+      message(
+        'user',
+        '# AGENTS.md instructions for /workspace\n<INSTRUCTIONS>rules</INSTRUCTIONS>',
+      ),
+      message(
+        'user',
+        '<environment_context><cwd>/workspace</cwd><shell>zsh</shell><current_date>2026-01-01</current_date><timezone>UTC</timezone><filesystem>restricted</filesystem></environment_context>',
+      ),
+      message('user', '<skill>\n<name>x</name>\n<path>/x</path>\nrules\n</skill>'),
       JSON.stringify({ type: 'response_item', payload: { type: 'reasoning', role: 'assistant' } }),
     ])
 
