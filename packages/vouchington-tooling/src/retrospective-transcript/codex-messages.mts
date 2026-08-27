@@ -28,6 +28,7 @@ function message(record: ParsedLine, payload: ParsedLine | undefined): Message |
 }
 
 function isDuplicate(previous: Message | undefined, current: Message): boolean {
+  // Hosted rollouts emit user duplicates current→legacy and assistant duplicates legacy→current.
   return (
     (current.role === 'user' && previous?.schema === 'current' && current.schema === 'legacy') ||
     (current.role === 'assistant' && previous?.schema === 'legacy' && current.schema === 'current')
@@ -46,10 +47,11 @@ export class CodexMessageCounter {
       current.role === 'user' &&
       payload !== undefined &&
       isInjectedUser(payload)
-    if (!current || injected) {
+    if (!current) {
       this.previous = undefined
       return
     }
+    if (injected) return
     if (this.previous?.role === current.role && isDuplicate(this.previous, current)) {
       this.previous = undefined
       return

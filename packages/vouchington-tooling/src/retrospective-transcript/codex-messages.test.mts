@@ -6,9 +6,21 @@ const current = (role: string): string =>
 const legacy = (type: string): string => JSON.stringify({ type: 'event_msg', payload: { type } })
 
 describe('Codex message pairing', () => {
-  it('counts current user messages without structured content', () => {
+  it('counts unstructured messages while ignoring injection in any content block', () => {
     const facts = computeTranscriptFacts([
       JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user' } }),
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role: 'user',
+          content: [
+            { type: 'image' },
+            { type: 'input_text', text: 'ordinary block' },
+            { type: 'input_text', text: '<environment_context>injected</environment_context>' },
+          ],
+        },
+      }),
     ])
 
     expect(facts.userPrompts).toBe(1)
@@ -39,5 +51,25 @@ describe('Codex message pairing', () => {
     ])
 
     expect(facts).toMatchObject({ userPrompts: 2, assistantResponses: 2, toolCalls: 1 })
+  })
+
+  it('keeps ignored injected records transparent to duplicate pairs', () => {
+    const injected = JSON.stringify({
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: '<skill>injected</skill>' }],
+      },
+    })
+    const user = computeTranscriptFacts([current('user'), injected, legacy('user_message')])
+    const assistant = computeTranscriptFacts([
+      legacy('agent_message'),
+      injected,
+      current('assistant'),
+    ])
+
+    expect(user.userPrompts).toBe(1)
+    expect(assistant).toMatchObject({ userPrompts: 0, assistantResponses: 1 })
   })
 })
