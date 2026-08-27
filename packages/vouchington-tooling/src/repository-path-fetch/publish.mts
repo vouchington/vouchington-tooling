@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { lstatSync, readFileSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
+import { writeMarkerAtomic } from './marker-write.mts'
 import {
   isOutputIdentity,
   moveAtomic,
@@ -90,9 +91,7 @@ export async function publishBundle(
   metadata: string,
   metadataDestination: string,
   move: (from: string, to: string) => Promise<void> = moveAtomic,
-  writeMarker: (path: string, contents: string) => Promise<void> = async (path, contents) => {
-    await writeFile(path, contents, { flag: 'wx', mode: 0o600 })
-  },
+  writeMarker: (path: string, contents: string) => Promise<void> = writeMarkerAtomic,
   removeMarker: (path: string) => Promise<void> = async (path) => {
     await rm(path, { force: true })
   },

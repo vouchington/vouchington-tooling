@@ -9,6 +9,10 @@ const cleanAction = readFileSync('.github/actions/clean-workspace/action.yml', '
 
 describe('repository path fetch action', () => {
   it('invokes the CLI with the locked contract and returns immutable metadata', () => {
+    expect(fetchAction).toContain(
+      'uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6',
+    )
+    expect(fetchAction).toContain('node-version: 24')
     expect(fetchAction).toContain('repository-path-fetch/cli.mts')
     expect(fetchAction).toContain('--config')
     expect(fetchAction).toContain('--destination')

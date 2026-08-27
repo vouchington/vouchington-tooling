@@ -343,6 +343,8 @@ describe('native-check-harness', () => {
       execFileSync('bash', [script])
       const published = readFileSync(summary, 'utf8')
       expect(published).toContain('## Check summary')
+      expect(published).toContain('| --- | --- | --- | --- |')
+      expect(published).not.toContain('| --- | --- | --- | --- | --- |')
       expect(published).toContain('| fail | failed | 9 |')
       expect(published).toContain('    diagnostic\n')
     } finally {

@@ -174,7 +174,7 @@ native_check_publish_summary() {
       local staged_summary
       staged_summary="$(mktemp "${destination}.publish.XXXXXX")"
       {
-        printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- | --- |\n'
+        printf '## Check summary\n\n| Check | Result | Exit | Duration |\n| --- | --- | --- | --- |\n'
         cat "${NATIVE_CHECK_SUMMARY_FILE}"
         cat "${NATIVE_CHECK_DIAGNOSTICS_FILE}"
       } >"${staged_summary}"
