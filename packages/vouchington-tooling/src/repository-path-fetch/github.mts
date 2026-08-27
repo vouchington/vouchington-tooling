@@ -52,7 +52,7 @@ export async function getGithubJson<T>(
 }
 
 function tokenContainsUnsafeCharacter(token: string): boolean {
-  if (/%0[ad]/i.test(token)) return true
+  if (/%[0-9a-f]{2}/i.test(token)) return true
   for (const character of token) {
     const code = character.codePointAt(0)!
     if (/\s/u.test(character) || code <= 31 || code === 127) return true

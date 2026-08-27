@@ -8,14 +8,20 @@ describe('getGithubJson', () => {
     const base64Bytes = Math.ceil((MAX_BLOB_BYTES * 4) / 3)
     expect(MAX_BLOB_RESPONSE_BYTES).toBeGreaterThan(base64Bytes + Math.ceil(base64Bytes / 60) * 2)
   })
-  it.each(['', 'token\n', 'token value', 'token\u0000', 'token%0d%0aheader', 'x'.repeat(1025)])(
-    'rejects unsafe token %j',
-    async (token) => {
-      await expect(getGithubJson(new URL('https://api.example/'), 'value', token)).rejects.toThrow(
-        'token contains whitespace or control characters',
-      )
-    },
-  )
+  it.each([
+    '',
+    'token\n',
+    'token value',
+    'token\u0000',
+    'token%0d%0aheader',
+    'token%01',
+    'token%7f',
+    'x'.repeat(1025),
+  ])('rejects unsafe token %j', async (token) => {
+    await expect(getGithubJson(new URL('https://api.example/'), 'value', token)).rejects.toThrow(
+      'token contains whitespace or control characters',
+    )
+  })
   it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects an invalid response limit: %s',
     async (limit) => {
