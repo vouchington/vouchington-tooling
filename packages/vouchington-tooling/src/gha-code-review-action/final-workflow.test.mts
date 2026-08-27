@@ -171,12 +171,11 @@ describe('CI final review fan-in', () => {
   it('recognizes REST and GraphQL dependency-bot identities', () => {
     const requestScript = requestReview.jobs?.['request-final-code-review']?.steps?.at(0)?.run ?? ''
     const selectScript = finalReview.jobs?.['select-final-review']?.steps?.at(0)?.run ?? ''
+    const botCasePattern =
+      /dependabot\|'dependabot\[bot\]'\|app\/dependabot\|renovate\|'renovate\[bot\]'\|app\/renovate/
 
     for (const script of [requestScript, selectScript]) {
-      expect(script).toContain('dependabot[bot]')
-      expect(script).toContain('app/dependabot')
-      expect(script).toContain('renovate[bot]')
-      expect(script).toContain('app/renovate')
+      expect(script).toMatch(botCasePattern)
     }
   })
 })
