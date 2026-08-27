@@ -5,15 +5,15 @@ type Message = { role: Role; schema: 'current' | 'legacy' }
 
 function isInjectedUser(payload: ParsedLine): boolean {
   if (!Array.isArray(payload.content)) return false
-  const first = payload.content
-    .map(asRecord)
-    .find((item) => item?.type === 'input_text' && typeof item.text === 'string')
-  const text = typeof first?.text === 'string' ? first.text.trimStart() : undefined
-  return (
-    text?.startsWith('# AGENTS.md instructions for ') === true ||
-    text?.startsWith('<environment_context>') === true ||
-    text?.startsWith('<skill>') === true
-  )
+  return payload.content.map(asRecord).some((item) => {
+    if (item?.type !== 'input_text' || typeof item.text !== 'string') return false
+    const text = item.text.trimStart()
+    return (
+      text.startsWith('# AGENTS.md instructions for ') ||
+      text.startsWith('<environment_context>') ||
+      text.startsWith('<skill>')
+    )
+  })
 }
 
 function message(record: ParsedLine, payload: ParsedLine | undefined): Message | undefined {
