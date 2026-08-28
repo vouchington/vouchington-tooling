@@ -89,6 +89,12 @@ function readLogContent(descriptor: number): string {
   return buffer.subarray(0, length).toString('utf8')
 }
 
+function nonEmptyLineCount(content: string): number {
+  let count = 0
+  for (const line of content.split('\n')) if (line.trim()) count++
+  return count
+}
+
 function validEventCount(content: string, limit: number): number {
   let count = 0
   for (const line of content.split('\n')) {
@@ -99,6 +105,12 @@ function validEventCount(content: string, limit: number): number {
     if (count >= limit) break
   }
   return count
+}
+
+// Valid events are a subset of raw lines, so a raw count under the limit proves the valid
+// count is too, without parsing every line on each observation.
+function atEventLimit(content: string, limit: number): boolean {
+  return nonEmptyLineCount(content) >= limit && validEventCount(content, limit) >= limit
 }
 
 export function recordFriction(
@@ -118,7 +130,7 @@ export function recordFriction(
       fchmodSync(descriptor, 0o600)
       if (!classified) return
       const content = readLogContent(descriptor)
-      if (validEventCount(content, maxEvents) >= maxEvents) return
+      if (atEventLimit(content, maxEvents)) return
       const event = {
         ...classified,
         commandPrefix: normalizeAuditText(classified.commandPrefix),
