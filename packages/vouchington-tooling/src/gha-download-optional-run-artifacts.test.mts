@@ -77,16 +77,38 @@ describe('download-optional-run-artifacts', () => {
     const result = runHelper({
       args: (temporaryDirectory) => [
         '--pattern',
-        'coverage-*',
+        '*',
         '--dir',
         join(temporaryDirectory, 'coverage-fallback'),
       ],
+      ghScript: '#!/bin/sh\n[ "$1" = api ] && exit 0\nexit 99\n',
     })
 
     expect(result.status).toBe(0)
     expect(result.stderr).toContain('[optional-run-artifacts] selection selector=pattern count=0')
     expect(result.stderr).toContain(
       '[optional-run-artifacts] result=unavailable selector=pattern exit=1',
+    )
+    expect(result.output).toBe('availability=unavailable\n')
+  })
+
+  it.each(['.', '..'])('rejects unsafe patterned artifact directory %s', (artifact) => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--pattern',
+        '*',
+        '--dir',
+        join(temporaryDirectory, 'coverage-fallback'),
+      ],
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then printf '%s\\n' '${artifact}'; exit 0; fi
+exit 99
+`,
+    })
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain(
+      '[optional-run-artifacts] result=unavailable selector=pattern exit=2',
     )
     expect(result.output).toBe('availability=unavailable\n')
   })

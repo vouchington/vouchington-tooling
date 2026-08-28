@@ -42,6 +42,7 @@ download_pattern() {
   artifacts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | .name') || return $?
   count=0
   while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
     # shellcheck disable=SC2254
     # selector is the caller's intended glob pattern.
     case "$artifact" in
@@ -49,7 +50,7 @@ download_pattern() {
       *) continue ;;
     esac
     case "$artifact" in
-      *[!A-Za-z0-9._-]*) return 2 ;;
+      .|..|*[!A-Za-z0-9._-]*) return 2 ;;
     esac
     count=$((count + 1))
     echo "[optional-run-artifacts] selected artifact=$artifact" >&2
@@ -59,10 +60,14 @@ EOF
   echo "[optional-run-artifacts] selection selector=pattern count=$count" >&2
   [ "$count" -gt 0 ] || return 1
   while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
     # shellcheck disable=SC2254
     case "$artifact" in
       $selector) ;;
       *) continue ;;
+    esac
+    case "$artifact" in
+      .|..|*[!A-Za-z0-9._-]*) return 2 ;;
     esac
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
     gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$destination/$artifact" || return $?
