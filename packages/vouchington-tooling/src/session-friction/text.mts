@@ -1,5 +1,6 @@
 const CONTROL_CHARACTERS = /\p{Cc}+/gu
-const MARKDOWN_CHARACTERS = /\\|`|\*|_|\[|\]|<|>/g
+const MARKDOWN_CHARACTER = /\\|`|\*|_|\[|\]|<|>/
+const MARKDOWN_AUDIT_MAX_LENGTH = 120
 
 export function normalizeAuditText(value: string): string {
   return value.replace(CONTROL_CHARACTERS, ' ').trim()
@@ -10,5 +11,11 @@ export function isSafeAuditText(value: unknown): value is string {
 }
 
 export function markdownAuditText(value: string): string {
-  return normalizeAuditText(value).replace(MARKDOWN_CHARACTERS, '\\$&').slice(0, 120)
+  let result = ''
+  for (const character of normalizeAuditText(value)) {
+    const escaped = MARKDOWN_CHARACTER.test(character) ? `\\${character}` : character
+    if (result.length + escaped.length > MARKDOWN_AUDIT_MAX_LENGTH) break
+    result += escaped
+  }
+  return result
 }
