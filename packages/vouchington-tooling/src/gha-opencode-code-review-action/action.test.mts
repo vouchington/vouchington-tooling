@@ -88,7 +88,7 @@ describe('opencode-code-review action', () => {
     expect(action.inputs?.timeout_seconds).toMatchObject({ default: '1500' })
     expect(review?.env?.TIMEOUT_SECONDS).toBe('${{ inputs.timeout_seconds }}')
     expect(review?.run).toContain('must be a positive integer')
-    expect(review?.run).toContain('run-with-timeout.sh "$TIMEOUT_SECONDS" 30')
+    expect(review?.run).toContain('run-with-timeout.sh" "$TIMEOUT_SECONDS" 30')
     expect(review?.['continue-on-error']).toBe(true)
   })
 
