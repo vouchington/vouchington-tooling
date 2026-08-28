@@ -3,6 +3,7 @@ import { buildCiFailuresSection, getConformingGroups } from './ci-failures.mts'
 import { buildSandboxSection } from './sandbox.mts'
 import type {
   FrictionLogOptions,
+  FrictionLogReadResult,
   JournalEntry,
   JournalLoadResult,
   SessionFrictionReport,
@@ -50,6 +51,12 @@ function errorMessage(error: unknown): string {
   }
 }
 
+function sandboxMarkdown(friction: FrictionLogReadResult): string {
+  if (friction.status === 'events') return buildSandboxSection(friction.events)
+  const status = friction.status === 'empty' ? 'none observed' : 'unavailable (no friction log)'
+  return `## Sandbox & Permission Audit\nStatus: ${status}`
+}
+
 function reportFromLog(
   sessionId: string,
   logOptions: FrictionLogOptions,
@@ -60,8 +67,7 @@ function reportFromLog(
   try {
     const friction = readFrictionLog(sessionId, logOptions)
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
-    if (friction.status !== 'events') return { markdown }
-    return { markdown: `${markdown}\n\n${buildSandboxSection(friction.events)}` }
+    return { markdown: `${markdown}\n\n${sandboxMarkdown(friction)}` }
   } catch (error) {
     const ciMarkdown =
       journal.status === 'ok' && journal.markdownBlocks.length === 0

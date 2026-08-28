@@ -149,7 +149,9 @@ describe('buildSessionFrictionReport', () => {
         journalLoader: async () => ({ status: 'not-found' }),
       }),
     ).resolves.toEqual({
-      markdown: '## CI Failures\nStatus: unavailable (no friction log for session missing)',
+      markdown:
+        '## CI Failures\nStatus: unavailable (no friction log for session missing)\n\n' +
+        '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
     })
     await expect(
       buildSessionFrictionReport('broken', {
@@ -159,7 +161,9 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toEqual({
-      markdown: '## CI Failures\nStatus: unavailable (blackboard unreachable)',
+      markdown:
+        '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
+        '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
       diagnostic: 'fetch failed',
     })
   })
@@ -176,6 +180,22 @@ describe('buildSessionFrictionReport', () => {
       }),
     })
     expect(report.markdown).toContain(conforming)
+  })
+
+  it('renders sandbox evidence status independently of CI failures', async () => {
+    const directory = await makeDirectory()
+    const options = {
+      directory,
+      journalLoader: () => ({
+        status: 'ok' as const,
+        entries: [{ data: { type: 'journal' as const, markdown: conforming } }],
+      }),
+    }
+    const absent = await buildSessionFrictionReport('independent', options)
+    expect(absent.markdown).toContain('Status: unavailable (no friction log)')
+    recordFriction('independent', { type: 'tool-result', command: 'echo ok' }, { directory })
+    const observed = await buildSessionFrictionReport('independent', options)
+    expect(observed.markdown).toContain('## Sandbox & Permission Audit\nStatus: none observed')
   })
 
   it('bounds journal entries consumed from an iterable', async () => {
@@ -280,7 +300,11 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({ markdown: '## CI Failures\nStatus: none observed' })
+    ).resolves.toEqual({
+      markdown:
+        '## CI Failures\nStatus: none observed\n\n' +
+        '## Sandbox & Permission Audit\nStatus: none observed',
+    })
   })
 
   it('handles an unprintable thrown journal value without rejecting', async () => {
@@ -299,7 +323,9 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toEqual({
-      markdown: '## CI Failures\nStatus: unavailable (blackboard unreachable)',
+      markdown:
+        '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
+        '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
       diagnostic: '[unprintable error]',
     })
   })

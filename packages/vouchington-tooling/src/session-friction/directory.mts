@@ -46,7 +46,14 @@ export function ensurePrivateDirectory(directory: string, create: boolean): bool
     if (!status.isDirectory())
       throw new Error('session-friction log directory must be a private directory')
     if (created) chmodSync(path, PRIVATE_DIRECTORY_MODE)
-    if (!created && leaf && (status.mode & 0o777) !== PRIVATE_DIRECTORY_MODE)
+    const effectiveUserId = process.geteuid?.()
+    /* v8 ignore next -- foreign ownership requires another OS user. */
+    if (
+      !created &&
+      leaf &&
+      ((status.mode & 0o777) !== PRIVATE_DIRECTORY_MODE ||
+        (effectiveUserId !== undefined && status.uid !== effectiveUserId))
+    )
       throw new Error('session-friction log directory must be a private directory')
   }
   return true
