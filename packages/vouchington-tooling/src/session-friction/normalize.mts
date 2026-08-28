@@ -1,9 +1,10 @@
 const MAX_COMMAND_TOKEN_LENGTH = 40
+const MAX_COMMAND_LENGTH = 100_000
 const REDACTED_TOKEN = '[REDACTED]'
 const CREDENTIAL_OPTION = /^--?(?:api[-_]?key|auth|credential|password|secret|token)=/i
 const URL_USERINFO = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
-const PACKAGE_RUNNERS = new Set(['npx', 'pnpm', 'pnpx', 'yarn'])
+const PACKAGE_RUNNERS = new Set(['npm', 'npx', 'pnpm', 'pnpx', 'yarn'])
 const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
 const ENV_OPTIONS_WITH_ARGS = new Set(['-C', '--chdir', '-S', '--split-string', '-u', '--unset'])
 const ENV_OPTIONS_WITHOUT_ARGS = new Set([
@@ -131,6 +132,7 @@ function normalizeSegment(tokens: string[]): string {
 }
 
 export function normalizeCommandPrefix(command: string, wrappersToStrip: string[] = []): string {
+  if (command.length > MAX_COMMAND_LENGTH) return REDACTED_TOKEN
   const segments = splitCommand(command)
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++

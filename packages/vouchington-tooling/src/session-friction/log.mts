@@ -86,7 +86,7 @@ function readLogContent(descriptor: number): string {
   }
   /* v8 ignore next -- detects external growth after the descriptor size check. */
   if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
-  return buffer.subarray(0, length).toString('utf8')
+  return new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length))
 }
 
 function nonEmptyLineCount(content: string): number {

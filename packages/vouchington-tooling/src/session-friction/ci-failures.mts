@@ -16,11 +16,12 @@ const FIELD_PREFIXES = [
   '  - Disposition: ',
 ]
 
-function safeField(line: string): string {
+function safeField(line: string): string | null {
   const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))
   /* v8 ignore next -- matchBlock currently passes only fields with a known prefix. */
   if (!prefix) return markdownAuditText(line)
-  return `${prefix}${markdownAuditText(line.slice(prefix.length))}`
+  const value = markdownAuditText(line.slice(prefix.length))
+  return value ? `${prefix}${value}` : null
 }
 
 function matchBlock(markdown: string): string | null {
@@ -41,7 +42,8 @@ function matchBlock(markdown: string): string | null {
   ]
   if (fields.some((field) => field === null)) return null
   if (!lines.slice(index).every((line) => BLANK.test(line))) return null
-  return fields.map((field) => safeField(field!)).join('\n')
+  const safeFields = fields.map((field) => safeField(field!))
+  return safeFields.some((field) => field === null) ? null : safeFields.join('\n')
 }
 
 export function isConformingCiFailureBlock(markdown: string): boolean {

@@ -67,6 +67,15 @@ it('rejects a non-regular session log', async () => {
   ).toThrow(/regular file/)
 })
 
+it('rejects invalid UTF-8 in a session log', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('invalid-utf8', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  await writeFile(join(directory, file), Buffer.from([0x7b, 0x22, 0x80, 0x22, 0x7d]))
+  expect(() => readFrictionLog('invalid-utf8', options)).toThrow(/encoded data/)
+})
+
 it('rejects a multiply-linked session log without modifying its target', async () => {
   const directory = await temporaryDirectory()
   const outside = await temporaryDirectory()
@@ -149,6 +158,13 @@ it('does not recognize IPv6 loopback embedded in remote-looking tokens', () => {
         structuredStderr: `connect ECONNREFUSED ${hostname}:443`,
       }),
     ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node server',
+      structuredStderr: 'connect ECONNREFUSED ::1:3000',
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
 })
 
 it('bounds structured stderr inspection', () => {

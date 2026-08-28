@@ -152,7 +152,15 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       descriptor = openSync(lockPath, 'wx', 0o600)
     } catch (error) {
       if (!hasCode(error, 'EEXIST')) throw error
-      if (lstatSync(lockPath).isSymbolicLink())
+      /* v8 ignore next 7 -- detects ordinary lock release between O_EXCL and lstat. */
+      let lockStatus
+      try {
+        lockStatus = lstatSync(lockPath)
+      } catch (statusError) {
+        if (hasCode(statusError, 'ENOENT')) continue
+        throw statusError
+      }
+      if (lockStatus.isSymbolicLink())
         throw new Error('session-friction log lock must be a regular file')
       if (removeStaleLock(lockPath)) continue
       waitForLock()
