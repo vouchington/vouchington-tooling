@@ -236,7 +236,8 @@ from the journal loader when building a report, stopping earlier when its aggreg
 inspected-byte budget is reached. Log reads are capped at 2 MB, journal Markdown at
 10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
 is synchronous and may wait up to one second for a contended per-session file lock before failing
-explicitly.
+explicitly. Evidence-directory validation requires POSIX ownership and mode checks, so it fails
+closed on platforms without them.
 Command-prefix normalization is not a secret scrubber; callers must not include credentials in
 captured commands.
 

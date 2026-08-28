@@ -20,6 +20,8 @@ function directoryChain(directory: string): string[] {
 export function ensurePrivateDirectory(directory: string, create: boolean): boolean {
   const chain = directoryChain(directory)
   const effectiveUserId = process.geteuid?.()
+  if (effectiveUserId === undefined)
+    throw new Error('session-friction requires POSIX directory permissions')
   for (const [index, path] of chain.entries()) {
     let created = false
     let status
@@ -52,7 +54,7 @@ export function ensurePrivateDirectory(directory: string, create: boolean): bool
       throw new Error('session-friction log directory must be a private directory')
     if (created) chmodSync(path, PRIVATE_DIRECTORY_MODE)
     if (!created) {
-      const ownedByCaller = effectiveUserId === undefined || status.uid === effectiveUserId
+      const ownedByCaller = status.uid === effectiveUserId
       const ownedByRoot = status.uid === 0
       const writableByOthers = (status.mode & 0o022) !== 0
       const sticky = (status.mode & 0o1000) !== 0

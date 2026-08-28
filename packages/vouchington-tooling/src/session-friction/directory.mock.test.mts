@@ -19,6 +19,13 @@ vi.mock('node:fs', async () => {
 describe('ensurePrivateDirectory symlink ancestors', () => {
   afterEach(() => vi.clearAllMocks())
 
+  it('fails closed without POSIX ownership checks', () => {
+    vi.spyOn(process, 'geteuid').mockReturnValueOnce(undefined as never)
+    expect(() => ensurePrivateDirectory('/private/audit', false)).toThrow(
+      /POSIX directory permissions/,
+    )
+  })
+
   it('follows a root-owned symlink ancestor that resolves to a directory', () => {
     const effectiveUserId = process.geteuid ? process.geteuid() : 0
     const directory = (uid: number, mode: number) => ({
