@@ -58,6 +58,15 @@ download_exact() {
   artifact="$1"
   directory="$2"
   validate_artifact_name "$artifact" || return $?
+  artifacts=$(list_artifact_names) || return $?
+  found=0
+  while IFS= read -r candidate; do
+    if [ "$candidate" = "$artifact" ]; then
+      found=1
+      break
+    fi
+  done < <(printf '%s\n' "$artifacts")
+  [ "$found" -eq 1 ] || return 3
   echo "[optional-run-artifacts] attempt selector=$selector_type" >&2
   gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
 }
@@ -86,7 +95,7 @@ download_pattern() {
   done < <(printf '%s\n' "$artifacts")
   count=${#selected_artifacts[@]}
   echo "[optional-run-artifacts] selection selector=pattern count=$count" >&2
-  [ "$count" -gt 0 ] || return 1
+  [ "$count" -gt 0 ] || return 3
   for artifact in "${selected_artifacts[@]}"; do
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
     gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
@@ -104,12 +113,14 @@ if [ "$status" -eq 0 ]; then
 else
   case "$status" in
     130|143) exit "$status" ;;
-    2)
+    3)
+      echo 'availability=unavailable' >> "$GITHUB_OUTPUT"
+      echo "::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=$selector_type exit=$status)" >&2
+      echo "[optional-run-artifacts] result=unavailable selector=$selector_type exit=$status" >&2
+      ;;
+    *)
       echo "[optional-run-artifacts] result=error selector=$selector_type exit=$status" >&2
-      exit 2
+      exit "$status"
       ;;
   esac
-  echo 'availability=unavailable' >> "$GITHUB_OUTPUT"
-  echo "::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=$selector_type exit=$status)" >&2
-  echo "[optional-run-artifacts] result=unavailable selector=$selector_type exit=$status" >&2
 fi

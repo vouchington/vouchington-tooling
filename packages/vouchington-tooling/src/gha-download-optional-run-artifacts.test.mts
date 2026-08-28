@@ -31,7 +31,11 @@ function runHelper(options: RunOptions = {}) {
   const githubOutput = join(temporaryDirectory, 'github-output')
   const ghPath = join(binDirectory, 'gh')
   mkdirSync(binDirectory)
-  writeFileSync(ghPath, options.ghScript ?? '#!/bin/sh\nprintf "downloaded %s\\n" "$*"\n')
+  writeFileSync(
+    ghPath,
+    options.ghScript ??
+      '#!/bin/sh\nif [ "$1" = api ]; then echo transport-download-control; else printf "downloaded %s\\n" "$*"; fi\n',
+  )
   chmodSync(ghPath, 0o755)
   const args =
     typeof options.args === 'function'
@@ -75,6 +79,18 @@ describe('download-optional-run-artifacts', () => {
     expect(result.output).toBe('availability=available\n')
   })
 
+  it('reports an unavailable exact artifact only when the run does not contain it', () => {
+    const result = runHelper({
+      ghScript: '#!/bin/sh\nif [ "$1" = api ]; then echo another-artifact; exit 0; fi\nexit 99\n',
+    })
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain(
+      '[optional-run-artifacts] result=unavailable selector=name exit=3',
+    )
+    expect(result.output).toBe('availability=unavailable\n')
+  })
+
   it('reports an unavailable patterned same-run artifact when nothing matches', () => {
     const result = runHelper({
       args: (temporaryDirectory) => [
@@ -89,7 +105,7 @@ describe('download-optional-run-artifacts', () => {
     expect(result.status).toBe(0)
     expect(result.stderr).toContain('[optional-run-artifacts] selection selector=pattern count=0')
     expect(result.stderr).toContain(
-      '[optional-run-artifacts] result=unavailable selector=pattern exit=1',
+      '[optional-run-artifacts] result=unavailable selector=pattern exit=3',
     )
     expect(result.output).toBe('availability=unavailable\n')
   })
@@ -243,31 +259,35 @@ exit 1
 `,
     })
 
-    expect(result.status).toBe(0)
+    expect(result.status).toBe(1)
     expect(result.stderr).toContain('[optional-run-artifacts] selected artifact=coverage-tooling')
     expect(result.stderr).toContain('[optional-run-artifacts] selected artifact=coverage-web')
     expect(result.stderr).toContain('[optional-run-artifacts] selection selector=pattern count=2')
     expect(result.stderr).toContain('[optional-run-artifacts] attempt artifact=coverage-tooling')
     expect(result.stderr).not.toContain('[optional-run-artifacts] attempt artifact=coverage-web')
-    expect(result.output).toBe('availability=unavailable\n')
+    expect(result.output).toBe('')
   })
 
-  it('preserves the downloader diagnostic and normalizes expected unavailability', () => {
+  it('preserves the downloader diagnostic and rejects transport failures', () => {
     const result = runHelper({
-      ghScript: '#!/bin/sh\necho "Artifact not found" >&2\nexit 1\n',
+      ghScript:
+        '#!/bin/sh\nif [ "$1" = api ]; then echo transport-download-control; exit 0; fi\necho "download failed" >&2\nexit 1\n',
     })
 
-    expect(result.status).toBe(0)
-    expect(result.stderr).toContain('Artifact not found')
-    expect(result.stderr).toContain(
-      '::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=name exit=1)',
-    )
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('download failed')
+    expect(result.stderr).toContain('[optional-run-artifacts] result=error selector=name exit=1')
     expect(result.stderr).not.toContain('::error::')
-    expect(result.output).toBe('availability=unavailable\n')
+    expect(result.output).toBe('')
   })
 
   it.each([130, 143])('preserves cancellation exit code %i', (status) => {
-    const result = runHelper({ ghScript: `#!/bin/sh\nexit ${status}\n` })
+    const result = runHelper({
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then echo transport-download-control; exit 0; fi
+exit ${status}
+`,
+    })
 
     expect(result.status).toBe(status)
     expect(result.stderr).toContain('[optional-run-artifacts] attempt selector=name')
