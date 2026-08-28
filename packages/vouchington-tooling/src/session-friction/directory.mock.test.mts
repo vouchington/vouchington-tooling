@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ensurePrivateDirectory } from './directory.mts'
 
@@ -17,22 +17,38 @@ vi.mock('node:fs', async () => {
 })
 
 describe('ensurePrivateDirectory symlink ancestors', () => {
+  afterEach(() => vi.clearAllMocks())
+
   it('follows a root-owned symlink ancestor that resolves to a directory', () => {
-    const directory = () => ({ isDirectory: () => true, isSymbolicLink: () => false })
     const effectiveUserId = process.geteuid ? process.geteuid() : 0
+    const directory = (uid: number, mode: number) => ({
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+      mode,
+      uid,
+    })
     mocks.lstat
-      .mockReturnValueOnce(directory())
-      .mockReturnValueOnce(directory())
+      .mockReturnValueOnce(directory(0, 0o755))
+      .mockReturnValueOnce(directory(effectiveUserId, 0o755))
       .mockReturnValueOnce({ isDirectory: () => false, isSymbolicLink: () => true, uid: 0 })
-      .mockReturnValueOnce({
-        isDirectory: () => true,
-        isSymbolicLink: () => false,
-        mode: 0o700,
-        uid: effectiveUserId,
-      })
-    mocks.stat.mockReturnValueOnce({ isDirectory: () => true })
+      .mockReturnValueOnce(directory(effectiveUserId, 0o700))
+    mocks.stat.mockReturnValueOnce(directory(0, 0o755))
 
     expect(ensurePrivateDirectory('/a/sym/leaf', false)).toBe(true)
     expect(mocks.stat).toHaveBeenCalledOnce()
+  })
+
+  it('rejects an untrusted writable ancestor', () => {
+    const effectiveUserId = process.geteuid ? process.geteuid() : 0
+    const directory = (uid: number, mode: number) => ({
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+      mode,
+      uid,
+    })
+    mocks.lstat
+      .mockReturnValueOnce(directory(0, 0o755))
+      .mockReturnValueOnce(directory(effectiveUserId, 0o777))
+    expect(() => ensurePrivateDirectory('/unsafe/leaf', false)).toThrow(/private directory/)
   })
 })

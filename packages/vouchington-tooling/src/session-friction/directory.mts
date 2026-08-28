@@ -19,6 +19,7 @@ function directoryChain(directory: string): string[] {
 
 export function ensurePrivateDirectory(directory: string, create: boolean): boolean {
   const chain = directoryChain(directory)
+  const effectiveUserId = process.geteuid?.()
   for (const [index, path] of chain.entries()) {
     let created = false
     let status
@@ -39,23 +40,25 @@ export function ensurePrivateDirectory(directory: string, create: boolean): bool
     }
     const leaf = index === chain.length - 1
     if (status.isSymbolicLink()) {
-      if (leaf || status.uid !== 0 || !statSync(path).isDirectory())
+      if (leaf || status.uid !== 0)
         throw new Error('session-friction log directory must be a private directory')
-      /* v8 ignore next -- root-owned ancestor symlinks are platform-specific. */
-      continue
+      status = statSync(path)
     }
     if (!status.isDirectory())
       throw new Error('session-friction log directory must be a private directory')
     if (created) chmodSync(path, PRIVATE_DIRECTORY_MODE)
-    const effectiveUserId = process.geteuid?.()
-    /* v8 ignore next -- foreign ownership requires another OS user. */
-    if (
-      !created &&
-      leaf &&
-      ((status.mode & 0o777) !== PRIVATE_DIRECTORY_MODE ||
-        (effectiveUserId !== undefined && status.uid !== effectiveUserId))
-    )
-      throw new Error('session-friction log directory must be a private directory')
+    if (!created) {
+      const ownedByCaller = effectiveUserId === undefined || status.uid === effectiveUserId
+      const ownedByRoot = status.uid === 0
+      const writableByOthers = (status.mode & 0o022) !== 0
+      const sticky = (status.mode & 0o1000) !== 0
+      if (
+        (leaf && ((status.mode & 0o777) !== PRIVATE_DIRECTORY_MODE || !ownedByCaller)) ||
+        (!leaf && !ownedByCaller && !ownedByRoot) ||
+        (!leaf && writableByOthers && !sticky)
+      )
+        throw new Error('session-friction log directory must be a private directory')
+    }
   }
   return true
 }

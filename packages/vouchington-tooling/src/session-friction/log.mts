@@ -121,10 +121,12 @@ export function recordFriction(
   const maxEvents = eventLimit(options.maxEvents)
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
-  ensurePrivateDirectory(requireDirectory(options.directory), true)
+  const directory = requireDirectory(options.directory)
+  ensurePrivateDirectory(directory, true)
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withFileLock(path, () => {
+    ensurePrivateDirectory(directory, true)
     const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)
     try {
       fchmodSync(descriptor, 0o600)
@@ -159,10 +161,12 @@ export function readFrictionLog(
   options: FrictionLogOptions,
 ): FrictionLogReadResult {
   const path = logPath(sessionId, options.directory)
-  if (!ensurePrivateDirectory(requireDirectory(options.directory), false))
-    return { status: 'absent' }
+  const directory = requireDirectory(options.directory)
+  if (!ensurePrivateDirectory(directory, false)) return { status: 'absent' }
   try {
     return withFileLock(path, () => {
+      /* v8 ignore next -- detects directory removal after acquiring the file lock. */
+      if (!ensurePrivateDirectory(directory, false)) return { status: 'absent' }
       const descriptor = openLogFile(path, constants.O_RDONLY)
       try {
         const events: FrictionEvent[] = []
