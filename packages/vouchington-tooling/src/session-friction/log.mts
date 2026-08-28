@@ -81,12 +81,6 @@ function readLogContent(descriptor: number): string {
   return decodeUtf8(buffer.subarray(0, length))
 }
 
-function nonEmptyLineCount(content: string): number {
-  let count = 0
-  for (const line of content.split('\n')) if (line.trim()) count++
-  return count
-}
-
 function validEventCount(content: string, limit: number): number {
   let count = 0
   for (const line of content.split('\n')) {
@@ -100,7 +94,7 @@ function validEventCount(content: string, limit: number): number {
 }
 
 function atEventLimit(content: string, limit: number): boolean {
-  return nonEmptyLineCount(content) >= limit && validEventCount(content, limit) >= limit
+  return validEventCount(content, limit) >= limit
 }
 
 function writeAll(descriptor: number, value: string): void {

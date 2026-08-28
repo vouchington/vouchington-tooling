@@ -1,7 +1,6 @@
 import {
   closeSync,
   constants,
-  existsSync,
   fstatSync,
   lstatSync,
   openSync,
@@ -151,7 +150,14 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
   const lockPath = `${path}.lock`
   const reaperPath = `${lockPath}.reap`
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
-    if (existsSync(reaperPath)) {
+    let reaperExists = false
+    try {
+      lstatSync(reaperPath)
+      reaperExists = true
+    } catch (error) {
+      if (!hasCode(error, 'ENOENT')) throw error
+    }
+    if (reaperExists) {
       if (removeOrphanedReaper(reaperPath)) continue
       waitForLock()
       continue
