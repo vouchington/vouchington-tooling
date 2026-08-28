@@ -1,5 +1,5 @@
 import { normalizeCommandPrefix } from './normalize.mts'
-import { normalizeAuditText } from './text.mts'
+import { boundedText, normalizeAuditText } from './text.mts'
 import type { FrictionEvent, FrictionObservation } from './types.mts'
 
 const FAILURE_TOKENS: [string, RegExp][] = [
@@ -20,17 +20,6 @@ const LOOPBACK_ADDRESSES = [
   /(?<![0-9a-z_.:\x5b\x5d-])(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?(?::\d{1,5})?(?![0-9a-z_.:\x5b\x5d-])/i,
 ]
 const DETAIL_MAX_LENGTH = 1_000
-
-function boundedText(value: string, maximum: number): string {
-  let end = Math.min(value.length, maximum)
-  if (
-    end < value.length &&
-    /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
-    /[\uDC00-\uDFFF]/.test(value[end]!)
-  )
-    end--
-  return value.slice(0, end)
-}
 
 function boundedStderr(value: string): string {
   if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
@@ -72,7 +61,7 @@ export function classifyFrictionObservation(
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
   if (
     stderr
-      .split(/\r\n|\r|\n/)
+      .split(/\r\n|[\r\n]/)
       .some(
         (line) =>
           CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line)),

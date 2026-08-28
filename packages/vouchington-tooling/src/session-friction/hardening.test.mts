@@ -257,4 +257,11 @@ it('preserves Unicode pairs in bounded details and rejects malformed runtime std
       command: 42,
     } as unknown as FrictionObservation),
   ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node server',
+      structuredStderr: 'ECONNREFUSED 10.0.0.5\runrelated localhost note',
+    }),
+  ).toBeNull()
 })

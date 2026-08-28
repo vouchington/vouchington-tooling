@@ -3,7 +3,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { classifyFrictionObservation } from './classify.mts'
 import { ensurePrivateDirectory } from './directory.mts'
 import { withFileLock } from './lock.mts'
-import { isSafeAuditText, normalizeAuditText } from './text.mts'
+import { boundedText, isSafeAuditText, normalizeAuditText } from './text.mts'
 import type {
   FrictionEvent,
   FrictionLogOptions,
@@ -17,20 +17,6 @@ export const FRICTION_LOG_MAX_EVENTS = 500
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
 
-function boundedAuditText(value: string): string {
-  return boundedText(value, EVENT_FIELD_MAX_LENGTH)
-}
-
-function boundedText(value: string, maximum: number): string {
-  let end = Math.min(value.length, maximum)
-  if (
-    end < value.length &&
-    /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
-    /[\uDC00-\uDFFF]/.test(value[end]!)
-  )
-    end--
-  return value.slice(0, end)
-}
 function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
   return resolve(directory)
@@ -157,8 +143,9 @@ export function recordFriction(
         commandPrefix: normalizeAuditText(classified.commandPrefix),
         detail: normalizeAuditText(classified.detail),
         timestamp:
-          boundedAuditText(normalizeAuditText(timestamp ?? new Date().toISOString())) ||
-          new Date().toISOString(),
+          normalizeAuditText(
+            boundedText(timestamp ?? new Date().toISOString(), EVENT_FIELD_MAX_LENGTH),
+          ) || new Date().toISOString(),
       }
       /* v8 ignore next -- normalized classified fields satisfy validEvent defensively. */
       if (!validEvent(event)) return

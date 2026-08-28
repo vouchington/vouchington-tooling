@@ -6,6 +6,17 @@ export function normalizeAuditText(value: string): string {
   return value.replace(CONTROL_CHARACTERS, ' ').trim()
 }
 
+export function boundedText(value: string, maximum: number): string {
+  let end = Math.min(value.length, maximum)
+  if (
+    end < value.length &&
+    /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
+    /[\uDC00-\uDFFF]/.test(value[end]!)
+  )
+    end--
+  return value.slice(0, end)
+}
+
 export function isSafeAuditText(value: unknown): value is string {
   return typeof value === 'string' && value !== '' && value === normalizeAuditText(value)
 }

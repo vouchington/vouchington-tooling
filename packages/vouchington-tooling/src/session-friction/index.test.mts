@@ -407,14 +407,14 @@ describe('friction log', () => {
     recordFriction(
       'private-log',
       { type: 'permission-request', command: 'git push' },
-      { directory: directoryPath, timestamp: 'x'.repeat(2_000) },
+      { directory: directoryPath, timestamp: `${'x'.repeat(999)}\ud83d\ude00` },
     )
     const [file] = await readdir(directoryPath)
     expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
     expect((await stat(join(directoryPath, file!))).mode & 0o777).toBe(0o600)
     const result = readFrictionLog('private-log', { directory: directoryPath })
     expect(result.status).toBe('events')
-    if (result.status === 'events') expect(result.events[0]?.timestamp).toHaveLength(1_000)
+    if (result.status === 'events') expect(result.events[0]?.timestamp).toHaveLength(999)
   })
 
   it('bounds log reads even when malformed data bypasses the event cap', async () => {
