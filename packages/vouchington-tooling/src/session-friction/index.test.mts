@@ -37,6 +37,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
     expect(normalizeCommandPrefix('git -- status')).toBe('git status')
     expect(normalizeCommandPrefix('rtk git status')).toBe('rtk git status')
+    expect(normalizeCommandPrefix(`${'rtk '.repeat(5_000)}git status`)).toBe('rtk git status')
+    expect(normalizeCommandPrefix('rtk rtk')).toBe('rtk')
     expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
     expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
   })
@@ -441,10 +443,19 @@ describe('friction log', () => {
     const path = join(directoryPath, file!)
     await writeFile(`${path}.lock`, '2147483647')
     vi.spyOn(process, 'kill').mockImplementationOnce(() => {
-      rmSync(path)
+      rmSync(directoryPath, { recursive: true })
       throw Object.assign(new Error('gone'), { code: 'ESRCH' })
     })
     expect(readFrictionLog('removed-log', options)).toEqual({ status: 'absent' })
+  })
+
+  it('waits while stale-lock reclamation is in progress', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('reaping', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, `${file}.lock.reap`), '')
+    expect(() => readFrictionLog('reaping', options)).toThrow(/could not acquire/)
   })
 
   it('supports callback and generated timestamps', async () => {

@@ -139,11 +139,12 @@ difference between an observed clean session and missing evidence. Report markdo
 diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
 truncates event detail to 1,000 characters, and consumes at most 500 entries from the journal loader
 when building a report. Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
-and rendered audit fields at 120 escaped characters. Evidence directories and files are tightened
-to owner-only permissions when recording. Command-prefix normalization recognizes simple shell
+and rendered audit fields at 120 escaped characters. The supplied log directory must be dedicated
+to session-friction; directories and files are enforced as owner-only when recording.
+Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
-grammar. Recording and report log reads are synchronous and may wait up to one second for a
-contended per-session file lock before failing explicitly.
+grammar. Recording and report log reads are synchronous: on contention they block the caller's
+event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -214,6 +214,22 @@ describe('buildSessionFrictionReport', () => {
     })
     expect(report.markdown).toContain('unavailable')
     expect(report.markdown).not.toContain('x'.repeat(1_000))
+  })
+
+  it('returns paste-safe output when the friction log is unreadable', async () => {
+    const directory = await makeDirectory()
+    recordFriction('oversized', { type: 'tool-result', command: 'echo ok' }, { directory })
+    const [file] = await readdir(directory)
+    await writeFile(join(directory, file!), 'x'.repeat(2_000_001))
+    await expect(
+      buildSessionFrictionReport('oversized', {
+        directory,
+        journalLoader: async () => ({ status: 'not-found' }),
+      }),
+    ).resolves.toEqual({
+      markdown: '## CI Failures\nStatus: unavailable (friction log unreadable)',
+      diagnostic: 'session-friction log is too large',
+    })
   })
 
   it('bounds bytes inspected from rejected journal markdown', async () => {

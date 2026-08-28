@@ -105,7 +105,6 @@ function packageRunner(token: string): boolean {
 function normalizeSegment(tokens: string[]): string {
   const [first, ...rest] = tokens
   if (!first) return ''
-  if (first === 'rtk' && rest.length) return `rtk ${normalizeSegment(stripAssignments(rest))}`
   if (packageRunner(first) && (rest[0] === 'run' || rest[0] === 'exec') && rest[1])
     return `${redact(first)} ${rest[0]} ${redact(rest[1])}`
   const effective = first === 'git' ? stripGitOptions(rest) : rest
@@ -116,5 +115,10 @@ export function normalizeCommandPrefix(command: string): string {
   const segments = splitCommand(command)
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
-  return normalizeSegment(stripAssignments(segments[index] ?? []))
+  const tokens = stripAssignments(segments[index] ?? [])
+  let wrappers = 0
+  while (tokens[wrappers] === 'rtk') wrappers++
+  if (!wrappers) return normalizeSegment(tokens)
+  const nested = normalizeSegment(stripAssignments(tokens.slice(wrappers)))
+  return nested ? `rtk ${nested}` : 'rtk'
 }

@@ -5,16 +5,14 @@ import {
   existsSync,
   mkdirSync,
   openSync,
-  readFileSync,
   readSync,
   statSync,
-  unlinkSync,
-  writeFileSync,
 } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { createHash } from 'node:crypto'
 
 import { classifyFrictionObservation } from './classify.mts'
+import { withFileLock } from './lock.mts'
 import { isSafeAuditText, normalizeAuditText } from './text.mts'
 import type {
   FrictionEvent,
@@ -25,11 +23,8 @@ import type {
 
 export const FRICTION_LOG_MAX_EVENTS = 500
 const SESSION_ID_MAX_LENGTH = 4096
-const LOCK_ATTEMPTS = 200
-const STALE_LOCK_AGE_MS = 30_000
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
-const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
@@ -87,55 +82,6 @@ function validEventCount(content: string, limit: number): number {
   return count
 }
 
-function removeStaleLock(lockPath: string): boolean {
-  try {
-    const fresh = Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS
-    const owner = Number(readFileSync(lockPath, 'utf8'))
-    if (Number.isInteger(owner) && owner > 0) {
-      try {
-        process.kill(owner, 0)
-        return false
-      } catch (error) {
-        if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH'))
-          return false
-        unlinkSync(lockPath)
-        return true
-      }
-    }
-    if (fresh) return false
-    unlinkSync(lockPath)
-    return true
-  } catch {
-    /* v8 ignore next -- a concurrently removed or unreadable lock is retried by the caller. */
-    return false
-  }
-}
-
-function withLogLock<Result>(path: string, action: () => Result): Result {
-  const lockPath = `${path}.lock`
-  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
-    let descriptor: number
-    try {
-      descriptor = openSync(lockPath, 'wx', 0o600)
-    } catch (error) {
-      if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST'))
-        /* v8 ignore next -- lock acquisition failures are platform errors that must propagate. */
-        throw error
-      if (removeStaleLock(lockPath)) continue
-      Atomics.wait(lockWait, 0, 0, 5)
-      continue
-    }
-    try {
-      writeFileSync(descriptor, String(process.pid))
-      return action()
-    } finally {
-      closeSync(descriptor)
-      unlinkSync(lockPath)
-    }
-  }
-  throw new Error('could not acquire session-friction log lock')
-}
-
 export function recordFriction(
   sessionId: string,
   observation: FrictionObservation,
@@ -146,16 +92,12 @@ export function recordFriction(
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)
   mkdirSync(directory, { mode: 0o700, recursive: true })
-  try {
-    chmodSync(directory, 0o700)
-  } catch {}
+  chmodSync(directory, 0o700)
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
-  withLogLock(path, () => {
+  withFileLock(path, () => {
     appendFileSync(path, '', { encoding: 'utf8', mode: 0o600 })
-    try {
-      chmodSync(path, 0o600)
-    } catch {}
+    chmodSync(path, 0o600)
     if (!classified) return
     const content = readLogContent(path)
     if (validEventCount(content, maxEvents) >= maxEvents) return
@@ -185,16 +127,22 @@ export function readFrictionLog(
 ): FrictionLogReadResult {
   const path = logPath(sessionId, options.directory)
   if (!existsSync(requireDirectory(options.directory))) return { status: 'absent' }
-  return withLogLock(path, () => {
-    if (!existsSync(path)) return { status: 'absent' }
-    const events: FrictionEvent[] = []
-    for (const line of readLogContent(path).split('\n')) {
-      if (!line.trim()) continue
-      try {
-        const value: unknown = JSON.parse(line)
-        if (validEvent(value)) events.push(value)
-      } catch {}
-    }
-    return events.length ? { status: 'events', events } : { status: 'empty' }
-  })
+  try {
+    return withFileLock(path, () => {
+      if (!existsSync(path)) return { status: 'absent' }
+      const events: FrictionEvent[] = []
+      for (const line of readLogContent(path).split('\n')) {
+        if (!line.trim()) continue
+        try {
+          const value: unknown = JSON.parse(line)
+          if (validEvent(value)) events.push(value)
+        } catch {}
+      }
+      return events.length ? { status: 'events', events } : { status: 'empty' }
+    })
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+      return { status: 'absent' }
+    throw error
+  }
 }
