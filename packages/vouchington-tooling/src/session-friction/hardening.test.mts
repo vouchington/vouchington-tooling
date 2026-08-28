@@ -121,7 +121,7 @@ it('does not follow a symbolic link while inspecting a lock owner', async () => 
   const target = join(outside, 'owner')
   await writeFile(target, '2147483647')
   await symlink(target, join(directory, `${file}.lock`))
-  expect(() => readFrictionLog('linked-lock', options)).toThrow(/could not acquire/)
+  expect(() => readFrictionLog('linked-lock', options)).toThrow(/lock must be a regular file/)
   expect(await readFile(target, 'utf8')).toBe('2147483647')
   await rm(join(directory, `${file}.lock`))
   await writeFile(join(directory, `${file}.lock`), 'x'.repeat(33))
