@@ -85,7 +85,7 @@ describe('opencode-code-review action', () => {
 
   it('bounds and validates the OpenCode process before payload cleanup', () => {
     const review = stepByName.get('Run OpenCode Review')
-    expect(action.inputs?.timeout_seconds).toMatchObject({ default: '1500' })
+    expect(action.inputs?.timeout_seconds).toMatchObject({ default: '1200' })
     expect(review?.env?.TIMEOUT_SECONDS).toBe('${{ inputs.timeout_seconds }}')
     expect(review?.run).toContain('must be a positive integer')
     expect(review?.run).toContain('run-with-timeout.sh" "$TIMEOUT_SECONDS" 30')

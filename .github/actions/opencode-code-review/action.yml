@@ -22,7 +22,7 @@ inputs:
   timeout_seconds:
     description: Maximum OpenCode runtime in seconds (1-1500); reserves job time for payload handoff and cleanup
     required: false
-    default: '1500'
+    default: '1200'
   payload_artifact_name:
     description: Unique suffix for the code-review-payload-* artifact
     required: true
