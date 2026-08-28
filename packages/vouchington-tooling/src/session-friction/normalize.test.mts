@@ -26,6 +26,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('[REDACTED] run')
     const wrapper = 'w'.repeat(80)
     expect(normalizeCommandPrefix(`${wrapper} git status`, [wrapper])).toBe('[REDACTED] git status')
+    expect(normalizeCommandPrefix('curl https://user:pass@example.test')).toBe('curl [REDACTED]')
+    expect(normalizeCommandPrefix('client --token=secret')).toBe('client [REDACTED]')
   })
 
   it('handles escaped quotes and strips env assignments', () => {

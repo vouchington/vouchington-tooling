@@ -1,5 +1,7 @@
 const MAX_COMMAND_TOKEN_LENGTH = 40
 const REDACTED_TOKEN = '[REDACTED]'
+const CREDENTIAL_OPTION = /^--?(?:api[-_]?key|auth|credential|password|secret|token)=/i
+const URL_USERINFO = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 const PACKAGE_RUNNERS = new Set(['npx', 'pnpm', 'pnpx', 'yarn'])
 const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
@@ -64,7 +66,11 @@ function splitCommand(command: string): string[][] {
 }
 
 function redact(token: string): string {
-  return token.length > MAX_COMMAND_TOKEN_LENGTH ? REDACTED_TOKEN : token
+  return token.length > MAX_COMMAND_TOKEN_LENGTH ||
+    CREDENTIAL_OPTION.test(token) ||
+    URL_USERINFO.test(token)
+    ? REDACTED_TOKEN
+    : token
 }
 
 function stripAssignments(tokens: string[]): string[] {

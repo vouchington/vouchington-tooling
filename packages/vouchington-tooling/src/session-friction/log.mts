@@ -107,10 +107,20 @@ function validEventCount(content: string, limit: number): number {
   return count
 }
 
-// Valid events are a subset of raw lines, so a raw count under the limit proves the valid
-// count is too, without parsing every line on each observation.
+// A raw line count under the limit proves the valid-event count is also under it.
 function atEventLimit(content: string, limit: number): boolean {
   return nonEmptyLineCount(content) >= limit && validEventCount(content, limit) >= limit
+}
+
+function writeAll(descriptor: number, value: string): void {
+  const buffer = Buffer.from(value)
+  let offset = 0
+  while (offset < buffer.length) {
+    const written = writeSync(descriptor, buffer, offset, buffer.length - offset)
+    /* v8 ignore next -- a zero-byte synchronous file write is an external I/O failure. */
+    if (written === 0) throw new Error('session-friction log write made no progress')
+    offset += written
+  }
 }
 
 export function recordFriction(
@@ -149,7 +159,7 @@ export function recordFriction(
       const addition = `${prefix}${JSON.stringify(event)}\n`
       if (fstatSync(descriptor).size + Buffer.byteLength(addition) > LOG_MAX_BYTES)
         throw new Error('session-friction log is too large')
-      writeSync(descriptor, addition)
+      writeAll(descriptor, addition)
     } finally {
       closeSync(descriptor)
     }

@@ -8,6 +8,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
   ['EPERM', /\bEPERM\b/i],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
+const STDERR_INSPECTION_MAX_LENGTH = 100_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
 const LOOPBACK_ADDRESS = new RegExp(
   String.raw`(?<![0-9a-z_.-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])|` +
@@ -37,7 +38,7 @@ export function classifyFrictionObservation(
       detail: escalationDetail,
     }
   }
-  const stderr = observation.structuredStderr
+  const stderr = observation.structuredStderr?.slice(0, STDERR_INSPECTION_MAX_LENGTH)
   if (stderr === undefined) return null
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }

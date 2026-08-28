@@ -89,3 +89,13 @@ it('requires loopback hostnames to end at a hostname boundary', () => {
       }),
     ).toBeNull()
 })
+
+it('bounds structured stderr inspection', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(100_000)} EPERM`,
+    }),
+  ).toBeNull()
+})
