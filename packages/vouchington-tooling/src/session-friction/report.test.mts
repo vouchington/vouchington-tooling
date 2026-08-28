@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildSessionFrictionReport, isConformingCiFailureBlock, recordFriction } from './index.mts'
+import { buildSandboxSection } from './sandbox.mts'
 
 const directories: string[] = []
 const conforming = [
@@ -36,6 +37,19 @@ describe('CI failure grammar', () => {
 })
 
 describe('buildSessionFrictionReport', () => {
+  it('omits sandbox event kinds with no events', () => {
+    const section = buildSandboxSection([
+      {
+        kind: 'sandbox-escalation',
+        commandPrefix: 'git push',
+        detail: 'permission-request',
+        timestamp: '1',
+      },
+    ])
+    expect(section).toContain('sandbox-escalation (1)')
+    expect(section).not.toContain('sandbox-failure')
+  })
+
   it('renders journal failures and deterministic sandbox events', async () => {
     const directory = await makeDirectory()
     recordFriction(
