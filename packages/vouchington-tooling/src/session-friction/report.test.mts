@@ -35,6 +35,8 @@ describe('CI failure grammar', () => {
     expect(isConformingCiFailureBlock(`${conforming}\nextra`)).toBe(false)
     expect(isConformingCiFailureBlock(conforming.split('\n').slice(0, 2).join('\n'))).toBe(false)
     expect(isConformingCiFailureBlock(`${conforming} `)).toBe(false)
+    expect(isConformingCiFailureBlock(`${conforming}${'x'.repeat(10_000)}`)).toBe(false)
+    expect(isConformingCiFailureBlock(`${conforming}${'é'.repeat(5_000)}`)).toBe(false)
     expect(
       getConformingGroups([
         {
@@ -68,6 +70,25 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).rejects.toThrow(/non-empty/)
+    expect(loaded).toBe(false)
+  })
+
+  it('validates log options before invoking the journal loader', async () => {
+    let loaded = false
+    const journalLoader = () => {
+      loaded = true
+      return { status: 'not-found' as const }
+    }
+    await expect(
+      buildSessionFrictionReport('session', { directory: 'relative', journalLoader }),
+    ).rejects.toThrow(/absolute/)
+    await expect(
+      buildSessionFrictionReport('session', {
+        directory: await makeDirectory(),
+        journalLoader,
+        maxEvents: 0,
+      }),
+    ).rejects.toThrow(/positive integer/)
     expect(loaded).toBe(false)
   })
 

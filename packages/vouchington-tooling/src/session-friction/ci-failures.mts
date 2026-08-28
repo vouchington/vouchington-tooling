@@ -8,6 +8,7 @@ const DISPOSITION = /^ {2}- Disposition: .*[^\s]$/
 const BLANK = /^\s*$/
 
 const CI_FAILURES_HEADER = '## CI Failures'
+const CI_FAILURE_BLOCK_MAX_BYTES = 10_000
 const FIELD_PREFIXES = [
   '- `recurring` — `GitHub Actions` — ',
   '- `one-off` — `GitHub Actions` — ',
@@ -48,6 +49,11 @@ function matchBlock(markdown: string): string | null {
 }
 
 export function isConformingCiFailureBlock(markdown: string): boolean {
+  if (
+    markdown.length > CI_FAILURE_BLOCK_MAX_BYTES ||
+    Buffer.byteLength(markdown) > CI_FAILURE_BLOCK_MAX_BYTES
+  )
+    return false
   return matchBlock(markdown) !== null
 }
 

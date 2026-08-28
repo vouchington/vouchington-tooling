@@ -1,4 +1,4 @@
-import { readFrictionLog } from './log.mts'
+import { eventLimit, readFrictionLog, requireDirectory } from './log.mts'
 import { buildCiFailuresSection, getConformingGroups } from './ci-failures.mts'
 import { buildSandboxSection } from './sandbox.mts'
 import { validateSessionId } from './session-id.mts'
@@ -98,6 +98,8 @@ export async function buildSessionFrictionReport(
   options: SessionFrictionReportOptions,
 ): Promise<SessionFrictionReport> {
   validateSessionId(sessionId)
+  requireDirectory(options.directory)
+  eventLimit(options.maxEvents)
   let journal:
     | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string }

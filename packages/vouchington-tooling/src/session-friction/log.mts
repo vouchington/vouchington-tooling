@@ -17,12 +17,12 @@ export const FRICTION_LOG_MAX_EVENTS = 500
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
 
-function requireDirectory(directory: string): string {
+export function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
   return resolve(directory)
 }
 
-function eventLimit(maxEvents: number | undefined): number {
+export function eventLimit(maxEvents: number | undefined): number {
   const limit = maxEvents ?? FRICTION_LOG_MAX_EVENTS
   if (!Number.isInteger(limit) || limit < 1) throw new Error('maxEvents must be a positive integer')
   return Math.min(limit, FRICTION_LOG_MAX_EVENTS)
