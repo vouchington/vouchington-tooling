@@ -156,7 +156,14 @@ it('bounds structured stderr inspection', () => {
     classifyFrictionObservation({
       type: 'tool-result',
       command: 'node test',
-      structuredStderr: `${'x'.repeat(100_000)} EPERM`,
+      structuredStderr: `${'x'.repeat(50_000)} EPERM ${'x'.repeat(50_000)}`,
     }),
   ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(100_000)} EPERM`,
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' })
 })

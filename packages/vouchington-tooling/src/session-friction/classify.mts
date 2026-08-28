@@ -24,6 +24,12 @@ function boundedDetail(value: string): string {
   return value.slice(0, DETAIL_MAX_LENGTH)
 }
 
+function boundedStderr(value: string): string {
+  if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
+  const half = STDERR_INSPECTION_MAX_LENGTH / 2
+  return `${value.slice(0, half)}\n${value.slice(-half)}`
+}
+
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
@@ -41,7 +47,9 @@ export function classifyFrictionObservation(
       detail: escalationDetail,
     }
   }
-  const stderr = observation.structuredStderr?.slice(0, STDERR_INSPECTION_MAX_LENGTH)
+  const stderr = observation.structuredStderr
+    ? boundedStderr(observation.structuredStderr)
+    : observation.structuredStderr
   if (stderr === undefined) return null
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
