@@ -224,11 +224,13 @@ describe('buildSessionFrictionReport', () => {
     await expect(
       buildSessionFrictionReport('oversized', {
         directory,
-        journalLoader: async () => ({ status: 'not-found' }),
+        journalLoader: async () => {
+          throw new Error('journal unavailable')
+        },
       }),
     ).resolves.toEqual({
       markdown: '## CI Failures\nStatus: unavailable (friction log unreadable)',
-      diagnostic: 'session-friction log is too large',
+      diagnostic: 'journal unavailable; session-friction log is too large',
     })
   })
 

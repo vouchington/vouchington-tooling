@@ -79,6 +79,13 @@ describe('classifyFrictionObservation', () => {
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'node test',
+        structuredStderr: 'ECONNREFUSED 127.999.0.1',
+      }),
+    ).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'node test',
         structuredStderr: 'connect ECONNREFUSED [::1]:5432',
       }),
     ).toMatchObject({ kind: 'sandbox-failure' })
