@@ -31,9 +31,23 @@ done
 [ -n "${GITHUB_REPOSITORY:-}" ] || { echo 'GITHUB_REPOSITORY must be set' >&2; exit 2; }
 [ -n "${GITHUB_RUN_ID:-}" ] || { echo 'GITHUB_RUN_ID must be set' >&2; exit 2; }
 
+validate_artifact_name() {
+  case "$1" in
+    ''|.|..)
+      echo '[optional-run-artifacts] invalid artifact name' >&2
+      return 2
+      ;;
+    *[!A-Za-z0-9._-]*)
+      echo '[optional-run-artifacts] unsafe characters in artifact name' >&2
+      return 2
+      ;;
+  esac
+}
+
 download_exact() {
   artifact="$1"
   directory="$2"
+  validate_artifact_name "$artifact" || return $?
   echo "[optional-run-artifacts] attempt selector=$selector_type" >&2
   gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$directory"
 }
@@ -49,9 +63,7 @@ download_pattern() {
       $selector) ;;
       *) continue ;;
     esac
-    case "$artifact" in
-      .|..|*[!A-Za-z0-9._-]*) return 2 ;;
-    esac
+    validate_artifact_name "$artifact" || return $?
     count=$((count + 1))
     echo "[optional-run-artifacts] selected artifact=$artifact" >&2
   done <<EOF
@@ -66,9 +78,7 @@ EOF
       $selector) ;;
       *) continue ;;
     esac
-    case "$artifact" in
-      .|..|*[!A-Za-z0-9._-]*) return 2 ;;
-    esac
+    validate_artifact_name "$artifact" || return $?
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
     gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$destination/$artifact" || return $?
   done <<EOF
@@ -87,6 +97,10 @@ if [ "$status" -eq 0 ]; then
 else
   case "$status" in
     130|143) exit "$status" ;;
+    2)
+      echo "[optional-run-artifacts] result=error selector=$selector_type exit=$status" >&2
+      exit 2
+      ;;
   esac
   echo 'availability=unavailable' >> "$GITHUB_OUTPUT"
   echo "::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=$selector_type exit=$status)" >&2

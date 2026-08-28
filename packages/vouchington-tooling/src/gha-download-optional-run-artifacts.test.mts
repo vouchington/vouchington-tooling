@@ -106,11 +106,25 @@ exit 99
 `,
     })
 
-    expect(result.status).toBe(0)
-    expect(result.stderr).toContain(
-      '[optional-run-artifacts] result=unavailable selector=pattern exit=2',
-    )
-    expect(result.output).toBe('availability=unavailable\n')
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('[optional-run-artifacts] result=error selector=pattern exit=2')
+    expect(result.output).toBe('')
+  })
+
+  it.each(['.', '..', 'nested/name'])('rejects unsafe exact artifact name %s', (artifact) => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--name',
+        artifact,
+        '--dir',
+        join(temporaryDirectory, 'coverage-control'),
+      ],
+    })
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('[optional-run-artifacts] result=error selector=name exit=2')
+    expect(result.stdout).toBe('')
+    expect(result.output).toBe('')
   })
 
   it('preserves each patterned artifact under its artifact-name directory', () => {
