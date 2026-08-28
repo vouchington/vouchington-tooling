@@ -26,6 +26,7 @@ export type ScriptCommand =
   | 'gha-output'
   | 'gha-needs-results'
   | 'download-with-diagnostics'
+  | 'download-optional-run-artifacts'
   | 'host-pressure-diagnostics'
   | 'allocate-browser-safe-ports'
   | 'diagnose-port-collision'
@@ -46,6 +47,7 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
   'gha-needs-results',
   'download-with-diagnostics',
+  'download-optional-run-artifacts',
   'host-pressure-diagnostics',
   'allocate-browser-safe-ports',
   'diagnose-port-collision',

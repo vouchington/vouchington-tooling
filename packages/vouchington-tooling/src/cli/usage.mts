@@ -7,6 +7,7 @@ Commands:
   gha-output                    Write a collision-safe multiline GITHUB_OUTPUT record
   gha-needs-results             Fail if required GitHub Actions job results failed
   download-with-diagnostics     Download a URL and report HTTP status on failure
+  download-optional-run-artifacts  Download optional artifacts from the current run
   host-pressure-diagnostics     Print a bounded host memory/OOM/PSI snapshot
   allocate-browser-safe-ports   Allocate Fetch-safe localhost ports
   diagnose-port-collision       Capture bounded localhost port diagnostics
@@ -59,6 +60,7 @@ gha-runtime-audit
 gha-output <name>
 gha-needs-results [label]
 download-with-diagnostics <url> <destination> [-- curl-args...]
+download-optional-run-artifacts (--name <name> | --pattern <pattern>) --dir <directory>
 host-pressure-diagnostics
 allocate-browser-safe-ports [count] [--policy path] [--forbidden-ports path]
 diagnose-port-collision [--ports "2200 2216"] [--output-dir PATH]

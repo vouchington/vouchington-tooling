@@ -20,6 +20,7 @@ vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\
 vouchington gha-output name
 vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
+vouchington download-optional-run-artifacts --pattern 'coverage-*' --dir ./coverage-fallback
 vouchington host-pressure-diagnostics
 vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-ports ./ports.json
 vouchington diagnose-port-collision --ports "2200 2216"
@@ -45,6 +46,11 @@ vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
+
+`download-optional-run-artifacts` uses the current Actions run and host. Pattern mode discovers
+non-expired artifacts across the run, keeps the first result for each name (matching `gh run
+download`), and extracts each selected name into its own directory. Ordinary absence is reported as
+`availability=unavailable`; invalid names and cancellation remain hard failures.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
