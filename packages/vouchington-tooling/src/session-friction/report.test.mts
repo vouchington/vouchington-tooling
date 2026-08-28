@@ -48,6 +48,11 @@ describe('CI failure grammar', () => {
       ])[0],
     ).toContain('\\~\\~hidden\\~\\~')
     expect(
+      getConformingGroups([
+        { data: { type: 'journal', markdown: conforming.replace('cache corruption', '&nbsp;') } },
+      ])[0],
+    ).toContain('\\&nbsp;')
+    expect(
       isConformingCiFailureBlock(
         conforming.replace('build cache failure', '\u202e').replace('CI run 123 failed', '\u202e'),
       ),

@@ -29,7 +29,10 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('[REDACTED]')
     expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('[REDACTED] run')
     const wrapper = 'w'.repeat(80)
-    expect(normalizeCommandPrefix(`${wrapper} git status`, [wrapper])).toBe('[REDACTED] git status')
+    expect(normalizeCommandPrefix(`${wrapper} git status`, [wrapper])).toBe('[REDACTED] git')
+    expect(normalizeCommandPrefix('rtk git status', Array(20).fill('other').concat('rtk'))).toBe(
+      'rtk git',
+    )
     expect(normalizeCommandPrefix('curl https://user:pass@example.test')).toBe('curl [REDACTED]')
     expect(normalizeCommandPrefix('client --token=secret')).toBe('client [REDACTED]')
     expect(normalizeCommandPrefix('npm run build')).toBe('npm run build')

@@ -14,6 +14,7 @@ import { basename } from 'node:path'
 const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
 const LOCK_OWNER_MAX_BYTES = 32
+const MAX_PID = 2_147_483_647
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function waitForLock(): void {
@@ -119,7 +120,7 @@ function removeStaleLock(lockPath: string): boolean {
       if (!inspected) return false
       const fresh = isFresh(inspected.mtimeMs)
       const { owner } = inspected
-      if (typeof owner === 'number' && Number.isInteger(owner) && owner > 0) {
+      if (typeof owner === 'number' && Number.isInteger(owner) && owner > 0 && owner <= MAX_PID) {
         try {
           process.kill(owner, 0)
           return false

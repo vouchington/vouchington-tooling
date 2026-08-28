@@ -1,5 +1,6 @@
 const MAX_COMMAND_TOKEN_LENGTH = 40
 const MAX_COMMAND_LENGTH = 100_000
+const MAX_COMMAND_WRAPPERS = 16
 const REDACTED_TOKEN = '[REDACTED]'
 const CREDENTIAL_OPTION = /^--?(?:api[-_]?key|auth|credential|password|secret|token)=/i
 const URL_USERINFO = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i
@@ -140,7 +141,14 @@ export function normalizeCommandPrefix(command: string, wrappersToStrip: string[
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
   const tokens = stripAssignments(segments[index] ?? [])
-  const wrapperNames = new Set(wrappersToStrip.filter(Boolean))
+  const wrapperNames = new Set(
+    wrappersToStrip
+      .slice(0, MAX_COMMAND_WRAPPERS)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0 && value.length <= MAX_COMMAND_TOKEN_LENGTH,
+      ),
+  )
   let wrappers = 0
   while (tokens[wrappers] && wrapperNames.has(tokens[wrappers]!)) wrappers++
   if (!wrappers) return normalizeSegment(tokens)
