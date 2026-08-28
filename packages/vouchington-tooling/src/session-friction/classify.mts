@@ -23,8 +23,9 @@ const DETAIL_MAX_LENGTH = 1_000
 
 function boundedStderr(value: string): string {
   if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
-  const half = STDERR_INSPECTION_MAX_LENGTH / 2
-  return `${value.slice(0, half)}\n${value.slice(-half)}`
+  const headLength = Math.floor((STDERR_INSPECTION_MAX_LENGTH - 1) / 2)
+  const tailLength = STDERR_INSPECTION_MAX_LENGTH - 1 - headLength
+  return `${value.slice(0, headLength)}\n${value.slice(-tailLength)}`
 }
 
 export function classifyFrictionObservation(

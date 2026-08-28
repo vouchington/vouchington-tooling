@@ -235,9 +235,9 @@ events per session, truncates event detail to 1,000 characters, and consumes up 
 from the journal loader when building a report, stopping earlier when its aggregate 1 MB
 inspected-byte budget is reached. Log reads are capped at 2 MB, journal Markdown at
 10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
-is synchronous and may wait up to one second for a contended per-session file lock before failing
-explicitly. Evidence-directory validation requires POSIX ownership and mode checks, so it fails
-closed on platforms without them.
+and report construction synchronously access the evidence log and may wait up to one second for a
+contended per-session file lock before failing explicitly. Evidence-directory validation requires
+POSIX ownership and mode checks, so it fails closed on platforms without them.
 Command-prefix normalization is not a secret scrubber; callers must not include credentials in
 captured commands.
 
