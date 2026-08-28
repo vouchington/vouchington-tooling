@@ -1,0 +1,45 @@
+import { describe, expect, it } from 'vitest'
+
+import { normalizeCommandPrefix } from './index.mts'
+
+describe('normalizeCommandPrefix', () => {
+  it('normalizes compound commands, runners, assignments, and git options', () => {
+    expect(normalizeCommandPrefix('cd /private/path && CI=1 pnpm exec vitest run')).toBe(
+      'pnpm exec vitest',
+    )
+    expect(normalizeCommandPrefix('git -C /private/path push origin main')).toBe('git push')
+    expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
+    expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
+    expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
+    expect(normalizeCommandPrefix('git -- status')).toBe('git status')
+    expect(normalizeCommandPrefix('rtk git status')).toBe('rtk git status')
+    expect(normalizeCommandPrefix(`${'rtk '.repeat(5_000)}git status`)).toBe('rtk git status')
+    expect(normalizeCommandPrefix('rtk rtk')).toBe('rtk')
+    expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
+    expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
+  })
+
+  it('redacts overlong tokens in the report-safe prefix', () => {
+    expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('[REDACTED] run')
+  })
+
+  it('handles escaped quotes and strips env assignments', () => {
+    expect(normalizeCommandPrefix('echo "hello \\"world\\"" && pnpm test')).toBe(
+      'echo hello "world"',
+    )
+    expect(normalizeCommandPrefix('env API_TOKEN=secret curl https://example.test')).toBe(
+      'curl https://example.test',
+    )
+    expect(normalizeCommandPrefix('env -i --ignore-environment API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('/usr/bin/env API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('rtk env API_TOKEN=secret curl')).toBe('rtk curl')
+    expect(normalizeCommandPrefix('env --chdir /tmp API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env --chd /tmp API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix("env --spl 'API_TOKEN=secret curl'")).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix('env --unknown secret curl')).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
+  })
+})

@@ -1,4 +1,4 @@
-const CONTROL_CHARACTERS = /\p{Cc}+/gu
+const CONTROL_CHARACTERS = /[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]+/gu
 const MARKDOWN_CHARACTER = /\\|`|\*|_|\[|\]|<|>/
 const MARKDOWN_AUDIT_MAX_LENGTH = 120
 

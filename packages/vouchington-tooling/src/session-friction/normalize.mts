@@ -1,9 +1,17 @@
 const MAX_COMMAND_TOKEN_LENGTH = 40
-const REDACTED_TOKEN = '…'
+const REDACTED_TOKEN = '[REDACTED]'
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 const PACKAGE_RUNNERS = new Set(['npx', 'pnpm', 'pnpx', 'yarn'])
 const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
 const ENV_OPTIONS_WITH_ARGS = new Set(['-C', '--chdir', '-S', '--split-string', '-u', '--unset'])
+const ENV_OPTIONS_WITHOUT_ARGS = new Set([
+  '-i',
+  '--ignore-environment',
+  '-0',
+  '--null',
+  '-v',
+  '--debug',
+])
 const GIT_OPTIONS_WITHOUT_ARGS = new Set([
   '-v',
   '--version',
@@ -72,14 +80,19 @@ function stripAssignments(tokens: string[]): string[] {
       index++
       break
     }
-    if (ENV_OPTIONS_WITH_ARGS.has(option)) {
-      index += 2
+    const optionName = option.split('=', 1)[0]!
+    const abbreviatedArgument =
+      optionName.length >= 5 &&
+      ['--chdir', '--split-string'].some((value) => value.startsWith(optionName))
+    if (ENV_OPTIONS_WITH_ARGS.has(optionName) || abbreviatedArgument) {
+      index += option.includes('=') ? 1 : 2
       continue
     }
-    if (option.startsWith('-')) {
+    if (ENV_OPTIONS_WITHOUT_ARGS.has(option)) {
       index++
       continue
     }
+    if (option.startsWith('-')) return [REDACTED_TOKEN]
     break
   }
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++

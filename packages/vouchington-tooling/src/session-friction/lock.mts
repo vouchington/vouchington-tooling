@@ -7,10 +7,16 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
+import { basename } from 'node:path'
 
 const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
+
+function waitForLock(): void {
+  // Intentional synchronous backoff; Node 24 supports Atomics.wait on its main thread.
+  Atomics.wait(lockWait, 0, 0, 5)
+}
 
 function hasCode(error: unknown, code: string): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === code)
@@ -63,7 +69,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
   const reaperPath = `${lockPath}.reap`
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
     if (existsSync(reaperPath)) {
-      Atomics.wait(lockWait, 0, 0, 5)
+      waitForLock()
       continue
     }
     let descriptor: number
@@ -72,7 +78,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
     } catch (error) {
       if (!hasCode(error, 'EEXIST')) throw error
       if (removeStaleLock(lockPath)) continue
-      Atomics.wait(lockWait, 0, 0, 5)
+      waitForLock()
       continue
     }
     try {
@@ -83,5 +89,5 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       unlinkSync(lockPath)
     }
   }
-  throw new Error('could not acquire session-friction log lock')
+  throw new Error(`could not acquire session-friction log lock for ${basename(path)}`)
 }

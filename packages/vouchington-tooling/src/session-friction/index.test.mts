@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   classifyFrictionObservation,
   FRICTION_LOG_MAX_EVENTS,
-  normalizeCommandPrefix,
   readFrictionLog,
   recordFriction,
 } from './index.mts'
@@ -24,45 +23,6 @@ afterEach(async () => {
   await Promise.all(
     directories.splice(0).map((value) => rm(value, { force: true, recursive: true })),
   )
-})
-
-describe('normalizeCommandPrefix', () => {
-  it('normalizes compound commands, runners, assignments, and git options', () => {
-    expect(normalizeCommandPrefix('cd /private/path && CI=1 pnpm exec vitest run')).toBe(
-      'pnpm exec vitest',
-    )
-    expect(normalizeCommandPrefix('git -C /private/path push origin main')).toBe('git push')
-    expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
-    expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
-    expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
-    expect(normalizeCommandPrefix('git -- status')).toBe('git status')
-    expect(normalizeCommandPrefix('rtk git status')).toBe('rtk git status')
-    expect(normalizeCommandPrefix(`${'rtk '.repeat(5_000)}git status`)).toBe('rtk git status')
-    expect(normalizeCommandPrefix('rtk rtk')).toBe('rtk')
-    expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
-    expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
-  })
-
-  it('redacts overlong tokens in the report-safe prefix', () => {
-    expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('…')
-    expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('… run')
-  })
-
-  it('handles escaped quotes and strips env assignments', () => {
-    expect(normalizeCommandPrefix('echo "hello \\"world\\"" && pnpm test')).toBe(
-      'echo hello "world"',
-    )
-    expect(normalizeCommandPrefix('env API_TOKEN=secret curl https://example.test')).toBe(
-      'curl https://example.test',
-    )
-    expect(normalizeCommandPrefix('env -i --ignore-environment API_TOKEN=secret curl')).toBe('curl')
-    expect(normalizeCommandPrefix('/usr/bin/env API_TOKEN=secret curl')).toBe('curl')
-    expect(normalizeCommandPrefix('rtk env API_TOKEN=secret curl')).toBe('rtk curl')
-    expect(normalizeCommandPrefix('env --chdir /tmp API_TOKEN=secret curl')).toBe('curl')
-    expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
-    expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('…')
-    expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
-  })
 })
 
 describe('classifyFrictionObservation', () => {
@@ -100,6 +60,13 @@ describe('classifyFrictionObservation', () => {
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'node test',
+        structuredStderr: 'ECONNREFUSED 127.0.0.2',
+      }),
+    ).toMatchObject({ kind: 'sandbox-failure' })
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'node test',
         structuredStderr: 'connect ECONNREFUSED [::1]:5432',
       }),
     ).toMatchObject({ kind: 'sandbox-failure' })
@@ -122,6 +89,13 @@ describe('classifyFrictionObservation', () => {
       detail: 'stderr matched "EPERM"',
     })
     expect(classifyFrictionObservation({ type: 'tool-result', command: 'rg EPERM' })).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'git push',
+        escalationDetail: 'safe\u202ereversed\u202c',
+      }),
+    ).toMatchObject({ detail: 'safe reversed' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',

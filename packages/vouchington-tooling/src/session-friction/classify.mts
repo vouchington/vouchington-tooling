@@ -9,7 +9,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
 const LOOPBACK_ADDRESS =
-  /\b(?:127\.0\.0\.1|localhost)\b|(?<![0-9a-f:])\[?(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\]?(?![0-9a-f:])/i
+  /\b(?:127(?:\.\d{1,3}){3}|localhost)\b|(?<![0-9a-f:])\[?(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\]?(?![0-9a-f:])/i
 const DETAIL_MAX_LENGTH = 1_000
 
 function boundedDetail(value: string): string {
