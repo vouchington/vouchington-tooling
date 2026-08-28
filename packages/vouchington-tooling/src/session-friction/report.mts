@@ -18,19 +18,21 @@ async function collectEntries(
 ): Promise<JournalEntry[]> {
   const result: JournalEntry[] = []
   let consumed = 0
-  let totalBytes = 0
+  let inspectedBytes = 0
+  let retainedBytes = 0
   for await (const entry of entries) {
     consumed++
     const data = (entry as JournalEntry | null)?.data
     const markdown = data?.markdown
     if (data?.type === 'journal' && typeof markdown === 'string') {
       const bytes = Buffer.byteLength(markdown)
-      if (bytes <= JOURNAL_MARKDOWN_MAX_BYTES && totalBytes + bytes <= JOURNAL_TOTAL_MAX_BYTES) {
+      inspectedBytes += bytes
+      if (bytes <= JOURNAL_MARKDOWN_MAX_BYTES && retainedBytes + bytes <= JOURNAL_TOTAL_MAX_BYTES) {
         result.push({ data: { type: 'journal', markdown } })
-        totalBytes += bytes
+        retainedBytes += bytes
       }
     }
-    if (consumed >= JOURNAL_ENTRY_MAX_COUNT || totalBytes >= JOURNAL_TOTAL_MAX_BYTES) break
+    if (consumed >= JOURNAL_ENTRY_MAX_COUNT || inspectedBytes >= JOURNAL_TOTAL_MAX_BYTES) break
   }
   return result
 }

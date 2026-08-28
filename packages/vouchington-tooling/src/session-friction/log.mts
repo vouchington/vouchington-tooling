@@ -92,7 +92,7 @@ function validEventCount(path: string, limit: number): number {
 function removeStaleLock(lockPath: string): boolean {
   try {
     const ageMs = Date.now() - statSync(lockPath).mtimeMs
-    const fresh = ageMs >= 0 && ageMs < STALE_LOCK_AGE_MS
+    const fresh = ageMs > -1_000 && ageMs < STALE_LOCK_AGE_MS
     const owner = Number(readFileSync(lockPath, 'utf8'))
     let ownerDead = false
     if (Number.isInteger(owner) && owner > 0) {
@@ -147,9 +147,10 @@ export function recordFriction(
   const maxEvents = eventLimit(options.maxEvents)
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
-  mkdirSync(requireDirectory(options.directory), { mode: 0o700, recursive: true })
+  const directory = requireDirectory(options.directory)
+  mkdirSync(directory, { mode: 0o700, recursive: true })
   try {
-    chmodSync(requireDirectory(options.directory), 0o700)
+    chmodSync(directory, statSync(directory).mode & 0o700)
   } catch {}
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp

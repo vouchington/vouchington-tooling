@@ -18,6 +18,7 @@ const FIELD_PREFIXES = [
 
 function safeField(line: string): string {
   const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))
+  /* v8 ignore next -- matchBlock currently passes only fields with a known prefix. */
   if (!prefix) return markdownAuditText(line)
   return `${prefix}${markdownAuditText(line.slice(prefix.length))}`
 }

@@ -216,6 +216,24 @@ describe('buildSessionFrictionReport', () => {
     expect(report.markdown).not.toContain('x'.repeat(1_000))
   })
 
+  it('bounds bytes inspected from rejected journal markdown', async () => {
+    const directory = await makeDirectory()
+    let consumed = 0
+    await buildSessionFrictionReport('s', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: (function* () {
+          while (true) {
+            consumed++
+            yield { data: { type: 'journal', markdown: 'x'.repeat(10_001) } }
+          }
+        })(),
+      }),
+    })
+    expect(consumed).toBe(100)
+  })
+
   it('reports observed-clean only when the friction log was touched', async () => {
     const directory = await makeDirectory()
     recordFriction('clean', { type: 'tool-result', command: 'echo ok' }, { directory })

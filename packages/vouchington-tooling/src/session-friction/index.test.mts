@@ -35,6 +35,7 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
     expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
     expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
+    expect(normalizeCommandPrefix('git -- status')).toBe('git status')
     expect(normalizeCommandPrefix('rtk git status')).toBe('rtk git status')
     expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
     expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
@@ -320,14 +321,15 @@ describe('friction log', () => {
     expect(readFrictionLog('expired-lock', options)).toMatchObject({ status: 'events' })
   })
 
-  it('recovers an expired lock even when its pid has been reused', async () => {
+  it('recovers a future-dated lock even when its pid has been reused', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
     recordFriction('reused-pid', { type: 'tool-result', command: 'echo ok' }, options)
     const [file] = await readdir(directoryPath)
     const lockPath = join(directoryPath, `${file}.lock`)
     await writeFile(lockPath, String(process.pid))
-    await utimes(lockPath, new Date(0), new Date(0))
+    const future = new Date(Date.now() + 60_000)
+    await utimes(lockPath, future, future)
     recordFriction('reused-pid', { type: 'permission-request', command: 'git push' }, options)
     expect(readFrictionLog('reused-pid', options)).toMatchObject({ status: 'events' })
   })
@@ -369,6 +371,15 @@ describe('friction log', () => {
     const [file] = await readdir(directoryPath)
     expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
     expect((await stat(join(directoryPath, file!))).mode & 0o777).toBe(0o600)
+    await chmod(directoryPath, 0o777)
+    recordFriction(
+      'private-log',
+      { type: 'permission-request', command: 'git push' },
+      {
+        directory: directoryPath,
+      },
+    )
+    expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
     const result = readFrictionLog('private-log', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events[0]?.timestamp).toHaveLength(1_000)
