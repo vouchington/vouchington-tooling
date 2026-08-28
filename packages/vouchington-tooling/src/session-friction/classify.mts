@@ -38,6 +38,10 @@ function boundedStderr(value: string): string {
   return `${head}\n${tail}`
 }
 
+function withoutUrlUserinfo(line: string): string {
+  return line.includes('://') && line.includes('@') ? line.replace(URL_USERINFO, '$1') : line
+}
+
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
@@ -76,10 +80,7 @@ export function classifyFrictionObservation(
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
   if (
     stderr.split(/\r\n|[\r\n]/).some((rawLine) => {
-      const line =
-        rawLine.includes('://') && rawLine.includes('@')
-          ? rawLine.replace(URL_USERINFO, '$1')
-          : rawLine
+      const line = withoutUrlUserinfo(rawLine)
       return (
         CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line))
       )

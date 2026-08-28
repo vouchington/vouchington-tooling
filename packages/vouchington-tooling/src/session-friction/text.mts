@@ -1,5 +1,4 @@
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}]+/gu
-const ILL_FORMED_UTF16 = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
 const MARKDOWN_CHARACTER = /\\|`|\*|_|~|\[|\]|<|>|#|-|\+|!|\||&/
 const MARKDOWN_AUDIT_MAX_LENGTH = 120
 
@@ -19,7 +18,15 @@ export function boundedText(value: string, maximum: number): string {
 }
 
 export function isWellFormedUnicode(value: string): boolean {
-  return !ILL_FORMED_UTF16.test(value)
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index)
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1)
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false
+      index++
+    } else if (code >= 0xdc00 && code <= 0xdfff) return false
+  }
+  return true
 }
 
 export function isSafeAuditText(value: unknown): value is string {
