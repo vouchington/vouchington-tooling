@@ -50,6 +50,18 @@ describe('buildSessionFrictionReport', () => {
     expect(section).not.toContain('sandbox-failure')
   })
 
+  it('bounds sandbox fields after Markdown escaping', () => {
+    const section = buildSandboxSection([
+      {
+        kind: 'sandbox-escalation',
+        commandPrefix: 'git push',
+        detail: '*'.repeat(120),
+        timestamp: '1',
+      },
+    ])
+    expect(section.split(' — ')[1]).toHaveLength(120)
+  })
+
   it('keeps report fields on one markdown line', async () => {
     const directory = await makeDirectory()
     recordFriction(

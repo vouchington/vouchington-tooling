@@ -138,7 +138,8 @@ environment variables, install hooks, or connect to a journal service by itself.
 difference between an observed clean session and missing evidence. Report markdown keeps backend
 diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
 truncates event detail to 1,000 characters, and consumes at most 500 entries from the journal loader
-when building a report.
+when building a report. Recording is synchronous and may wait up to one second for a contended
+per-session file lock before failing explicitly.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied
