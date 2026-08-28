@@ -8,7 +8,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
   ['EPERM', /\bEPERM\b/i],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
-const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)[^\s/?#]*@/gi
+const URL_USERINFO = /([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/?#@]*@/gi
 const STDERR_INSPECTION_MAX_LENGTH = 100_000
 const COMMAND_INSPECTION_MAX_LENGTH = 10_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
@@ -76,7 +76,10 @@ export function classifyFrictionObservation(
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
   if (
     stderr.split(/\r\n|[\r\n]/).some((rawLine) => {
-      const line = rawLine.replace(URL_USERINFO, '$1')
+      const line =
+        rawLine.includes('://') && rawLine.includes('@')
+          ? rawLine.replace(URL_USERINFO, '$1')
+          : rawLine
       return (
         CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line))
       )
