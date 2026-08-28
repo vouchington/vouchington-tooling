@@ -32,7 +32,7 @@ function isFresh(mtimeMs: number): boolean {
 
 function inspectLock(
   lockPath: string,
-): { dev: number; ino: number; mtimeMs: number; owner: number } | null {
+): { dev: number; ino: number; mtimeMs: number; owner: number | null } | null {
   let descriptor: number
   try {
     descriptor = openSync(
@@ -45,7 +45,12 @@ function inspectLock(
   }
   try {
     const status = fstatSync(descriptor)
-    if (!status.isFile() || status.size > LOCK_OWNER_MAX_BYTES) return null
+    /* v8 ignore next -- opening a non-regular lock requires a platform-specific FIFO/device. */
+    if (!status.isFile()) return null
+    if (status.size > LOCK_OWNER_MAX_BYTES)
+      return isFresh(status.mtimeMs)
+        ? null
+        : { dev: status.dev, ino: status.ino, mtimeMs: status.mtimeMs, owner: null }
     const buffer = Buffer.alloc(LOCK_OWNER_MAX_BYTES + 1)
     let length = 0
     while (length < buffer.length) {
@@ -114,7 +119,7 @@ function removeStaleLock(lockPath: string): boolean {
       if (!inspected) return false
       const fresh = isFresh(inspected.mtimeMs)
       const { owner } = inspected
-      if (Number.isInteger(owner) && owner > 0) {
+      if (typeof owner === 'number' && Number.isInteger(owner) && owner > 0) {
         try {
           process.kill(owner, 0)
           return false

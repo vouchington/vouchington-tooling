@@ -169,6 +169,8 @@ it('does not follow a symbolic link while inspecting a lock owner', async () => 
   await rm(join(directory, `${file}.lock`))
   await writeFile(join(directory, `${file}.lock`), 'x'.repeat(33))
   expect(() => readFrictionLog('linked-lock', options)).toThrow(/could not acquire/)
+  await utimes(join(directory, `${file}.lock`), new Date(0), new Date(0))
+  expect(readFrictionLog('linked-lock', options)).toEqual({ status: 'empty' })
 })
 
 it('requires loopback hostnames to end at a hostname boundary', () => {
@@ -216,6 +218,27 @@ it('bounds structured stderr inspection', () => {
       structuredStderr: `${'x'.repeat(100_000)} EPERM`,
     }),
   ).toMatchObject({ kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' })
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(50_001)}😀${'x'.repeat(49_993)} EPERM`,
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
+})
+
+it('rejects non-string timestamp callback results', async () => {
+  const directory = await temporaryDirectory()
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      {
+        directory,
+        timestamp: (() => 42) as unknown as () => string,
+      },
+    ),
+  ).toThrow(/timestamp must be a string/)
 })
 
 it('bounds command inspection before normalization', () => {

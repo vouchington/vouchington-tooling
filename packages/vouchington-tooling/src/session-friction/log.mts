@@ -126,8 +126,10 @@ export function recordFriction(
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)
   ensurePrivateDirectory(directory, true)
-  const timestamp =
+  const timestamp: unknown =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
+  if (timestamp !== undefined && typeof timestamp !== 'string')
+    throw new Error('timestamp must be a string')
   withFileLock(path, () => {
     ensurePrivateDirectory(directory, true)
     const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)

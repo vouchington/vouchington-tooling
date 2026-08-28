@@ -21,11 +21,20 @@ const LOOPBACK_ADDRESSES = [
 ]
 const DETAIL_MAX_LENGTH = 1_000
 
+function boundedTail(value: string, maximum: number): string {
+  let start = Math.max(0, value.length - maximum)
+  const first = value.charCodeAt(start)
+  const previous = value.charCodeAt(start - 1)
+  if (first >= 0xdc00 && first <= 0xdfff && previous >= 0xd800 && previous <= 0xdbff) start++
+  return value.slice(start)
+}
+
 function boundedStderr(value: string): string {
   if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
   const headLength = Math.floor((STDERR_INSPECTION_MAX_LENGTH - 1) / 2)
-  const tailLength = STDERR_INSPECTION_MAX_LENGTH - 1 - headLength
-  return `${value.slice(0, headLength)}\n${value.slice(-tailLength)}`
+  const head = boundedText(value, headLength)
+  const tail = boundedTail(value, STDERR_INSPECTION_MAX_LENGTH - 1 - head.length)
+  return `${head}\n${tail}`
 }
 
 export function classifyFrictionObservation(
