@@ -271,7 +271,7 @@ it('bounds structured stderr inspection', () => {
 })
 
 it('rejects non-string timestamp callback results', async () => {
-  const directory = await temporaryDirectory()
+  const directory = join(await temporaryDirectory(), 'missing')
   expect(() =>
     recordFriction(
       'timestamp',
@@ -282,6 +282,7 @@ it('rejects non-string timestamp callback results', async () => {
       },
     ),
   ).toThrow(/timestamp must be a string/)
+  expect(existsSync(directory)).toBe(false)
 })
 
 it('bounds command inspection before normalization', () => {
