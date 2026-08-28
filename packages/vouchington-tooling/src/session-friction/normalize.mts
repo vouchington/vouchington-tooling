@@ -103,7 +103,8 @@ function stripAssignments(tokens: string[]): string[] {
     break
   }
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
-  return index < tokens.length ? tokens.slice(index) : [REDACTED_TOKEN]
+  if (index < tokens.length) return tokens.slice(index)
+  return tokens.some((token) => ENV_ASSIGNMENT.test(token)) ? [REDACTED_TOKEN] : []
 }
 
 function stripGitOptions(tokens: string[]): string[] {

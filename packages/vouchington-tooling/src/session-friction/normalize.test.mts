@@ -53,6 +53,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('env --unknown secret curl')).toBe('[REDACTED]')
     expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix('env')).toBe('')
+    expect(normalizeCommandPrefix('env -i')).toBe('')
     expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
     expect(normalizeCommandPrefix('echo > /private/path')).toBe('echo')
   })

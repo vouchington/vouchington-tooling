@@ -149,7 +149,8 @@ Ownership checks require POSIX effective-user IDs; Windows callers must secure t
 an appropriate ACL because Node's mode bits do not express the full access policy there.
 Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
-grammar. It is not a secret scrubber; callers must not include credentials in captured commands.
+grammar. Normalization attempts limited redaction of obvious credential patterns but is not a secret
+scrubber; callers must ensure credentials are never included in captured commands.
 Failure classification inspects at most 100,000 structured-stderr characters, split evenly between
 the beginning and end when input exceeds that bound.
 Cooperating log readers and writers are serialized, including the initial clean-session
