@@ -52,10 +52,17 @@ function reportFromLog(
     | { status: 'ok'; markdownBlocks: string[] }
     | { status: 'unreachable'; diagnostic: string },
 ): SessionFrictionReport {
-  const friction = readFrictionLog(sessionId, logOptions)
-  const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
-  if (friction.status !== 'events') return { markdown }
-  return { markdown: `${markdown}\n\n${buildSandboxSection(friction.events)}` }
+  try {
+    const friction = readFrictionLog(sessionId, logOptions)
+    const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
+    if (friction.status !== 'events') return { markdown }
+    return { markdown: `${markdown}\n\n${buildSandboxSection(friction.events)}` }
+  } catch (error) {
+    return {
+      markdown: '## CI Failures\nStatus: unavailable (friction log unreadable)',
+      diagnostic: errorMessage(error),
+    }
+  }
 }
 
 export async function buildSessionFrictionReport(
