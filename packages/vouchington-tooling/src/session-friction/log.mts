@@ -18,6 +18,8 @@ const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
 
 export function requireDirectory(directory: string): string {
+  if (Buffer.byteLength(directory) > 4096)
+    throw new Error('session-friction log directory path is too long')
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
   return resolve(directory)
 }

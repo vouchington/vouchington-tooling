@@ -15,6 +15,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('git -- status')).toBe('git status')
     expect(normalizeCommandPrefix('git -C')).toBe('git [REDACTED]')
     expect(normalizeCommandPrefix('rtk git status', ['rtk'])).toBe('rtk git status')
+    expect(normalizeCommandPrefix('rtk git status', null as unknown as string[])).toBe('rtk git')
+    expect(normalizeCommandPrefix('rtk git status', 'rtk' as unknown as string[])).toBe('rtk git')
     expect(normalizeCommandPrefix(`${'rtk '.repeat(5_000)}git status`, ['rtk'])).toBe(
       'rtk git status',
     )

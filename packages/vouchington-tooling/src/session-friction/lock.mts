@@ -30,7 +30,7 @@ function hasCode(error: unknown, code: string): boolean {
 
 function isFresh(mtimeMs: number): boolean {
   const age = Date.now() - Math.floor(mtimeMs)
-  return age >= 0 && age < STALE_LOCK_AGE_MS
+  return age > -STALE_LOCK_AGE_MS && age < STALE_LOCK_AGE_MS
 }
 
 function inspectLock(

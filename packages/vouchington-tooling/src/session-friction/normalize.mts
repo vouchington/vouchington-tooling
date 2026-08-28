@@ -141,8 +141,9 @@ export function normalizeCommandPrefix(command: string, wrappersToStrip: string[
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
   const tokens = stripAssignments(segments[index] ?? [])
+  const wrapperValues = Array.isArray(wrappersToStrip) ? wrappersToStrip : []
   const wrapperNames = new Set(
-    wrappersToStrip
+    wrapperValues
       .slice(0, MAX_COMMAND_WRAPPERS)
       .filter(
         (value): value is string =>

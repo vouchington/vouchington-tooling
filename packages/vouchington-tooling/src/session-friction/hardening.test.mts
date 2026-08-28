@@ -44,6 +44,9 @@ it('validates read limits before inspecting storage', async () => {
 it('rejects oversized session ids before Unicode validation', async () => {
   const directory = await temporaryDirectory()
   expect(() => readFrictionLog(`${'x'.repeat(4_097)}\ud800`, { directory })).toThrow(/too long/)
+  expect(() => readFrictionLog('session', { directory: `/${'a'.repeat(4_096)}` })).toThrow(
+    /path is too long/,
+  )
 })
 
 it('rejects unsupported observation discriminants', () => {
@@ -131,7 +134,7 @@ it('reclaims an orphaned stale reaper guard', async () => {
   expect(existsSync(reaper)).toBe(false)
 })
 
-it('reclaims future-dated ownerless locks and reaper guards', async () => {
+it('reclaims far-future ownerless locks and reaper guards', async () => {
   const directory = await temporaryDirectory()
   const options = { directory }
   recordFriction('future-lock', { type: 'tool-result', command: 'echo ok' }, options)
@@ -143,6 +146,22 @@ it('reclaims future-dated ownerless locks and reaper guards', async () => {
   await writeFile(join(directory, `${file}.lock.reap`), '')
   await utimes(join(directory, `${file}.lock.reap`), future, future)
   expect(readFrictionLog('future-lock', options)).toMatchObject({ status: 'events' })
+})
+
+it('preserves near-future ownerless locks and reaper guards', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('clock-skew', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  const future = new Date(Date.now() + 10_000)
+  await writeFile(lock, '')
+  await utimes(lock, future, future)
+  expect(() => readFrictionLog('clock-skew', options)).toThrow(/could not acquire/)
+  await rm(lock)
+  await writeFile(`${lock}.reap`, '')
+  await utimes(`${lock}.reap`, future, future)
+  expect(() => readFrictionLog('clock-skew', options)).toThrow(/could not acquire/)
 })
 
 it('preserves an expired lock owned by a running process', async () => {
@@ -197,6 +216,7 @@ it('does not follow a symbolic link while inspecting a lock owner', async () => 
 })
 
 it('requires loopback hostnames to end at a hostname boundary', () => {
+  expect(classifyFrictionObservation({ type: 'permission-request', command: '\u200b' })).toBeNull()
   expect(classifyFrictionObservation({ type: 'permission-request', command: '&&' })).toBeNull()
   for (const hostname of ['localhost.example.com', '127.0.0.1.example.com'])
     expect(

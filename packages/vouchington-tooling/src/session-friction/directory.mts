@@ -12,9 +12,9 @@ function directoryChain(directory: string): string[] {
   let current = directory
   while (dirname(current) !== current) {
     current = dirname(current)
-    chain.unshift(current)
+    chain.push(current)
   }
-  return chain
+  return chain.reverse()
 }
 
 export function ensurePrivateDirectory(directory: string, create: boolean): boolean {

@@ -57,6 +57,15 @@ describe('CI failure grammar', () => {
         conforming.replace('build cache failure', '\u202e').replace('CI run 123 failed', '\u202e'),
       ),
     ).toBe(false)
+    expect(
+      isConformingCiFailureBlock(
+        conforming
+          .replace('build cache failure', '\u200b')
+          .replace('CI run 123 failed', '\u200b')
+          .replace('cache corruption', '\u200b')
+          .replace('rebuilt cache', '\u200b'),
+      ),
+    ).toBe(false)
     expect(getConformingGroups([{ data: { type: 'journal', markdown: 42 } }])).toEqual([])
     expect(getConformingGroups([null] as unknown as JournalEntry[])).toEqual([])
   })
