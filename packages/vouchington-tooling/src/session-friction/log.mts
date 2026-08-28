@@ -128,12 +128,17 @@ export function recordFriction(
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   if (timestamp !== undefined && typeof timestamp !== 'string')
     throw new Error('timestamp must be a string')
+  const normalizedTimestamp =
+    normalizeAuditText(
+      boundedText(timestamp ?? new Date().toISOString(), EVENT_FIELD_MAX_LENGTH),
+    ) || new Date().toISOString()
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)
   ensurePrivateDirectory(directory, true)
   withFileLock(path, () => {
-    ensurePrivateDirectory(directory, true)
+    if (!ensurePrivateDirectory(directory, false))
+      throw new Error('session-friction log directory disappeared while acquiring the lock')
     const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)
     try {
       fchmodSync(descriptor, 0o600)
@@ -146,10 +151,7 @@ export function recordFriction(
         ...classified,
         commandPrefix: normalizeAuditText(classified.commandPrefix),
         detail: normalizeAuditText(classified.detail),
-        timestamp:
-          normalizeAuditText(
-            boundedText(timestamp ?? new Date().toISOString(), EVENT_FIELD_MAX_LENGTH),
-          ) || new Date().toISOString(),
+        timestamp: normalizedTimestamp,
       }
       /* v8 ignore next -- normalized classified fields satisfy validEvent defensively. */
       if (!validEvent(event)) return
