@@ -1,5 +1,6 @@
 import {
   appendFileSync,
+  chmodSync,
   closeSync,
   existsSync,
   mkdirSync,
@@ -146,6 +147,9 @@ export function recordFriction(
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
   mkdirSync(requireDirectory(options.directory), { mode: 0o700, recursive: true })
+  try {
+    chmodSync(requireDirectory(options.directory), 0o700)
+  } catch {}
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withLogLock(path, () => {
