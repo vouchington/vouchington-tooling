@@ -1,8 +1,14 @@
 import { normalizeCommandPrefix } from './normalize.mts'
+import { normalizeAuditText } from './text.mts'
 import type { FrictionEvent, FrictionObservation } from './types.mts'
 
-const FAILURE_TOKENS = ['Operation not permitted', 'E2BIG', 'EPERM']
-const LOCALHOST_FAILURE = /ECONNREFUSED.*(127\.0\.0\.1|::1|localhost)|connect ECONNREFUSED/i
+const FAILURE_TOKENS: [string, RegExp][] = [
+  ['Operation not permitted', /Operation not permitted/i],
+  ['E2BIG', /\bE2BIG\b/],
+  ['EPERM', /\bEPERM\b/],
+]
+const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
+const LOOPBACK_ADDRESS = /\b(?:127\.0\.0\.1|localhost)\b|::1/i
 
 export function classifyFrictionObservation(
   observation: FrictionObservation,
@@ -13,18 +19,19 @@ export function classifyFrictionObservation(
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
   }
-  if (observation.escalationDetail !== undefined) {
+  const escalationDetail = normalizeAuditText(observation.escalationDetail ?? '')
+  if (escalationDetail) {
     return {
       kind: 'sandbox-escalation',
       commandPrefix,
-      detail: observation.escalationDetail,
+      detail: escalationDetail,
     }
   }
   const stderr = observation.structuredStderr
   if (stderr === undefined) return null
-  const token = FAILURE_TOKENS.find((value) => stderr.includes(value))
+  const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
-  if (LOCALHOST_FAILURE.test(stderr)) {
+  if (CONNECTION_REFUSED.test(stderr) && LOOPBACK_ADDRESS.test(stderr)) {
     return {
       kind: 'sandbox-failure',
       commandPrefix,

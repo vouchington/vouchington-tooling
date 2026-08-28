@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -40,6 +40,18 @@ describe('normalizeCommandPrefix', () => {
 
   it('redacts overlong tokens in the report-safe prefix', () => {
     expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('…')
+  })
+
+  it('handles escaped quotes and strips env assignments', () => {
+    expect(normalizeCommandPrefix('echo "hello \\"world\\"" && pnpm test')).toBe(
+      'echo hello "world"',
+    )
+    expect(normalizeCommandPrefix('env API_TOKEN=secret curl https://example.test')).toBe(
+      'curl https://example.test',
+    )
+    expect(normalizeCommandPrefix('env -i --ignore-environment API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('…')
+    expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
   })
 })
 
@@ -86,6 +98,23 @@ describe('classifyFrictionObservation', () => {
       detail: 'stderr matched "EPERM"',
     })
     expect(classifyFrictionObservation({ type: 'tool-result', command: 'rg EPERM' })).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: 'connect ECONNREFUSED 10.0.0.5:5432',
+      }),
+    ).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'echo',
+        structuredStderr: 'TEMPERMANENT failure',
+      }),
+    ).toBeNull()
+    expect(
+      classifyFrictionObservation({ type: 'tool-result', command: 'echo', escalationDetail: '  ' }),
+    ).toBeNull()
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -140,7 +169,8 @@ describe('friction log', () => {
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events).toHaveLength(FRICTION_LOG_MAX_EVENTS)
     expect(isAbsolute(directoryPath)).toBe(true)
-    const raw = await readFile(join(directoryPath, 'capped.jsonl'), 'utf8')
+    const [file] = await readdir(directoryPath)
+    const raw = await readFile(join(directoryPath, file!), 'utf8')
     expect(raw.trim().split('\n')).toHaveLength(FRICTION_LOG_MAX_EVENTS)
   })
 
@@ -151,7 +181,8 @@ describe('friction log', () => {
       { type: 'permission-request', command: 'git push' },
       { directory: directoryPath, timestamp: 't' },
     )
-    const path = join(directoryPath, 'malformed.jsonl')
+    const [file] = await readdir(directoryPath)
+    const path = join(directoryPath, file!)
     const original = await readFile(path, 'utf8')
     await rm(path)
     await writeFile(
@@ -171,6 +202,7 @@ describe('friction log', () => {
     )
     const result = readFrictionLog('malformed', { directory: directoryPath })
     expect(result.status).toBe('events')
+    if (result.status === 'events') expect(result.events).toHaveLength(1)
   })
 
   it('sanitizes session ids and validates limits before touching storage', async () => {
@@ -180,9 +212,10 @@ describe('friction log', () => {
       { type: 'permission-request', command: 'git push' },
       { directory: directoryPath, maxEvents: 1, timestamp: 't' },
     )
-    expect(await readFile(join(directoryPath, 'parent_child_path.jsonl'), 'utf8')).toContain(
-      'permission-request',
-    )
+    expect(await readdir(directoryPath)).toEqual([expect.stringMatching(/^[a-f0-9]{64}\.jsonl$/)])
+    expect(readFrictionLog('parent_child_path', { directory: directoryPath })).toEqual({
+      status: 'absent',
+    })
     expect(() =>
       recordFriction(
         'invalid-limit',
@@ -191,6 +224,37 @@ describe('friction log', () => {
       ),
     ).toThrow(/positive integer/)
     await expect(readFile(join(directoryPath, 'invalid-limit.jsonl'), 'utf8')).rejects.toThrow()
+  })
+
+  it('isolates colliding ids and ignores malformed entries when capping', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath, maxEvents: 1, timestamp: 't' }
+    recordFriction('parent:child', { type: 'permission-request', command: 'git push' }, options)
+    recordFriction('parent/child', { type: 'permission-request', command: 'pnpm test' }, options)
+    expect(readFrictionLog('parent:child', options)).toMatchObject({ status: 'events' })
+    expect(readFrictionLog('parent/child', options)).toMatchObject({ status: 'events' })
+    const beforeTouch = new Set(await readdir(directoryPath))
+    recordFriction('malformed', { type: 'tool-result', command: 'echo ok' }, options)
+    const file = (await readdir(directoryPath)).find((value) => !beforeTouch.has(value))
+    await writeFile(join(directoryPath, file!), '{}\nnot-json\n')
+    recordFriction('malformed', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('malformed', options)).toMatchObject({
+      status: 'events',
+      events: [expect.objectContaining({ commandPrefix: 'git push' })],
+    })
+    expect(() => readFrictionLog('', options)).toThrow(/non-empty/)
+    expect(() => readFrictionLog('x'.repeat(4097), options)).toThrow(/too long/)
+  })
+
+  it('makes lock acquisition exhaustion explicit', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('locked', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, `${file}.lock`), '')
+    expect(() =>
+      recordFriction('locked', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/could not acquire/)
   })
 
   it('supports callback and generated timestamps', async () => {
@@ -205,11 +269,17 @@ describe('friction log', () => {
       { type: 'permission-request', command: 'pnpm test' },
       { directory: directoryPath },
     )
+    recordFriction(
+      'timestamps',
+      { type: 'permission-request', command: 'npm test' },
+      { directory: directoryPath, timestamp: '\n' },
+    )
     const result = readFrictionLog('timestamps', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') {
       expect(result.events[0]?.timestamp).toBe('callback')
       expect(result.events[1]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+      expect(result.events[2]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     }
   })
 })

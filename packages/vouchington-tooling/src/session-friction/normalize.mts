@@ -25,6 +25,7 @@ function splitCommand(command: string): string[][] {
   let segment: string[] = []
   let word = ''
   let quote: '"' | "'" | undefined
+  let escaped = false
   const flushWord = (): void => {
     if (word) segment.push(word)
     word = ''
@@ -35,7 +36,12 @@ function splitCommand(command: string): string[][] {
     segment = []
   }
   for (const char of command) {
-    if (quote) {
+    if (escaped) {
+      word += char
+      escaped = false
+    } else if (char === '\\' && quote !== "'") {
+      escaped = true
+    } else if (quote) {
       if (char === quote) quote = undefined
       else word += char
     } else if (char === '"' || char === "'") quote = char
@@ -43,6 +49,7 @@ function splitCommand(command: string): string[][] {
     else if (/\s/.test(char)) flushWord()
     else word += char
   }
+  if (escaped) word += '\\'
   flushSegment()
   return result
 }
@@ -54,7 +61,13 @@ function redact(token: string): string {
 function stripAssignments(tokens: string[]): string[] {
   let index = 0
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
-  return index < tokens.length ? tokens.slice(index) : tokens
+  if (tokens[index] !== 'env')
+    return index < tokens.length ? tokens.slice(index) : index ? [REDACTED_TOKEN] : tokens
+  index++
+  while (index < tokens.length && (tokens[index] === '-i' || tokens[index]!.startsWith('--')))
+    index++
+  while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
+  return index < tokens.length ? tokens.slice(index) : [REDACTED_TOKEN]
 }
 
 function stripGitOptions(tokens: string[]): string[] {

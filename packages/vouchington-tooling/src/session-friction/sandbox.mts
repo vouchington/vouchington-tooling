@@ -1,4 +1,5 @@
 import type { FrictionEvent, FrictionEventKind } from './types.mts'
+import { markdownAuditText } from './text.mts'
 
 const SANDBOX_SECTION_HEADER = '## Sandbox & Permission Audit'
 const KIND_ORDER: FrictionEventKind[] = ['sandbox-escalation', 'sandbox-failure']
@@ -10,7 +11,8 @@ export function buildSandboxSection(events: FrictionEvent[]): string {
       ? [
           `- ${kind} (${selected.length})`,
           ...selected.map(
-            (event) => `  - ${event.commandPrefix} — ${event.detail} — ${event.timestamp}`,
+            (event) =>
+              `  - ${markdownAuditText(event.commandPrefix)} — ${markdownAuditText(event.detail)} — ${markdownAuditText(event.timestamp)}`,
           ),
         ].join('\n')
       : undefined

@@ -1,4 +1,5 @@
 import type { FrictionLogReadResult, JournalEntry } from './types.mts'
+import { markdownAuditText } from './text.mts'
 
 const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$/
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
@@ -55,7 +56,7 @@ export function buildCiFailuresSection(
   if (journal.status === 'unreachable')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (blackboard unreachable)`
   if (journal.markdownBlocks.length === 0 && frictionStatus === 'absent')
-    return `${CI_FAILURES_HEADER}\nStatus: unavailable (no friction log for session ${sessionId})`
+    return `${CI_FAILURES_HEADER}\nStatus: unavailable (no friction log for session ${markdownAuditText(sessionId)})`
   if (journal.markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`
   return `${CI_FAILURES_HEADER}\nStatus: failures observed\n\n${journal.markdownBlocks.join('\n\n')}`
 }

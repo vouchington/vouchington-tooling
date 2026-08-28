@@ -50,6 +50,21 @@ describe('buildSessionFrictionReport', () => {
     expect(section).not.toContain('sandbox-failure')
   })
 
+  it('keeps report fields on one markdown line', async () => {
+    const directory = await makeDirectory()
+    recordFriction(
+      'session\n## forged',
+      { type: 'tool-result', command: 'git push', escalationDetail: 'override\n- forged' },
+      { directory, timestamp: '1\n## forged' },
+    )
+    const report = await buildSessionFrictionReport('session\n## forged', {
+      directory,
+      journalLoader: async () => ({ status: 'not-found' }),
+    })
+    expect(report.markdown).not.toContain('\n## forged')
+    expect(report.markdown).toContain('override - forged')
+  })
+
   it('renders journal failures and deterministic sandbox events', async () => {
     const directory = await makeDirectory()
     recordFriction(
