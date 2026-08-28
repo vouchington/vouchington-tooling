@@ -113,12 +113,11 @@ function removeStaleLock(lockPath: string): boolean {
       const inspected = inspectLock(lockPath)
       if (!inspected) return false
       const fresh = isFresh(inspected.mtimeMs)
-      const future = inspected.mtimeMs > Date.now()
       const { owner } = inspected
       if (Number.isInteger(owner) && owner > 0) {
         try {
           process.kill(owner, 0)
-          if (fresh || future) return false
+          return false
         } catch (error) {
           if (!hasCode(error, 'ESRCH')) return false
         }

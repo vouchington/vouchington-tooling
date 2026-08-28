@@ -71,13 +71,21 @@ function reportFromLog(
 ): SessionFrictionReport {
   try {
     const friction = readFrictionLog(sessionId, logOptions)
+    if (journal.status === 'ok' && journal.truncated)
+      return {
+        markdown:
+          '## CI Failures\nStatus: unavailable (journal scan incomplete)\n\n' +
+          sandboxMarkdown(friction),
+      }
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
     return { markdown: `${markdown}\n\n${sandboxMarkdown(friction)}` }
   } catch (error) {
     const ciMarkdown =
-      journal.status === 'ok' && journal.markdownBlocks.length === 0
-        ? '## CI Failures\nStatus: unavailable (friction log unreadable)'
-        : buildCiFailuresSection(sessionId, journal, 'empty')
+      journal.status === 'ok' && journal.truncated
+        ? '## CI Failures\nStatus: unavailable (journal scan incomplete)'
+        : journal.status === 'ok' && journal.markdownBlocks.length === 0
+          ? '## CI Failures\nStatus: unavailable (friction log unreadable)'
+          : buildCiFailuresSection(sessionId, journal, 'empty')
     return {
       markdown: `${ciMarkdown}\n\n## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)`,
       diagnostic: errorMessage(error),

@@ -122,7 +122,7 @@ it('reclaims future-dated ownerless locks and reaper guards', async () => {
   expect(readFrictionLog('future-lock', options)).toMatchObject({ status: 'events' })
 })
 
-it('reclaims a stale lock whose PID has been reused', async () => {
+it('preserves an expired lock owned by a running process', async () => {
   const directory = await temporaryDirectory()
   const options = { directory }
   recordFriction('reused-owner', { type: 'tool-result', command: 'echo ok' }, options)
@@ -130,8 +130,9 @@ it('reclaims a stale lock whose PID has been reused', async () => {
   const lock = join(directory, `${file}.lock`)
   await writeFile(lock, String(process.pid))
   await utimes(lock, new Date(0), new Date(0))
-  recordFriction('reused-owner', { type: 'permission-request', command: 'git push' }, options)
-  expect(readFrictionLog('reused-owner', options)).toMatchObject({ status: 'events' })
+  expect(() =>
+    recordFriction('reused-owner', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/could not acquire/)
 })
 
 it('does not follow a symbolic link while inspecting a lock owner', async () => {

@@ -249,6 +249,8 @@ describe('buildSessionFrictionReport', () => {
         status: 'ok',
         entries: (function* () {
           try {
+            consumed++
+            yield { data: { type: 'journal', markdown: conforming } }
             while (true) {
               consumed++
               yield { data: { type: 'retrospective' } }
@@ -262,6 +264,7 @@ describe('buildSessionFrictionReport', () => {
     expect(consumed).toBe(500)
     expect(closed).toBe(true)
     expect(report.markdown).toContain('unavailable (journal scan incomplete)')
+    expect(report.markdown).not.toContain('failures observed')
   })
 
   it('does not retain oversized journal markdown', async () => {

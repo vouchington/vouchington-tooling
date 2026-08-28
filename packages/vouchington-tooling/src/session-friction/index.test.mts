@@ -206,13 +206,14 @@ describe('friction log', () => {
         { type: 'permission-request', command: 'git push' },
         { directory: directoryPath, maxEvents: 1_000, timestamp: String(index) },
       )
+    const path = join(directoryPath, (await readdir(directoryPath))[0]!)
+    const raw = await readFile(path, 'utf8')
+    await writeFile(path, raw.repeat(2))
     const result = readFrictionLog('capped', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events).toHaveLength(FRICTION_LOG_MAX_EVENTS)
     expect(isAbsolute(directoryPath)).toBe(true)
-    const [file] = await readdir(directoryPath)
-    const raw = await readFile(join(directoryPath, file!), 'utf8')
-    expect(raw.trim().split('\n')).toHaveLength(FRICTION_LOG_MAX_EVENTS)
+    expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1_000)
   })
 
   it('ignores malformed lines while retaining valid events', async () => {

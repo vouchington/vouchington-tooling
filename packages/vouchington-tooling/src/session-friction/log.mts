@@ -180,6 +180,7 @@ export function readFrictionLog(
             const value: unknown = JSON.parse(line)
             if (validEvent(value)) events.push(value)
           } catch {}
+          if (events.length >= eventLimit(options.maxEvents)) break
         }
         return events.length ? { status: 'events', events } : { status: 'empty' }
       } finally {
