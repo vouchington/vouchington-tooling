@@ -17,7 +17,8 @@ const FIELD_PREFIXES = [
 ]
 
 function safeField(line: string): string {
-  const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))!
+  const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))
+  if (!prefix) return markdownAuditText(line)
   return `${prefix}${markdownAuditText(line.slice(prefix.length))}`
 }
 
