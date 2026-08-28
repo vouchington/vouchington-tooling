@@ -33,6 +33,7 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('git -C /private/path push origin main')).toBe('git push')
     expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
     expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
+    expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
     expect(normalizeCommandPrefix('rtk git status')).toBe('rtk git status')
     expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
     expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
