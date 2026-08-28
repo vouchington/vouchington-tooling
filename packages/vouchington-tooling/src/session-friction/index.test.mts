@@ -104,6 +104,13 @@ describe('classifyFrictionObservation', () => {
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
+        command: 'node test',
+        structuredStderr: 'connect ECONNREFUSED 0:0:0:0:0:0:0:1%lo0',
+      }),
+    ).toMatchObject({ kind: 'sandbox-failure' })
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
         command: 'cat',
         structuredStderr: 'eperm',
       }),
@@ -338,7 +345,7 @@ describe('friction log', () => {
     expect(readFrictionLog('expired-lock', options)).toMatchObject({ status: 'events' })
   })
 
-  it('recovers a future-dated lock even when its pid has been reused', async () => {
+  it('preserves a future-dated lock while its owner is alive', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
     recordFriction('reused-pid', { type: 'tool-result', command: 'echo ok' }, options)
@@ -347,22 +354,18 @@ describe('friction log', () => {
     await writeFile(lockPath, String(process.pid))
     const future = new Date(Date.now() + 60_000)
     await utimes(lockPath, future, future)
-    recordFriction('reused-pid', { type: 'permission-request', command: 'git push' }, options)
-    expect(readFrictionLog('reused-pid', options)).toMatchObject({ status: 'events' })
+    expect(() =>
+      recordFriction('reused-pid', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/could not acquire/)
   })
 
-  it('propagates lock creation failures other than contention', async () => {
+  it('repairs restrictive evidence directory permissions', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
     recordFriction('denied-lock', { type: 'tool-result', command: 'echo ok' }, options)
     await chmod(directoryPath, 0o500)
-    try {
-      expect(() =>
-        recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options),
-      ).toThrow()
-    } finally {
-      await chmod(directoryPath, 0o700)
-    }
+    recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options)
+    expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
   })
 
   it('bounds persisted escalation details', async () => {

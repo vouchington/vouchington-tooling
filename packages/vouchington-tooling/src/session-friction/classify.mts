@@ -8,7 +8,8 @@ const FAILURE_TOKENS: [string, RegExp][] = [
   ['EPERM', /\bEPERM\b/i],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
-const LOOPBACK_ADDRESS = /\b(?:127\.0\.0\.1|localhost)\b|(?:^|[^0-9a-f:])::1(?=$|[^0-9a-f:])/i
+const LOOPBACK_ADDRESS =
+  /\b(?:127\.0\.0\.1|localhost)\b|(?<![0-9a-f:])\[?(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\]?(?![0-9a-f:])/i
 const DETAIL_MAX_LENGTH = 1_000
 
 function boundedDetail(value: string): string {

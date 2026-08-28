@@ -89,21 +89,20 @@ function validEventCount(content: string, limit: number): number {
 
 function removeStaleLock(lockPath: string): boolean {
   try {
-    const ageMs = Date.now() - statSync(lockPath).mtimeMs
-    const fresh = ageMs > -1_000 && ageMs < STALE_LOCK_AGE_MS
+    const fresh = Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS
     const owner = Number(readFileSync(lockPath, 'utf8'))
-    let ownerDead = false
     if (Number.isInteger(owner) && owner > 0) {
       try {
         process.kill(owner, 0)
+        return false
       } catch (error) {
         if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH'))
-          /* v8 ignore next -- permission errors conservatively preserve a potentially live lock. */
           return false
-        ownerDead = true
+        unlinkSync(lockPath)
+        return true
       }
     }
-    if (!ownerDead && fresh) return false
+    if (fresh) return false
     unlinkSync(lockPath)
     return true
   } catch {
