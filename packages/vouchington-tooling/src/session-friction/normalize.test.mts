@@ -37,6 +37,7 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('/usr/bin/env API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('rtk env API_TOKEN=secret curl', ['rtk'])).toBe('rtk curl')
     expect(normalizeCommandPrefix('env --chdir /tmp API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env --chdir=/tmp API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env --chd /tmp API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix("env --spl 'API_TOKEN=secret curl'")).toBe('[REDACTED]')
     expect(normalizeCommandPrefix('env --unknown secret curl')).toBe('[REDACTED]')

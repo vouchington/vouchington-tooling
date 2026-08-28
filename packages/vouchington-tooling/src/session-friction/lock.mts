@@ -58,12 +58,12 @@ function removeStaleLock(lockPath: string): boolean {
         }
       } else if (fresh) return false
       const current = statSync(lockPath)
+      /* v8 ignore next 5 -- requires external replacement despite the reaper protocol. */
       if (
         current.dev !== inspected.dev ||
         current.ino !== inspected.ino ||
         current.mtimeMs !== inspected.mtimeMs
       )
-        /* v8 ignore next -- requires external replacement despite the reaper protocol. */
         return false
       unlinkSync(lockPath)
       return true
