@@ -1,0 +1,200 @@
+name: Dependabot Auto-merge
+description: Enable squash auto-merge for eligible Dependabot dependency updates.
+inputs:
+  automerge_token:
+    description: Token used only to enable eligible or disable stale auto-merge.
+    required: true
+  expected_base_sha:
+    description: 40-char lowercase hex SHA, or empty to use pull_request_target event base SHA.
+    required: false
+    default: ''
+  expected_head_sha:
+    description: 40-char lowercase hex SHA, or empty to use pull_request_target event head SHA.
+    required: false
+    default: ''
+  manual_update_rules:
+    description: JSON array of packageEcosystem/directory updates that require manual merge.
+    required: false
+    default: '[]'
+runs:
+  using: composite
+  steps:
+    - name: Fetch Dependabot metadata
+      id: dependabot-metadata
+      uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      with:
+        github-token: ${{ github.token }}
+    - name: Evaluate policy and enable auto-merge
+      if: ${{ always() }}
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+      env:
+        AUTOMERGE_TOKEN: ${{ inputs.automerge_token }}
+        EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha || github.event.pull_request.base.sha }}
+        EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha }}
+        GRAPHQL_URL: ${{ github.graphql_url }}
+        MANUAL_UPDATE_RULES: ${{ inputs.manual_update_rules }}
+        UPDATED_DEPENDENCIES_JSON: ${{ steps.dependabot-metadata.outputs.updated-dependencies-json }}
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          const pr = context.payload.pull_request;
+          function parseSemver(value) {
+            if (typeof value !== 'string') return null;
+            const match = value.match(/^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/);
+            if (!match) return null;
+            const prerelease = match[4]?.split('.') ?? [];
+            if (prerelease.some(part => /^\d+$/.test(part) && part.length > 1 && part.startsWith('0'))) return null;
+            return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease };
+          }
+          function comparePrerelease(left, right) {
+            if (left.length === 0 || right.length === 0) return left.length === right.length ? 0 : left.length === 0 ? 1 : -1;
+            for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+              if (left[index] === undefined) return -1;
+              if (right[index] === undefined) return 1;
+              if (left[index] === right[index]) continue;
+              const leftNumeric = /^\d+$/.test(left[index]);
+              const rightNumeric = /^\d+$/.test(right[index]);
+              if (leftNumeric && rightNumeric) return Number(left[index]) < Number(right[index]) ? -1 : 1;
+              if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+              return left[index] < right[index] ? -1 : 1;
+            }
+            return 0;
+          }
+          function compareSemver(left, right) {
+            for (const key of ['major', 'minor', 'patch']) if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1;
+            return comparePrerelease(left.prerelease, right.prerelease);
+          }
+          function isManualRule(rule, update) {
+            return rule.packageEcosystem === update.packageEcosystem && rule.directory === update.directory;
+          }
+          let freshPr;
+          async function requireHumanAction(messages, forceDisable = false) {
+            for (const message of messages) core.info(`Human action required: ${message}`);
+            const target = freshPr ?? pr;
+            if (!forceDisable && !target.auto_merge) return;
+            const mergeToken = process.env.AUTOMERGE_TOKEN;
+            if (!mergeToken) {
+              core.setFailed('AUTOMERGE_TOKEN is required to disable stale auto-merge');
+              return;
+            }
+            const response = await fetch(process.env.GRAPHQL_URL, {
+              method: 'POST',
+              headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${mergeToken}`, 'content-type': 'application/json', 'user-agent': 'dependabot-automerge-action', 'x-github-api-version': '2022-11-28' },
+              body: JSON.stringify({ query: 'mutation($pullRequestId: ID!) { disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) { clientMutationId } }', variables: { pullRequestId: target.node_id } }),
+            });
+            let result;
+            try { result = await response.json(); } catch (error) {
+              throw new Error(`Unable to disable stale Dependabot auto-merge (HTTP ${response.status}): invalid JSON response`, { cause: error });
+            }
+            const errors = Array.isArray(result?.errors) ? result.errors.map(error => error?.message).filter(Boolean) : [];
+            if (!response.ok || errors.length > 0) throw new Error(`Unable to disable stale Dependabot auto-merge (HTTP ${response.status})${errors.length > 0 ? `: ${errors.join('; ')}` : ''}`);
+            if (!result?.data?.disablePullRequestAutoMerge || !Object.hasOwn(result.data.disablePullRequestAutoMerge, 'clientMutationId')) throw new Error(`Unable to disable stale Dependabot auto-merge (HTTP ${response.status}): unexpected response envelope`);
+            core.info('Done: stale auto-merge disabled');
+          }
+          if (!pr) {
+            core.warning('Skipping event without a pull request');
+            return;
+          }
+          const expectedBase = process.env.EXPECTED_BASE_SHA;
+          const expectedHead = process.env.EXPECTED_HEAD_SHA;
+          try { ({ data: freshPr } = await github.rest.pulls.get({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number })); } catch (error) {
+            await requireHumanAction(['initial pull request refresh failed'], true);
+            core.setFailed(`Unable to refresh pull request (${error.message})`); return; }
+          if (freshPr.draft) {
+            await requireHumanAction(['pull request is draft']);
+            return;
+          }
+          if (!/^[a-f0-9]{40}$/.test(expectedBase ?? '') || !/^[a-f0-9]{40}$/.test(expectedHead ?? '')) {
+            await requireHumanAction(['expected base or head SHA is malformed']);
+            core.setFailed('Expected base and head SHAs must be 40-character lowercase hexadecimal values');
+            return;
+          }
+          if (freshPr.user?.login !== 'dependabot[bot]' || freshPr.draft || freshPr.state !== 'open' || freshPr.merged || freshPr.base?.ref !== context.payload.repository.default_branch || freshPr.base?.sha !== expectedBase || freshPr.head?.sha !== expectedHead || freshPr.head?.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` || freshPr.head?.ref !== pr.head?.ref || !freshPr.head?.ref?.startsWith('dependabot/')) {
+            await requireHumanAction(['pull request changed or is not a trusted Dependabot branch']);
+            return;
+          }
+          let manualRules;
+          try {
+            manualRules = JSON.parse(process.env.MANUAL_UPDATE_RULES ?? '');
+          } catch (error) {
+            await requireHumanAction([`MANUAL_UPDATE_RULES is not valid JSON (${error.message})`]);
+            core.setFailed(`MANUAL_UPDATE_RULES is not valid JSON (${error.message})`);
+            return;
+          }
+          if (!Array.isArray(manualRules) || manualRules.some(rule => !rule || typeof rule.packageEcosystem !== 'string' || rule.packageEcosystem.trim() === '' || typeof rule.directory !== 'string' || !rule.directory.startsWith('/'))) {
+            await requireHumanAction(['MANUAL_UPDATE_RULES must be an array of packageEcosystem/directory objects']);
+            core.setFailed('MANUAL_UPDATE_RULES must be an array of packageEcosystem/directory objects');
+            return;
+          }
+          let updates;
+          try {
+            updates = JSON.parse(process.env.UPDATED_DEPENDENCIES_JSON ?? '');
+          } catch (error) {
+            await requireHumanAction([`Dependabot metadata is not valid JSON (${error.message})`]);
+            core.setFailed(`Dependabot metadata is not valid JSON (${error.message})`);
+            return;
+          }
+          if (!Array.isArray(updates) || updates.length === 0 || updates.some(update => typeof update?.packageEcosystem !== 'string' || typeof update?.directory !== 'string')) {
+            await requireHumanAction(['Dependabot metadata is empty or incomplete']);
+            core.setFailed('Dependabot metadata is empty or incomplete');
+            return;
+          }
+          if (manualRules.some(rule => updates.some(update => isManualRule(rule, update)))) {
+            await requireHumanAction(['update matches a manual merge rule']);
+            return;
+          }
+          const reasons = [];
+          for (const update of updates) {
+            const previous = parseSemver(update?.prevVersion);
+            const next = parseSemver(update?.newVersion);
+            const name = update?.dependencyName ?? '<unknown dependency>';
+            let reason;
+            if (!previous || !next) reason = 'missing or malformed semantic version';
+            else if (compareSemver(previous, next) >= 0) reason = 'version does not increase';
+            else {
+              const type = previous.major !== next.major ? 'version-update:semver-major' : previous.minor !== next.minor ? 'version-update:semver-minor' : 'version-update:semver-patch';
+              if (update?.updateType !== type) reason = `metadata type ${String(update?.updateType)} does not match ${type}`;
+              else if (type === 'version-update:semver-major') reason = 'semantic-version major updates require human action';
+              else if (type === 'version-update:semver-minor' && (previous.major === 0 || next.prerelease.length > 0)) reason = 'unstable minor updates require human action';
+            }
+            if (reason) reasons.push(`${name}: ${reason}`);
+          }
+          if (reasons.length > 0) {
+            await requireHumanAction(reasons.map(reason => `for ${reason}`));
+            return;
+          }
+          if (freshPr.auto_merge) {
+            core.info('Replacing existing auto-merge with the dedicated token');
+            await requireHumanAction([]);
+          }
+          const mergeToken = process.env.AUTOMERGE_TOKEN;
+          if (!mergeToken) {
+            core.setFailed('AUTOMERGE_TOKEN is not set');
+            return;
+          }
+          const response = await fetch(process.env.GRAPHQL_URL, {
+            method: 'POST',
+            headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${mergeToken}`, 'content-type': 'application/json', 'user-agent': 'dependabot-automerge-action', 'x-github-api-version': '2022-11-28' },
+            body: JSON.stringify({
+              query: 'mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, expectedHeadOid: $expectedHeadOid, mergeMethod: SQUASH }) { clientMutationId } }',
+              variables: { expectedHeadOid: expectedHead, pullRequestId: freshPr.node_id },
+            }),
+          });
+          let result;
+          try { result = await response.json(); } catch (error) {
+            throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status}): invalid JSON response`, { cause: error });
+          }
+          const errors = Array.isArray(result?.errors) ? result.errors.map(error => error?.message).filter(Boolean) : [];
+          if (!response.ok || errors.length > 0) throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status})${errors.length > 0 ? `: ${errors.join('; ')}` : ''}`);
+          const payload = result?.data?.enablePullRequestAutoMerge;
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !Object.hasOwn(payload, 'clientMutationId')) throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status}): unexpected response envelope`);
+          try { ({ data: freshPr } = await github.rest.pulls.get({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pr.number })); } catch (error) {
+            await requireHumanAction(['post-enable pull request refresh failed'], true);
+            core.setFailed(`Unable to revalidate enabled auto-merge (${error.message})`); return; }
+          if (freshPr.merged) { core.info('Done: auto-merge completed'); return; }
+          if (freshPr.state !== 'open') { core.setFailed('Pull request changed while auto-merge was enabled'); return; }
+          if (freshPr.user?.login !== 'dependabot[bot]' || freshPr.draft || freshPr.base?.ref !== context.payload.repository.default_branch || freshPr.base?.sha !== expectedBase || freshPr.head?.sha !== expectedHead || freshPr.head?.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` || freshPr.head?.ref !== pr.head?.ref || !freshPr.head?.ref?.startsWith('dependabot/')) {
+            await requireHumanAction(['pull request changed while auto-merge was enabled'], true);
+            core.setFailed('Pull request changed while auto-merge was enabled'); return;
+          }
+          core.info('Done: auto-merge enabled');

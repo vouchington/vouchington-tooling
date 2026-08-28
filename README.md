@@ -103,7 +103,29 @@ thread resolution. There is no `@claude` mention workflow.
     model: openrouter/stealth/ox-alpha
     payload_artifact_name: opencode
     openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+
+- uses: vouchington/vouchington-tooling/.github/actions/dependabot-automerge@<sha>
+  with:
+    automerge_token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+    # Optional: JSON rules that require manual merge for an ecosystem/directory.
+    manual_update_rules: '[{"packageEcosystem":"nuget","directory":"/native"}]'
 ```
+
+`dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
+auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
+branch before using the dedicated token to enable eligible auto-merge or disable stale auto-merge.
+The `automerge_token` must be a dedicated token because a
+`GITHUB_TOKEN` merge does not trigger downstream workflows. It must be stored specifically as a
+repository Dependabot secret, or as an organization Dependabot secret selected for every consumer
+repository—not only as an Actions secret—and needs Contents and Pull requests read/write permission. Mutation failures intentionally fail the job
+so a broken or underprivileged token cannot look like successful automation. Both manual-rule fields
+must exactly match `dependabot/fetch-metadata`; ecosystems are lowercase and directories include the leading slash. Use the action only from a trusted
+`pull_request_target` workflow that checks out the exact base SHA with credentials disabled; never
+check out or execute pull-request code. Include `converted_to_draft` and `edited` event types so the
+action can disable stale auto-merge after draft conversion or a base-branch retarget.
+
+The action never submits or requires an approval review. Branch-protection required checks remain
+the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
 
 Or call the two-job reusable workflow:
 
