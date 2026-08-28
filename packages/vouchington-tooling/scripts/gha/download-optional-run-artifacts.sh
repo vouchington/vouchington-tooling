@@ -63,7 +63,7 @@ list_artifact_names() {
 
 download_pattern() {
   artifacts=$(list_artifact_names | awk '!seen[$0]++') || return $?
-  count=0
+  selected_artifacts=()
   while IFS= read -r artifact; do
     [ -n "$artifact" ] || continue
     # shellcheck disable=SC2254
@@ -73,22 +73,16 @@ download_pattern() {
       *) continue ;;
     esac
     validate_artifact_name "$artifact" || return $?
-    count=$((count + 1))
+    selected_artifacts+=("$artifact")
     echo "[optional-run-artifacts] selected artifact=$artifact" >&2
   done < <(printf '%s\n' "$artifacts")
+  count=${#selected_artifacts[@]}
   echo "[optional-run-artifacts] selection selector=pattern count=$count" >&2
   [ "$count" -gt 0 ] || return 1
-  while IFS= read -r artifact; do
-    [ -n "$artifact" ] || continue
-    # shellcheck disable=SC2254
-    case "$artifact" in
-      $selector) ;;
-      *) continue ;;
-    esac
-    validate_artifact_name "$artifact" || return $?
+  for artifact in "${selected_artifacts[@]}"; do
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
     gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
-  done < <(printf '%s\n' "$artifacts")
+  done
 }
 
 if [ "$selector_type" = name ]; then
