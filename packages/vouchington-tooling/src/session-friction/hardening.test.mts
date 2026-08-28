@@ -155,15 +155,24 @@ it('preserves an expired lock owned by a running process', async () => {
   ).toThrow(/could not acquire/)
 })
 
-it('reclaims a stale lock with an out-of-range owner PID', async () => {
+it('reclaims stale locks with invalid owner PIDs', async () => {
   const directory = await temporaryDirectory()
   const options = { directory }
   recordFriction('invalid-owner', { type: 'tool-result', command: 'echo ok' }, options)
   const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
   const lock = join(directory, `${file}.lock`)
-  await writeFile(lock, '4294967296')
-  await utimes(lock, new Date(0), new Date(0))
-  expect(readFrictionLog('invalid-owner', options)).toEqual({ status: 'empty' })
+  for (const owner of [
+    '4294967296',
+    ` ${process.pid} `,
+    `+${process.pid}`,
+    `0x${process.pid.toString(16)}`,
+    `${process.pid}e0`,
+    `0${process.pid}`,
+  ]) {
+    await writeFile(lock, owner)
+    await utimes(lock, new Date(0), new Date(0))
+    expect(readFrictionLog('invalid-owner', options)).toEqual({ status: 'empty' })
+  }
 })
 
 it('does not follow a symbolic link while inspecting a lock owner', async () => {

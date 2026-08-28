@@ -15,6 +15,8 @@ const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
 const LOCK_OWNER_MAX_BYTES = 32
 const MAX_PID = 2_147_483_647
+const LOCK_CREATE_FLAGS =
+  constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function waitForLock(): void {
@@ -61,11 +63,12 @@ function inspectLock(
     }
     /* v8 ignore next -- detects external growth after the descriptor metadata check. */
     if (length > LOCK_OWNER_MAX_BYTES) return null
+    const rawOwner = buffer.subarray(0, length).toString()
     return {
       dev: status.dev,
       ino: status.ino,
       mtimeMs: status.mtimeMs,
-      owner: Number(buffer.subarray(0, length).toString()),
+      owner: /^[1-9][0-9]*$/.test(rawOwner) ? Number(rawOwner) : null,
     }
   } finally {
     closeSync(descriptor)
@@ -76,7 +79,7 @@ function withReaperLock(lockPath: string, action: () => boolean): boolean {
   const reaperPath = `${lockPath}.reap`
   let descriptor: number
   try {
-    descriptor = openSync(reaperPath, 'wx', 0o600)
+    descriptor = openSync(reaperPath, LOCK_CREATE_FLAGS, 0o600)
   } catch (error) {
     /* v8 ignore next 2 -- requires a narrow filesystem race or platform open failure. */
     if (hasCode(error, 'EEXIST') || hasCode(error, 'ENOENT')) return false
@@ -155,7 +158,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
     }
     let descriptor: number
     try {
-      descriptor = openSync(lockPath, 'wx', 0o600)
+      descriptor = openSync(lockPath, LOCK_CREATE_FLAGS, 0o600)
     } catch (error) {
       if (!hasCode(error, 'EEXIST')) throw error
       let lockStatus
