@@ -140,7 +140,9 @@ diagnostics separate from its paste-safe output. Capture stores at most 500 even
 truncates event detail to 1,000 characters, and consumes at most 500 entries from the journal loader
 when building a report. Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
 and rendered audit fields at 120 escaped characters. The supplied log directory must be dedicated
-to session-friction; directories and files are enforced as owner-only when recording.
+to session-friction; existing directories must already be owner-only, while newly created
+directories and log files are enforced as owner-only when recording. Reads allocate only the
+current log size, up to the documented 2 MB cap.
 Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
 grammar. Recording and report log reads are synchronous: on contention they block the caller's

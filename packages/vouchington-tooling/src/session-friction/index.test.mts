@@ -30,11 +30,16 @@ describe('classifyFrictionObservation', () => {
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
-        command: 'git push',
+        command: 'rtk git push',
+        commandWrappers: ['rtk'],
         escalationDetail: 'sandbox override',
         structuredStderr: 'EPERM',
       }),
-    ).toEqual({ kind: 'sandbox-escalation', commandPrefix: 'git push', detail: 'sandbox override' })
+    ).toEqual({
+      kind: 'sandbox-escalation',
+      commandPrefix: 'rtk git push',
+      detail: 'sandbox override',
+    })
   })
 
   it('classifies permission requests and structured stderr only', () => {
@@ -63,6 +68,13 @@ describe('classifyFrictionObservation', () => {
         structuredStderr: 'ECONNREFUSED 127.0.0.2',
       }),
     ).toMatchObject({ kind: 'sandbox-failure' })
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'node test',
+        structuredStderr: 'ECONNREFUSED at foo::1 bar',
+      }),
+    ).toBeNull()
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -335,13 +347,15 @@ describe('friction log', () => {
     ).toThrow(/could not acquire/)
   })
 
-  it('repairs restrictive evidence directory permissions', async () => {
+  it('rejects restrictive existing evidence directory permissions', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
     recordFriction('denied-lock', { type: 'tool-result', command: 'echo ok' }, options)
     await chmod(directoryPath, 0o500)
-    recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options)
-    expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
+    expect(() =>
+      recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/private directory/)
+    await chmod(directoryPath, 0o700)
   })
 
   it('bounds persisted escalation details', async () => {
@@ -367,15 +381,6 @@ describe('friction log', () => {
     const [file] = await readdir(directoryPath)
     expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
     expect((await stat(join(directoryPath, file!))).mode & 0o777).toBe(0o600)
-    await chmod(directoryPath, 0o777)
-    recordFriction(
-      'private-log',
-      { type: 'permission-request', command: 'git push' },
-      {
-        directory: directoryPath,
-      },
-    )
-    expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
     const result = readFrictionLog('private-log', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events[0]?.timestamp).toHaveLength(1_000)

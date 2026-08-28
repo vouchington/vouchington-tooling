@@ -1,12 +1,10 @@
 import {
   appendFileSync,
   chmodSync,
-  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
-  openSync,
-  readSync,
+  readFileSync,
   statSync,
 } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
@@ -60,15 +58,11 @@ function validEvent(value: unknown): value is FrictionEvent {
 }
 
 function readLogContent(path: string): string {
-  const descriptor = openSync(path, 'r')
-  try {
-    const buffer = Buffer.alloc(LOG_MAX_BYTES + 1)
-    const length = readSync(descriptor, buffer, 0, buffer.length, 0)
-    if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
-    return buffer.toString('utf8', 0, length)
-  } finally {
-    closeSync(descriptor)
-  }
+  if (statSync(path).size > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
+  const buffer = readFileSync(path)
+  /* v8 ignore next -- detects external growth between the size check and read. */
+  if (buffer.length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
+  return buffer.toString('utf8')
 }
 
 function validEventCount(content: string, limit: number): number {

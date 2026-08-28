@@ -32,7 +32,12 @@ async function collectEntries(
         retainedBytes += bytes
       }
     }
-    if (consumed >= JOURNAL_ENTRY_MAX_COUNT || inspectedBytes >= JOURNAL_TOTAL_MAX_BYTES) break
+    if (
+      consumed >= JOURNAL_ENTRY_MAX_COUNT ||
+      inspectedBytes >= JOURNAL_TOTAL_MAX_BYTES ||
+      retainedBytes >= JOURNAL_TOTAL_MAX_BYTES
+    )
+      break
   }
   return result
 }

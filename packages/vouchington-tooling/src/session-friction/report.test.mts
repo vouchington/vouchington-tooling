@@ -88,7 +88,7 @@ describe('buildSessionFrictionReport', () => {
       journalLoader: async () => ({ status: 'not-found' }),
     })
     expect(report.markdown).not.toContain('\n## forged')
-    expect(report.markdown).toContain('override - forged')
+    expect(report.markdown).toContain('override \\- forged')
   })
 
   it('renders journal failures and deterministic sandbox events', async () => {
@@ -137,8 +137,8 @@ describe('buildSessionFrictionReport', () => {
     })
     expect(report.markdown).not.toMatch(/(?:^|[^\\])<!--/)
     expect(report.markdown).not.toMatch(/(?:^|[^\\])-->/)
-    expect(report.markdown).toContain('\\<!-- hidden')
-    expect(report.markdown).toContain('--\\> \\*forged\\*')
+    expect(report.markdown).toContain('\\<\\!\\-\\- hidden')
+    expect(report.markdown).toContain('\\-\\-\\> \\*forged\\*')
   })
 
   it('treats not-found as empty and keeps thrown diagnostics separate', async () => {

@@ -54,7 +54,7 @@ function splitCommand(command: string): string[][] {
       if (char === quote) quote = undefined
       else word += char
     } else if (char === '"' || char === "'") quote = char
-    else if (';&|\n\r'.includes(char)) flushSegment()
+    else if (';&|<>\n\r'.includes(char)) flushSegment()
     else if (/\s/.test(char)) flushWord()
     else word += char
   }
@@ -129,9 +129,10 @@ export function normalizeCommandPrefix(command: string, wrappersToStrip: string[
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
   const tokens = stripAssignments(segments[index] ?? [])
+  const wrapperNames = new Set(wrappersToStrip.filter(Boolean))
   let wrappers = 0
-  while (wrappersToStrip.includes(tokens[wrappers] ?? '')) wrappers++
+  while (tokens[wrappers] && wrapperNames.has(tokens[wrappers]!)) wrappers++
   if (!wrappers) return normalizeSegment(tokens)
   const nested = normalizeSegment(stripAssignments(tokens.slice(wrappers)))
-  return nested ? `${wrappersToStrip[0]} ${nested}` : (wrappersToStrip[0] ?? '')
+  return nested ? `${tokens[0]} ${nested}` : tokens[0]!
 }

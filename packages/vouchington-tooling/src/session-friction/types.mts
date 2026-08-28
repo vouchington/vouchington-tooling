@@ -10,6 +10,7 @@ export type FrictionEvent = {
 export type ToolResultObservation = {
   type: 'tool-result'
   command: string
+  commandWrappers?: string[]
   escalationDetail?: string
   structuredStderr?: string
 }
@@ -17,6 +18,7 @@ export type ToolResultObservation = {
 export type PermissionRequestObservation = {
   type: 'permission-request'
   command: string
+  commandWrappers?: string[]
 }
 
 export type FrictionObservation = ToolResultObservation | PermissionRequestObservation

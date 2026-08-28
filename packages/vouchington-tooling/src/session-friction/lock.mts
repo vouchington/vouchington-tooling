@@ -46,7 +46,8 @@ function withReaperLock(lockPath: string, action: () => boolean): boolean {
 function removeStaleLock(lockPath: string): boolean {
   return withReaperLock(lockPath, () => {
     try {
-      const fresh = Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS
+      const inspected = statSync(lockPath)
+      const fresh = Date.now() - inspected.mtimeMs < STALE_LOCK_AGE_MS
       const owner = Number(readFileSync(lockPath, 'utf8'))
       if (Number.isInteger(owner) && owner > 0) {
         try {
@@ -56,6 +57,14 @@ function removeStaleLock(lockPath: string): boolean {
           if (!hasCode(error, 'ESRCH')) return false
         }
       } else if (fresh) return false
+      const current = statSync(lockPath)
+      if (
+        current.dev !== inspected.dev ||
+        current.ino !== inspected.ino ||
+        current.mtimeMs !== inspected.mtimeMs
+      )
+        /* v8 ignore next -- requires external replacement despite the reaper protocol. */
+        return false
       unlinkSync(lockPath)
       return true
     } catch {
