@@ -249,6 +249,16 @@ it('does not recognize IPv6 loopback embedded in remote-looking tokens', () => {
   ).toMatchObject({ kind: 'sandbox-failure' })
 })
 
+it('does not recognize an IPv4-looking tail inside a remote IPv6 address', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl remote',
+      structuredStderr: 'connect ECONNREFUSED 2001:db8::127.0.0.1:443',
+    }),
+  ).toBeNull()
+})
+
 it('bounds structured stderr inspection', () => {
   expect(
     classifyFrictionObservation({

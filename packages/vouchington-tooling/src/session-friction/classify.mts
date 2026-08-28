@@ -13,7 +13,7 @@ const COMMAND_INSPECTION_MAX_LENGTH = 10_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
 const LOOPBACK_ADDRESSES = [
   new RegExp(
-    String.raw`(?<![0-9a-z_.-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])`,
+    String.raw`(?<![0-9a-z_.:-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])`,
     'i',
   ),
   /(?<![0-9a-z_.-])\[(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\](?![0-9a-z_.-])/i,
