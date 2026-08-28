@@ -124,14 +124,14 @@ function normalizeSegment(tokens: string[]): string {
   return effective[0] ? `${redact(first)} ${redact(effective[0])}` : redact(first)
 }
 
-export function normalizeCommandPrefix(command: string): string {
+export function normalizeCommandPrefix(command: string, wrappersToStrip: string[] = []): string {
   const segments = splitCommand(command)
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
   const tokens = stripAssignments(segments[index] ?? [])
   let wrappers = 0
-  while (tokens[wrappers] === 'rtk') wrappers++
+  while (wrappersToStrip.includes(tokens[wrappers] ?? '')) wrappers++
   if (!wrappers) return normalizeSegment(tokens)
   const nested = normalizeSegment(stripAssignments(tokens.slice(wrappers)))
-  return nested ? `rtk ${nested}` : 'rtk'
+  return nested ? `${wrappersToStrip[0]} ${nested}` : (wrappersToStrip[0] ?? '')
 }
