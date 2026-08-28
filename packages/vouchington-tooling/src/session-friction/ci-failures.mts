@@ -1,5 +1,5 @@
 import type { FrictionLogReadResult, JournalEntry } from './types.mts'
-import { markdownAuditText } from './text.mts'
+import { isWellFormedUnicode, markdownAuditText } from './text.mts'
 
 const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$/
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
@@ -26,6 +26,7 @@ function safeField(line: string): string | null {
 }
 
 function matchBlock(markdown: string): string | null {
+  if (!isWellFormedUnicode(markdown)) return null
   const lines = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
   let index = 0
   const consume = (pattern: RegExp): string | null => {

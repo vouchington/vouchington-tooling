@@ -20,7 +20,7 @@ const LOCK_CREATE_FLAGS =
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function waitForLock(): void {
-  // Intentional synchronous backoff; Node 24 supports Atomics.wait on its main thread.
+  // Intentional synchronous backoff for CLI and hook callers.
   Atomics.wait(lockWait, 0, 0, 5)
 }
 
@@ -170,8 +170,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
         /* v8 ignore next -- requires an unexpected lstat failure during the same race. */
         throw statusError
       }
-      if (lockStatus.isSymbolicLink())
-        throw new Error('session-friction log lock must be a regular file')
+      if (!lockStatus.isFile()) throw new Error('session-friction log lock must be a regular file')
       if (removeStaleLock(lockPath)) continue
       waitForLock()
       continue

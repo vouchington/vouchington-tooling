@@ -106,6 +106,23 @@ it('rejects invalid UTF-8 in a session log', async () => {
   expect(() => readFrictionLog('invalid-utf8', options)).toThrow(/not valid UTF-8/)
 })
 
+it('ignores persisted events with ill-formed audit fields', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('invalid-unicode', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  await writeFile(
+    join(directory, file),
+    `${JSON.stringify({
+      kind: 'sandbox-failure',
+      timestamp: '2026-08-28T00:00:00Z',
+      commandPrefix: 'git push',
+      detail: '\ud800',
+    })}\n`,
+  )
+  expect(readFrictionLog('invalid-unicode', options)).toEqual({ status: 'empty' })
+})
+
 it('rejects a multiply-linked session log without modifying its target', async () => {
   const directory = await temporaryDirectory()
   const outside = await temporaryDirectory()
@@ -218,6 +235,17 @@ it('does not follow a symbolic link while inspecting a lock owner', async () => 
   expect(readFrictionLog('linked-lock', options)).toEqual({ status: 'empty' })
 })
 
+it('rejects a non-regular lock without removing it', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('directory-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  await mkdir(lock)
+  expect(() => readFrictionLog('directory-lock', options)).toThrow(/lock must be a regular file/)
+  expect((await stat(lock)).isDirectory()).toBe(true)
+})
+
 it('requires loopback hostnames to end at a hostname boundary', () => {
   expect(classifyFrictionObservation({ type: 'permission-request', command: '\u200b' })).toBeNull()
   expect(classifyFrictionObservation({ type: 'permission-request', command: '&&' })).toBeNull()
@@ -255,6 +283,39 @@ it('does not recognize an IPv4-looking tail inside a remote IPv6 address', () =>
       type: 'tool-result',
       command: 'curl remote',
       structuredStderr: 'connect ECONNREFUSED 2001:db8::127.0.0.1:443',
+    }),
+  ).toBeNull()
+})
+
+it('does not recognize loopback-looking URL userinfo as the remote host', () => {
+  for (const userinfo of ['localhost', '127.0.0.1', 'localhost:password'])
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: `connect ECONNREFUSED https://${userinfo}@example.test:443`,
+      }),
+    ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl local',
+      structuredStderr: 'connect ECONNREFUSED https://user:password@localhost:443',
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
+})
+
+it('rejects primitive observations and ill-formed audit text', () => {
+  expect(classifyFrictionObservation(null as unknown as FrictionObservation)).toBeNull()
+  expect(classifyFrictionObservation(42 as unknown as FrictionObservation)).toBeNull()
+  expect(
+    classifyFrictionObservation({ type: 'permission-request', command: 'git \ud800push' }),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: 'bad \udc00detail',
     }),
   ).toBeNull()
 })
@@ -305,6 +366,13 @@ it('rejects non-string timestamp callback results', async () => {
       },
     ),
   ).toThrow(/timestamp must be non-empty/)
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      { directory, timestamp: '2026-08-28T00:00:00Z\ud800' },
+    ),
+  ).toThrow(/timestamp must be well-formed Unicode/)
   expect(existsSync(directory)).toBe(false)
 })
 

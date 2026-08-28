@@ -37,6 +37,7 @@ describe('CI failure grammar', () => {
     expect(isConformingCiFailureBlock(`${conforming} `)).toBe(false)
     expect(isConformingCiFailureBlock(`${conforming}${'x'.repeat(10_000)}`)).toBe(false)
     expect(isConformingCiFailureBlock(`${conforming}${'é'.repeat(5_000)}`)).toBe(false)
+    expect(isConformingCiFailureBlock(conforming.replace('cache corruption', '\ud800'))).toBe(false)
     expect(
       getConformingGroups([
         {

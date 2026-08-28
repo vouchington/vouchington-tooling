@@ -79,6 +79,7 @@ function stripAssignments(tokens: string[]): string[] {
   let index = 0
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
   const wrapper = tokens[index]
+  // Assignments without an executable are represented by a safe sentinel.
   if (wrapper !== 'env' && !wrapper?.endsWith('/env'))
     return index < tokens.length ? tokens.slice(index) : index ? [REDACTED_TOKEN] : tokens
   index++

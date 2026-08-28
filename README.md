@@ -237,9 +237,9 @@ inspected-byte budget is reached. Log reads are capped at 2 MB, journal Markdown
 10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
 and report construction synchronously access the evidence log and may wait up to one second for a
 contended per-session file lock before failing explicitly. Evidence-directory validation requires
-POSIX ownership and mode checks, so it fails closed on platforms without them.
-Command-prefix normalization is not a secret scrubber; callers must not include credentials in
-captured commands.
+POSIX ownership and mode checks (Linux and macOS), so session-friction throws on Windows.
+Command-prefix normalization attempts limited redaction of obvious credential patterns but is not
+a secret scrubber; callers must not include credentials in captured commands.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in

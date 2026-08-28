@@ -3,7 +3,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { classifyFrictionObservation } from './classify.mts'
 import { ensurePrivateDirectory } from './directory.mts'
 import { withFileLock } from './lock.mts'
-import { boundedText, isSafeAuditText, normalizeAuditText } from './text.mts'
+import { boundedText, isSafeAuditText, isWellFormedUnicode, normalizeAuditText } from './text.mts'
 import type {
   FrictionEvent,
   FrictionLogOptions,
@@ -15,7 +15,6 @@ import { sanitizeSessionId } from './session-id.mts'
 export const FRICTION_LOG_MAX_EVENTS = 500
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
-
 export function requireDirectory(directory: string): string {
   if (typeof directory !== 'string') throw new Error('log directory must be a string')
   if (Buffer.byteLength(directory) > 4096)
@@ -100,7 +99,6 @@ function validEventCount(content: string, limit: number): number {
   return count
 }
 
-// A raw line count under the limit proves the valid-event count is also under it.
 function atEventLimit(content: string, limit: number): boolean {
   return nonEmptyLineCount(content) >= limit && validEventCount(content, limit) >= limit
 }
@@ -129,6 +127,8 @@ export function recordFriction(
   const rawTimestamp = timestamp ?? new Date().toISOString()
   const normalizedTimestamp = normalizeAuditText(boundedText(rawTimestamp, EVENT_FIELD_MAX_LENGTH))
   if (!normalizedTimestamp) throw new Error('timestamp must be non-empty')
+  if (!isWellFormedUnicode(normalizedTimestamp))
+    throw new Error('timestamp must be well-formed Unicode')
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)

@@ -1,5 +1,5 @@
 import { normalizeCommandPrefix } from './normalize.mts'
-import { boundedText, normalizeAuditText } from './text.mts'
+import { boundedText, isWellFormedUnicode, normalizeAuditText } from './text.mts'
 import type { FrictionEvent, FrictionObservation } from './types.mts'
 
 const FAILURE_TOKENS: [string, RegExp][] = [
@@ -8,6 +8,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
   ['EPERM', /\bEPERM\b/i],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
+const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)[^\s/?#]*@/gi
 const STDERR_INSPECTION_MAX_LENGTH = 100_000
 const COMMAND_INSPECTION_MAX_LENGTH = 10_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
@@ -40,11 +41,12 @@ function boundedStderr(value: string): string {
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
+  if (!observation || typeof observation !== 'object') return null
   if (typeof observation.command !== 'string') return null
   const command = boundedText(observation.command, COMMAND_INSPECTION_MAX_LENGTH)
-  if (normalizeAuditText(command) === '') return null
+  if (!isWellFormedUnicode(command) || normalizeAuditText(command) === '') return null
   const commandPrefix = normalizeCommandPrefix(command, observation.commandWrappers)
-  if (commandPrefix === '') return null
+  if (commandPrefix === '' || !isWellFormedUnicode(commandPrefix)) return null
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
   }
@@ -57,6 +59,7 @@ export function classifyFrictionObservation(
   const escalationDetail = normalizeAuditText(
     boundedText(observation.escalationDetail ?? '', DETAIL_MAX_LENGTH),
   )
+  if (!isWellFormedUnicode(escalationDetail)) return null
   if (escalationDetail) {
     return {
       kind: 'sandbox-escalation',
@@ -65,18 +68,19 @@ export function classifyFrictionObservation(
     }
   }
   const rawStderr = observation.structuredStderr
-  if (rawStderr !== undefined && typeof rawStderr !== 'string') return null
+  if (rawStderr !== undefined && (typeof rawStderr !== 'string' || !isWellFormedUnicode(rawStderr)))
+    return null
   const stderr = rawStderr ? boundedStderr(rawStderr) : rawStderr
   if (stderr === undefined) return null
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
   if (
-    stderr
-      .split(/\r\n|[\r\n]/)
-      .some(
-        (line) =>
-          CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line)),
+    stderr.split(/\r\n|[\r\n]/).some((rawLine) => {
+      const line = rawLine.replace(URL_USERINFO, '$1')
+      return (
+        CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line))
       )
+    })
   ) {
     return {
       kind: 'sandbox-failure',
