@@ -55,6 +55,7 @@ describe('normalizeCommandPrefix', () => {
     )
     expect(normalizeCommandPrefix('env -i --ignore-environment API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('/usr/bin/env API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('rtk env API_TOKEN=secret curl')).toBe('rtk curl')
     expect(normalizeCommandPrefix('env --chdir /tmp API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('…')
@@ -191,7 +192,7 @@ describe('friction log', () => {
       recordFriction(
         'capped',
         { type: 'permission-request', command: 'git push' },
-        { directory: directoryPath, timestamp: String(index) },
+        { directory: directoryPath, maxEvents: 1_000, timestamp: String(index) },
       )
     const result = readFrictionLog('capped', { directory: directoryPath })
     expect(result.status).toBe('events')
@@ -233,6 +234,19 @@ describe('friction log', () => {
     if (result.status === 'events') expect(result.events).toHaveLength(1)
   })
 
+  it('separates a new event from an unterminated malformed line', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('unterminated', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, file!), 'not-json')
+    recordFriction('unterminated', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('unterminated', options)).toMatchObject({
+      status: 'events',
+      events: [expect.objectContaining({ commandPrefix: 'git push' })],
+    })
+  })
+
   it('sanitizes session ids and validates limits before touching storage', async () => {
     const directoryPath = await directory()
     recordFriction(
@@ -242,6 +256,9 @@ describe('friction log', () => {
     )
     expect(await readdir(directoryPath)).toEqual([expect.stringMatching(/^[a-f0-9]{64}\.jsonl$/)])
     expect(readFrictionLog('parent_child_path', { directory: directoryPath })).toEqual({
+      status: 'absent',
+    })
+    expect(readFrictionLog('missing', { directory: join(directoryPath, 'missing') })).toEqual({
       status: 'absent',
     })
     expect(() =>
@@ -390,18 +407,25 @@ describe('friction log', () => {
     const options = { directory: directoryPath }
     recordFriction('oversized-log', { type: 'tool-result', command: 'echo ok' }, options)
     const [file] = await readdir(directoryPath)
-    await writeFile(join(directoryPath, file!), 'x'.repeat(2_000_001))
+    const path = join(directoryPath, file!)
+    await writeFile(path, 'x'.repeat(2_000_000))
+    expect(() =>
+      recordFriction('oversized-log', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/too large/)
+    expect((await stat(path)).size).toBe(2_000_000)
+    await writeFile(path, 'x'.repeat(2_000_001))
     expect(() => readFrictionLog('oversized-log', options)).toThrow(/too large/)
     expect(() =>
       recordFriction('oversized-log', { type: 'permission-request', command: 'git push' }, options),
     ).toThrow(/too large/)
   })
 
-  it('uses the session lock while reading', async () => {
+  it('uses the session lock while first log creation is in progress', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
     recordFriction('read-locked', { type: 'tool-result', command: 'echo ok' }, options)
     const [file] = await readdir(directoryPath)
+    await rm(join(directoryPath, file!))
     await writeFile(join(directoryPath, `${file}.lock`), '')
     expect(() => readFrictionLog('read-locked', options)).toThrow(/could not acquire/)
   })

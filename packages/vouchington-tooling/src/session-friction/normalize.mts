@@ -105,7 +105,7 @@ function packageRunner(token: string): boolean {
 function normalizeSegment(tokens: string[]): string {
   const [first, ...rest] = tokens
   if (!first) return ''
-  if (first === 'rtk' && rest.length) return `rtk ${normalizeSegment(rest)}`
+  if (first === 'rtk' && rest.length) return `rtk ${normalizeSegment(stripAssignments(rest))}`
   if (packageRunner(first) && (rest[0] === 'run' || rest[0] === 'exec') && rest[1])
     return `${redact(first)} ${rest[0]} ${redact(rest[1])}`
   const effective = first === 'git' ? stripGitOptions(rest) : rest

@@ -39,7 +39,7 @@ function requireDirectory(directory: string): string {
 function eventLimit(maxEvents: number | undefined): number {
   const limit = maxEvents ?? FRICTION_LOG_MAX_EVENTS
   if (!Number.isInteger(limit) || limit < 1) throw new Error('maxEvents must be a positive integer')
-  return limit
+  return Math.min(limit, FRICTION_LOG_MAX_EVENTS)
 }
 
 function sanitizeSessionId(sessionId: string): string {
@@ -75,15 +75,13 @@ function readLogContent(path: string): string {
   }
 }
 
-function validEventCount(path: string, limit: number): number {
+function validEventCount(content: string, limit: number): number {
   let count = 0
-  for (const line of readLogContent(path).split('\n')) {
+  for (const line of content.split('\n')) {
     if (!line.trim()) continue
     try {
       if (validEvent(JSON.parse(line))) count++
-    } catch {
-      // Malformed lines do not count toward the event limit.
-    }
+    } catch {}
     if (count >= limit) break
   }
   return count
@@ -156,7 +154,10 @@ export function recordFriction(
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withLogLock(path, () => {
     appendFileSync(path, '', { encoding: 'utf8', mode: 0o600 })
-    if (!classified || validEventCount(path, maxEvents) >= maxEvents) return
+    chmodSync(path, statSync(path).mode & 0o600)
+    if (!classified) return
+    const content = readLogContent(path)
+    if (validEventCount(content, maxEvents) >= maxEvents) return
     const event = {
       ...classified,
       commandPrefix: normalizeAuditText(classified.commandPrefix),
@@ -167,7 +168,13 @@ export function recordFriction(
           EVENT_FIELD_MAX_LENGTH,
         ) || new Date().toISOString(),
     }
-    if (validEvent(event)) appendFileSync(path, `${JSON.stringify(event)}\n`, 'utf8')
+    /* v8 ignore next -- normalized classified fields satisfy validEvent defensively. */
+    if (!validEvent(event)) return
+    const prefix = content && !content.endsWith('\n') ? '\n' : ''
+    const addition = `${prefix}${JSON.stringify(event)}\n`
+    if (statSync(path).size + Buffer.byteLength(addition) > LOG_MAX_BYTES)
+      throw new Error('session-friction log is too large')
+    appendFileSync(path, addition, 'utf8')
   })
 }
 
@@ -176,7 +183,7 @@ export function readFrictionLog(
   options: FrictionLogOptions,
 ): FrictionLogReadResult {
   const path = logPath(sessionId, options.directory)
-  if (!existsSync(path)) return { status: 'absent' }
+  if (!existsSync(requireDirectory(options.directory))) return { status: 'absent' }
   return withLogLock(path, () => {
     if (!existsSync(path)) return { status: 'absent' }
     const events: FrictionEvent[] = []
@@ -185,9 +192,7 @@ export function readFrictionLog(
       try {
         const value: unknown = JSON.parse(line)
         if (validEvent(value)) events.push(value)
-      } catch {
-        // Corrupt lines do not make the rest of a session's evidence unreadable.
-      }
+      } catch {}
     }
     return events.length ? { status: 'events', events } : { status: 'empty' }
   })
