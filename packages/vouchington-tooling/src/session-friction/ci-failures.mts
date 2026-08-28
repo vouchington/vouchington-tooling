@@ -48,8 +48,11 @@ export function isConformingCiFailureBlock(markdown: string): boolean {
 
 function journalMarkdown(entries: Iterable<JournalEntry>): string[] {
   return [...entries]
-    .filter((entry) => entry.data?.type === 'journal')
-    .map((entry) => (typeof entry.data?.markdown === 'string' ? entry.data.markdown : ''))
+    .filter((entry) => (entry as JournalEntry | null)?.data?.type === 'journal')
+    .map((entry) => {
+      const markdown = (entry as JournalEntry | null)?.data?.markdown
+      return typeof markdown === 'string' ? markdown : ''
+    })
 }
 
 export function getConformingGroups(entries: Iterable<JournalEntry>): string[] {
