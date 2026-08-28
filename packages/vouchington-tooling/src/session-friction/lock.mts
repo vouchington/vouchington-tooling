@@ -39,8 +39,8 @@ function inspectLock(
       lockPath,
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     )
-    /* v8 ignore next 2 -- detects a lock that disappears or is replaced while being inspected. */
   } catch {
+    /* v8 ignore next -- detects a lock that disappears or is replaced while being inspected. */
     return null
   }
   try {
@@ -152,11 +152,11 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       descriptor = openSync(lockPath, 'wx', 0o600)
     } catch (error) {
       if (!hasCode(error, 'EEXIST')) throw error
-      /* v8 ignore next 7 -- detects ordinary lock release between O_EXCL and lstat. */
       let lockStatus
       try {
         lockStatus = lstatSync(lockPath)
       } catch (statusError) {
+        /* v8 ignore next 2 -- detects ordinary lock release between O_EXCL and lstat. */
         if (hasCode(statusError, 'ENOENT')) continue
         throw statusError
       }
