@@ -23,13 +23,11 @@ export function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
   return resolve(directory)
 }
-
 export function eventLimit(maxEvents: number | undefined): number {
   const limit = maxEvents ?? FRICTION_LOG_MAX_EVENTS
   if (!Number.isInteger(limit) || limit < 1) throw new Error('maxEvents must be a positive integer')
   return Math.min(limit, FRICTION_LOG_MAX_EVENTS)
 }
-
 function logPath(sessionId: string, directory: string): string {
   return join(requireDirectory(directory), `${sanitizeSessionId(sessionId)}.jsonl`)
 }
