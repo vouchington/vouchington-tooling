@@ -91,7 +91,8 @@ function validEventCount(path: string, limit: number): number {
 
 function removeStaleLock(lockPath: string): boolean {
   try {
-    const fresh = Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS
+    const ageMs = Date.now() - statSync(lockPath).mtimeMs
+    const fresh = ageMs >= 0 && ageMs < STALE_LOCK_AGE_MS
     const owner = Number(readFileSync(lockPath, 'utf8'))
     let ownerDead = false
     if (Number.isInteger(owner) && owner > 0) {
