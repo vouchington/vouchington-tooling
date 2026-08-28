@@ -10,5 +10,5 @@ export function isSafeAuditText(value: unknown): value is string {
 }
 
 export function markdownAuditText(value: string): string {
-  return normalizeAuditText(value).slice(0, 120).replace(MARKDOWN_CHARACTERS, '\\$&')
+  return normalizeAuditText(value).replace(MARKDOWN_CHARACTERS, '\\$&').slice(0, 120)
 }
