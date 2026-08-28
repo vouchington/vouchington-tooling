@@ -58,6 +58,7 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('env')).toBe('')
     expect(normalizeCommandPrefix('env -i')).toBe('')
     expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
+    expect(normalizeCommandPrefix("echo '\\' && git push")).toBe('echo \\')
     expect(normalizeCommandPrefix('echo > /private/path')).toBe('echo')
   })
 })

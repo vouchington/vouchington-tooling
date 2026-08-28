@@ -52,7 +52,7 @@ function openLogFile(path: string, flags: number): number {
       error &&
       typeof error === 'object' &&
       'code' in error &&
-      (error.code === 'ELOOP' || error.code === 'EISDIR')
+      (error.code === 'ELOOP' || error.code === 'EISDIR' || error.code === 'ENOTDIR')
     )
       throw new Error('session-friction log must be a regular file')
     throw error
