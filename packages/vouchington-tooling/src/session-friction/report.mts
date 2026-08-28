@@ -21,8 +21,9 @@ async function collectEntries(
   let totalBytes = 0
   for await (const entry of entries) {
     consumed++
-    const markdown = entry.data?.markdown
-    if (entry.data?.type === 'journal' && typeof markdown === 'string') {
+    const data = (entry as JournalEntry | null)?.data
+    const markdown = data?.markdown
+    if (data?.type === 'journal' && typeof markdown === 'string') {
       const bytes = Buffer.byteLength(markdown)
       if (bytes <= JOURNAL_MARKDOWN_MAX_BYTES && totalBytes + bytes <= JOURNAL_TOTAL_MAX_BYTES) {
         result.push({ data: { type: 'journal', markdown } })

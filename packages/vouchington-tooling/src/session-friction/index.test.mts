@@ -103,7 +103,7 @@ describe('classifyFrictionObservation', () => {
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'cat',
-        structuredStderr: 'EPERM',
+        structuredStderr: 'eperm',
       }),
     ).toEqual({
       kind: 'sandbox-failure',

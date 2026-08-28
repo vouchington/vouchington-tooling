@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildSessionFrictionReport, isConformingCiFailureBlock, recordFriction } from './index.mts'
 import { getConformingGroups } from './ci-failures.mts'
+import type { JournalEntry } from './types.mts'
 import { buildSandboxSection } from './sandbox.mts'
 
 const directories: string[] = []
@@ -35,6 +36,7 @@ describe('CI failure grammar', () => {
     expect(isConformingCiFailureBlock(conforming.split('\n').slice(0, 2).join('\n'))).toBe(false)
     expect(isConformingCiFailureBlock(`${conforming} `)).toBe(false)
     expect(getConformingGroups([{ data: { type: 'journal', markdown: 42 } }])).toEqual([])
+    expect(getConformingGroups([null] as unknown as JournalEntry[])).toEqual([])
   })
 })
 
@@ -62,6 +64,16 @@ describe('buildSessionFrictionReport', () => {
       },
     ])
     expect(section.split(' — ')[1]).toHaveLength(120)
+    const boundary = buildSandboxSection([
+      {
+        kind: 'sandbox-escalation',
+        commandPrefix: 'git push',
+        detail: `${'a'.repeat(119)}*`,
+        timestamp: '1',
+      },
+    ])
+    expect(boundary.split(' — ')[1]).toHaveLength(119)
+    expect(boundary.split(' — ')[1]).not.toMatch(/\\$/)
   })
 
   it('keeps report fields on one markdown line', async () => {
@@ -169,19 +181,25 @@ describe('buildSessionFrictionReport', () => {
   it('bounds journal entries consumed from an iterable', async () => {
     const directory = await makeDirectory()
     let consumed = 0
+    let closed = false
     const report = await buildSessionFrictionReport('s', {
       directory,
       journalLoader: () => ({
         status: 'ok',
         entries: (function* () {
-          while (true) {
-            consumed++
-            yield { data: { type: 'retrospective' } }
+          try {
+            while (true) {
+              consumed++
+              yield { data: { type: 'retrospective' } }
+            }
+          } finally {
+            closed = true
           }
         })(),
       }),
     })
     expect(consumed).toBe(500)
+    expect(closed).toBe(true)
     expect(report.markdown).toContain('unavailable')
   })
 

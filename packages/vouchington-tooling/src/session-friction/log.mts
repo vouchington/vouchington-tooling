@@ -65,7 +65,7 @@ function validEvent(value: unknown): value is FrictionEvent {
 function readLogContent(path: string): string {
   const descriptor = openSync(path, 'r')
   try {
-    const buffer = Buffer.allocUnsafe(LOG_MAX_BYTES + 1)
+    const buffer = Buffer.alloc(LOG_MAX_BYTES + 1)
     const length = readSync(descriptor, buffer, 0, buffer.length, 0)
     if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
     return buffer.toString('utf8', 0, length)
