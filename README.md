@@ -232,8 +232,10 @@ import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/
 directory, hook observation, and journal loader. Host payload parsing, hook installation, session
 discovery, and journal transport stay with the consuming repository. Capture stores at most 500
 events per session, truncates event detail to 1,000 characters, and consumes at most 500 entries
-from the journal loader when building a report. Recording is synchronous and may wait up to one
-second for a contended per-session file lock before failing explicitly.
+from the journal loader when building a report. Log reads are capped at 2 MB, journal Markdown at
+10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
+is synchronous and may wait up to one second for a contended per-session file lock before failing
+explicitly.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in

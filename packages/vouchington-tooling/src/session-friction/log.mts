@@ -27,6 +27,7 @@ const SESSION_ID_MAX_LENGTH = 4096
 const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
 const LOG_MAX_BYTES = 2_000_000
+const EVENT_FIELD_MAX_LENGTH = 1_000
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function requireDirectory(directory: string): string {
@@ -89,17 +90,20 @@ function validEventCount(path: string, limit: number): number {
 
 function removeStaleLock(lockPath: string): boolean {
   try {
+    const fresh = Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS
     const owner = Number(readFileSync(lockPath, 'utf8'))
+    let ownerDead = false
     if (Number.isInteger(owner) && owner > 0) {
       try {
         process.kill(owner, 0)
-        return false
       } catch (error) {
         if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH'))
           /* v8 ignore next -- permission errors conservatively preserve a potentially live lock. */
           return false
+        ownerDead = true
       }
-    } else if (Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS) return false
+    }
+    if (!ownerDead && fresh) return false
     unlinkSync(lockPath)
     return true
   } catch {
@@ -113,7 +117,7 @@ function withLogLock<Result>(path: string, action: () => Result): Result {
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
     let descriptor: number
     try {
-      descriptor = openSync(lockPath, 'wx')
+      descriptor = openSync(lockPath, 'wx', 0o600)
     } catch (error) {
       if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST'))
         /* v8 ignore next -- lock acquisition failures are platform errors that must propagate. */
@@ -141,18 +145,21 @@ export function recordFriction(
   const maxEvents = eventLimit(options.maxEvents)
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
-  mkdirSync(requireDirectory(options.directory), { recursive: true })
+  mkdirSync(requireDirectory(options.directory), { mode: 0o700, recursive: true })
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withLogLock(path, () => {
-    appendFileSync(path, '', 'utf8')
+    appendFileSync(path, '', { encoding: 'utf8', mode: 0o600 })
     if (!classified || validEventCount(path, maxEvents) >= maxEvents) return
     const event = {
       ...classified,
       commandPrefix: normalizeAuditText(classified.commandPrefix),
       detail: normalizeAuditText(classified.detail),
       timestamp:
-        normalizeAuditText(timestamp ?? new Date().toISOString()) || new Date().toISOString(),
+        normalizeAuditText(timestamp ?? new Date().toISOString()).slice(
+          0,
+          EVENT_FIELD_MAX_LENGTH,
+        ) || new Date().toISOString(),
     }
     if (validEvent(event)) appendFileSync(path, `${JSON.stringify(event)}\n`, 'utf8')
   })

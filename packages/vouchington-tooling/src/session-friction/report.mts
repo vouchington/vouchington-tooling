@@ -10,14 +10,26 @@ import type {
 } from './types.mts'
 
 const JOURNAL_ENTRY_MAX_COUNT = 500
+const JOURNAL_MARKDOWN_MAX_BYTES = 10_000
+const JOURNAL_TOTAL_MAX_BYTES = 1_000_000
 
 async function collectEntries(
   entries: Iterable<JournalEntry> | AsyncIterable<JournalEntry>,
 ): Promise<JournalEntry[]> {
   const result: JournalEntry[] = []
+  let consumed = 0
+  let totalBytes = 0
   for await (const entry of entries) {
-    result.push(entry)
-    if (result.length >= JOURNAL_ENTRY_MAX_COUNT) break
+    consumed++
+    const markdown = entry.data?.markdown
+    if (entry.data?.type === 'journal' && typeof markdown === 'string') {
+      const bytes = Buffer.byteLength(markdown)
+      if (bytes <= JOURNAL_MARKDOWN_MAX_BYTES && totalBytes + bytes <= JOURNAL_TOTAL_MAX_BYTES) {
+        result.push({ data: { type: 'journal', markdown } })
+        totalBytes += bytes
+      }
+    }
+    if (consumed >= JOURNAL_ENTRY_MAX_COUNT || totalBytes >= JOURNAL_TOTAL_MAX_BYTES) break
   }
   return result
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildSessionFrictionReport, isConformingCiFailureBlock, recordFriction } from './index.mts'
+import { getConformingGroups } from './ci-failures.mts'
 import { buildSandboxSection } from './sandbox.mts'
 
 const directories: string[] = []
@@ -33,6 +34,7 @@ describe('CI failure grammar', () => {
     expect(isConformingCiFailureBlock(`${conforming}\nextra`)).toBe(false)
     expect(isConformingCiFailureBlock(conforming.split('\n').slice(0, 2).join('\n'))).toBe(false)
     expect(isConformingCiFailureBlock(`${conforming} `)).toBe(false)
+    expect(getConformingGroups([{ data: { type: 'journal', markdown: 42 } }])).toEqual([])
   })
 })
 
@@ -109,6 +111,24 @@ describe('buildSessionFrictionReport', () => {
     )
   })
 
+  it('escapes accepted journal fields before rendering them', async () => {
+    const directory = await makeDirectory()
+    const unsafe = conforming
+      .replace('build cache failure', '<!-- hidden')
+      .replace('rebuilt cache', '--> *forged*')
+    const report = await buildSessionFrictionReport('s', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: [{ data: { type: 'journal', markdown: unsafe } }],
+      }),
+    })
+    expect(report.markdown).not.toMatch(/(?:^|[^\\])<!--/)
+    expect(report.markdown).not.toMatch(/(?:^|[^\\])-->/)
+    expect(report.markdown).toContain('\\<!-- hidden')
+    expect(report.markdown).toContain('--\\> \\*forged\\*')
+  })
+
   it('treats not-found as empty and keeps thrown diagnostics separate', async () => {
     const directory = await makeDirectory()
     await expect(
@@ -163,6 +183,19 @@ describe('buildSessionFrictionReport', () => {
     })
     expect(consumed).toBe(500)
     expect(report.markdown).toContain('unavailable')
+  })
+
+  it('does not retain oversized journal markdown', async () => {
+    const directory = await makeDirectory()
+    const report = await buildSessionFrictionReport('s', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: [{ data: { type: 'journal', markdown: 'x'.repeat(10_001) } }],
+      }),
+    })
+    expect(report.markdown).toContain('unavailable')
+    expect(report.markdown).not.toContain('x'.repeat(1_000))
   })
 
   it('reports observed-clean only when the friction log was touched', async () => {

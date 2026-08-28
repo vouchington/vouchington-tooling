@@ -8,6 +8,18 @@ const DISPOSITION = /^ {2}- Disposition: .*[^\s]$/
 const BLANK = /^\s*$/
 
 const CI_FAILURES_HEADER = '## CI Failures'
+const FIELD_PREFIXES = [
+  '- `recurring` — `GitHub Actions` — ',
+  '- `one-off` — `GitHub Actions` — ',
+  '  - Evidence: ',
+  '  - Root diagnostic: ',
+  '  - Disposition: ',
+]
+
+function safeField(line: string): string {
+  const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))!
+  return `${prefix}${markdownAuditText(line.slice(prefix.length))}`
+}
 
 function matchBlock(markdown: string): string | null {
   const lines = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
@@ -27,7 +39,7 @@ function matchBlock(markdown: string): string | null {
   ]
   if (fields.some((field) => field === null)) return null
   if (!lines.slice(index).every((line) => BLANK.test(line))) return null
-  return fields.join('\n')
+  return fields.map((field) => safeField(field!)).join('\n')
 }
 
 export function isConformingCiFailureBlock(markdown: string): boolean {

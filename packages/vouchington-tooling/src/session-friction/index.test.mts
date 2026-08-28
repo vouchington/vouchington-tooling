@@ -1,5 +1,5 @@
 import { rmSync } from 'node:fs'
-import { chmod, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -320,6 +320,18 @@ describe('friction log', () => {
     expect(readFrictionLog('expired-lock', options)).toMatchObject({ status: 'events' })
   })
 
+  it('recovers an expired lock even when its pid has been reused', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('reused-pid', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    const lockPath = join(directoryPath, `${file}.lock`)
+    await writeFile(lockPath, String(process.pid))
+    await utimes(lockPath, new Date(0), new Date(0))
+    recordFriction('reused-pid', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('reused-pid', options)).toMatchObject({ status: 'events' })
+  })
+
   it('propagates lock creation failures other than contention', async () => {
     const directoryPath = await directory()
     const options = { directory: directoryPath }
@@ -344,6 +356,22 @@ describe('friction log', () => {
     const result = readFrictionLog('bounded-detail', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events[0]?.detail).toHaveLength(1_000)
+  })
+
+  it('bounds persisted timestamps and creates private evidence', async () => {
+    const parent = await directory()
+    const directoryPath = join(parent, 'private')
+    recordFriction(
+      'private-log',
+      { type: 'permission-request', command: 'git push' },
+      { directory: directoryPath, timestamp: 'x'.repeat(2_000) },
+    )
+    const [file] = await readdir(directoryPath)
+    expect((await stat(directoryPath)).mode & 0o777).toBe(0o700)
+    expect((await stat(join(directoryPath, file!))).mode & 0o777).toBe(0o600)
+    const result = readFrictionLog('private-log', { directory: directoryPath })
+    expect(result.status).toBe('events')
+    if (result.status === 'events') expect(result.events[0]?.timestamp).toHaveLength(1_000)
   })
 
   it('bounds log reads even when malformed data bypasses the event cap', async () => {
