@@ -5,6 +5,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -25,6 +26,7 @@ export const FRICTION_LOG_MAX_EVENTS = 500
 const SESSION_ID_MAX_LENGTH = 4096
 const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
+const LOG_MAX_BYTES = 2_000_000
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function requireDirectory(directory: string): string {
@@ -59,9 +61,21 @@ function validEvent(value: unknown): value is FrictionEvent {
   )
 }
 
+function readLogContent(path: string): string {
+  const descriptor = openSync(path, 'r')
+  try {
+    const buffer = Buffer.allocUnsafe(LOG_MAX_BYTES + 1)
+    const length = readSync(descriptor, buffer, 0, buffer.length, 0)
+    if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
+    return buffer.toString('utf8', 0, length)
+  } finally {
+    closeSync(descriptor)
+  }
+}
+
 function validEventCount(path: string, limit: number): number {
   let count = 0
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
+  for (const line of readLogContent(path).split('\n')) {
     if (!line.trim()) continue
     try {
       if (validEvent(JSON.parse(line))) count++
@@ -94,25 +108,26 @@ function removeStaleLock(lockPath: string): boolean {
   }
 }
 
-function withLogLock(path: string, action: () => void): void {
+function withLogLock<Result>(path: string, action: () => Result): Result {
   const lockPath = `${path}.lock`
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
+    let descriptor: number
     try {
-      const descriptor = openSync(lockPath, 'wx')
-      try {
-        writeFileSync(descriptor, String(process.pid))
-        action()
-      } finally {
-        closeSync(descriptor)
-        unlinkSync(lockPath)
-      }
-      return
+      descriptor = openSync(lockPath, 'wx')
     } catch (error) {
       if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST'))
         /* v8 ignore next -- lock acquisition failures are platform errors that must propagate. */
         throw error
       if (removeStaleLock(lockPath)) continue
       Atomics.wait(lockWait, 0, 0, 5)
+      continue
+    }
+    try {
+      writeFileSync(descriptor, String(process.pid))
+      return action()
+    } finally {
+      closeSync(descriptor)
+      unlinkSync(lockPath)
     }
   }
   throw new Error('could not acquire session-friction log lock')
@@ -149,15 +164,18 @@ export function readFrictionLog(
 ): FrictionLogReadResult {
   const path = logPath(sessionId, options.directory)
   if (!existsSync(path)) return { status: 'absent' }
-  const events: FrictionEvent[] = []
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    if (!line.trim()) continue
-    try {
-      const value: unknown = JSON.parse(line)
-      if (validEvent(value)) events.push(value)
-    } catch {
-      // Corrupt lines do not make the rest of a session's evidence unreadable.
+  return withLogLock(path, () => {
+    if (!existsSync(path)) return { status: 'absent' }
+    const events: FrictionEvent[] = []
+    for (const line of readLogContent(path).split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const value: unknown = JSON.parse(line)
+        if (validEvent(value)) events.push(value)
+      } catch {
+        // Corrupt lines do not make the rest of a session's evidence unreadable.
+      }
     }
-  }
-  return events.length ? { status: 'events', events } : { status: 'empty' }
+    return events.length ? { status: 'events', events } : { status: 'empty' }
+  })
 }
