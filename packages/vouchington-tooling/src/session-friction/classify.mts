@@ -36,7 +36,11 @@ export function classifyFrictionObservation(
   if (stderr === undefined) return null
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
-  if (CONNECTION_REFUSED.test(stderr) && LOOPBACK_ADDRESS.test(stderr)) {
+  if (
+    stderr
+      .split(/\r?\n/)
+      .some((line) => CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESS.test(line))
+  ) {
     return {
       kind: 'sandbox-failure',
       commandPrefix,

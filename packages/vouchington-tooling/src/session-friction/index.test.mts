@@ -1,3 +1,4 @@
+import { rmSync } from 'node:fs'
 import { chmod, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
@@ -115,6 +116,13 @@ describe('classifyFrictionObservation', () => {
         type: 'tool-result',
         command: 'curl remote',
         structuredStderr: 'connect ECONNREFUSED 10.0.0.5:5432',
+      }),
+    ).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: 'connect ECONNREFUSED 10.0.0.5:5432\nunrelated localhost note',
       }),
     ).toBeNull()
     expect(
@@ -336,6 +344,41 @@ describe('friction log', () => {
     const result = readFrictionLog('bounded-detail', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events[0]?.detail).toHaveLength(1_000)
+  })
+
+  it('bounds log reads even when malformed data bypasses the event cap', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('oversized-log', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, file!), 'x'.repeat(2_000_001))
+    expect(() => readFrictionLog('oversized-log', options)).toThrow(/too large/)
+    expect(() =>
+      recordFriction('oversized-log', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/too large/)
+  })
+
+  it('uses the session lock while reading', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('read-locked', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, `${file}.lock`), '')
+    expect(() => readFrictionLog('read-locked', options)).toThrow(/could not acquire/)
+  })
+
+  it('returns absent when a log disappears while waiting for its lock', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('removed-log', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    const path = join(directoryPath, file!)
+    await writeFile(`${path}.lock`, '2147483647')
+    vi.spyOn(process, 'kill').mockImplementationOnce(() => {
+      rmSync(path)
+      throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+    })
+    expect(readFrictionLog('removed-log', options)).toEqual({ status: 'absent' })
   })
 
   it('supports callback and generated timestamps', async () => {
