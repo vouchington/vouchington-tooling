@@ -3,6 +3,7 @@ import {
   chmodSync,
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readSync,
@@ -91,8 +92,13 @@ export function recordFriction(
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)
+  const existed = existsSync(directory)
   mkdirSync(directory, { mode: 0o700, recursive: true })
-  chmodSync(directory, 0o700)
+  if (existed) {
+    const status = lstatSync(directory)
+    if (status.isSymbolicLink() || !status.isDirectory() || (status.mode & 0o777) !== 0o700)
+      throw new Error('session-friction log directory must be a private directory')
+  } else chmodSync(directory, 0o700)
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withFileLock(path, () => {
