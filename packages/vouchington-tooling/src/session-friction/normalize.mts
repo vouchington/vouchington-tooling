@@ -132,7 +132,7 @@ function normalizeSegment(tokens: string[]): string {
 }
 
 export function normalizeCommandPrefix(command: string, wrappersToStrip: string[] = []): string {
-  if (command.length > MAX_COMMAND_LENGTH) return REDACTED_TOKEN
+  if (command.length > MAX_COMMAND_LENGTH) return '[REDACTED: command too long]'
   const segments = splitCommand(command)
   let index = 0
   while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++

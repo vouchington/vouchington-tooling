@@ -306,7 +306,7 @@ describe('buildSessionFrictionReport', () => {
         })(),
       }),
     })
-    expect(consumed).toBe(100)
+    expect(consumed).toBe(50)
   })
 
   it('reports observed-clean only when the friction log was touched', async () => {

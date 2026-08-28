@@ -1,7 +1,5 @@
 import { closeSync, constants, fchmodSync, fstatSync, openSync, readSync, writeSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
-import { createHash } from 'node:crypto'
-
 import { classifyFrictionObservation } from './classify.mts'
 import { ensurePrivateDirectory } from './directory.mts'
 import { withFileLock } from './lock.mts'
@@ -13,9 +11,9 @@ import type {
   FrictionObservation,
 } from './types.mts'
 import { decodeUtf8 } from './utf8.mts'
+import { sanitizeSessionId } from './session-id.mts'
 
 export const FRICTION_LOG_MAX_EVENTS = 500
-const SESSION_ID_MAX_LENGTH = 4096
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
 function requireDirectory(directory: string): string {
@@ -27,12 +25,6 @@ function eventLimit(maxEvents: number | undefined): number {
   const limit = maxEvents ?? FRICTION_LOG_MAX_EVENTS
   if (!Number.isInteger(limit) || limit < 1) throw new Error('maxEvents must be a positive integer')
   return Math.min(limit, FRICTION_LOG_MAX_EVENTS)
-}
-
-function sanitizeSessionId(sessionId: string): string {
-  if (normalizeAuditText(sessionId) === '') throw new Error('sessionId must be non-empty')
-  if (sessionId.length > SESSION_ID_MAX_LENGTH) throw new Error('sessionId is too long')
-  return createHash('sha256').update(sessionId).digest('hex')
 }
 
 function logPath(sessionId: string, directory: string): string {
@@ -140,6 +132,8 @@ export function recordFriction(
     const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)
     try {
       fchmodSync(descriptor, 0o600)
+      if (fstatSync(descriptor).size > LOG_MAX_BYTES)
+        throw new Error('session-friction log is too large')
       if (!classified) return
       const content = readLogContent(descriptor)
       if (atEventLimit(content, maxEvents)) return

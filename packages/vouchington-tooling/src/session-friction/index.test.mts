@@ -301,6 +301,7 @@ describe('friction log', () => {
     })
     expect(() => readFrictionLog('', options)).toThrow(/non-empty/)
     expect(() => readFrictionLog('x'.repeat(4097), options)).toThrow(/too long/)
+    expect(() => readFrictionLog('\ud800', options)).toThrow(/well-formed Unicode/)
   })
 
   it('makes lock acquisition exhaustion explicit', async () => {
@@ -429,6 +430,9 @@ describe('friction log', () => {
     expect((await stat(path)).size).toBe(2_000_000)
     await writeFile(path, 'x'.repeat(2_000_001))
     expect(() => readFrictionLog('oversized-log', options)).toThrow(/too large/)
+    expect(() =>
+      recordFriction('oversized-log', { type: 'tool-result', command: 'echo ok' }, options),
+    ).toThrow(/too large/)
     expect(() =>
       recordFriction('oversized-log', { type: 'permission-request', command: 'git push' }, options),
     ).toThrow(/too large/)

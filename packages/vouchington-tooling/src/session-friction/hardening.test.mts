@@ -203,4 +203,10 @@ it('bounds command inspection before normalization', () => {
       command: `npm run build ${'x'.repeat(10_001)}`,
     }),
   ).toMatchObject({ commandPrefix: 'npm run build' })
+  expect(
+    classifyFrictionObservation({
+      type: 'permission-request',
+      command: `${'x'.repeat(9_999)}\ud83d\udca5 trailing`,
+    })?.commandPrefix,
+  ).not.toContain('\ufffd')
 })

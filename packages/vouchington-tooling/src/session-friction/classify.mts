@@ -31,10 +31,21 @@ function boundedStderr(value: string): string {
   return `${value.slice(0, half)}\n${value.slice(-half)}`
 }
 
+function boundedCommand(value: string): string {
+  let end = Math.min(value.length, COMMAND_INSPECTION_MAX_LENGTH)
+  if (
+    end < value.length &&
+    /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
+    /[\uDC00-\uDFFF]/.test(value[end]!)
+  )
+    end--
+  return value.slice(0, end)
+}
+
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
-  const command = observation.command.slice(0, COMMAND_INSPECTION_MAX_LENGTH)
+  const command = boundedCommand(observation.command)
   if (normalizeAuditText(command) === '') return null
   const commandPrefix = normalizeCommandPrefix(command, observation.commandWrappers)
   if (commandPrefix === '') return null
