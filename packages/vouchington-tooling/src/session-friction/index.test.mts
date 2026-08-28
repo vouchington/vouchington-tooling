@@ -51,6 +51,9 @@ describe('normalizeCommandPrefix', () => {
       'curl https://example.test',
     )
     expect(normalizeCommandPrefix('env -i --ignore-environment API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('/usr/bin/env API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env --chdir /tmp API_TOKEN=secret curl')).toBe('curl')
+    expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('…')
     expect(normalizeCommandPrefix('echo \\')).toBe('echo \\')
   })
@@ -90,6 +93,13 @@ describe('classifyFrictionObservation', () => {
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
+        command: 'node test',
+        structuredStderr: 'connect ECONNREFUSED [::1]:5432',
+      }),
+    ).toMatchObject({ kind: 'sandbox-failure' })
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
         command: 'cat',
         structuredStderr: 'EPERM',
       }),
@@ -104,6 +114,13 @@ describe('classifyFrictionObservation', () => {
         type: 'tool-result',
         command: 'curl remote',
         structuredStderr: 'connect ECONNREFUSED 10.0.0.5:5432',
+      }),
+    ).toBeNull()
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: 'connect ECONNREFUSED [2001:db8::1]:5432',
       }),
     ).toBeNull()
     expect(
@@ -256,6 +273,28 @@ describe('friction log', () => {
     expect(() =>
       recordFriction('locked', { type: 'permission-request', command: 'git push' }, options),
     ).toThrow(/could not acquire/)
+  })
+
+  it('recovers a lock whose owner process no longer exists', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('stale-lock', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, `${file}.lock`), '2147483647')
+    recordFriction('stale-lock', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('stale-lock', options)).toMatchObject({ status: 'events' })
+  })
+
+  it('bounds persisted escalation details', async () => {
+    const directoryPath = await directory()
+    recordFriction(
+      'bounded-detail',
+      { type: 'tool-result', command: 'git push', escalationDetail: 'x'.repeat(2_000) },
+      { directory: directoryPath },
+    )
+    const result = readFrictionLog('bounded-detail', { directory: directoryPath })
+    expect(result.status).toBe('events')
+    if (result.status === 'events') expect(result.events[0]?.detail).toHaveLength(1_000)
   })
 
   it('supports callback and generated timestamps', async () => {

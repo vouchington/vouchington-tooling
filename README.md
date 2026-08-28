@@ -230,7 +230,9 @@ import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/
 
 `session-friction` remains dormant until a caller explicitly supplies a session id, absolute log
 directory, hook observation, and journal loader. Host payload parsing, hook installation, session
-discovery, and journal transport stay with the consuming repository.
+discovery, and journal transport stay with the consuming repository. Capture stores at most 500
+events per session, truncates event detail to 1,000 characters, and consumes at most 500 entries
+from the journal loader when building a report.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in

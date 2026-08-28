@@ -5,7 +5,9 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  statSync,
   unlinkSync,
+  writeFileSync,
 } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -21,7 +23,8 @@ import type {
 
 export const FRICTION_LOG_MAX_EVENTS = 500
 const SESSION_ID_MAX_LENGTH = 4096
-const LOCK_ATTEMPTS = 20
+const LOCK_ATTEMPTS = 200
+const STALE_LOCK_AGE_MS = 30_000
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function requireDirectory(directory: string): string {
@@ -45,13 +48,6 @@ function logPath(sessionId: string, directory: string): string {
   return join(requireDirectory(directory), `${sanitizeSessionId(sessionId)}.jsonl`)
 }
 
-function ensureLog(sessionId: string, directory: string): string {
-  const path = logPath(sessionId, directory)
-  mkdirSync(requireDirectory(directory), { recursive: true })
-  appendFileSync(path, '', 'utf8')
-  return path
-}
-
 function validEvent(value: unknown): value is FrictionEvent {
   if (!value || typeof value !== 'object') return false
   const record = value as Record<string, unknown>
@@ -63,17 +59,39 @@ function validEvent(value: unknown): value is FrictionEvent {
   )
 }
 
-function validEventCount(path: string): number {
-  return readFileSync(path, 'utf8')
-    .split('\n')
-    .reduce((count, line) => {
-      if (!line.trim()) return count
+function validEventCount(path: string, limit: number): number {
+  let count = 0
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line.trim()) continue
+    try {
+      if (validEvent(JSON.parse(line))) count++
+    } catch {
+      // Malformed lines do not count toward the event limit.
+    }
+    if (count >= limit) break
+  }
+  return count
+}
+
+function removeStaleLock(lockPath: string): boolean {
+  try {
+    const owner = Number(readFileSync(lockPath, 'utf8'))
+    if (Number.isInteger(owner) && owner > 0) {
       try {
-        return validEvent(JSON.parse(line)) ? count + 1 : count
-      } catch {
-        return count
+        process.kill(owner, 0)
+        return false
+      } catch (error) {
+        if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH'))
+          /* v8 ignore next -- permission errors conservatively preserve a potentially live lock. */
+          return false
       }
-    }, 0)
+    } else if (Date.now() - statSync(lockPath).mtimeMs < STALE_LOCK_AGE_MS) return false
+    unlinkSync(lockPath)
+    return true
+  } catch {
+    /* v8 ignore next -- a concurrently removed or unreadable lock is retried by the caller. */
+    return false
+  }
 }
 
 function withLogLock(path: string, action: () => void): void {
@@ -82,6 +100,7 @@ function withLogLock(path: string, action: () => void): void {
     try {
       const descriptor = openSync(lockPath, 'wx')
       try {
+        writeFileSync(descriptor, String(process.pid))
         action()
       } finally {
         closeSync(descriptor)
@@ -92,6 +111,7 @@ function withLogLock(path: string, action: () => void): void {
       if (!(error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST'))
         /* v8 ignore next -- lock acquisition failures are platform errors that must propagate. */
         throw error
+      if (removeStaleLock(lockPath)) continue
       Atomics.wait(lockWait, 0, 0, 5)
     }
   }
@@ -105,12 +125,13 @@ export function recordFriction(
 ): void {
   const maxEvents = eventLimit(options.maxEvents)
   const classified = classifyFrictionObservation(observation)
-  const path = ensureLog(sessionId, options.directory)
-  if (!classified) return
+  const path = logPath(sessionId, options.directory)
+  mkdirSync(requireDirectory(options.directory), { recursive: true })
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withLogLock(path, () => {
-    if (validEventCount(path) >= maxEvents) return
+    appendFileSync(path, '', 'utf8')
+    if (!classified || validEventCount(path, maxEvents) >= maxEvents) return
     const event = {
       ...classified,
       commandPrefix: normalizeAuditText(classified.commandPrefix),

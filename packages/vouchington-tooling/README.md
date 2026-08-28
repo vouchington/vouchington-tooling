@@ -136,7 +136,9 @@ absolute log directory, host-independent observation, and journal loader; it doe
 environment variables, install hooks, or connect to a journal service by itself. Invoking
 `recordFriction` touches the session log even when no event is classified, preserving the
 difference between an observed clean session and missing evidence. Report markdown keeps backend
-diagnostics separate from its paste-safe output.
+diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
+truncates event detail to 1,000 characters, and consumes at most 500 entries from the journal loader
+when building a report.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied

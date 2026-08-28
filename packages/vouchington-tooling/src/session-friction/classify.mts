@@ -8,7 +8,12 @@ const FAILURE_TOKENS: [string, RegExp][] = [
   ['EPERM', /\bEPERM\b/],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
-const LOOPBACK_ADDRESS = /\b(?:127\.0\.0\.1|localhost)\b|::1/i
+const LOOPBACK_ADDRESS = /\b(?:127\.0\.0\.1|localhost)\b|(?:^|[^0-9a-f:])::1(?=$|[^0-9a-f:])/i
+const DETAIL_MAX_LENGTH = 1_000
+
+function boundedDetail(value: string): string {
+  return value.slice(0, DETAIL_MAX_LENGTH)
+}
 
 export function classifyFrictionObservation(
   observation: FrictionObservation,
@@ -19,7 +24,7 @@ export function classifyFrictionObservation(
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
   }
-  const escalationDetail = normalizeAuditText(observation.escalationDetail ?? '')
+  const escalationDetail = boundedDetail(normalizeAuditText(observation.escalationDetail ?? ''))
   if (escalationDetail) {
     return {
       kind: 'sandbox-escalation',

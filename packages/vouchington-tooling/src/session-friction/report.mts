@@ -9,11 +9,16 @@ import type {
   SessionFrictionReportOptions,
 } from './types.mts'
 
+const JOURNAL_ENTRY_MAX_COUNT = 500
+
 async function collectEntries(
   entries: Iterable<JournalEntry> | AsyncIterable<JournalEntry>,
 ): Promise<JournalEntry[]> {
   const result: JournalEntry[] = []
-  for await (const entry of entries) result.push(entry)
+  for await (const entry of entries) {
+    result.push(entry)
+    if (result.length >= JOURNAL_ENTRY_MAX_COUNT) break
+  }
   return result
 }
 

@@ -3,6 +3,7 @@ const REDACTED_TOKEN = '…'
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 const PACKAGE_RUNNERS = new Set(['npx', 'pnpm', 'pnpx', 'yarn'])
 const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
+const ENV_OPTIONS_WITH_ARGS = new Set(['-C', '--chdir', '-S', '--split-string', '-u', '--unset'])
 const GIT_OPTIONS_WITHOUT_ARGS = new Set([
   '-v',
   '--version',
@@ -61,11 +62,26 @@ function redact(token: string): string {
 function stripAssignments(tokens: string[]): string[] {
   let index = 0
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
-  if (tokens[index] !== 'env')
+  const wrapper = tokens[index]
+  if (wrapper !== 'env' && !wrapper?.endsWith('/env'))
     return index < tokens.length ? tokens.slice(index) : index ? [REDACTED_TOKEN] : tokens
   index++
-  while (index < tokens.length && (tokens[index] === '-i' || tokens[index]!.startsWith('--')))
-    index++
+  while (index < tokens.length) {
+    const option = tokens[index]!
+    if (option === '--') {
+      index++
+      break
+    }
+    if (ENV_OPTIONS_WITH_ARGS.has(option)) {
+      index += 2
+      continue
+    }
+    if (option.startsWith('-')) {
+      index++
+      continue
+    }
+    break
+  }
   while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
   return index < tokens.length ? tokens.slice(index) : [REDACTED_TOKEN]
 }
