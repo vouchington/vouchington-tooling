@@ -85,9 +85,14 @@ describe('opencode-code-review action', () => {
 
   it('bounds and validates the OpenCode process before payload cleanup', () => {
     const review = stepByName.get('Run OpenCode Review')
-    expect(action.inputs?.timeout_seconds).toMatchObject({ default: '1200' })
+    expect(action.inputs?.timeout_seconds).toMatchObject({
+      default: '1200',
+      description: expect.stringContaining('30-second termination grace'),
+    })
     expect(review?.env?.TIMEOUT_SECONDS).toBe('${{ inputs.timeout_seconds }}')
+    expect(review?.run).toContain('[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|1[0-4][0-9][0-9]|1500)')
     expect(review?.run).toContain('must be a positive integer')
+    expect(review?.run).toContain('run-with-timeout.sh not found relative to GITHUB_ACTION_PATH')
     expect(review?.run).toContain('run-with-timeout.sh" "$TIMEOUT_SECONDS" 30')
     expect(review?.['continue-on-error']).toBe(true)
   })

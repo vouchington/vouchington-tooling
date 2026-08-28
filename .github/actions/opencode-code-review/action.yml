@@ -20,7 +20,7 @@ inputs:
     description: OpenCode model id in provider/model form
     required: true
   timeout_seconds:
-    description: Maximum OpenCode runtime in seconds (1-1500); reserves job time for payload handoff and cleanup
+    description: Maximum OpenCode runtime in seconds (1-1500), plus a fixed 30-second termination grace; reserves job time for payload handoff and cleanup
     required: false
     default: '1200'
   payload_artifact_name:
@@ -180,6 +180,10 @@ runs:
         mkdir -p "${GITHUB_WORKSPACE}/.review-context"
         cp "$OPENCODE_PROMPT_PATH" "${GITHUB_WORKSPACE}/.review-context/prompt.md"
         bash "$GITHUB_ACTION_PATH/install-review-project.sh"
+        if [ ! -f "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/run-with-timeout.sh" ]; then
+          echo '::error::run-with-timeout.sh not found relative to GITHUB_ACTION_PATH'
+          exit 1
+        fi
         bash "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/run-with-timeout.sh" "$TIMEOUT_SECONDS" 30 \
           "$OPENCODE_BIN" run \
           --model "$OPENCODE_MODEL" \
