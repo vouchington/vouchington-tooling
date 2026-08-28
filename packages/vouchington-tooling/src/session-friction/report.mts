@@ -90,5 +90,11 @@ export async function buildSessionFrictionReport(
     journal = { status: 'unreachable', diagnostic }
   }
   const report = reportFromLog(sessionId, options, journal)
-  return journal.status === 'unreachable' ? { ...report, diagnostic: journal.diagnostic } : report
+  if (journal.status === 'unreachable') {
+    const diagnostic = report.diagnostic
+      ? `${journal.diagnostic}; ${report.diagnostic}`
+      : journal.diagnostic
+    return { ...report, diagnostic }
+  }
+  return report
 }
