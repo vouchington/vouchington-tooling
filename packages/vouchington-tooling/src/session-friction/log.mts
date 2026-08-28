@@ -65,7 +65,8 @@ function openLogFile(path: string, flags: number): number {
     throw error
   }
   try {
-    if (!fstatSync(descriptor).isFile())
+    const status = fstatSync(descriptor)
+    if (!status.isFile() || status.nlink !== 1)
       throw new Error('session-friction log must be a regular file')
     return descriptor
   } catch (error) {
@@ -73,7 +74,6 @@ function openLogFile(path: string, flags: number): number {
     throw error
   }
 }
-
 function readLogContent(descriptor: number): string {
   if (fstatSync(descriptor).size > LOG_MAX_BYTES)
     throw new Error('session-friction log is too large')

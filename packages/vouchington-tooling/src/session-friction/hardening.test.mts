@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import {
   chmod,
+  link,
   mkdir,
   mkdtemp,
   readFile,
@@ -64,6 +65,25 @@ it('rejects a non-regular session log', async () => {
   expect(() =>
     recordFriction('directory-log', { type: 'permission-request', command: 'git push' }, options),
   ).toThrow(/regular file/)
+})
+
+it('rejects a multiply-linked session log without modifying its target', async () => {
+  const directory = await temporaryDirectory()
+  const outside = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('linked-inode', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const path = join(directory, file)
+  const target = join(outside, 'target')
+  await writeFile(target, 'unchanged')
+  await rm(path)
+  await link(target, path)
+
+  expect(() => readFrictionLog('linked-inode', options)).toThrow(/regular file/)
+  expect(() =>
+    recordFriction('linked-inode', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/regular file/)
+  expect(await readFile(target, 'utf8')).toBe('unchanged')
 })
 
 it('reclaims an orphaned stale reaper guard', async () => {

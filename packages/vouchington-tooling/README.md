@@ -149,6 +149,7 @@ an appropriate ACL because Node's mode bits do not express the full access polic
 Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
 grammar. It is not a secret scrubber; callers must not include credentials in captured commands.
+Failure classification inspects only the first 100,000 structured-stderr characters.
 Cooperating log readers and writers are serialized, including the initial clean-session
 touch. Recording and report log reads are synchronous: on contention they block the caller's
 event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
