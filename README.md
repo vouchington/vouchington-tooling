@@ -222,10 +222,15 @@ import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
 `dockerfile-parse` uses `dockerfile-ast`.
+
+`session-friction` remains dormant until a caller explicitly supplies a session id, absolute log
+directory, hook observation, and journal loader. Host payload parsing, hook installation, session
+discovery, and journal transport stay with the consuming repository.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in

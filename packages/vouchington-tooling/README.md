@@ -128,7 +128,15 @@ import {
   readDiagnosticReportSummaries,
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
+
+`session-friction` is an opt-in capture and reporting library. Callers supply the session id,
+absolute log directory, host-independent observation, and journal loader; it does not inspect host
+environment variables, install hooks, or connect to a journal service by itself. Invoking
+`recordFriction` touches the session log even when no event is classified, preserving the
+difference between an observed clean session and missing evidence. Report markdown keeps backend
+diagnostics separate from its paste-safe output.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied

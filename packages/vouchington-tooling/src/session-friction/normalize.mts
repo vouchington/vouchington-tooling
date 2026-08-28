@@ -1,0 +1,90 @@
+const MAX_COMMAND_TOKEN_LENGTH = 40
+const REDACTED_TOKEN = '…'
+const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+const PACKAGE_RUNNERS = new Set(['npx', 'pnpm', 'pnpx', 'yarn'])
+const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
+const GIT_OPTIONS_WITHOUT_ARGS = new Set([
+  '-v',
+  '--version',
+  '-h',
+  '--help',
+  '--exec-path',
+  '--html-path',
+  '--man-path',
+  '--info-path',
+  '-p',
+  '--paginate',
+  '-P',
+  '--no-pager',
+  '--no-replace-objects',
+  '--bare',
+])
+
+function splitCommand(command: string): string[][] {
+  const result: string[][] = []
+  let segment: string[] = []
+  let word = ''
+  let quote: '"' | "'" | undefined
+  const flushWord = (): void => {
+    if (word) segment.push(word)
+    word = ''
+  }
+  const flushSegment = (): void => {
+    flushWord()
+    if (segment.length) result.push(segment)
+    segment = []
+  }
+  for (const char of command) {
+    if (quote) {
+      if (char === quote) quote = undefined
+      else word += char
+    } else if (char === '"' || char === "'") quote = char
+    else if (';&|\n\r'.includes(char)) flushSegment()
+    else if (/\s/.test(char)) flushWord()
+    else word += char
+  }
+  flushSegment()
+  return result
+}
+
+function redact(token: string): string {
+  return token.length > MAX_COMMAND_TOKEN_LENGTH ? REDACTED_TOKEN : token
+}
+
+function stripAssignments(tokens: string[]): string[] {
+  let index = 0
+  while (index < tokens.length && ENV_ASSIGNMENT.test(tokens[index]!)) index++
+  return index < tokens.length ? tokens.slice(index) : tokens
+}
+
+function stripGitOptions(tokens: string[]): string[] {
+  let index = 0
+  while (index < tokens.length) {
+    const token = tokens[index]!
+    if (GIT_OPTIONS_WITH_ARGS.has(token)) index += 2
+    else if (GIT_OPTIONS_WITHOUT_ARGS.has(token) || /^--[a-z-]+=/.test(token)) index++
+    else break
+  }
+  return tokens.slice(index)
+}
+
+function packageRunner(token: string): boolean {
+  return [...PACKAGE_RUNNERS].some((runner) => token === runner || token.endsWith(`/${runner}`))
+}
+
+function normalizeSegment(tokens: string[]): string {
+  const [first, ...rest] = tokens
+  if (!first) return ''
+  if (first === 'rtk' && rest.length) return `rtk ${normalizeSegment(rest)}`
+  if (packageRunner(first) && (rest[0] === 'run' || rest[0] === 'exec') && rest[1])
+    return `${redact(first)} ${rest[0]} ${redact(rest[1])}`
+  const effective = first === 'git' ? stripGitOptions(rest) : rest
+  return effective[0] ? `${redact(first)} ${redact(effective[0])}` : redact(first)
+}
+
+export function normalizeCommandPrefix(command: string): string {
+  const segments = splitCommand(command)
+  let index = 0
+  while (index < segments.length - 1 && stripAssignments(segments[index]!)[0] === 'cd') index++
+  return normalizeSegment(stripAssignments(segments[index] ?? []))
+}
