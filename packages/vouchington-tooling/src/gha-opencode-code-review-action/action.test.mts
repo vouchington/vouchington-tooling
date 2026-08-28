@@ -1,9 +1,11 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
 import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 type CompositeStep = {
+  'continue-on-error'?: boolean
   name?: string
   id?: string
   if?: string
@@ -80,6 +82,31 @@ describe('opencode-code-review action', () => {
     )
     expect(review?.run).toContain('install-review-project.sh')
     expect(stepByName.get('Clean review payload files')?.run).toContain('restore-review-project.sh')
+  })
+
+  it('bounds and validates the OpenCode process before payload cleanup', () => {
+    const review = stepByName.get('Run OpenCode Review')
+    expect(action.inputs?.timeout_seconds).toMatchObject({
+      default: '1200',
+      description: expect.stringContaining('30-second termination grace'),
+    })
+    expect(review?.env?.TIMEOUT_SECONDS).toBe('${{ inputs.timeout_seconds }}')
+    const validator = review?.run?.match(/case "\$TIMEOUT_SECONDS" in[\s\S]*?\n\s*esac/)?.[0]
+    expect(validator).toBeDefined()
+    for (const value of ['1', '9', '10', '999', '1000', '1499', '1500']) {
+      expect(
+        spawnSync('bash', ['-c', validator!], { env: { TIMEOUT_SECONDS: value } }).status,
+      ).toBe(0)
+    }
+    for (const value of ['', '0', '00', '01', '1501', '-1', '1.5', '1500 ']) {
+      expect(
+        spawnSync('bash', ['-c', validator!], { env: { TIMEOUT_SECONDS: value } }).status,
+      ).toBe(1)
+    }
+    expect(review?.run).toContain('must be a positive integer no greater than 1500')
+    expect(review?.run).toContain('run-with-timeout.sh not found relative to GITHUB_ACTION_PATH')
+    expect(review?.run).toContain('run-with-timeout.sh" "$TIMEOUT_SECONDS" 30')
+    expect(review?.['continue-on-error']).toBe(true)
   })
 
   it('stages the payload through the same-ref CLI and a unique artifact name', () => {

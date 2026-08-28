@@ -19,6 +19,10 @@ inputs:
   model:
     description: OpenCode model id in provider/model form
     required: true
+  timeout_seconds:
+    description: Maximum OpenCode runtime in seconds (1-1500), plus a fixed 30-second termination grace; reserves job time for payload handoff and cleanup
+    required: false
+    default: '1200'
   payload_artifact_name:
     description: Unique suffix for the code-review-payload-* artifact
     required: true
@@ -152,6 +156,7 @@ runs:
         GITHUB_TOKEN: ''
         OPENCODE_MODEL: ${{ inputs.model }}
         OPENCODE_PROMPT_PATH: ${{ steps.review-prompt.outputs.prompt_path }}
+        TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
         OPENCODE_PERMISSION: >-
           {"bash":"deny","webfetch":"deny","websearch":"deny","task":"deny","skill":"deny","read":"allow","glob":"allow","grep":"allow","list":"allow","external_directory":"deny","edit":{"*":"deny","code-review-payload.json":"allow"}}
       run: |
@@ -164,10 +169,23 @@ runs:
           echo '::error::OpenCode review requires openrouter_api_key or opencode_api_key.'
           exit 1
         fi
+        case "$TIMEOUT_SECONDS" in
+          [1-9]|[1-9][0-9]|[1-9][0-9][0-9]|1[0-4][0-9][0-9]|1500)
+            ;;
+          *)
+            echo '::error::timeout_seconds must be a positive integer no greater than 1500.'
+            exit 1
+            ;;
+        esac
         mkdir -p "${GITHUB_WORKSPACE}/.review-context"
         cp "$OPENCODE_PROMPT_PATH" "${GITHUB_WORKSPACE}/.review-context/prompt.md"
         bash "$GITHUB_ACTION_PATH/install-review-project.sh"
-        "$OPENCODE_BIN" run \
+        if [ ! -f "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/run-with-timeout.sh" ]; then
+          echo '::error::run-with-timeout.sh not found relative to GITHUB_ACTION_PATH'
+          exit 1
+        fi
+        bash "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/run-with-timeout.sh" "$TIMEOUT_SECONDS" 30 \
+          "$OPENCODE_BIN" run \
           --model "$OPENCODE_MODEL" \
           --agent code-review \
           --auto \
