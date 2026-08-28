@@ -155,6 +155,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       lstatSync(reaperPath)
       reaperExists = true
     } catch (error) {
+      /* v8 ignore next -- unexpected reaper lstat failures must propagate. */
       if (!hasCode(error, 'ENOENT')) throw error
     }
     if (reaperExists) {
