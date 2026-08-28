@@ -228,10 +228,24 @@ import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
 `dockerfile-parse` uses `dockerfile-ast`.
+
+`session-friction` remains dormant until a caller explicitly supplies a session id, absolute log
+directory, hook observation, and journal loader. Host payload parsing, hook installation, session
+discovery, and journal transport stay with the consuming repository. Capture stores at most 500
+events per session, truncates event detail to 1,000 characters, and consumes up to 500 entries
+from the journal loader when building a report, stopping earlier when its aggregate 1 MB
+inspected-byte budget is reached. Log reads are capped at 2 MB, journal Markdown at
+10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
+and report construction synchronously access the evidence log and may wait up to one second for a
+contended per-session file lock before failing explicitly. Evidence-directory validation requires
+POSIX ownership and mode checks (Linux and macOS), so session-friction throws on Windows.
+Command-prefix normalization attempts limited redaction of obvious credential patterns but is not
+a secret scrubber; callers must not include credentials in captured commands.
 
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in

@@ -16,6 +16,30 @@ export type {
 } from './retrospective-transcript/index.mts'
 
 export {
+  buildSessionFrictionReport,
+  classifyFrictionObservation,
+  FRICTION_LOG_MAX_EVENTS,
+  isConformingCiFailureBlock,
+  normalizeCommandPrefix,
+  readFrictionLog,
+  recordFriction,
+} from './session-friction/index.mts'
+export type {
+  FrictionEvent,
+  FrictionEventKind,
+  FrictionLogOptions,
+  FrictionLogReadResult,
+  FrictionObservation,
+  JournalEntry,
+  JournalLoader,
+  JournalLoadResult,
+  PermissionRequestObservation,
+  SessionFrictionReport,
+  SessionFrictionReportOptions,
+  ToolResultObservation,
+} from './session-friction/index.mts'
+
+export {
   EphemeralListenerAttemptsExhaustedError,
   isRunnerReservedPort,
   listenOnRunnerUnreservedEphemeralPort,

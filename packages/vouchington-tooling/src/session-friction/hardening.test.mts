@@ -1,0 +1,446 @@
+import { existsSync } from 'node:fs'
+import {
+  chmod,
+  link,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, expect, it } from 'vitest'
+
+import { classifyFrictionObservation, readFrictionLog, recordFriction } from './index.mts'
+import type { FrictionObservation } from './types.mts'
+
+const directories: string[] = []
+
+async function temporaryDirectory(): Promise<string> {
+  const value = await mkdtemp(join(tmpdir(), 'session-friction-hardening-'))
+  directories.push(value)
+  return value
+}
+
+afterEach(async () => {
+  await Promise.all(
+    directories.splice(0).map((value) => rm(value, { force: true, recursive: true })),
+  )
+})
+
+it('validates read limits before inspecting storage', async () => {
+  const directory = await temporaryDirectory()
+  expect(() => readFrictionLog('missing', { directory, maxEvents: 0 })).toThrow(/positive integer/)
+  expect(() => readFrictionLog(42 as unknown as string, { directory })).toThrow(
+    /sessionId must be a string/,
+  )
+  expect(() => readFrictionLog('missing', { directory: null as unknown as string })).toThrow(
+    /log directory must be a string/,
+  )
+})
+
+it('rejects oversized session ids before Unicode validation', async () => {
+  const directory = await temporaryDirectory()
+  expect(() => readFrictionLog(`${'x'.repeat(4_097)}\ud800`, { directory })).toThrow(/too long/)
+  expect(() => readFrictionLog('session', { directory: `/${'a'.repeat(4_096)}` })).toThrow(
+    /path is too long/,
+  )
+})
+
+it('rejects unsupported observation discriminants', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool_result',
+      command: 'git push',
+      structuredStderr: 'EPERM',
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+})
+
+it('rejects a symlinked session log without modifying its target', async () => {
+  const directory = await temporaryDirectory()
+  const outside = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('linked-log', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const path = join(directory, file)
+  const target = join(outside, 'target')
+  await writeFile(target, 'unchanged')
+  await chmod(target, 0o644)
+  await rm(path)
+  await symlink(target, path)
+
+  expect(() =>
+    recordFriction('linked-log', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/regular file/)
+  expect(() => readFrictionLog('linked-log', options)).toThrow(/regular file/)
+  expect(await readFile(target, 'utf8')).toBe('unchanged')
+  expect((await stat(target)).mode & 0o777).toBe(0o644)
+})
+
+it('rejects a non-regular session log', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('directory-log', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const path = join(directory, file)
+  await rm(path)
+  await mkdir(path)
+  expect(() => readFrictionLog('directory-log', options)).toThrow(/regular file/)
+  expect(() =>
+    recordFriction('directory-log', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/regular file/)
+})
+
+it('rejects invalid UTF-8 in a session log', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('invalid-utf8', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  await writeFile(join(directory, file), Buffer.from([0x7b, 0x22, 0x80, 0x22, 0x7d]))
+  expect(() => readFrictionLog('invalid-utf8', options)).toThrow(/not valid UTF-8/)
+})
+
+it('ignores persisted events with ill-formed audit fields', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('invalid-unicode', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  await writeFile(
+    join(directory, file),
+    `${JSON.stringify({
+      kind: 'sandbox-failure',
+      timestamp: '2026-08-28T00:00:00Z',
+      commandPrefix: 'git push',
+      detail: '\ud800',
+    })}\n`,
+  )
+  expect(readFrictionLog('invalid-unicode', options)).toEqual({ status: 'empty' })
+})
+
+it('rejects a multiply-linked session log without modifying its target', async () => {
+  const directory = await temporaryDirectory()
+  const outside = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('linked-inode', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const path = join(directory, file)
+  const target = join(outside, 'target')
+  await writeFile(target, 'unchanged')
+  await rm(path)
+  await link(target, path)
+
+  expect(() => readFrictionLog('linked-inode', options)).toThrow(/regular file/)
+  expect(() =>
+    recordFriction('linked-inode', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/regular file/)
+  expect(await readFile(target, 'utf8')).toBe('unchanged')
+})
+
+it('reclaims an orphaned stale reaper guard', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('orphaned-reaper', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const reaper = join(directory, `${file}.lock.reap`)
+  await writeFile(reaper, '')
+  await utimes(reaper, new Date(0), new Date(0))
+  expect(readFrictionLog('orphaned-reaper', options)).toEqual({ status: 'empty' })
+  expect(existsSync(reaper)).toBe(false)
+})
+
+it('reclaims far-future ownerless locks and reaper guards', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('future-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const future = new Date(Date.now() + 60_000)
+  await writeFile(join(directory, `${file}.lock`), '')
+  await utimes(join(directory, `${file}.lock`), future, future)
+  recordFriction('future-lock', { type: 'permission-request', command: 'git push' }, options)
+  await writeFile(join(directory, `${file}.lock.reap`), '')
+  await utimes(join(directory, `${file}.lock.reap`), future, future)
+  expect(readFrictionLog('future-lock', options)).toMatchObject({ status: 'events' })
+})
+
+it('preserves near-future ownerless locks and reaper guards', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('clock-skew', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  const future = new Date(Date.now() + 10_000)
+  await writeFile(lock, '')
+  await utimes(lock, future, future)
+  expect(() => readFrictionLog('clock-skew', options)).toThrow(/could not acquire/)
+  await rm(lock)
+  await writeFile(`${lock}.reap`, '')
+  await utimes(`${lock}.reap`, future, future)
+  expect(() => readFrictionLog('clock-skew', options)).toThrow(/could not acquire/)
+})
+
+it('preserves an expired lock owned by a running process', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('reused-owner', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  await writeFile(lock, String(process.pid))
+  await utimes(lock, new Date(0), new Date(0))
+  expect(() =>
+    recordFriction('reused-owner', { type: 'permission-request', command: 'git push' }, options),
+  ).toThrow(/could not acquire/)
+})
+
+it('reclaims stale locks with invalid owner PIDs', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('invalid-owner', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  for (const owner of [
+    '4294967296',
+    ` ${process.pid} `,
+    `+${process.pid}`,
+    `0x${process.pid.toString(16)}`,
+    `${process.pid}e0`,
+    `0${process.pid}`,
+  ]) {
+    await writeFile(lock, owner)
+    await utimes(lock, new Date(0), new Date(0))
+    expect(readFrictionLog('invalid-owner', options)).toEqual({ status: 'empty' })
+  }
+})
+
+it('does not follow a symbolic link while inspecting a lock owner', async () => {
+  const directory = await temporaryDirectory()
+  const outside = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('linked-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const target = join(outside, 'owner')
+  await writeFile(target, '2147483647')
+  await symlink(target, join(directory, `${file}.lock`))
+  expect(() => readFrictionLog('linked-lock', options)).toThrow(/lock must be a regular file/)
+  expect(await readFile(target, 'utf8')).toBe('2147483647')
+  await rm(join(directory, `${file}.lock`))
+  await writeFile(join(directory, `${file}.lock`), 'x'.repeat(33))
+  expect(() => readFrictionLog('linked-lock', options)).toThrow(/could not acquire/)
+  await utimes(join(directory, `${file}.lock`), new Date(0), new Date(0))
+  expect(readFrictionLog('linked-lock', options)).toEqual({ status: 'empty' })
+})
+
+it('rejects a non-regular lock without removing it', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('directory-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  await mkdir(lock)
+  expect(() => readFrictionLog('directory-lock', options)).toThrow(/lock must be a regular file/)
+  expect((await stat(lock)).isDirectory()).toBe(true)
+})
+
+it('requires loopback hostnames to end at a hostname boundary', () => {
+  expect(classifyFrictionObservation({ type: 'permission-request', command: '\u200b' })).toBeNull()
+  expect(classifyFrictionObservation({ type: 'permission-request', command: '&&' })).toBeNull()
+  for (const hostname of ['localhost.example.com', '127.0.0.1.example.com'])
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: `connect ECONNREFUSED ${hostname}:443`,
+      }),
+    ).toBeNull()
+})
+
+it('does not recognize IPv6 loopback embedded in remote-looking tokens', () => {
+  for (const hostname of ['foo.::1', 'foo[::1].example'])
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: `connect ECONNREFUSED ${hostname}:443`,
+      }),
+    ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node server',
+      structuredStderr: 'connect ECONNREFUSED ::1:3000',
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
+})
+
+it('does not recognize an IPv4-looking tail inside a remote IPv6 address', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl remote',
+      structuredStderr: 'connect ECONNREFUSED 2001:db8::127.0.0.1:443',
+    }),
+  ).toBeNull()
+})
+
+it('does not recognize loopback-looking URL userinfo as the remote host', () => {
+  for (const userinfo of ['localhost', '127.0.0.1', 'localhost:password'])
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: `connect ECONNREFUSED https://${userinfo}@example.test:443`,
+      }),
+    ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl local',
+      structuredStderr: 'connect ECONNREFUSED https://user:password@localhost:443',
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
+})
+
+it('rejects primitive observations and ill-formed audit text', () => {
+  expect(classifyFrictionObservation(null as unknown as FrictionObservation)).toBeNull()
+  expect(classifyFrictionObservation(42 as unknown as FrictionObservation)).toBeNull()
+  expect(
+    classifyFrictionObservation({ type: 'permission-request', command: 'git \ud800push' }),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: 'bad \udc00detail',
+    }),
+  ).toBeNull()
+})
+
+it('bounds structured stderr inspection', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(50_000)} EPERM ${'x'.repeat(50_000)}`,
+    }),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(100_000)} EPERM`,
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' })
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node test',
+      structuredStderr: `${'x'.repeat(50_001)}😀${'x'.repeat(49_993)} EPERM`,
+    }),
+  ).toMatchObject({ kind: 'sandbox-failure' })
+})
+
+it('rejects non-string timestamp callback results', async () => {
+  const directory = join(await temporaryDirectory(), 'missing')
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      {
+        directory,
+        timestamp: (() => 42) as unknown as () => string,
+      },
+    ),
+  ).toThrow(/timestamp must be a string/)
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      {
+        directory,
+        timestamp: ' \u200b',
+      },
+    ),
+  ).toThrow(/timestamp must be non-empty/)
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      { directory, timestamp: '2026-08-28T00:00:00Z\ud800' },
+    ),
+  ).toThrow(/timestamp must be well-formed Unicode/)
+  expect(existsSync(directory)).toBe(false)
+})
+
+it('bounds command inspection before normalization', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'permission-request',
+      command: `npm run build ${'x'.repeat(10_001)}`,
+    }),
+  ).toMatchObject({ commandPrefix: 'npm run build' })
+  expect(
+    classifyFrictionObservation({
+      type: 'permission-request',
+      command: `${'x'.repeat(9_999)}\ud83d\udca5 trailing`,
+    })?.commandPrefix,
+  ).not.toContain('\ufffd')
+})
+
+it('preserves detail pairs and separates lone carriage-return diagnostics', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: `${'x'.repeat(999)}😀`,
+    })?.detail,
+  ).toBe('x'.repeat(999))
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl remote',
+      structuredStderr: 'ECONNREFUSED 10.0.0.5\runrelated localhost note',
+    }),
+  ).toBeNull()
+})
+
+it('preserves Unicode pairs in bounded details and rejects malformed runtime stderr', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: `${'x'.repeat(999)}\ud83d\ude00`,
+    })?.detail,
+  ).toBe('x'.repeat(999))
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      structuredStderr: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'node server',
+      structuredStderr: 'ECONNREFUSED 10.0.0.5\runrelated localhost note',
+    }),
+  ).toBeNull()
+})

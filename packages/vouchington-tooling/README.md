@@ -134,7 +134,37 @@ import {
   readDiagnosticReportSummaries,
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
+
+`session-friction` is an opt-in capture and reporting library. Callers supply the session id,
+absolute log directory, host-independent observation, and journal loader; it does not inspect host
+environment variables, install hooks, or connect to a journal service by itself. Invoking
+`recordFriction` touches the session log even when no event is classified, preserving the
+difference between an observed clean session and missing evidence. Report markdown keeps backend
+diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
+truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
+when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
+Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
+Report liveness inherits the caller-supplied journal loader, which must bound its own I/O and yields.
+Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
+and rendered audit fields at 120 escaped characters. The supplied log directory must be dedicated
+to session-friction; existing directories must already be owner-only, while newly created
+directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
+buffer that can detect growth one byte beyond the documented 2 MB cap.
+Ownership checks require POSIX effective-user IDs (Linux and macOS); session-friction throws on
+Windows and other platforms where those IDs are unavailable.
+Root-owned system symlink ancestors are supported for paths such as macOS `/var`; callers must not
+allow the directory chain to be mutated while it is being validated.
+Command-prefix normalization recognizes simple shell
+segments with single or double quotes; it does not evaluate substitutions or implement a full shell
+grammar. Normalization attempts limited redaction of obvious credential patterns but is not a secret
+scrubber; callers must ensure credentials are never included in captured commands.
+Failure classification inspects at most 100,000 structured-stderr characters, split evenly between
+the beginning and end when input exceeds that bound.
+Cooperating log readers and writers are serialized, including the initial clean-session
+touch. Recording and report log reads are synchronous: on contention they block the caller's
+event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied

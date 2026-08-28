@@ -41,6 +41,11 @@
       "import": "./dist/retrospective-transcript/index.mjs",
       "default": "./dist/retrospective-transcript/index.mjs"
     },
+    "./session-friction": {
+      "types": "./dist/session-friction/index.d.mts",
+      "import": "./dist/session-friction/index.mjs",
+      "default": "./dist/session-friction/index.mjs"
+    },
     "./sql-ast": {
       "types": "./dist/sql-ast/index.d.mts",
       "import": "./dist/sql-ast/index.mjs",

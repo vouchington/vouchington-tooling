@@ -1,0 +1,194 @@
+import { closeSync, constants, fchmodSync, fstatSync, openSync, readSync, writeSync } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
+import { classifyFrictionObservation } from './classify.mts'
+import { ensurePrivateDirectory } from './directory.mts'
+import { withFileLock } from './lock.mts'
+import { boundedText, isSafeAuditText, isWellFormedUnicode, normalizeAuditText } from './text.mts'
+import type {
+  FrictionEvent,
+  FrictionLogOptions,
+  FrictionLogReadResult,
+  FrictionObservation,
+} from './types.mts'
+import { decodeUtf8 } from './utf8.mts'
+import { sanitizeSessionId } from './session-id.mts'
+export const FRICTION_LOG_MAX_EVENTS = 500
+const LOG_MAX_BYTES = 2_000_000
+const EVENT_FIELD_MAX_LENGTH = 1_000
+export function requireDirectory(directory: string): string {
+  if (typeof directory !== 'string') throw new Error('log directory must be a string')
+  if (Buffer.byteLength(directory) > 4096)
+    throw new Error('session-friction log directory path is too long')
+  if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
+  return resolve(directory)
+}
+export function eventLimit(maxEvents: number | undefined): number {
+  const limit = maxEvents ?? FRICTION_LOG_MAX_EVENTS
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('maxEvents must be a positive integer')
+  return Math.min(limit, FRICTION_LOG_MAX_EVENTS)
+}
+function logPath(sessionId: string, directory: string): string {
+  return join(requireDirectory(directory), `${sanitizeSessionId(sessionId)}.jsonl`)
+}
+
+function validEvent(value: unknown): value is FrictionEvent {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return (
+    (record.kind === 'sandbox-escalation' || record.kind === 'sandbox-failure') &&
+    isSafeAuditText(record.timestamp) &&
+    isSafeAuditText(record.commandPrefix) &&
+    isSafeAuditText(record.detail)
+  )
+}
+
+function openLogFile(path: string, flags: number): number {
+  let descriptor: number
+  try {
+    descriptor = openSync(path, flags | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600)
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error.code === 'ELOOP' || error.code === 'EISDIR' || error.code === 'ENOTDIR')
+    )
+      throw new Error('session-friction log must be a regular file')
+    throw error
+  }
+  try {
+    const status = fstatSync(descriptor)
+    if (!status.isFile() || status.nlink !== 1)
+      throw new Error('session-friction log must be a regular file')
+    return descriptor
+  } catch (error) {
+    closeSync(descriptor)
+    throw error
+  }
+}
+function readLogContent(descriptor: number): string {
+  if (fstatSync(descriptor).size > LOG_MAX_BYTES)
+    throw new Error('session-friction log is too large')
+  const buffer = Buffer.alloc(LOG_MAX_BYTES + 1)
+  let length = 0
+  while (length < buffer.length) {
+    const bytes = readSync(descriptor, buffer, length, buffer.length - length, length)
+    if (bytes === 0) break
+    length += bytes
+  }
+  /* v8 ignore next -- detects external growth after the descriptor size check. */
+  if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
+  return decodeUtf8(buffer.subarray(0, length))
+}
+
+function validEventCount(content: string, limit: number): number {
+  let count = 0
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      if (validEvent(JSON.parse(line))) count++
+    } catch {}
+    if (count >= limit) break
+  }
+  return count
+}
+
+function atEventLimit(content: string, limit: number): boolean {
+  return validEventCount(content, limit) >= limit
+}
+
+function writeAll(descriptor: number, value: string): void {
+  const buffer = Buffer.from(value)
+  let offset = 0
+  while (offset < buffer.length) {
+    const written = writeSync(descriptor, buffer, offset, buffer.length - offset)
+    /* v8 ignore next -- a zero-byte synchronous file write is an external I/O failure. */
+    if (written === 0) throw new Error('session-friction log write made no progress')
+    offset += written
+  }
+}
+
+export function recordFriction(
+  sessionId: string,
+  observation: FrictionObservation,
+  options: FrictionLogOptions & { timestamp?: string | (() => string) },
+): void {
+  const maxEvents = eventLimit(options.maxEvents)
+  const timestamp: unknown =
+    typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
+  if (timestamp !== undefined && typeof timestamp !== 'string')
+    throw new Error('timestamp must be a string')
+  const rawTimestamp = timestamp ?? new Date().toISOString()
+  const normalizedTimestamp = normalizeAuditText(boundedText(rawTimestamp, EVENT_FIELD_MAX_LENGTH))
+  if (!normalizedTimestamp) throw new Error('timestamp must be non-empty')
+  if (!isWellFormedUnicode(normalizedTimestamp))
+    throw new Error('timestamp must be well-formed Unicode')
+  const classified = classifyFrictionObservation(observation)
+  const path = logPath(sessionId, options.directory)
+  const directory = requireDirectory(options.directory)
+  ensurePrivateDirectory(directory, true)
+  withFileLock(path, () => {
+    /* v8 ignore next 2 -- requires the directory path to be replaced after its lock is acquired. */
+    if (!ensurePrivateDirectory(directory, false))
+      throw new Error('session-friction log directory disappeared while acquiring the lock')
+    const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)
+    try {
+      fchmodSync(descriptor, 0o600)
+      if (fstatSync(descriptor).size > LOG_MAX_BYTES)
+        throw new Error('session-friction log is too large')
+      if (!classified) return
+      const content = readLogContent(descriptor)
+      if (atEventLimit(content, maxEvents)) return
+      const event = {
+        ...classified,
+        commandPrefix: normalizeAuditText(classified.commandPrefix),
+        detail: normalizeAuditText(classified.detail),
+        timestamp: normalizedTimestamp,
+      }
+      /* v8 ignore next -- normalized classified fields satisfy validEvent defensively. */
+      if (!validEvent(event)) return
+      const prefix = content && !content.endsWith('\n') ? '\n' : ''
+      const addition = `${prefix}${JSON.stringify(event)}\n`
+      if (fstatSync(descriptor).size + Buffer.byteLength(addition) > LOG_MAX_BYTES)
+        throw new Error('session-friction log is too large')
+      writeAll(descriptor, addition)
+    } finally {
+      closeSync(descriptor)
+    }
+  })
+}
+
+export function readFrictionLog(
+  sessionId: string,
+  options: FrictionLogOptions,
+): FrictionLogReadResult {
+  const maxEvents = eventLimit(options.maxEvents)
+  const path = logPath(sessionId, options.directory)
+  const directory = requireDirectory(options.directory)
+  if (!ensurePrivateDirectory(directory, false)) return { status: 'absent' }
+  try {
+    return withFileLock(path, () => {
+      /* v8 ignore next -- detects directory removal after acquiring the file lock. */
+      if (!ensurePrivateDirectory(directory, false)) return { status: 'absent' }
+      const descriptor = openLogFile(path, constants.O_RDONLY)
+      try {
+        const events: FrictionEvent[] = []
+        for (const line of readLogContent(descriptor).split('\n')) {
+          if (!line.trim()) continue
+          try {
+            const value: unknown = JSON.parse(line)
+            if (validEvent(value)) events.push(value)
+          } catch {}
+          if (events.length >= maxEvents) break
+        }
+        return events.length ? { status: 'events', events } : { status: 'empty' }
+      } finally {
+        closeSync(descriptor)
+      }
+    })
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+      return { status: 'absent' }
+    throw error
+  }
+}
