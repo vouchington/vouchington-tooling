@@ -145,8 +145,9 @@ and rendered audit fields at 120 escaped characters. The supplied log directory 
 to session-friction; existing directories must already be owner-only, while newly created
 directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
 buffer that can detect growth one byte beyond the documented 2 MB cap.
-Ownership checks require POSIX effective-user IDs; Windows callers must secure the directory with
-an appropriate ACL because Node's mode bits do not express the full access policy there.
+Ownership checks require POSIX effective-user IDs and fail closed when those IDs are unavailable.
+Root-owned system symlink ancestors are supported for paths such as macOS `/var`; callers must not
+allow the directory chain to be mutated while it is being validated.
 Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
 grammar. Normalization attempts limited redaction of obvious credential patterns but is not a secret

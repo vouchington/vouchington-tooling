@@ -13,6 +13,7 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
     expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
     expect(normalizeCommandPrefix('git -- status')).toBe('git status')
+    expect(normalizeCommandPrefix('git -C')).toBe('git [REDACTED]')
     expect(normalizeCommandPrefix('rtk git status', ['rtk'])).toBe('rtk git status')
     expect(normalizeCommandPrefix(`${'rtk '.repeat(5_000)}git status`, ['rtk'])).toBe(
       'rtk git status',

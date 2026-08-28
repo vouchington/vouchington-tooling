@@ -112,8 +112,10 @@ function stripGitOptions(tokens: string[]): string[] {
   while (index < tokens.length) {
     const token = tokens[index]!
     if (token === '--') return tokens.slice(index + 1)
-    if (GIT_OPTIONS_WITH_ARGS.has(token)) index += 2
-    else if (GIT_OPTIONS_WITHOUT_ARGS.has(token) || /^--[a-z0-9-]+=/i.test(token)) index++
+    if (GIT_OPTIONS_WITH_ARGS.has(token)) {
+      if (index + 1 >= tokens.length) return [REDACTED_TOKEN]
+      index += 2
+    } else if (GIT_OPTIONS_WITHOUT_ARGS.has(token) || /^--[a-z0-9-]+=/i.test(token)) index++
     else break
   }
   return tokens.slice(index)

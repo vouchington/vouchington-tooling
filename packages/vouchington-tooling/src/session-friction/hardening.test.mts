@@ -33,6 +33,11 @@ afterEach(async () => {
   )
 })
 
+it('validates read limits before inspecting storage', async () => {
+  const directory = await temporaryDirectory()
+  expect(() => readFrictionLog('missing', { directory, maxEvents: 0 })).toThrow(/positive integer/)
+})
+
 it('rejects a symlinked session log without modifying its target', async () => {
   const directory = await temporaryDirectory()
   const outside = await temporaryDirectory()

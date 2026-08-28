@@ -164,6 +164,7 @@ export function readFrictionLog(
   sessionId: string,
   options: FrictionLogOptions,
 ): FrictionLogReadResult {
+  const maxEvents = eventLimit(options.maxEvents)
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)
   if (!ensurePrivateDirectory(directory, false)) return { status: 'absent' }
@@ -180,7 +181,7 @@ export function readFrictionLog(
             const value: unknown = JSON.parse(line)
             if (validEvent(value)) events.push(value)
           } catch {}
-          if (events.length >= eventLimit(options.maxEvents)) break
+          if (events.length >= maxEvents) break
         }
         return events.length ? { status: 'events', events } : { status: 'empty' }
       } finally {
