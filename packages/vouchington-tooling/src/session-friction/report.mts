@@ -15,6 +15,15 @@ const JOURNAL_ENTRY_MAX_COUNT = 500
 const JOURNAL_MARKDOWN_MAX_BYTES = 10_000
 const JOURNAL_TOTAL_MAX_BYTES = 1_000_000
 
+function journalData(entry: JournalEntry): { type: unknown; markdown: unknown } | undefined {
+  try {
+    const data = (entry as JournalEntry | null)?.data
+    return data ? { type: data.type, markdown: data.markdown } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function collectEntries(
   entries: Iterable<JournalEntry> | AsyncIterable<JournalEntry>,
 ): Promise<{ entries: JournalEntry[]; truncated: boolean }> {
@@ -25,7 +34,7 @@ async function collectEntries(
   let truncated = false
   for await (const entry of entries) {
     consumed++
-    const data = (entry as JournalEntry | null)?.data
+    const data = journalData(entry)
     const markdown = data?.markdown
     if (data?.type === 'journal' && typeof markdown === 'string') {
       const bytes = Buffer.byteLength(markdown)

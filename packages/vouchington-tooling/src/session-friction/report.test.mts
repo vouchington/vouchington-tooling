@@ -248,6 +248,24 @@ describe('buildSessionFrictionReport', () => {
     expect(report.markdown).toContain(conforming)
   })
 
+  it('skips hostile journal entry getters while retaining later evidence', async () => {
+    const directory = await makeDirectory()
+    const hostile = Object.defineProperty({}, 'data', {
+      get: () => {
+        throw new Error('hostile getter')
+      },
+    }) as JournalEntry
+    const report = await buildSessionFrictionReport('s', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: [hostile, { data: { type: 'journal', markdown: conforming } }],
+      }),
+    })
+    expect(report.markdown).toContain('Status: failures observed')
+    expect(report.diagnostic).toBeUndefined()
+  })
+
   it('renders sandbox evidence status independently of CI failures', async () => {
     const directory = await makeDirectory()
     const options = {
