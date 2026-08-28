@@ -30,15 +30,16 @@ done
 [ -n "${GITHUB_OUTPUT:-}" ] || { echo 'GITHUB_OUTPUT must be set' >&2; exit 2; }
 [ -n "${GITHUB_REPOSITORY:-}" ] || { echo 'GITHUB_REPOSITORY must be set' >&2; exit 2; }
 [ -n "${GITHUB_RUN_ID:-}" ] || { echo 'GITHUB_RUN_ID must be set' >&2; exit 2; }
+github_host="${GH_HOST:-${GITHUB_SERVER_URL:-https://github.com}}"
+github_host="${github_host#*://}"
+github_host="${github_host%%/*}"
+[ -n "$github_host" ] || { echo 'GitHub host must be set' >&2; exit 2; }
+repository="$github_host/$GITHUB_REPOSITORY"
 
 validate_artifact_name() {
   case "$1" in
-    ''|.|..)
+    ''|.|..|*/*|*\\*)
       echo '[optional-run-artifacts] invalid artifact name' >&2
-      return 2
-      ;;
-    *[!A-Za-z0-9._-]*)
-      echo '[optional-run-artifacts] unsafe characters in artifact name' >&2
       return 2
       ;;
   esac
@@ -49,11 +50,19 @@ download_exact() {
   directory="$2"
   validate_artifact_name "$artifact" || return $?
   echo "[optional-run-artifacts] attempt selector=$selector_type" >&2
-  gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$directory"
+  gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
+}
+
+list_artifact_names() {
+  gh api \
+    --hostname "$github_host" \
+    --paginate \
+    "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+    --jq '.artifacts[] | select(.expired | not) | .name'
 }
 
 download_pattern() {
-  artifacts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | .name') || return $?
+  artifacts=$(list_artifact_names | awk '!seen[$0]++') || return $?
   count=0
   while IFS= read -r artifact; do
     [ -n "$artifact" ] || continue
@@ -80,7 +89,7 @@ EOF
     esac
     validate_artifact_name "$artifact" || return $?
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
-    gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$destination/$artifact" || return $?
+    gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
   done <<EOF
 $artifacts
 EOF
