@@ -36,6 +36,9 @@ afterEach(async () => {
 it('validates read limits before inspecting storage', async () => {
   const directory = await temporaryDirectory()
   expect(() => readFrictionLog('missing', { directory, maxEvents: 0 })).toThrow(/positive integer/)
+  expect(() => readFrictionLog(42 as unknown as string, { directory })).toThrow(
+    /sessionId must be a string/,
+  )
 })
 
 it('rejects oversized session ids before Unicode validation', async () => {
