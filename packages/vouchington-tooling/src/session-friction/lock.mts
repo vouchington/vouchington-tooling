@@ -39,6 +39,7 @@ function inspectLock(
       lockPath,
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     )
+    /* v8 ignore next 2 -- detects a lock that disappears or is replaced while being inspected. */
   } catch {
     return null
   }
