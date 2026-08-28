@@ -39,6 +39,7 @@ export function classifyFrictionObservation(
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
   }
+  if (observation.type !== 'tool-result') return null
   if (
     observation.escalationDetail !== undefined &&
     typeof observation.escalationDetail !== 'string'

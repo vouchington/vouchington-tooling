@@ -43,6 +43,16 @@ it('rejects oversized session ids before Unicode validation', async () => {
   expect(() => readFrictionLog(`${'x'.repeat(4_097)}\ud800`, { directory })).toThrow(/too long/)
 })
 
+it('rejects unsupported observation discriminants', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool_result',
+      command: 'git push',
+      structuredStderr: 'EPERM',
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+})
+
 it('rejects a symlinked session log without modifying its target', async () => {
   const directory = await temporaryDirectory()
   const outside = await temporaryDirectory()
