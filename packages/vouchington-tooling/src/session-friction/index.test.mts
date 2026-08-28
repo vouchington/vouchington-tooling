@@ -103,7 +103,7 @@ describe('classifyFrictionObservation', () => {
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'node test',
-        structuredStderr: 'connect ECONNREFUSED 0:0:0:0:0:0:0:1%lo0',
+        structuredStderr: 'connect ECONNREFUSED 0:0:0:0:0:0:0:1%lo0:3000',
       }),
     ).toMatchObject({ kind: 'sandbox-failure' })
     expect(

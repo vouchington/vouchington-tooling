@@ -113,11 +113,12 @@ function removeStaleLock(lockPath: string): boolean {
       const inspected = inspectLock(lockPath)
       if (!inspected) return false
       const fresh = isFresh(inspected.mtimeMs)
+      const future = inspected.mtimeMs > Date.now()
       const { owner } = inspected
       if (Number.isInteger(owner) && owner > 0) {
         try {
           process.kill(owner, 0)
-          return false
+          if (fresh || future) return false
         } catch (error) {
           if (!hasCode(error, 'ESRCH')) return false
         }
@@ -156,8 +157,9 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       try {
         lockStatus = lstatSync(lockPath)
       } catch (statusError) {
-        /* v8 ignore next 2 -- detects ordinary lock release between O_EXCL and lstat. */
+        /* v8 ignore next -- requires the owner to release between EEXIST and lstat. */
         if (hasCode(statusError, 'ENOENT')) continue
+        /* v8 ignore next -- requires an unexpected lstat failure during the same race. */
         throw statusError
       }
       if (lockStatus.isSymbolicLink())

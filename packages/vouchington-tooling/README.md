@@ -139,6 +139,7 @@ difference between an observed clean session and missing evidence. Report markdo
 diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
 truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
 when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
+Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
 Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
 and rendered audit fields at 120 escaped characters. The supplied log directory must be dedicated
 to session-friction; existing directories must already be owner-only, while newly created

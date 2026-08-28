@@ -205,6 +205,7 @@ describe('buildSessionFrictionReport', () => {
 
   it('bounds journal entries consumed from an iterable', async () => {
     const directory = await makeDirectory()
+    recordFriction('s', { type: 'tool-result', command: 'echo ok' }, { directory })
     let consumed = 0
     let closed = false
     const report = await buildSessionFrictionReport('s', {
@@ -225,7 +226,7 @@ describe('buildSessionFrictionReport', () => {
     })
     expect(consumed).toBe(500)
     expect(closed).toBe(true)
-    expect(report.markdown).toContain('unavailable')
+    expect(report.markdown).toContain('unavailable (journal scan incomplete)')
   })
 
   it('does not retain oversized journal markdown', async () => {

@@ -9,6 +9,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
 const STDERR_INSPECTION_MAX_LENGTH = 100_000
+const COMMAND_INSPECTION_MAX_LENGTH = 10_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
 const LOOPBACK_ADDRESSES = [
   new RegExp(
@@ -16,7 +17,7 @@ const LOOPBACK_ADDRESSES = [
     'i',
   ),
   /(?<![0-9a-z_.-])\[(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\](?![0-9a-z_.-])/i,
-  /(?<![0-9a-z_.:\x5b\x5d-])(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?(?=$|[^0-9a-z_.:\x5b\x5d-]|:\d+\b)/i,
+  /(?<![0-9a-z_.:\x5b\x5d-])(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?(?::\d{1,5})?(?![0-9a-z_.:\x5b\x5d-])/i,
 ]
 const DETAIL_MAX_LENGTH = 1_000
 
@@ -33,8 +34,9 @@ function boundedStderr(value: string): string {
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
-  if (normalizeAuditText(observation.command) === '') return null
-  const commandPrefix = normalizeCommandPrefix(observation.command, observation.commandWrappers)
+  const command = observation.command.slice(0, COMMAND_INSPECTION_MAX_LENGTH)
+  if (normalizeAuditText(command) === '') return null
+  const commandPrefix = normalizeCommandPrefix(command, observation.commandWrappers)
   if (commandPrefix === '') return null
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }

@@ -19,9 +19,9 @@ const FIELD_PREFIXES = [
 function safeField(line: string): string | null {
   const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))
   /* v8 ignore next -- matchBlock currently passes only fields with a known prefix. */
-  if (!prefix) return markdownAuditText(line)
-  const value = markdownAuditText(line.slice(prefix.length))
-  return value ? `${prefix}${value}` : null
+  if (!prefix) return markdownAuditText(line) || null
+  const content = markdownAuditText(line.slice(prefix.length))
+  return content ? `${prefix}${content}` : null
 }
 
 function matchBlock(markdown: string): string | null {
@@ -43,7 +43,8 @@ function matchBlock(markdown: string): string | null {
   if (fields.some((field) => field === null)) return null
   if (!lines.slice(index).every((line) => BLANK.test(line))) return null
   const safeFields = fields.map((field) => safeField(field!))
-  return safeFields.some((field) => field === null) ? null : safeFields.join('\n')
+  if (safeFields.some((field) => field === null)) return null
+  return safeFields.join('\n')
 }
 
 export function isConformingCiFailureBlock(markdown: string): boolean {
@@ -66,12 +67,14 @@ export function getConformingGroups(entries: Iterable<JournalEntry>): string[] {
 export function buildCiFailuresSection(
   sessionId: string,
   journal:
-    | { status: 'ok'; markdownBlocks: string[] }
+    | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string },
   frictionStatus: FrictionLogReadResult['status'],
 ): string {
   if (journal.status === 'unreachable')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (blackboard unreachable)`
+  if (journal.markdownBlocks.length === 0 && journal.truncated)
+    return `${CI_FAILURES_HEADER}\nStatus: unavailable (journal scan incomplete)`
   if (journal.markdownBlocks.length === 0 && frictionStatus === 'absent')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (no friction log for session ${markdownAuditText(sessionId)})`
   if (journal.markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`

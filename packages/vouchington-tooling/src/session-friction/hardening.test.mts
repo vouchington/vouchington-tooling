@@ -73,7 +73,7 @@ it('rejects invalid UTF-8 in a session log', async () => {
   recordFriction('invalid-utf8', { type: 'tool-result', command: 'echo ok' }, options)
   const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
   await writeFile(join(directory, file), Buffer.from([0x7b, 0x22, 0x80, 0x22, 0x7d]))
-  expect(() => readFrictionLog('invalid-utf8', options)).toThrow(/encoded data/)
+  expect(() => readFrictionLog('invalid-utf8', options)).toThrow(/not valid UTF-8/)
 })
 
 it('rejects a multiply-linked session log without modifying its target', async () => {
@@ -119,6 +119,18 @@ it('reclaims future-dated ownerless locks and reaper guards', async () => {
   await writeFile(join(directory, `${file}.lock.reap`), '')
   await utimes(join(directory, `${file}.lock.reap`), future, future)
   expect(readFrictionLog('future-lock', options)).toMatchObject({ status: 'events' })
+})
+
+it('reclaims a stale lock whose PID has been reused', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('reused-owner', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const lock = join(directory, `${file}.lock`)
+  await writeFile(lock, String(process.pid))
+  await utimes(lock, new Date(0), new Date(0))
+  recordFriction('reused-owner', { type: 'permission-request', command: 'git push' }, options)
+  expect(readFrictionLog('reused-owner', options)).toMatchObject({ status: 'events' })
 })
 
 it('does not follow a symbolic link while inspecting a lock owner', async () => {
@@ -182,4 +194,13 @@ it('bounds structured stderr inspection', () => {
       structuredStderr: `${'x'.repeat(100_000)} EPERM`,
     }),
   ).toMatchObject({ kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' })
+})
+
+it('bounds command inspection before normalization', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'permission-request',
+      command: `npm run build ${'x'.repeat(10_001)}`,
+    }),
+  ).toMatchObject({ commandPrefix: 'npm run build' })
 })

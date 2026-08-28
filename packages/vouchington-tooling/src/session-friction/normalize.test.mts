@@ -19,6 +19,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('rtk rtk', ['rtk'])).toBe('rtk')
     expect(normalizeCommandPrefix("echo 'git push' && gh pr view 1")).toBe('echo git push')
     expect(normalizeCommandPrefix('cd /private/path')).toBe('cd /private/path')
+    expect(normalizeCommandPrefix('npm run build')).toBe('npm run build')
+    expect(normalizeCommandPrefix('npm exec vitest')).toBe('npm exec vitest')
   })
 
   it('redacts overlong tokens in the report-safe prefix', () => {

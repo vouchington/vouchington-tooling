@@ -12,12 +12,12 @@ import type {
   FrictionLogReadResult,
   FrictionObservation,
 } from './types.mts'
+import { decodeUtf8 } from './utf8.mts'
 
 export const FRICTION_LOG_MAX_EVENTS = 500
 const SESSION_ID_MAX_LENGTH = 4096
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
-
 function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
   return resolve(directory)
@@ -86,7 +86,7 @@ function readLogContent(descriptor: number): string {
   }
   /* v8 ignore next -- detects external growth after the descriptor size check. */
   if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
-  return new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length))
+  return decodeUtf8(buffer.subarray(0, length))
 }
 
 function nonEmptyLineCount(content: string): number {

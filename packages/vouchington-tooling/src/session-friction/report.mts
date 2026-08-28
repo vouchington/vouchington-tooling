@@ -16,11 +16,12 @@ const JOURNAL_TOTAL_MAX_BYTES = 1_000_000
 
 async function collectEntries(
   entries: Iterable<JournalEntry> | AsyncIterable<JournalEntry>,
-): Promise<JournalEntry[]> {
+): Promise<{ entries: JournalEntry[]; truncated: boolean }> {
   const result: JournalEntry[] = []
   let consumed = 0
   let inspectedBytes = 0
   let retainedBytes = 0
+  let truncated = false
   for await (const entry of entries) {
     consumed++
     const data = (entry as JournalEntry | null)?.data
@@ -40,10 +41,12 @@ async function collectEntries(
       consumed >= JOURNAL_ENTRY_MAX_COUNT ||
       inspectedBytes >= JOURNAL_TOTAL_MAX_BYTES ||
       retainedBytes >= JOURNAL_TOTAL_MAX_BYTES
-    )
+    ) {
+      truncated = true
       break
+    }
   }
-  return result
+  return { entries: result, truncated }
 }
 
 function errorMessage(error: unknown): string {
@@ -64,7 +67,7 @@ function reportFromLog(
   sessionId: string,
   logOptions: FrictionLogOptions,
   journal:
-    | { status: 'ok'; markdownBlocks: string[] }
+    | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string },
 ): SessionFrictionReport {
   try {
@@ -88,16 +91,20 @@ export async function buildSessionFrictionReport(
   options: SessionFrictionReportOptions,
 ): Promise<SessionFrictionReport> {
   let journal:
-    | { status: 'ok'; markdownBlocks: string[] }
+    | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string }
   try {
     const loaded: JournalLoadResult = await options.journalLoader(sessionId)
-    if (loaded.status === 'not-found') journal = { status: 'ok', markdownBlocks: [] }
-    else
+    if (loaded.status === 'not-found')
+      journal = { status: 'ok', markdownBlocks: [], truncated: false }
+    else {
+      const collected = await collectEntries(loaded.entries)
       journal = {
         status: 'ok',
-        markdownBlocks: getConformingGroups(await collectEntries(loaded.entries)),
+        markdownBlocks: getConformingGroups(collected.entries),
+        truncated: collected.truncated,
       }
+    }
   } catch (error) {
     const diagnostic = errorMessage(error)
     journal = { status: 'unreachable', diagnostic }
