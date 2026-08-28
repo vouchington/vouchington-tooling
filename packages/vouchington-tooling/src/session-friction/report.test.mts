@@ -46,6 +46,21 @@ describe('CI failure grammar', () => {
 })
 
 describe('buildSessionFrictionReport', () => {
+  it('validates the session ID before invoking the journal loader', async () => {
+    const directory = await makeDirectory()
+    let loaded = false
+    await expect(
+      buildSessionFrictionReport('', {
+        directory,
+        journalLoader: () => {
+          loaded = true
+          return { status: 'not-found' }
+        },
+      }),
+    ).rejects.toThrow(/non-empty/)
+    expect(loaded).toBe(false)
+  })
+
   it('omits sandbox event kinds with no events', () => {
     const section = buildSandboxSection([
       {
@@ -238,7 +253,7 @@ describe('buildSessionFrictionReport', () => {
         entries: [{ data: { type: 'journal', markdown: 'x'.repeat(10_001) } }],
       }),
     })
-    expect(report.markdown).toContain('unavailable')
+    expect(report.markdown).toContain('unavailable (journal scan incomplete)')
     expect(report.markdown).not.toContain('x'.repeat(1_000))
   })
 

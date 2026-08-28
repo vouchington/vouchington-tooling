@@ -128,7 +128,7 @@ function normalizeSegment(tokens: string[]): string {
   if (!first) return ''
   if (packageRunner(first) && (rest[0] === 'run' || rest[0] === 'exec') && rest[1])
     return `${redact(first)} ${rest[0]} ${redact(rest[1])}`
-  const effective = first === 'git' ? stripGitOptions(rest) : rest
+  const effective = first === 'git' || first.endsWith('/git') ? stripGitOptions(rest) : rest
   return effective[0] ? `${redact(first)} ${redact(effective[0])}` : redact(first)
 }
 

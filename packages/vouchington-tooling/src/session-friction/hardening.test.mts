@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
 import { classifyFrictionObservation, readFrictionLog, recordFriction } from './index.mts'
+import type { FrictionObservation } from './types.mts'
 
 const directories: string[] = []
 
@@ -209,4 +210,34 @@ it('bounds command inspection before normalization', () => {
       command: `${'x'.repeat(9_999)}\ud83d\udca5 trailing`,
     })?.commandPrefix,
   ).not.toContain('\ufffd')
+})
+
+it('preserves Unicode pairs in bounded details and rejects malformed runtime stderr', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: `${'x'.repeat(999)}\ud83d\ude00`,
+    })?.detail,
+  ).toBe('x'.repeat(999))
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      structuredStderr: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 42,
+    } as unknown as FrictionObservation),
+  ).toBeNull()
 })

@@ -1,6 +1,7 @@
 import { readFrictionLog } from './log.mts'
 import { buildCiFailuresSection, getConformingGroups } from './ci-failures.mts'
 import { buildSandboxSection } from './sandbox.mts'
+import { validateSessionId } from './session-id.mts'
 import type {
   FrictionLogOptions,
   FrictionLogReadResult,
@@ -29,6 +30,7 @@ async function collectEntries(
     if (data?.type === 'journal' && typeof markdown === 'string') {
       const bytes = Buffer.byteLength(markdown)
       inspectedBytes += bytes
+      if (bytes > JOURNAL_MARKDOWN_MAX_BYTES) truncated = true
       if (bytes <= JOURNAL_MARKDOWN_MAX_BYTES && retainedBytes + bytes <= JOURNAL_TOTAL_MAX_BYTES) {
         result.push({ data: { type: 'journal', markdown } })
         retainedBytes += bytes
@@ -87,6 +89,7 @@ export async function buildSessionFrictionReport(
   sessionId: string,
   options: SessionFrictionReportOptions,
 ): Promise<SessionFrictionReport> {
+  validateSessionId(sessionId)
   let journal:
     | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string }

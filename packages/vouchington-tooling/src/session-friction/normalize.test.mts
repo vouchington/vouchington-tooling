@@ -8,6 +8,7 @@ describe('normalizeCommandPrefix', () => {
       'pnpm exec vitest',
     )
     expect(normalizeCommandPrefix('git -C /private/path push origin main')).toBe('git push')
+    expect(normalizeCommandPrefix('/usr/bin/git -C /private/path push')).toBe('/usr/bin/git push')
     expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
     expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
     expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')

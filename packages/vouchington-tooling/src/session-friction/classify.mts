@@ -21,18 +21,8 @@ const LOOPBACK_ADDRESSES = [
 ]
 const DETAIL_MAX_LENGTH = 1_000
 
-function boundedDetail(value: string): string {
-  return value.slice(0, DETAIL_MAX_LENGTH)
-}
-
-function boundedStderr(value: string): string {
-  if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
-  const half = STDERR_INSPECTION_MAX_LENGTH / 2
-  return `${value.slice(0, half)}\n${value.slice(-half)}`
-}
-
-function boundedCommand(value: string): string {
-  let end = Math.min(value.length, COMMAND_INSPECTION_MAX_LENGTH)
+function boundedText(value: string, maximum: number): string {
+  let end = Math.min(value.length, maximum)
   if (
     end < value.length &&
     /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
@@ -42,17 +32,32 @@ function boundedCommand(value: string): string {
   return value.slice(0, end)
 }
 
+function boundedStderr(value: string): string {
+  if (value.length <= STDERR_INSPECTION_MAX_LENGTH) return value
+  const half = STDERR_INSPECTION_MAX_LENGTH / 2
+  return `${value.slice(0, half)}\n${value.slice(-half)}`
+}
+
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
-  const command = boundedCommand(observation.command)
+  if (typeof observation.command !== 'string') return null
+  const command = boundedText(observation.command, COMMAND_INSPECTION_MAX_LENGTH)
   if (normalizeAuditText(command) === '') return null
   const commandPrefix = normalizeCommandPrefix(command, observation.commandWrappers)
   if (commandPrefix === '') return null
   if (observation.type === 'permission-request') {
     return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
   }
-  const escalationDetail = boundedDetail(normalizeAuditText(observation.escalationDetail ?? ''))
+  if (
+    observation.escalationDetail !== undefined &&
+    typeof observation.escalationDetail !== 'string'
+  )
+    return null
+  const escalationDetail = boundedText(
+    normalizeAuditText(observation.escalationDetail ?? ''),
+    DETAIL_MAX_LENGTH,
+  )
   if (escalationDetail) {
     return {
       kind: 'sandbox-escalation',
@@ -60,9 +65,9 @@ export function classifyFrictionObservation(
       detail: escalationDetail,
     }
   }
-  const stderr = observation.structuredStderr
-    ? boundedStderr(observation.structuredStderr)
-    : observation.structuredStderr
+  const rawStderr = observation.structuredStderr
+  if (rawStderr !== undefined && typeof rawStderr !== 'string') return null
+  const stderr = rawStderr ? boundedStderr(rawStderr) : rawStderr
   if (stderr === undefined) return null
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
