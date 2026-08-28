@@ -94,6 +94,16 @@ describe('buildSessionFrictionReport', () => {
     ])
     expect(boundary.split(' — ')[1]).toHaveLength(119)
     expect(boundary.split(' — ')[1]).not.toMatch(/\\$/)
+    expect(
+      buildSandboxSection([
+        {
+          kind: 'sandbox-failure',
+          commandPrefix: 'git push',
+          detail: '~~hidden~~',
+          timestamp: '1',
+        },
+      ]),
+    ).toContain('\\~\\~hidden\\~\\~')
   })
 
   it('keeps report fields on one markdown line', async () => {

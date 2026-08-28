@@ -54,9 +54,8 @@ export function classifyFrictionObservation(
     typeof observation.escalationDetail !== 'string'
   )
     return null
-  const escalationDetail = boundedText(
-    normalizeAuditText(observation.escalationDetail ?? ''),
-    DETAIL_MAX_LENGTH,
+  const escalationDetail = normalizeAuditText(
+    boundedText(observation.escalationDetail ?? '', DETAIL_MAX_LENGTH),
   )
   if (escalationDetail) {
     return {
@@ -73,7 +72,7 @@ export function classifyFrictionObservation(
   if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
   if (
     stderr
-      .split(/\r?\n/)
+      .split(/\r\n|\r|\n/)
       .some(
         (line) =>
           CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line)),

@@ -212,6 +212,23 @@ it('bounds command inspection before normalization', () => {
   ).not.toContain('\ufffd')
 })
 
+it('preserves detail pairs and separates lone carriage-return diagnostics', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'git push',
+      escalationDetail: `${'x'.repeat(999)}😀`,
+    })?.detail,
+  ).toBe('x'.repeat(999))
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'curl remote',
+      structuredStderr: 'ECONNREFUSED 10.0.0.5\runrelated localhost note',
+    }),
+  ).toBeNull()
+})
+
 it('preserves Unicode pairs in bounded details and rejects malformed runtime stderr', () => {
   expect(
     classifyFrictionObservation({
