@@ -259,7 +259,7 @@ describe('buildSessionFrictionReport', () => {
       directory,
       journalLoader: () => ({
         status: 'ok',
-        entries: [hostile, { data: { type: 'journal', markdown: conforming } }],
+        entries: [{}, hostile, { data: { type: 'journal', markdown: conforming } }],
       }),
     })
     expect(report.markdown).toContain('Status: failures observed')
