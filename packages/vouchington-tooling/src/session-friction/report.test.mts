@@ -280,6 +280,23 @@ describe('buildSessionFrictionReport', () => {
     expect(report.markdown).not.toContain('x'.repeat(1_000))
   })
 
+  it('reports an incomplete journal when the friction log is unreadable', async () => {
+    const directory = await makeDirectory()
+    recordFriction('incomplete', { type: 'tool-result', command: 'echo ok' }, { directory })
+    const [file] = await readdir(directory)
+    await writeFile(join(directory, file!), 'x'.repeat(2_000_001))
+    const report = await buildSessionFrictionReport('incomplete', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: Array.from({ length: 500 }, () => ({
+          data: { type: 'journal', markdown: conforming },
+        })),
+      }),
+    })
+    expect(report.markdown).toContain('Status: unavailable (journal scan incomplete)')
+  })
+
   it('returns paste-safe output when the friction log is unreadable', async () => {
     const directory = await makeDirectory()
     recordFriction('oversized', { type: 'tool-result', command: 'echo ok' }, { directory })

@@ -73,8 +73,6 @@ export function buildCiFailuresSection(
 ): string {
   if (journal.status === 'unreachable')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (blackboard unreachable)`
-  if (journal.markdownBlocks.length === 0 && journal.truncated)
-    return `${CI_FAILURES_HEADER}\nStatus: unavailable (journal scan incomplete)`
   if (journal.markdownBlocks.length === 0 && frictionStatus === 'absent')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (no friction log for session ${markdownAuditText(sessionId)})`
   if (journal.markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`
