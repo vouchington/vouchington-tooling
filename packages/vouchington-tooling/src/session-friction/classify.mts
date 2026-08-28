@@ -4,8 +4,8 @@ import type { FrictionEvent, FrictionObservation } from './types.mts'
 
 const FAILURE_TOKENS: [string, RegExp][] = [
   ['Operation not permitted', /Operation not permitted/i],
-  ['E2BIG', /\bE2BIG\b/],
-  ['EPERM', /\bEPERM\b/],
+  ['E2BIG', /\bE2BIG\b/i],
+  ['EPERM', /\bEPERM\b/i],
 ]
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
 const LOOPBACK_ADDRESS = /\b(?:127\.0\.0\.1|localhost)\b|(?:^|[^0-9a-f:])::1(?=$|[^0-9a-f:])/i
