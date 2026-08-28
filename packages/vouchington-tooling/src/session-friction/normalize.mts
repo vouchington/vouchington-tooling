@@ -134,5 +134,5 @@ export function normalizeCommandPrefix(command: string, wrappersToStrip: string[
   while (tokens[wrappers] && wrapperNames.has(tokens[wrappers]!)) wrappers++
   if (!wrappers) return normalizeSegment(tokens)
   const nested = normalizeSegment(stripAssignments(tokens.slice(wrappers)))
-  return nested ? `${tokens[0]} ${nested}` : tokens[0]!
+  return nested ? `${redact(tokens[0]!)} ${nested}` : redact(tokens[0]!)
 }

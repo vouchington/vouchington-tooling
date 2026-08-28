@@ -43,6 +43,26 @@ function withReaperLock(lockPath: string, action: () => boolean): boolean {
   }
 }
 
+function removeOrphanedReaper(reaperPath: string): boolean {
+  try {
+    const inspected = statSync(reaperPath)
+    if (Date.now() - inspected.mtimeMs < STALE_LOCK_AGE_MS) return false
+    const current = statSync(reaperPath)
+    /* v8 ignore next 5 -- requires external replacement during stale-reaper recovery. */
+    if (
+      current.dev !== inspected.dev ||
+      current.ino !== inspected.ino ||
+      current.mtimeMs !== inspected.mtimeMs
+    )
+      return false
+    unlinkSync(reaperPath)
+    return true
+  } catch {
+    /* v8 ignore next -- requires external removal during stale-reaper recovery. */
+    return false
+  }
+}
+
 function removeStaleLock(lockPath: string): boolean {
   return withReaperLock(lockPath, () => {
     try {
@@ -78,6 +98,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
   const reaperPath = `${lockPath}.reap`
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
     if (existsSync(reaperPath)) {
+      if (removeOrphanedReaper(reaperPath)) continue
       waitForLock()
       continue
     }

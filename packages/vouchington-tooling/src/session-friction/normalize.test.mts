@@ -24,6 +24,8 @@ describe('normalizeCommandPrefix', () => {
   it('redacts overlong tokens in the report-safe prefix', () => {
     expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('[REDACTED]')
     expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('[REDACTED] run')
+    const wrapper = 'w'.repeat(80)
+    expect(normalizeCommandPrefix(`${wrapper} git status`, [wrapper])).toBe('[REDACTED] git status')
   })
 
   it('handles escaped quotes and strips env assignments', () => {

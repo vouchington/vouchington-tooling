@@ -229,9 +229,29 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toEqual({
-      markdown: '## CI Failures\nStatus: unavailable (friction log unreadable)',
+      markdown:
+        '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
+        '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
       diagnostic: 'journal unavailable; session-friction log is too large',
     })
+  })
+
+  it('preserves validated CI failures when the friction log is unreadable', async () => {
+    const directory = await makeDirectory()
+    recordFriction('oversized-with-ci', { type: 'tool-result', command: 'echo ok' }, { directory })
+    const [file] = await readdir(directory)
+    await writeFile(join(directory, file!), 'x'.repeat(2_000_001))
+    const report = await buildSessionFrictionReport('oversized-with-ci', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: [{ data: { type: 'journal', markdown: conforming } }],
+      }),
+    })
+    expect(report.markdown).toContain('Status: failures observed')
+    expect(report.markdown).toContain(conforming)
+    expect(report.markdown).toContain('Status: unavailable (friction log unreadable)')
+    expect(report.diagnostic).toBe('session-friction log is too large')
   })
 
   it('bounds bytes inspected from rejected journal markdown', async () => {

@@ -10,7 +10,7 @@ const FAILURE_TOKENS: [string, RegExp][] = [
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
 const LOOPBACK_ADDRESS = new RegExp(
-  String.raw`\b(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)\b|` +
+  String.raw`(?<![0-9a-z_.-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])|` +
     String.raw`(?<![0-9a-z:])\[?(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\]?(?![0-9a-z:])`,
   'i',
 )
@@ -23,7 +23,7 @@ function boundedDetail(value: string): string {
 export function classifyFrictionObservation(
   observation: FrictionObservation,
 ): Omit<FrictionEvent, 'timestamp'> | null {
-  if (observation.command === '') return null
+  if (normalizeAuditText(observation.command) === '') return null
   const commandPrefix = normalizeCommandPrefix(observation.command, observation.commandWrappers)
   if (commandPrefix === '') return null
   if (observation.type === 'permission-request') {

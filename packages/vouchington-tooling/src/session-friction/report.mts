@@ -63,8 +63,12 @@ function reportFromLog(
     if (friction.status !== 'events') return { markdown }
     return { markdown: `${markdown}\n\n${buildSandboxSection(friction.events)}` }
   } catch (error) {
+    const ciMarkdown =
+      journal.status === 'ok' && journal.markdownBlocks.length === 0
+        ? '## CI Failures\nStatus: unavailable (friction log unreadable)'
+        : buildCiFailuresSection(sessionId, journal, 'empty')
     return {
-      markdown: '## CI Failures\nStatus: unavailable (friction log unreadable)',
+      markdown: `${ciMarkdown}\n\n## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)`,
       diagnostic: errorMessage(error),
     }
   }
