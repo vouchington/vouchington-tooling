@@ -12,7 +12,6 @@ import type {
 } from './types.mts'
 import { decodeUtf8 } from './utf8.mts'
 import { sanitizeSessionId } from './session-id.mts'
-
 export const FRICTION_LOG_MAX_EVENTS = 500
 const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
@@ -135,6 +134,7 @@ export function recordFriction(
   const directory = requireDirectory(options.directory)
   ensurePrivateDirectory(directory, true)
   withFileLock(path, () => {
+    /* v8 ignore next 2 -- requires the directory path to be replaced after its lock is acquired. */
     if (!ensurePrivateDirectory(directory, false))
       throw new Error('session-friction log directory disappeared while acquiring the lock')
     const descriptor = openLogFile(path, constants.O_CREAT | constants.O_RDWR | constants.O_APPEND)
