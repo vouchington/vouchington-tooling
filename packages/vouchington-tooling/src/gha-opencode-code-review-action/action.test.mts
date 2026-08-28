@@ -91,7 +91,7 @@ describe('opencode-code-review action', () => {
     })
     expect(review?.env?.TIMEOUT_SECONDS).toBe('${{ inputs.timeout_seconds }}')
     expect(review?.run).toContain('[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|1[0-4][0-9][0-9]|1500)')
-    expect(review?.run).toContain('must be a positive integer')
+    expect(review?.run).toContain('must be a positive integer no greater than 1500')
     expect(review?.run).toContain('run-with-timeout.sh not found relative to GITHUB_ACTION_PATH')
     expect(review?.run).toContain('run-with-timeout.sh" "$TIMEOUT_SECONDS" 30')
     expect(review?.['continue-on-error']).toBe(true)
