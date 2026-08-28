@@ -1,16 +1,9 @@
-import {
-  appendFileSync,
-  chmodSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-} from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { appendFileSync, chmodSync, existsSync, readFileSync, statSync } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 
 import { classifyFrictionObservation } from './classify.mts'
+import { ensurePrivateDirectory } from './directory.mts'
 import { withFileLock } from './lock.mts'
 import { isSafeAuditText, normalizeAuditText } from './text.mts'
 import type {
@@ -27,7 +20,7 @@ const EVENT_FIELD_MAX_LENGTH = 1_000
 
 function requireDirectory(directory: string): string {
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
-  return directory
+  return resolve(directory)
 }
 
 function eventLimit(maxEvents: number | undefined): number {
@@ -85,14 +78,7 @@ export function recordFriction(
   const maxEvents = eventLimit(options.maxEvents)
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
-  const directory = requireDirectory(options.directory)
-  const existed = existsSync(directory)
-  mkdirSync(directory, { mode: 0o700, recursive: true })
-  if (existed) {
-    const status = lstatSync(directory)
-    if (status.isSymbolicLink() || !status.isDirectory() || (status.mode & 0o777) !== 0o700)
-      throw new Error('session-friction log directory must be a private directory')
-  } else chmodSync(directory, 0o700)
+  ensurePrivateDirectory(requireDirectory(options.directory), true)
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withFileLock(path, () => {
@@ -126,7 +112,8 @@ export function readFrictionLog(
   options: FrictionLogOptions,
 ): FrictionLogReadResult {
   const path = logPath(sessionId, options.directory)
-  if (!existsSync(requireDirectory(options.directory))) return { status: 'absent' }
+  if (!ensurePrivateDirectory(requireDirectory(options.directory), false))
+    return { status: 'absent' }
   try {
     return withFileLock(path, () => {
       if (!existsSync(path)) return { status: 'absent' }

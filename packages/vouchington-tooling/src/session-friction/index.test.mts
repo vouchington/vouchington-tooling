@@ -1,5 +1,15 @@
 import { rmSync } from 'node:fs'
-import { chmod, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -363,6 +373,19 @@ describe('friction log', () => {
       recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options),
     ).toThrow(/private directory/)
     await chmod(directoryPath, 0o700)
+  })
+
+  it('rejects symbolic links in the evidence directory chain for writes and reads', async () => {
+    const parent = await directory()
+    const target = await directory()
+    const linked = join(parent, 'linked')
+    await symlink(target, linked, 'dir')
+    const options = { directory: join(linked, 'nested') }
+    expect(() =>
+      recordFriction('linked', { type: 'permission-request', command: 'git push' }, options),
+    ).toThrow(/private directory/)
+    expect(await readdir(target)).toEqual([])
+    expect(() => readFrictionLog('linked', { directory: linked })).toThrow(/private directory/)
   })
 
   it('bounds persisted escalation details', async () => {
