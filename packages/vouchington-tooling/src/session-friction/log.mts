@@ -154,7 +154,9 @@ export function recordFriction(
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   withLogLock(path, () => {
     appendFileSync(path, '', { encoding: 'utf8', mode: 0o600 })
-    chmodSync(path, statSync(path).mode & 0o600)
+    try {
+      chmodSync(path, 0o600)
+    } catch {}
     if (!classified) return
     const content = readLogContent(path)
     if (validEventCount(content, maxEvents) >= maxEvents) return
