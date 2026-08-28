@@ -89,9 +89,10 @@ function stripAssignments(tokens: string[]): string[] {
       break
     }
     const optionName = option.split('=', 1)[0]!
-    const abbreviatedArgument =
-      optionName.length >= 5 &&
-      ['--chdir', '--split-string'].some((value) => value.startsWith(optionName))
+    const splitStringOption =
+      optionName === '-S' || (optionName.length >= 5 && '--split-string'.startsWith(optionName))
+    if (splitStringOption) return [REDACTED_TOKEN]
+    const abbreviatedArgument = optionName.length >= 5 && '--chdir'.startsWith(optionName)
     if (ENV_OPTIONS_WITH_ARGS.has(optionName) || abbreviatedArgument) {
       index += option.includes('=') ? 1 : 2
       continue

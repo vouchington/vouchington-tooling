@@ -57,6 +57,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('env --chdir=/tmp API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env --chd /tmp API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix("env --spl 'API_TOKEN=secret curl'")).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix("env -S 'git push'")).toBe('[REDACTED]')
+    expect(normalizeCommandPrefix("env --split-string='git push'")).toBe('[REDACTED]')
     expect(normalizeCommandPrefix('env --unknown secret curl')).toBe('[REDACTED]')
     expect(normalizeCommandPrefix('env -- API_TOKEN=secret curl')).toBe('curl')
     expect(normalizeCommandPrefix('env API_TOKEN=secret')).toBe('[REDACTED]')
