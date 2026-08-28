@@ -34,7 +34,7 @@ github_host="${GH_HOST:-${GITHUB_SERVER_URL:-https://github.com}}"
 github_host="${github_host#*://}"
 github_host="${github_host%%/*}"
 [ -n "$github_host" ] || { echo 'GitHub host must be set' >&2; exit 2; }
-repository="$github_host/$GITHUB_REPOSITORY"
+repository="$GITHUB_REPOSITORY"
 case "$github_host" in
   github.com|*.ghe.com) ;;
   *)
@@ -68,7 +68,7 @@ download_exact() {
   done < <(printf '%s\n' "$artifacts")
   [ "$found" -eq 1 ] || return 3
   echo "[optional-run-artifacts] attempt selector=$selector_type" >&2
-  gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
+  GH_HOST="$github_host" gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
 }
 
 list_artifact_names() {
@@ -98,7 +98,7 @@ download_pattern() {
   [ "$count" -gt 0 ] || return 3
   for artifact in "${selected_artifacts[@]}"; do
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
-    gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
+    GH_HOST="$github_host" gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
   done
 }
 

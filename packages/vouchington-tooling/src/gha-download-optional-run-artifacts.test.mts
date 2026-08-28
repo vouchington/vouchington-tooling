@@ -179,10 +179,15 @@ printf '%s\\n' "$name" > "$dir/artifact-name"
   it('targets the Actions server host', () => {
     const result = runHelper({
       env: { GH_HOST: '', GITHUB_SERVER_URL: 'https://ghe.example:8443' },
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then echo transport-download-control; exit 0; fi
+printf '%s|%s\\n' "$GH_HOST" "$*"
+`,
     })
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('--repo ghe.example:8443/owner/repo')
+    expect(result.stdout).toContain('ghe.example:8443|')
+    expect(result.stdout).toContain('--repo owner/repo')
   })
 
   it('forwards the workflow token and host to GHES API calls', () => {
