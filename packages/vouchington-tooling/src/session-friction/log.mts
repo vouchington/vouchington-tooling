@@ -148,7 +148,7 @@ export function recordFriction(
   const directory = requireDirectory(options.directory)
   mkdirSync(directory, { mode: 0o700, recursive: true })
   try {
-    chmodSync(directory, statSync(directory).mode & 0o700)
+    chmodSync(directory, 0o700)
   } catch {}
   const timestamp =
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
