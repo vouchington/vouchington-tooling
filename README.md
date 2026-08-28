@@ -101,6 +101,8 @@ thread resolution. There is no `@claude` mention workflow.
     pr_number: ${{ inputs.pr_number }}
     trusted_prompt_ref: ${{ github.sha }}
     model: openrouter/stealth/ox-alpha
+    # Optional: OpenCode runtime cap in seconds (1-1500; default: 1500).
+    timeout_seconds: '1500'
     payload_artifact_name: opencode
     openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
 ```
