@@ -161,10 +161,36 @@ printf '%s\\n' "$name" > "$dir/artifact-name"
   })
 
   it('targets the Actions server host', () => {
-    const result = runHelper({ env: { GH_HOST: '', GITHUB_SERVER_URL: 'https://ghe.example' } })
+    const result = runHelper({
+      env: { GH_HOST: '', GITHUB_SERVER_URL: 'https://ghe.example:8443' },
+    })
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('--repo ghe.example/owner/repo')
+    expect(result.stdout).toContain('--repo ghe.example:8443/owner/repo')
+  })
+
+  it('forwards the workflow token and host to GHES API calls', () => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--pattern',
+        '*',
+        '--dir',
+        join(temporaryDirectory, 'coverage-fallback'),
+      ],
+      env: {
+        GH_ENTERPRISE_TOKEN: '',
+        GH_HOST: '',
+        GH_TOKEN: 'workflow-token',
+        GITHUB_SERVER_URL: 'https://ghe.example:8443',
+      },
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then printf '%s\\n' "$GH_HOST|$GH_ENTERPRISE_TOKEN" >&2; exit 0; fi
+exit 99
+`,
+    })
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain('ghe.example:8443|workflow-token')
   })
 
   it('preserves each patterned artifact under its artifact-name directory', () => {

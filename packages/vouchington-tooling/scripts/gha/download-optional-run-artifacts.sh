@@ -35,6 +35,15 @@ github_host="${github_host#*://}"
 github_host="${github_host%%/*}"
 [ -n "$github_host" ] || { echo 'GitHub host must be set' >&2; exit 2; }
 repository="$github_host/$GITHUB_REPOSITORY"
+case "$github_host" in
+  github.com|*.ghe.com) ;;
+  *)
+    if [ -z "${GH_ENTERPRISE_TOKEN:-${GITHUB_ENTERPRISE_TOKEN:-}}" ]; then
+      enterprise_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+      [ -z "$enterprise_token" ] || export GH_ENTERPRISE_TOKEN="$enterprise_token"
+    fi
+    ;;
+esac
 
 validate_artifact_name() {
   case "$1" in
@@ -54,8 +63,7 @@ download_exact() {
 }
 
 list_artifact_names() {
-  gh api \
-    --hostname "$github_host" \
+  GH_HOST="$github_host" gh api \
     --paginate \
     "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
     --jq '.artifacts[] | select(.expired | not) | .name'
