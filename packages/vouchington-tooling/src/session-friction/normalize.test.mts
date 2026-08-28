@@ -11,6 +11,8 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix('/usr/bin/git -C /private/path push')).toBe('/usr/bin/git push')
     expect(normalizeCommandPrefix('git --no-pager status')).toBe('git status')
     expect(normalizeCommandPrefix('git --work-tree=/private/path status')).toBe('git status')
+    expect(normalizeCommandPrefix('git --work-tree /private/path status')).toBe('git status')
+    expect(normalizeCommandPrefix('git --git-dir .git push')).toBe('git push')
     expect(normalizeCommandPrefix('git --option1=value status')).toBe('git status')
     expect(normalizeCommandPrefix('git -- status')).toBe('git status')
     expect(normalizeCommandPrefix('git -C')).toBe('git [REDACTED]')

@@ -6,7 +6,7 @@ const CREDENTIAL_OPTION = /^--?(?:api[-_]?key|auth|credential|password|secret|to
 const URL_USERINFO = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 const PACKAGE_RUNNERS = new Set(['npm', 'npx', 'pnpm', 'pnpx', 'yarn'])
-const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c'])
+const GIT_OPTIONS_WITH_ARGS = new Set(['-C', '-c', '--git-dir', '--work-tree'])
 const ENV_OPTIONS_WITH_ARGS = new Set(['-C', '--chdir', '-S', '--split-string', '-u', '--unset'])
 const ENV_OPTIONS_WITHOUT_ARGS = new Set([
   '-i',
