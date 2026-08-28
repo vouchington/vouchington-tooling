@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   classifyFrictionObservation,
@@ -41,6 +41,7 @@ describe('normalizeCommandPrefix', () => {
 
   it('redacts overlong tokens in the report-safe prefix', () => {
     expect(normalizeCommandPrefix(`secret=${'x'.repeat(80)}`)).toBe('…')
+    expect(normalizeCommandPrefix(`${'x'.repeat(80)} run`)).toBe('… run')
   })
 
   it('handles escaped quotes and strips env assignments', () => {
@@ -283,6 +284,46 @@ describe('friction log', () => {
     await writeFile(join(directoryPath, `${file}.lock`), '2147483647')
     recordFriction('stale-lock', { type: 'permission-request', command: 'git push' }, options)
     expect(readFrictionLog('stale-lock', options)).toMatchObject({ status: 'events' })
+  })
+
+  it('preserves a lock when its owner check is denied, then retries', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('owner-check', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    await writeFile(join(directoryPath, `${file}.lock`), '2147483647')
+    const denied = Object.assign(new Error('denied'), { code: 'EPERM' })
+    vi.spyOn(process, 'kill').mockImplementationOnce(() => {
+      throw denied
+    })
+    recordFriction('owner-check', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('owner-check', options)).toMatchObject({ status: 'events' })
+  })
+
+  it('recovers an ownerless lock after its lease expires', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('expired-lock', { type: 'tool-result', command: 'echo ok' }, options)
+    const [file] = await readdir(directoryPath)
+    const lockPath = join(directoryPath, `${file}.lock`)
+    await writeFile(lockPath, '')
+    await utimes(lockPath, new Date(0), new Date(0))
+    recordFriction('expired-lock', { type: 'permission-request', command: 'git push' }, options)
+    expect(readFrictionLog('expired-lock', options)).toMatchObject({ status: 'events' })
+  })
+
+  it('propagates lock creation failures other than contention', async () => {
+    const directoryPath = await directory()
+    const options = { directory: directoryPath }
+    recordFriction('denied-lock', { type: 'tool-result', command: 'echo ok' }, options)
+    await chmod(directoryPath, 0o500)
+    try {
+      expect(() =>
+        recordFriction('denied-lock', { type: 'permission-request', command: 'git push' }, options),
+      ).toThrow()
+    } finally {
+      await chmod(directoryPath, 0o700)
+    }
   })
 
   it('bounds persisted escalation details', async () => {
