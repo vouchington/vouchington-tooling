@@ -112,6 +112,21 @@ describe('parseCli', () => {
       command: 'download-with-diagnostics',
       args: ['https://x', 'out'],
     })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'download-optional-run-artifacts',
+        '--pattern',
+        'coverage-*',
+        '--dir',
+        'coverage',
+      ]),
+    ).toEqual({
+      kind: 'script',
+      command: 'download-optional-run-artifacts',
+      args: ['--pattern', 'coverage-*', '--dir', 'coverage'],
+    })
     expect(parseCli(['node', 'vouchington', 'host-pressure-diagnostics'])).toEqual({
       kind: 'script',
       command: 'host-pressure-diagnostics',

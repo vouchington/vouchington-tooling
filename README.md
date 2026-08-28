@@ -150,6 +150,7 @@ vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\
 vouchington gha-output name
 vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
+vouchington download-optional-run-artifacts --pattern 'coverage-*' --dir ./coverage-fallback
 vouchington host-pressure-diagnostics
 vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-ports ./ports.json
 vouchington diagnose-port-collision --ports "2200 2216"

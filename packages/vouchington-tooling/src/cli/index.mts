@@ -27,6 +27,10 @@ const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
     command: 'bash',
     path: 'scripts/gha/download-with-diagnostics.sh',
   },
+  'download-optional-run-artifacts': {
+    command: 'bash',
+    path: 'scripts/gha/download-optional-run-artifacts.sh',
+  },
   'host-pressure-diagnostics': {
     command: 'bash',
     path: 'scripts/gha/host-pressure-diagnostics.sh',
