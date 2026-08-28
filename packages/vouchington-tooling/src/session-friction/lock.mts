@@ -1,9 +1,11 @@
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
+  lstatSync,
   openSync,
-  readFileSync,
-  statSync,
+  readSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -11,6 +13,7 @@ import { basename } from 'node:path'
 
 const LOCK_ATTEMPTS = 200
 const STALE_LOCK_AGE_MS = 30_000
+const LOCK_OWNER_MAX_BYTES = 32
 const lockWait = new Int32Array(new SharedArrayBuffer(4))
 
 function waitForLock(): void {
@@ -20,6 +23,46 @@ function waitForLock(): void {
 
 function hasCode(error: unknown, code: string): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === code)
+}
+
+function isFresh(mtimeMs: number): boolean {
+  const age = Date.now() - Math.floor(mtimeMs)
+  return age >= 0 && age < STALE_LOCK_AGE_MS
+}
+
+function inspectLock(
+  lockPath: string,
+): { dev: number; ino: number; mtimeMs: number; owner: number } | null {
+  let descriptor: number
+  try {
+    descriptor = openSync(
+      lockPath,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    )
+  } catch {
+    return null
+  }
+  try {
+    const status = fstatSync(descriptor)
+    if (!status.isFile() || status.size > LOCK_OWNER_MAX_BYTES) return null
+    const buffer = Buffer.alloc(LOCK_OWNER_MAX_BYTES + 1)
+    let length = 0
+    while (length < buffer.length) {
+      const bytes = readSync(descriptor, buffer, length, buffer.length - length, length)
+      if (bytes === 0) break
+      length += bytes
+    }
+    /* v8 ignore next -- detects external growth after the descriptor metadata check. */
+    if (length > LOCK_OWNER_MAX_BYTES) return null
+    return {
+      dev: status.dev,
+      ino: status.ino,
+      mtimeMs: status.mtimeMs,
+      owner: Number(buffer.subarray(0, length).toString()),
+    }
+  } finally {
+    closeSync(descriptor)
+  }
 }
 
 function withReaperLock(lockPath: string, action: () => boolean): boolean {
@@ -45,9 +88,9 @@ function withReaperLock(lockPath: string, action: () => boolean): boolean {
 
 function removeOrphanedReaper(reaperPath: string): boolean {
   try {
-    const inspected = statSync(reaperPath)
-    if (Date.now() - inspected.mtimeMs < STALE_LOCK_AGE_MS) return false
-    const current = statSync(reaperPath)
+    const inspected = lstatSync(reaperPath)
+    if (isFresh(inspected.mtimeMs)) return false
+    const current = lstatSync(reaperPath)
     /* v8 ignore next 5 -- requires external replacement during stale-reaper recovery. */
     if (
       current.dev !== inspected.dev ||
@@ -66,9 +109,10 @@ function removeOrphanedReaper(reaperPath: string): boolean {
 function removeStaleLock(lockPath: string): boolean {
   return withReaperLock(lockPath, () => {
     try {
-      const inspected = statSync(lockPath)
-      const fresh = Date.now() - inspected.mtimeMs < STALE_LOCK_AGE_MS
-      const owner = Number(readFileSync(lockPath, 'utf8'))
+      const inspected = inspectLock(lockPath)
+      if (!inspected) return false
+      const fresh = isFresh(inspected.mtimeMs)
+      const { owner } = inspected
       if (Number.isInteger(owner) && owner > 0) {
         try {
           process.kill(owner, 0)
@@ -77,7 +121,7 @@ function removeStaleLock(lockPath: string): boolean {
           if (!hasCode(error, 'ESRCH')) return false
         }
       } else if (fresh) return false
-      const current = statSync(lockPath)
+      const current = lstatSync(lockPath)
       /* v8 ignore next 5 -- requires external replacement despite the reaper protocol. */
       if (
         current.dev !== inspected.dev ||

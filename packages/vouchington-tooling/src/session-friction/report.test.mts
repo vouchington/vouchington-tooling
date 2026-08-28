@@ -295,7 +295,7 @@ describe('buildSessionFrictionReport', () => {
         entries: (function* () {
           while (true) {
             consumed++
-            yield { data: { type: 'journal', markdown: 'x'.repeat(10_001) } }
+            yield { data: { type: 'journal', markdown: '😀'.repeat(5_001) } }
           }
         })(),
       }),

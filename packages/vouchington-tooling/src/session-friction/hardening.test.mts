@@ -78,6 +78,36 @@ it('reclaims an orphaned stale reaper guard', async () => {
   expect(existsSync(reaper)).toBe(false)
 })
 
+it('reclaims future-dated ownerless locks and reaper guards', async () => {
+  const directory = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('future-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const future = new Date(Date.now() + 60_000)
+  await writeFile(join(directory, `${file}.lock`), '')
+  await utimes(join(directory, `${file}.lock`), future, future)
+  recordFriction('future-lock', { type: 'permission-request', command: 'git push' }, options)
+  await writeFile(join(directory, `${file}.lock.reap`), '')
+  await utimes(join(directory, `${file}.lock.reap`), future, future)
+  expect(readFrictionLog('future-lock', options)).toMatchObject({ status: 'events' })
+})
+
+it('does not follow a symbolic link while inspecting a lock owner', async () => {
+  const directory = await temporaryDirectory()
+  const outside = await temporaryDirectory()
+  const options = { directory }
+  recordFriction('linked-lock', { type: 'tool-result', command: 'echo ok' }, options)
+  const file = (await readdir(directory)).find((value) => value.endsWith('.jsonl'))!
+  const target = join(outside, 'owner')
+  await writeFile(target, '2147483647')
+  await symlink(target, join(directory, `${file}.lock`))
+  expect(() => readFrictionLog('linked-lock', options)).toThrow(/could not acquire/)
+  expect(await readFile(target, 'utf8')).toBe('2147483647')
+  await rm(join(directory, `${file}.lock`))
+  await writeFile(join(directory, `${file}.lock`), 'x'.repeat(33))
+  expect(() => readFrictionLog('linked-lock', options)).toThrow(/could not acquire/)
+})
+
 it('requires loopback hostnames to end at a hostname boundary', () => {
   expect(classifyFrictionObservation({ type: 'permission-request', command: '&&' })).toBeNull()
   for (const hostname of ['localhost.example.com', '127.0.0.1.example.com'])

@@ -144,6 +144,8 @@ and rendered audit fields at 120 escaped characters. The supplied log directory 
 to session-friction; existing directories must already be owner-only, while newly created
 directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
 buffer that can detect growth one byte beyond the documented 2 MB cap.
+Ownership checks require POSIX effective-user IDs; Windows callers must secure the directory with
+an appropriate ACL because Node's mode bits do not express the full access policy there.
 Command-prefix normalization recognizes simple shell
 segments with single or double quotes; it does not evaluate substitutions or implement a full shell
 grammar. It is not a secret scrubber; callers must not include credentials in captured commands.
