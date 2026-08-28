@@ -42,7 +42,11 @@ export function ensurePrivateDirectory(directory: string, create: boolean): bool
     if (status.isSymbolicLink()) {
       if (leaf || status.uid !== 0)
         throw new Error('session-friction log directory must be a private directory')
-      status = statSync(path)
+      try {
+        status = statSync(path)
+      } catch {
+        throw new Error('session-friction log directory must be a private directory')
+      }
     }
     if (!status.isDirectory())
       throw new Error('session-friction log directory must be a private directory')

@@ -90,6 +90,17 @@ it('requires loopback hostnames to end at a hostname boundary', () => {
     ).toBeNull()
 })
 
+it('does not recognize IPv6 loopback embedded in remote-looking tokens', () => {
+  for (const hostname of ['foo.::1', 'foo[::1].example'])
+    expect(
+      classifyFrictionObservation({
+        type: 'tool-result',
+        command: 'curl remote',
+        structuredStderr: `connect ECONNREFUSED ${hostname}:443`,
+      }),
+    ).toBeNull()
+})
+
 it('bounds structured stderr inspection', () => {
   expect(
     classifyFrictionObservation({

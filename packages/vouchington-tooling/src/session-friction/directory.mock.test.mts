@@ -51,4 +51,20 @@ describe('ensurePrivateDirectory symlink ancestors', () => {
       .mockReturnValueOnce(directory(effectiveUserId, 0o777))
     expect(() => ensurePrivateDirectory('/unsafe/leaf', false)).toThrow(/private directory/)
   })
+
+  it('normalizes a dangling root-owned symlink ancestor error', () => {
+    mocks.lstat
+      .mockReturnValueOnce({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+        mode: 0o755,
+        uid: 0,
+      })
+      .mockReturnValueOnce({ isDirectory: () => false, isSymbolicLink: () => true, uid: 0 })
+    mocks.stat.mockImplementationOnce(() => {
+      throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+    })
+
+    expect(() => ensurePrivateDirectory('/dangling/leaf', false)).toThrow(/private directory/)
+  })
 })

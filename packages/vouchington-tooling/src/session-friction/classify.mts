@@ -10,11 +10,14 @@ const FAILURE_TOKENS: [string, RegExp][] = [
 const CONNECTION_REFUSED = /\bECONNREFUSED\b/i
 const STDERR_INSPECTION_MAX_LENGTH = 100_000
 const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)'
-const LOOPBACK_ADDRESS = new RegExp(
-  String.raw`(?<![0-9a-z_.-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])|` +
-    String.raw`(?<![0-9a-z:])\[?(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\]?(?![0-9a-z:])`,
-  'i',
-)
+const LOOPBACK_ADDRESSES = [
+  new RegExp(
+    String.raw`(?<![0-9a-z_.-])(?:127\.${IPV4_OCTET}(?:\.${IPV4_OCTET}){2}|localhost)(?![0-9a-z_.-])`,
+    'i',
+  ),
+  /(?<![0-9a-z_.-])\[(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?\](?![0-9a-z_.-])/i,
+  /(?<![0-9a-z_.:\x5b\x5d-])(?:::1|0:0:0:0:0:0:0:1)(?:%[a-z0-9_.-]+)?(?![0-9a-z_.:\x5b\x5d-])/i,
+]
 const DETAIL_MAX_LENGTH = 1_000
 
 function boundedDetail(value: string): string {
@@ -45,7 +48,10 @@ export function classifyFrictionObservation(
   if (
     stderr
       .split(/\r?\n/)
-      .some((line) => CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESS.test(line))
+      .some(
+        (line) =>
+          CONNECTION_REFUSED.test(line) && LOOPBACK_ADDRESSES.some((pattern) => pattern.test(line)),
+      )
   ) {
     return {
       kind: 'sandbox-failure',
