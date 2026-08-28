@@ -17,6 +17,7 @@ const LOG_MAX_BYTES = 2_000_000
 const EVENT_FIELD_MAX_LENGTH = 1_000
 
 export function requireDirectory(directory: string): string {
+  if (typeof directory !== 'string') throw new Error('log directory must be a string')
   if (Buffer.byteLength(directory) > 4096)
     throw new Error('session-friction log directory path is too long')
   if (!isAbsolute(directory)) throw new Error('session-friction log directory must be absolute')
@@ -125,10 +126,9 @@ export function recordFriction(
     typeof options.timestamp === 'function' ? options.timestamp() : options.timestamp
   if (timestamp !== undefined && typeof timestamp !== 'string')
     throw new Error('timestamp must be a string')
-  const normalizedTimestamp =
-    normalizeAuditText(
-      boundedText(timestamp ?? new Date().toISOString(), EVENT_FIELD_MAX_LENGTH),
-    ) || new Date().toISOString()
+  const rawTimestamp = timestamp ?? new Date().toISOString()
+  const normalizedTimestamp = normalizeAuditText(boundedText(rawTimestamp, EVENT_FIELD_MAX_LENGTH))
+  if (!normalizedTimestamp) throw new Error('timestamp must be non-empty')
   const classified = classifyFrictionObservation(observation)
   const path = logPath(sessionId, options.directory)
   const directory = requireDirectory(options.directory)

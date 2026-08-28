@@ -484,17 +484,12 @@ describe('friction log', () => {
       { type: 'permission-request', command: 'pnpm test' },
       { directory: directoryPath },
     )
-    recordFriction(
-      'timestamps',
-      { type: 'permission-request', command: 'npm test' },
-      { directory: directoryPath, timestamp: '\n' },
-    )
     const result = readFrictionLog('timestamps', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') {
       expect(result.events[0]?.timestamp).toBe('callback')
       expect(result.events[1]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-      expect(result.events[2]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+      expect(result.events).toHaveLength(2)
     }
   })
 })

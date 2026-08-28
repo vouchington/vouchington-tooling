@@ -39,6 +39,9 @@ it('validates read limits before inspecting storage', async () => {
   expect(() => readFrictionLog(42 as unknown as string, { directory })).toThrow(
     /sessionId must be a string/,
   )
+  expect(() => readFrictionLog('missing', { directory: null as unknown as string })).toThrow(
+    /log directory must be a string/,
+  )
 })
 
 it('rejects oversized session ids before Unicode validation', async () => {
@@ -282,6 +285,16 @@ it('rejects non-string timestamp callback results', async () => {
       },
     ),
   ).toThrow(/timestamp must be a string/)
+  expect(() =>
+    recordFriction(
+      'timestamp',
+      { type: 'permission-request', command: 'git push' },
+      {
+        directory,
+        timestamp: ' \u200b',
+      },
+    ),
+  ).toThrow(/timestamp must be non-empty/)
   expect(existsSync(directory)).toBe(false)
 })
 
