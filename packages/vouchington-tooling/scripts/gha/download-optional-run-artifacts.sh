@@ -75,9 +75,7 @@ download_pattern() {
     validate_artifact_name "$artifact" || return $?
     count=$((count + 1))
     echo "[optional-run-artifacts] selected artifact=$artifact" >&2
-  done <<EOF
-$artifacts
-EOF
+  done < <(printf '%s\n' "$artifacts")
   echo "[optional-run-artifacts] selection selector=pattern count=$count" >&2
   [ "$count" -gt 0 ] || return 1
   while IFS= read -r artifact; do
@@ -90,9 +88,7 @@ EOF
     validate_artifact_name "$artifact" || return $?
     echo "[optional-run-artifacts] attempt artifact=$artifact" >&2
     gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$destination/$artifact" || return $?
-  done <<EOF
-$artifacts
-EOF
+  done < <(printf '%s\n' "$artifacts")
 }
 
 if [ "$selector_type" = name ]; then

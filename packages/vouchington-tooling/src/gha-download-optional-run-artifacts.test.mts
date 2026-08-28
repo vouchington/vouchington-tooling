@@ -138,7 +138,7 @@ exit 99
         join(temporaryDirectory, 'coverage-fallback'),
       ],
       ghScript: `#!/bin/sh
-if [ "$1" = api ]; then printf '%s\\n' 'coverage λinux'; exit 0; fi
+if [ "$1" = api ]; then printf '%s\\n' 'coverage λinux $(printf expanded)'; exit 0; fi
 name=''; dir=''
 while [ "$#" -gt 0 ]; do
   case "$1" in --name) name="$2"; shift 2;; --dir) dir="$2"; shift 2;; *) shift;; esac
@@ -151,10 +151,13 @@ printf '%s\\n' "$name" > "$dir/artifact-name"
     expect(result.status).toBe(0)
     expect(
       readFileSync(
-        join(result.temporaryDirectory, 'coverage-fallback/coverage λinux/artifact-name'),
+        join(
+          result.temporaryDirectory,
+          'coverage-fallback/coverage λinux $(printf expanded)/artifact-name',
+        ),
         'utf8',
       ),
-    ).toBe('coverage λinux\n')
+    ).toBe('coverage λinux $(printf expanded)\n')
   })
 
   it('targets the Actions server host', () => {
