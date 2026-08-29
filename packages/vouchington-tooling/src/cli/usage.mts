@@ -33,6 +33,8 @@ Commands:
   stage-review-payload          Validate a review payload file into a staging directory
   retrospective-transcript      Format facts from Claude-compatible, Codex, or Grok transcripts
   link-skill                    Link one packaged skill into an explicit consumer directory
+  retrospective-facts           Gather immutable facts for a retrospective
+  agent-blackboard              Probe and journal an Agent Blackboard deployment
 
 Options:
   -h, --help       Show this help
@@ -88,6 +90,12 @@ post-review
 stage-review-payload optional|required <source> <destination>
 retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
 link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>
+retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]
+agent-blackboard probe
+agent-blackboard journal append --session-id UUID --agent NAME --version VERSION --file PATH [--parent-session-id UUID] [--timestamp ISO8601]
+agent-blackboard journal entries --session-id UUID
+agent-blackboard snapshot partition --snapshot PATH --checksum SHA256 --counts '{"sessions":N,"entries":N,"records":N,"bytes":N}'
+agent-blackboard snapshot cleanup [--snapshot PATH] [--partition-directory PATH --receipt JSON]
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

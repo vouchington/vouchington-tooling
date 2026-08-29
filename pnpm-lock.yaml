@@ -79,6 +79,9 @@ importers:
       '@types/picomatch':
         specifier: ^4.0.3
         version: 4.0.3
+      agent-blackboard:
+        specifier: ^0.3.1
+        version: 0.3.1(supports-color@7.2.0)(zod@4.4.3)
     optionalDependencies:
       '@libpg-query/parser':
         specifier: ^18.0.0
@@ -1020,6 +1023,11 @@ packages:
   adm-zip@0.5.18:
     resolution: {integrity: sha512-ufJnssQGbxzLNS1Ho9bCtX4rQKCCvoVuDLHoJyc3F9dOGDB4BkWs2Ci0kv53lqocAEQ/Cbi+I2XCsNYGqVYqng==}
     engines: {node: '>=12.0'}
+
+  agent-blackboard@0.3.1:
+    resolution: {integrity: sha512-jo7aoGFgH/9FgXUuLXRhb+SHCllzOKT4iwabgN84kKUgLep/FIzcKzO59NJ6NUrMrWim2BFX0gftqGAylFTTuA==}
+    engines: {node: '>=24.0.0'}
+    hasBin: true
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -2697,6 +2705,14 @@ snapshots:
   acorn@8.18.0: {}
 
   adm-zip@0.5.18: {}
+
+  agent-blackboard@0.3.1(supports-color@7.2.0)(zod@4.4.3):
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.30.0(supports-color@7.2.0)(zod@4.4.3)
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+      - zod
 
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:

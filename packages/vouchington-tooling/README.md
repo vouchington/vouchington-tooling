@@ -6,6 +6,8 @@ Libraries and the `vouchington` CLI.
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
+# optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
+npm install agent-blackboard@^0.3.1
 ```
 
 ## CLI
@@ -39,6 +41,12 @@ vouchington lint-links --offline
 vouchington materialize-pr-context
 vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
+vouchington retrospective-facts --pr 49 --repo vouchington/vouchington-infra --raw
+vouchington agent-blackboard probe
+vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md
+vouchington agent-blackboard journal entries --session-id <uuid>
+vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --checksum <sha256> --counts <counts.json>
+vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
@@ -67,6 +75,16 @@ Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `update
 layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discovery at a nondefault
 Grok session root. Without `--session-id`, it reads those session identities from the host
 environment.
+
+Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
+need `agent-blackboard@^0.3.1`. Snapshot cleanup accepts only package-generated temporary paths.
+It captures a target under a private tombstone, validates partition names, permissions, JSONL,
+ordering, terminal manifests, and the identity-bound cleanup receipt before deleting files, and
+restores the original path on a validation or deletion failure whenever possible. The partition
+command returns that receipt; directory cleanup requires it.
+The receipt is authenticated with an owner-only per-user HMAC key stored under a dedicated
+`0700` directory in the system temporary directory. This small host-local state is the trust
+boundary: a copied or caller-created receipt cannot authorize cleanup without that key.
 
 Host-lock environment:
 
@@ -144,6 +162,7 @@ import {
   readDiagnosticReportSummaries,
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
+import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
 
