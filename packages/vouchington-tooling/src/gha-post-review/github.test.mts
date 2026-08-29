@@ -186,9 +186,32 @@ describe('github review adapter', () => {
       createGhPostReviewIo({
         ...options,
         prNumber: '9',
+        exec: () => `${HEAD_SHA}\tnot-a-sha`,
+      }).getHeadSha(),
+    ).toThrow('Could not resolve PR base SHA')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
         expectedHeadSha: HEAD_SHA,
       }).getHeadSha(),
     ).toThrow('EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: 'not-a-sha',
+        expectedBaseSha: BASE_SHA,
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_HEAD_SHA must be a full commit SHA')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: HEAD_SHA,
+        expectedBaseSha: 'not-a-sha',
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_BASE_SHA must be a full commit SHA')
   })
 
   it('wraps execFileSync as a gh helper', () => {
