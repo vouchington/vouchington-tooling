@@ -33,11 +33,15 @@ export type PostReviewIo = {
 
 export function runPostReview(payloadPath: string, io: PostReviewIo): { posted: boolean } {
   try {
-    let review = parseReviewPayload(io.readFile(payloadPath), io.getHeadSha())
+    const selectedHeadSha = io.getHeadSha()
+    let review = parseReviewPayload(io.readFile(payloadPath), selectedHeadSha)
     try {
       review = remapReviewComments(review, indexReviewFiles(io.listPullFiles()))
     } catch {
       // Keep the parsed review when the PR file list is unavailable.
+    }
+    if (io.getHeadSha() !== selectedHeadSha) {
+      throw new ReviewPayloadError('PR head changed while preparing the selected review.')
     }
     const first = io.postReview(review)
     if (first.ok) return { posted: true }

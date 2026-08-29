@@ -56,6 +56,7 @@ function makeIo(options: {
   file?: Buffer | string | null
   posts?: PostResult[]
   files?: PullFile[]
+  headShas?: string[]
   listPullFiles?: () => PullFile[]
 }): {
   io: PostReviewIo
@@ -65,6 +66,7 @@ function makeIo(options: {
   const posts: SanitizedReview[] = []
   const removed: string[] = []
   const queue = [...(options.posts ?? [{ ok: true, status: 201, body: '' }])]
+  const headShas = [...(options.headShas ?? [HEAD_SHA])]
   const file = options.file === undefined ? null : options.file
   const io: PostReviewIo = {
     readFile(path) {
@@ -76,7 +78,7 @@ function makeIo(options: {
       removed.push(path)
     },
     getHeadSha() {
-      return HEAD_SHA
+      return headShas.shift() ?? HEAD_SHA
     },
     listPullFiles() {
       if (options.listPullFiles) return options.listPullFiles()
@@ -161,6 +163,19 @@ describe('runPostReview', () => {
     expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow('GitHub review POST failed (HTTP 422)')
     expect(posts).toHaveLength(1)
     expect(posts[0]?.comments).toHaveLength(1)
+  })
+
+  it('rechecks the selected head immediately before posting', () => {
+    const { io, posts, removed } = makeIo({
+      file: JSON.stringify({ body: 'Verdict.', comments: [] }),
+      headShas: [HEAD_SHA, 'b'.repeat(40)],
+    })
+
+    expect(() => runPostReview(PAYLOAD_PATH, io)).toThrow(
+      'PR head changed while preparing the selected review',
+    )
+    expect(posts).toEqual([])
+    expect(removed).toEqual([PAYLOAD_PATH])
   })
 
   it('does not retry a non-422 failure and still removes the file', () => {
