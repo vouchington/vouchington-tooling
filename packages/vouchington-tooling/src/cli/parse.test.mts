@@ -309,6 +309,26 @@ describe('parseCli', () => {
     ).toEqual({ kind: 'retrospective-transcript', args: ['--session-id', 'session'] })
   })
 
+  it('forwards retrospective facts and agent-blackboard arguments', () => {
+    expect(
+      parseCli(['node', 'vouchington', 'retrospective-facts', '--pr', '42', '--no-pr']),
+    ).toEqual({ kind: 'retrospective-facts', args: ['--pr', '42', '--no-pr'] })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'agent-blackboard',
+        'journal',
+        'entries',
+        '--session-id',
+        'x',
+      ]),
+    ).toEqual({
+      kind: 'agent-blackboard',
+      args: ['journal', 'entries', '--session-id', 'x'],
+    })
+  })
+
   it('parses gha-artifacts-cleanup subcommands', () => {
     expect(
       parseCli([

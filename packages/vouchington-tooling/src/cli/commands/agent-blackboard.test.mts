@@ -1,5 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../agent-blackboard/index.mts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../agent-blackboard/index.mts')>()
+  return {
+    ...actual,
+    appendJournal: vi.fn(),
+    probeBlackboard: vi.fn(),
+  }
+})
+vi.mock('../../agent-blackboard/snapshot.mts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../agent-blackboard/snapshot.mts')>()
+  return {
+    ...actual,
+    cleanupSnapshotPartitions: vi.fn(),
+    partitionSnapshot: vi.fn(),
+  }
+})
+
 import { runAgentBlackboardCommand, setJournalReaderForTest } from './agent-blackboard.mts'
+import { appendJournal, probeBlackboard } from '../../agent-blackboard/index.mts'
+import { cleanupSnapshotPartitions, partitionSnapshot } from '../../agent-blackboard/snapshot.mts'
 
 describe('agent-blackboard CLI', () => {
   const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
@@ -7,6 +27,10 @@ describe('agent-blackboard CLI', () => {
   afterEach(() => {
     stderr.mockClear()
     stdout.mockClear()
+    vi.mocked(appendJournal).mockReset()
+    vi.mocked(probeBlackboard).mockReset()
+    vi.mocked(cleanupSnapshotPartitions).mockReset()
+    vi.mocked(partitionSnapshot).mockReset()
     setJournalReaderForTest()
   })
 
@@ -91,5 +115,87 @@ describe('agent-blackboard CLI', () => {
       ]),
     ).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--receipt is required')
+  })
+
+  it('reports incomplete options and unknown journal and snapshot actions', async () => {
+    await expect(runAgentBlackboardCommand(['journal', 'entries', 'session'])).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('invalid option: session')
+    await expect(runAgentBlackboardCommand(['journal', 'other'])).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('journal append|entries')
+    await expect(runAgentBlackboardCommand(['snapshot', 'other'])).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('snapshot partition|cleanup')
+  })
+
+  it('runs the probe and journal append commands through their service boundaries', async () => {
+    vi.mocked(appendJournal).mockResolvedValue('journaled')
+    await expect(runAgentBlackboardCommand(['probe'])).resolves.toBe(0)
+    expect(probeBlackboard).toHaveBeenCalledOnce()
+    await expect(
+      runAgentBlackboardCommand([
+        'journal',
+        'append',
+        '--session-id',
+        'session',
+        '--agent',
+        'codex',
+        '--file',
+        'entry.md',
+        '--version',
+        '1.0.0',
+        '--parent-session-id',
+        'parent',
+        '--timestamp',
+        '2026-01-01T00:00:00.000Z',
+      ]),
+    ).resolves.toBe(0)
+    expect(appendJournal).toHaveBeenCalledWith({
+      sessionId: 'session',
+      agent: 'codex',
+      version: '1.0.0',
+      markdownFile: 'entry.md',
+      parentSessionId: 'parent',
+      timestamp: '2026-01-01T00:00:00.000Z',
+    })
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toBe('journaled\n')
+  })
+
+  it('runs snapshot partition and cleanup commands through their service boundaries', async () => {
+    const receipt = { nonce: 'receipt' }
+    vi.mocked(partitionSnapshot).mockResolvedValue({ partitions: [] } as never)
+    await expect(
+      runAgentBlackboardCommand([
+        'snapshot',
+        'partition',
+        '--snapshot',
+        'snapshot.json',
+        '--checksum',
+        'checksum',
+        '--counts',
+        '{"entries":1}',
+      ]),
+    ).resolves.toBe(0)
+    expect(partitionSnapshot).toHaveBeenCalledWith({
+      path: 'snapshot.json',
+      checksum: { algorithm: 'sha256', value: 'checksum' },
+      counts: { entries: 1 },
+    })
+    await expect(
+      runAgentBlackboardCommand([
+        'snapshot',
+        'cleanup',
+        '--snapshot',
+        'snapshot.json',
+        '--partition-directory',
+        'partitions',
+        '--receipt',
+        JSON.stringify(receipt),
+      ]),
+    ).resolves.toBe(0)
+    expect(cleanupSnapshotPartitions).toHaveBeenCalledWith({
+      path: 'snapshot.json',
+      directory: 'partitions',
+      receipt,
+    })
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toBe('{"cleaned":true}\n')
   })
 })

@@ -6,15 +6,25 @@ vi.mock('./commands/pnpm-install.mts', () => ({
 vi.mock('./commands/vitest-blob-manifest.mts', () => ({
   runVitestBlobManifestCommand: vi.fn(() => 0),
 }))
+vi.mock('./commands/retrospective-facts.mts', () => ({
+  runRetrospectiveFactsCommand: vi.fn(async () => 0),
+}))
+vi.mock('./commands/agent-blackboard.mts', () => ({
+  runAgentBlackboardCommand: vi.fn(async () => 0),
+}))
 
 import { runCli } from './index.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
+import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
+import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
     vi.mocked(runPnpmInstallCli).mockClear()
     vi.mocked(runVitestBlobManifestCommand).mockClear()
+    vi.mocked(runRetrospectiveFactsCommand).mockClear()
+    vi.mocked(runAgentBlackboardCommand).mockClear()
   })
 
   it('forwards pnpm-install and vitest-blob-manifest to their commands', async () => {
@@ -32,5 +42,12 @@ describe('runCli extract command dispatch', () => {
     expect(vi.mocked(runPnpmInstallCli)).toHaveBeenCalledOnce()
     expect(runCli(['node', 'vouchington', 'vitest-blob-manifest', 'tooling'])).toBe(0)
     expect(vi.mocked(runVitestBlobManifestCommand)).toHaveBeenCalledWith(['tooling'])
+  })
+
+  it('forwards retrospective facts and agent-blackboard command arguments', async () => {
+    await expect(runCli(['node', 'vouchington', 'retrospective-facts', '--no-pr'])).resolves.toBe(0)
+    expect(runRetrospectiveFactsCommand).toHaveBeenCalledWith(['--no-pr'])
+    await expect(runCli(['node', 'vouchington', 'agent-blackboard', 'probe'])).resolves.toBe(0)
+    expect(runAgentBlackboardCommand).toHaveBeenCalledWith(['probe'])
   })
 })
