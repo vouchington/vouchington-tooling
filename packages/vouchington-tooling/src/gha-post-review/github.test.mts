@@ -164,6 +164,21 @@ describe('github review adapter', () => {
     })
     expect(io.getHeadSha()).toBe(HEAD_SHA)
     expect(attempts).toBe(3)
+
+    attempts = 0
+    const unavailable = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => {
+        attempts += 1
+        throw new Error('GitHub API unavailable')
+      },
+    })
+    expect(() => unavailable.getHeadSha()).toThrow('GitHub API unavailable')
+    expect(attempts).toBe(3)
   })
 
   it('rejects a non-SHA head', () => {
