@@ -91,6 +91,8 @@ describe('code-review reusable workflow', () => {
     expect(reviewGuard?.run).toContain('set -euo pipefail')
     expect(reviewGuard?.run).toContain('^[0-9a-f]{40}$')
     expect(reviewGuard?.run).toContain('must be provided together')
+    expect(reviewGuard?.run).toContain('Could not resolve PR head SHA')
+    expect(reviewGuard?.run).toContain('Could not resolve PR base SHA')
     expect(reviewGuard?.run).toContain('pulls/$PR_NUMBER')
     expect(reviewGuard?.if).toBe("inputs.expected_head_sha != '' || inputs.expected_base_sha != ''")
     expect(reviewGuard?.run).toContain("--jq '[.head.sha, .base.sha] | @tsv'")

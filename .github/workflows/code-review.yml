@@ -141,16 +141,18 @@ jobs:
           set -euo pipefail
           sha_or_empty() { [[ -z "$1" || "$1" =~ ^[0-9a-f]{40}$ ]]; }
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo '::error::pr_number must be a positive integer.'; exit 1; }
-          sha_or_empty "$EXPECTED_HEAD_SHA" || { echo '::error::expected_head_sha must be a full lowercase commit SHA.'; exit 1; }
-          sha_or_empty "$EXPECTED_BASE_SHA" || { echo '::error::expected_base_sha must be a full lowercase commit SHA.'; exit 1; }
           if { [ -n "$EXPECTED_HEAD_SHA" ] && [ -z "$EXPECTED_BASE_SHA" ]; } ||
              { [ -z "$EXPECTED_HEAD_SHA" ] && [ -n "$EXPECTED_BASE_SHA" ]; }; then
             echo '::error::expected_head_sha and expected_base_sha must be provided together.'
             exit 1
           fi
+          sha_or_empty "$EXPECTED_HEAD_SHA" || { echo '::error::expected_head_sha must be a full lowercase commit SHA.'; exit 1; }
+          sha_or_empty "$EXPECTED_BASE_SHA" || { echo '::error::expected_base_sha must be a full lowercase commit SHA.'; exit 1; }
           pr_refs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
             --jq '[.head.sha, .base.sha] | @tsv')"
           IFS=$'\t' read -r current_head current_base <<< "$pr_refs"
+          [[ "$current_head" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Could not resolve PR head SHA.'; exit 1; }
+          [[ "$current_base" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Could not resolve PR base SHA.'; exit 1; }
           if [ -n "$EXPECTED_HEAD_SHA" ] && [ "$current_head" != "$EXPECTED_HEAD_SHA" ]; then
             echo "::error::PR head changed from $EXPECTED_HEAD_SHA to $current_head before review."
             exit 1
