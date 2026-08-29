@@ -18,72 +18,31 @@ await copyFile(
   new URL('../dist/runner-port-policy/runner-port-policy.json', import.meta.url),
 )
 const skillsRoot = fileURLToPath(new URL('../skills', import.meta.url))
-const plugins = [
-  {
-    name: 'vouchington-workflow',
-    manifest: JSON.parse(
-      await readFile(
-        new URL('../../../plugins/vouchington-workflow/plugin.json', import.meta.url),
-        'utf8',
-      ),
-    ),
-    root: fileURLToPath(new URL('../../../plugins/vouchington-workflow/skills', import.meta.url)),
-    skills: await readdir(
-      new URL('../../../plugins/vouchington-workflow/skills', import.meta.url),
-      {
-        withFileTypes: true,
-      },
-    ),
-  },
-  {
-    name: 'vouchington-testing',
-    manifest: JSON.parse(
-      await readFile(
-        new URL('../../../plugins/vouchington-testing/plugin.json', import.meta.url),
-        'utf8',
-      ),
-    ),
-    root: fileURLToPath(new URL('../../../plugins/vouchington-testing/skills', import.meta.url)),
-    skills: await readdir(new URL('../../../plugins/vouchington-testing/skills', import.meta.url), {
-      withFileTypes: true,
-    }),
-  },
-  {
-    name: 'vouchington-database',
-    manifest: JSON.parse(
-      await readFile(
-        new URL('../../../plugins/vouchington-database/plugin.json', import.meta.url),
-        'utf8',
-      ),
-    ),
-    root: fileURLToPath(new URL('../../../plugins/vouchington-database/skills', import.meta.url)),
-    skills: await readdir(
-      new URL('../../../plugins/vouchington-database/skills', import.meta.url),
-      {
-        withFileTypes: true,
-      },
-    ),
-  },
-]
+const pluginRoot = fileURLToPath(new URL('../../../plugins', import.meta.url))
 const seenSkills = new Set()
 const skills = []
-for (const plugin of plugins) {
-  for (const skill of plugin.skills) {
+for (const pluginName of ['vouchington-workflow', 'vouchington-testing', 'vouchington-database']) {
+  const source = join(pluginRoot, pluginName)
+  // nosemgrep -- source is derived only from the compile-time plugin allowlist above.
+  const manifest = JSON.parse(await readFile(join(source, 'plugin.json'), 'utf8'))
+  // nosemgrep -- source is derived only from the compile-time plugin allowlist above.
+  for (const skill of await readdir(join(source, 'skills'), { withFileTypes: true })) {
     if (!skill.isDirectory()) continue
     if (seenSkills.has(skill.name)) throw new Error(`Duplicate skill: ${skill.name}`)
     seenSkills.add(skill.name)
-    await cp(join(plugin.root, skill.name), join(skillsRoot, skill.name), { recursive: true })
+    await cp(join(source, 'skills', skill.name), join(skillsRoot, skill.name), { recursive: true })
     skills.push({
       name: skill.name,
-      plugin: plugin.name,
-      pluginVersion: plugin.manifest.version,
+      plugin: pluginName,
+      pluginVersion: manifest.version,
       path: `${skill.name}/SKILL.md`,
     })
   }
 }
 skills.sort((left, right) => left.name.localeCompare(right.name))
+// nosemgrep -- skillsRoot is a package-owned build destination resolved from import.meta.url.
 await writeFile(
-  new URL('../skills/manifest.json', import.meta.url),
+  join(skillsRoot, 'manifest.json'),
   `${JSON.stringify({ version: 1, skills }, null, 2)}\n`,
 )
 await chmod(new URL('../dist/cli/index.mjs', import.meta.url), 0o755)
