@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -16,7 +16,7 @@ afterEach(async () => {
 })
 
 async function fixture(): Promise<{ sourceRoot: string; targetRoot: string }> {
-  const directory = await mkdtemp(join(tmpdir(), 'vouchington-skill-discovery-'))
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'vouchington-skill-discovery-')))
   directories.push(directory)
   const sourceRoot = join(directory, 'source')
   const targetRoot = join(directory, 'target')
@@ -344,5 +344,107 @@ describe('skill discovery', () => {
     await expect(linkSkill({ name: 'agent/workflow', sourceRoot, targetRoot })).rejects.toThrow(
       'Invalid skill name',
     )
+  })
+
+  it('validates unsafe transitive prerequisite names before creating a target', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(join(sourceRoot, 'dependent'), { recursive: true })
+    await mkdir(join(sourceRoot, 'prerequisite'), { recursive: true })
+    await writeFile(
+      join(sourceRoot, 'dependent', 'SKILL.md'),
+      'Apply [prerequisite](../prerequisite/SKILL.md) first.\n',
+    )
+    await writeFile(join(sourceRoot, 'prerequisite', 'SKILL.md'), '# Prerequisite\n')
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'dependent',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'dependent/SKILL.md',
+          },
+          {
+            name: '../unsafe-prerequisite',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'prerequisite/SKILL.md',
+          },
+        ],
+      }),
+    )
+    await expect(linkSkill({ name: 'dependent', sourceRoot, targetRoot })).rejects.toThrow(
+      'Invalid skill name',
+    )
+    await expect(lstat(targetRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects duplicate manifest names and lexical or canonical paths', async () => {
+    const { sourceRoot } = await fixture()
+    await mkdir(join(sourceRoot, 'second'), { recursive: true })
+    await writeFile(join(sourceRoot, 'second', 'SKILL.md'), '# Second\n')
+    const entry = (name: string, path: string) => ({
+      name,
+      plugin: 'workflow',
+      pluginVersion: '1.0.0',
+      path,
+    })
+    for (const [entries, message] of [
+      [
+        [
+          entry('agent-workflow', 'agent-workflow/SKILL.md'),
+          entry('agent-workflow', 'second/SKILL.md'),
+        ],
+        'Duplicate skill name',
+      ],
+      [
+        [
+          entry('agent-workflow', 'agent-workflow/SKILL.md'),
+          entry('second', 'agent-workflow/../agent-workflow/SKILL.md'),
+        ],
+        'Duplicate skill path',
+      ],
+    ] as const) {
+      await writeFile(
+        join(sourceRoot, 'manifest.json'),
+        JSON.stringify({ version: 1, skills: entries }),
+      )
+      await expect(readSkillManifest(sourceRoot)).rejects.toThrow(message)
+    }
+    await symlink(join(sourceRoot, 'agent-workflow'), join(sourceRoot, 'alias'), 'dir')
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          entry('agent-workflow', 'agent-workflow/SKILL.md'),
+          entry('alias', 'alias/SKILL.md'),
+        ],
+      }),
+    )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Duplicate skill path')
+  })
+
+  it('rejects a symlinked target ancestor before it can escape the target root', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    const outside = join(sourceRoot, '..', 'outside-target')
+    const fileTarget = join(sourceRoot, '..', 'target-file')
+    await mkdir(outside, { recursive: true })
+    await mkdir(targetRoot)
+    await symlink(outside, join(targetRoot, 'redirect'), 'dir')
+    await expect(
+      linkSkill({
+        name: 'agent-workflow',
+        sourceRoot,
+        targetRoot: join(targetRoot, 'redirect', 'nested'),
+      }),
+    ).rejects.toThrow('Target root contains symlink')
+    await expect(lstat(join(outside, 'nested'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await writeFile(fileTarget, '')
+    await expect(
+      linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: fileTarget }),
+    ).rejects.toThrow('Invalid target root')
   })
 })

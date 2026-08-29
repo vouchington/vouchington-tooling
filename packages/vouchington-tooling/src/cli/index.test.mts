@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -81,7 +81,7 @@ describe('runCli', () => {
   })
 
   it('links a named skill through the CLI dispatch', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'vouchington-link-cli-'))
+    const directory = await realpath(await mkdtemp(join(tmpdir(), 'vouchington-link-cli-')))
     const sourceRoot = join(directory, 'source')
     const targetRoot = join(directory, 'target')
     await mkdir(join(sourceRoot, 'agent-workflow'), { recursive: true })

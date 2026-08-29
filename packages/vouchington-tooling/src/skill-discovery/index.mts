@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 import { createDirectoryLink } from './link.mts'
 
 export type SkillManifestEntry = {
@@ -20,10 +20,10 @@ export type LinkSkillOptions = {
 export type LinkSkillResult = { created: boolean; path: string; source: string }
 
 export async function readSkillManifest(sourceRoot: string): Promise<SkillManifest> {
-  const root = resolve(sourceRoot)
+  const root = await realpath(resolve(sourceRoot))
   const parsed: unknown = JSON.parse(await readFile(join(root, 'manifest.json'), 'utf8'))
   if (!isManifest(parsed)) throw new Error('Invalid skills manifest')
-  for (const entry of parsed.skills) assertContained(root, entry.path)
+  await validateManifestEntries(root, parsed.skills)
   return parsed
 }
 
@@ -124,8 +124,49 @@ async function resolveSkillSource(sourceRoot: string, skillPath: string): Promis
 
 async function resolveTargetRoot(targetRoot: string): Promise<string> {
   const root = resolve(targetRoot)
+  await assertNoSymlinkAncestors(root)
   await mkdir(root, { recursive: true })
-  return realpath(root)
+  await assertNoSymlinkAncestors(root)
+  return root
+}
+
+async function validateManifestEntries(root: string, entries: SkillManifestEntry[]): Promise<void> {
+  const names = new Set<string>()
+  const lexicalPaths = new Set<string>()
+  const canonicalPaths = new Set<string>()
+  for (const entry of entries) {
+    if (!isSafeSkillName(entry.name)) throw new Error(`Invalid skill name: ${entry.name}`)
+    if (names.has(entry.name)) throw new Error(`Duplicate skill name: ${entry.name}`)
+    names.add(entry.name)
+    const path = assertContained(root, entry.path)
+    if (lexicalPaths.has(path)) throw new Error(`Duplicate skill path: ${entry.path}`)
+    lexicalPaths.add(path)
+    try {
+      const canonicalPath = await realpath(path)
+      if (!isContained(root, canonicalPath))
+        throw new Error(`Skill source escapes root: ${entry.path}`)
+      if (canonicalPaths.has(canonicalPath)) throw new Error(`Duplicate skill path: ${entry.path}`)
+      canonicalPaths.add(canonicalPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+  }
+}
+
+async function assertNoSymlinkAncestors(path: string): Promise<void> {
+  const parsed = parse(path)
+  let ancestor = parsed.root
+  for (const component of relative(parsed.root, path).split(sep)) {
+    ancestor = join(ancestor, component)
+    try {
+      const stat = await lstat(ancestor)
+      if (stat.isSymbolicLink()) throw new Error(`Target root contains symlink: ${ancestor}`)
+      if (!stat.isDirectory()) throw new Error(`Invalid target root: ${ancestor}`)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+  }
 }
 
 function isManifest(value: unknown): value is SkillManifest {
