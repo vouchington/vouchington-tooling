@@ -241,6 +241,9 @@ cross-references and never cause additional skills to be linked.
 Use `readSkillManifest(skillsRoot)` to discover installed skills or
 `linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The
 CLI equivalent is `vouchington link-skill <name> --source-root <skills-dir> --target-root <dir>`.
-It rejects unknown names, paths outside either root, and existing non-matching destinations.
+When `sourceRoot` contains `manifest.json`, linking validates the packaged inventory and recursively
+links declared prerequisites. Without a manifest, it links the conventional
+`<sourceRoot>/<name>/SKILL.md` repository-local skill. It rejects missing or unsafe sources, paths
+outside either root, and existing non-matching destinations.
 `targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
 rejected.

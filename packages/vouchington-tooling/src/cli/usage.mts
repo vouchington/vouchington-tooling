@@ -93,7 +93,7 @@ swift-semantic-equal <base> <head> <file.swift>
 post-review
 stage-review-payload optional|required <source> <destination>
 retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
-link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>
+link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>  Link a packaged or repository-local skill
 retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]
 agent-blackboard probe
 agent-blackboard journal append --session-id UUID --agent NAME --version VERSION --file PATH [--parent-session-id UUID] [--timestamp ISO8601]
