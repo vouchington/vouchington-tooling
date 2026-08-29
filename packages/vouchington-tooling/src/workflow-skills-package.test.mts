@@ -11,6 +11,10 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginRoots = ['vouchington-workflow', 'vouchington-testing', 'vouchington-database'].map(
   (plugin) => resolve(packageRoot, '../../plugins', plugin, 'skills'),
 )
+type SkillManifest = {
+  version: number
+  skills: Array<{ name: string; plugin: string; pluginVersion: string; path: string }>
+}
 
 describe('workflow skills package contract', () => {
   it('ships exactly the canonical skills at stable paths without tracked copies', () => {
@@ -30,6 +34,27 @@ describe('workflow skills package contract', () => {
         .sort()
       expect(packaged).toHaveLength(25)
       expect(packaged).toEqual(canonical)
+      const manifest = JSON.parse(
+        readFileSync(join(packageRoot, 'skill-manifest.json'), 'utf8'),
+      ) as SkillManifest
+      expect(manifest.version).toBe(1)
+      expect(manifest.skills.map((skill) => `package/skills/${skill.path}`).toSorted()).toEqual(
+        canonical,
+      )
+      expect(manifest.skills.map((skill) => skill.name)).toEqual(
+        manifest.skills
+          .map((skill) => skill.name)
+          .toSorted((left, right) => left.localeCompare(right)),
+      )
+      for (const skill of manifest.skills) {
+        const pluginManifest = JSON.parse(
+          readFileSync(resolve(packageRoot, '../../plugins', skill.plugin, 'plugin.json'), 'utf8'),
+        ) as { version: string }
+        expect(skill.pluginVersion).toBe(pluginManifest.version)
+      }
+      expect(readFileSync(join(packageRoot, 'skills/manifest.json'), 'utf8')).toBe(
+        readFileSync(join(packageRoot, 'skill-manifest.json'), 'utf8'),
+      )
       expect(
         execFileSync('git', ['ls-files', 'skills'], { cwd: packageRoot, encoding: 'utf8' }),
       ).toBe('')

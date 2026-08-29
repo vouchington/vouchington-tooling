@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { chmod, copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, cp, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import skillManifest from '../skill-manifest.json' with { type: 'json' }
 
 const packageRoot = new URL('..', import.meta.url)
 const dist = new URL('../dist', import.meta.url)
@@ -20,29 +22,15 @@ await copyFile(
 const skillsRoot = fileURLToPath(new URL('../skills', import.meta.url))
 const pluginRoot = fileURLToPath(new URL('../../../plugins', import.meta.url))
 const seenSkills = new Set()
-const skills = []
-for (const pluginName of ['vouchington-workflow', 'vouchington-testing', 'vouchington-database']) {
-  const source = join(pluginRoot, pluginName)
-  // nosemgrep -- source is derived only from the compile-time plugin allowlist above.
-  const manifest = JSON.parse(await readFile(join(source, 'plugin.json'), 'utf8'))
-  // nosemgrep -- source is derived only from the compile-time plugin allowlist above.
-  for (const skill of await readdir(join(source, 'skills'), { withFileTypes: true })) {
-    if (!skill.isDirectory()) continue
-    if (seenSkills.has(skill.name)) throw new Error(`Duplicate skill: ${skill.name}`)
-    seenSkills.add(skill.name)
-    await cp(join(source, 'skills', skill.name), join(skillsRoot, skill.name), { recursive: true })
-    skills.push({
-      name: skill.name,
-      plugin: pluginName,
-      pluginVersion: manifest.version,
-      path: `${skill.name}/SKILL.md`,
-    })
-  }
+for (const skill of skillManifest.skills) {
+  if (seenSkills.has(skill.name)) throw new Error(`Duplicate skill: ${skill.name}`)
+  seenSkills.add(skill.name)
+  await cp(join(pluginRoot, skill.plugin, 'skills', skill.name), join(skillsRoot, skill.name), {
+    recursive: true,
+  })
 }
-skills.sort((left, right) => left.name.localeCompare(right.name))
-// nosemgrep -- skillsRoot is a package-owned build destination resolved from import.meta.url.
-await writeFile(
-  join(skillsRoot, 'manifest.json'),
-  `${JSON.stringify({ version: 1, skills }, null, 2)}\n`,
+await copyFile(
+  new URL('../skill-manifest.json', import.meta.url),
+  new URL('../skills/manifest.json', import.meta.url),
 )
 await chmod(new URL('../dist/cli/index.mjs', import.meta.url), 0o755)
