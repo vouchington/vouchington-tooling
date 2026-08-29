@@ -100,7 +100,8 @@ list_artifact_names() {
 }
 
 download_pattern() {
-  artifacts=$(list_artifact_names | awk '!seen[$0]++') || return $?
+  artifacts=$(list_artifact_names) || return $?
+  artifacts=$(printf '%s\n' "$artifacts" | awk '!seen[$0]++')
   selected_artifacts=()
   while IFS= read -r artifact; do
     [ -n "$artifact" ] || continue
