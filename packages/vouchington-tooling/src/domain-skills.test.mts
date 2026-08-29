@@ -32,6 +32,16 @@ describe('domain skill plugins', () => {
     ])
   })
 
+  it('provides Codex marketplace long descriptions for testing and database plugins', async () => {
+    for (const plugin of ['vouchington-testing', 'vouchington-database']) {
+      const manifest = await readRecordJson(`plugins/${plugin}/.codex-plugin/plugin.json`)
+      expect(manifest.interface).toMatchObject({ longDescription: expect.any(String) })
+      expect((manifest.interface as { longDescription: string }).longDescription).not.toHaveLength(
+        0,
+      )
+    }
+  })
+
   it('keeps reusable practices in canonical resources without product policy', async () => {
     const resources = await Promise.all([
       readSkill('vouchington-workflow', 'agent-workflow/references/implementation.md'),
@@ -66,6 +76,10 @@ async function readJson(path: string): Promise<{ plugins: Array<{ name: string }
   return JSON.parse(await readFile(join(root, path), 'utf8')) as {
     plugins: Array<{ name: string }>
   }
+}
+
+async function readRecordJson(path: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await readFile(join(root, path), 'utf8')) as Record<string, unknown>
 }
 
 async function skillNames(plugin: string): Promise<string[]> {

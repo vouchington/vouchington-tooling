@@ -1,5 +1,6 @@
-import { lstat, mkdir, readFile, realpath, symlink } from 'node:fs/promises'
+import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { createDirectoryLink } from './link.mts'
 
 export type SkillManifestEntry = {
   name: string
@@ -32,9 +33,43 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
   const manifest = await readSkillManifest(sourceRoot)
   const entry = manifest.skills.find((candidate) => candidate.name === options.name)
   if (entry === undefined) throw new Error(`Unknown skill: ${options.name}`)
-  const source = await resolveSkillSource(sourceRoot, entry.path)
   const targetRoot = await resolveTargetRoot(options.targetRoot)
-  const path = assertContained(targetRoot, options.name)
+  const linked = new Set<string>()
+  const linking = new Set<string>()
+  return linkManifestSkill(sourceRoot, targetRoot, manifest, entry, linked, linking)
+}
+
+async function linkManifestSkill(
+  sourceRoot: string,
+  targetRoot: string,
+  manifest: SkillManifest,
+  entry: SkillManifestEntry,
+  linked: Set<string>,
+  linking: Set<string>,
+): Promise<LinkSkillResult> {
+  if (linked.has(entry.name)) return linkResult(targetRoot, entry.name, sourceRoot, entry.path)
+  if (linking.has(entry.name)) throw new Error(`Circular skill prerequisite: ${entry.name}`)
+  linking.add(entry.name)
+  try {
+    for (const prerequisite of await prerequisitesFor(sourceRoot, manifest, entry)) {
+      await linkManifestSkill(sourceRoot, targetRoot, manifest, prerequisite, linked, linking)
+    }
+    const result = await linkResult(targetRoot, entry.name, sourceRoot, entry.path)
+    linked.add(entry.name)
+    return result
+  } finally {
+    linking.delete(entry.name)
+  }
+}
+
+async function linkResult(
+  targetRoot: string,
+  name: string,
+  sourceRoot: string,
+  skillPath: string,
+): Promise<LinkSkillResult> {
+  const source = await resolveSkillSource(sourceRoot, skillPath)
+  const path = assertContained(targetRoot, name)
   try {
     const stat = await lstat(path)
     if (!stat.isSymbolicLink()) throw new Error(`Destination already exists: ${path}`)
@@ -43,8 +78,34 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  await symlink(source, path, 'dir')
+  await createDirectoryLink(source, path)
   return { created: true, path, source }
+}
+
+async function prerequisitesFor(
+  sourceRoot: string,
+  manifest: SkillManifest,
+  entry: SkillManifestEntry,
+): Promise<SkillManifestEntry[]> {
+  const source = await resolveSkillSource(sourceRoot, entry.path)
+  const prerequisites: SkillManifestEntry[] = []
+  for (const target of relativeSiblingSkillLinks(
+    await readFile(join(source, 'SKILL.md'), 'utf8'),
+  )) {
+    const path = resolve(sourceRoot, dirname(entry.path), target)
+    const prerequisite = manifest.skills.find(
+      (candidate) => resolve(sourceRoot, candidate.path) === path,
+    )
+    if (prerequisite === undefined) throw new Error(`Missing prerequisite skill: ${target}`)
+    prerequisites.push(prerequisite)
+  }
+  return prerequisites
+}
+
+function relativeSiblingSkillLinks(skill: string): string[] {
+  return [...skill.matchAll(/\[[^\]]+]\((\.\.\/[^)#]+\/SKILL\.md)(?:#[^)]*)?\)/g)].map(
+    (match) => match[1]!,
+  )
 }
 
 async function resolveSkillSource(sourceRoot: string, skillPath: string): Promise<string> {

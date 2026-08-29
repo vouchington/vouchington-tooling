@@ -10,6 +10,7 @@
   "interface": {
     "displayName": "Database foundations",
     "shortDescription": "Portable PostgreSQL guidance.",
+    "longDescription": "Reusable PostgreSQL guidance for Node.js performance, UUIDv7 partitioning, migration safety, and data lifecycle design.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],

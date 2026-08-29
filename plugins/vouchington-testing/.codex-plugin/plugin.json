@@ -10,6 +10,7 @@
   "interface": {
     "displayName": "Testing foundations",
     "shortDescription": "Portable test-authoring guidance.",
+    "longDescription": "Reusable guidance for designing reliable unit, integration, browser, .NET, Swift, Storybook, Next.js, and Vitest tests.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],
