@@ -46,7 +46,8 @@ export async function localFacts(
     options.branch ??
     (options.pr && head !== 'unavailable' ? head : options.noPr ? localBranch : 'unavailable')
   const rangeName = options.branch ?? (options.noPr ? localBranch : undefined)
-  const resolved = rangeName ? await resolveNamedRef(rangeName, run) : unresolvedRange()
+  const localRange = rangeName === 'unavailable' ? 'HEAD' : rangeName
+  const resolved = localRange ? await resolveNamedRef(localRange, run) : unresolvedRange()
   const range = resolved.range
   const commitsResult =
     !data && range && originMain
@@ -85,7 +86,7 @@ export async function localFacts(
           : originMain
             ? 'using existing local origin/main ref after failed fetch'
             : 'origin/main unavailable after failed fetch'
-      }${resolved.refreshed ? `; origin/${rangeName} refreshed` : ''}`,
+      }${resolved.refreshed ? `; origin/${localRange} refreshed` : ''}`,
       branch,
       pr: options.noPr ? 'none' : stringField(data, 'number'),
       state,

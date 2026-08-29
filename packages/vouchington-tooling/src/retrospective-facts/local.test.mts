@@ -50,6 +50,23 @@ describe('local retrospective facts branches', () => {
     expect(malformedGh.calls).not.toContain('git merge-base --is-ancestor topic origin/main')
   })
 
+  it('uses detached HEAD directly for no-PR ancestry without fetching an unavailable branch', async () => {
+    const detached = executor({
+      'git branch --show-current': { stdout: '' },
+      'git rev-list --count origin/main..HEAD': { stdout: '2' },
+      'git diff --name-only origin/main...HEAD': { stdout: 'src/file.mts\n' },
+      'git merge-base --is-ancestor HEAD origin/main': { ok: true },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+    })
+    const output = await localFacts({ noPr: true }, detached.execute)
+    expect(output).toContain('Commits ahead of origin/main: 2')
+    expect(output).toContain('Files changed from origin/main: 1')
+    expect(output).toContain('Merged to main: yes (origin/main contains HEAD)')
+    expect(detached.calls).not.toContain(
+      'git fetch origin unavailable:refs/remotes/origin/unavailable',
+    )
+  })
+
   it('handles origin fallback, failed local history calls, and a failed working tree read', async () => {
     const { execute } = executor({
       'git fetch origin main:refs/remotes/origin/main': { ok: false },
