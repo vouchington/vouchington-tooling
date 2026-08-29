@@ -29,7 +29,25 @@ describe('local retrospective facts branches', () => {
     const output = await localFacts({ pr: '1' }, failedGh.execute)
     expect(output).toContain('PR state: gh failed')
     expect(output).toContain('Branch: unavailable')
-    expect(output).toContain('Merged to main: yes (origin/main contains topic)')
+    expect(output).toContain('Merged to main: unavailable')
+    expect(failedGh.calls).not.toContain('git rev-list --count origin/main..topic')
+    expect(failedGh.calls).not.toContain('git diff --name-only origin/main...topic')
+    expect(failedGh.calls).not.toContain('git merge-base --is-ancestor topic origin/main')
+  })
+
+  it('does not fall back to checkout ancestry when an explicit PR response is malformed', async () => {
+    const malformedGh = executor({
+      'git branch --show-current': { stdout: 'topic' },
+      'gh pr view 1 --json number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName,baseRefName':
+        { stdout: '{not-json' },
+    })
+    const output = await localFacts({ pr: '1' }, malformedGh.execute)
+    expect(output).toContain('Commits ahead of origin/main: unavailable')
+    expect(output).toContain('Files changed from origin/main: unavailable')
+    expect(output).toContain('Merged to main: unavailable')
+    expect(malformedGh.calls).not.toContain('git rev-list --count origin/main..topic')
+    expect(malformedGh.calls).not.toContain('git diff --name-only origin/main...topic')
+    expect(malformedGh.calls).not.toContain('git merge-base --is-ancestor topic origin/main')
   })
 
   it('handles origin fallback, failed local history calls, and a failed working tree read', async () => {

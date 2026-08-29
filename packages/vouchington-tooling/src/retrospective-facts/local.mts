@@ -45,9 +45,7 @@ export async function localFacts(
   const branch =
     options.branch ??
     (options.pr && head !== 'unavailable' ? head : options.noPr ? localBranch : 'unavailable')
-  const rangeName =
-    options.branch ??
-    (!data && localBranch !== 'unavailable' ? localBranch : options.noPr ? 'HEAD' : undefined)
+  const rangeName = options.branch ?? (options.noPr ? localBranch : undefined)
   const resolved = rangeName ? await resolveNamedRef(rangeName, run) : unresolvedRange()
   const range = resolved.range
   const commitsResult =
@@ -62,7 +60,7 @@ export async function localFacts(
     Boolean(
       options.branch &&
       (localBranch !== options.branch || (head !== 'unavailable' && head !== options.branch)),
-    ) || Boolean(options.pr && !options.branch && head !== 'unavailable' && head !== localBranch)
+    ) || Boolean(options.pr && !options.branch && (head === 'unavailable' || head !== localBranch))
   const scope = options.branch ?? `#${options.pr}`
   const status = scoped
     ? undefined
@@ -72,7 +70,7 @@ export async function localFacts(
       ? undefined
       : await run('git', ['reflog', 'show', `origin/${branch}`])
   const merge = objectField(data, 'mergeCommit', 'oid')
-  const merged = await mergeFact(data, merge, resolved.range, originMain, options, run)
+  const merged = await mergeFact(data, state, merge, resolved.range, originMain, options, run)
   const filesText = diffResult?.ok ? text(diffResult) : undefined
   const raw = options.raw
     ? `\n=== Raw Command Output ===\n${calls.map((call) => rawBlock(call.command, call.args, call.result)).join('')}`
@@ -154,6 +152,7 @@ function unresolvedRange(): { range: undefined; refreshed: false } {
 
 async function mergeFact(
   data: Record<string, unknown> | undefined,
+  state: string,
   merge: string | undefined,
   range: string | undefined,
   originMain: boolean,
@@ -171,6 +170,7 @@ async function mergeFact(
       )
     return `yes (origin/main contains ${merge})`
   }
+  if (data && (state === 'OPEN' || state === 'CLOSED')) return 'unmerged at time of retro'
   if (!data && range && originMain) {
     const rangeInOrigin = await run('git', ['merge-base', '--is-ancestor', range, 'origin/main'])
     if (rangeInOrigin.ok) return `yes (origin/main contains ${range})`

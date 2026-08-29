@@ -96,6 +96,22 @@ describe('retrospective facts', () => {
     expect(output).toContain('stderr:\nnotice')
   })
 
+  it.each(['OPEN', 'CLOSED'])(
+    'keeps local %s PRs without a merge commit unmerged',
+    async (state) => {
+      const gh = `gh pr view 123 --json ${fields}`
+      const { execute } = makeExecutor({
+        'git branch --show-current': { stdout: 'topic-branch' },
+        [gh]: { stdout: JSON.stringify({ ...pr, state, mergeCommit: null }) },
+        'git status --porcelain --untracked-files=normal': { stdout: '' },
+        'git reflog show origin/topic-branch': { stdout: '' },
+      })
+      await expect(runRetrospectiveFacts({ pr: '123', execute })).resolves.toContain(
+        'Merged to main: unmerged at time of retro',
+      )
+    },
+  )
+
   it('uses --branch for local scope even with an explicit PR', async () => {
     const gh = `gh pr view 123 --json ${fields}`
     const { calls, execute } = makeExecutor({
