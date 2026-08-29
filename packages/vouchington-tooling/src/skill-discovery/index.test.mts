@@ -100,7 +100,7 @@ describe('skill discovery', () => {
     )
   })
 
-  it('links transitive relative sibling prerequisites before the requested skill', async () => {
+  it('links explicit transitive prerequisites while leaving Markdown cross-references inert', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     await mkdir(targetRoot)
     const skills = [
@@ -125,6 +125,12 @@ describe('skill discovery', () => {
             plugin: 'testing',
             pluginVersion: '1.0.0',
             path: `${name}/SKILL.md`,
+            prerequisites:
+              name === 'backend-vitest-test-authoring'
+                ? ['vitest-test-authoring']
+                : name === 'vitest-test-authoring'
+                  ? ['test-authoring']
+                  : [],
           })),
           {
             name: 'agent-workflow',
@@ -200,7 +206,7 @@ describe('skill discovery', () => {
     await rm(moved, { force: true, recursive: true })
   })
 
-  it('rejects circular relative sibling prerequisites', async () => {
+  it('rejects circular explicit prerequisites', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     await mkdir(targetRoot)
     for (const [name, prerequisite] of [
@@ -222,6 +228,7 @@ describe('skill discovery', () => {
           plugin: 'workflow',
           pluginVersion: '1.0.0',
           path: `${name}/SKILL.md`,
+          prerequisites: [name === 'first' ? 'second' : 'first'],
         })),
       }),
     )
@@ -230,7 +237,7 @@ describe('skill discovery', () => {
     )
   })
 
-  it('rejects relative sibling prerequisites that are absent from the manifest', async () => {
+  it('rejects explicit prerequisites that are absent from the manifest', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     await mkdir(targetRoot)
     await mkdir(join(sourceRoot, 'dependent'), { recursive: true })
@@ -248,6 +255,7 @@ describe('skill discovery', () => {
             plugin: 'workflow',
             pluginVersion: '1.0.0',
             path: 'dependent/SKILL.md',
+            prerequisites: ['missing'],
           },
         ],
       }),
@@ -383,7 +391,7 @@ describe('skill discovery', () => {
     )
   })
 
-  it('validates unsafe transitive prerequisite names before creating a target', async () => {
+  it('validates unsafe explicit prerequisite names before creating a target', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     await mkdir(join(sourceRoot, 'dependent'), { recursive: true })
     await mkdir(join(sourceRoot, 'prerequisite'), { recursive: true })
@@ -402,6 +410,7 @@ describe('skill discovery', () => {
             plugin: 'workflow',
             pluginVersion: '1.0.0',
             path: 'dependent/SKILL.md',
+            prerequisites: ['../unsafe-prerequisite'],
           },
           {
             name: '../unsafe-prerequisite',
@@ -413,7 +422,7 @@ describe('skill discovery', () => {
       }),
     )
     await expect(linkSkill({ name: 'dependent', sourceRoot, targetRoot })).rejects.toThrow(
-      'Invalid skill name',
+      'Invalid skill prerequisite',
     )
     await expect(lstat(targetRoot)).rejects.toMatchObject({ code: 'ENOENT' })
   })

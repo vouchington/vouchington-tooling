@@ -113,25 +113,40 @@ async function assertTargetAncestorsUnchanged(ancestors: TargetDirectory[]): Pro
 }
 
 const LINK_WORKER = String.raw`
-import { lstat, realpath, symlink } from 'node:fs/promises'
+import { lstat, readlink, symlink } from 'node:fs/promises'
 
 const [source, name, dev, ino] = process.argv.slice(1)
 const directory = await lstat('.', { bigint: true })
 if (!directory.isDirectory() || directory.isSymbolicLink() || directory.dev !== BigInt(dev) || directory.ino !== BigInt(ino))
   throw new Error('Target root changed during skill linking')
-try {
+async function assertExistingMatchesSource() {
   const destination = await lstat(name)
-  if (!destination.isSymbolicLink() || (await realpath(name)) !== source)
+  if (!destination.isSymbolicLink() || (await readlink(name)) !== source)
     throw new Error('Destination already exists: ' + name)
-  process.stdout.write('existing')
+}
+
+let created = false
+try {
+  await assertExistingMatchesSource()
 } catch (error) {
   if (error?.code !== 'ENOENT') throw error
   try {
     await symlink(source, name, 'dir')
+    created = true
   } catch (error) {
-    if (process.platform !== 'win32' || !['EACCES', 'EPERM'].includes(error?.code)) throw error
-    await symlink(source, name, 'junction')
+    if (error?.code === 'EEXIST') {
+      await assertExistingMatchesSource()
+    } else {
+      if (process.platform !== 'win32' || !['EACCES', 'EPERM'].includes(error?.code)) throw error
+      try {
+        await symlink(source, name, 'junction')
+        created = true
+      } catch (error) {
+        if (error?.code !== 'EEXIST') throw error
+        await assertExistingMatchesSource()
+      }
+    }
   }
-  process.stdout.write('created')
 }
+process.stdout.write(created ? 'created' : 'existing')
 `

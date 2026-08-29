@@ -13,7 +13,13 @@ const pluginRoots = ['vouchington-workflow', 'vouchington-testing', 'vouchington
 )
 type SkillManifest = {
   version: number
-  skills: Array<{ name: string; plugin: string; pluginVersion: string; path: string }>
+  skills: Array<{
+    name: string
+    plugin: string
+    pluginVersion: string
+    path: string
+    prerequisites?: string[]
+  }>
 }
 
 describe('workflow skills package contract', () => {
@@ -52,6 +58,13 @@ describe('workflow skills package contract', () => {
           .map((skill) => skill.name)
           .toSorted((left, right) => left.localeCompare(right)),
       )
+      const prerequisites = new Map(
+        manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
+      )
+      expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
+      expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
+      expect(prerequisites.get('vitest-test-authoring')).toEqual(['test-authoring'])
+      expect(prerequisites.get('github-issue')).toEqual([])
       for (const skill of manifest.skills) {
         const pluginManifest = JSON.parse(
           readFileSync(resolve(packageRoot, '../../plugins', skill.plugin, 'plugin.json'), 'utf8'),
