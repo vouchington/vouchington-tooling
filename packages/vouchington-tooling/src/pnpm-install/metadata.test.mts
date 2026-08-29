@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -61,6 +61,8 @@ describe('persistent metadata', () => {
         return { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
       }),
     ).rejects.toMatchObject({ code: 'EISDIR' })
+    await symlink('node_modules', join(root, 'node_modules'))
+    await expect(persistentDependencyTreeIsCold()).rejects.toMatchObject({ code: 'ELOOP' })
   })
 
   it('fails when pnpm --version fails', async () => {
@@ -153,6 +155,11 @@ describe('persistent metadata', () => {
     )
     expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
     await writeFile(join(root, 'node_modules', '.pnpm-install-metadata-health.json'), 'null\n')
+    expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
+    await writeFile(join(root, 'node_modules', '.pnpm-install-metadata-health.json'), 'false\n')
+    expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
+    await rm(join(root, 'node_modules', '.pnpm-install-metadata-health.json'))
+    await mkdir(join(root, 'node_modules', '.pnpm-install-metadata-health.json'))
     expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
   })
 })

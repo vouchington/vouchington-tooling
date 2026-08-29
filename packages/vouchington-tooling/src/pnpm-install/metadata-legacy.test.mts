@@ -116,6 +116,24 @@ describe('legacy persistent metadata API', () => {
         true,
       ),
     ).rejects.toThrow('pnpm --version failed: nope')
+    await expect(
+      persistentMetadataFingerprint(
+        async (args) =>
+          args[0] === '--version'
+            ? { code: 1, output: 'stdout-only' }
+            : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) },
+        true,
+      ),
+    ).rejects.toThrow('pnpm --version failed: stdout-only')
+    await expect(
+      persistentMetadataFingerprint(
+        async (args) =>
+          args[0] === '--version'
+            ? { code: 1, output: '' }
+            : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) },
+        true,
+      ),
+    ).rejects.toThrow('pnpm --version failed: unknown error')
 
     await mkdir(join(root, 'pnpm-lock.yaml'))
     await expect(

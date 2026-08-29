@@ -394,6 +394,22 @@ describe('pnpm install lifecycle', () => {
     }
   })
 
+  it('reconciles an unsafe metadata stamp and reports the unsafe transition', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      await writeFile(
+        join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'),
+        'null\n',
+      )
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"unsafe-stamp"')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   it('requires an enabled reconciliation after a script-disabled workspace-link repair', async () => {
     const fixture = await makeFixture()
     try {
