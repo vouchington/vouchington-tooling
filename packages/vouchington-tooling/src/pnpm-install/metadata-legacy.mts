@@ -7,6 +7,10 @@ import { type CaptureCommand, listWorkspaces, reportGlibcVersionRuntime } from '
 type PersistentMetadataStamp = { fingerprint: string; version: 3 }
 
 function persistentMetadataStampPath() {
+  return path.join(process.cwd(), 'node_modules', '.pnpm-install-metadata-health.v3.json')
+}
+
+function legacySharedStampPath() {
   return path.join(process.cwd(), 'node_modules', '.pnpm-install-metadata-health.json')
 }
 
@@ -71,14 +75,13 @@ export async function persistentMetadataFingerprint(
 }
 
 export async function persistentMetadataMatches(fingerprint: string) {
-  try {
-    const stamp = JSON.parse(
-      await readFile(persistentMetadataStampPath(), 'utf8'),
-    ) as PersistentMetadataStamp
-    return stamp.version === 3 && stamp.fingerprint === fingerprint
-  } catch {
-    return false
+  for (const filename of [persistentMetadataStampPath(), legacySharedStampPath()]) {
+    try {
+      const stamp = JSON.parse(await readFile(filename, 'utf8')) as PersistentMetadataStamp
+      if (stamp.version === 3 && stamp.fingerprint === fingerprint) return true
+    } catch {}
   }
+  return false
 }
 
 export async function writePersistentMetadataStamp(fingerprint: string) {

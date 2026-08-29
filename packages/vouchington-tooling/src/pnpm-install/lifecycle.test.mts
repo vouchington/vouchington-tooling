@@ -305,6 +305,7 @@ describe('pnpm install lifecycle', () => {
     try {
       await runInstaller(fixture, { installScripts: true })
       await resetInstallCalls(fixture)
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
       await runInstaller(fixture, { installScripts: false })
       await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
@@ -326,6 +327,48 @@ describe('pnpm install lifecycle', () => {
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
         'rebuild --pending --recursive',
       ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('clears capability when a script-disabled install adds a pending build', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: true })
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
+      await resetInstallCalls(fixture)
+      fixture.env.PNPM_PENDING_BUILDS = '"new-package@1.0.0"'
+      await runInstaller(fixture, { installScripts: false })
+      fixture.env.PNPM_PENDING_BUILDS = ''
+      await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles when a pending rebuild leaves a stale workspace link', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      fixture.env.PNPM_REBUILD_BREAK_LINK = '1'
+      fixture.env.PNPM_REPAIR_LINK = '1'
+      const result = await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"workspace-links-stale-after-rebuild"')
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }

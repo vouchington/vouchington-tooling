@@ -94,7 +94,7 @@ describe('legacy persistent metadata API', () => {
     expect(await persistentMetadataMatches(enabled)).toBe(false)
     await writePersistentMetadataStamp(enabled)
     expect(
-      await readFile(join(root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
+      await readFile(join(root, 'node_modules', '.pnpm-install-metadata-health.v3.json'), 'utf8'),
     ).toBe(`${JSON.stringify({ fingerprint: enabled, version: 3 })}\n`)
     expect(await persistentMetadataMatches(enabled)).toBe(true)
     expect(await persistentMetadataMatches(disabled)).toBe(false)
@@ -145,5 +145,23 @@ describe('legacy persistent metadata API', () => {
         true,
       ),
     ).rejects.toMatchObject({ code: 'EISDIR' })
+  })
+
+  it('isolates v3 writes and falls back read-only to old v3 stamps', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pnpm-metadata-legacy-isolated-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    process.chdir(root)
+    const fingerprint = 'a'.repeat(64)
+    const shared = join(root, 'node_modules', '.pnpm-install-metadata-health.json')
+    await writeFile(shared, `${JSON.stringify({ fingerprint, version: 4 })}\n`)
+    await writePersistentMetadataStamp(fingerprint)
+    expect(await readFile(shared, 'utf8')).toBe(`${JSON.stringify({ fingerprint, version: 4 })}\n`)
+    expect(await persistentMetadataMatches(fingerprint)).toBe(true)
+    await rm(join(root, 'node_modules', '.pnpm-install-metadata-health.v3.json'))
+    await writeFile(shared, `${JSON.stringify({ fingerprint, version: 3 })}\n`)
+    expect(await persistentMetadataMatches(fingerprint)).toBe(true)
+    await writeFile(shared, `${JSON.stringify({ fingerprint, version: 4 })}\n`)
+    expect(await persistentMetadataMatches(fingerprint)).toBe(false)
   })
 })
