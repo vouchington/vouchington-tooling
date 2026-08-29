@@ -59,7 +59,7 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
 }
 
 function isMissingManifest(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException).code === 'ENOENT'
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
 async function linkManifestSkill(
