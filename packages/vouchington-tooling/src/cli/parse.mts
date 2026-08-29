@@ -45,6 +45,8 @@ export type ScriptCommand =
   | 'wait-for-apt-locks'
   | 'install-playwright-chromium-arm64'
   | 'ghcr-package-retention'
+  | 'harness-admission-lane'
+  | 'harness-assert-gates'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
@@ -66,6 +68,8 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'wait-for-apt-locks',
   'install-playwright-chromium-arm64',
   'ghcr-package-retention',
+  'harness-admission-lane',
+  'harness-assert-gates',
 ])
 
 export function parseCli(argv: readonly string[]): ParsedCli {

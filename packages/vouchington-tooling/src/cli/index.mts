@@ -61,6 +61,11 @@ const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
     path: 'scripts/gha/install-playwright-chromium-arm64.sh',
   },
   'ghcr-package-retention': { command: 'bash', path: 'scripts/gha/ghcr-package-retention.sh' },
+  'harness-admission-lane': {
+    command: 'bash',
+    path: 'scripts/gha/harness-admission-lane.sh',
+  },
+  'harness-assert-gates': { command: 'bash', path: 'scripts/gha/harness-assert-gates.sh' },
 }
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {

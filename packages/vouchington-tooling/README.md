@@ -49,6 +49,8 @@ vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --ch
 vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
+vouchington harness-admission-lane 4
+vouchington harness-assert-gates HARNESS_DISPATCH_ENABLED HARNESS_SHEPHERD_ENABLED
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
