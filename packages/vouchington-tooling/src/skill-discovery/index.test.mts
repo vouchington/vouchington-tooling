@@ -173,6 +173,26 @@ describe('skill discovery', () => {
     ).rejects.toThrow('invalid result')
   })
 
+  it('rejects a target root swapped after the worker writes through its bound directory', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    const source = await realpath(join(sourceRoot, 'agent-workflow'))
+    const target = await resolveTargetDirectory(targetRoot)
+    const moved = `${targetRoot}-moved`
+    const victim = join(sourceRoot, '..', 'victim')
+    await mkdir(victim)
+    await expect(
+      linkDirectoryEntry(source, target, 'agent-workflow', undefined, undefined, async () => {
+        await rename(targetRoot, moved)
+        await symlink(victim, targetRoot, 'dir')
+      }),
+    ).rejects.toThrow('Target root changed during skill linking')
+    await expect(lstat(join(victim, 'agent-workflow'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(lstat(join(moved, 'agent-workflow'))).resolves.toMatchObject({
+      isSymbolicLink: expect.any(Function),
+    })
+    await rm(moved, { force: true, recursive: true })
+  })
+
   it('rejects circular relative sibling prerequisites', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     for (const [name, prerequisite] of [

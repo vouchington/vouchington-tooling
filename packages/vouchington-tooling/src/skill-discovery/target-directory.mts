@@ -21,9 +21,12 @@ export async function linkDirectoryEntry(
   name: string,
   beforeWorker?: () => Promise<void>,
   worker: DirectoryLinkWorker = runDirectoryLinkWorker,
+  afterWorker?: () => Promise<void>,
 ): Promise<boolean> {
   await beforeWorker?.()
   const stdout = await worker(source, target, name)
+  await afterWorker?.()
+  await assertTargetUnchanged(target)
   if (stdout === 'created') return true
   if (stdout === 'existing') return false
   throw new Error('Skill link worker returned an invalid result')
@@ -67,6 +70,14 @@ export async function snapshotTargetDirectory(path: string): Promise<TargetDirec
   if (stat.isSymbolicLink()) throw new Error(`Target root contains symlink: ${path}`)
   if (!stat.isDirectory()) throw new Error(`Invalid target root: ${path}`)
   return { path, dev: stat.dev, ino: stat.ino }
+}
+
+async function assertTargetUnchanged(target: TargetDirectory): Promise<void> {
+  try {
+    const current = await snapshotTargetDirectory(target.path)
+    if (current.dev === target.dev && current.ino === target.ino) return
+  } catch {}
+  throw new Error('Target root changed during skill linking')
 }
 
 async function assertNoSymlinkAncestors(path: string): Promise<void> {
