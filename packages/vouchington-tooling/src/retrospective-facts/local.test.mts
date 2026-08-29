@@ -20,7 +20,7 @@ describe('local retrospective facts branches', () => {
 
     const failedGh = executor({
       'git branch --show-current': { stdout: 'topic' },
-      'gh pr view 1 --json number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName':
+      'gh pr view 1 --json number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName,baseRefName':
         {
           ok: false,
         },
@@ -29,6 +29,7 @@ describe('local retrospective facts branches', () => {
     const output = await localFacts({ pr: '1' }, failedGh.execute)
     expect(output).toContain('PR state: gh failed')
     expect(output).toContain('Branch: unavailable')
+    expect(output).toContain('Merged to main: yes (origin/main contains topic)')
   })
 
   it('handles origin fallback, failed local history calls, and a failed working tree read', async () => {
@@ -57,7 +58,7 @@ describe('local retrospective facts branches', () => {
     async (head, local, scoped) => {
       const { calls, execute } = executor({
         'git branch --show-current': { stdout: local },
-        'gh pr view 1 --json number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName':
+        'gh pr view 1 --json number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName,baseRefName':
           {
             stdout: JSON.stringify({ headRefName: head }),
           },
@@ -92,6 +93,21 @@ describe('local retrospective facts branches', () => {
     })
     await expect(localFacts({ branch: 'topic' }, execute)).resolves.toContain(
       'Commits ahead of origin/main: unavailable',
+    )
+  })
+
+  it.each([
+    [{ ok: true }, 'yes (origin/main contains topic)'],
+    [{ ok: false, exitCode: 1 }, 'no (origin/main lacks topic)'],
+    [{ ok: false, exitCode: 2 }, 'unavailable'],
+  ])('reports resolved branch ancestry from merge-base %#', async (result, expected) => {
+    const { execute } = executor({
+      'git branch --show-current': { stdout: 'topic' },
+      'git rev-parse --verify --quiet refs/heads/topic': { ok: true },
+      'git merge-base --is-ancestor topic origin/main': result,
+    })
+    await expect(localFacts({ branch: 'topic' }, execute)).resolves.toContain(
+      `Merged to main: ${expected}`,
     )
   })
 })

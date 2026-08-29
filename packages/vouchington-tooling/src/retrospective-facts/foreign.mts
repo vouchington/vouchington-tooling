@@ -10,9 +10,14 @@ export async function foreignFacts(
   const result = await execute('gh', args)
   const data = result.ok ? readJson(result.stdout) : undefined
   const state = stringField(data, 'state', result.ok ? 'unavailable' : 'gh failed')
+  const base = stringField(data, 'baseRefName')
   const merged =
     state === 'MERGED'
-      ? 'yes (GitHub reports PR MERGED)'
+      ? base === 'main'
+        ? 'yes (GitHub reports PR MERGED into main)'
+        : base === 'unavailable'
+          ? 'unavailable'
+          : `no (GitHub reports PR MERGED into ${base})`
       : state === 'OPEN' || state === 'CLOSED'
         ? `no (GitHub reports PR ${state})`
         : 'unavailable'

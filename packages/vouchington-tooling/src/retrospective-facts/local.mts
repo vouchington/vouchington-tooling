@@ -45,9 +45,10 @@ export async function localFacts(
   const branch =
     options.branch ??
     (options.pr && head !== 'unavailable' ? head : options.noPr ? localBranch : 'unavailable')
-  const resolved = options.branch
-    ? await resolveNamedRef(options.branch, run)
-    : { range: options.noPr ? 'HEAD' : undefined, refreshed: false }
+  const rangeName =
+    options.branch ??
+    (!data && localBranch !== 'unavailable' ? localBranch : options.noPr ? 'HEAD' : undefined)
+  const resolved = rangeName ? await resolveNamedRef(rangeName, run) : unresolvedRange()
   const range = resolved.range
   const commitsResult =
     !data && range && originMain
@@ -71,7 +72,7 @@ export async function localFacts(
       ? undefined
       : await run('git', ['reflog', 'show', `origin/${branch}`])
   const merge = objectField(data, 'mergeCommit', 'oid')
-  const merged = await mergeFact(data, merge, originMain, options, run)
+  const merged = await mergeFact(data, merge, resolved.range, originMain, options, run)
   const filesText = diffResult?.ok ? text(diffResult) : undefined
   const raw = options.raw
     ? `\n=== Raw Command Output ===\n${calls.map((call) => rawBlock(call.command, call.args, call.result)).join('')}`
@@ -86,7 +87,7 @@ export async function localFacts(
           : originMain
             ? 'using existing local origin/main ref after failed fetch'
             : 'origin/main unavailable after failed fetch'
-      }${resolved.refreshed ? `; origin/${options.branch} refreshed` : ''}`,
+      }${resolved.refreshed ? `; origin/${rangeName} refreshed` : ''}`,
       branch,
       pr: options.noPr ? 'none' : stringField(data, 'number'),
       state,
@@ -137,6 +138,7 @@ async function resolveNamedRef(
   name: string,
   run: (command: string, args: string[]) => Promise<CommandResult>,
 ): Promise<{ range: string | undefined; refreshed: boolean }> {
+  if (name === 'HEAD') return { range: name, refreshed: false }
   if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`])).ok)
     return { range: name, refreshed: false }
   const fetch = await run('git', ['fetch', 'origin', `${name}:refs/remotes/origin/${name}`])
@@ -146,9 +148,14 @@ async function resolveNamedRef(
   return { range: undefined, refreshed: false }
 }
 
+function unresolvedRange(): { range: undefined; refreshed: false } {
+  return { range: undefined, refreshed: false }
+}
+
 async function mergeFact(
   data: Record<string, unknown> | undefined,
   merge: string | undefined,
+  range: string | undefined,
   originMain: boolean,
   options: RetrospectiveFactsOptions,
   run: (command: string, args: string[]) => Promise<CommandResult>,
@@ -164,10 +171,10 @@ async function mergeFact(
       )
     return `yes (origin/main contains ${merge})`
   }
-  if (!data && options.noPr && !options.branch && originMain) {
-    const headInOrigin = await run('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main'])
-    if (headInOrigin.ok) return 'yes (origin/main contains HEAD)'
-    if (headInOrigin.exitCode !== 1) return 'unavailable'
+  if (!data && range && originMain) {
+    const rangeInOrigin = await run('git', ['merge-base', '--is-ancestor', range, 'origin/main'])
+    if (rangeInOrigin.ok) return `yes (origin/main contains ${range})`
+    if (rangeInOrigin.exitCode === 1) return `no (origin/main lacks ${range})`
   }
-  return 'unmerged at time of retro'
+  return 'unavailable'
 }

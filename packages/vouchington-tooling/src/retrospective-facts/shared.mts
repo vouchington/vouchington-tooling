@@ -1,5 +1,5 @@
 export const PR_JSON_FIELDS =
-  'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName'
+  'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName,baseRefName'
 
 export type CommandResult = {
   ok: boolean

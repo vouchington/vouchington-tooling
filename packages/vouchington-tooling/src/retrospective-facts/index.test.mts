@@ -8,7 +8,8 @@ vi.mock('./exec.mts', async (importOriginal) => {
 import { runRetrospectiveFacts, type CommandExecutor, type CommandResult } from './index.mts'
 import { shell } from './exec.mts'
 
-const fields = 'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName'
+const fields =
+  'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName,baseRefName'
 const pr = {
   number: 123,
   state: 'MERGED',
@@ -18,6 +19,7 @@ const pr = {
   files: [{ path: 'dev/file.mts' }, { path: 'docs/file.md' }],
   commits: [{}, {}, {}],
   headRefName: 'topic-branch',
+  baseRefName: 'main',
 }
 
 function makeExecutor(responses: Record<string, Partial<CommandResult>> = {}) {
@@ -32,7 +34,7 @@ function makeExecutor(responses: Record<string, Partial<CommandResult>> = {}) {
 
 describe('retrospective facts', () => {
   it.each([
-    ['MERGED', 'yes (GitHub reports PR MERGED)'],
+    ['MERGED', 'yes (GitHub reports PR MERGED into main)'],
     ['OPEN', 'no (GitHub reports PR OPEN)'],
     ['CLOSED', 'no (GitHub reports PR CLOSED)'],
     ['UNKNOWN', 'unavailable'],
@@ -53,14 +55,14 @@ describe('retrospective facts', () => {
   it('keeps local ancestry behavior and never treats a failed diff as a changed file', async () => {
     const { execute } = makeExecutor({
       'git branch --show-current': { stdout: 'feature\n' },
-      'git rev-list --count origin/main..HEAD': { stdout: '1\n' },
-      'git diff --name-only origin/main...HEAD': { ok: false, stderr: 'bad diff' },
+      'git rev-list --count origin/main..feature': { stdout: '1\n' },
+      'git diff --name-only origin/main...feature': { ok: false, stderr: 'bad diff' },
       'git status --porcelain --untracked-files=normal': { stdout: '' },
       'git reflog show origin/feature': { stdout: '' },
-      'git merge-base --is-ancestor HEAD origin/main': { stdout: '' },
+      'git merge-base --is-ancestor feature origin/main': { stdout: '' },
     })
     const output = await runRetrospectiveFacts({ noPr: true, execute })
-    expect(output).toContain('Merged to main: yes (origin/main contains HEAD)')
+    expect(output).toContain('Merged to main: yes (origin/main contains feature)')
     expect(output).toContain('Files changed from origin/main: unavailable')
     expect(output).toContain('Top-level dirs changed from origin/main: unavailable')
   })
@@ -178,6 +180,26 @@ describe('retrospective facts', () => {
     expect(malformedOutput).toContain('PR state: unavailable')
   })
 
+  it.each([
+    ['release', 'no (GitHub reports PR MERGED into release)'],
+    [undefined, 'unavailable'],
+  ])(
+    'does not treat a foreign PR merged into %s as merged to main',
+    async (baseRefName, expected) => {
+      const key = `gh pr view 49 --repo vouchington/tooling --json ${fields}`
+      const { calls, execute } = makeExecutor({
+        [key]: { stdout: JSON.stringify({ ...pr, number: 49, baseRefName }) },
+      })
+      const output = await runRetrospectiveFacts({
+        pr: '49',
+        repo: 'vouchington/tooling',
+        execute,
+      })
+      expect(output).toContain(`Merged to main: ${expected}`)
+      expect(calls).toEqual([key])
+    },
+  )
+
   it('resolves a named branch from origin when no local branch exists', async () => {
     const { calls, execute } = makeExecutor({
       'git branch --show-current': { stdout: 'current' },
@@ -284,9 +306,9 @@ describe('retrospective facts', () => {
       'git branch --show-current': { stdout: 'topic' },
       'git reflog show origin/topic': { stdout: '' },
       'git status --porcelain --untracked-files=normal': { stdout: '' },
-      'git rev-list --count origin/main..HEAD': { stdout: '1' },
-      'git diff --name-only origin/main...HEAD': { stdout: '' },
-      'git merge-base --is-ancestor HEAD origin/main': { ok: false, exitCode: 2 },
+      'git rev-list --count origin/main..topic': { stdout: '1' },
+      'git diff --name-only origin/main...topic': { stdout: '' },
+      'git merge-base --is-ancestor topic origin/main': { ok: false, exitCode: 2 },
     })
     await expect(runRetrospectiveFacts({ noPr: true, execute })).resolves.toContain(
       'Merged to main: unavailable',
