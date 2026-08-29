@@ -205,6 +205,8 @@ For persistent `pnpm-install`, v4 metadata tracks structural inputs separately f
 `--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
 uses one script-suppressed verification install followed by `pnpm rebuild --pending --recursive`.
+When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
+rerunning first-party workspace hooks.
 The command emits a structured non-secret provenance diagnostic identifying changed structural
 categories, the last script policy, script capability, and native-binary health.
 

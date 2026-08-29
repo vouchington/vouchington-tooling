@@ -332,21 +332,26 @@ describe('pnpm install lifecycle', () => {
     }
   })
 
-  it('clears capability when a script-disabled install adds a pending build', async () => {
+  it('rebuilds only newly pending dependency IDs after a script-disabled install', async () => {
     const fixture = await makeFixture()
     try {
+      await writeFile(join(fixture.root, 'pnpm-lock.yaml'), 'packages:\n  new-package@1.0.0: {}\n')
       await runInstaller(fixture, { installScripts: true })
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
       await resetInstallCalls(fixture)
       fixture.env.PNPM_PENDING_BUILDS = '"new-package@1.0.0"'
       await runInstaller(fixture, { installScripts: false })
       fixture.env.PNPM_PENDING_BUILDS = ''
-      await runInstaller(fixture, { installScripts: true })
+      const result = await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'rebuild --pending --recursive',
+        'rebuild --recursive -- new-package@1.0.0',
       ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
+      ).resolves.toBe('pendingBuilds: []\n')
+      expect(result.stderr).not.toContain('new-package@1.0.0')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }

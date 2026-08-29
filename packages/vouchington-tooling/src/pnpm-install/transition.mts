@@ -4,12 +4,13 @@ export type ProvenanceStatus =
   | {
       kind: 'matching'
       lastInvocationInstallScripts: boolean
+      pendingDependencyBuilds: string[]
       scriptsEnabledInstallSucceeded: boolean
     }
   | { kind: 'unsafe' }
 
 export type PersistentInstallTransition = {
-  action: 'ordinary' | 'reconcile' | 'upgrade-scripts'
+  action: 'ordinary' | 'reconcile' | 'upgrade-dependencies' | 'upgrade-scripts'
   reason: string
 }
 
@@ -22,6 +23,8 @@ export function persistentInstallTransition(
   if (provenance.kind === 'matching') {
     if (installScripts && !provenance.scriptsEnabledInstallSucceeded)
       return { action: 'upgrade-scripts', reason: 'pending-scripts-rebuild' }
+    if (installScripts && provenance.pendingDependencyBuilds.length > 0)
+      return { action: 'upgrade-dependencies', reason: 'pending-dependency-rebuild' }
     return { action: 'ordinary', reason: 'matching-structural-provenance' }
   }
   if (provenance.kind === 'absent') return { action: 'ordinary', reason: 'missing-stamp' }
@@ -46,6 +49,8 @@ export function persistentProvenanceDiagnostic(
       provenance.kind === 'matching' ? provenance.scriptsEnabledInstallSucceeded : false,
     lastInvocationInstallScripts:
       provenance.kind === 'matching' ? provenance.lastInvocationInstallScripts : null,
+    pendingDependencyBuildCount:
+      provenance.kind === 'matching' ? provenance.pendingDependencyBuilds.length : 0,
     nativeBinariesMatchRuntime,
     reason: transition.reason,
     state: provenance.kind,

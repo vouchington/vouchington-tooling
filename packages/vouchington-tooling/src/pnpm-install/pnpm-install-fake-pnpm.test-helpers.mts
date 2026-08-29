@@ -35,6 +35,9 @@ if [ -n "\${PNPM_PENDING_BUILDS:-}" ]; then
 fi
 case " $* " in
   *' rebuild '*)
+    if [ "\${PNPM_REBUILD_INVALID_LEDGER:-0}" = 1 ]; then
+      printf 'pendingBuilds: invalid\n' > "$PNPM_NODE_MODULES/.modules.yaml"
+    fi
     if [ "\${PNPM_REBUILD_BREAK_LINK:-0}" = 1 ]; then rm -f "$PNPM_DEPENDENCY_LINK"; fi
     ;;
   *' --force '*)

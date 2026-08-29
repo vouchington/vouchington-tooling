@@ -18,6 +18,7 @@ type ComponentName = (typeof componentNames)[number]
 type StructuralProvenance = Record<ComponentName, string>
 type PersistentMetadataStamp = {
   lastInvocationInstallScripts: boolean
+  pendingDependencyBuilds?: string[]
   provenance: StructuralProvenance
   scriptsEnabledInstallSucceeded: boolean
   version: 4
@@ -25,10 +26,6 @@ type PersistentMetadataStamp = {
 
 function persistentMetadataStampPath() {
   return path.join(process.cwd(), 'node_modules', '.pnpm-install-metadata-health.json')
-}
-
-function fail(message: string): never {
-  throw new Error(message)
 }
 
 function addFingerprintInput(hash: ReturnType<typeof createHash>, label: string, value: string) {
@@ -70,7 +67,7 @@ export async function persistentMetadataFingerprintV4(runCapture: CaptureCommand
   )
   const pnpmVersion = await runCapture(['--version'])
   if (pnpmVersion.code !== 0)
-    fail(
+    throw new Error(
       `pnpm --version failed: ${pnpmVersion.errorOutput?.trim() || pnpmVersion.output.trim() || 'unknown error'}`,
     )
 
@@ -111,7 +108,10 @@ function validStamp(value: unknown): value is PersistentMetadataStamp {
     typeof stamp.scriptsEnabledInstallSucceeded === 'boolean' &&
     typeof stamp.provenance === 'object' &&
     stamp.provenance !== null &&
-    componentNames.every((name) => typeof stamp.provenance?.[name] === 'string')
+    componentNames.every((name) => typeof stamp.provenance?.[name] === 'string') &&
+    (stamp.pendingDependencyBuilds === undefined ||
+      (Array.isArray(stamp.pendingDependencyBuilds) &&
+        stamp.pendingDependencyBuilds.every((id) => typeof id === 'string')))
   )
 }
 
@@ -146,6 +146,7 @@ export async function persistentMetadataStatusV4(
     : {
         kind: 'matching',
         lastInvocationInstallScripts: stamp.lastInvocationInstallScripts,
+        pendingDependencyBuilds: stamp.pendingDependencyBuilds ?? [],
         scriptsEnabledInstallSucceeded: stamp.scriptsEnabledInstallSucceeded,
       }
 }
@@ -154,12 +155,18 @@ export async function writePersistentMetadataStampV4(
   provenance: StructuralProvenance,
   installScripts: boolean,
   resetScriptsEnabledCapability: boolean,
+  pendingDependencyBuilds?: string[],
 ) {
   const existing = await readPersistentMetadataStamp()
   const existingMatches =
     existing && componentNames.every((name) => existing.provenance[name] === provenance[name])
   const stamp: PersistentMetadataStamp = {
     lastInvocationInstallScripts: installScripts,
+    pendingDependencyBuilds: (
+      pendingDependencyBuilds ??
+      (existingMatches ? existing.pendingDependencyBuilds : undefined) ??
+      []
+    ).toSorted(),
     provenance,
     scriptsEnabledInstallSucceeded:
       installScripts ||

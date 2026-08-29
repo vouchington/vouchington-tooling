@@ -36,6 +36,7 @@ export async function makeFixture() {
       join(root, 'pnpm-workspace.yaml'),
       'packages:\n  - packages/*\nminimumReleaseAge: 2880\n',
     ),
+    writeFile(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\npackages: {}\n'),
     writeJson(join(consumer, 'package.json'), {
       name: '@fixture/consumer',
       dependencies: { '@fixture/dependency': 'workspace:^' },

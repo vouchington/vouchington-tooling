@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
 const execFileAsync = promisify(execFile)
 const installer = join(process.cwd(), 'packages/vouchington-tooling/src/cli/index.mts')
@@ -61,7 +62,7 @@ async function logLines(filename: string) {
 
 describe('pnpm install with a real registry fixture', () => {
   it(
-    'fetches once and runs deferred dependency and workspace scripts once',
+    'runs a seeded persisted dependency debt through pnpm without rerunning workspace hooks',
     { timeout: 30_000 },
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'pnpm-install-real-'))
@@ -128,10 +129,34 @@ describe('pnpm install with a real registry fixture', () => {
         expect(tarballFetches).toBe(1)
         expect((await logLines(postinstallLog)).toSorted()).toEqual(['dependency', 'workspace'])
 
+        const lockfile = parse(await readFile(join(root, 'pnpm-lock.yaml'), 'utf8')) as {
+          packages: Record<string, unknown>
+        }
+        const dependencyPath = Object.keys(lockfile.packages).find((key) =>
+          key.includes('@fixture/postinstall@'),
+        )
+        if (!dependencyPath) throw new Error('fixture dependency has no pnpm lockfile package path')
+        const stampPath = join(root, 'node_modules', '.pnpm-install-metadata-health.json')
+        const stamp = JSON.parse(await readFile(stampPath, 'utf8')) as Record<string, unknown>
+        stamp.pendingDependencyBuilds = [dependencyPath]
+        await writeFile(stampPath, `${JSON.stringify(stamp)}\n`)
+        const modulesPath = join(root, 'node_modules', '.modules.yaml')
+        const modules = parse(await readFile(modulesPath, 'utf8')) as Record<string, unknown>
+        modules.pendingBuilds = [dependencyPath]
+        await writeFile(modulesPath, `${JSON.stringify(modules)}\n`)
+        await rm(postinstallLog, { force: true })
+        await runInstaller(root, true, postinstallLog, storeDirectory)
+        expect(tarballFetches).toBe(1)
+        expect(await logLines(postinstallLog)).toEqual(['dependency'])
+        expect(
+          (parse(await readFile(modulesPath, 'utf8')) as { pendingBuilds: string[] }).pendingBuilds,
+        ).not.toContain(dependencyPath)
+
+        await rm(postinstallLog, { force: true })
         await runInstaller(root, false, postinstallLog, storeDirectory)
         await runInstaller(root, true, postinstallLog, storeDirectory)
         expect(tarballFetches).toBe(1)
-        expect((await logLines(postinstallLog)).toSorted()).toEqual(['dependency', 'workspace'])
+        expect(await logLines(postinstallLog)).toEqual([])
       } finally {
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve())),

@@ -45,6 +45,7 @@ describe('persistent metadata', () => {
     expect(await persistentMetadataMatches(fingerprint)).toEqual({
       kind: 'matching',
       lastInvocationInstallScripts: true,
+      pendingDependencyBuilds: [],
       scriptsEnabledInstallSucceeded: true,
     })
   })
@@ -101,6 +102,33 @@ describe('persistent metadata', () => {
     expect(await persistentMetadataMatches(provenance)).toMatchObject({
       lastInvocationInstallScripts: false,
       scriptsEnabledInstallSucceeded: true,
+    })
+    await writePersistentMetadataStamp(provenance, false, false, ['dependency@1'])
+    const changed = { ...provenance, lockfile: 'changed' }
+    await writePersistentMetadataStamp(changed, true, true)
+    expect(await persistentMetadataMatches(changed)).toMatchObject({
+      pendingDependencyBuilds: [],
+    })
+  })
+
+  it('treats an older v4 stamp without pending dependency builds as empty', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pnpm-metadata-old-v4-'))
+    dirs.push(root)
+    await writeFile(join(root, 'package.json'), '{"name":"root"}\n')
+    process.chdir(root)
+    const capture = async (args: string[]) =>
+      args[0] === '--version'
+        ? { code: 0, output: '11.0.0\n' }
+        : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
+    const provenance = await persistentMetadataFingerprint(capture)
+    await mkdir(join(root, 'node_modules'))
+    await writeFile(
+      join(root, 'node_modules', '.pnpm-install-metadata-health.json'),
+      `${JSON.stringify({ version: 4, provenance, lastInvocationInstallScripts: true, scriptsEnabledInstallSucceeded: true })}\n`,
+    )
+    await expect(persistentMetadataMatches(provenance)).resolves.toMatchObject({
+      kind: 'matching',
+      pendingDependencyBuilds: [],
     })
   })
 
