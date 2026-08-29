@@ -10,7 +10,7 @@ export type BlackboardConnection = {
   token: string
   readRetry: Record<string, never>
 }
-type ClientModule = {
+export type BlackboardClientModule = {
   Sessions: new (connection: BlackboardConnection) => {
     ensure(input: unknown): Promise<{ status: 'created' | 'exists' }>
     list(input: unknown): Promise<unknown>
@@ -21,6 +21,8 @@ type ClientModule = {
     get(input: unknown): AsyncIterable<unknown>
   }
 }
+export type BlackboardClientLoader = () => Promise<BlackboardClientModule>
+export type BlackboardClientDependencies = { loadClient?: BlackboardClientLoader }
 
 export function resolveBlackboardConnection(
   env: NodeJS.ProcessEnv = process.env,
@@ -32,8 +34,11 @@ export function resolveBlackboardConnection(
   return { baseUrl, token, readRetry: {} }
 }
 
-export async function probeBlackboard(env?: NodeJS.ProcessEnv): Promise<void> {
-  const { Sessions } = await loadClient()
+export async function probeBlackboard(
+  env?: NodeJS.ProcessEnv,
+  dependencies?: BlackboardClientDependencies,
+): Promise<void> {
+  const { Sessions } = await loadClient(dependencies?.loadClient)
   await new Sessions(resolveBlackboardConnection(env)).list({ limit: 1 })
 }
 
@@ -45,6 +50,7 @@ export async function appendJournal(input: {
   parentSessionId?: string | null
   timestamp?: string
   env?: NodeJS.ProcessEnv
+  dependencies?: BlackboardClientDependencies
 }): Promise<string> {
   assertSessionId(input.sessionId)
   let markdown: string
@@ -55,7 +61,7 @@ export async function appendJournal(input: {
   }
   if (!markdown) throw new Error(`note file is empty: ${input.markdownFile}`)
   const connection = resolveBlackboardConnection(input.env)
-  const { Sessions, Entries } = await loadClient()
+  const { Sessions, Entries } = await loadClient(input.dependencies?.loadClient)
   await new Sessions(connection).ensure({
     id: input.sessionId,
     parentSessionId: input.parentSessionId ?? null,
@@ -69,9 +75,13 @@ export async function appendJournal(input: {
   return `Journaled to agent-blackboard session ${input.sessionId} (entry created at ${entry.createdAt}).`
 }
 
-export async function readJournal(sessionId: string, env?: NodeJS.ProcessEnv): Promise<unknown[]> {
+export async function readJournal(
+  sessionId: string,
+  env?: NodeJS.ProcessEnv,
+  dependencies?: BlackboardClientDependencies,
+): Promise<unknown[]> {
   assertSessionId(sessionId)
-  const { Entries } = await loadClient()
+  const { Entries } = await loadClient(dependencies?.loadClient)
   const entries: unknown[] = []
   for await (const entry of new Entries(resolveBlackboardConnection(env)).get({
     sessionId,
@@ -106,9 +116,11 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
     .join('\n\n')
 }
 
-async function loadClient(): Promise<ClientModule> {
+async function loadClient(
+  loader: BlackboardClientLoader = defaultClientLoader,
+): Promise<BlackboardClientModule> {
   try {
-    return (await import('agent-blackboard')) as ClientModule
+    return await loader()
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND')
       throw new Error(
@@ -117,4 +129,8 @@ async function loadClient(): Promise<ClientModule> {
       )
     throw error
   }
+}
+
+async function defaultClientLoader(): Promise<BlackboardClientModule> {
+  return (await import('agent-blackboard')) as BlackboardClientModule
 }
