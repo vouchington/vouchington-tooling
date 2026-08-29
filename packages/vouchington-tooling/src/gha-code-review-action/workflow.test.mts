@@ -12,7 +12,13 @@ type Workflow = {
   jobs?: Record<
     string,
     {
-      steps?: Array<{ uses?: string; name?: string; with?: Record<string, unknown> }>
+      steps?: Array<{
+        env?: Record<string, unknown>
+        name?: string
+        run?: string
+        uses?: string
+        with?: Record<string, unknown>
+      }>
       permissions?: Record<string, unknown>
     }
   >
@@ -26,7 +32,14 @@ describe('code-review reusable workflow', () => {
     expect(workflow.on?.issue_comment).toBeUndefined()
     expect(text).not.toContain('@claude')
     const dispatchInputs = Object.keys(workflow.on?.workflow_dispatch?.inputs ?? {})
-    expect(dispatchInputs).toEqual(['pr_number', 'model', 'effort', 'required_review'])
+    expect(dispatchInputs).toEqual([
+      'pr_number',
+      'expected_head_sha',
+      'expected_base_sha',
+      'model',
+      'effort',
+      'required_review',
+    ])
     expect(workflow.on?.workflow_call?.inputs).not.toHaveProperty('prompt')
     expect(workflow.on?.workflow_dispatch?.inputs).not.toHaveProperty('prompt')
     expect(workflow.on?.workflow_dispatch?.inputs).not.toHaveProperty('extra_prompt')
@@ -51,6 +64,29 @@ describe('code-review reusable workflow', () => {
     expect(
       workflow.jobs?.poster?.steps?.some((step) => step.uses?.includes('code-review-poster')),
     ).toBe(true)
+  })
+
+  it('rejects stale selected refs before reviewing or posting', () => {
+    expect(workflow.on?.workflow_call?.inputs).toMatchObject({
+      expected_head_sha: expect.any(Object),
+      expected_base_sha: expect.any(Object),
+    })
+    expect(workflow.on?.workflow_dispatch?.inputs).toMatchObject({
+      expected_head_sha: expect.any(Object),
+      expected_base_sha: expect.any(Object),
+    })
+
+    const reviewGuard = workflow.jobs?.review?.steps?.find(
+      (step) => step.name === 'Validate selected pull request refs',
+    )
+    const posterGuard = workflow.jobs?.poster?.steps?.find(
+      (step) => step.name === 'Require the selected pull request head',
+    )
+    expect(reviewGuard?.run).toContain('EXPECTED_HEAD_SHA')
+    expect(reviewGuard?.run).toContain('EXPECTED_BASE_SHA')
+    expect(reviewGuard?.run).toContain('pulls/$PR_NUMBER')
+    expect(posterGuard?.run).toContain('EXPECTED_HEAD_SHA')
+    expect(posterGuard?.run).toContain('pulls/$PR_NUMBER')
   })
 
   it('loads nested composites from the workflow SHA, not the caller SHA', () => {

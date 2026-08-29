@@ -7,6 +7,16 @@ on:
         description: Pull request number to review
         required: true
         type: string
+      expected_head_sha:
+        description: Exact pull request head SHA that may be reviewed and posted
+        required: false
+        type: string
+        default: ''
+      expected_base_sha:
+        description: Exact pull request base SHA that owns the trusted prompt
+        required: false
+        type: string
+        default: ''
       trusted_prompt_ref:
         description: Trusted git ref for review prompt files
         required: false
@@ -61,6 +71,16 @@ on:
         description: Pull request number to review
         required: true
         type: number
+      expected_head_sha:
+        description: Exact pull request head SHA that may be reviewed and posted
+        required: false
+        type: string
+        default: ''
+      expected_base_sha:
+        description: Exact pull request base SHA that owns the trusted prompt
+        required: false
+        type: string
+        default: ''
       model:
         description: Claude model to use
         required: false
@@ -104,6 +124,35 @@ jobs:
       agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
     steps:
+      - name: Validate selected pull request refs
+        if: inputs.expected_head_sha != '' || inputs.expected_base_sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
+          TRUSTED_PROMPT_REF: ${{ inputs.trusted_prompt_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          sha() { [[ -z "$1" || "$1" =~ ^[0-9a-f]{40}$ ]]; }
+          sha "$EXPECTED_HEAD_SHA" || { echo '::error::expected_head_sha must be a full commit SHA.'; exit 1; }
+          sha "$EXPECTED_BASE_SHA" || { echo '::error::expected_base_sha must be a full commit SHA.'; exit 1; }
+          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          current_head="$(jq -r '.head.sha' <<< "$pr_json")"
+          current_base="$(jq -r '.base.sha' <<< "$pr_json")"
+          if [ -n "$EXPECTED_HEAD_SHA" ] && [ "$current_head" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error::PR head changed from $EXPECTED_HEAD_SHA to $current_head before review."
+            exit 1
+          fi
+          if [ -n "$EXPECTED_BASE_SHA" ] && [ "$current_base" != "$EXPECTED_BASE_SHA" ]; then
+            echo "::error::PR base changed from $EXPECTED_BASE_SHA to $current_base before review."
+            exit 1
+          fi
+          if [ -n "$EXPECTED_BASE_SHA" ] && [ "$TRUSTED_PROMPT_REF" != "$EXPECTED_BASE_SHA" ]; then
+            echo '::error::trusted_prompt_ref must match expected_base_sha.'
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -162,6 +211,24 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: .vouchington-tooling
           fetch-depth: 1
+
+      - name: Require the selected pull request head
+        if: inputs.expected_head_sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::expected_head_sha must be a full commit SHA.'
+            exit 1
+          }
+          current="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+          [ "$current" = "$EXPECTED_HEAD_SHA" ] || {
+            echo "::error::PR head changed from $EXPECTED_HEAD_SHA to $current before posting."
+            exit 1
+          }
 
       - name: Post Code Review
         id: poster
