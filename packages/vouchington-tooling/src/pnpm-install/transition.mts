@@ -9,10 +9,9 @@ export type ProvenanceStatus =
     }
   | { kind: 'unsafe' }
 
-export type PersistentInstallTransition = {
-  action: 'ordinary' | 'reconcile' | 'upgrade-dependencies' | 'upgrade-scripts'
-  reason: string
-}
+export type PersistentInstallTransition =
+  | { action: 'ordinary' | 'reconcile' | 'upgrade-scripts'; reason: string }
+  | { action: 'upgrade-dependencies'; pendingDependencyBuilds: string[]; reason: string }
 
 // The matching rows are deliberately explicit: a script-disabled invocation can never erase
 // evidence that this structural tree has already completed a scripts-enabled install.
@@ -24,7 +23,11 @@ export function persistentInstallTransition(
     if (installScripts && !provenance.scriptsEnabledInstallSucceeded)
       return { action: 'upgrade-scripts', reason: 'pending-scripts-rebuild' }
     if (installScripts && provenance.pendingDependencyBuilds.length > 0)
-      return { action: 'upgrade-dependencies', reason: 'pending-dependency-rebuild' }
+      return {
+        action: 'upgrade-dependencies',
+        pendingDependencyBuilds: provenance.pendingDependencyBuilds,
+        reason: 'pending-dependency-rebuild',
+      }
     return { action: 'ordinary', reason: 'matching-structural-provenance' }
   }
   if (provenance.kind === 'absent') return { action: 'ordinary', reason: 'missing-stamp' }
