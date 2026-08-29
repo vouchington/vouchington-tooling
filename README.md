@@ -125,7 +125,8 @@ jobs:
 
 When an orchestrator selects an exact pull request revision, pass both expected SHAs. The reusable
 workflow rejects a changed head or base before the agent starts, requires the trusted prompt ref to
-match that base, and rechecks the head immediately before the poster uses its write credential.
+match that base. At the write boundary, the poster verifies both selected refs and binds the review
+commit ID to the selected head SHA.
 
 This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
 parallel only after the exact pull request head has a successful `tests` fan-in. A trusted

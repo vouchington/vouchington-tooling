@@ -212,24 +212,6 @@ jobs:
           path: .vouchington-tooling
           fetch-depth: 1
 
-      - name: Require the selected pull request head
-        if: inputs.expected_head_sha != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pr_number }}
-          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo '::error::expected_head_sha must be a full commit SHA.'
-            exit 1
-          }
-          current="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
-          [ "$current" = "$EXPECTED_HEAD_SHA" ] || {
-            echo "::error::PR head changed from $EXPECTED_HEAD_SHA to $current before posting."
-            exit 1
-          }
-
       - name: Post Code Review
         id: poster
         uses: ./.vouchington-tooling/.github/actions/code-review-poster
@@ -238,6 +220,8 @@ jobs:
           artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}
           token_source: ${{ inputs.token_source || 'claude-app' }}
+          expected_head_sha: ${{ inputs.expected_head_sha }}
+          expected_base_sha: ${{ inputs.expected_base_sha }}
 
       - name: Require poster success
         if: >-

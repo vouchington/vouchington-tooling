@@ -58,8 +58,11 @@ export function createGhPostReviewIo(options: {
   payloadBytes: Buffer
   token: string
   exec: GhExec
+  expectedHeadSha?: string
+  expectedBaseSha?: string
 }): PostReviewIo {
-  const { repository, prNumber, payloadBytes, token, exec } = options
+  const { repository, prNumber, payloadBytes, token, exec, expectedHeadSha, expectedBaseSha } =
+    options
   return {
     readFile() {
       return payloadBytes
@@ -68,11 +71,32 @@ export function createGhPostReviewIo(options: {
       rmSync(path, { force: true })
     },
     getHeadSha() {
-      const sha = exec(['api', `repos/${repository}/pulls/${prNumber}`, '--jq', '.head.sha'])
-      if (!/^[0-9a-f]{40}$/u.test(sha)) {
-        throw new ReviewPayloadError(`Could not resolve PR head SHA (got "${sha}").`)
+      const refs = exec([
+        'api',
+        `repos/${repository}/pulls/${prNumber}`,
+        '--jq',
+        '[.head.sha, .base.sha] | @tsv',
+      ]).split('\t')
+      const [headSha = '', baseSha = ''] = refs
+      if (!/^[0-9a-f]{40}$/u.test(headSha)) {
+        throw new ReviewPayloadError(`Could not resolve PR head SHA (got "${headSha}").`)
       }
-      return sha
+      if (!/^[0-9a-f]{40}$/u.test(baseSha)) {
+        throw new ReviewPayloadError(`Could not resolve PR base SHA (got "${baseSha}").`)
+      }
+      if (expectedHeadSha && !/^[0-9a-f]{40}$/u.test(expectedHeadSha)) {
+        throw new ReviewPayloadError('EXPECTED_HEAD_SHA must be a full commit SHA.')
+      }
+      if (expectedBaseSha && !/^[0-9a-f]{40}$/u.test(expectedBaseSha)) {
+        throw new ReviewPayloadError('EXPECTED_BASE_SHA must be a full commit SHA.')
+      }
+      if (expectedHeadSha && headSha !== expectedHeadSha) {
+        throw new ReviewPayloadError('PR head changed before posting the selected review.')
+      }
+      if (expectedBaseSha && baseSha !== expectedBaseSha) {
+        throw new ReviewPayloadError('PR base changed before posting the selected review.')
+      }
+      return expectedHeadSha || headSha
     },
     listPullFiles() {
       return parseReviewFilesJson(
@@ -104,6 +128,8 @@ export async function postReviewFromEnv(
         payloadBytes,
         token,
         exec,
+        expectedHeadSha: env.EXPECTED_HEAD_SHA ?? '',
+        expectedBaseSha: env.EXPECTED_BASE_SHA ?? '',
       }),
     )
   const token = resolveReviewPostToken(env)

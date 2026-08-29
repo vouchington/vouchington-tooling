@@ -81,19 +81,16 @@ describe('code-review reusable workflow', () => {
     const reviewGuard = reviewSteps.find(
       (step) => step.name === 'Validate selected pull request refs',
     )
-    const posterGuard = posterSteps.find(
-      (step) => step.name === 'Require the selected pull request head',
-    )
+    const poster = posterSteps.find((step) => step.uses?.includes('code-review-poster') === true)
     expect(reviewGuard?.run).toContain('EXPECTED_HEAD_SHA')
     expect(reviewGuard?.run).toContain('EXPECTED_BASE_SHA')
     expect(reviewGuard?.run).toContain('pulls/$PR_NUMBER')
-    expect(posterGuard?.run).toContain('EXPECTED_HEAD_SHA')
-    expect(posterGuard?.run).toContain('pulls/$PR_NUMBER')
+    expect(poster?.with).toMatchObject({
+      expected_head_sha: '${{ inputs.expected_head_sha }}',
+      expected_base_sha: '${{ inputs.expected_base_sha }}',
+    })
     expect(reviewSteps.indexOf(reviewGuard!)).toBeLessThan(
       reviewSteps.findIndex((step) => step.uses?.includes('code-review') === true),
-    )
-    expect(posterSteps.indexOf(posterGuard!)).toBeLessThan(
-      posterSteps.findIndex((step) => step.uses?.includes('code-review-poster') === true),
     )
   })
 

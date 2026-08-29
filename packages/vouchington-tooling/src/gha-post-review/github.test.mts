@@ -15,6 +15,7 @@ import {
 import type { ClaudeTokenIo } from './claude-token.mts'
 
 const HEAD_SHA = 'b'.repeat(40)
+const BASE_SHA = 'a'.repeat(40)
 
 function makeExec(handler: (args: readonly string[]) => string): GhExec {
   return (args) => handler(args)
@@ -112,7 +113,7 @@ describe('github review adapter', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, '{"body":"ok","comments":[]}')
     const exec = makeExec((args) => {
-      if (args.includes('.head.sha')) return HEAD_SHA
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
       return '[]'
     })
     const io = createGhPostReviewIo({
@@ -122,6 +123,8 @@ describe('github review adapter', () => {
       payloadBytes: Buffer.from('{"body":"ok"}'),
       token: 'tok',
       exec,
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
     })
     expect(io.readFile(payloadPath).toString()).toContain('ok')
     expect(io.getHeadSha()).toBe(HEAD_SHA)
@@ -138,9 +141,33 @@ describe('github review adapter', () => {
       payloadPath: '/tmp/x',
       payloadBytes: Buffer.from('{}'),
       token: 'tok',
-      exec: () => 'not-a-sha',
+      exec: () => `not-a-sha\t${BASE_SHA}`,
     })
     expect(() => io.getHeadSha()).toThrow('Could not resolve PR head SHA')
+  })
+
+  it('rejects a pull request that changed after review selection', () => {
+    const options = {
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+    }
+    const staleHead = createGhPostReviewIo({
+      ...options,
+      expectedHeadSha: HEAD_SHA,
+      exec: () => `${'c'.repeat(40)}\t${BASE_SHA}`,
+    })
+    expect(() => staleHead.getHeadSha()).toThrow('PR head changed before posting')
+
+    const staleBase = createGhPostReviewIo({
+      ...options,
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+      exec: () => `${HEAD_SHA}\t${'d'.repeat(40)}`,
+    })
+    expect(() => staleBase.getHeadSha()).toThrow('PR base changed before posting')
   })
 
   it('wraps execFileSync as a gh helper', () => {
@@ -165,7 +192,7 @@ describe('postReviewFromEnv', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     const exec: GhExec = (args) => {
-      if (args.includes('.head.sha')) return HEAD_SHA
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
       if (args.includes('/files?per_page=100')) return '[]'
       return ''
     }
@@ -177,6 +204,8 @@ describe('postReviewFromEnv', () => {
             PR_NUMBER: '4',
             CODE_REVIEW_PAYLOAD_PATH: payloadPath,
             CODE_REVIEW_TOKEN_SOURCE: 'github-token',
+            EXPECTED_HEAD_SHA: HEAD_SHA,
+            EXPECTED_BASE_SHA: BASE_SHA,
             GH_TOKEN: 'job-token',
           },
           exec,
