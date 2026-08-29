@@ -21,7 +21,7 @@ await copyFile(
 )
 const pluginRoot = fileURLToPath(new URL('../../../plugins', import.meta.url))
 const skillsRoot = fileURLToPath(new URL('../skills/', import.meta.url))
-await mkdir(skillsRoot, { recursive: true })
+await mkdir(new URL('../skills/', import.meta.url), { recursive: true })
 const seenSkills = new Set()
 for (const skill of skillManifest.skills) {
   if (seenSkills.has(skill.name)) throw new Error(`Duplicate skill: ${skill.name}`)
