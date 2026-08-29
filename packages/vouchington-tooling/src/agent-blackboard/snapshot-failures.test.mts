@@ -141,7 +141,6 @@ describe('snapshot resource failures', () => {
       await Promise.all(created.map((directory) => expect(stat(directory)).rejects.toThrow()))
     },
   )
-
   it('restores a tombstoned snapshot after removal fails and cleans it on retry', async () => {
     const path = await snapshot()
     const content = await readFile(path, 'utf8')
@@ -161,7 +160,6 @@ describe('snapshot resource failures', () => {
     await expect(cleanupSnapshotPartitions({ path })).resolves.toBeUndefined()
     paths.delete(path)
   })
-
   it.each(['second partition', 'receipt', 'directory'] as const)(
     'retains a resumable tombstone when %s deletion fails',
     async (failure) => {
@@ -205,7 +203,6 @@ describe('snapshot resource failures', () => {
       paths.delete(result.directory)
     },
   )
-
   it('resumes only signed cleanup metadata after a tombstone disappears', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -220,7 +217,6 @@ describe('snapshot resource failures', () => {
     paths.delete(result.directory)
     paths.delete(marker)
   })
-
   it('refuses unsafe resume metadata and tombstones', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -240,7 +236,6 @@ describe('snapshot resource failures', () => {
       cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
     ).rejects.toThrow('tombstone is unsafe')
   })
-
   it('fails closed when a resumable tombstone cannot be inspected', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -264,7 +259,6 @@ describe('snapshot resource failures', () => {
       cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
     ).rejects.toThrow('tombstone inspection failed')
   })
-
   it('requires a schema-one receipt while a partition directory is captured', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -289,7 +283,6 @@ describe('snapshot resource failures', () => {
       ),
     ).rejects.toThrow('does not match generated output')
   })
-
   it('atomically reuses and removes only exact resume metadata', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -308,7 +301,6 @@ describe('snapshot resource failures', () => {
       'does not match receipt',
     )
   })
-
   it('surfaces a resume-metadata publication failure other than a concurrent winner', async () => {
     const path = await snapshot()
     const result = await partitionSnapshot({ path })
@@ -319,7 +311,6 @@ describe('snapshot resource failures', () => {
     })
     await expect(writeResumeReceipt(result.cleanupReceipt)).rejects.toThrow('resume open failed')
   })
-
   it('includes a non-Error tombstone removal failure after successful rollback', async () => {
     const path = await snapshot()
     setSnapshotCleanupFilesystemForTest({
@@ -333,7 +324,6 @@ describe('snapshot resource failures', () => {
     )
     await expect(readFile(path)).resolves.toBeTruthy()
   })
-
   it('reports an aggregate and leaves retry evidence when tombstone rollback fails', async () => {
     const path = await snapshot()
     let renames = 0
@@ -374,7 +364,6 @@ describe('snapshot resource failures', () => {
     expect(tombstone).toBeDefined()
     paths.add(join(tmpdir(), tombstone!))
   })
-
   it('preserves a caller-created valid lookalike without a cleanup receipt', async () => {
     const directory = await mkdtemp(
       join(tmpdir(), `agent-blackboard-partitions-${randomUUID().replaceAll('-', '')}`),
@@ -448,6 +437,33 @@ describe('snapshot resource failures', () => {
         receipt: { ...result.cleanupReceipt, directoryIno: 0 },
       }),
     ).rejects.toThrow('signature is invalid')
+    await expect(
+      cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+    ).resolves.toBeUndefined()
+    paths.delete(result.directory)
+  })
+
+  it('accepts semantically identical receipts with reordered JSON keys', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    paths.add(result.directory)
+    const marker = join(result.directory, '.agent-blackboard-cleanup-receipt.json')
+    const value = JSON.parse(await readFile(marker, 'utf8')) as typeof result.cleanupReceipt
+    const reordered = {
+      signature: value.signature,
+      partitions: value.partitions.map(({ checksum, name }) => ({
+        checksum: { value: checksum.value, algorithm: checksum.algorithm },
+        name,
+      })),
+      token: value.token,
+      directoryIno: value.directoryIno,
+      directoryDev: value.directoryDev,
+      directory: value.directory,
+      schemaVersion: value.schemaVersion,
+    }
+    await chmod(marker, 0o600)
+    await writeFile(marker, JSON.stringify(reordered), { mode: 0o400 })
+    await chmod(marker, 0o400)
     await expect(
       cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
     ).resolves.toBeUndefined()

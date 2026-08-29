@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
-import { link, lstat, mkdir, open, unlink } from 'node:fs/promises'
+import { link, lstat, mkdir, open, readdir, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 const KEY_NAME = 'receipt-hmac-sha256.key'
 const KEY_BYTES = 32
-const defaults = { lstat, mkdir, open, link, unlink }
+const defaults = { lstat, mkdir, open, readdir, link, unlink }
 let filesystem = defaults
 let temporaryDirectory = tmpdir
 
@@ -51,11 +51,27 @@ async function keyPath(): Promise<{ path: string; uid: number }> {
   assertDirectory(await filesystem.lstat(directory), uid)
   return { path: join(directory, KEY_NAME), uid }
 }
-async function readKey(path: string, uid: number, retries = 8): Promise<Buffer> {
-  const before = await filesystem.lstat(path)
-  if (before.nlink === 2 && retries) {
-    await new Promise<void>((resolve) => setImmediate(resolve))
-    return readKey(path, uid, retries - 1)
+async function readKey(path: string, uid: number): Promise<Buffer> {
+  let before = await filesystem.lstat(path)
+  if (before.nlink === 2) {
+    const candidates = (await filesystem.readdir(dirname(path))).filter((name) =>
+      new RegExp(`^\\.${KEY_NAME.replaceAll('.', '\\.')}\\.[0-9a-f-]{36}$`).test(name),
+    )
+    const linked = await Promise.all(
+      candidates.map(async (name) => ({
+        name,
+        info: await filesystem.lstat(join(dirname(path), name)),
+      })),
+    )
+    const matches = linked.filter(({ info }) => info.dev === before.dev && info.ino === before.ino)
+    if (matches.length !== 1) throw new Error('snapshot cleanup key has an unsafe temporary link')
+    const temporary = join(dirname(path), matches[0]!.name)
+    const staged = matches[0]!.info
+    assertKey(staged, uid)
+    if (staged.dev !== before.dev || staged.ino !== before.ino)
+      throw new Error('snapshot cleanup key has an unsafe temporary link')
+    await filesystem.unlink(temporary)
+    before = await filesystem.lstat(path)
   }
   assertKey(before, uid)
   const file = await filesystem.open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -87,7 +103,7 @@ async function publishKey(path: string, uid: number): Promise<void> {
   try {
     await filesystem.link(temporary, path)
   } finally {
-    await filesystem.unlink(temporary)
+    await filesystem.unlink(temporary).catch(() => undefined)
   }
   await readKey(path, uid)
 }

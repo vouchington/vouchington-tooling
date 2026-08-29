@@ -1,11 +1,11 @@
 import { constants } from 'node:fs'
-import { lstat, open, readFile, rm } from 'node:fs/promises'
+import { link, lstat, open, readFile, readdir, rm, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { verifyCleanupReceipt } from './snapshot-cleanup-receipt.mts'
+import { sameCleanupReceipt, verifyCleanupReceipt } from './snapshot-cleanup-receipt.mts'
 import type { SnapshotCleanupReceipt } from './snapshot-types.mts'
 
-const defaults = { lstat, open, readFile, rm }
+const defaults = { link, lstat, open, readFile, readdir, rm, unlink }
 let filesystem = defaults
 
 export function setResumeFilesystemForTest(overrides?: Partial<typeof defaults>): void {
@@ -16,6 +16,9 @@ function pathFor(receipt: SnapshotCleanupReceipt): string {
   if (!/^[0-9a-f-]{36}$/.test(receipt.token))
     throw new Error('partition directory cleanup receipt has an invalid token')
   return join(tmpdir(), `.agent-blackboard-cleanup-${receipt.token}.resume.json`)
+}
+function temporaryPath(receipt: SnapshotCleanupReceipt): string {
+  return `${pathFor(receipt)}.${crypto.randomUUID()}.tmp`
 }
 function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>): void {
   if (
@@ -29,30 +32,65 @@ function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>): void {
 }
 async function read(receipt: SnapshotCleanupReceipt): Promise<void> {
   const path = pathFor(receipt)
-  const before = await filesystem.lstat(path)
+  let before = await filesystem.lstat(path)
+  if (before.nlink === 2) {
+    const candidates = (await filesystem.readdir(tmpdir())).filter((name) =>
+      new RegExp(
+        `^${path.split('/').at(-1)!.replaceAll('.', '\\.')}(?:\\.[0-9a-f-]{36}\\.tmp)$`,
+      ).test(name),
+    )
+    const linked = await Promise.all(
+      candidates.map(async (name) => ({
+        name,
+        info: await filesystem.lstat(join(tmpdir(), name)),
+      })),
+    )
+    const matches = linked.filter(({ info }) => info.dev === before.dev && info.ino === before.ino)
+    if (matches.length !== 1)
+      throw new Error('partition directory cleanup resume metadata is unsafe')
+    const temporary = join(tmpdir(), matches[0]!.name)
+    const staged = matches[0]!.info
+    assertResumeFile(staged)
+    if (staged.dev !== before.dev || staged.ino !== before.ino)
+      throw new Error('partition directory cleanup resume metadata is unsafe')
+    await filesystem.unlink(temporary)
+    before = await filesystem.lstat(path)
+  }
   assertResumeFile(before)
   const contents = await filesystem.readFile(path, 'utf8')
   const after = await filesystem.lstat(path)
   assertResumeFile(after)
-  if (before.dev !== after.dev || before.ino !== after.ino || contents !== JSON.stringify(receipt))
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(contents)
+  } catch {
+    throw new Error('partition directory cleanup resume metadata does not match receipt')
+  }
+  if (before.dev !== after.dev || before.ino !== after.ino || !sameCleanupReceipt(parsed, receipt))
     throw new Error('partition directory cleanup resume metadata does not match receipt')
   await verifyCleanupReceipt(receipt)
 }
 export async function writeResumeReceipt(receipt: SnapshotCleanupReceipt): Promise<void> {
   const path = pathFor(receipt)
+  const temporary = temporaryPath(receipt)
   let file
   try {
     file = await filesystem.open(
-      path,
+      temporary,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       0o400,
     )
-    await file.writeFile(JSON.stringify(receipt))
+    const { serializeCleanupReceipt } = await import('./snapshot-cleanup-receipt.mts')
+    await file.writeFile(serializeCleanupReceipt(receipt))
     await file.sync()
+    await file.close()
+    file = undefined
+    await filesystem.link(temporary, path)
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   } finally {
     await file?.close()
+    await filesystem.unlink(temporary).catch(() => undefined)
   }
   await read(receipt)
 }

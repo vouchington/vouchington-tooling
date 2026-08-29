@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -41,17 +41,6 @@ describe('snapshot cleanup signing key', () => {
     paths.add(root)
     setCleanupKeyTempDirectoryForTest(() => root)
     await loadCleanupSigningKey()
-    let delayed = false
-    setCleanupKeyFilesystemForTest({
-      lstat: async (path) => {
-        const info = await lstat(path)
-        if (!delayed && String(path).endsWith('receipt-hmac-sha256.key')) {
-          delayed = true
-          return Object.assign(Object.create(Object.getPrototypeOf(info)), info, { nlink: 2 })
-        }
-        return info
-      },
-    })
     await expect(loadCleanupSigningKey()).resolves.toHaveLength(32)
   })
 

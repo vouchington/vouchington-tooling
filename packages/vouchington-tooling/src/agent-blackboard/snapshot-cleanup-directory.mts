@@ -1,6 +1,6 @@
 import type { lstat, readFile, readdir, rm, rmdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { RECEIPT_NAME } from './snapshot-cleanup-receipt.mts'
+import { RECEIPT_NAME, sameCleanupReceipt } from './snapshot-cleanup-receipt.mts'
 import { removeResumeReceipt, writeResumeReceipt } from './snapshot-cleanup-resume.mts'
 import { assertPartitionFile, validatePartition } from './snapshot-partition-validate.mts'
 import type { SnapshotCleanupReceipt } from './snapshot-types.mts'
@@ -77,7 +77,7 @@ async function validateReceipt(
   } catch {
     throw new Error('partition directory cleanup receipt is invalid')
   }
-  if (JSON.stringify(parsed) !== JSON.stringify(receipt))
+  if (!sameCleanupReceipt(parsed, receipt))
     throw new Error('partition directory cleanup receipt does not match generated output')
   validateReceiptOutput(originalPath, receipt, directory, names)
 }

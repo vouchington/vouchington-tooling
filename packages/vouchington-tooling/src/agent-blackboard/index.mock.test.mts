@@ -116,7 +116,7 @@ describe('agent blackboard client', () => {
         agent: 'codex',
         version: '1',
         markdownFile: 'missing',
-        timestamp: 'nope',
+        timestamp: '',
         env,
       }),
     ).rejects.toThrow('valid date-time')

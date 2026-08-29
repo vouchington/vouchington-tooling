@@ -100,6 +100,27 @@ describe('snapshot record format', () => {
     )
     consumeSnapshotRecord(parsedSession, snapshotState)
     expect(() => consumeSnapshotRecord(laterSession, snapshotState)).toThrow('not ordered')
+    const epoch = state()
+    consumeSnapshotRecord(
+      parseSnapshotRecord(
+        JSON.stringify({
+          type: 'session',
+          session: { ...session, createdAt: '1970-01-01T00:00:00.000Z' },
+        }),
+      ),
+      epoch,
+    )
+    expect(() =>
+      consumeSnapshotRecord(
+        parseSnapshotRecord(
+          JSON.stringify({
+            type: 'session',
+            session: { ...session, id: 'session:zero', createdAt: '1969-12-31T23:59:59.000Z' },
+          }),
+        ),
+        epoch,
+      ),
+    ).toThrow('not ordered')
     expect(() =>
       consumeSnapshotRecord(parseSnapshotRecord(JSON.stringify({ type: 'entry', entry })), state()),
     ).toThrow('entries must follow')

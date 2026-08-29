@@ -53,7 +53,7 @@ export async function appendJournal(input: {
   dependencies?: BlackboardClientDependencies
 }): Promise<string> {
   assertSessionId(input.sessionId)
-  const timestamp = input.timestamp ? new Date(input.timestamp) : new Date()
+  const timestamp = input.timestamp === undefined ? new Date() : new Date(input.timestamp)
   if (Number.isNaN(timestamp.valueOf()))
     throw new Error('journal timestamp is not a valid date-time')
   let markdown: string

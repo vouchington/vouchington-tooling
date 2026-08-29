@@ -154,7 +154,7 @@ export function consumeSnapshotRecord(record: SnapshotRecord, state: SnapshotSta
   if (record.type === 'manifest') return
   if (record.type === 'session') {
     const createdAt = Date.parse(record.session.createdAt as string)
-    if (state.lastSessionCreatedAt && createdAt < state.lastSessionCreatedAt)
+    if (state.lastSessionCreatedAt !== undefined && createdAt < state.lastSessionCreatedAt)
       throw new Error('snapshot sessions are not ordered')
     state.sessions += 1
     state.records += 1
@@ -166,7 +166,7 @@ export function consumeSnapshotRecord(record: SnapshotRecord, state: SnapshotSta
   const createdAt = Date.parse(record.entry.createdAt as string)
   if (state.currentSessionId !== record.entry.sessionId)
     throw new Error('snapshot entries must follow their session')
-  if (state.lastEntryCreatedAt && createdAt < state.lastEntryCreatedAt)
+  if (state.lastEntryCreatedAt !== undefined && createdAt < state.lastEntryCreatedAt)
     throw new Error('snapshot entries are not ordered')
   state.entries += 1
   state.records += 1
