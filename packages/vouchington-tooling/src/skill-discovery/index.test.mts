@@ -73,6 +73,7 @@ describe('skill discovery', () => {
     ).rejects.toThrow('already exists')
     const mismatched = join(targetRoot, 'mismatched')
     await mkdir(mismatched, { recursive: true })
+    await mkdir(join(sourceRoot, 'other'))
     await symlink(join(sourceRoot, 'other'), join(mismatched, 'agent-workflow'), 'dir')
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: mismatched }),
@@ -94,6 +95,83 @@ describe('skill discovery', () => {
       }),
     )
     await expect(readSkillManifest(sourceRoot)).rejects.toThrow('escapes')
+  })
+
+  it('rejects malformed manifests and absolute or non-file skill sources', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    for (const invalid of [
+      null,
+      1,
+      { version: 2, skills: [] },
+      { version: 1, skills: null },
+      { version: 1, skills: [null] },
+      { version: 1, skills: [1] },
+      {
+        version: 1,
+        skills: [{ name: '', plugin: 'workflow', pluginVersion: '1.0.0', path: 'x/SKILL.md' }],
+      },
+      {
+        version: 1,
+        skills: [{ name: 'x', plugin: 1, pluginVersion: '1.0.0', path: 'x/SKILL.md' }],
+      },
+    ]) {
+      await writeFile(join(sourceRoot, 'manifest.json'), JSON.stringify(invalid))
+      await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Invalid skills manifest')
+    }
+
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'agent-workflow',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: join(sourceRoot, 'agent-workflow', 'SKILL.md'),
+          },
+        ],
+      }),
+    )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('escapes')
+
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'agent-workflow',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'agent-workflow/README.md',
+          },
+        ],
+      }),
+    )
+    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'Invalid skill source',
+    )
+
+    await rm(join(sourceRoot, 'agent-workflow', 'SKILL.md'))
+    await mkdir(join(sourceRoot, 'agent-workflow', 'SKILL.md'))
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'agent-workflow',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'agent-workflow/SKILL.md',
+          },
+        ],
+      }),
+    )
+    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'escapes root',
+    )
   })
 
   it('rejects escaped or dangling skill sources before linking', async () => {

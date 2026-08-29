@@ -113,6 +113,21 @@ describe('runCli', () => {
       ]),
     ).resolves.toBe(0)
     expect(String(stdout.mock.calls.at(-1)?.[0])).toMatch(/linked .*\/target\/agent-workflow\n/)
+    await expect(
+      runCli([
+        'node',
+        'vouchington',
+        'link-skill',
+        'agent-workflow',
+        '--source-root',
+        sourceRoot,
+        '--target-root',
+        targetRoot,
+      ]),
+    ).resolves.toBe(0)
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toMatch(
+      /already-linked .*\/target\/agent-workflow\n/,
+    )
   })
 
   it('maps a missing process status to exit 1 and surfaces spawn errors', async () => {

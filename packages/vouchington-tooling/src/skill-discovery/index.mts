@@ -90,7 +90,7 @@ function assertContained(root: string, child: string): string {
 
 function isContained(root: string, path: string): boolean {
   const pathRelative = relative(root, path)
-  return pathRelative === '' || (!pathRelative.startsWith('..') && !isAbsolute(pathRelative))
+  return !pathRelative.startsWith('..') && !isAbsolute(pathRelative)
 }
 
 function isSafeSkillName(name: string): boolean {
