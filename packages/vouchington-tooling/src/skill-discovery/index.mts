@@ -1,5 +1,5 @@
-import { lstat, mkdir, readFile, readlink, symlink } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { lstat, mkdir, readFile, realpath, symlink } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 export type SkillManifestEntry = {
   name: string
@@ -27,25 +27,44 @@ export async function readSkillManifest(sourceRoot: string): Promise<SkillManife
 }
 
 export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillResult> {
-  const sourceRoot = resolve(options.sourceRoot)
-  const targetRoot = resolve(options.targetRoot)
+  if (!isSafeSkillName(options.name)) throw new Error(`Invalid skill name: ${options.name}`)
+  const sourceRoot = await realpath(resolve(options.sourceRoot))
   const manifest = await readSkillManifest(sourceRoot)
   const entry = manifest.skills.find((candidate) => candidate.name === options.name)
   if (entry === undefined) throw new Error(`Unknown skill: ${options.name}`)
-  const source = dirname(assertContained(sourceRoot, entry.path))
+  const source = await resolveSkillSource(sourceRoot, entry.path)
+  const targetRoot = await resolveTargetRoot(options.targetRoot)
   const path = assertContained(targetRoot, options.name)
-  await mkdir(targetRoot, { recursive: true })
   try {
     const stat = await lstat(path)
     if (!stat.isSymbolicLink()) throw new Error(`Destination already exists: ${path}`)
-    if (resolve(dirname(path), await readlink(path)) !== source)
-      throw new Error(`Destination already exists: ${path}`)
+    if ((await realpath(path)) !== source) throw new Error(`Destination already exists: ${path}`)
     return { created: false, path, source }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
   await symlink(source, path, 'dir')
   return { created: true, path, source }
+}
+
+async function resolveSkillSource(sourceRoot: string, skillPath: string): Promise<string> {
+  if (basename(skillPath) !== 'SKILL.md') throw new Error(`Invalid skill source: ${skillPath}`)
+  const candidate = assertContained(sourceRoot, skillPath)
+  let skill: string
+  try {
+    skill = await realpath(candidate)
+  } catch {
+    throw new Error(`Invalid skill source: ${skillPath}`)
+  }
+  if (!isContained(sourceRoot, skill) || !(await lstat(skill)).isFile())
+    throw new Error(`Skill source escapes root: ${skillPath}`)
+  return dirname(skill)
+}
+
+async function resolveTargetRoot(targetRoot: string): Promise<string> {
+  const root = resolve(targetRoot)
+  await mkdir(root, { recursive: true })
+  return realpath(root)
 }
 
 function isManifest(value: unknown): value is SkillManifest {
@@ -65,6 +84,15 @@ function isEntry(value: unknown): value is SkillManifestEntry {
 function assertContained(root: string, child: string): string {
   if (isAbsolute(child)) throw new Error(`Skill path escapes root: ${child}`)
   const path = resolve(root, child)
-  if (relative(root, path).startsWith('..')) throw new Error(`Skill path escapes root: ${child}`)
+  if (!isContained(root, path)) throw new Error(`Skill path escapes root: ${child}`)
   return path
+}
+
+function isContained(root: string, path: string): boolean {
+  const pathRelative = relative(root, path)
+  return pathRelative === '' || (!pathRelative.startsWith('..') && !isAbsolute(pathRelative))
+}
+
+function isSafeSkillName(name: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
 }

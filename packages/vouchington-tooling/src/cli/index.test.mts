@@ -112,7 +112,7 @@ describe('runCli', () => {
         targetRoot,
       ]),
     ).resolves.toBe(0)
-    expect(stdout.mock.calls.at(-1)?.[0]).toBe(`linked ${join(targetRoot, 'agent-workflow')}\n`)
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toMatch(/linked .*\/target\/agent-workflow\n/)
   })
 
   it('maps a missing process status to exit 1 and surfaces spawn errors', async () => {

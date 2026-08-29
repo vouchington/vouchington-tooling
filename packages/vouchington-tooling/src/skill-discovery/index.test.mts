@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -56,7 +56,7 @@ describe('skill discovery', () => {
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot }),
     ).resolves.toMatchObject({ created: true })
     await expect(readlink(join(targetRoot, 'agent-workflow'))).resolves.toBe(
-      join(sourceRoot, 'agent-workflow'),
+      await realpath(join(sourceRoot, 'agent-workflow')),
     )
   })
 
@@ -94,5 +94,32 @@ describe('skill discovery', () => {
       }),
     )
     await expect(readSkillManifest(sourceRoot)).rejects.toThrow('escapes')
+  })
+
+  it('rejects escaped or dangling skill sources before linking', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    const outside = join(sourceRoot, '..', 'outside')
+    await mkdir(outside, { recursive: true })
+    await writeFile(join(outside, 'SKILL.md'), '# Outside\n')
+    await rm(join(sourceRoot, 'agent-workflow'), { force: true, recursive: true })
+    await symlink(outside, join(sourceRoot, 'agent-workflow'), 'dir')
+    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'escapes',
+    )
+    await rm(join(sourceRoot, 'agent-workflow'))
+    await symlink(join(sourceRoot, 'missing'), join(sourceRoot, 'agent-workflow'), 'dir')
+    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'Invalid skill source',
+    )
+  })
+
+  it('rejects unsafe skill names before they can escape the target root', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    await expect(linkSkill({ name: '../agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'Invalid skill name',
+    )
+    await expect(linkSkill({ name: 'agent/workflow', sourceRoot, targetRoot })).rejects.toThrow(
+      'Invalid skill name',
+    )
   })
 })
