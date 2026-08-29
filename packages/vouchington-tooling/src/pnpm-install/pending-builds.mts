@@ -40,9 +40,11 @@ async function lockfileDependencyIds() {
   }
 }
 
-export async function validDependencyBuildIds(ids: string[]) {
+export async function validDependencyBuildIds(ids: [string, ...string[]]) {
   const packages = await lockfileDependencyIds()
-  return packages && ids.every((id) => packages.has(id)) ? ids.toSorted() : undefined
+  if (!packages || !ids.every((id) => packages.has(id))) return undefined
+  const [first, ...remaining] = ids.toSorted()
+  return [first, ...remaining] as [string, ...string[]]
 }
 
 export async function clearPendingDependencyBuilds(ids: string[]) {

@@ -37,12 +37,10 @@ async function persistent(options: InstallOptions) {
     ? provisionalTransition
     : { action: 'reconcile' as const, reason: 'native-health-mismatch' }
   if (transition.action === 'upgrade-dependencies') {
-    const ids = await validDependencyBuildIds(
-      provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : [],
-    )
+    const ids = await validDependencyBuildIds(transition.pendingDependencyBuilds)
     if (!ids)
       transition = { action: 'upgrade-scripts', reason: 'invalid-pending-dependency-builds' }
-    else if (provenance.kind === 'matching') provenance.pendingDependencyBuilds = ids
+    else transition = { ...transition, pendingDependencyBuilds: ids }
   }
   const provenanceOk =
     provenance.kind === 'matching' && transition.action !== 'reconcile' && nativesMatch
@@ -85,15 +83,14 @@ async function persistent(options: InstallOptions) {
   const stale = await findWorkspaceLinkMismatches(runCapture)
   if (stale.length === 0) {
     if (transition.action.startsWith('upgrade-')) {
+      const pendingDependencyBuilds =
+        transition.action === 'upgrade-dependencies'
+          ? transition.pendingDependencyBuilds
+          : undefined
       const rebuild =
-        transition.action === 'upgrade-scripts'
+        pendingDependencyBuilds === undefined
           ? ['rebuild', '--pending', '--recursive']
-          : [
-              'rebuild',
-              '--recursive',
-              '--',
-              ...(provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : []),
-            ]
+          : ['rebuild', '--recursive', '--', ...pendingDependencyBuilds]
       await install(rebuild, options, 'pending scripts rebuild')
       const rebuiltStale = await findWorkspaceLinkMismatches(runCapture)
       if (rebuiltStale.length > 0) {
@@ -109,10 +106,8 @@ async function persistent(options: InstallOptions) {
         return 'persistent reconciled'
       }
       if (
-        transition.action === 'upgrade-dependencies' &&
-        !(await clearPendingDependencyBuilds(
-          provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : [],
-        ))
+        pendingDependencyBuilds !== undefined &&
+        !(await clearPendingDependencyBuilds(pendingDependencyBuilds))
       )
         fail('dependency rebuild completed but pending build ledger could not be updated safely')
     }
