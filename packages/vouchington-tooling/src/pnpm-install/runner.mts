@@ -1,116 +1,160 @@
-import { scheduler } from 'node:timers/promises'
-
 import {
   persistentDependencyTreeIsCold,
-  persistentMetadataFingerprint,
-  persistentMetadataMatches,
-  writePersistentMetadataStamp,
+  persistentMetadataFingerprintV4,
+  persistentMetadataStatusV4,
+  writePersistentMetadataStampV4,
 } from './metadata.mts'
-import { nativeBinariesMatchRuntime } from './native-health.mts'
 import { runPnpm } from './exec.mts'
-import { INSTALL_TERMINATION_FAILED } from './process.mts'
-import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
+import { nativeBinariesMatchRuntime } from './native-health.mts'
+import {
+  clearPendingDependencyBuilds,
+  pendingBuildDelta,
+  pendingBuilds,
+  validDependencyBuildIds,
+} from './pending-builds.mts'
+import { install, reconcileOrFail, withScriptPolicy } from './install-operations.mts'
 import {
   baseInstallArgs,
   findWorkspaceLinkMismatches,
   logWorkspaceLinkMismatches,
-  type CommandResult,
   type InstallOptions,
 } from './support.mts'
+import { persistentInstallTransition, persistentProvenanceDiagnostic } from './transition.mts'
 
 // oxfmt-ignore
 const fail = (message: string): never => { throw new Error(message) }
-
-async function install(args: string[], options: InstallOptions, label: string) {
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
-    const attemptResult = await runPnpm(args, options)
-    if (attemptResult.code === 0) return
-    if (attemptResult.code === INSTALL_TERMINATION_FAILED)
-      fail(`${label} could not terminate safely`)
-    const combinedOutput = `${attemptResult.output}\n${attemptResult.errorOutput ?? ''}`
-    if (isReleaseAgeViolation(combinedOutput)) fail(formatReleaseAgeFailure(label, combinedOutput))
-    if (attempt < options.maxAttempts) {
-      console.warn(`${label} failed (attempt ${attempt}/${options.maxAttempts}); retrying`)
-      await scheduler.wait(5000)
-    }
-  }
-  fail(
-    `${label} failed after ${options.maxAttempts} attempt${options.maxAttempts === 1 ? '' : 's'}`,
-  )
-}
-
-function withScriptPolicy(args: string[], installScripts: boolean) {
-  return installScripts ? args : [...args, '--ignore-scripts']
-}
-
-async function reconcileAndFindMismatches(
-  options: InstallOptions,
-  runCapture: (args: string[]) => Promise<CommandResult>,
-) {
-  const forced = ['install', '--frozen-lockfile', '--force', ...baseInstallArgs.slice(2)]
-  // oxfmt-ignore
-  await install([...forced, '--ignore-scripts', '--ignore-pnpmfile'], options, 'script-free reconciliation')
-  // oxfmt-ignore
-  await install(withScriptPolicy(forced, options.installScripts), options, 'strict persistent reconciliation')
-  return findWorkspaceLinkMismatches(runCapture)
-}
-
-async function reconcileOrFail(
-  options: InstallOptions,
-  runCapture: (args: string[]) => Promise<CommandResult>,
-) {
-  const remaining = await reconcileAndFindMismatches(options, runCapture)
-  if (remaining.length > 0) {
-    logWorkspaceLinkMismatches(remaining)
-    fail('persistent reconciliation completed with invalid workspace links')
-  }
-}
 
 async function persistent(options: InstallOptions) {
   if (options.ephemeralWorkspaces.trim())
     fail('ephemeral-workspaces is only valid for ephemeral runners')
 
   const runCapture = (args: string[]) => runPnpm(args, options, true)
-  const fingerprint = await persistentMetadataFingerprint(runCapture, options.installScripts)
-  const stamped = await persistentMetadataMatches(fingerprint)
+  const fingerprint = await persistentMetadataFingerprintV4(runCapture)
+  const provenance = await persistentMetadataStatusV4(fingerprint)
   const nativesMatch = await nativeBinariesMatchRuntime()
-  const provenanceOk = stamped && nativesMatch
+  const provisionalTransition = persistentInstallTransition(provenance, options.installScripts)
+  let transition = nativesMatch
+    ? provisionalTransition
+    : { action: 'reconcile' as const, reason: 'native-health-mismatch' }
+  if (transition.action === 'upgrade-dependencies') {
+    const ids = await validDependencyBuildIds(
+      provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : [],
+    )
+    if (!ids)
+      transition = { action: 'upgrade-scripts', reason: 'invalid-pending-dependency-builds' }
+    else if (provenance.kind === 'matching') provenance.pendingDependencyBuilds = ids
+  }
+  const provenanceOk =
+    provenance.kind === 'matching' && transition.action !== 'reconcile' && nativesMatch
 
-  // An absent tree has nothing to repair, so one ordinary install below matches the
-  // reconciled end state. Check first: an install would otherwise make the tree non-cold.
   const cold = !provenanceOk && (await persistentDependencyTreeIsCold())
   if (!provenanceOk && !cold) {
+    const finalTransition =
+      provenance.kind === 'absent'
+        ? { action: 'reconcile' as const, reason: 'missing-stamp-populated-tree' }
+        : transition
     console.warn(
-      stamped && !nativesMatch
+      persistentProvenanceDiagnostic(
+        provenance,
+        options.installScripts,
+        nativesMatch,
+        finalTransition,
+      ),
+    )
+    console.warn(
+      provenance.kind === 'matching' && !nativesMatch
         ? 'persistent optional native binaries do not match this runtime; reconciling'
         : 'persistent dependency metadata provenance is missing or changed; reconciling',
     )
     await reconcileOrFail(options, runCapture)
-    await writePersistentMetadataStamp(fingerprint)
+    await writePersistentMetadataStampV4(fingerprint, options.installScripts, true, [])
     return 'persistent metadata reconciled'
   }
-  if (!stamped) console.warn('persistent dependency tree is absent; installing cold')
-
+  if (provenance.kind === 'absent')
+    console.warn('persistent dependency tree is absent; installing cold')
+  const pendingBefore =
+    transition.action === 'ordinary' && !options.installScripts ? await pendingBuilds() : undefined
   await install(
-    withScriptPolicy([...baseInstallArgs], options.installScripts),
+    withScriptPolicy(
+      [...baseInstallArgs],
+      transition.action.startsWith('upgrade-') ? false : options.installScripts,
+    ),
     options,
     'ordinary persistent install',
   )
   const stale = await findWorkspaceLinkMismatches(runCapture)
   if (stale.length === 0) {
-    if (!stamped) await writePersistentMetadataStamp(fingerprint)
-    return stamped ? 'persistent ordinary' : 'persistent cold'
+    if (transition.action.startsWith('upgrade-')) {
+      const rebuild =
+        transition.action === 'upgrade-scripts'
+          ? ['rebuild', '--pending', '--recursive']
+          : [
+              'rebuild',
+              '--recursive',
+              '--',
+              ...(provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : []),
+            ]
+      await install(rebuild, options, 'pending scripts rebuild')
+      const rebuiltStale = await findWorkspaceLinkMismatches(runCapture)
+      if (rebuiltStale.length > 0) {
+        logWorkspaceLinkMismatches(rebuiltStale)
+        await reconcileOrFail(options, runCapture)
+        console.warn(
+          persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {
+            action: 'reconcile',
+            reason: 'workspace-links-stale-after-rebuild',
+          }),
+        )
+        await writePersistentMetadataStampV4(fingerprint, options.installScripts, true, [])
+        return 'persistent reconciled'
+      }
+      if (
+        transition.action === 'upgrade-dependencies' &&
+        !(await clearPendingDependencyBuilds(
+          provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : [],
+        ))
+      )
+        fail('dependency rebuild completed but pending build ledger could not be updated safely')
+    }
+    console.warn(
+      persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, transition),
+    )
+    const pendingAfter = pendingBefore ? await pendingBuilds() : undefined
+    const delta =
+      pendingBefore && pendingAfter
+        ? await pendingBuildDelta(pendingBefore, pendingAfter)
+        : undefined
+    const unsafePending = delta?.kind === 'unknown' || Boolean(delta?.workspaceIds.length)
+    const pendingDependencyBuilds =
+      transition.action.startsWith('upgrade-') || unsafePending
+        ? []
+        : [
+            ...new Set([
+              ...(provenance.kind === 'matching' ? provenance.pendingDependencyBuilds : []),
+              ...(delta?.kind === 'known' ? delta.dependencyIds : []),
+            ]),
+          ].toSorted()
+    await writePersistentMetadataStampV4(
+      fingerprint,
+      options.installScripts,
+      unsafePending,
+      pendingDependencyBuilds,
+    )
+    return provenance.kind === 'absent' ? 'persistent cold' : 'persistent ordinary'
   }
 
   logWorkspaceLinkMismatches(stale)
+  console.warn(
+    persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {
+      action: 'reconcile',
+      reason: 'workspace-links-stale',
+    }),
+  )
   await reconcileOrFail(options, runCapture)
-  await writePersistentMetadataStamp(fingerprint)
+  await writePersistentMetadataStampV4(fingerprint, options.installScripts, true, [])
   return 'persistent reconciled'
 }
 
-// A path selector's `...` (dependency closure) suffix is silently ignored by pnpm unless the
-// path is brace-wrapped, e.g. `{./web}...` — `./web...` installs only `web` itself. Reject the
-// unbraced form outright rather than let it resolve to a smaller-than-intended scope.
 function isUnbracedPathClosureSelector(selector: string) {
   return /^\.{0,2}\//.test(selector) && selector.endsWith('...') && !selector.startsWith('{')
 }

@@ -20,10 +20,11 @@ describe('pnpm install lifecycle', () => {
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
       await expect(readFile(join(fixture.root, stamp), 'utf8')).resolves.toEqual(
-        expect.stringContaining('"version":3'),
+        expect.stringContaining('"version":4'),
       )
       await resetInstallCalls(fixture)
-      await expect(runInstaller(fixture)).resolves.toBeDefined()
+      const result = await runInstaller(fixture)
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
@@ -57,6 +58,9 @@ describe('pnpm install lifecycle', () => {
       expect(repaired.stderr).toContain(
         'persistent optional native binaries do not match this runtime; reconciling',
       )
+      expect(repaired.stderr).toContain('"action":"reconcile"')
+      expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
+      expect(repaired.stderr).toContain('"reason":"native-health-mismatch"')
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
@@ -291,6 +295,184 @@ describe('pnpm install lifecycle', () => {
       await expect(readFile(fixture.summary, 'utf8')).resolves.toMatch(
         /pnpm install: persistent ordinary completed in \d+ms/,
       )
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('uses ordinary installs for warm true-to-false-to-true transitions after scripts have succeeded', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: true })
+      await resetInstallCalls(fixture)
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
+      await runInstaller(fixture, { installScripts: false })
+      await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('upgrades warm false-to-true transitions with a pending scripts rebuild', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('rebuilds only newly pending dependency IDs after a script-disabled install', async () => {
+    const fixture = await makeFixture()
+    try {
+      await writeFile(join(fixture.root, 'pnpm-lock.yaml'), 'packages:\n  new-package@1.0.0: {}\n')
+      await runInstaller(fixture, { installScripts: true })
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
+      await resetInstallCalls(fixture)
+      fixture.env.PNPM_PENDING_BUILDS = '"new-package@1.0.0"'
+      await runInstaller(fixture, { installScripts: false })
+      fixture.env.PNPM_PENDING_BUILDS = ''
+      const result = await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --recursive -- new-package@1.0.0',
+      ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
+      ).resolves.toBe('pendingBuilds: []\n')
+      expect(result.stderr).not.toContain('new-package@1.0.0')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles when a pending rebuild leaves a stale workspace link', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      fixture.env.PNPM_REBUILD_BREAK_LINK = '1'
+      fixture.env.PNPM_REPAIR_LINK = '1'
+      const result = await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"workspace-links-stale-after-rebuild"')
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('emits a structured non-secret persistent provenance diagnostic for every transition', async () => {
+    const fixture = await makeFixture()
+    try {
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"event":"pnpm-install-persistent-provenance"')
+      expect(result.stderr).toContain('"lastInvocationInstallScripts":null')
+      expect(result.stderr).toContain('"nativeBinariesMatchRuntime":true')
+      expect(result.stderr).toContain('"reason":"missing-stamp"')
+      expect(result.stderr).not.toContain('pnpm-lock.yaml')
+      expect(result.stderr).not.toContain(fixture.root)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('requires an enabled reconciliation after a script-disabled native repair', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      const addon = join(
+        fixture.root,
+        'node_modules',
+        '.pnpm',
+        'native@1.0.0',
+        'node_modules',
+        'native',
+        'addon.node',
+      )
+      await mkdir(join(addon, '..'), { recursive: true })
+      await writeFile(
+        addon,
+        process.platform === 'darwin'
+          ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
+          : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+      )
+      await runInstaller(fixture, { installScripts: false })
+      await rm(addon)
+      await resetInstallCalls(fixture)
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+      expect(result.stderr).toContain('"action":"upgrade-scripts"')
+      expect(result.stderr).toContain('"reason":"pending-scripts-rebuild"')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles a populated tree with a missing metadata stamp and reports one final diagnostic', async () => {
+    const fixture = await makeFixture()
+    try {
+      await mkdir(join(fixture.root, 'node_modules'), { recursive: true })
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"missing-stamp-populated-tree"')
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles an unsafe metadata stamp and reports the unsafe transition', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      await writeFile(
+        join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'),
+        'null\n',
+      )
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"unsafe-stamp"')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('requires an enabled reconciliation after a script-disabled workspace-link repair', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      await rm(fixture.dependencyLink)
+      fixture.env.PNPM_REPAIR_LINK = '1'
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+      expect(result.stderr).toContain('"action":"upgrade-scripts"')
+      expect(result.stderr).toContain('"reason":"pending-scripts-rebuild"')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
