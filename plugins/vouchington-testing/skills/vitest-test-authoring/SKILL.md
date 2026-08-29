@@ -11,3 +11,5 @@ timing waits. Mock external boundaries rather than modules under test, and use t
 the project supplies them. Run the selected file or project before broader validation.
 
 Consumer wrappers own project selection, mock boundaries, fixture names, and coverage policy.
+
+Read [mock boundaries](references/mock-boundaries.md) when adding module mocks or changing exports.

@@ -11,3 +11,5 @@ coverage where it catches behavior unavailable to unit tests. Do not use stories
 end-to-end setup or production data handling.
 
 Consumer wrappers own Storybook configuration, exclusions, visual baselines, and commands.
+
+Read [component coverage](references/component-coverage.md) for direct stories and browser isolation.

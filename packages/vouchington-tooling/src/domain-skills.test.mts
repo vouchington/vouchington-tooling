@@ -31,6 +31,35 @@ describe('domain skill plugins', () => {
       'postgres-partitioning-uuid-v7',
     ])
   })
+
+  it('keeps reusable practices in canonical resources without product policy', async () => {
+    const resources = await Promise.all([
+      readSkill('vouchington-workflow', 'agent-workflow/references/implementation.md'),
+      readSkill('vouchington-workflow', 'agent-workflow/references/review.md'),
+      readSkill('vouchington-workflow', 'agent-workflow/references/evidence-sweep.md'),
+      readSkill('vouchington-testing', 'vitest-test-authoring/references/mock-boundaries.md'),
+      readSkill(
+        'vouchington-testing',
+        'backend-vitest-test-authoring/references/integration-boundaries.md',
+      ),
+      readSkill('vouchington-testing', 'playwright-authoring/references/browser-reliability.md'),
+      readSkill('vouchington-testing', 'swift-test-authoring/references/network-test-doubles.md'),
+      readSkill(
+        'vouchington-database',
+        'postgres-node-performance-tuning/references/performance-patterns.md',
+      ),
+      readSkill(
+        'vouchington-database',
+        'postgres-partitioning-uuid-v7/references/partition-lifecycle.md',
+      ),
+    ])
+    expect(resources.join('\n')).toMatch(
+      /accepted-decision ledger|failure paths|acceptance criterion|typed module shape|collision-safe|locator|stopLoading|read-after-write|partition key/i,
+    )
+    for (const resource of resources) {
+      expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
+    }
+  })
 })
 
 async function readJson(path: string): Promise<{ plugins: Array<{ name: string }> }> {
@@ -45,4 +74,8 @@ async function skillNames(plugin: string): Promise<string[]> {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()
+}
+
+function readSkill(plugin: string, path: string): Promise<string> {
+  return readFile(join(root, 'plugins', plugin, 'skills', path), 'utf8')
 }

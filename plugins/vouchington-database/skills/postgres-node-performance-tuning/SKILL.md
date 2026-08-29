@@ -11,3 +11,5 @@ keep connection-pool usage bounded. Validate query changes with representative c
 watch latency, memory, lock time, and connection pressure together.
 
 Consumer wrappers own schema ownership, operational thresholds, pooling configuration, and rollout.
+
+Read [performance patterns](references/performance-patterns.md) before changing high-volume paths.

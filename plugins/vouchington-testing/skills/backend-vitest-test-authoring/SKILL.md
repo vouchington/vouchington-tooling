@@ -11,3 +11,5 @@ network or provider edge. Randomize fixture identities where shared stores can c
 authorization and retry behavior at boundaries, and clean up resources deterministically.
 
 Consumer wrappers own database setup, queue providers, test projects, and rate-limit policy.
+
+Read [integration boundaries](references/integration-boundaries.md) for fixture and collision safety.

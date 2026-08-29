@@ -11,3 +11,6 @@ instead of private implementation details. Keep test helpers typed and reusable 
 repeated setup without hiding important expectations.
 
 Consumer wrappers own solution layout, test frameworks, native dependencies, and coverage policy.
+
+Keep portable library tests separate from rendered application tests; batch compatible native targets
+in one selection pass so a shared build validates the same source set.

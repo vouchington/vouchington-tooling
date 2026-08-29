@@ -11,3 +11,5 @@ rendered output and user-visible state. Keep API-response fixtures representativ
 framework internals. Use browser tests for behavior that cannot be represented in the test runtime.
 
 Consumer wrappers own framework mock helpers, render libraries, and route fixture conventions.
+
+Read [framework boundaries](references/framework-boundaries.md) for module shape and server-only cases.

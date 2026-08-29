@@ -12,3 +12,6 @@ before a behavior change when practical, then run the narrowest relevant test an
 
 Do not invent project test commands, coverage targets, mock libraries, or integration environments.
 A consumer wrapper owns those choices.
+
+Read [core practice](references/core-practice.md) for the shared boundary, completion, and evidence
+rules before choosing a runner-specific approach.

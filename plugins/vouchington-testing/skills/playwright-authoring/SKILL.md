@@ -11,3 +11,5 @@ Keep each scenario independently repeatable, use auto-waiting assertions, and ca
 failure. Prefer browser coverage for real browser interactions rather than duplicating unit tests.
 
 Consumer wrappers own environments, credentials, personas, fixtures, and suite commands.
+
+Read [browser reliability](references/browser-reliability.md) for locator, waiting, state, and network rules.

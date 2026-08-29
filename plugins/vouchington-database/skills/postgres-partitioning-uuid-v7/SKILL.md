@@ -12,3 +12,5 @@ pruning is observable. Plan creation, retention, migration, and verification as 
 lifecycle, including rollback and independent-reader compatibility.
 
 Consumer wrappers own partition intervals, migration tooling, retention policy, and deploy sequencing.
+
+Read [partition lifecycle](references/partition-lifecycle.md) before a schema or retention migration.
