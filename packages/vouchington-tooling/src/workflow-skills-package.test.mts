@@ -20,6 +20,16 @@ describe('workflow skills package contract', () => {
   it('ships exactly the canonical skills at stable paths without tracked copies', () => {
     const output = mkdtempSync(resolve(tmpdir(), 'vouchington-skills-pack-'))
     try {
+      const canonical = pluginRoots
+        .flatMap((root) => skillPaths(root))
+        .map((path) => `package/skills/${path}`)
+        .sort()
+      execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: packageRoot })
+      expect(
+        skillPaths(join(packageRoot, 'skills'))
+          .map((path) => `package/skills/${path}`)
+          .sort(),
+      ).toEqual(canonical)
       execFileSync('pnpm', ['pack', '--pack-destination', output], { cwd: packageRoot })
       const tarball = join(
         output,
@@ -27,10 +37,6 @@ describe('workflow skills package contract', () => {
       )
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
-        .sort()
-      const canonical = pluginRoots
-        .flatMap((root) => skillPaths(root))
-        .map((path) => `package/skills/${path}`)
         .sort()
       expect(packaged).toHaveLength(25)
       expect(packaged).toEqual(canonical)
