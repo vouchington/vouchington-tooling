@@ -1,4 +1,6 @@
 set -euo pipefail
+# shellcheck source=gh-retry.sh
+source "$(dirname "${BASH_SOURCE[0]}")/gh-retry.sh"
 if [ "$IS_DRAFT" = true ]; then exit 0; fi
 if [ "$EVENT_STATE" != open ]; then exit 0; fi
 if [ "$EVENT_BASE_REF" != "$DEFAULT_BRANCH" ]; then exit 0; fi
@@ -10,7 +12,8 @@ if [ "$GATE_STATUS" = stale ]; then exit 0; fi
 if [ "$GATE_STATUS" = closed ] || [ "$GATE_STATUS" = base-stale ]; then
   echo "::error::Final review selection became $GATE_STATUS."; exit 1;
 fi
-pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+gh_capture_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+pr_json="$GH_RETRY_OUTPUT"
 [ "$(jq -r '.head.sha' <<< "$pr_json")" = "$SELECTED_HEAD_SHA" ] || {
   echo '::error::PR head changed before completion.'; exit 1;
 }
@@ -34,7 +37,8 @@ if [ "$GATE_STATUS" = untrusted ]; then exit 0; fi
 case "$GATE_STATUS" in
   complete) exit 0 ;;
   deferred)
-    live_draft="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft)"
+    gh_capture_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft
+    live_draft="$GH_RETRY_OUTPUT"
     [ "$live_draft" = true ] && { echo 'Final code review stopped because the PR became a draft.'; exit 0; }
     echo '::error::Final code review is unexpectedly deferred'; exit 1 ;;
   untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;

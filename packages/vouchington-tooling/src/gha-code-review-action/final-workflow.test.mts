@@ -149,6 +149,7 @@ describe('final code review workflow', () => {
     }
 
     expect(gateScript).toContain('Review selection failed')
+    expect(gateScript).toContain('gh_capture_retry none gh api --method GET')
     expect(gateScript).toContain('Review settings are invalid')
     expect(gateScript).toContain('review did not complete successfully')
     expect(gateScript).not.toContain('A required code review provider failed')
