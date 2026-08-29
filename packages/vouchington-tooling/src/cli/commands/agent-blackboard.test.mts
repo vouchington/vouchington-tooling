@@ -93,7 +93,19 @@ describe('agent-blackboard CLI', () => {
     expect(String(stdout.mock.calls.at(-1)?.[0])).toBe(
       'No journal entries found for session one.\n',
     )
+    setJournalReaderForTest(async () => Promise.reject({ statusCode: 404 }))
+    await expect(
+      runAgentBlackboardCommand(['journal', 'entries', '--session-id', 'one']),
+    ).resolves.toBe(0)
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toBe(
+      'No journal entries found for session one.\n',
+    )
     setJournalReaderForTest(async () => Promise.reject(new Error('provider unavailable')))
+    await expect(
+      runAgentBlackboardCommand(['journal', 'entries', '--session-id', 'one']),
+    ).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('provider unavailable')
+    setJournalReaderForTest(async () => Promise.reject('provider unavailable'))
     await expect(
       runAgentBlackboardCommand(['journal', 'entries', '--session-id', 'one']),
     ).resolves.toBe(2)
@@ -124,6 +136,10 @@ describe('agent-blackboard CLI', () => {
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('journal append|entries')
     await expect(runAgentBlackboardCommand(['snapshot', 'other'])).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('snapshot partition|cleanup')
+    await expect(
+      runAgentBlackboardCommand(['journal', 'entries', undefined as never]),
+    ).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('invalid option: ')
   })
 
   it('runs the probe and journal append commands through their service boundaries', async () => {
@@ -157,6 +173,24 @@ describe('agent-blackboard CLI', () => {
       timestamp: '2026-01-01T00:00:00.000Z',
     })
     expect(String(stdout.mock.calls.at(-1)?.[0])).toBe('journaled\n')
+    await expect(
+      runAgentBlackboardCommand([
+        'journal',
+        'append',
+        '--session-id',
+        'session',
+        '--agent',
+        'codex',
+        '--file',
+        'entry.md',
+      ]),
+    ).resolves.toBe(0)
+    expect(appendJournal).toHaveBeenLastCalledWith({
+      sessionId: 'session',
+      agent: 'codex',
+      version: 'unknown',
+      markdownFile: 'entry.md',
+    })
   })
 
   it('runs snapshot partition and cleanup commands through their service boundaries', async () => {
@@ -193,6 +227,24 @@ describe('agent-blackboard CLI', () => {
     ).resolves.toBe(0)
     expect(cleanupSnapshotPartitions).toHaveBeenCalledWith({
       path: 'snapshot.json',
+      directory: 'partitions',
+      receipt,
+    })
+    await expect(
+      runAgentBlackboardCommand(['snapshot', 'cleanup', '--snapshot', 'snapshot.json']),
+    ).resolves.toBe(0)
+    expect(cleanupSnapshotPartitions).toHaveBeenLastCalledWith({ path: 'snapshot.json' })
+    await expect(
+      runAgentBlackboardCommand([
+        'snapshot',
+        'cleanup',
+        '--partition-directory',
+        'partitions',
+        '--receipt',
+        JSON.stringify(receipt),
+      ]),
+    ).resolves.toBe(0)
+    expect(cleanupSnapshotPartitions).toHaveBeenLastCalledWith({
       directory: 'partitions',
       receipt,
     })

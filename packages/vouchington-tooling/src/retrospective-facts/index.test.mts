@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('./exec.mts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./exec.mts')>()
+  return { ...actual, shell: vi.fn() }
+})
+
 import { runRetrospectiveFacts, type CommandExecutor, type CommandResult } from './index.mts'
+import { shell } from './exec.mts'
 
 const fields = 'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName'
 const pr = {
@@ -228,5 +235,11 @@ describe('retrospective facts', () => {
     await expect(runRetrospectiveFacts({ pr: '123', execute })).resolves.toContain(
       'Merged to main: no (origin/main lacks abc123)',
     )
+  })
+
+  it('uses the shell boundary when no executor is supplied', async () => {
+    vi.mocked(shell).mockResolvedValue({ ok: true, stdout: '', stderr: '' })
+    await expect(runRetrospectiveFacts({ noPr: true })).resolves.toContain('PR: none')
+    expect(shell).toHaveBeenCalled()
   })
 })
