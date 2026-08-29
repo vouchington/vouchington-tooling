@@ -137,4 +137,82 @@ describe('retrospective facts', () => {
       ).rejects.toThrow()
     },
   )
+
+  it.each([
+    { repo: 'o/r' },
+    {},
+    { pr: '1', noPr: true },
+    { repo: 'o/r', branch: 'topic', pr: '1' },
+  ])('rejects incomplete or contradictory selector %#', async (options) => {
+    await expect(
+      runRetrospectiveFacts({ ...options, execute: makeExecutor().execute }),
+    ).rejects.toThrow()
+  })
+
+  it('reports failed and malformed foreign GitHub responses, including raw evidence', async () => {
+    const key = `gh pr view 49 --repo vouchington/tooling --json ${fields}`
+    const failed = makeExecutor({ [key]: { ok: false, stderr: 'offline' } })
+    const failedOutput = await runRetrospectiveFacts({
+      pr: '49',
+      repo: 'vouchington/tooling',
+      raw: true,
+      execute: failed.execute,
+    })
+    expect(failedOutput).toContain('PR state: gh failed')
+    expect(failedOutput).toContain('stderr:\noffline')
+
+    const malformed = makeExecutor({ [key]: { stdout: '{not-json' } })
+    const malformedOutput = await runRetrospectiveFacts({
+      pr: '49',
+      repo: 'vouchington/tooling',
+      execute: malformed.execute,
+    })
+    expect(malformedOutput).toContain('PR state: unavailable')
+  })
+
+  it('resolves a named branch from origin when no local branch exists', async () => {
+    const { calls, execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/topic': { ok: false },
+      'git rev-parse --verify --quiet refs/remotes/origin/topic': { ok: true },
+      'git rev-list --count origin/main..origin/topic': { stdout: '2' },
+      'git diff --name-only origin/main...origin/topic': { stdout: 'src/a.mts' },
+    })
+    const output = await runRetrospectiveFacts({ branch: 'topic', execute })
+    expect(output).toContain('Commits ahead of origin/main: 2')
+    expect(calls).toContain('git diff --name-only origin/main...origin/topic')
+  })
+
+  it('returns unavailable branch facts when neither named ref exists', async () => {
+    const { calls, execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/missing': { ok: false },
+      'git rev-parse --verify --quiet refs/remotes/origin/missing': { ok: false },
+    })
+    const output = await runRetrospectiveFacts({ branch: 'missing', execute })
+    expect(output).toContain('Commits ahead of origin/main: unavailable')
+    expect(calls).not.toContain('git rev-list --count origin/main..missing')
+  })
+
+  it('warns when origin/main contains the merge but local main does not', async () => {
+    const gh = `gh pr view 123 --json ${fields}`
+    const warnings: string[] = []
+    const { execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'topic-branch' },
+      [gh]: { stdout: JSON.stringify(pr) },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+      'git reflog show origin/topic-branch': { stdout: '' },
+      'git merge-base --is-ancestor abc123 origin/main': { ok: true },
+      'git merge-base --is-ancestor abc123 main': { ok: false },
+    })
+    const output = await runRetrospectiveFacts({
+      pr: '123',
+      execute,
+      onWarning: warnings.push.bind(warnings),
+    })
+    expect(output).toContain('Merged to main: yes (origin/main contains abc123)')
+    expect(warnings).toEqual([
+      'Warning: local main lacks PR merge commit abc123, but origin/main contains it.',
+    ])
+  })
 })
