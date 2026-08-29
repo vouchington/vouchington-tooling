@@ -79,6 +79,12 @@ export function createGhPostReviewIo(options: {
           'EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together.',
         )
       }
+      if (expectedHeadSha && !/^[0-9a-f]{40}$/u.test(expectedHeadSha)) {
+        throw new ReviewPayloadError('EXPECTED_HEAD_SHA must be a full lowercase commit SHA.')
+      }
+      if (expectedBaseSha && !/^[0-9a-f]{40}$/u.test(expectedBaseSha)) {
+        throw new ReviewPayloadError('EXPECTED_BASE_SHA must be a full lowercase commit SHA.')
+      }
       const refs = exec([
         'api',
         `repos/${repository}/pulls/${prNumber}`,
@@ -92,18 +98,13 @@ export function createGhPostReviewIo(options: {
       if (!/^[0-9a-f]{40}$/u.test(baseSha)) {
         throw new ReviewPayloadError(`Could not resolve PR base SHA (got "${baseSha}").`)
       }
-      if (expectedHeadSha && !/^[0-9a-f]{40}$/u.test(expectedHeadSha)) {
-        throw new ReviewPayloadError('EXPECTED_HEAD_SHA must be a full commit SHA.')
-      }
-      if (expectedBaseSha && !/^[0-9a-f]{40}$/u.test(expectedBaseSha)) {
-        throw new ReviewPayloadError('EXPECTED_BASE_SHA must be a full commit SHA.')
-      }
       if (expectedHeadSha && headSha !== expectedHeadSha) {
         throw new ReviewPayloadError('PR head changed before posting the selected review.')
       }
       if (expectedBaseSha && baseSha !== expectedBaseSha) {
         throw new ReviewPayloadError('PR base changed before posting the selected review.')
       }
+      // Preserve the orchestrator-selected revision as the review commit_id after equality checks.
       return expectedHeadSha || headSha
     },
     listPullFiles() {

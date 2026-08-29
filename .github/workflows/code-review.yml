@@ -18,7 +18,7 @@ on:
         type: string
         default: ''
       trusted_prompt_ref:
-        description: Trusted git ref for review prompt files; must match expected_base_sha when pinned
+        description: Set explicitly to expected_base_sha whenever selected SHAs are provided
         required: false
         type: string
         default: ${{ github.sha }}
@@ -82,7 +82,7 @@ on:
         type: string
         default: ''
       trusted_prompt_ref:
-        description: Trusted git ref for review prompt files; must match expected_base_sha when pinned
+        description: Set explicitly to expected_base_sha whenever selected SHAs are provided
         required: false
         type: string
         default: ''
@@ -130,6 +130,7 @@ jobs:
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
     steps:
       - name: Validate selected pull request refs
+        if: inputs.expected_head_sha != '' || inputs.expected_base_sha != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
@@ -147,9 +148,9 @@ jobs:
             echo '::error::expected_head_sha and expected_base_sha must be provided together.'
             exit 1
           fi
-          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
-          current_head="$(jq -r '.head.sha' <<< "$pr_json")"
-          current_base="$(jq -r '.base.sha' <<< "$pr_json")"
+          pr_refs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '[.head.sha, .base.sha] | @tsv')"
+          IFS=$'\t' read -r current_head current_base <<< "$pr_refs"
           if [ -n "$EXPECTED_HEAD_SHA" ] && [ "$current_head" != "$EXPECTED_HEAD_SHA" ]; then
             echo "::error::PR head changed from $EXPECTED_HEAD_SHA to $current_head before review."
             exit 1

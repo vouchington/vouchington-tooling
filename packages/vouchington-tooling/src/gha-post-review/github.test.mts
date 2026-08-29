@@ -172,6 +172,9 @@ describe('github review adapter', () => {
   })
 
   it('rejects invalid pull request selection inputs', () => {
+    const noExec = (): never => {
+      throw new Error('network access was not expected')
+    }
     const options = {
       repository: 'o/r',
       payloadPath: '/tmp/x',
@@ -179,9 +182,9 @@ describe('github review adapter', () => {
       token: 'tok',
       exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
     }
-    expect(() => createGhPostReviewIo({ ...options, prNumber: '../9' }).getHeadSha()).toThrow(
-      'PR_NUMBER must be a positive integer',
-    )
+    expect(() =>
+      createGhPostReviewIo({ ...options, prNumber: '../9', exec: noExec }).getHeadSha(),
+    ).toThrow('PR_NUMBER must be a positive integer')
     expect(() =>
       createGhPostReviewIo({
         ...options,
@@ -194,6 +197,7 @@ describe('github review adapter', () => {
         ...options,
         prNumber: '9',
         expectedHeadSha: HEAD_SHA,
+        exec: noExec,
       }).getHeadSha(),
     ).toThrow('EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together')
     expect(() =>
@@ -202,16 +206,18 @@ describe('github review adapter', () => {
         prNumber: '9',
         expectedHeadSha: 'not-a-sha',
         expectedBaseSha: BASE_SHA,
+        exec: noExec,
       }).getHeadSha(),
-    ).toThrow('EXPECTED_HEAD_SHA must be a full commit SHA')
+    ).toThrow('EXPECTED_HEAD_SHA must be a full lowercase commit SHA')
     expect(() =>
       createGhPostReviewIo({
         ...options,
         prNumber: '9',
         expectedHeadSha: HEAD_SHA,
         expectedBaseSha: 'not-a-sha',
+        exec: noExec,
       }).getHeadSha(),
-    ).toThrow('EXPECTED_BASE_SHA must be a full commit SHA')
+    ).toThrow('EXPECTED_BASE_SHA must be a full lowercase commit SHA')
   })
 
   it('wraps execFileSync as a gh helper', () => {
