@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   rm,
+  rmdir,
   stat,
   writeFile,
 } from 'node:fs/promises'
@@ -16,13 +17,21 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanupSnapshotPartitions, partitionSnapshot } from './snapshot.mts'
 import { writeCleanupReceipt } from './snapshot-cleanup-receipt.mts'
+import {
+  removeResumeReceipt,
+  requireResumeReceipt,
+  setResumeFilesystemForTest,
+  writeResumeReceipt,
+} from './snapshot-cleanup-resume.mts'
 import { setSnapshotCleanupFilesystemForTest } from './snapshot-partition-cleanup.mts'
+import { removePartitionDirectory } from './snapshot-cleanup-directory.mts'
 import { setSnapshotFilesystemForTest } from './snapshot-partitions.mts'
 
 const paths = new Set<string>()
 afterEach(async () => {
   setSnapshotFilesystemForTest()
   setSnapshotCleanupFilesystemForTest()
+  setResumeFilesystemForTest()
   await Promise.all([...paths].map((path) => rm(path, { recursive: true, force: true })))
   paths.clear()
 })
@@ -38,9 +47,15 @@ function records(): object[] {
     archivedAt: null,
     data: {},
   }
+  const sessions = [
+    session,
+    { ...session, id: 'session:two', createdAt: '2026-01-02T00:00:00.000Z' },
+  ]
   return [
-    { type: 'session', session },
-    { type: 'entry', entry: { sessionId: session.id, createdAt: session.createdAt, data: {} } },
+    ...sessions.flatMap((item) => [
+      { type: 'session', session: item },
+      { type: 'entry', entry: { sessionId: item.id, createdAt: item.createdAt, data: {} } },
+    ]),
     {
       type: 'manifest',
       manifest: {
@@ -49,7 +64,7 @@ function records(): object[] {
         createdAt: session.createdAt,
         completedAt: '2026-01-01T00:01:00.000Z',
         selection: { archived: false },
-        counts: { sessions: 1, entries: 1, records: 3 },
+        counts: { sessions: 2, entries: 2, records: 5 },
         ordering: {
           sessions: 'createdAt ascending',
           entries: 'createdAt ascending within session',
@@ -69,6 +84,10 @@ async function snapshot(
   await writeFile(path, content, { mode: 0o400 })
   paths.add(path)
   return path
+}
+
+function resumePath(token: string): string {
+  return join(tmpdir(), `.agent-blackboard-cleanup-${token}.resume.json`)
 }
 
 function sourceClosure(): { closed: () => boolean; open: typeof open } {
@@ -141,6 +160,164 @@ describe('snapshot resource failures', () => {
     setSnapshotCleanupFilesystemForTest()
     await expect(cleanupSnapshotPartitions({ path })).resolves.toBeUndefined()
     paths.delete(path)
+  })
+
+  it.each(['second partition', 'receipt', 'directory'] as const)(
+    'retains a resumable tombstone when %s deletion fails',
+    async (failure) => {
+      const path = await snapshot()
+      const result = await partitionSnapshot({ path, maxSessions: 1 })
+      paths.add(result.directory)
+      let removals = 0
+      setSnapshotCleanupFilesystemForTest({
+        rm: async (target, options) => {
+          const value = String(target)
+          if (
+            (failure === 'second partition' && value.includes('partition-') && ++removals === 2) ||
+            (failure === 'receipt' && value.endsWith('.agent-blackboard-cleanup-receipt.json'))
+          )
+            throw new Error(`${failure} removal failed`)
+          return rm(target, options)
+        },
+        ...(failure === 'directory'
+          ? {
+              rmdir: async () => {
+                throw new Error('directory removal failed')
+              },
+            }
+          : {}),
+      })
+      await expect(
+        cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+      ).rejects.toThrow('retained tombstone')
+      await expect(readFile(result.directory)).rejects.toThrow()
+      if (failure === 'directory')
+        await expect(
+          cleanupSnapshotPartitions({
+            directory: result.directory,
+            receipt: result.cleanupReceipt,
+          }),
+        ).rejects.toThrow('retained tombstone')
+      setSnapshotCleanupFilesystemForTest()
+      await expect(
+        cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+      ).resolves.toBeUndefined()
+      paths.delete(result.directory)
+    },
+  )
+
+  it('resumes only signed cleanup metadata after a tombstone disappears', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    const marker = resumePath(result.cleanupReceipt.token)
+    paths.add(result.directory)
+    paths.add(marker)
+    await rm(result.directory, { recursive: true })
+    await writeResumeReceipt(result.cleanupReceipt)
+    await expect(
+      cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+    ).resolves.toBeUndefined()
+    paths.delete(result.directory)
+    paths.delete(marker)
+  })
+
+  it('refuses unsafe resume metadata and tombstones', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    const marker = resumePath(result.cleanupReceipt.token)
+    const tombstone = join(tmpdir(), `.agent-blackboard-cleanup-${result.cleanupReceipt.token}`)
+    paths.add(result.directory)
+    paths.add(marker)
+    paths.add(tombstone)
+    await writeFile(marker, JSON.stringify(result.cleanupReceipt), { mode: 0o600 })
+    await expect(requireResumeReceipt(result.cleanupReceipt)).rejects.toThrow('metadata is unsafe')
+    await expect(removeResumeReceipt(result.cleanupReceipt)).rejects.toThrow('metadata is unsafe')
+    await rm(marker)
+    await writeResumeReceipt(result.cleanupReceipt)
+    await rm(result.directory, { recursive: true })
+    await writeFile(tombstone, 'unsafe')
+    await expect(
+      cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+    ).rejects.toThrow('tombstone is unsafe')
+  })
+
+  it('fails closed when a resumable tombstone cannot be inspected', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    const marker = resumePath(result.cleanupReceipt.token)
+    const tombstone = join(tmpdir(), `.agent-blackboard-cleanup-${result.cleanupReceipt.token}`)
+    paths.add(result.directory)
+    paths.add(marker)
+    await writeResumeReceipt(result.cleanupReceipt)
+    await rm(result.directory, { recursive: true })
+    setSnapshotCleanupFilesystemForTest({
+      lstat: (async (target) => {
+        if (target === tombstone) {
+          const error = new Error('tombstone inspection failed') as NodeJS.ErrnoException
+          error.code = 'EACCES'
+          throw error
+        }
+        return lstat(target)
+      }) as typeof lstat,
+    })
+    await expect(
+      cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+    ).rejects.toThrow('tombstone inspection failed')
+  })
+
+  it('requires a schema-one receipt while a partition directory is captured', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    paths.add(result.directory)
+    const altered = {
+      ...result.cleanupReceipt,
+      schemaVersion: 2,
+    } as unknown as typeof result.cleanupReceipt
+    const marker = join(result.directory, '.agent-blackboard-cleanup-receipt.json')
+    await chmod(marker, 0o600)
+    await writeFile(marker, JSON.stringify(altered), { mode: 0o400 })
+    await chmod(marker, 0o400)
+    await expect(
+      removePartitionDirectory(
+        { lstat, readFile, readdir, rm, rmdir },
+        result.directory,
+        result.directory,
+        altered,
+        await lstat(result.directory),
+        false,
+        () => undefined,
+      ),
+    ).rejects.toThrow('does not match generated output')
+  })
+
+  it('atomically reuses and removes only exact resume metadata', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    const marker = resumePath(result.cleanupReceipt.token)
+    paths.add(result.directory)
+    paths.add(marker)
+    await expect(
+      writeResumeReceipt({ ...result.cleanupReceipt, token: 'invalid' }),
+    ).rejects.toThrow('invalid token')
+    await writeResumeReceipt(result.cleanupReceipt)
+    await writeResumeReceipt(result.cleanupReceipt)
+    await removeResumeReceipt(result.cleanupReceipt)
+    await removeResumeReceipt(result.cleanupReceipt)
+    await writeFile(marker, '{}', { mode: 0o400 })
+    await expect(requireResumeReceipt(result.cleanupReceipt)).rejects.toThrow(
+      'does not match receipt',
+    )
+  })
+
+  it('surfaces a resume-metadata publication failure other than a concurrent winner', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    paths.add(result.directory)
+    setResumeFilesystemForTest({
+      open: async () =>
+        Promise.reject(Object.assign(new Error('resume open failed'), { code: 'EIO' })),
+    })
+    await expect(writeResumeReceipt(result.cleanupReceipt)).rejects.toThrow('resume open failed')
   })
 
   it('includes a non-Error tombstone removal failure after successful rollback', async () => {

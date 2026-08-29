@@ -1,17 +1,21 @@
 import { randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
-import { lstat, mkdir, open } from 'node:fs/promises'
+import { link, lstat, mkdir, open, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const KEY_NAME = 'receipt-hmac-sha256.key'
 const KEY_BYTES = 32
+const defaults = { lstat, mkdir, open, link, unlink }
+let filesystem = defaults
 let temporaryDirectory = tmpdir
 
 export function setCleanupKeyTempDirectoryForTest(directory = tmpdir): void {
   temporaryDirectory = directory
 }
-
+export function setCleanupKeyFilesystemForTest(overrides?: Partial<typeof defaults>): void {
+  filesystem = { ...defaults, ...overrides }
+}
 function euid(): number {
   if (typeof process.geteuid !== 'function')
     throw new Error('snapshot cleanup receipts require a POSIX effective user ID')
@@ -40,17 +44,21 @@ async function keyPath(): Promise<{ path: string; uid: number }> {
   const uid = euid()
   const directory = join(temporaryDirectory(), `agent-blackboard-cleanup-${uid}`)
   try {
-    await mkdir(directory, { mode: 0o700 })
+    await filesystem.mkdir(directory, { mode: 0o700 })
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
-  assertDirectory(await lstat(directory), uid)
+  assertDirectory(await filesystem.lstat(directory), uid)
   return { path: join(directory, KEY_NAME), uid }
 }
-async function readKey(path: string, uid: number): Promise<Buffer> {
-  const before = await lstat(path)
+async function readKey(path: string, uid: number, retries = 8): Promise<Buffer> {
+  const before = await filesystem.lstat(path)
+  if (before.nlink === 2 && retries) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    return readKey(path, uid, retries - 1)
+  }
   assertKey(before, uid)
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  const file = await filesystem.open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     const after = await file.stat()
     assertKey(after, uid)
@@ -63,7 +71,26 @@ async function readKey(path: string, uid: number): Promise<Buffer> {
     await file.close()
   }
 }
-
+async function publishKey(path: string, uid: number): Promise<void> {
+  const temporary = join(dirname(path), `.${KEY_NAME}.${crypto.randomUUID()}`)
+  const file = await filesystem.open(
+    temporary,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o600,
+  )
+  try {
+    await file.writeFile(randomBytes(KEY_BYTES))
+    await file.sync()
+  } finally {
+    await file.close()
+  }
+  try {
+    await filesystem.link(temporary, path)
+  } finally {
+    await filesystem.unlink(temporary)
+  }
+  await readKey(path, uid)
+}
 export async function loadCleanupSigningKey(): Promise<Buffer> {
   const { path, uid } = await keyPath()
   try {
@@ -71,18 +98,10 @@ export async function loadCleanupSigningKey(): Promise<Buffer> {
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  const created = randomBytes(KEY_BYTES)
   try {
-    const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600)
-    try {
-      await file.writeFile(created)
-      await file.sync()
-    } finally {
-      await file.close()
-    }
-    return await readKey(path, uid)
+    await publishKey(path, uid)
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-    return readKey(path, uid)
   }
+  return readKey(path, uid)
 }

@@ -1,13 +1,13 @@
 import { lstat, readFile, readdir, rename, rm, rmdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
-import { RECEIPT_NAME, verifyCleanupReceipt } from './snapshot-cleanup-receipt.mts'
-import { assertPartitionFile, validatePartition } from './snapshot-partition-validate.mts'
+import { verifyCleanupReceipt } from './snapshot-cleanup-receipt.mts'
+import { removePartitionDirectory } from './snapshot-cleanup-directory.mts'
+import { removeResumeReceipt, requireResumeReceipt } from './snapshot-cleanup-resume.mts'
 import type { SnapshotCleanupOptions, SnapshotCleanupReceipt } from './snapshot-types.mts'
 
 const SOURCE_NAME = /^agent-blackboard-snapshot-[0-9a-f-]{36}\.jsonl$/
 const DIRECTORY_NAME = /^agent-blackboard-partitions-[A-Za-z0-9]+$/
-const PARTITION = /^partition-([1-9][0-9]*)\.jsonl$/
 const defaults = { lstat, readFile, readdir, rename, rm, rmdir }
 let filesystem = defaults
 
@@ -35,6 +35,8 @@ async function removeCaptured(
   try {
     initial = await filesystem.lstat(path)
   } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && directory && receipt)
+      return resumeDirectory(path, receipt)
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error
   }
@@ -45,11 +47,12 @@ async function removeCaptured(
     (!directory && initial.nlink !== 1)
   )
     throw new Error(`${label} is not a generated ${directory ? 'directory' : 'regular file'}`)
-  const tombstone = join(
-    tmpdir(),
-    `.agent-blackboard-cleanup-${process.pid}-${crypto.randomUUID()}`,
-  )
+  const tombstone =
+    directory && receipt
+      ? tombstonePath(receipt)
+      : join(tmpdir(), `.agent-blackboard-cleanup-${process.pid}-${crypto.randomUUID()}`)
   await filesystem.rename(path, tombstone)
+  let deleting = false
   try {
     const captured = await filesystem.lstat(tombstone)
     if (
@@ -60,9 +63,24 @@ async function removeCaptured(
       (!directory && (!captured.isFile() || captured.nlink !== 1))
     )
       throw new Error(`${label} changed while it was being removed`)
-    if (directory) await removeDirectory(tombstone, path, optionsReceipt(receipt), captured)
+    if (directory)
+      await removePartitionDirectory(
+        filesystem,
+        tombstone,
+        path,
+        optionsReceipt(receipt),
+        captured,
+        false,
+        () => {
+          deleting = true
+        },
+      )
     else await filesystem.rm(tombstone, { force: true })
   } catch (error) {
+    if (directory && deleting)
+      throw new Error(`${label} cleanup failed; retained tombstone ${tombstone} for retry`, {
+        cause: error,
+      })
     try {
       await filesystem.rename(tombstone, path)
     } catch (rollback) {
@@ -77,80 +95,42 @@ async function removeCaptured(
     })
   }
 }
+function tombstonePath(receipt: SnapshotCleanupReceipt): string {
+  return join(tmpdir(), `.agent-blackboard-cleanup-${receipt.token}`)
+}
+async function resumeDirectory(path: string, receipt: SnapshotCleanupReceipt): Promise<void> {
+  const tombstone = tombstonePath(receipt)
+  await requireResumeReceipt(receipt)
+  let info
+  try {
+    info = await filesystem.lstat(tombstone)
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    await removeResumeReceipt(receipt)
+    return
+  }
+  if (!info.isDirectory() || info.isSymbolicLink())
+    throw new Error('partition directory tombstone is unsafe')
+  try {
+    await removePartitionDirectory(
+      filesystem,
+      tombstone,
+      path,
+      receipt,
+      info,
+      true,
+      () => undefined,
+    )
+  } catch (error) {
+    throw new Error(
+      `partition directory cleanup failed; retained tombstone ${tombstone} for retry`,
+      { cause: error },
+    )
+  }
+}
 function optionsReceipt(receipt: SnapshotCleanupReceipt | undefined): SnapshotCleanupReceipt {
   if (!receipt) throw new Error('partition directory cleanup requires a receipt')
   return receipt
-}
-async function removeDirectory(
-  path: string,
-  originalPath: string,
-  receipt: SnapshotCleanupReceipt,
-  directory: Awaited<ReturnType<typeof lstat>>,
-): Promise<void> {
-  const names = await filesystem.readdir(path)
-  const ordered = names
-    .filter((name) => PARTITION.test(name))
-    .map((name) => ({ name, number: Number(PARTITION.exec(name)?.[1]) }))
-    .sort((left, right) => left.number - right.number)
-  if (
-    ordered.some(({ number }, index) => number !== index + 1) ||
-    names.length !== receipt.partitions.length + 1 ||
-    !names.includes(RECEIPT_NAME)
-  )
-    throw new Error('partition directory contains unexpected content')
-  await validateReceipt(
-    originalPath,
-    path,
-    receipt,
-    directory,
-    ordered.map(({ name }) => name),
-  )
-  for (const { name } of ordered) {
-    const file = join(path, name)
-    const info = await filesystem.lstat(file)
-    assertPartitionFile(info)
-    await validatePartition(
-      file,
-      info,
-      receipt.partitions.find((partition) => partition.name === name)?.checksum,
-    )
-  }
-  for (const { name } of ordered) {
-    const file = join(path, name)
-    await filesystem.rm(file, { force: false })
-  }
-  await filesystem.rm(join(path, RECEIPT_NAME), { force: false })
-  await filesystem.rmdir(path)
-}
-async function validateReceipt(
-  originalPath: string,
-  path: string,
-  receipt: SnapshotCleanupReceipt,
-  directory: Awaited<ReturnType<typeof lstat>>,
-  names: string[],
-): Promise<void> {
-  const marker = join(path, RECEIPT_NAME)
-  const info = await filesystem.lstat(marker)
-  assertPartitionFile(info)
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(await filesystem.readFile(marker, 'utf8'))
-  } catch {
-    throw new Error('partition directory cleanup receipt is invalid')
-  }
-  if (
-    JSON.stringify(parsed) !== JSON.stringify(receipt) ||
-    receipt.schemaVersion !== 1 ||
-    receipt.directory !== originalPath ||
-    receipt.directoryDev !== directory.dev ||
-    receipt.directoryIno !== directory.ino ||
-    receipt.partitions.length !== names.length ||
-    receipt.partitions.some(
-      ({ name, checksum }, index) =>
-        name !== names[index] || checksum.algorithm !== 'sha256' || !checksum.value,
-    )
-  )
-    throw new Error('partition directory cleanup receipt does not match generated output')
 }
 export async function cleanupSnapshotPartitions(options: SnapshotCleanupOptions): Promise<void> {
   if (!options.path && !options.directory)

@@ -1,15 +1,17 @@
-import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   loadCleanupSigningKey,
+  setCleanupKeyFilesystemForTest,
   setCleanupKeyTempDirectoryForTest,
 } from './snapshot-cleanup-key.mts'
 
 const paths = new Set<string>()
 afterEach(async () => {
   setCleanupKeyTempDirectoryForTest()
+  setCleanupKeyFilesystemForTest()
   await Promise.all([...paths].map((path) => rm(path, { recursive: true, force: true })))
   paths.clear()
 })
@@ -24,6 +26,33 @@ describe('snapshot cleanup signing key', () => {
     const directory = join(root, `agent-blackboard-cleanup-${process.geteuid!()}`)
     expect((await stat(directory)).mode & 0o777).toBe(0o700)
     expect((await stat(join(directory, 'receipt-hmac-sha256.key'))).mode & 0o777).toBe(0o600)
+  })
+
+  it('publishes a complete winner before a loser reads it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    const keys = await Promise.all([loadCleanupSigningKey(), loadCleanupSigningKey()])
+    expect(keys[0]!.equals(keys[1]!)).toBe(true)
+  })
+
+  it('waits for the publisher to unlink its temporary key hard link', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    await loadCleanupSigningKey()
+    let delayed = false
+    setCleanupKeyFilesystemForTest({
+      lstat: async (path) => {
+        const info = await lstat(path)
+        if (!delayed && String(path).endsWith('receipt-hmac-sha256.key')) {
+          delayed = true
+          return Object.assign(Object.create(Object.getPrototypeOf(info)), info, { nlink: 2 })
+        }
+        return info
+      },
+    })
+    await expect(loadCleanupSigningKey()).resolves.toHaveLength(32)
   })
 
   it('fails closed for a symlinked key directory', async () => {

@@ -53,6 +53,9 @@ export async function appendJournal(input: {
   dependencies?: BlackboardClientDependencies
 }): Promise<string> {
   assertSessionId(input.sessionId)
+  const timestamp = input.timestamp ? new Date(input.timestamp) : new Date()
+  if (Number.isNaN(timestamp.valueOf()))
+    throw new Error('journal timestamp is not a valid date-time')
   let markdown: string
   try {
     markdown = new TextDecoder('utf-8', { fatal: true }).decode(await readFile(input.markdownFile))
@@ -70,7 +73,7 @@ export async function appendJournal(input: {
   })
   const entry = await new Entries(connection).append({
     sessionId: input.sessionId,
-    data: { type: 'journal', markdown, timestamp: input.timestamp ?? new Date().toISOString() },
+    data: { type: 'journal', markdown, timestamp: timestamp.toISOString() },
   })
   return `Journaled to agent-blackboard session ${input.sessionId} (entry created at ${entry.createdAt}).`
 }

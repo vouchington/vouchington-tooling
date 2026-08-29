@@ -109,6 +109,33 @@ describe('agent blackboard client', () => {
     )
   })
 
+  it('validates timestamps before provider calls and canonicalizes offsets', async () => {
+    await expect(
+      appendJournal({
+        sessionId,
+        agent: 'codex',
+        version: '1',
+        markdownFile: 'missing',
+        timestamp: 'nope',
+        env,
+      }),
+    ).rejects.toThrow('valid date-time')
+    expect(client.ensure).not.toHaveBeenCalled()
+    client.ensure.mockResolvedValue({ status: 'created' })
+    client.append.mockResolvedValue({ createdAt: timestamp })
+    await appendJournal({
+      sessionId,
+      agent: 'codex',
+      version: '1',
+      markdownFile: await note(),
+      timestamp: '2026-01-01T01:00:00+01:00',
+      env,
+    })
+    expect(client.append).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ timestamp }) }),
+    )
+  })
+
   it('reads and formats only sorted journal entries', async () => {
     client.entries = [
       { createdAt: '2026-01-02T00:00:00.000Z', data: { type: 'journal', markdown: 'later' } },
