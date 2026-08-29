@@ -79,7 +79,7 @@ list_artifact_names_once() {
 }
 
 list_artifact_names() {
-  local attempt status delay artifact_names
+  local attempt status=0 delay artifact_names
   for attempt in 1 2 3; do
     if artifact_names=$(list_artifact_names_once); then
       [ -z "$artifact_names" ] || printf '%s\n' "$artifact_names"
@@ -101,7 +101,9 @@ list_artifact_names() {
 
 download_pattern() {
   artifacts=$(list_artifact_names) || return $?
-  artifacts=$(printf '%s\n' "$artifacts" | awk '!seen[$0]++')
+  if [ -n "$artifacts" ]; then
+    artifacts=$(printf '%s\n' "$artifacts" | awk '!seen[$0]++')
+  fi
   selected_artifacts=()
   while IFS= read -r artifact; do
     [ -n "$artifact" ] || continue
