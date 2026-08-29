@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { resolveTargetDirectory } from './target-directory.mts'
+import { linkDirectoryEntry, resolveTargetDirectory } from './target-directory.mts'
 
 const directories: string[] = []
 
@@ -56,6 +56,20 @@ describe('target directory', () => {
         await mkdir(target, { recursive: true })
       }),
     ).rejects.toThrow('Target root changed while resolving')
+  })
+
+  it('accepts an unchanged target after a worker creates or finds its entry', async () => {
+    const root = await fixture()
+    const targetPath = join(root, 'target')
+    await mkdir(targetPath)
+    const target = await resolveTargetDirectory(targetPath)
+
+    await expect(
+      linkDirectoryEntry('source', target, 'skill', undefined, async () => 'created'),
+    ).resolves.toBe(true)
+    await expect(
+      linkDirectoryEntry('source', target, 'skill', undefined, async () => 'existing'),
+    ).resolves.toBe(false)
   })
 })
 

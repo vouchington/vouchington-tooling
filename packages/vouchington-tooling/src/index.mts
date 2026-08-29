@@ -23,6 +23,35 @@ export type {
   TranscriptFacts,
 } from './retrospective-transcript/index.mts'
 
+export { runRetrospectiveFacts } from './retrospective-facts/index.mts'
+export type {
+  CommandExecutor,
+  CommandResult,
+  RetrospectiveFactsOptions,
+} from './retrospective-facts/index.mts'
+
+export {
+  appendJournal,
+  assertSessionId,
+  cleanupSnapshotPartitions,
+  partitionSnapshot,
+  probeBlackboard,
+  readJournal,
+  resolveBlackboardConnection,
+} from './agent-blackboard/index.mts'
+export type {
+  BlackboardConnection,
+  SnapshotChecksum,
+  SnapshotCleanupReceipt,
+  SnapshotCleanupOptions,
+  SnapshotCounts,
+  SnapshotManifest,
+  SnapshotPartition,
+  SnapshotPartitionOptions,
+  SnapshotPartitionResult,
+  SnapshotSelection,
+} from './agent-blackboard/index.mts'
+
 export {
   buildSessionFrictionReport,
   classifyFrictionObservation,

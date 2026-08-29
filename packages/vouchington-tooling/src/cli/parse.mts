@@ -20,6 +20,8 @@ export type ParsedCli =
   | { kind: 'http-origin'; field: string; value: string }
   | { kind: 'retrospective-transcript'; args: string[] }
   | { kind: 'link-skill'; name: string; sourceRoot: string; targetRoot: string }
+  | { kind: 'retrospective-facts'; args: string[] }
+  | { kind: 'agent-blackboard'; args: string[] }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
 
@@ -85,6 +87,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'retrospective-transcript')
     return { kind: 'retrospective-transcript', args: rest }
   if (command === 'link-skill') return parseLinkSkill(rest)
+  if (command === 'retrospective-facts') return { kind: 'retrospective-facts', args: rest }
+  if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args: rest }
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
