@@ -46,7 +46,10 @@ export async function localFacts(
     options.branch ??
     (options.pr && head !== 'unavailable' ? head : options.noPr ? localBranch : 'unavailable')
   const rangeName = options.branch ?? (options.noPr ? localBranch : undefined)
-  const localRange = rangeName === 'unavailable' ? 'HEAD' : rangeName
+  const localRange =
+    options.noPr && options.branch === undefined && localBranch === 'unavailable'
+      ? 'HEAD'
+      : rangeName
   const resolved = localRange ? await resolveNamedRef(localRange, run) : unresolvedRange()
   const range = resolved.range
   const commitsResult =

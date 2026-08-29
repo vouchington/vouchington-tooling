@@ -67,6 +67,23 @@ describe('local retrospective facts branches', () => {
     )
   })
 
+  it('treats an explicit unavailable branch name as a named remote ref', async () => {
+    const named = executor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/unavailable': { ok: false },
+      'git fetch origin unavailable:refs/remotes/origin/unavailable': { ok: true },
+      'git rev-parse --verify --quiet refs/remotes/origin/unavailable': { ok: true },
+      'git rev-list --count origin/main..origin/unavailable': { stdout: '2' },
+      'git diff --name-only origin/main...origin/unavailable': { stdout: 'src/file.mts\n' },
+      'git merge-base --is-ancestor origin/unavailable origin/main': { ok: true },
+    })
+    const output = await localFacts({ branch: 'unavailable' }, named.execute)
+    expect(output).toContain('Commits ahead of origin/main: 2')
+    expect(output).toContain('Merged to main: yes (origin/main contains origin/unavailable)')
+    expect(named.calls).toContain('git fetch origin unavailable:refs/remotes/origin/unavailable')
+    expect(named.calls).not.toContain('git rev-list --count origin/main..HEAD')
+  })
+
   it('handles origin fallback, failed local history calls, and a failed working tree read', async () => {
     const { execute } = executor({
       'git fetch origin main:refs/remotes/origin/main': { ok: false },
