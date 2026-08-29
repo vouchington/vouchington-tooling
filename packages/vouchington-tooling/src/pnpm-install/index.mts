@@ -42,9 +42,9 @@ export {
   terminateProcessGroup,
   terminateSafeProcessGroup,
 } from './process.mts'
+export { persistentDependencyTreeIsCold } from './metadata.mts'
 export {
-  persistentDependencyTreeIsCold,
   persistentMetadataFingerprint,
   persistentMetadataMatches,
   writePersistentMetadataStamp,
-} from './metadata.mts'
+} from './metadata-legacy.mts'

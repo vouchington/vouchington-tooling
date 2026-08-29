@@ -201,6 +201,13 @@ vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
 
+For persistent `pnpm-install`, v4 metadata tracks structural inputs separately from the
+`--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
+`true → false → true` without forced reconciliation; a tree first installed with scripts disabled
+still performs the existing script-free then scripts-enabled reconciliation before it is trusted.
+The command emits a structured non-secret provenance diagnostic identifying changed structural
+categories, the last script policy, script capability, and native-binary health.
+
 `download-optional-run-artifacts` uses the current Actions run and host. Pattern mode discovers
 non-expired artifacts across the run, keeps the first result for each name (matching `gh run
 download`), and extracts each selected name into its own directory. Ordinary absence is reported as

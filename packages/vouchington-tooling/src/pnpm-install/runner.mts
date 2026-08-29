@@ -2,9 +2,9 @@ import { scheduler } from 'node:timers/promises'
 
 import {
   persistentDependencyTreeIsCold,
-  persistentMetadataFingerprint,
-  persistentMetadataMatches,
-  writePersistentMetadataStamp,
+  persistentMetadataFingerprintV4,
+  persistentMetadataStatusV4,
+  writePersistentMetadataStampV4,
 } from './metadata.mts'
 import { nativeBinariesMatchRuntime } from './native-health.mts'
 import { runPnpm } from './exec.mts'
@@ -17,6 +17,7 @@ import {
   type CommandResult,
   type InstallOptions,
 } from './support.mts'
+import { persistentInstallTransition, persistentProvenanceDiagnostic } from './transition.mts'
 
 // oxfmt-ignore
 const fail = (message: string): never => { throw new Error(message) }
@@ -71,26 +72,43 @@ async function persistent(options: InstallOptions) {
     fail('ephemeral-workspaces is only valid for ephemeral runners')
 
   const runCapture = (args: string[]) => runPnpm(args, options, true)
-  const fingerprint = await persistentMetadataFingerprint(runCapture, options.installScripts)
-  const stamped = await persistentMetadataMatches(fingerprint)
+  const fingerprint = await persistentMetadataFingerprintV4(runCapture)
+  const provenance = await persistentMetadataStatusV4(fingerprint)
   const nativesMatch = await nativeBinariesMatchRuntime()
-  const provenanceOk = stamped && nativesMatch
+  const provisionalTransition = persistentInstallTransition(provenance, options.installScripts)
+  const transition = nativesMatch
+    ? provisionalTransition
+    : { action: 'reconcile' as const, reason: 'native-health-mismatch' }
+  const provenanceOk =
+    provenance.kind === 'matching' && transition.action === 'ordinary' && nativesMatch
 
   // An absent tree has nothing to repair, so one ordinary install below matches the
   // reconciled end state. Check first: an install would otherwise make the tree non-cold.
   const cold = !provenanceOk && (await persistentDependencyTreeIsCold())
   if (!provenanceOk && !cold) {
+    const finalTransition =
+      provenance.kind === 'absent'
+        ? { action: 'reconcile' as const, reason: 'missing-stamp-populated-tree' }
+        : transition
     console.warn(
-      stamped && !nativesMatch
+      persistentProvenanceDiagnostic(
+        provenance,
+        options.installScripts,
+        nativesMatch,
+        finalTransition,
+      ),
+    )
+    console.warn(
+      provenance.kind === 'matching' && !nativesMatch
         ? 'persistent optional native binaries do not match this runtime; reconciling'
         : 'persistent dependency metadata provenance is missing or changed; reconciling',
     )
     await reconcileOrFail(options, runCapture)
-    await writePersistentMetadataStamp(fingerprint)
+    await writePersistentMetadataStampV4(fingerprint, options.installScripts, true)
     return 'persistent metadata reconciled'
   }
-  if (!stamped) console.warn('persistent dependency tree is absent; installing cold')
-
+  if (provenance.kind === 'absent')
+    console.warn('persistent dependency tree is absent; installing cold')
   await install(
     withScriptPolicy([...baseInstallArgs], options.installScripts),
     options,
@@ -98,13 +116,22 @@ async function persistent(options: InstallOptions) {
   )
   const stale = await findWorkspaceLinkMismatches(runCapture)
   if (stale.length === 0) {
-    if (!stamped) await writePersistentMetadataStamp(fingerprint)
-    return stamped ? 'persistent ordinary' : 'persistent cold'
+    console.warn(
+      persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, transition),
+    )
+    await writePersistentMetadataStampV4(fingerprint, options.installScripts, false)
+    return provenance.kind === 'absent' ? 'persistent cold' : 'persistent ordinary'
   }
 
   logWorkspaceLinkMismatches(stale)
+  console.warn(
+    persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {
+      action: 'reconcile',
+      reason: 'workspace-links-stale',
+    }),
+  )
   await reconcileOrFail(options, runCapture)
-  await writePersistentMetadataStamp(fingerprint)
+  await writePersistentMetadataStampV4(fingerprint, options.installScripts, true)
   return 'persistent reconciled'
 }
 

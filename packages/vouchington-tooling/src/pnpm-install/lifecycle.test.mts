@@ -20,10 +20,11 @@ describe('pnpm install lifecycle', () => {
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
       await expect(readFile(join(fixture.root, stamp), 'utf8')).resolves.toEqual(
-        expect.stringContaining('"version":3'),
+        expect.stringContaining('"version":4'),
       )
       await resetInstallCalls(fixture)
-      await expect(runInstaller(fixture)).resolves.toBeDefined()
+      const result = await runInstaller(fixture)
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
@@ -57,6 +58,9 @@ describe('pnpm install lifecycle', () => {
       expect(repaired.stderr).toContain(
         'persistent optional native binaries do not match this runtime; reconciling',
       )
+      expect(repaired.stderr).toContain('"action":"reconcile"')
+      expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
+      expect(repaired.stderr).toContain('"reason":"native-health-mismatch"')
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
@@ -291,6 +295,110 @@ describe('pnpm install lifecycle', () => {
       await expect(readFile(fixture.summary, 'utf8')).resolves.toMatch(
         /pnpm install: persistent ordinary completed in \d+ms/,
       )
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('uses ordinary installs for warm true-to-false-to-true transitions after scripts have succeeded', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: true })
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture, { installScripts: false })
+      await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles warm false-to-true transitions until a scripts-enabled install succeeds', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture, { installScripts: true })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('emits a structured non-secret persistent provenance diagnostic for every transition', async () => {
+    const fixture = await makeFixture()
+    try {
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"event":"pnpm-install-persistent-provenance"')
+      expect(result.stderr).toContain('"lastInvocationInstallScripts":null')
+      expect(result.stderr).toContain('"nativeBinariesMatchRuntime":true')
+      expect(result.stderr).toContain('"reason":"missing-stamp"')
+      expect(result.stderr).not.toContain('pnpm-lock.yaml')
+      expect(result.stderr).not.toContain(fixture.root)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('requires an enabled reconciliation after a script-disabled native repair', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      const addon = join(
+        fixture.root,
+        'node_modules',
+        '.pnpm',
+        'native@1.0.0',
+        'node_modules',
+        'native',
+        'addon.node',
+      )
+      await mkdir(join(addon, '..'), { recursive: true })
+      await writeFile(
+        addon,
+        process.platform === 'darwin'
+          ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
+          : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+      )
+      await runInstaller(fixture, { installScripts: false })
+      await rm(addon)
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toHaveLength(2)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('reconciles a populated tree with a missing metadata stamp and reports one final diagnostic', async () => {
+    const fixture = await makeFixture()
+    try {
+      await mkdir(join(fixture.root, 'node_modules'), { recursive: true })
+      const result = await runInstaller(fixture)
+      expect(result.stderr).toContain('"action":"reconcile"')
+      expect(result.stderr).toContain('"reason":"missing-stamp-populated-tree"')
+      expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('requires an enabled reconciliation after a script-disabled workspace-link repair', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      await rm(fixture.dependencyLink)
+      fixture.env.PNPM_REPAIR_LINK = '1'
+      await runInstaller(fixture, { installScripts: false })
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toHaveLength(2)
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
