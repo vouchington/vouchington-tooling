@@ -50,7 +50,8 @@ vouchington stage-review-payload optional|required <source> <destination>
 `download-optional-run-artifacts` uses the current Actions run and host. Pattern mode discovers
 non-expired artifacts across the run, keeps the first result for each name (matching `gh run
 download`), and extracts each selected name into its own directory. Ordinary absence is reported as
-`availability=unavailable`; invalid names and cancellation remain hard failures.
+`availability=unavailable`. Artifact listing retries up to three times with bounded backoff;
+exhausted transport errors, invalid names, and cancellation remain hard failures.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session

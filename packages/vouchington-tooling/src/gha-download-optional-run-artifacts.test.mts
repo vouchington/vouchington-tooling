@@ -22,6 +22,7 @@ type RunOptions = {
   readonly args?: readonly string[] | ((temporaryDirectory: string) => readonly string[])
   readonly env?: Readonly<Record<string, string>>
   readonly ghScript?: string
+  readonly sleepScript?: string
 }
 
 function runHelper(options: RunOptions = {}) {
@@ -37,6 +38,11 @@ function runHelper(options: RunOptions = {}) {
       '#!/bin/sh\nif [ "$1" = api ]; then echo transport-download-control; else printf "downloaded %s\\n" "$*"; fi\n',
   )
   chmodSync(ghPath, 0o755)
+  if (options.sleepScript !== undefined) {
+    const sleepPath = join(binDirectory, 'sleep')
+    writeFileSync(sleepPath, options.sleepScript)
+    chmodSync(sleepPath, 0o755)
+  }
   const args =
     typeof options.args === 'function'
       ? options.args(temporaryDirectory)
@@ -248,6 +254,141 @@ printf '%s\\n' "$name" > "$dir/artifact-name"
     ).toBe('coverage-web\n')
     expect(result.stderr).toContain('[optional-run-artifacts] selection selector=pattern count=2')
     expect(result.stderr.match(/attempt artifact=coverage-tooling/g)).toHaveLength(1)
+  })
+
+  it('retries transient artifact listing failures before downloading the selected batch', () => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--pattern',
+        'coverage-*',
+        '--dir',
+        join(temporaryDirectory, 'coverage-fallback'),
+      ],
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then
+  attempts="$GITHUB_OUTPUT.attempts"
+  attempt=0
+  [ ! -f "$attempts" ] || attempt=$(cat "$attempts")
+  attempt=$((attempt + 1))
+  printf '%s\n' "$attempt" > "$attempts"
+  if [ "$attempt" -lt 3 ]; then echo 'TLS handshake timeout' >&2; exit 71; fi
+  printf '%s\n' coverage-tooling
+  exit 0
+fi
+exit 0
+`,
+      sleepScript: '#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$GITHUB_OUTPUT.sleeps"\n',
+    })
+
+    expect(result.status).toBe(0)
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.attempts'), 'utf8')).toBe(
+      '3\n',
+    )
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.sleeps'), 'utf8')).toBe(
+      '2\n5\n',
+    )
+    expect(result.stderr).toContain('artifact listing failed (attempt 1/3 exit=71)')
+    expect(result.stderr).toContain('artifact listing failed (attempt 2/3 exit=71)')
+    expect(result.stderr).toContain('[optional-run-artifacts] result=available selector=pattern')
+    expect(result.output).toBe('availability=available\n')
+  })
+
+  it('discards partial failed listings before retrying exact selection', () => {
+    const result = runHelper({
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then
+  attempts="$GITHUB_OUTPUT.attempts"
+  attempt=0
+  [ ! -f "$attempts" ] || attempt=$(cat "$attempts")
+  attempt=$((attempt + 1))
+  printf '%s\n' "$attempt" > "$attempts"
+  if [ "$attempt" -eq 1 ]; then
+    printf '%s\n' transport-download-control
+    echo 'later page failed' >&2
+    exit 71
+  fi
+  printf '%s\n' another-artifact
+  exit 0
+fi
+printf downloaded > "$GITHUB_OUTPUT.downloaded"
+`,
+      sleepScript: '#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$GITHUB_OUTPUT.sleeps"\n',
+    })
+
+    expect(result.status).toBe(0)
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.attempts'), 'utf8')).toBe(
+      '2\n',
+    )
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.sleeps'), 'utf8')).toBe(
+      '2\n',
+    )
+    expect(existsSync(join(result.temporaryDirectory, 'github-output.downloaded'))).toBe(false)
+    expect(result.stderr).toContain('[optional-run-artifacts] result=unavailable selector=name')
+    expect(result.output).toBe('availability=unavailable\n')
+  })
+
+  it('hard-fails after artifact listing retries are exhausted', () => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--pattern',
+        'coverage-*',
+        '--dir',
+        join(temporaryDirectory, 'coverage-fallback'),
+      ],
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then
+  attempts="$GITHUB_OUTPUT.attempts"
+  attempt=0
+  [ ! -f "$attempts" ] || attempt=$(cat "$attempts")
+  attempt=$((attempt + 1))
+  printf '%s\n' "$attempt" > "$attempts"
+  echo 'TLS handshake timeout' >&2
+  exit 71
+fi
+exit 99
+`,
+      sleepScript: '#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$GITHUB_OUTPUT.sleeps"\n',
+    })
+
+    expect(result.status).toBe(71)
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.attempts'), 'utf8')).toBe(
+      '3\n',
+    )
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.sleeps'), 'utf8')).toBe(
+      '2\n5\n',
+    )
+    expect(result.stderr).toContain('[optional-run-artifacts] listing exhausted attempts=3 exit=71')
+    expect(result.stderr).toContain(
+      '[optional-run-artifacts] result=error selector=pattern exit=71',
+    )
+    expect(result.stderr).not.toContain('selection selector=pattern count=0')
+    expect(result.output).toBe('')
+  })
+
+  it.each([130, 143])('does not retry artifact listing cancellation exit %i', (status) => {
+    const result = runHelper({
+      args: (temporaryDirectory) => [
+        '--pattern',
+        'coverage-*',
+        '--dir',
+        join(temporaryDirectory, 'coverage-fallback'),
+      ],
+      ghScript: `#!/bin/sh
+if [ "$1" = api ]; then
+  printf attempted > "$GITHUB_OUTPUT.attempts"
+  exit ${status}
+fi
+exit 99
+`,
+      sleepScript: '#!/bin/sh\nprintf slept > "$GITHUB_OUTPUT.sleeps"\n',
+    })
+
+    expect(result.status).toBe(status)
+    expect(readFileSync(join(result.temporaryDirectory, 'github-output.attempts'), 'utf8')).toBe(
+      'attempted',
+    )
+    expect(existsSync(join(result.temporaryDirectory, 'github-output.sleeps'))).toBe(false)
+    expect(result.output).toBe('')
   })
 
   it('announces every selected artifact before the first sequential download failure', () => {

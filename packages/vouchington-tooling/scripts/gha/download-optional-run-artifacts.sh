@@ -71,11 +71,32 @@ download_exact() {
   GH_HOST="$github_host" gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
 }
 
-list_artifact_names() {
+list_artifact_names_once() {
   GH_HOST="$github_host" gh api \
     --paginate \
     "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
     --jq '.artifacts[] | select(.expired | not) | .name'
+}
+
+list_artifact_names() {
+  local attempt status delay artifact_names
+  for attempt in 1 2 3; do
+    if artifact_names=$(list_artifact_names_once); then
+      [ -z "$artifact_names" ] || printf '%s\n' "$artifact_names"
+      return 0
+    else
+      status=$?
+    fi
+    case "$status" in 130|143) return "$status" ;; esac
+    if [ "$attempt" -lt 3 ]; then
+      delay=2
+      [ "$attempt" -eq 2 ] && delay=5
+      echo "::warning::Optional same-run artifact listing failed (attempt $attempt/3 exit=$status); retrying in ${delay}s" >&2
+      if sleep "$delay"; then :; else return $?; fi
+    fi
+  done
+  echo "[optional-run-artifacts] listing exhausted attempts=3 exit=$status" >&2
+  return "$status"
 }
 
 download_pattern() {
