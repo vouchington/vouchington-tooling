@@ -28,7 +28,12 @@ export async function localFacts(
     calls.push({ command, args, result })
     return result
   }
-  const fetch = await run('git', ['fetch', 'origin', 'main:refs/remotes/origin/main'])
+  const mainSpec = 'main:refs/remotes/origin/main'
+  const branchSpec = options.branch
+    ? `${options.branch}:refs/remotes/origin/${options.branch}`
+    : undefined
+  const fetch = await run('git', ['fetch', 'origin', mainSpec])
+  const branchFetch = branchSpec ? await run('git', ['fetch', 'origin', branchSpec]) : undefined
   const originMain =
     fetch.ok ||
     (await run('git', ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'])).ok
@@ -50,7 +55,13 @@ export async function localFacts(
     options.noPr && options.branch === undefined && localBranch === 'unavailable'
       ? 'HEAD'
       : rangeName
-  const resolved = localRange ? await resolveNamedRef(localRange, run) : unresolvedRange()
+  const resolved = localRange
+    ? await resolveNamedRef(
+        localRange,
+        run,
+        localRange === options.branch && branchFetch?.ok === true,
+      )
+    : unresolvedRange()
   const range = resolved.range
   const commitsResult =
     !data && range && originMain
@@ -81,7 +92,7 @@ export async function localFacts(
     : ''
   return format(
     {
-      fetch: 'git fetch origin main:refs/remotes/origin/main',
+      fetch: `git fetch origin ${mainSpec}${branchSpec ? `; git fetch origin ${branchSpec}` : ''}`,
       fetchStatus: fetch.ok ? 'ok' : 'failed',
       fetchNote: `${
         fetch.ok
@@ -139,11 +150,14 @@ function lines(value: string): string[] {
 async function resolveNamedRef(
   name: string,
   run: (command: string, args: string[]) => Promise<CommandResult>,
+  fetched = false,
 ): Promise<{ range: string | undefined; refreshed: boolean }> {
   if (name === 'HEAD') return { range: name, refreshed: false }
   if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`])).ok)
     return { range: name, refreshed: false }
-  const fetch = await run('git', ['fetch', 'origin', `${name}:refs/remotes/origin/${name}`])
+  const fetch = fetched
+    ? { ok: true, stdout: '', stderr: '' }
+    : await run('git', ['fetch', 'origin', `${name}:refs/remotes/origin/${name}`])
   if (!fetch.ok) return { range: undefined, refreshed: false }
   if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${name}`])).ok)
     return { range: `origin/${name}`, refreshed: true }

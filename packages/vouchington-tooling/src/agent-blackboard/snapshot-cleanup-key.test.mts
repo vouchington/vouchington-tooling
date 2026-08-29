@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile, link, lstat, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
 import {
   loadCleanupSigningKey,
   setCleanupKeyFilesystemForTest,
@@ -41,6 +42,58 @@ describe('snapshot cleanup signing key', () => {
     paths.add(root)
     setCleanupKeyTempDirectoryForTest(() => root)
     await loadCleanupSigningKey()
+    await expect(loadCleanupSigningKey()).resolves.toHaveLength(32)
+  })
+
+  it('retries when a temporary key link disappears during recovery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    await loadCleanupSigningKey()
+    const directory = join(root, `agent-blackboard-cleanup-${process.geteuid!()}`)
+    const key = join(directory, 'receipt-hmac-sha256.key')
+    const staging = join(directory, `.receipt-hmac-sha256.key.${randomUUID()}`)
+    await link(key, staging)
+    let vanished = false
+    setCleanupKeyFilesystemForTest({
+      lstat: (async (path: Parameters<typeof lstat>[0]) => {
+        if (!vanished && path === staging) {
+          vanished = true
+          await unlink(staging)
+          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+        }
+        return lstat(path)
+      }) as typeof lstat,
+    })
+    await expect(loadCleanupSigningKey()).resolves.toHaveLength(32)
+  })
+
+  it('rejects two-link key recovery without a matching temporary name', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    await loadCleanupSigningKey()
+    const directory = join(root, `agent-blackboard-cleanup-${process.geteuid!()}`)
+    const key = join(directory, 'receipt-hmac-sha256.key')
+    await link(key, join(directory, `.receipt-hmac-sha256.key.not-a-uuid`))
+    await expect(loadCleanupSigningKey()).rejects.toThrow('unsafe temporary link')
+  })
+
+  it('ignores a vanished temporary key file after publishing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    let removed = false
+    setCleanupKeyFilesystemForTest({
+      unlink: (async (path: Parameters<typeof unlink>[0]) => {
+        if (!removed && String(path).includes('.receipt-hmac-sha256.key.')) {
+          removed = true
+          await unlink(path)
+          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+        }
+        return unlink(path)
+      }) as typeof unlink,
+    })
     await expect(loadCleanupSigningKey()).resolves.toHaveLength(32)
   })
 

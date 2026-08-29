@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { lstat, readFile, readdir, rename, rm, rmdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -54,7 +55,7 @@ async function removeCaptured(
   const tombstone =
     directory && receipt
       ? tombstonePath(receipt)
-      : join(tmpdir(), `.agent-blackboard-cleanup-${process.pid}-${crypto.randomUUID()}`)
+      : join(tmpdir(), `.agent-blackboard-cleanup-${process.pid}-${randomUUID()}`)
   if (directory) await writeResumeReceipt(optionsReceipt(receipt))
   await filesystem.rename(path, tombstone)
   let deleting = false

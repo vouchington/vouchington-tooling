@@ -93,6 +93,27 @@ describe('agent blackboard client', () => {
       }),
     ).rejects.toThrow('URL-safe')
     await expect(
+      appendJournal({
+        sessionId,
+        parentSessionId: 'parent/one',
+        agent: 'codex',
+        version: '1',
+        markdownFile: 'missing',
+        env,
+      }),
+    ).rejects.toThrow('parent session id')
+    await expect(
+      appendJournal({
+        sessionId,
+        parentSessionId: '',
+        agent: 'codex',
+        version: '1',
+        markdownFile: 'missing',
+        env,
+      }),
+    ).rejects.toThrow('parent session id')
+    expect(client.ensure).not.toHaveBeenCalled()
+    await expect(
       appendJournal({ sessionId, agent: 'codex', version: '1', markdownFile: await note(''), env }),
     ).rejects.toThrow('note file is empty')
     client.ensure.mockResolvedValue({ status: 'exists' })

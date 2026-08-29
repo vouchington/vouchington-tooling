@@ -131,6 +131,24 @@ describe('local retrospective facts branches', () => {
     },
   )
 
+  it('fetches the requested branch before using a remote-tracking ref as evidence', async () => {
+    const { calls, execute } = executor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/topic': { ok: false },
+      'git fetch origin topic:refs/remotes/origin/topic': { ok: true },
+      'git rev-parse --verify --quiet refs/remotes/origin/topic': { ok: true },
+      'git rev-list --count origin/main..origin/topic': { stdout: '1' },
+      'git diff --name-only origin/main...origin/topic': { stdout: '' },
+    })
+    const output = await localFacts({ branch: 'topic' }, execute)
+    expect(output).toContain(
+      'Fetch: git fetch origin main:refs/remotes/origin/main; git fetch origin topic:refs/remotes/origin/topic',
+    )
+    expect(calls.indexOf('git fetch origin topic:refs/remotes/origin/topic')).toBeLessThan(
+      calls.indexOf('git rev-list --count origin/main..origin/topic'),
+    )
+  })
+
   it('refuses a stale remote branch when its refresh fails', async () => {
     const { calls, execute } = executor({
       'git branch --show-current': { stdout: 'current' },

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { link, lstat, open, readFile, readdir, rm, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -18,7 +19,7 @@ function pathFor(receipt: SnapshotCleanupReceipt): string {
   return join(tmpdir(), `.agent-blackboard-cleanup-${receipt.token}.resume.json`)
 }
 function temporaryPath(receipt: SnapshotCleanupReceipt): string {
-  return `${pathFor(receipt)}.${crypto.randomUUID()}.tmp`
+  return `${pathFor(receipt)}.${randomUUID()}.tmp`
 }
 function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>, links = 1): void {
   if (
@@ -52,8 +53,6 @@ async function read(receipt: SnapshotCleanupReceipt): Promise<void> {
     const temporary = join(tmpdir(), matches[0]!.name)
     const staged = matches[0]!.info
     assertResumeFile(staged, 2)
-    if (staged.dev !== before.dev || staged.ino !== before.ino)
-      throw new Error('partition directory cleanup resume metadata is unsafe')
     await filesystem.unlink(temporary)
     before = await filesystem.lstat(path)
   }

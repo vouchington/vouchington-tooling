@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { link, lstat, mkdir, open, readdir, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -52,6 +52,14 @@ async function keyPath(): Promise<{ path: string; uid: number }> {
   return { path: join(directory, KEY_NAME), uid }
 }
 async function readKey(path: string, uid: number): Promise<Buffer> {
+  try {
+    return await readPresentKey(path, uid)
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    return readPresentKey(path, uid)
+  }
+}
+async function readPresentKey(path: string, uid: number): Promise<Buffer> {
   let before = await filesystem.lstat(path)
   if (before.nlink === 2) {
     assertKey(before, uid, 2)
@@ -69,8 +77,6 @@ async function readKey(path: string, uid: number): Promise<Buffer> {
     const temporary = join(dirname(path), matches[0]!.name)
     const staged = matches[0]!.info
     assertKey(staged, uid, 2)
-    if (staged.dev !== before.dev || staged.ino !== before.ino)
-      throw new Error('snapshot cleanup key has an unsafe temporary link')
     await filesystem.unlink(temporary)
     before = await filesystem.lstat(path)
   }
@@ -89,7 +95,7 @@ async function readKey(path: string, uid: number): Promise<Buffer> {
   }
 }
 async function publishKey(path: string, uid: number): Promise<void> {
-  const temporary = join(dirname(path), `.${KEY_NAME}.${crypto.randomUUID()}`)
+  const temporary = join(dirname(path), `.${KEY_NAME}.${randomUUID()}`)
   const file = await filesystem.open(
     temporary,
     constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
