@@ -98,6 +98,20 @@ describe('final code review workflow', () => {
     }
     expect(finalReview.jobs?.['opencode-code-review-poster']?.['continue-on-error']).toBe(true)
     expect(finalReview.jobs?.['opencode-zen-code-review-poster']?.['continue-on-error']).toBe(true)
+    for (const posterName of ['opencode-code-review-poster', 'opencode-zen-code-review-poster']) {
+      const poster = finalReview.jobs?.[posterName]?.steps?.find((step) =>
+        step.uses?.includes('code-review-poster'),
+      )
+      expect(poster?.with).toMatchObject({
+        expected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
+        expected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
+      })
+      expect(
+        finalReview.jobs?.[posterName]?.steps?.some(
+          (step) => step.name === 'Require the selected PR head before posting',
+        ),
+      ).toBe(false)
+    }
 
     const gateScript = finalReview.jobs?.['code-reviewed']?.steps?.at(0)?.run ?? ''
     expect(gateScript).toContain('Review selection failed')

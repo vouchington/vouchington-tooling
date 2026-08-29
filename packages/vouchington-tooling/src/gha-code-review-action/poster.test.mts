@@ -41,6 +41,12 @@ describe('code-review-poster action', () => {
     expect(stepByName.get('Post batched review')?.env?.CODE_REVIEW_TOKEN_SOURCE).toBe(
       '${{ inputs.token_source }}',
     )
+    expect(stepByName.get('Post batched review')?.env).toMatchObject({
+      EXPECTED_HEAD_SHA: '${{ inputs.expected_head_sha }}',
+      EXPECTED_BASE_SHA: '${{ inputs.expected_base_sha }}',
+    })
+    expect(action.inputs?.expected_head_sha).toMatchObject({ default: '' })
+    expect(action.inputs?.expected_base_sha).toMatchObject({ default: '' })
     expect(action.inputs?.token_source).toMatchObject({ default: 'claude-app' })
   })
 

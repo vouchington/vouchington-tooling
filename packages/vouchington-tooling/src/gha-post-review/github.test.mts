@@ -15,6 +15,7 @@ import {
 import type { ClaudeTokenIo } from './claude-token.mts'
 
 const HEAD_SHA = 'b'.repeat(40)
+const BASE_SHA = 'a'.repeat(40)
 
 function makeExec(handler: (args: readonly string[]) => string): GhExec {
   return (args) => handler(args)
@@ -112,7 +113,7 @@ describe('github review adapter', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, '{"body":"ok","comments":[]}')
     const exec = makeExec((args) => {
-      if (args.includes('.head.sha')) return HEAD_SHA
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
       return '[]'
     })
     const io = createGhPostReviewIo({
@@ -122,6 +123,8 @@ describe('github review adapter', () => {
       payloadBytes: Buffer.from('{"body":"ok"}'),
       token: 'tok',
       exec,
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
     })
     expect(io.readFile(payloadPath).toString()).toContain('ok')
     expect(io.getHeadSha()).toBe(HEAD_SHA)
@@ -131,6 +134,53 @@ describe('github review adapter', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('returns the live head without expected refs for legacy callers', () => {
+    const io = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+    })
+    expect(io.getHeadSha()).toBe(HEAD_SHA)
+  })
+
+  it('retries transient pull-ref read failures', () => {
+    let attempts = 0
+    const io = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+      exec: () => {
+        attempts += 1
+        if (attempts < 3) throw new Error('temporary GitHub API failure')
+        return `${HEAD_SHA}\t${BASE_SHA}`
+      },
+    })
+    expect(io.getHeadSha()).toBe(HEAD_SHA)
+    expect(attempts).toBe(3)
+
+    attempts = 0
+    const unavailable = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => {
+        attempts += 1
+        throw new Error('GitHub API unavailable')
+      },
+    })
+    expect(() => unavailable.getHeadSha()).toThrow('GitHub API unavailable')
+    expect(attempts).toBe(3)
+  })
+
   it('rejects a non-SHA head', () => {
     const io = createGhPostReviewIo({
       repository: 'o/r',
@@ -138,9 +188,83 @@ describe('github review adapter', () => {
       payloadPath: '/tmp/x',
       payloadBytes: Buffer.from('{}'),
       token: 'tok',
-      exec: () => 'not-a-sha',
+      exec: () => `not-a-sha\t${BASE_SHA}`,
     })
     expect(() => io.getHeadSha()).toThrow('Could not resolve PR head SHA')
+  })
+
+  it('rejects a pull request that changed after review selection', () => {
+    const options = {
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+    }
+    const staleHead = createGhPostReviewIo({
+      ...options,
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+      exec: () => `${'c'.repeat(40)}\t${BASE_SHA}`,
+    })
+    expect(() => staleHead.getHeadSha()).toThrow('PR head changed before posting')
+
+    const staleBase = createGhPostReviewIo({
+      ...options,
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+      exec: () => `${HEAD_SHA}\t${'d'.repeat(40)}`,
+    })
+    expect(() => staleBase.getHeadSha()).toThrow('PR base changed before posting')
+  })
+
+  it('rejects invalid pull request selection inputs', () => {
+    const noExec = (): never => {
+      throw new Error('network access was not expected')
+    }
+    const options = {
+      repository: 'o/r',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+    }
+    expect(() =>
+      createGhPostReviewIo({ ...options, prNumber: '../9', exec: noExec }).getHeadSha(),
+    ).toThrow('PR_NUMBER must be a positive integer')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        exec: () => `${HEAD_SHA}\tnot-a-sha`,
+      }).getHeadSha(),
+    ).toThrow('Could not resolve PR base SHA')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: HEAD_SHA,
+        exec: noExec,
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: 'not-a-sha',
+        expectedBaseSha: BASE_SHA,
+        exec: noExec,
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_HEAD_SHA must be a full lowercase commit SHA')
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: HEAD_SHA,
+        expectedBaseSha: 'not-a-sha',
+        exec: noExec,
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_BASE_SHA must be a full lowercase commit SHA')
   })
 
   it('wraps execFileSync as a gh helper', () => {
@@ -165,7 +289,7 @@ describe('postReviewFromEnv', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     const exec: GhExec = (args) => {
-      if (args.includes('.head.sha')) return HEAD_SHA
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
       if (args.includes('/files?per_page=100')) return '[]'
       return ''
     }
@@ -177,6 +301,8 @@ describe('postReviewFromEnv', () => {
             PR_NUMBER: '4',
             CODE_REVIEW_PAYLOAD_PATH: payloadPath,
             CODE_REVIEW_TOKEN_SOURCE: 'github-token',
+            EXPECTED_HEAD_SHA: HEAD_SHA,
+            EXPECTED_BASE_SHA: BASE_SHA,
             GH_TOKEN: 'job-token',
           },
           exec,

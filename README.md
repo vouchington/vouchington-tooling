@@ -137,10 +137,20 @@ jobs:
     uses: vouchington/vouchington-tooling/.github/workflows/code-review.yml@<sha>
     with:
       pr_number: ${{ inputs.pr_number }}
+      expected_head_sha: ${{ inputs.expected_head_sha }}
+      expected_base_sha: ${{ inputs.expected_base_sha }}
+      trusted_prompt_ref: ${{ inputs.expected_base_sha }}
       runs_on: '["self-hosted","Claude Code"]'
     secrets:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
+
+When an orchestrator selects an exact pull request revision, it must pass both expected SHAs
+together and set `trusted_prompt_ref` to `expected_base_sha`. The reusable workflow rejects a
+changed head or base before the agent starts and requires the trusted prompt ref to match that base.
+The agent checkout is pinned to the selected head. At the write boundary, the poster verifies both
+selected refs and binds the review commit ID to the selected head SHA. A validation failure exits
+before the review agent runs or before a review is posted.
 
 This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
 parallel only after the exact pull request head has a successful `tests` fan-in. A trusted

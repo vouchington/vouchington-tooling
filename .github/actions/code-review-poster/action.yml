@@ -16,6 +16,14 @@ inputs:
     description: Review POST credential. claude-app mints an App token via OIDC; github-token uses GITHUB_TOKEN.
     required: false
     default: claude-app
+  expected_head_sha:
+    description: Exact pull request head SHA that may receive the review
+    required: false
+    default: ''
+  expected_base_sha:
+    description: Exact pull request base SHA required when the review is posted
+    required: false
+    default: ''
 outputs:
   poster_outcome:
     description: Aggregate download, validation, and posting outcome
@@ -95,6 +103,8 @@ runs:
         PR_NUMBER: ${{ inputs.pr_number }}
         CODE_REVIEW_PAYLOAD_PATH: ${{ runner.temp }}/code-review-payload-ready/code-review-payload.json
         CODE_REVIEW_TOKEN_SOURCE: ${{ inputs.token_source }}
+        EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
       run: |
         set -euo pipefail
         node --experimental-strip-types \
