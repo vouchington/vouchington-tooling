@@ -56,6 +56,7 @@ async function fixture(): Promise<{ sourceRoot: string; targetRoot: string }> {
 describe('skill discovery', () => {
   it('reads the schema-v1 manifest and links a named skill within explicit roots', async () => {
     const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(targetRoot)
     await expect(readSkillManifest(sourceRoot)).resolves.toEqual({
       version: 1,
       skills: [
@@ -77,6 +78,7 @@ describe('skill discovery', () => {
 
   it('is idempotent only for the matching symlink and never overwrites paths', async () => {
     const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(targetRoot)
     await linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot }),
@@ -100,6 +102,7 @@ describe('skill discovery', () => {
 
   it('links transitive relative sibling prerequisites before the requested skill', async () => {
     const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(targetRoot)
     const skills = [
       ['test-authoring', '# Test authoring\n'],
       ['vitest-test-authoring', 'Apply [test authoring](../test-authoring/SKILL.md) first.\n'],
@@ -143,6 +146,7 @@ describe('skill discovery', () => {
   it('does not link into a root swapped for a directory link before its worker starts', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     const source = await realpath(join(sourceRoot, 'agent-workflow'))
+    await mkdir(targetRoot)
     const target = await resolveTargetDirectory(targetRoot)
     const moved = `${targetRoot}-moved`
     const victim = join(sourceRoot, '..', 'victim')
@@ -167,7 +171,9 @@ describe('skill discovery', () => {
     await expect(snapshotTargetDirectory(link)).rejects.toThrow('contains symlink')
     await writeFile(targetRoot, '')
     await expect(snapshotTargetDirectory(targetRoot)).rejects.toThrow('Invalid target root')
-    const target = await resolveTargetDirectory(join(sourceRoot, '..', 'valid-target'))
+    const validTarget = join(sourceRoot, '..', 'valid-target')
+    await mkdir(validTarget)
+    const target = await resolveTargetDirectory(validTarget)
     await expect(
       linkDirectoryEntry(source, target, 'agent-workflow', undefined, async () => 'unexpected'),
     ).rejects.toThrow('invalid result')
@@ -176,6 +182,7 @@ describe('skill discovery', () => {
   it('rejects a target root swapped after the worker writes through its bound directory', async () => {
     const { sourceRoot, targetRoot } = await fixture()
     const source = await realpath(join(sourceRoot, 'agent-workflow'))
+    await mkdir(targetRoot)
     const target = await resolveTargetDirectory(targetRoot)
     const moved = `${targetRoot}-moved`
     const victim = join(sourceRoot, '..', 'victim')
@@ -195,6 +202,7 @@ describe('skill discovery', () => {
 
   it('rejects circular relative sibling prerequisites', async () => {
     const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(targetRoot)
     for (const [name, prerequisite] of [
       ['first', 'second'],
       ['second', 'first'],
@@ -224,6 +232,7 @@ describe('skill discovery', () => {
 
   it('rejects relative sibling prerequisites that are absent from the manifest', async () => {
     const { sourceRoot, targetRoot } = await fixture()
+    await mkdir(targetRoot)
     await mkdir(join(sourceRoot, 'dependent'), { recursive: true })
     await writeFile(
       join(sourceRoot, 'dependent', 'SKILL.md'),
@@ -474,5 +483,8 @@ describe('skill discovery', () => {
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: fileTarget }),
     ).rejects.toThrow('Invalid target root')
+    await expect(
+      linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: join(targetRoot, 'missing') }),
+    ).rejects.toThrow('Target root must exist')
   })
 })

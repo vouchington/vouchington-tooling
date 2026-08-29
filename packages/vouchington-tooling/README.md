@@ -199,4 +199,5 @@ Use `readSkillManifest(skillsRoot)` to discover installed skills or
 `linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The
 CLI equivalent is `vouchington link-skill <name> --source-root <skills-dir> --target-root <dir>`.
 It rejects unknown names, paths outside either root, and existing non-matching destinations.
-`targetRoot` must be a physical directory path: symlinked target roots or ancestors are rejected.
+`targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
+rejected.

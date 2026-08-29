@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { lstat, mkdir } from 'node:fs/promises'
+import { lstat } from 'node:fs/promises'
 import { parse, relative, resolve, sep, join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -7,12 +7,15 @@ const execFileAsync = promisify(execFile)
 
 export type TargetDirectory = { path: string; dev: bigint; ino: bigint }
 
-export async function resolveTargetDirectory(targetRoot: string): Promise<TargetDirectory> {
+export async function resolveTargetDirectory(
+  targetRoot: string,
+  beforeRevalidate?: () => Promise<void>,
+): Promise<TargetDirectory> {
   const path = resolve(targetRoot)
-  await assertNoSymlinkAncestors(path)
-  await mkdir(path, { recursive: true })
-  await assertNoSymlinkAncestors(path)
-  return snapshotTargetDirectory(path)
+  const ancestors = await snapshotTargetAncestors(path)
+  await beforeRevalidate?.()
+  await assertTargetAncestorsUnchanged(ancestors)
+  return ancestors.at(-1)!
 }
 
 export async function linkDirectoryEntry(
@@ -80,19 +83,32 @@ async function assertTargetUnchanged(target: TargetDirectory): Promise<void> {
   throw new Error('Target root changed during skill linking')
 }
 
-async function assertNoSymlinkAncestors(path: string): Promise<void> {
+async function snapshotTargetAncestors(path: string): Promise<TargetDirectory[]> {
   const parsed = parse(path)
   let ancestor = parsed.root
+  const ancestors: TargetDirectory[] = []
   for (const component of relative(parsed.root, path).split(sep)) {
     ancestor = join(ancestor, component)
     try {
-      const stat = await lstat(ancestor)
-      if (stat.isSymbolicLink()) throw new Error(`Target root contains symlink: ${ancestor}`)
-      if (!stat.isDirectory()) throw new Error(`Invalid target root: ${ancestor}`)
+      ancestors.push(await snapshotTargetDirectory(ancestor))
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+        throw new Error(`Target root must exist: ${path}`)
       throw error
     }
+  }
+  return ancestors
+}
+
+async function assertTargetAncestorsUnchanged(ancestors: TargetDirectory[]): Promise<void> {
+  try {
+    for (const target of ancestors) {
+      const current = await snapshotTargetDirectory(target.path)
+      if (current.dev !== target.dev || current.ino !== target.ino)
+        throw new Error('Target root changed while resolving')
+    }
+  } catch {
+    throw new Error('Target root changed while resolving')
   }
 }
 

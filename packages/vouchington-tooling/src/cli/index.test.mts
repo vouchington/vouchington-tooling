@@ -85,6 +85,7 @@ describe('runCli', () => {
     const sourceRoot = join(directory, 'source')
     const targetRoot = join(directory, 'target')
     await mkdir(join(sourceRoot, 'agent-workflow'), { recursive: true })
+    await mkdir(targetRoot)
     await writeFile(join(sourceRoot, 'agent-workflow', 'SKILL.md'), '# Agent workflow\n')
     await writeFile(
       join(sourceRoot, 'manifest.json'),
