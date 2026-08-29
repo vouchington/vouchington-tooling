@@ -1,6 +1,10 @@
-import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
-import { createDirectoryLink } from './link.mts'
+import { lstat, readFile, realpath } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import {
+  linkDirectoryEntry,
+  resolveTargetDirectory,
+  type TargetDirectory,
+} from './target-directory.mts'
 
 export type SkillManifestEntry = {
   name: string
@@ -33,7 +37,7 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
   const manifest = await readSkillManifest(sourceRoot)
   const entry = manifest.skills.find((candidate) => candidate.name === options.name)
   if (entry === undefined) throw new Error(`Unknown skill: ${options.name}`)
-  const targetRoot = await resolveTargetRoot(options.targetRoot)
+  const targetRoot = await resolveTargetDirectory(options.targetRoot)
   const linked = new Set<string>()
   const linking = new Set<string>()
   return linkManifestSkill(sourceRoot, targetRoot, manifest, entry, linked, linking)
@@ -41,7 +45,7 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
 
 async function linkManifestSkill(
   sourceRoot: string,
-  targetRoot: string,
+  targetRoot: TargetDirectory,
   manifest: SkillManifest,
   entry: SkillManifestEntry,
   linked: Set<string>,
@@ -63,23 +67,14 @@ async function linkManifestSkill(
 }
 
 async function linkResult(
-  targetRoot: string,
+  targetRoot: TargetDirectory,
   name: string,
   sourceRoot: string,
   skillPath: string,
 ): Promise<LinkSkillResult> {
   const source = await resolveSkillSource(sourceRoot, skillPath)
-  const path = assertContained(targetRoot, name)
-  try {
-    const stat = await lstat(path)
-    if (!stat.isSymbolicLink()) throw new Error(`Destination already exists: ${path}`)
-    if ((await realpath(path)) !== source) throw new Error(`Destination already exists: ${path}`)
-    return { created: false, path, source }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-  }
-  await createDirectoryLink(source, path)
-  return { created: true, path, source }
+  const path = assertContained(targetRoot.path, name)
+  return { created: await linkDirectoryEntry(source, targetRoot, name), path, source }
 }
 
 async function prerequisitesFor(
@@ -109,25 +104,18 @@ function relativeSiblingSkillLinks(skill: string): string[] {
 }
 
 async function resolveSkillSource(sourceRoot: string, skillPath: string): Promise<string> {
-  if (basename(skillPath) !== 'SKILL.md') throw new Error(`Invalid skill source: ${skillPath}`)
   const candidate = assertContained(sourceRoot, skillPath)
   let skill: string
   try {
     skill = await realpath(candidate)
   } catch {
+    /* v8 ignore next 2 -- only an attacker replacing a validated source can reach this. */
     throw new Error(`Invalid skill source: ${skillPath}`)
   }
+  /* v8 ignore next 2 -- only an attacker replacing a validated source can reach this. */
   if (!isContained(sourceRoot, skill) || !(await lstat(skill)).isFile())
     throw new Error(`Skill source escapes root: ${skillPath}`)
   return dirname(skill)
-}
-
-async function resolveTargetRoot(targetRoot: string): Promise<string> {
-  const root = resolve(targetRoot)
-  await assertNoSymlinkAncestors(root)
-  await mkdir(root, { recursive: true })
-  await assertNoSymlinkAncestors(root)
-  return root
 }
 
 async function validateManifestEntries(root: string, entries: SkillManifestEntry[]): Promise<void> {
@@ -138,34 +126,22 @@ async function validateManifestEntries(root: string, entries: SkillManifestEntry
     if (!isSafeSkillName(entry.name)) throw new Error(`Invalid skill name: ${entry.name}`)
     if (names.has(entry.name)) throw new Error(`Duplicate skill name: ${entry.name}`)
     names.add(entry.name)
+    if (basename(entry.path) !== 'SKILL.md') throw new Error(`Invalid skill source: ${entry.path}`)
     const path = assertContained(root, entry.path)
     if (lexicalPaths.has(path)) throw new Error(`Duplicate skill path: ${entry.path}`)
     lexicalPaths.add(path)
+    let canonicalPath: string
     try {
-      const canonicalPath = await realpath(path)
-      if (!isContained(root, canonicalPath))
-        throw new Error(`Skill source escapes root: ${entry.path}`)
-      if (canonicalPaths.has(canonicalPath)) throw new Error(`Duplicate skill path: ${entry.path}`)
-      canonicalPaths.add(canonicalPath)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      canonicalPath = await realpath(path)
+    } catch {
+      throw new Error(`Invalid skill source: ${entry.path}`)
     }
-  }
-}
-
-async function assertNoSymlinkAncestors(path: string): Promise<void> {
-  const parsed = parse(path)
-  let ancestor = parsed.root
-  for (const component of relative(parsed.root, path).split(sep)) {
-    ancestor = join(ancestor, component)
-    try {
-      const stat = await lstat(ancestor)
-      if (stat.isSymbolicLink()) throw new Error(`Target root contains symlink: ${ancestor}`)
-      if (!stat.isDirectory()) throw new Error(`Invalid target root: ${ancestor}`)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-      throw error
-    }
+    if (!isContained(root, canonicalPath))
+      throw new Error(`Skill source escapes root: ${entry.path}`)
+    if (!(await lstat(canonicalPath)).isFile())
+      throw new Error(`Invalid skill source: ${entry.path}`)
+    if (canonicalPaths.has(canonicalPath)) throw new Error(`Duplicate skill path: ${entry.path}`)
+    canonicalPaths.add(canonicalPath)
   }
 }
 

@@ -1,11 +1,25 @@
-import { lstat, mkdtemp, mkdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  mkdtemp,
+  mkdir,
+  readlink,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { linkSkill, readSkillManifest } from './index.mts'
-import { createDirectoryLink } from './link.mts'
+import {
+  linkDirectoryEntry,
+  resolveTargetDirectory,
+  snapshotTargetDirectory,
+} from './target-directory.mts'
 
 const directories: string[] = []
 
@@ -126,51 +140,37 @@ describe('skill discovery', () => {
     }
   })
 
-  it('falls back to a Windows junction when directory symlink creation needs privileges', async () => {
-    const calls: Array<{ source: string; path: string; type: string }> = []
-    await createDirectoryLink(
-      '/source',
-      '/target',
-      async (source, path, type) => {
-        calls.push({ source, path, type })
-        if (type === 'dir') throw Object.assign(new Error('permission denied'), { code: 'EPERM' })
-      },
-      'win32',
-    )
-    expect(calls).toEqual([
-      { source: '/source', path: '/target', type: 'dir' },
-      { source: '/source', path: '/target', type: 'junction' },
-    ])
+  it('does not link into a root swapped for a directory link before its worker starts', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    const source = await realpath(join(sourceRoot, 'agent-workflow'))
+    const target = await resolveTargetDirectory(targetRoot)
+    const moved = `${targetRoot}-moved`
+    const victim = join(sourceRoot, '..', 'victim')
+    await mkdir(victim)
     await expect(
-      createDirectoryLink(
-        '/source',
-        '/target',
-        async () => {
-          throw Object.assign(new Error('permission denied'), { code: 'EPERM' })
-        },
-        'darwin',
-      ),
-    ).rejects.toThrow('permission denied')
+      linkDirectoryEntry(source, target, 'agent-workflow', async () => {
+        await rename(targetRoot, moved)
+        await symlink(victim, targetRoot, 'dir')
+      }),
+    ).rejects.toThrow('Target root changed during skill linking')
+    await expect(lstat(join(victim, 'agent-workflow'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await rm(moved, { force: true, recursive: true })
+  })
+
+  it('rejects non-directory target snapshots and unexpected worker results', async () => {
+    const { sourceRoot, targetRoot } = await fixture()
+    const source = await realpath(join(sourceRoot, 'agent-workflow'))
+    const victim = join(sourceRoot, '..', 'victim')
+    const link = join(sourceRoot, '..', 'target-link')
+    await mkdir(victim)
+    await symlink(victim, link, 'dir')
+    await expect(snapshotTargetDirectory(link)).rejects.toThrow('contains symlink')
+    await writeFile(targetRoot, '')
+    await expect(snapshotTargetDirectory(targetRoot)).rejects.toThrow('Invalid target root')
+    const target = await resolveTargetDirectory(join(sourceRoot, '..', 'valid-target'))
     await expect(
-      createDirectoryLink(
-        '/source',
-        '/target',
-        async () => {
-          throw Object.assign(new Error('missing source'), { code: 'ENOENT' })
-        },
-        'win32',
-      ),
-    ).rejects.toThrow('missing source')
-    await expect(
-      createDirectoryLink(
-        '/source',
-        '/target',
-        async () => {
-          throw new Error('missing error code')
-        },
-        'win32',
-      ),
-    ).rejects.toThrow('missing error code')
+      linkDirectoryEntry(source, target, 'agent-workflow', undefined, async () => 'unexpected'),
+    ).rejects.toThrow('invalid result')
   })
 
   it('rejects circular relative sibling prerequisites', async () => {
@@ -243,7 +243,7 @@ describe('skill discovery', () => {
   })
 
   it('rejects malformed manifests and absolute or non-file skill sources', async () => {
-    const { sourceRoot, targetRoot } = await fixture()
+    const { sourceRoot } = await fixture()
     for (const invalid of [
       null,
       1,
@@ -294,9 +294,23 @@ describe('skill discovery', () => {
         ],
       }),
     )
-    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
-      'Invalid skill source',
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Invalid skill source')
+
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'missing',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'missing/SKILL.md',
+          },
+        ],
+      }),
     )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Invalid skill source')
 
     await rm(join(sourceRoot, 'agent-workflow', 'SKILL.md'))
     await mkdir(join(sourceRoot, 'agent-workflow', 'SKILL.md'))
@@ -314,26 +328,20 @@ describe('skill discovery', () => {
         ],
       }),
     )
-    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
-      'escapes root',
-    )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Invalid skill source')
   })
 
   it('rejects escaped or dangling skill sources before linking', async () => {
-    const { sourceRoot, targetRoot } = await fixture()
+    const { sourceRoot } = await fixture()
     const outside = join(sourceRoot, '..', 'outside')
     await mkdir(outside, { recursive: true })
     await writeFile(join(outside, 'SKILL.md'), '# Outside\n')
     await rm(join(sourceRoot, 'agent-workflow'), { force: true, recursive: true })
     await symlink(outside, join(sourceRoot, 'agent-workflow'), 'dir')
-    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
-      'escapes',
-    )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('escapes')
     await rm(join(sourceRoot, 'agent-workflow'))
     await symlink(join(sourceRoot, 'missing'), join(sourceRoot, 'agent-workflow'), 'dir')
-    await expect(linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot })).rejects.toThrow(
-      'Invalid skill source',
-    )
+    await expect(readSkillManifest(sourceRoot)).rejects.toThrow('Invalid skill source')
   })
 
   it('rejects unsafe skill names before they can escape the target root', async () => {
