@@ -152,5 +152,7 @@ describe('persistent metadata', () => {
       '{"version":3}\n',
     )
     expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
+    await writeFile(join(root, 'node_modules', '.pnpm-install-metadata-health.json'), 'null\n')
+    expect(await persistentMetadataMatches(after)).toEqual({ kind: 'unsafe' })
   })
 })

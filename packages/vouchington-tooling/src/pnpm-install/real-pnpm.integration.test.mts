@@ -51,17 +51,17 @@ async function runInstaller(
   }
 }
 
-async function lineCount(filename: string) {
+async function logLines(filename: string) {
   try {
-    return (await readFile(filename, 'utf8')).trim().split('\n').filter(Boolean).length
+    return (await readFile(filename, 'utf8')).trim().split('\n').filter(Boolean)
   } catch {
-    return 0
+    return []
   }
 }
 
 describe('pnpm install with a real registry fixture', () => {
   it(
-    'does not refetch tarballs or rerun postinstall across warm true-to-false-to-true transitions',
+    'fetches once and runs deferred dependency and workspace scripts once',
     { timeout: 30_000 },
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'pnpm-install-real-'))
@@ -77,7 +77,7 @@ describe('pnpm install with a real registry fixture', () => {
           name: '@fixture/postinstall',
           scripts: {
             postinstall:
-              "node -e \"require('node:fs').appendFileSync(process.env.POSTINSTALL_LOG, 'postinstall\\n')\"",
+              "node -e \"require('node:fs').appendFileSync(process.env.POSTINSTALL_LOG, 'dependency\\n')\"",
           },
           version: '1.0.0',
         }),
@@ -104,6 +104,10 @@ describe('pnpm install with a real registry fixture', () => {
             dependencies: { '@fixture/postinstall': tarballUrl },
             name: 'real-pnpm-fixture',
             private: true,
+            scripts: {
+              postinstall:
+                "node -e \"require('node:fs').appendFileSync(process.env.POSTINSTALL_LOG, 'workspace\\n')\"",
+            },
             version: '1.0.0',
           }),
         )
@@ -118,16 +122,16 @@ describe('pnpm install with a real registry fixture', () => {
 
         await runInstaller(root, false, postinstallLog, storeDirectory)
         expect(tarballFetches).toBe(1)
-        expect(await lineCount(postinstallLog)).toBe(0)
+        expect(await logLines(postinstallLog)).toEqual([])
 
         await runInstaller(root, true, postinstallLog, storeDirectory)
         expect(tarballFetches).toBe(1)
-        expect(await lineCount(postinstallLog)).toBe(1)
+        expect((await logLines(postinstallLog)).toSorted()).toEqual(['dependency', 'workspace'])
 
         await runInstaller(root, false, postinstallLog, storeDirectory)
         await runInstaller(root, true, postinstallLog, storeDirectory)
         expect(tarballFetches).toBe(1)
-        expect(await lineCount(postinstallLog)).toBe(1)
+        expect((await logLines(postinstallLog)).toSorted()).toEqual(['dependency', 'workspace'])
       } finally {
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve())),

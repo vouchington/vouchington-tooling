@@ -80,7 +80,7 @@ async function persistent(options: InstallOptions) {
     ? provisionalTransition
     : { action: 'reconcile' as const, reason: 'native-health-mismatch' }
   const provenanceOk =
-    provenance.kind === 'matching' && transition.action === 'ordinary' && nativesMatch
+    provenance.kind === 'matching' && transition.action !== 'reconcile' && nativesMatch
 
   // An absent tree has nothing to repair, so one ordinary install below matches the
   // reconciled end state. Check first: an install would otherwise make the tree non-cold.
@@ -110,12 +110,17 @@ async function persistent(options: InstallOptions) {
   if (provenance.kind === 'absent')
     console.warn('persistent dependency tree is absent; installing cold')
   await install(
-    withScriptPolicy([...baseInstallArgs], options.installScripts),
+    withScriptPolicy(
+      [...baseInstallArgs],
+      transition.action === 'upgrade-scripts' ? false : options.installScripts,
+    ),
     options,
     'ordinary persistent install',
   )
   const stale = await findWorkspaceLinkMismatches(runCapture)
   if (stale.length === 0) {
+    if (transition.action === 'upgrade-scripts')
+      await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
     console.warn(
       persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, transition),
     )

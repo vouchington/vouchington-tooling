@@ -9,7 +9,7 @@ export type ProvenanceStatus =
   | { kind: 'unsafe' }
 
 export type PersistentInstallTransition = {
-  action: 'ordinary' | 'reconcile'
+  action: 'ordinary' | 'reconcile' | 'upgrade-scripts'
   reason: string
 }
 
@@ -21,7 +21,7 @@ export function persistentInstallTransition(
 ): PersistentInstallTransition {
   if (provenance.kind === 'matching') {
     if (installScripts && !provenance.scriptsEnabledInstallSucceeded)
-      return { action: 'reconcile', reason: 'scripts-not-yet-enabled' }
+      return { action: 'upgrade-scripts', reason: 'pending-scripts-rebuild' }
     return { action: 'ordinary', reason: 'matching-structural-provenance' }
   }
   if (provenance.kind === 'absent') return { action: 'ordinary', reason: 'missing-stamp' }

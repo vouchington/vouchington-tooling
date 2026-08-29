@@ -316,15 +316,15 @@ describe('pnpm install lifecycle', () => {
     }
   })
 
-  it('reconciles warm false-to-true transitions until a scripts-enabled install succeeds', async () => {
+  it('upgrades warm false-to-true transitions with a pending scripts rebuild', async () => {
     const fixture = await makeFixture()
     try {
       await runInstaller(fixture, { installScripts: false })
       await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -369,8 +369,13 @@ describe('pnpm install lifecycle', () => {
       await runInstaller(fixture, { installScripts: false })
       await rm(addon)
       await resetInstallCalls(fixture)
-      await runInstaller(fixture)
-      await expect(installCalls(fixture)).resolves.toHaveLength(2)
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+      expect(result.stderr).toContain('"action":"upgrade-scripts"')
+      expect(result.stderr).toContain('"reason":"pending-scripts-rebuild"')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
@@ -397,8 +402,13 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_REPAIR_LINK = '1'
       await runInstaller(fixture, { installScripts: false })
       await resetInstallCalls(fixture)
-      await runInstaller(fixture)
-      await expect(installCalls(fixture)).resolves.toHaveLength(2)
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'rebuild --pending --recursive',
+      ])
+      expect(result.stderr).toContain('"action":"upgrade-scripts"')
+      expect(result.stderr).toContain('"reason":"pending-scripts-rebuild"')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }

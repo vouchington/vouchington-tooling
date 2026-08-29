@@ -23,7 +23,10 @@ function add(hash: ReturnType<typeof createHash>, label: string, value: string) 
   hash.update(`${label.length}:${label}${value.length}:${value}`)
 }
 
-function expectedFingerprint(root: string, installScripts: boolean, packageJson: string) {
+function expectedFingerprint(
+  installScripts: boolean,
+  manifests: Array<{ path: string; contents: string }>,
+) {
   const glibc = reportGlibcVersionRuntime(process.report?.getReport())
   const hash = createHash('sha256')
   add(
@@ -50,7 +53,8 @@ function expectedFingerprint(root: string, installScripts: boolean, packageJson:
     '.pnpmfile.mjs',
   ])
     add(hash, filename, filename === 'pnpm-lock.yaml' ? 'lock\n' : '')
-  add(hash, relative(process.cwd(), join(root, 'package.json')), packageJson)
+  for (const manifest of manifests.toSorted((left, right) => left.path.localeCompare(right.path)))
+    add(hash, relative(process.cwd(), join(manifest.path, 'package.json')), manifest.contents)
   return hash.digest('hex')
 }
 
@@ -59,19 +63,33 @@ describe('legacy persistent metadata API', () => {
     const root = await mkdtemp(join(tmpdir(), 'pnpm-metadata-legacy-'))
     roots.push(root)
     const packageJson = '{"name":"root"}\n'
+    const dependency = join(root, 'dependency')
+    const dependencyPackageJson = '{"name":"dependency"}\n'
     await Promise.all([
       writeFile(join(root, 'package.json'), packageJson),
       writeFile(join(root, 'pnpm-lock.yaml'), 'lock\n'),
+      mkdir(dependency),
     ])
+    await writeFile(join(dependency, 'package.json'), dependencyPackageJson)
     process.chdir(root)
     const capture = async (args: string[]) =>
       args[0] === '--version'
         ? { code: 0, output: '11.0.0\n' }
-        : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
+        : {
+            code: 0,
+            output: JSON.stringify([
+              { name: 'root', path: root },
+              { name: 'dependency', path: dependency },
+            ]),
+          }
     const enabled = await persistentMetadataFingerprint(capture, true)
     const disabled = await persistentMetadataFingerprint(capture, false)
-    expect(enabled).toBe(expectedFingerprint(root, true, packageJson))
-    expect(disabled).toBe(expectedFingerprint(root, false, packageJson))
+    const manifests = [
+      { contents: dependencyPackageJson, path: dependency },
+      { contents: packageJson, path: root },
+    ]
+    expect(enabled).toBe(expectedFingerprint(true, manifests))
+    expect(disabled).toBe(expectedFingerprint(false, manifests))
     expect(enabled).not.toBe(disabled)
     expect(await persistentMetadataMatches(enabled)).toBe(false)
     await writePersistentMetadataStamp(enabled)
