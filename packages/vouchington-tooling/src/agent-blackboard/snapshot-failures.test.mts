@@ -227,6 +227,10 @@ describe('snapshot resource failures', () => {
           await mkdir(directory)
           await writeFile(join(directory, 'replacement'), 'keep')
         }
+        if (String(path).includes('.agent-blackboard-cleanup-'))
+          return Object.assign(Object.create(Object.getPrototypeOf(info)), info, {
+            ino: Number(info.ino) + 1,
+          }) as typeof info
         return info
       }) as typeof lstat,
     })
