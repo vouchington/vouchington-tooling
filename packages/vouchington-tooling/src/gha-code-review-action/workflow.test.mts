@@ -95,6 +95,8 @@ describe('code-review reusable workflow', () => {
     expect(reviewGuard?.if).toBe("inputs.expected_head_sha != '' || inputs.expected_base_sha != ''")
     expect(reviewGuard?.run).toContain("--jq '[.head.sha, .base.sha] | @tsv'")
     expect(reviewGuard?.run).not.toContain('jq -r')
+    const repositoryCheckout = reviewSteps.find((step) => step.name === 'Checkout repository')
+    expect(repositoryCheckout?.with?.ref).toBe('${{ inputs.expected_head_sha || github.sha }}')
     expect(poster?.with).toMatchObject({
       expected_head_sha: '${{ inputs.expected_head_sha }}',
       expected_base_sha: '${{ inputs.expected_base_sha }}',

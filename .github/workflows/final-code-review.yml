@@ -246,6 +246,8 @@ jobs:
           artifact_id: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
           provider_name: OpenCode OpenRouter
           token_source: github-token
+          expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
+          expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
 
   opencode-zen-code-review:
     name: OpenCode Zen Review
@@ -328,6 +330,8 @@ jobs:
           artifact_id: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
           provider_name: OpenCode Zen
           token_source: github-token
+          expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
+          expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
 
   code-reviewed:
     name: >-
