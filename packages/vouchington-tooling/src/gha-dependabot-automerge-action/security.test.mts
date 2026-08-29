@@ -4,6 +4,7 @@ import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 interface Step {
+  'continue-on-error'?: boolean
   env?: Record<string, string>
   id?: string
   uses?: string
@@ -27,6 +28,12 @@ describe('Dependabot auto-merge action security boundary', () => {
     expect(script?.uses).toMatch(/^actions\/github-script@[a-f0-9]{40}$/)
     expect(script?.with?.['github-token']).toBe('${{ github.token }}')
     expect(script?.env?.AUTOMERGE_TOKEN).toBe('${{ inputs.automerge_token }}')
+    expect(script?.env?.DEPENDABOT_METADATA_OUTCOME).toBe(
+      '${{ steps.dependabot-metadata.outcome }}',
+    )
+    expect(metadata?.['continue-on-error']).toBe(true)
+    expect(source).not.toContain('skip-commit-verification')
+    expect(source).not.toContain('skip-verification')
     expect(script?.env?.EXPECTED_BASE_SHA).toContain('github.event.pull_request.base.sha')
     expect(script?.env?.EXPECTED_HEAD_SHA).toContain('github.event.pull_request.head.sha')
     expect(script?.env?.GRAPHQL_URL).toBe('${{ github.graphql_url }}')

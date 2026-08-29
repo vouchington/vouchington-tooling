@@ -59,6 +59,7 @@ export async function runPolicy(
   manualRules = '[]',
   confirmedPullRequestOverrides: Error | Record<string, unknown> = freshPullRequestOverrides,
   initialRefreshError?: Error,
+  metadataOutcome = 'success',
 ): Promise<ScriptResult> {
   if (!script) throw new Error('Dependabot auto-merge script is missing')
   const failures: string[] = []
@@ -118,6 +119,7 @@ export async function runPolicy(
   const environment: Record<string, string> = {
     DEPENDABOT_DIRECTORY: dependabot.directory,
     DEPENDABOT_ECOSYSTEM: dependabot.ecosystem,
+    DEPENDABOT_METADATA_OUTCOME: metadataOutcome,
     EXPECTED_BASE_SHA: expectedBase ?? String((eventPullRequest.base as { sha: string }).sha),
     EXPECTED_HEAD_SHA: expectedHead ?? String((eventPullRequest.head as { sha: string }).sha),
     GRAPHQL_URL: 'https://github.example.test/api/graphql',

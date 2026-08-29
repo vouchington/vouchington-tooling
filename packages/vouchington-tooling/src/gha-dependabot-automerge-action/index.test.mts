@@ -286,14 +286,14 @@ describe('Dependabot auto-merge action policy', () => {
         auto_merge: { merge_method: 'squash' },
       },
     )
-    expect(alreadyEnabled.mutationRequests).toHaveLength(2)
-    expect(alreadyEnabled.mutationRequests[0]?.body).toContain('disablePullRequestAutoMerge')
-    expect(alreadyEnabled.mutationRequests[1]?.body).toContain('mergeMethod: SQUASH')
+    expect(alreadyEnabled.failures).toEqual([])
+    expect(alreadyEnabled.mutationRequests).toEqual([])
+    expect(alreadyEnabled.infos).toContain('Done: auto-merge already enabled')
 
     const wrongMethod = await runPolicy(candidate, {}, { auto_merge: { merge_method: 'merge' } })
-    expect(wrongMethod.mutationRequests).toHaveLength(2)
-    expect(wrongMethod.mutationRequests[0]?.body).toContain('disablePullRequestAutoMerge')
-    expect(wrongMethod.mutationRequests[1]?.body).toContain('mergeMethod: SQUASH')
+    expect(wrongMethod.failures).toEqual([])
+    expect(wrongMethod.mutationRequests).toEqual([])
+    expect(wrongMethod.infos).toContain('Done: auto-merge already enabled')
   })
 
   it('disables auto-merge if the trusted PR changes while it is enabled', async () => {

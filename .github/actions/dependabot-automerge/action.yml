@@ -21,6 +21,7 @@ runs:
   steps:
     - name: Fetch Dependabot metadata
       id: dependabot-metadata
+      continue-on-error: true
       uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
       with:
         github-token: ${{ github.token }}
@@ -29,6 +30,7 @@ runs:
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
       env:
         AUTOMERGE_TOKEN: ${{ inputs.automerge_token }}
+        DEPENDABOT_METADATA_OUTCOME: ${{ steps.dependabot-metadata.outcome }}
         EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha || github.event.pull_request.base.sha }}
         EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.event.pull_request.head.sha }}
         GRAPHQL_URL: ${{ github.graphql_url }}
@@ -113,6 +115,10 @@ runs:
             await requireHumanAction(['pull request changed or is not a trusted Dependabot branch']);
             return;
           }
+          if (process.env.DEPENDABOT_METADATA_OUTCOME !== 'success') {
+            await requireHumanAction(['Dependabot metadata unavailable (unsigned or non-Dependabot HEAD)']);
+            return;
+          }
           let manualRules;
           try {
             manualRules = JSON.parse(process.env.MANUAL_UPDATE_RULES ?? '');
@@ -164,8 +170,8 @@ runs:
             return;
           }
           if (freshPr.auto_merge) {
-            core.info('Replacing existing auto-merge with the dedicated token');
-            await requireHumanAction([]);
+            core.info('Done: auto-merge already enabled');
+            return;
           }
           const mergeToken = process.env.AUTOMERGE_TOKEN;
           if (!mergeToken) {
