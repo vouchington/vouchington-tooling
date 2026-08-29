@@ -42,6 +42,21 @@ describe('target directory', () => {
       code: 'ENOENT',
     })
   })
+
+  it('rejects an ancestor replaced by another physical directory', async () => {
+    const root = await fixture()
+    const parent = join(root, 'parent')
+    const target = join(parent, 'target')
+    const moved = join(root, 'parent-moved')
+    await mkdir(target, { recursive: true })
+
+    await expect(
+      resolveTargetDirectory(target, async () => {
+        await rename(parent, moved)
+        await mkdir(target, { recursive: true })
+      }),
+    ).rejects.toThrow('Target root changed while resolving')
+  })
 })
 
 async function fixture(): Promise<string> {
