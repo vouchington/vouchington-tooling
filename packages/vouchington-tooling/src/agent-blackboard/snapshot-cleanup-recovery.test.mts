@@ -9,6 +9,7 @@ import {
 } from './snapshot-cleanup-key.mts'
 import { requireResumeReceipt, writeResumeReceipt } from './snapshot-cleanup-resume.mts'
 import { writeCleanupReceipt } from './snapshot-cleanup-receipt.mts'
+import { cleanupSnapshotPartitions } from './snapshot.mts'
 
 const paths = new Set<string>()
 afterEach(async () => {
@@ -47,5 +48,16 @@ describe('snapshot cleanup publication recovery', () => {
     await link(marker, staging)
     await expect(requireResumeReceipt(receipt)).resolves.toBeUndefined()
     expect((await stat(marker)).nlink).toBe(1)
+  })
+
+  it('accepts a response-lost retry only after every receipt-derived cleanup path is absent', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'agent-blackboard-partitions-'))
+    const partition = join(directory, 'partition-1.jsonl')
+    await writeFile(partition, 'x', { mode: 0o400 })
+    const receipt = await writeCleanupReceipt(directory, [
+      { path: partition, checksum: { algorithm: 'sha256', value: '0'.repeat(64) } },
+    ])
+    await rm(directory, { recursive: true })
+    await expect(cleanupSnapshotPartitions({ directory, receipt })).resolves.toBeUndefined()
   })
 })

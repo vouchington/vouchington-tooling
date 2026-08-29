@@ -56,12 +56,7 @@ async function removeCaptured(
       ? tombstonePath(receipt)
       : join(tmpdir(), `.agent-blackboard-cleanup-${process.pid}-${crypto.randomUUID()}`)
   if (directory) await writeResumeReceipt(optionsReceipt(receipt))
-  try {
-    await filesystem.rename(path, tombstone)
-  } catch (error) {
-    if (directory) await removeResumeReceipt(optionsReceipt(receipt)).catch(() => undefined)
-    throw error
-  }
+  await filesystem.rename(path, tombstone)
   let deleting = false
   try {
     const captured = await filesystem.lstat(tombstone)
@@ -99,7 +94,6 @@ async function removeCaptured(
         `${label} cleanup failed; tombstone ${tombstone} could not be restored to ${path}`,
       )
     }
-    if (directory) await removeResumeReceipt(optionsReceipt(receipt)).catch(() => undefined)
     const detail = error instanceof Error ? `: ${error.message}` : ''
     throw new Error(`${label} cleanup failed; restored ${path} for retry${detail}`, {
       cause: error,
@@ -111,15 +105,22 @@ function tombstonePath(receipt: SnapshotCleanupReceipt): string {
 }
 async function resumeDirectory(path: string, receipt: SnapshotCleanupReceipt): Promise<void> {
   const tombstone = tombstonePath(receipt)
-  await requireResumeReceipt(receipt)
+  let marker = true
+  try {
+    await requireResumeReceipt(receipt)
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    marker = false
+  }
   let info
   try {
     info = await filesystem.lstat(tombstone)
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    await removeResumeReceipt(receipt)
+    if (marker) await removeResumeReceipt(receipt)
     return
   }
+  if (!marker) throw new Error('partition directory tombstone has no resume metadata')
   if (!info.isDirectory() || info.isSymbolicLink())
     throw new Error('partition directory tombstone is unsafe')
   try {
