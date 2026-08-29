@@ -145,6 +145,11 @@ describe('snapshot record format', () => {
       ),
     ).not.toThrow()
     expect(() =>
+      parseSnapshotRecord(
+        JSON.stringify({ type: 'session', session: { ...session, lastEntryAt: timestamp } }),
+      ),
+    ).not.toThrow()
+    expect(() =>
       parseSnapshotRecord(JSON.stringify({ type: 'session', session: { ...session, agent: 1 } })),
     ).toThrow('unsupported record')
   })

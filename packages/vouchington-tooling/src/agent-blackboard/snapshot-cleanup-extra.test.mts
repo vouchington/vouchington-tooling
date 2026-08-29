@@ -141,6 +141,17 @@ describe('snapshot cleanup guardrails', () => {
       cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
     ).rejects.toThrow('receipt is invalid')
   })
+
+  it('rejects a generated partition directory path replaced by a regular file', async () => {
+    const path = await snapshot()
+    const result = await partitionSnapshot({ path })
+    paths.add(result.directory)
+    await rm(result.directory, { recursive: true })
+    await writeFile(result.directory, 'replacement')
+    await expect(
+      cleanupSnapshotPartitions({ directory: result.directory, receipt: result.cleanupReceipt }),
+    ).rejects.toThrow('not a generated directory')
+  })
 })
 
 describe('snapshot cleanup signing-key guards', () => {

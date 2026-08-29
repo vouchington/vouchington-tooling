@@ -143,6 +143,20 @@ describe('snapshot resource failures', () => {
     paths.delete(path)
   })
 
+  it('includes a non-Error tombstone removal failure after successful rollback', async () => {
+    const path = await snapshot()
+    setSnapshotCleanupFilesystemForTest({
+      rm: async (target, options) => {
+        if (String(target).includes('.agent-blackboard-cleanup-')) throw 'removal failed'
+        return rm(target, options)
+      },
+    })
+    await expect(cleanupSnapshotPartitions({ path })).rejects.toThrow(
+      'restored ' + path + ' for retry',
+    )
+    await expect(readFile(path)).resolves.toBeTruthy()
+  })
+
   it('reports an aggregate and leaves retry evidence when tombstone rollback fails', async () => {
     const path = await snapshot()
     let renames = 0
