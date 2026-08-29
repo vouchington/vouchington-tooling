@@ -21,7 +21,7 @@ export type BlackboardClientModule = {
     get(input: unknown): AsyncIterable<unknown>
   }
 }
-export type BlackboardClientLoader = () => Promise<BlackboardClientModule>
+type BlackboardClientLoader = () => Promise<BlackboardClientModule>
 export type BlackboardClientDependencies = { loadClient?: BlackboardClientLoader }
 
 export function resolveBlackboardConnection(
