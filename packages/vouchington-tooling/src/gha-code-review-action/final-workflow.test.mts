@@ -1,7 +1,17 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
+
+type Step = {
+  env?: Record<string, string>
+  id?: string
+  if?: string
+  name?: string
+  run?: string
+  uses?: string
+  with?: Record<string, string>
+}
 
 type Job = {
   'continue-on-error'?: boolean
@@ -10,12 +20,7 @@ type Job = {
   needs?: string[]
   permissions?: Record<string, string>
   'runs-on'?: string | string[]
-  steps?: Array<{
-    name?: string
-    run?: string
-    uses?: string
-    with?: Record<string, string>
-  }>
+  steps?: Step[]
 }
 
 type Workflow = {
@@ -23,54 +28,89 @@ type Workflow = {
   jobs?: Record<string, Job>
   on?: {
     pull_request_target?: { types?: string[] }
-    workflow_run?: { types?: string[]; workflows?: string[] }
+    workflow_run?: unknown
   }
 }
 
 const finalReviewText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
 const finalReview = load(finalReviewText) as Workflow
 const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8')) as Workflow
-const routerText = readFileSync('.github/workflows/ci-request-final-code-review.yml', 'utf8')
-const router = load(routerText) as Workflow
+const selectAction = readFileSync('.github/actions/final-review-select/action.yml', 'utf8')
+const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
+const selectScript = readFileSync('.github/actions/final-review-select/select.sh', 'utf8')
+const waitScript = readFileSync('.github/actions/final-review-select/wait-for-tests.sh', 'utf8')
+const dispatchScript = readFileSync(
+  '.github/actions/final-review-dispatch-claude/dispatch-claude.sh',
+  'utf8',
+)
+const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
 
 describe('final code review workflow', () => {
   it('creates the native required gate from trusted default-branch code for every PR head', () => {
-    expect(finalReview.on?.pull_request_target?.types).toEqual(['labeled', 'ready_for_review'])
+    expect(finalReview.on?.pull_request_target?.types).toEqual([
+      'opened',
+      'reopened',
+      'synchronize',
+      'ready_for_review',
+      'converted_to_draft',
+      'closed',
+    ])
     expect(finalReview.concurrency).toEqual({
       group:
-        "final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.event.action }}-${{ github.event.label.name || 'none' }}",
-      'cancel-in-progress': false,
+        'final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}',
+      'cancel-in-progress': true,
     })
 
     const gate = finalReview.jobs?.['code-reviewed']
     expect(gate?.name).toContain("&& 'Code Reviewed'")
-    expect(gate?.name).toContain("|| 'Ignore final review request'")
-    expect(gate?.if).toContain("github.event.label.name == 'final-code-review:requested'")
-    expect(gate?.if).toContain('github.event.pull_request.draft == false')
-    expect(gate?.permissions?.checks).toBeUndefined()
+    expect(gate?.name).toContain("|| 'Ignore ineligible final review'")
+    expect(gate?.if).toContain('always()')
+    expect(gate?.permissions).toEqual({
+      issues: 'write',
+      'pull-requests': 'write',
+    })
     expect(finalReviewText).not.toContain('repos/$GITHUB_REPOSITORY/check-runs')
+    expect(existsSync('.github/workflows/ci-request-final-code-review.yml')).toBe(false)
   })
 
-  it('requires the exact CI workflow, PR, head SHA, and successful tests job', () => {
+  it('grants issues and pull-requests write so completion labels do not 403', () => {
+    expect(finalReview.jobs?.['select-final-review']?.permissions).toMatchObject({
+      issues: 'write',
+      'pull-requests': 'write',
+    })
+    expect(finalReview.jobs?.['code-reviewed']?.permissions).toMatchObject({
+      issues: 'write',
+      'pull-requests': 'write',
+    })
+    expect(selectAction).toContain('issues: write and pull-requests: write')
+    expect(gateAction).toContain('issues: write and pull-requests: write')
+    expect(selectAction).toContain('33269571876')
+    expect(gateAction).toContain('33269571876')
+  })
+
+  it('selects only a trusted, tested exact head through the extracted composite', () => {
     const selector = finalReview.jobs?.['select-final-review']
-    const script = selector?.steps?.at(0)?.run ?? ''
+    const selectStep = selector?.steps?.find((step) => step.id === 'select')
 
     expect(selector?.permissions?.actions).toBe('read')
-    expect(selector?.steps?.some((step) => step.uses?.includes('checkout'))).toBe(false)
-    expect(script).toContain('actions/workflows/ci.yml/runs')
-    expect(script).toContain('-f "head_sha=$head_sha"')
-    expect(script).toContain('-f event=pull_request')
-    expect(script).toContain('any(.pull_requests[]?; .number == $pr)')
-    expect(script).toContain('.name == "tests" and .conclusion == "success"')
-    expect(script.indexOf('tests_passed=true')).toBeLessThan(
-      script.indexOf('gate_status untrusted'),
+    expect(selector?.steps?.some((step) => step.uses?.includes('actions/checkout'))).toBe(true)
+    expect(selectStep?.uses).toBe('./.github/actions/final-review-select')
+    expect(waitScript).toContain('actions/workflows/$ci_workflow/runs')
+    expect(waitScript).toContain('-f "head_sha=$head_sha"')
+    expect(waitScript).toContain('-f event=pull_request')
+    expect(waitScript).toContain('any(.pull_requests[]?; .number == $pr)')
+    expect(waitScript).toContain('$tests')
+    expect(waitScript).toContain('FORBIDDEN_SUCCESS_JOB')
+    expect(selectScript).not.toContain('ci-expensive-deferred')
+    expect(waitScript).not.toContain('ci-expensive-deferred')
+    expect(selectScript).toContain('export head_sha head_repository head_ref base_sha')
+    expect(selectScript.indexOf('is_untrusted=true')).toBeLessThan(
+      selectScript.indexOf('gate_status untrusted'),
     )
   })
 
-  it('passes forks and dependency bots only after tests without provider secrets or checkout', () => {
-    const script = finalReview.jobs?.['select-final-review']?.steps?.at(0)?.run ?? ''
-
-    expect(script).toContain('if [ "$is_cross_repository" = true ]')
+  it('passes forks and dependency bots only after tests without provider secrets', () => {
+    expect(selectScript).toContain('if [ "$is_cross_repository" = true ]')
     for (const login of [
       'dependabot',
       'dependabot[bot]',
@@ -79,9 +119,9 @@ describe('final code review workflow', () => {
       'renovate[bot]',
       'app/renovate',
     ]) {
-      expect(script).toContain(login)
+      expect(selectScript).toContain(login)
     }
-    expect(script).toContain('output gate_status untrusted')
+    expect(selectScript).toContain('output gate_status untrusted')
     expect(finalReview.jobs?.['validate-review-settings']?.if).toContain(
       "gate_status != 'untrusted'",
     )
@@ -106,15 +146,10 @@ describe('final code review workflow', () => {
         expected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
         expected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
       })
-      expect(
-        finalReview.jobs?.[posterName]?.steps?.some(
-          (step) => step.name === 'Require the selected PR head before posting',
-        ),
-      ).toBe(false)
     }
 
-    const gateScript = finalReview.jobs?.['code-reviewed']?.steps?.at(0)?.run ?? ''
     expect(gateScript).toContain('Review selection failed')
+    expect(gateScript).toContain('gh_capture_retry none gh api --method GET')
     expect(gateScript).toContain('Review settings are invalid')
     expect(gateScript).toContain('review did not complete successfully')
     expect(gateScript).not.toContain('A required code review provider failed')
@@ -139,37 +174,21 @@ describe('final code review workflow', () => {
     expect(Object.values(reviewStep?.with ?? {})).toContain(`\${{ secrets.${secret} }}`)
   })
 
+  it('dispatches Claude with string required_review and keeps it advisory', () => {
+    const dispatch = finalReview.jobs?.['claude-code-review']
+    expect(dispatch?.['continue-on-error']).toBe(true)
+    expect(dispatch?.steps?.find((step) => step.id === 'dispatch')?.uses).toBe(
+      './.github/actions/final-review-dispatch-claude',
+    )
+    expect(dispatchScript).toContain('required_review: "true"')
+    expect(dispatchScript).not.toContain('--argjson')
+    expect(JSON.stringify(dispatch)).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')
+  })
+
   it('routes a successful exact ready-head CI fan-in into the native gate', () => {
     expect(ci.jobs).not.toHaveProperty('untrusted-code-reviewed')
     expect(ci.jobs).not.toHaveProperty('request-final-code-review')
-    expect(finalReviewText).not.toContain('workflow_dispatch')
-    expect(router.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
-    expect(routerText).toContain('github.event.workflow_run.head_sha')
-    expect(routerText).toContain('GH_TOKEN: ${{ github.token }}')
-    expect(routerText).toContain('TRIGGER_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}')
-    const labelDeletes = routerText
-      .split('\n')
-      .filter((line) => line.includes('gh_retry 404 gh api --method DELETE'))
-    expect(labelDeletes).toHaveLength(3)
-    expect(labelDeletes.every((line) => line.includes('GH_TOKEN="$TRIGGER_TOKEN"'))).toBe(true)
-    expect(routerText).toContain('GH_TOKEN="$TRIGGER_TOKEN" gh_retry none gh api --method POST')
-    expect(router.jobs?.['request-final-code-review']?.permissions).toEqual({
-      actions: 'read',
-      checks: 'read',
-      contents: 'read',
-      'pull-requests': 'read',
-    })
-    expect(routerText).not.toContain('GH_TOKEN: ${{ secrets.CODE_REVIEW_TRIGGER_TOKEN }}')
-    expect(routerText).toContain('commits/$TESTED_HEAD_SHA/pulls')
-    expect(routerText).toContain('.head.repo.full_name == $head_repo')
-    expect(routerText).toContain('.path == ".github/workflows/final-code-review.yml"')
-    expect(routerText).toContain('cancel-in-progress: false')
-    expect(routerText).toContain('.base.ref == $base')
-    expect(routerText).toContain('.name == "tests"')
-    expect(routerText).toContain('sort_by(.run_attempt, .id)')
-    expect(routerText).toContain('[ "$is_draft" = true ]')
-    expect(routerText).toContain('final_state')
-    expect(routerText).toContain('-f "labels[]=$REQUESTED_LABEL"')
+    expect(finalReview.on?.workflow_run).toBeUndefined()
   })
 })
 

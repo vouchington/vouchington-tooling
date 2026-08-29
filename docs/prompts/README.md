@@ -26,6 +26,8 @@ provider secrets or a provider checkout.
 The [main-branch ruleset](https://github.com/vouchington/vouchington-tooling/rules/21224701) pins both
 `tests` and `Code Reviewed` to the GitHub Actions integration.
 
-Each new commit creates another native gate and review attempt. Reopening a pull request or marking
-a draft ready also retriggers the default-branch workflow. Provider and poster failures remain
-advisory; orchestration, settings, exact-test provenance, and live-head failures remain blocking.
+Each new commit creates another native gate and review attempt. Opening, reopening, synchronizing,
+converting to draft, closing, or marking a draft ready retriggers the default-branch workflow.
+Provider and poster failures remain advisory; orchestration, settings, exact-test provenance,
+live-head failures, and completion-label writes remain blocking. Label jobs grant both
+`issues: write` and `pull-requests: write`.

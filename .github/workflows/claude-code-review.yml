@@ -1,0 +1,73 @@
+name: Claude Code Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact pull request head SHA that may be reviewed and posted
+        required: false
+        type: string
+        default: ''
+      expected_base_sha:
+        description: Exact pull request base SHA that owns the trusted prompt
+        required: false
+        type: string
+        default: ''
+      model:
+        description: Claude model to use
+        required: false
+        type: choice
+        default: opus
+        options:
+          - haiku
+          - sonnet
+          - opus
+      effort:
+        description: Thinking effort level
+        required: false
+        type: choice
+        default: xhigh
+        options:
+          - low
+          - medium
+          - high
+          - xhigh
+          - max
+      required_review:
+        description: Fail the workflow if the review cannot run
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-dispatch-${{ inputs.pr_number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  claude-review:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: ./.github/workflows/code-review.yml
+    with:
+      pr_number: ${{ inputs.pr_number }}
+      expected_head_sha: ${{ inputs.expected_head_sha }}
+      expected_base_sha: ${{ inputs.expected_base_sha }}
+      trusted_prompt_ref: ${{ inputs.expected_base_sha || github.sha }}
+      model: ${{ inputs.model }}
+      effort: ${{ inputs.effort }}
+      runs_on: '["ubuntu-latest"]'
+      required_review: ${{ (inputs.required_review == true || inputs.required_review == 'true') && 'true' || 'false' }}
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

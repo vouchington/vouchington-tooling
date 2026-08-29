@@ -49,9 +49,10 @@ on:
         type: string
         default: '["ubuntu-latest"]'
       required_review:
+        description: String true or false. workflow_dispatch input leaves must be strings.
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: 'false'
       token_source:
         required: false
         type: string
@@ -70,7 +71,7 @@ on:
       pr_number:
         description: Pull request number to review
         required: true
-        type: number
+        type: string
       expected_head_sha:
         description: Exact pull request head SHA that may be reviewed and posted
         required: false
