@@ -40,6 +40,7 @@ export function runPostReview(payloadPath: string, io: PostReviewIo): { posted: 
     } catch {
       // Keep the parsed review when the PR file list is unavailable.
     }
+    // The adapter also revalidates a pinned base; equality catches legacy live-head drift.
     if (io.getHeadSha() !== selectedHeadSha) {
       throw new ReviewPayloadError('PR head changed while preparing the selected review.')
     }

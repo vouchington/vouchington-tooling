@@ -161,7 +161,7 @@ jobs:
             echo "::error::PR base changed from $EXPECTED_BASE_SHA to $current_base before review."
             exit 1
           fi
-          if [ -n "$EXPECTED_BASE_SHA" ] && [ "$TRUSTED_PROMPT_REF" != "$EXPECTED_BASE_SHA" ]; then
+          if [ "$TRUSTED_PROMPT_REF" != "$EXPECTED_BASE_SHA" ]; then
             echo '::error::trusted_prompt_ref must be explicitly set to expected_base_sha.'
             exit 1
           fi

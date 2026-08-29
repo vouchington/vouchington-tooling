@@ -106,6 +106,11 @@ describe('final code review workflow', () => {
         expected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
         expected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
       })
+      expect(
+        finalReview.jobs?.[posterName]?.steps?.some(
+          (step) => step.name === 'Require the selected PR head before posting',
+        ),
+      ).toBe(false)
     }
 
     const gateScript = finalReview.jobs?.['code-reviewed']?.steps?.at(0)?.run ?? ''
