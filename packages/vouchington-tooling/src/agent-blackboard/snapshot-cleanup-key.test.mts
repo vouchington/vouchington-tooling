@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -35,5 +35,17 @@ describe('snapshot cleanup signing key', () => {
     await symlink(target, directory)
     setCleanupKeyTempDirectoryForTest(() => root)
     await expect(loadCleanupSigningKey()).rejects.toThrow('not owner-only')
+  })
+
+  it('surfaces non-race directory errors and invalid existing key lengths', async () => {
+    setCleanupKeyTempDirectoryForTest(() => join(tmpdir(), `missing-key-root-${Date.now()}`))
+    await expect(loadCleanupSigningKey()).rejects.toThrow('ENOENT')
+    const root = await mkdtemp(join(tmpdir(), 'snapshot-key-'))
+    paths.add(root)
+    setCleanupKeyTempDirectoryForTest(() => root)
+    const directory = join(root, `agent-blackboard-cleanup-${process.geteuid!()}`)
+    await mkdir(directory, { mode: 0o700 })
+    await writeFile(join(directory, 'receipt-hmac-sha256.key'), 'short', { mode: 0o600 })
+    await expect(loadCleanupSigningKey()).rejects.toThrow('invalid length')
   })
 })

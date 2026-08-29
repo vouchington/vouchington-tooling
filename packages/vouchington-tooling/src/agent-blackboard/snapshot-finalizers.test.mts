@@ -164,6 +164,18 @@ describe('snapshot finalizers and identity guards', () => {
     } finally {
       prototype.stat = originalStat
     }
+    const blank = await temporary(
+      'partition',
+      `${JSON.stringify({ type: 'session', session })}\n\n${JSON.stringify({ type: 'manifest', manifest })}\n`,
+    )
+    await expect(validatePartition(blank, await stat(blank))).rejects.toThrow('invalid JSONL')
+    const afterManifest = await temporary(
+      'partition',
+      `${JSON.stringify({ type: 'session', session })}\n${JSON.stringify({ type: 'manifest', manifest })}\n${JSON.stringify({ type: 'session', session })}\n`,
+    )
+    await expect(validatePartition(afterManifest, await stat(afterManifest))).rejects.toThrow(
+      'invalid JSONL',
+    )
   })
 
   it('splits an active partition by bytes and swallows an active file close failure', async () => {
@@ -184,9 +196,14 @@ describe('snapshot finalizers and identity guards', () => {
     await expect(
       writePartitions(index, manifest, await mkdtemp(join(tmpdir(), 'partition-output-')), 1, 1000),
     ).rejects.toThrow()
+    const empty = join(await mkdtemp(join(tmpdir(), 'partition-empty-')), 'index.jsonl')
+    paths.add(join(empty, '..'))
+    await writeFile(empty, '')
+    expect(await writePartitions(empty, manifest, join(empty, '..'), 1, 1000)).toEqual([])
   })
 
   it('rejects mismatched counts and opened snapshots while swallowing a source close failure', async () => {
+    await expect(partitionSnapshot({ path: 'relative.jsonl' })).rejects.toThrow('must be absolute')
     const path = await snapshot()
     await expect(
       partitionSnapshot({ path, counts: { bytes: 1, sessions: 1, entries: 0, records: 2 } }),
