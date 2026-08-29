@@ -100,11 +100,8 @@ function prerequisitesFor(
   manifest: SkillManifest,
   entry: SkillManifestEntry,
 ): SkillManifestEntry[] {
-  return (entry.prerequisites ?? []).map((name) => {
-    const prerequisite = manifest.skills.find((candidate) => candidate.name === name)
-    if (!prerequisite) throw new Error(`Missing prerequisite skill: ${name}`)
-    return prerequisite
-  })
+  const entriesByName = new Map(manifest.skills.map((candidate) => [candidate.name, candidate]))
+  return (entry.prerequisites ?? []).map((name) => entriesByName.get(name)!)
 }
 
 async function resolveSkillSource(

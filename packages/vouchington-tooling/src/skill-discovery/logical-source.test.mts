@@ -52,6 +52,47 @@ describe('logical skill source roots', () => {
     await expect(readSkillManifest(root)).rejects.toThrow('Missing prerequisite skill')
     await writeFile(manifestPath, JSON.stringify({ version: 1, skills: [entry(['unsafe/name'])] }))
     await expect(readSkillManifest(root)).rejects.toThrow('Invalid skill prerequisite')
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        skills: [{ ...entry([]), name: '../unsafe-skill' }],
+      }),
+    )
+    await expect(readSkillManifest(root)).rejects.toThrow('Invalid skill name')
+  })
+
+  it('deduplicates a shared explicit prerequisite during one linking operation', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'vouchington-shared-prerequisite-')))
+    directories.push(root)
+    const targetRoot = join(root, 'target')
+    await writeSkillStore(root, '# Requested skill\n')
+    for (const name of ['first', 'second', 'shared']) {
+      await mkdir(join(root, name), { recursive: true })
+      await writeFile(join(root, name, 'SKILL.md'), `# ${name}\n`)
+    }
+    await writeFile(
+      join(root, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          skillEntry('agent-workflow', ['first', 'second']),
+          skillEntry('first', ['shared']),
+          skillEntry('second', ['shared']),
+          skillEntry('shared', []),
+        ],
+      }),
+    )
+    await mkdir(targetRoot)
+
+    await expect(
+      linkSkill({ name: 'agent-workflow', sourceRoot: root, targetRoot }),
+    ).resolves.toMatchObject({
+      created: true,
+    })
+    for (const name of ['agent-workflow', 'first', 'second', 'shared']) {
+      await expect(readlink(join(targetRoot, name))).resolves.toBe(join(root, name))
+    }
   })
 
   it('validates canonical source containment but links the stable logical installed path', async () => {
@@ -106,4 +147,14 @@ async function writeSkillStore(root: string, contents: string): Promise<void> {
       ],
     }),
   )
+}
+
+function skillEntry(name: string, prerequisites: string[]) {
+  return {
+    name,
+    plugin: 'workflow',
+    pluginVersion: '1.0.0',
+    path: `${name}/SKILL.md`,
+    prerequisites,
+  }
 }
