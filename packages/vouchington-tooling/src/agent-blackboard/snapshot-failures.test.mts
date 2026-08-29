@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto'
 import {
   chmod,
+  lstat,
   mkdir,
   mkdtemp,
   open,
   readFile,
   readdir,
-  rename,
   rm,
   stat,
   writeFile,
@@ -219,15 +219,16 @@ describe('snapshot resource failures', () => {
     paths.add(directory)
     let replaced = false
     setSnapshotCleanupFilesystemForTest({
-      rename: async (from, to) => {
-        if (!replaced && from === directory) {
+      lstat: (async (path: Parameters<typeof lstat>[0]) => {
+        const info = await lstat(path)
+        if (!replaced && path === directory) {
           replaced = true
           await rm(directory, { recursive: true, force: true })
           await mkdir(directory)
           await writeFile(join(directory, 'replacement'), 'keep')
         }
-        return rename(from, to)
-      },
+        return info
+      }) as typeof lstat,
     })
     await expect(cleanupSnapshotPartitions({ directory, receipt })).rejects.toThrow('changed while')
     await expect(readFile(join(directory, 'replacement'), 'utf8')).resolves.toBe('keep')
