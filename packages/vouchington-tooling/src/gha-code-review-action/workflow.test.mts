@@ -14,6 +14,7 @@ type Workflow = {
     {
       steps?: Array<{
         env?: Record<string, unknown>
+        if?: string
         name?: string
         run?: string
         uses?: string
@@ -36,6 +37,7 @@ describe('code-review reusable workflow', () => {
       'pr_number',
       'expected_head_sha',
       'expected_base_sha',
+      'trusted_prompt_ref',
       'model',
       'effort',
       'required_review',
@@ -74,6 +76,7 @@ describe('code-review reusable workflow', () => {
     expect(workflow.on?.workflow_dispatch?.inputs).toMatchObject({
       expected_head_sha: expect.any(Object),
       expected_base_sha: expect.any(Object),
+      trusted_prompt_ref: expect.any(Object),
     })
 
     const reviewSteps = workflow.jobs?.review?.steps ?? []
@@ -84,7 +87,12 @@ describe('code-review reusable workflow', () => {
     const poster = posterSteps.find((step) => step.uses?.includes('code-review-poster') === true)
     expect(reviewGuard?.run).toContain('EXPECTED_HEAD_SHA')
     expect(reviewGuard?.run).toContain('EXPECTED_BASE_SHA')
+    expect(reviewGuard?.run).toContain('TRUSTED_PROMPT_REF')
+    expect(reviewGuard?.run).toContain('set -euo pipefail')
+    expect(reviewGuard?.run).toContain('^[0-9a-f]{40}$')
+    expect(reviewGuard?.run).toContain('must be provided together')
     expect(reviewGuard?.run).toContain('pulls/$PR_NUMBER')
+    expect(reviewGuard?.if).toBeUndefined()
     expect(poster?.with).toMatchObject({
       expected_head_sha: '${{ inputs.expected_head_sha }}',
       expected_base_sha: '${{ inputs.expected_base_sha }}',

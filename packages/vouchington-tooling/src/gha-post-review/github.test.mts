@@ -157,6 +157,7 @@ describe('github review adapter', () => {
     const staleHead = createGhPostReviewIo({
       ...options,
       expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
       exec: () => `${'c'.repeat(40)}\t${BASE_SHA}`,
     })
     expect(() => staleHead.getHeadSha()).toThrow('PR head changed before posting')
@@ -168,6 +169,26 @@ describe('github review adapter', () => {
       exec: () => `${HEAD_SHA}\t${'d'.repeat(40)}`,
     })
     expect(() => staleBase.getHeadSha()).toThrow('PR base changed before posting')
+  })
+
+  it('rejects invalid pull request selection inputs', () => {
+    const options = {
+      repository: 'o/r',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+    }
+    expect(() => createGhPostReviewIo({ ...options, prNumber: '../9' }).getHeadSha()).toThrow(
+      'PR_NUMBER must be a positive integer',
+    )
+    expect(() =>
+      createGhPostReviewIo({
+        ...options,
+        prNumber: '9',
+        expectedHeadSha: HEAD_SHA,
+      }).getHeadSha(),
+    ).toThrow('EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together')
   })
 
   it('wraps execFileSync as a gh helper', () => {

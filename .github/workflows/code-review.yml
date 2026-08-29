@@ -18,7 +18,7 @@ on:
         type: string
         default: ''
       trusted_prompt_ref:
-        description: Trusted git ref for review prompt files
+        description: Trusted git ref for review prompt files; must match expected_base_sha when pinned
         required: false
         type: string
         default: ${{ github.sha }}
@@ -81,6 +81,11 @@ on:
         required: false
         type: string
         default: ''
+      trusted_prompt_ref:
+        description: Trusted git ref for review prompt files; must match expected_base_sha when pinned
+        required: false
+        type: string
+        default: ''
       model:
         description: Claude model to use
         required: false
@@ -125,7 +130,6 @@ jobs:
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
     steps:
       - name: Validate selected pull request refs
-        if: inputs.expected_head_sha != '' || inputs.expected_base_sha != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
@@ -134,9 +138,15 @@ jobs:
           TRUSTED_PROMPT_REF: ${{ inputs.trusted_prompt_ref || github.sha }}
         run: |
           set -euo pipefail
-          sha() { [[ -z "$1" || "$1" =~ ^[0-9a-f]{40}$ ]]; }
-          sha "$EXPECTED_HEAD_SHA" || { echo '::error::expected_head_sha must be a full commit SHA.'; exit 1; }
-          sha "$EXPECTED_BASE_SHA" || { echo '::error::expected_base_sha must be a full commit SHA.'; exit 1; }
+          sha_or_empty() { [[ -z "$1" || "$1" =~ ^[0-9a-f]{40}$ ]]; }
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo '::error::pr_number must be a positive integer.'; exit 1; }
+          sha_or_empty "$EXPECTED_HEAD_SHA" || { echo '::error::expected_head_sha must be a full lowercase commit SHA.'; exit 1; }
+          sha_or_empty "$EXPECTED_BASE_SHA" || { echo '::error::expected_base_sha must be a full lowercase commit SHA.'; exit 1; }
+          if { [ -n "$EXPECTED_HEAD_SHA" ] && [ -z "$EXPECTED_BASE_SHA" ]; } ||
+             { [ -z "$EXPECTED_HEAD_SHA" ] && [ -n "$EXPECTED_BASE_SHA" ]; }; then
+            echo '::error::expected_head_sha and expected_base_sha must be provided together.'
+            exit 1
+          fi
           pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
           current_head="$(jq -r '.head.sha' <<< "$pr_json")"
           current_base="$(jq -r '.base.sha' <<< "$pr_json")"
@@ -149,7 +159,7 @@ jobs:
             exit 1
           fi
           if [ -n "$EXPECTED_BASE_SHA" ] && [ "$TRUSTED_PROMPT_REF" != "$EXPECTED_BASE_SHA" ]; then
-            echo '::error::trusted_prompt_ref must match expected_base_sha.'
+            echo '::error::trusted_prompt_ref must be explicitly set to expected_base_sha.'
             exit 1
           fi
 

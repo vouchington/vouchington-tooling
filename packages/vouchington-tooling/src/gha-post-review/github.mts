@@ -71,6 +71,14 @@ export function createGhPostReviewIo(options: {
       rmSync(path, { force: true })
     },
     getHeadSha() {
+      if (!/^[1-9][0-9]*$/u.test(prNumber)) {
+        throw new ReviewPayloadError('PR_NUMBER must be a positive integer.')
+      }
+      if (Boolean(expectedHeadSha) !== Boolean(expectedBaseSha)) {
+        throw new ReviewPayloadError(
+          'EXPECTED_HEAD_SHA and EXPECTED_BASE_SHA must be provided together.',
+        )
+      }
       const refs = exec([
         'api',
         `repos/${repository}/pulls/${prNumber}`,
