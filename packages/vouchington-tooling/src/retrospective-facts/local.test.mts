@@ -13,6 +13,13 @@ function executor(responses: Record<string, Partial<CommandResult>> = {}) {
 }
 
 describe('local retrospective facts branches', () => {
+  it('reports unavailable PR state when no selector requests GitHub data', async () => {
+    const { calls, execute } = executor()
+    const output = await localFacts({}, execute)
+    expect(output).toContain('PR state: unavailable')
+    expect(calls).not.toContainEqual(expect.stringMatching(/^gh /))
+  })
+
   it('handles an empty local branch, no GitHub request, and a failed GitHub request', async () => {
     const noPr = executor({ 'git branch --show-current': { stdout: '' } })
     await expect(localFacts({ noPr: true }, noPr.execute)).resolves.toContain('Branch: unavailable')
