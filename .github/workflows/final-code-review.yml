@@ -2,7 +2,7 @@ name: Final Code Review
 
 on:
   pull_request_target:
-    types: [labeled, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
 
 permissions:
   actions: read
@@ -10,23 +10,22 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.event.action }}-${{ github.event.label.name || 'none' }}
-  cancel-in-progress: false
+  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
 
 jobs:
   select-final-review:
     name: Select final review
     if: >-
-      (github.event.action == 'ready_for_review' ||
-      github.event.label.name == 'final-code-review:requested') &&
-      github.event.pull_request.draft == false
+      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 90
     permissions:
       actions: read
       checks: read
       contents: read
-      pull-requests: read
+      issues: write
+      pull-requests: write
     outputs:
       should_review: ${{ steps.select.outputs.should_review }}
       gate_status: ${{ steps.select.outputs.gate_status }}
@@ -34,8 +33,13 @@ jobs:
       head_sha: ${{ steps.select.outputs.head_sha }}
       base_sha: ${{ steps.select.outputs.base_sha }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
       - name: Select final review
         id: select
+        uses: ./.github/actions/final-review-select
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -43,127 +47,98 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           READY_AT: ${{ github.event.pull_request.updated_at }}
-          TESTS_WAIT_ATTEMPTS: '180'
-          TESTS_WAIT_SECONDS: '10'
-        run: |
-          set -euo pipefail
-          output() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
-          output pr_number "$PR_NUMBER"
-
-          [ "$EVENT_NAME" = pull_request_target ] || {
-            echo '::error::Final Code Review requires a pull_request_target event.'
-            exit 1
-          }
-
-          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json headRefOid,headRefName,headRepository,baseRefOid,isDraft,isCrossRepository,author)"
-          head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
-          head_ref="$(jq -r '.headRefName' <<< "$pr_json")"
-          head_repository="$(jq -r '.headRepository.nameWithOwner' <<< "$pr_json")"
-          base_sha="$(jq -r '.baseRefOid' <<< "$pr_json")"
-          is_draft="$(jq -r '.isDraft' <<< "$pr_json")"
-          is_cross_repository="$(jq -r '.isCrossRepository' <<< "$pr_json")"
-          actor="$(jq -r '.author.login' <<< "$pr_json")"
-          if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo '::error::PR head and base refs must resolve to full commit SHAs.'
-            exit 1
-          fi
-          output head_sha "$head_sha"
-          output base_sha "$base_sha"
-
-          is_untrusted=false
-          case "$actor" in
-            dependabot|'dependabot[bot]'|app/dependabot|renovate|'renovate[bot]'|app/renovate)
-              is_untrusted=true ;;
-          esac
-          if [ "$is_cross_repository" = true ]; then is_untrusted=true; fi
-          if [ -n "$EVENT_HEAD_SHA" ] && [ "$EVENT_HEAD_SHA" != "$head_sha" ]; then
-            output should_review false
-            output gate_status stale
-            echo "::error::Event head $EVENT_HEAD_SHA no longer matches PR head $head_sha."
-            exit 0
-          fi
-          if [ "$is_draft" = true ]; then
-            output should_review false
-            output gate_status deferred
-            echo 'Final code review is deferred while the PR is a draft.'
-            exit 0
-          fi
-          tests_passed=false
-          attempt=1
-          while [ "$attempt" -le "$TESTS_WAIT_ATTEMPTS" ]; do
-            current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --json headRefOid --jq .headRefOid)"
-            if [ "$current_head_sha" != "$head_sha" ]; then
-              output should_review false
-              output gate_status stale
-              echo "::error::PR head changed from $head_sha to $current_head_sha while waiting for tests."
-              exit 0
-            fi
-            while IFS= read -r run_id; do
-              [ -n "$run_id" ] || continue
-              if [ "$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json jobs \
-                --jq '[.jobs[] | select(.name == "tests" and .conclusion == "success")] | length')" -gt 0 ]; then
-                tests_passed=true
-                break
-              fi
-            done < <(gh api --method GET \
-              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
-              -f "head_sha=$head_sha" -f event=pull_request -f status=completed -f per_page=20 | \
-              jq -r --argjson pr "$PR_NUMBER" --arg head_repo "$head_repository" --arg head_ref "$head_ref" --arg action "$EVENT_ACTION" --arg ready_at "$READY_AT" \
-                '.workflow_runs[] | select(
-                  (any(.pull_requests[]?; .number == $pr) or
-                   ((.pull_requests | length) == 0 and .head_repository.full_name == $head_repo and .head_branch == $head_ref)) and
-                  ($action != "ready_for_review" or .created_at >= $ready_at)) | .id')
-            [ "$tests_passed" = true ] && break
-            sleep "$TESTS_WAIT_SECONDS"
-            attempt=$((attempt + 1))
-          done
-          if [ "$tests_passed" != true ]; then
-            output should_review false
-            output gate_status untested
-            echo "::error::No successful tests fan-in arrived for PR head $head_sha."
-            exit 0
-          fi
-
-          if [ "$is_untrusted" = true ]; then
-            output should_review false
-            output gate_status untrusted
-            echo 'Secret-backed review is unavailable for this PR context after exact-head tests passed.'
-            exit 0
-          fi
-
-          output should_review true
-          output gate_status review
-          echo "Selected PR #$PR_NUMBER at $head_sha for final review."
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          COMPLETE_LABEL: final-code-review:complete
+          CI_WORKFLOW: ci.yml
+          TESTS_JOB_NAME: tests
+          GH_RETRY_ATTEMPTS: '3'
+          GH_RETRY_BACKOFF_SECONDS: '5'
+          GH_RETRY_TRANSPORT_MARKERS: |
+            net/http: TLS handshake timeout
+            net/http: timeout awaiting response headers
+            connection reset by peer
+            unexpected EOF
+            i/o timeout
+          TESTS_WAIT_ATTEMPTS: '160'
+          TESTS_WAIT_SECONDS: '30'
 
   validate-review-settings:
     name: Validate code review settings
     needs: [select-final-review]
     if: >-
-      always() &&
-      needs.select-final-review.result == 'success' &&
+      always() && needs.select-final-review.result == 'success' &&
+      needs.select-final-review.outputs.gate_status != 'ignore' &&
       needs.select-final-review.outputs.gate_status != 'untrusted' &&
-      needs.select-final-review.outputs.gate_status != 'stale'
+      needs.select-final-review.outputs.gate_status != 'stale' &&
+      needs.select-final-review.outputs.gate_status != 'closed' &&
+      needs.select-final-review.outputs.gate_status != 'deferred' &&
+      needs.select-final-review.outputs.gate_status != 'base-stale'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
     steps:
       - name: Validate required organization variables
         env:
+          CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
+          CLAUDE_EFFORT: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
           OPENROUTER_MODEL: ${{ vars.OPENCODE_CODE_REVIEW_MODEL }}
           ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
           ZEN_MODEL: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
         run: |
           set -euo pipefail
-          validate_boolean() {
-            case "$2" in true|false) ;; *) echo "::error::$1 must be exactly true or false"; exit 1;; esac
-          }
-          validate_boolean OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
-          validate_boolean OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
+          boolean() { case "$2" in true|false) ;; *) echo "::error::$1 must be exactly true or false"; exit 1;; esac; }
+          boolean CLAUDE_CODE_REVIEW_ENABLED "$CLAUDE_ENABLED"
+          boolean OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
+          boolean OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
+          case "$CLAUDE_MODEL" in haiku|sonnet|opus) ;; *) echo '::error::CLAUDE_CODE_REVIEW_MODEL must be haiku, sonnet, or opus'; exit 1;; esac
+          case "$CLAUDE_EFFORT" in low|medium|high|xhigh|max) ;; *) echo '::error::CLAUDE_CODE_REVIEW_EFFORT must be low, medium, high, xhigh, or max'; exit 1;; esac
           [ -n "$OPENROUTER_MODEL" ] || { echo '::error::OPENCODE_CODE_REVIEW_MODEL is required'; exit 1; }
           [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
+
+  claude-code-review:
+    name: Dispatch Claude Code Review
+    needs: [select-final-review, validate-review-settings]
+    if: >-
+      needs.select-final-review.outputs.should_review == 'true' &&
+      vars.CLAUDE_CODE_REVIEW_ENABLED == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    outputs:
+      conclusion: ${{ steps.dispatch.outputs.conclusion }}
+      run_url: ${{ steps.dispatch.outputs.run_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Dispatch and wait for trusted Claude review
+        id: dispatch
+        uses: ./.github/actions/final-review-dispatch-claude
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          MODEL: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
+          EFFORT: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}
+          GH_RETRY_ATTEMPTS: '3'
+          GH_RETRY_BACKOFF_SECONDS: '5'
+          GH_RETRY_TRANSPORT_MARKERS: |
+            net/http: TLS handshake timeout
+            net/http: timeout awaiting response headers
+            connection reset by peer
+            unexpected EOF
+            i/o timeout
+          WAIT_ATTEMPTS: '180'
+          WAIT_SECONDS: '15'
 
   opencode-code-review:
     name: OpenCode OpenRouter Review
@@ -180,22 +155,41 @@ jobs:
       issues: read
       pull-requests: read
     outputs:
-      agent_outcome: ${{ steps.review.outputs.agent_outcome }}
-      payload_artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+      action_outcome: ${{ steps.opencode-review-agent.outcome }}
+      agent_outcome: ${{ steps.opencode-review-agent.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.opencode-review-agent.outputs.payload_artifact_id }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Require a live ready default-branch PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [ "$(jq -r '.head.sha' <<< "$pr_json")" = "$EXPECTED_HEAD_SHA" ]
+          [ "$(jq -r '.base.sha' <<< "$pr_json")" = "$EXPECTED_BASE_SHA" ]
+          [ "$(jq -r '.base.ref' <<< "$pr_json")" = "$DEFAULT_BRANCH" ]
+          [ "$(jq -r '.base.repo.full_name' <<< "$pr_json")" = "$GITHUB_REPOSITORY" ]
+          [ "$(jq -r '.draft' <<< "$pr_json")" = false ]
+          [ "$(jq -r '.state' <<< "$pr_json")" = open ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.head_sha }}
+          fetch-depth: 1
+          clean: true
           persist-credentials: false
       - name: Remove untrusted action path
         run: rm -rf .trusted-review-action
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
       - name: Run OpenCode OpenRouter review
-        id: review
+        id: opencode-review-agent
         uses: ./.trusted-review-action/.github/actions/opencode-code-review
         with:
           pr_number: ${{ needs.select-final-review.outputs.pr_number }}
@@ -206,6 +200,13 @@ jobs:
           model: ${{ vars.OPENCODE_CODE_REVIEW_MODEL }}
           payload_artifact_name: opencode-openrouter
           openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+      - name: Require agent success
+        if: >-
+          always() && (steps.opencode-review-agent.outcome != 'success' ||
+          steps.opencode-review-agent.outputs.agent_outcome != 'success')
+        run: |
+          echo '::error::OpenCode OpenRouter review did not complete successfully.'
+          exit 1
 
   opencode-code-review-poster:
     name: OpenCode OpenRouter Review Poster
@@ -219,15 +220,31 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
+      poster_outcome: ${{ steps.opencode-review-poster.outputs.poster_outcome }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Require a live ready default-branch PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [ "$(jq -r '.head.sha' <<< "$pr_json")" = "$EXPECTED_HEAD_SHA" ]
+          [ "$(jq -r '.base.sha' <<< "$pr_json")" = "$EXPECTED_BASE_SHA" ]
+          [ "$(jq -r '.base.ref' <<< "$pr_json")" = "$DEFAULT_BRANCH" ]
+          [ "$(jq -r '.base.repo.full_name' <<< "$pr_json")" = "$GITHUB_REPOSITORY" ]
+          [ "$(jq -r '.draft' <<< "$pr_json")" = false ]
+          [ "$(jq -r '.state' <<< "$pr_json")" = open ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
       - name: Post OpenCode OpenRouter review
-        id: poster
+        id: opencode-review-poster
         uses: ./.trusted-review-action/.github/actions/code-review-poster
         with:
           pr_number: ${{ needs.select-final-review.outputs.pr_number }}
@@ -236,6 +253,13 @@ jobs:
           token_source: github-token
           expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
           expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
+      - name: Require poster success
+        if: >-
+          always() && (steps.opencode-review-poster.outcome != 'success' ||
+          steps.opencode-review-poster.outputs.poster_outcome != 'success')
+        run: |
+          echo '::error::OpenCode OpenRouter review poster did not complete successfully.'
+          exit 1
 
   opencode-zen-code-review:
     name: OpenCode Zen Review
@@ -252,22 +276,41 @@ jobs:
       issues: read
       pull-requests: read
     outputs:
-      agent_outcome: ${{ steps.review.outputs.agent_outcome }}
-      payload_artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
+      action_outcome: ${{ steps.opencode-review-agent.outcome }}
+      agent_outcome: ${{ steps.opencode-review-agent.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.opencode-review-agent.outputs.payload_artifact_id }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Require a live ready default-branch PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [ "$(jq -r '.head.sha' <<< "$pr_json")" = "$EXPECTED_HEAD_SHA" ]
+          [ "$(jq -r '.base.sha' <<< "$pr_json")" = "$EXPECTED_BASE_SHA" ]
+          [ "$(jq -r '.base.ref' <<< "$pr_json")" = "$DEFAULT_BRANCH" ]
+          [ "$(jq -r '.base.repo.full_name' <<< "$pr_json")" = "$GITHUB_REPOSITORY" ]
+          [ "$(jq -r '.draft' <<< "$pr_json")" = false ]
+          [ "$(jq -r '.state' <<< "$pr_json")" = open ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.head_sha }}
+          fetch-depth: 1
+          clean: true
           persist-credentials: false
       - name: Remove untrusted action path
         run: rm -rf .trusted-review-action
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
       - name: Run OpenCode Zen review
-        id: review
+        id: opencode-review-agent
         uses: ./.trusted-review-action/.github/actions/opencode-code-review
         with:
           pr_number: ${{ needs.select-final-review.outputs.pr_number }}
@@ -278,6 +321,13 @@ jobs:
           model: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
           payload_artifact_name: opencode-zen
           opencode_api_key: ${{ secrets.OPENCODE_FREE_API_KEY }}
+      - name: Require agent success
+        if: >-
+          always() && (steps.opencode-review-agent.outcome != 'success' ||
+          steps.opencode-review-agent.outputs.agent_outcome != 'success')
+        run: |
+          echo '::error::OpenCode Zen review did not complete successfully.'
+          exit 1
 
   opencode-zen-code-review-poster:
     name: OpenCode Zen Review Poster
@@ -291,15 +341,31 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
+      poster_outcome: ${{ steps.opencode-review-poster.outputs.poster_outcome }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Require a live ready default-branch PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          [ "$(jq -r '.head.sha' <<< "$pr_json")" = "$EXPECTED_HEAD_SHA" ]
+          [ "$(jq -r '.base.sha' <<< "$pr_json")" = "$EXPECTED_BASE_SHA" ]
+          [ "$(jq -r '.base.ref' <<< "$pr_json")" = "$DEFAULT_BRANCH" ]
+          [ "$(jq -r '.base.repo.full_name' <<< "$pr_json")" = "$GITHUB_REPOSITORY" ]
+          [ "$(jq -r '.draft' <<< "$pr_json")" = false ]
+          [ "$(jq -r '.state' <<< "$pr_json")" = open ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.select-final-review.outputs.base_sha }}
           path: .trusted-review-action
           persist-credentials: false
       - name: Post OpenCode Zen review
-        id: poster
+        id: opencode-review-poster
         uses: ./.trusted-review-action/.github/actions/code-review-poster
         with:
           pr_number: ${{ needs.select-final-review.outputs.pr_number }}
@@ -308,72 +374,73 @@ jobs:
           token_source: github-token
           expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
           expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
+      - name: Require poster success
+        if: >-
+          always() && (steps.opencode-review-poster.outcome != 'success' ||
+          steps.opencode-review-poster.outputs.poster_outcome != 'success')
+        run: |
+          echo '::error::OpenCode Zen review poster did not complete successfully.'
+          exit 1
 
   code-reviewed:
     name: >-
-      ${{ (github.event.action == 'ready_for_review' || github.event.label.name == 'final-code-review:requested') && github.event.pull_request.draft == false && 'Code Reviewed' || 'Ignore final review request' }}
+      ${{ github.event.pull_request.draft == false &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      'Code Reviewed' || 'Ignore ineligible final review' }}
     needs:
       - select-final-review
       - validate-review-settings
+      - claude-code-review
       - opencode-code-review
       - opencode-code-review-poster
       - opencode-zen-code-review
       - opencode-zen-code-review-poster
-    if: >-
-      always() && (github.event.action == 'ready_for_review' ||
-      github.event.label.name == 'final-code-review:requested') &&
-      github.event.pull_request.draft == false
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
-      pull-requests: read
+      issues: write
+      pull-requests: write
     steps:
-      - name: Validate final review outcome
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Run native final review gate
+        uses: ./.github/actions/final-review-gate
+        with:
+          gate_status: ${{ needs.select-final-review.outputs.gate_status }}
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          EVENT_STATE: ${{ github.event.pull_request.state }}
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
           SELECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
+          SELECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
+          COMPLETE_LABEL: final-code-review:complete
+          GH_RETRY_ATTEMPTS: '3'
+          GH_RETRY_BACKOFF_SECONDS: '5'
+          GH_RETRY_TRANSPORT_MARKERS: |
+            net/http: TLS handshake timeout
+            net/http: timeout awaiting response headers
+            connection reset by peer
+            unexpected EOF
+            i/o timeout
+          CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
+          CLAUDE_RESULT: ${{ needs.claude-code-review.outputs.conclusion }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
+          OPENROUTER_ACTION: ${{ needs.opencode-code-review.outputs.action_outcome }}
           OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
           OPENROUTER_ARTIFACT: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
           OPENROUTER_POSTER: ${{ needs.opencode-code-review-poster.outputs.poster_outcome }}
           ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
+          ZEN_ACTION: ${{ needs.opencode-zen-code-review.outputs.action_outcome }}
           ZEN_AGENT: ${{ needs.opencode-zen-code-review.outputs.agent_outcome }}
           ZEN_ARTIFACT: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
           ZEN_POSTER: ${{ needs.opencode-zen-code-review-poster.outputs.poster_outcome }}
-        run: |
-          set -euo pipefail
-          [ "$SELECT_RESULT" = success ] || { echo '::error::Review selection failed'; exit 1; }
-          case "$GATE_STATUS" in
-            untrusted) exit 0 ;;
-            deferred)
-              live_draft="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
-              [ "$live_draft" = true ] && { echo 'Final code review stopped because the PR became a draft.'; exit 0; }
-              echo '::error::Final code review is unexpectedly deferred.'; exit 1 ;;
-            stale|untested) echo "::error::Final code review is $GATE_STATUS"; exit 1 ;;
-            review) ;;
-            *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
-          esac
-          [ "$SETTINGS_RESULT" = success ] || { echo '::error::Review settings are invalid'; exit 1; }
-
-          current_head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
-          [ "$current_head_sha" = "$SELECTED_HEAD_SHA" ] || {
-            echo "::error::PR head changed from $SELECTED_HEAD_SHA to $current_head_sha before completion."
-            exit 1
-          }
-
-          provider_failed() {
-            [ "$1" = success ] || return 0
-            [ -z "$2" ] || [ "$3" = success ] || return 0
-            return 1
-          }
-          if [ "$OPENROUTER_ENABLED" = true ] && provider_failed "$OPENROUTER_AGENT" "$OPENROUTER_ARTIFACT" "$OPENROUTER_POSTER"; then
-            echo '::warning::OpenCode OpenRouter review did not complete successfully.'
-          fi
-          if [ "$ZEN_ENABLED" = true ] && provider_failed "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER"; then
-            echo '::warning::OpenCode Zen review did not complete successfully.'
-          fi

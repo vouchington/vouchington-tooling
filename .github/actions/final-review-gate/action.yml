@@ -1,0 +1,39 @@
+name: Final review native gate
+description: >
+  Validate advisory provider outcomes, add final-code-review:complete, and
+  fail closed on orchestration errors. Provider failures stay warnings.
+  The caller job must grant issues: write and pull-requests: write.
+  issues: write alone 403s PR labels (jonathanong/filaments run 33269571876).
+inputs:
+  gate_status:
+    description: Native gate status from the selector composite
+    required: true
+outputs:
+  gate_outcome:
+    description: Outcome of the advisory validation step
+    value: ${{ steps.gate.outcome }}
+  mark_outcome:
+    description: Outcome of the completion-label step
+    value: ${{ steps.mark-complete.outcome }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate final review outcome
+      id: gate
+      continue-on-error: true
+      shell: bash
+      run: bash "${GITHUB_ACTION_PATH}/gate.sh"
+    - name: Mark final review complete
+      id: mark-complete
+      if: ${{ steps.gate.outcome == 'success' && inputs.gate_status == 'review' }}
+      continue-on-error: true
+      shell: bash
+      run: bash "${GITHUB_ACTION_PATH}/mark-complete.sh"
+    - name: Require native gate outcome
+      if: always()
+      shell: bash
+      env:
+        GATE_OUTCOME: ${{ steps.gate.outcome }}
+        MARK_OUTCOME: ${{ steps.mark-complete.outcome }}
+      run: bash "${GITHUB_ACTION_PATH}/require.sh"

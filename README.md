@@ -178,16 +178,22 @@ exact-head tests succeed.
 
 The setup expects these organization Actions variables and fails when any is missing or malformed:
 
+- `CLAUDE_CODE_REVIEW_ENABLED` (`true` or `false`)
+- `CLAUDE_CODE_REVIEW_MODEL` (`haiku`, `sonnet`, or `opus`)
+- `CLAUDE_CODE_REVIEW_EFFORT` (`low`, `medium`, `high`, `xhigh`, or `max`)
 - `OPENCODE_CODE_REVIEW_ENABLED` (`true` or `false`)
 - `OPENCODE_CODE_REVIEW_MODEL`
 - `OPENCODE_ZEN_CODE_REVIEW_ENABLED` (`true` or `false`)
 - `OPENCODE_ZEN_CODE_REVIEW_MODEL`
 
 It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
-secrets. Provider execution and review-comment posting are advisory: failures are reported as
-warnings but do not fail `Code Reviewed`. Workflow selection, settings, exact-test provenance, and
-live-head validation remain fail-closed. There is no label router, manual dispatcher, or synthetic
-check publisher for the required context.
+secrets, plus `CLAUDE_CODE_OAUTH_TOKEN` when Claude review is enabled. Provider execution and
+review-comment posting are advisory: failures are reported as warnings but do not fail
+`Code Reviewed`. Workflow selection, settings, exact-test provenance, live-head validation, and
+adding `final-code-review:complete` remain fail-closed. Label mutations need both `issues: write`
+and `pull-requests: write` (`issues: write` alone 403s PR labels). There is no PAT router or
+synthetic check publisher for the required context. Claude `workflow_call` `required_review` is a
+string so `workflow_dispatch` input leaves remain strings.
 
 ## CLI
 

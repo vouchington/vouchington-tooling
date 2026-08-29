@@ -1,0 +1,20 @@
+name: Final review dispatch Claude
+description: >
+  Dispatch the consumer repository's claude-code-review.yml workflow and wait
+  for that exact run. required_review is sent as the string true because the
+  workflow_dispatch API rejects JSON booleans in the inputs map.
+outputs:
+  conclusion:
+    description: Child workflow conclusion
+    value: ${{ steps.dispatch.outputs.conclusion }}
+  run_url:
+    description: Child workflow HTML URL
+    value: ${{ steps.dispatch.outputs.run_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Dispatch and wait for trusted Claude review
+      id: dispatch
+      shell: bash
+      run: bash "${GITHUB_ACTION_PATH}/dispatch-claude.sh"

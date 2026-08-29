@@ -112,4 +112,17 @@ describe('code-review reusable workflow', () => {
     expect(text).toContain('ref: ${{ github.workflow_sha }}')
     expect(text).toContain('repository: vouchington/vouchington-tooling')
   })
+
+  it('accepts string required_review on workflow_call so dispatch leaves do not fail graph build', () => {
+    const callInput = workflow.on?.workflow_call?.inputs?.required_review as {
+      default?: string
+      type?: string
+    }
+    const dispatchInput = workflow.on?.workflow_dispatch?.inputs?.required_review as {
+      type?: string
+    }
+    expect(callInput?.type).toBe('string')
+    expect(callInput?.default).toBe('false')
+    expect(dispatchInput?.type).toBe('boolean')
+  })
 })
