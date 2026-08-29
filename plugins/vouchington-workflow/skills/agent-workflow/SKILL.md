@@ -23,5 +23,9 @@ branching, review, and release policy.
 6. Review the diff for accidental files, secrets, generated output, broken documentation links,
    and assumptions that belong in local instructions instead.
 
+For portable implementation and review checks, read
+[implementation and review](references/implementation-and-review.md). Local instructions remain
+authoritative for commands, commits, review systems, and release policy.
+
 Do not invent a default branch, runner class, documentation root, review system, merge policy, or
 command catalog. A consumer wrapper or local instruction file owns those choices.

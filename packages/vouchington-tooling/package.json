@@ -31,6 +31,11 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./skill-discovery": {
+      "types": "./dist/skill-discovery/index.d.mts",
+      "import": "./dist/skill-discovery/index.mjs",
+      "default": "./dist/skill-discovery/index.mjs"
+    },
     "./runner-port-policy": {
       "types": "./dist/runner-port-policy/index.d.mts",
       "import": "./dist/runner-port-policy/index.mjs",

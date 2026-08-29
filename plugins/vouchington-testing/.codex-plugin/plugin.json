@@ -1,0 +1,18 @@
+{
+  "name": "vouchington-testing",
+  "version": "0.1.0",
+  "description": "Portable testing guidance for common runners and application stacks.",
+  "author": { "name": "Vouchington", "url": "https://github.com/vouchington" },
+  "homepage": "https://github.com/vouchington/vouchington-tooling",
+  "repository": "https://github.com/vouchington/vouchington-tooling",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Testing foundations",
+    "shortDescription": "Portable test-authoring guidance.",
+    "developerName": "Vouchington",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Use the repository's local test conventions with this guidance."]
+  }
+}

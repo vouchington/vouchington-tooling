@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "vouchington-database",
+  "version": "0.1.0",
+  "description": "Portable PostgreSQL schema and performance guidance.",
+  "author": { "name": "Vouchington" },
+  "skills": "./skills/"
+}

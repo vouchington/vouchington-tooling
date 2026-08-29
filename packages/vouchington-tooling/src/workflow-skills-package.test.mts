@@ -8,7 +8,9 @@ import { gunzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const canonicalRoot = resolve(packageRoot, '../../plugins/vouchington-workflow/skills')
+const pluginRoots = ['vouchington-workflow', 'vouchington-testing', 'vouchington-database'].map(
+  (plugin) => resolve(packageRoot, '../../plugins', plugin, 'skills'),
+)
 
 describe('workflow skills package contract', () => {
   it('ships exactly the canonical skills at stable paths without tracked copies', () => {
@@ -22,10 +24,11 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      const canonical = skillPaths(canonicalRoot)
+      const canonical = pluginRoots
+        .flatMap((root) => skillPaths(root))
         .map((path) => `package/skills/${path}`)
         .sort()
-      expect(packaged).toHaveLength(15)
+      expect(packaged).toHaveLength(25)
       expect(packaged).toEqual(canonical)
       expect(
         execFileSync('git', ['ls-files', 'skills'], { cwd: packageRoot, encoding: 'utf8' }),

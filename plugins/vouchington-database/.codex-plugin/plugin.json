@@ -1,0 +1,18 @@
+{
+  "name": "vouchington-database",
+  "version": "0.1.0",
+  "description": "Portable PostgreSQL schema and performance guidance.",
+  "author": { "name": "Vouchington", "url": "https://github.com/vouchington" },
+  "homepage": "https://github.com/vouchington/vouchington-tooling",
+  "repository": "https://github.com/vouchington/vouchington-tooling",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Database foundations",
+    "shortDescription": "Portable PostgreSQL guidance.",
+    "developerName": "Vouchington",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Use the repository's local database policy with this guidance."]
+  }
+}

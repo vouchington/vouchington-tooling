@@ -1,5 +1,13 @@
 /* eslint-disable max-lines -- package entry point enumerates the supported public API. */
 
+export { linkSkill, readSkillManifest } from './skill-discovery/index.mts'
+export type {
+  LinkSkillOptions,
+  LinkSkillResult,
+  SkillManifest,
+  SkillManifestEntry,
+} from './skill-discovery/index.mts'
+
 export {
   codexChildren,
   codexIdentity,

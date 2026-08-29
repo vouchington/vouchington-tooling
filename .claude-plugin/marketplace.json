@@ -20,6 +20,20 @@
       "source": "./plugins/vouchington-workflow",
       "category": "productivity",
       "homepage": "https://github.com/vouchington/vouchington-tooling"
+    },
+    {
+      "name": "vouchington-testing",
+      "description": "Repository-neutral testing guidance for common runners and application stacks.",
+      "source": "./plugins/vouchington-testing",
+      "category": "productivity",
+      "homepage": "https://github.com/vouchington/vouchington-tooling"
+    },
+    {
+      "name": "vouchington-database",
+      "description": "Repository-neutral PostgreSQL schema and performance guidance.",
+      "source": "./plugins/vouchington-database",
+      "category": "productivity",
+      "homepage": "https://github.com/vouchington/vouchington-tooling"
     }
   ]
 }
