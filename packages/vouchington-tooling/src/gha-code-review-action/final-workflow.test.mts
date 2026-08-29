@@ -103,6 +103,7 @@ describe('final code review workflow', () => {
     expect(waitScript).toContain('FORBIDDEN_SUCCESS_JOB')
     expect(selectScript).not.toContain('ci-expensive-deferred')
     expect(waitScript).not.toContain('ci-expensive-deferred')
+    expect(selectScript).toContain('export head_sha head_repository head_ref base_sha')
     expect(selectScript.indexOf('is_untrusted=true')).toBeLessThan(
       selectScript.indexOf('gate_status untrusted'),
     )

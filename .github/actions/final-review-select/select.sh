@@ -104,6 +104,7 @@ if [ "$is_draft" = true ]; then
   exit 0
 fi
 
+export head_sha head_repository head_ref base_sha
 # shellcheck source=wait-for-tests.sh
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for-tests.sh"
 
