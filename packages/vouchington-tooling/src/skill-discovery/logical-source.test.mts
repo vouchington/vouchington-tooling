@@ -25,6 +25,25 @@ afterEach(async () => {
 })
 
 describe('logical skill source roots', () => {
+  it('links a conventional repository-local skill when no manifest exists', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'vouchington-local-skill-')))
+    directories.push(root)
+    const targetRoot = join(root, 'target')
+    await writeSkillStore(root, '# Local skill\n')
+    await rm(join(root, 'manifest.json'))
+    await mkdir(targetRoot)
+
+    await expect(
+      linkSkill({ name: 'agent-workflow', sourceRoot: root, targetRoot }),
+    ).resolves.toMatchObject({ created: true })
+    await expect(readlink(join(targetRoot, 'agent-workflow'))).resolves.toBe(
+      await realpath(join(root, 'agent-workflow')),
+    )
+    await expect(linkSkill({ name: 'missing', sourceRoot: root, targetRoot })).rejects.toThrow(
+      'Invalid skill source',
+    )
+  })
+
   it('validates explicit prerequisite declarations', async () => {
     const root = await realpath(
       await mkdtemp(join(tmpdir(), 'vouchington-manifest-prerequisites-')),

@@ -28,7 +28,20 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
   if (!isSafeSkillName(options.name)) throw new Error(`Invalid skill name: ${options.name}`)
   const sourceRoot = resolve(options.sourceRoot)
   const canonicalSourceRoot = await realpath(sourceRoot)
-  const manifest = await readSkillManifest(sourceRoot)
+  let manifest: SkillManifest
+  try {
+    manifest = await readSkillManifest(sourceRoot)
+  } catch (error) {
+    if (!isMissingManifest(error)) throw error
+    const targetRoot = await resolveTargetDirectory(options.targetRoot)
+    return linkResult(
+      targetRoot,
+      options.name,
+      sourceRoot,
+      canonicalSourceRoot,
+      `${options.name}/SKILL.md`,
+    )
+  }
   const entry = manifest.skills.find((candidate) => candidate.name === options.name)
   if (entry === undefined) throw new Error(`Unknown skill: ${options.name}`)
   const targetRoot = await resolveTargetDirectory(options.targetRoot)
@@ -43,6 +56,10 @@ export async function linkSkill(options: LinkSkillOptions): Promise<LinkSkillRes
     linked,
     linking,
   )
+}
+
+function isMissingManifest(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException).code === 'ENOENT'
 }
 
 async function linkManifestSkill(
