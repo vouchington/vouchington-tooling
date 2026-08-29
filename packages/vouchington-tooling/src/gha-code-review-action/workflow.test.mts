@@ -76,10 +76,12 @@ describe('code-review reusable workflow', () => {
       expected_base_sha: expect.any(Object),
     })
 
-    const reviewGuard = workflow.jobs?.review?.steps?.find(
+    const reviewSteps = workflow.jobs?.review?.steps ?? []
+    const posterSteps = workflow.jobs?.poster?.steps ?? []
+    const reviewGuard = reviewSteps.find(
       (step) => step.name === 'Validate selected pull request refs',
     )
-    const posterGuard = workflow.jobs?.poster?.steps?.find(
+    const posterGuard = posterSteps.find(
       (step) => step.name === 'Require the selected pull request head',
     )
     expect(reviewGuard?.run).toContain('EXPECTED_HEAD_SHA')
@@ -87,6 +89,12 @@ describe('code-review reusable workflow', () => {
     expect(reviewGuard?.run).toContain('pulls/$PR_NUMBER')
     expect(posterGuard?.run).toContain('EXPECTED_HEAD_SHA')
     expect(posterGuard?.run).toContain('pulls/$PR_NUMBER')
+    expect(reviewSteps.indexOf(reviewGuard!)).toBeLessThan(
+      reviewSteps.findIndex((step) => step.uses?.includes('code-review') === true),
+    )
+    expect(posterSteps.indexOf(posterGuard!)).toBeLessThan(
+      posterSteps.findIndex((step) => step.uses?.includes('code-review-poster') === true),
+    )
   })
 
   it('loads nested composites from the workflow SHA, not the caller SHA', () => {
