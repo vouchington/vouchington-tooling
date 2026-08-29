@@ -7,7 +7,11 @@ Public tooling extracted from the Vouchington product monorepo. Two npm packages
 | [`vouchington-tooling`](./packages/vouchington-tooling)             | Libraries plus the `vouchington` CLI          |
 | [`eslint-plugin-vouchington`](./packages/eslint-plugin-vouchington) | Non-generic Vouchington ESLint / Oxlint rules |
 
-Both packages are published to npm. Releases go through the `Release` workflow (`workflow_dispatch`) using npm trusted publishing (OIDC). Do not publish from a laptop.
+Both packages are published to npm through the manually dispatched `Release` workflow using npm
+trusted publishing (OIDC). Do not publish from a laptop. Choose `prepare` with a package and bump
+to create or reuse a release PR; merge it through the required checks. Then choose `publish` with
+the package, exact merged version, and PR number. Publication verifies the merged PR, main's
+version, tag, and npm state before it tags, publishes, and creates the GitHub release.
 
 ## Agent plugins
 

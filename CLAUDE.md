@@ -32,4 +32,4 @@ Record the source SHA and path list in the commit body when copying from the pro
 
 ## Publishing
 
-Do not publish from a laptop. The `Release` workflow is `workflow_dispatch` and publishes with npm trusted publishing (OIDC). `RELEASE_TOKEN` needs Contents Read & Write on this repository for the version-bump push and GitHub release. There is no `NPM_TOKEN` on purpose.
+Do not publish from a laptop. The `Release` workflow is `workflow_dispatch` and publishes with npm trusted publishing (OIDC). `RELEASE_TOKEN` needs Contents Read & Write and Pull requests Read & Write on this repository for the release branch, release PR, tag, and GitHub release. There is no `NPM_TOKEN` on purpose.
