@@ -199,8 +199,16 @@ process-group probe and bounded-drain semantics outside a browser session.
 
 ## Workflow skills outside plugins
 
-The package ships the canonical Vouchington workflow skill tree at
-`skills/<skill>/SKILL.md`. This stable installed path supports agents that do not
-load Claude or Codex plugins. The Claude and Codex plugin manifests continue to reference the same
-canonical source tree under `plugins/vouchington-workflow/skills`; package build materializes that tree
-without hand-copying skill content.
+The package ships a flat union of canonical workflow, testing, and database skills at
+`skills/<skill>/SKILL.md`. This stable installed path supports agents that do not load Claude or
+Codex plugins. The package build materializes plugin source trees without hand-copying skill content
+and writes sorted schema-v1 provenance to `skills/manifest.json`.
+Each manifest entry may declare its ordered `prerequisites`; ordinary Markdown links remain
+cross-references and never cause additional skills to be linked.
+
+Use `readSkillManifest(skillsRoot)` to discover installed skills or
+`linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The
+CLI equivalent is `vouchington link-skill <name> --source-root <skills-dir> --target-root <dir>`.
+It rejects unknown names, paths outside either root, and existing non-matching destinations.
+`targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
+rejected.

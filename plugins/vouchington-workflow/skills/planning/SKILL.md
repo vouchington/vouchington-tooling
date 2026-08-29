@@ -19,5 +19,8 @@ Use before implementation work that needs a durable plan. Repository-local `AGEN
 5. Validate and save the plan using the repository's required issue or document workflow before
    implementation when local policy requires one.
 
+For cross-cutting changes, read [impact discovery](references/impact-discovery.md) before selecting
+tests or concluding that a surface has no dependents.
+
 Do not invent a plan template, default repository, issue taxonomy, dependency graph tool, or
 approval workflow. A consumer wrapper owns those choices.

@@ -11,12 +11,14 @@ Both packages are published to npm. Releases go through the `Release` workflow (
 
 ## Agent plugins
 
-The repository also publishes the public [`security-triage`](./plugins/security-triage) and
-[`vouchington-workflow`](./plugins/vouchington-workflow) agent plugins. `security-triage` has one
+The repository also publishes the public [`security-triage`](./plugins/security-triage),
+[`vouchington-workflow`](./plugins/vouchington-workflow),
+[`vouchington-testing`](./plugins/vouchington-testing), and
+[`vouchington-database`](./plugins/vouchington-database) agent plugins. `security-triage` has one
 repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
 commit, GitHub Actions, package-metadata, static-analysis, planning, issue-management,
 blackboard journaling, retrospective and follow-up review, CI-log review, and
-pull-request-description skills. Both plugins use one canonical
+pull-request-description skills. All plugins use one canonical
 `skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in
 `AGENTS.md`, `CLAUDE.md`, or thin wrapper skills. The portable issue workflow verifies live
 collaborator authority before creation, routes denied external work to a verified consumer tracker,
@@ -26,6 +28,11 @@ Consumers still own repository defaults, taxonomy definitions, templates, and st
 `security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
 handoff, while each consuming repository owns issue taxonomy and issue creation.
 
+`vouchington-testing` supplies shared test-authoring guidance plus Vitest, backend, Next.js,
+Playwright, Storybook, Swift, and .NET specializations. `vouchington-database` supplies PostgreSQL
+performance and UUIDv7 partitioning guidance. Consumer wrappers own runner configuration, fixtures,
+database policy, and commands.
+
 ### Install
 
 Codex:
@@ -34,6 +41,8 @@ Codex:
 codex plugin marketplace add vouchington/vouchington-tooling --ref main
 codex plugin add security-triage@vouchington
 codex plugin add vouchington-workflow@vouchington
+codex plugin add vouchington-testing@vouchington
+codex plugin add vouchington-database@vouchington
 ```
 
 Claude:
@@ -42,6 +51,8 @@ Claude:
 claude plugin marketplace add vouchington/vouchington-tooling --sparse .claude-plugin plugins
 claude plugin install security-triage@vouchington
 claude plugin install vouchington-workflow@vouchington
+claude plugin install vouchington-testing@vouchington
+claude plugin install vouchington-database@vouchington
 ```
 
 Grok:
@@ -49,6 +60,8 @@ Grok:
 ```bash
 grok plugin install vouchington/vouchington-tooling#plugins/security-triage
 grok plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow
+grok plugin install vouchington/vouchington-tooling#plugins/vouchington-testing
+grok plugin install vouchington/vouchington-tooling#plugins/vouchington-database
 ```
 
 Other Claude-compatible clients that support the same direct-install syntax can select either
@@ -65,6 +78,10 @@ ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-workflow
   ~/.cursor/plugins/local/vouchington-workflow
 ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/security-triage \
   ~/.cursor/plugins/local/security-triage
+ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-testing \
+  ~/.cursor/plugins/local/vouchington-testing
+ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-database \
+  ~/.cursor/plugins/local/vouchington-database
 ```
 
 The clone and symlink commands intentionally fail if either target already exists, preventing an

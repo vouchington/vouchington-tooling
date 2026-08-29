@@ -32,6 +32,7 @@ Commands:
   post-review                   Post one COMMENT review from a staged payload file
   stage-review-payload          Validate a review payload file into a staging directory
   retrospective-transcript      Format facts from Claude-compatible, Codex, or Grok transcripts
+  link-skill                    Link one packaged skill into an explicit consumer directory
 
 Options:
   -h, --help       Show this help
@@ -86,6 +87,7 @@ swift-semantic-equal <base> <head> <file.swift>
 post-review
 stage-review-payload optional|required <source> <destination>
 retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
+link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

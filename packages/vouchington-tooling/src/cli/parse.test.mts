@@ -20,6 +20,46 @@ describe('parseCli', () => {
     })
   })
 
+  it('requires explicit roots when linking a packaged skill', () => {
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'link-skill',
+        'agent-workflow',
+        '--source-root',
+        'skills',
+        '--target-root',
+        'consumer',
+      ]),
+    ).toEqual({
+      kind: 'link-skill',
+      name: 'agent-workflow',
+      sourceRoot: 'skills',
+      targetRoot: 'consumer',
+    })
+    expect(parseCli(['node', 'vouchington', 'link-skill', 'agent-workflow'])).toEqual({
+      kind: 'error',
+      message: 'link-skill requires --source-root and --target-root',
+    })
+    expect(parseCli(['node', 'vouchington', 'link-skill', '--source-root', 'skills'])).toEqual({
+      kind: 'error',
+      message: 'link-skill requires a skill name',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'link-skill', 'agent-workflow', '--other', 'value']),
+    ).toEqual({
+      kind: 'error',
+      message: 'unknown link-skill option: --other',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'link-skill', 'agent-workflow', '--source-root']),
+    ).toEqual({
+      kind: 'error',
+      message: '--source-root requires a path',
+    })
+  })
+
   it('parses runner-port-policy flags', () => {
     expect(parseCli(['node', 'vouchington', 'runner-port-policy'])).toEqual({
       kind: 'runner-port-policy',

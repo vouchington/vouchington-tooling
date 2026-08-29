@@ -49,10 +49,12 @@ describe('security-triage plugin', () => {
     ])
 
     expect(codex.name).toBe('vouchington')
-    expect(codex.plugins).toHaveLength(2)
+    expect(codex.plugins).toHaveLength(4)
     expect((codex.plugins as Array<{ name: string }>).map(({ name }) => name)).toEqual([
       'security-triage',
       'vouchington-workflow',
+      'vouchington-testing',
+      'vouchington-database',
     ])
     expect(codex.plugins).toContainEqual(
       expect.objectContaining({
@@ -61,10 +63,12 @@ describe('security-triage plugin', () => {
       }),
     )
     expect(claude.name).toBe('vouchington')
-    expect(claude.plugins).toHaveLength(2)
+    expect(claude.plugins).toHaveLength(4)
     expect((claude.plugins as Array<{ name: string }>).map(({ name }) => name)).toEqual([
       'security-triage',
       'vouchington-workflow',
+      'vouchington-testing',
+      'vouchington-database',
     ])
     expect(claude.plugins).toContainEqual(
       expect.objectContaining({ name: 'security-triage', source: './plugins/security-triage' }),
@@ -116,7 +120,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.2.1')
+      expect(manifest.version).toBe('0.3.0')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')

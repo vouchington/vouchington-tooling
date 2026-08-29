@@ -19,6 +19,7 @@ export type ParsedCli =
   | { kind: 'stage-review-payload'; args: string[] }
   | { kind: 'http-origin'; field: string; value: string }
   | { kind: 'retrospective-transcript'; args: string[] }
+  | { kind: 'link-skill'; name: string; sourceRoot: string; targetRoot: string }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
 
@@ -83,11 +84,33 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'http-origin') return parseHttpOrigin(rest)
   if (command === 'retrospective-transcript')
     return { kind: 'retrospective-transcript', args: rest }
+  if (command === 'link-skill') return parseLinkSkill(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
   }
   return { kind: 'error', message: `unknown command: ${command}` }
+}
+
+function parseLinkSkill(args: readonly string[]): ParsedCli {
+  const [name, ...flags] = args
+  if (name === undefined || name.startsWith('-'))
+    return { kind: 'error', message: 'link-skill requires a skill name' }
+  let sourceRoot: string | undefined
+  let targetRoot: string | undefined
+  for (let index = 0; index < flags.length; index += 1) {
+    const flag = flags[index]
+    const value = flags[index + 1]
+    if (flag !== '--source-root' && flag !== '--target-root')
+      return { kind: 'error', message: `unknown link-skill option: ${flag}` }
+    if (value === undefined) return { kind: 'error', message: `${flag} requires a path` }
+    if (flag === '--source-root') sourceRoot = value
+    else targetRoot = value
+    index += 1
+  }
+  if (sourceRoot === undefined || targetRoot === undefined)
+    return { kind: 'error', message: 'link-skill requires --source-root and --target-root' }
+  return { kind: 'link-skill', name, sourceRoot, targetRoot }
 }
 
 function parseRunnerPortPolicy(args: readonly string[]): ParsedCli {
