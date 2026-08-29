@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { verifyCleanupReceipt } from './snapshot-cleanup-receipt.mts'
 import { removePartitionDirectory } from './snapshot-cleanup-directory.mts'
-import { removeResumeReceipt, requireResumeReceipt } from './snapshot-cleanup-resume.mts'
+import {
+  removeResumeReceipt,
+  requireResumeReceipt,
+  writeResumeReceipt,
+} from './snapshot-cleanup-resume.mts'
 import type { SnapshotCleanupOptions, SnapshotCleanupReceipt } from './snapshot-types.mts'
 
 const SOURCE_NAME = /^agent-blackboard-snapshot-[0-9a-f-]{36}\.jsonl$/
@@ -51,7 +55,13 @@ async function removeCaptured(
     directory && receipt
       ? tombstonePath(receipt)
       : join(tmpdir(), `.agent-blackboard-cleanup-${process.pid}-${crypto.randomUUID()}`)
-  await filesystem.rename(path, tombstone)
+  if (directory) await writeResumeReceipt(optionsReceipt(receipt))
+  try {
+    await filesystem.rename(path, tombstone)
+  } catch (error) {
+    if (directory) await removeResumeReceipt(optionsReceipt(receipt)).catch(() => undefined)
+    throw error
+  }
   let deleting = false
   try {
     const captured = await filesystem.lstat(tombstone)
@@ -89,6 +99,7 @@ async function removeCaptured(
         `${label} cleanup failed; tombstone ${tombstone} could not be restored to ${path}`,
       )
     }
+    if (directory) await removeResumeReceipt(optionsReceipt(receipt)).catch(() => undefined)
     const detail = error instanceof Error ? `: ${error.message}` : ''
     throw new Error(`${label} cleanup failed; restored ${path} for retry${detail}`, {
       cause: error,

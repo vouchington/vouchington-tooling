@@ -20,11 +20,11 @@ function pathFor(receipt: SnapshotCleanupReceipt): string {
 function temporaryPath(receipt: SnapshotCleanupReceipt): string {
   return `${pathFor(receipt)}.${crypto.randomUUID()}.tmp`
 }
-function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>): void {
+function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>, links = 1): void {
   if (
     info.isSymbolicLink() ||
     !info.isFile() ||
-    info.nlink !== 1 ||
+    info.nlink !== links ||
     (Number(info.mode) & 0o777) !== 0o400 ||
     (typeof process.geteuid === 'function' && info.uid !== process.geteuid())
   )
@@ -34,6 +34,7 @@ async function read(receipt: SnapshotCleanupReceipt): Promise<void> {
   const path = pathFor(receipt)
   let before = await filesystem.lstat(path)
   if (before.nlink === 2) {
+    assertResumeFile(before, 2)
     const candidates = (await filesystem.readdir(tmpdir())).filter((name) =>
       new RegExp(
         `^${path.split('/').at(-1)!.replaceAll('.', '\\.')}(?:\\.[0-9a-f-]{36}\\.tmp)$`,
@@ -50,7 +51,7 @@ async function read(receipt: SnapshotCleanupReceipt): Promise<void> {
       throw new Error('partition directory cleanup resume metadata is unsafe')
     const temporary = join(tmpdir(), matches[0]!.name)
     const staged = matches[0]!.info
-    assertResumeFile(staged)
+    assertResumeFile(staged, 2)
     if (staged.dev !== before.dev || staged.ino !== before.ino)
       throw new Error('partition directory cleanup resume metadata is unsafe')
     await filesystem.unlink(temporary)

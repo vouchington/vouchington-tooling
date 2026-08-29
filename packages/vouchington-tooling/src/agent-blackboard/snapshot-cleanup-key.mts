@@ -30,11 +30,11 @@ function assertDirectory(info: Awaited<ReturnType<typeof lstat>>, uid: number): 
   )
     throw new Error('snapshot cleanup key directory is not owner-only')
 }
-function assertKey(info: Awaited<ReturnType<typeof lstat>>, uid: number): void {
+function assertKey(info: Awaited<ReturnType<typeof lstat>>, uid: number, links = 1): void {
   if (
     info.isSymbolicLink() ||
     !info.isFile() ||
-    info.nlink !== 1 ||
+    info.nlink !== links ||
     info.uid !== uid ||
     (Number(info.mode) & 0o777) !== 0o600
   )
@@ -54,6 +54,7 @@ async function keyPath(): Promise<{ path: string; uid: number }> {
 async function readKey(path: string, uid: number): Promise<Buffer> {
   let before = await filesystem.lstat(path)
   if (before.nlink === 2) {
+    assertKey(before, uid, 2)
     const candidates = (await filesystem.readdir(dirname(path))).filter((name) =>
       new RegExp(`^\\.${KEY_NAME.replaceAll('.', '\\.')}\\.[0-9a-f-]{36}$`).test(name),
     )
@@ -67,7 +68,7 @@ async function readKey(path: string, uid: number): Promise<Buffer> {
     if (matches.length !== 1) throw new Error('snapshot cleanup key has an unsafe temporary link')
     const temporary = join(dirname(path), matches[0]!.name)
     const staged = matches[0]!.info
-    assertKey(staged, uid)
+    assertKey(staged, uid, 2)
     if (staged.dev !== before.dev || staged.ino !== before.ino)
       throw new Error('snapshot cleanup key has an unsafe temporary link')
     await filesystem.unlink(temporary)

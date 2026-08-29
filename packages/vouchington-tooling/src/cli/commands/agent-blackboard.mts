@@ -92,7 +92,7 @@ async function runJournal(args: string[]): Promise<number> {
       'timestamp',
     ])
     process.stdout.write(
-      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...(values.timestamp ? { timestamp: values.timestamp } : {}) })}\n`,
+      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...('timestamp' in values ? { timestamp: values.timestamp } : {}) })}\n`,
     )
     return 0
   }
