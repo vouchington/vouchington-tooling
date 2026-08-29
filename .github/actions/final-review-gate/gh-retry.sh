@@ -6,6 +6,7 @@ gh_capture_retry() {
     status=0; "$@" > "$stdout_file" 2> "$stderr_file" || status=$?
     if [ "$status" -eq 0 ]; then
       GH_RETRY_OUTPUT="$(cat "$stdout_file")"
+      export GH_RETRY_OUTPUT
       rm -f "$stdout_file" "$stderr_file"
       return 0
     fi
