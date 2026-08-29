@@ -2,8 +2,8 @@ name: Dependabot Auto-merge
 
 on:
   pull_request_target:
-    # `edited` lets the action disable stale auto-merge after a base-branch retarget.
-    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited]
+    # Enable once per PR. `edited` is cleanup-only after a base-branch retarget.
+    types: [opened, reopened, ready_for_review, edited]
 
 permissions:
   contents: read
@@ -15,7 +15,11 @@ concurrency:
 
 jobs:
   automerge:
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      (github.event.action == 'opened' ||
+        github.event.action == 'reopened' ||
+        github.event.action == 'ready_for_review')
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -26,6 +30,25 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
       - name: Evaluate Dependabot update
+        uses: ./.github/actions/dependabot-automerge
+        with:
+          automerge_token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+
+  cleanup-retargeted-automerge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref != github.event.repository.default_branch &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/')
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted automation # nosemgrep
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Disable stale Dependabot auto-merge
         uses: ./.github/actions/dependabot-automerge
         with:
           automerge_token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}

@@ -133,6 +133,9 @@ thread resolution. There is no `@claude` mention workflow.
 `dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
 auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
 branch before using the dedicated token to enable eligible auto-merge or disable stale auto-merge.
+Enable auto-merge once per PR on `opened`, `reopened`, and `ready_for_review`. Do not re-run enablement on `synchronize`.
+Keep `edited` so a base-branch retarget can disable stale auto-merge. Already-armed PRs are a no-op.
+Unsigned or otherwise unverified HEAD (mixed repair commits) is a successful human-merge no-op and does not fail the job.
 The `automerge_token` must be a dedicated token because a
 `GITHUB_TOKEN` merge does not trigger downstream workflows. It must be stored specifically as a
 repository Dependabot secret, or as an organization Dependabot secret selected for every consumer
@@ -140,8 +143,7 @@ repository—not only as an Actions secret—and needs Contents and Pull request
 so a broken or underprivileged token cannot look like successful automation. Both manual-rule fields
 must exactly match `dependabot/fetch-metadata`; ecosystems are lowercase and directories include the leading slash. Use the action only from a trusted
 `pull_request_target` workflow that checks out the exact base SHA with credentials disabled; never
-check out or execute pull-request code. Include `converted_to_draft` and `edited` event types so the
-action can disable stale auto-merge after draft conversion or a base-branch retarget.
+check out or execute pull-request code.
 
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
