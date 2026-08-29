@@ -76,6 +76,12 @@ layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discove
 Grok session root. Without `--session-id`, it reads those session identities from the host
 environment.
 
+`retrospective-facts` keeps local Git evidence separate from GitHub PR data. `Commits ahead of
+origin/main` is populated only from a local ancestry range; GitHub responses instead populate
+`PR commits`. API-derived file and directory counts are labelled `GitHub API`. When a named local
+branch is absent, the command refreshes `origin/<branch>` before using it and refuses a stale
+remote ref when that refresh fails.
+
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
 need `agent-blackboard@^0.3.1`. Snapshot cleanup accepts only package-generated temporary paths.
 It captures a target under a private tombstone, validates partition names, permissions, JSONL,

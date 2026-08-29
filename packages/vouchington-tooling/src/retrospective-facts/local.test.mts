@@ -70,4 +70,28 @@ describe('local retrospective facts branches', () => {
       expect(calls.includes('git status --porcelain --untracked-files=normal')).toBe(!scoped)
     },
   )
+
+  it('refuses a stale remote branch when its refresh fails', async () => {
+    const { calls, execute } = executor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/topic': { ok: false },
+      'git fetch origin topic:refs/remotes/origin/topic': { ok: false, exitCode: 128 },
+    })
+    const output = await localFacts({ branch: 'topic', raw: true }, execute)
+    expect(output).toContain('Commits ahead of origin/main: unavailable')
+    expect(output).toContain('$ git fetch origin topic:refs/remotes/origin/topic')
+    expect(calls).not.toContain('git rev-parse --verify --quiet refs/remotes/origin/topic')
+  })
+
+  it('requires the refreshed remote ref to exist before using it', async () => {
+    const { execute } = executor({
+      'git branch --show-current': { stdout: 'current' },
+      'git rev-parse --verify --quiet refs/heads/topic': { ok: false },
+      'git fetch origin topic:refs/remotes/origin/topic': { ok: true },
+      'git rev-parse --verify --quiet refs/remotes/origin/topic': { ok: false },
+    })
+    await expect(localFacts({ branch: 'topic' }, execute)).resolves.toContain(
+      'Commits ahead of origin/main: unavailable',
+    )
+  })
 })

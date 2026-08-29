@@ -1,6 +1,10 @@
-export function format(f: Record<string, string | undefined>, raw: string): string {
+export function format(
+  f: Record<string, string | undefined> & { changeSource?: 'api' | 'local' },
+  raw: string,
+): string {
   const scoped = f.scoped ? `n/a (scoped to ${f.scoped})` : undefined
-  return `=== Retrospective Facts ===\nFetch: ${f.fetch}\nFetch status: ${f.fetchStatus}\nFetch note: ${f.fetchNote}\nBranch: ${f.branch}\nPR: ${f.pr ?? 'unavailable'}\nPR state: ${f.state}\nPR merged at: ${f.mergedAt ?? 'unavailable'}\nPR merge commit: ${f.mergeCommit ?? 'unavailable'}\nMerged to main: ${f.merged}\nCommits ahead of origin/main: ${f.commits}\nRemote updates for origin/${f.branch}: ${f.remote ?? scoped ?? 'unavailable'}\nPush-like updates for origin/${f.branch}: ${f.pushes ?? scoped ?? 'unavailable'}\nFiles changed from origin/main: ${f.files}\nTop-level dirs changed: ${f.dirs}\nWorking tree changes: ${scoped ?? f.working ?? 'unavailable'}\n${raw}`
+  const fileSource = f.changeSource === 'api' ? 'GitHub API' : 'origin/main'
+  return `=== Retrospective Facts ===\nFetch: ${f.fetch}\nFetch status: ${f.fetchStatus}\nFetch note: ${f.fetchNote}\nBranch: ${f.branch}\nPR: ${f.pr ?? 'unavailable'}\nPR state: ${f.state}\nPR merged at: ${f.mergedAt ?? 'unavailable'}\nPR merge commit: ${f.mergeCommit ?? 'unavailable'}\nMerged to main: ${f.merged}\nCommits ahead of origin/main: ${f.commits ?? 'unavailable'}\nPR commits: ${f.prCommits ?? 'unavailable'}\nRemote updates for origin/${f.branch}: ${f.remote ?? scoped ?? 'unavailable'}\nPush-like updates for origin/${f.branch}: ${f.pushes ?? scoped ?? 'unavailable'}\nFiles changed from ${fileSource}: ${f.files}\nTop-level dirs changed from ${fileSource}: ${f.dirs}\nWorking tree changes: ${scoped ?? f.working ?? 'unavailable'}\n${raw}`
 }
 export function readJson(value: string): Record<string, unknown> | undefined {
   try {

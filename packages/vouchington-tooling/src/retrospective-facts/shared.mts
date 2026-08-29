@@ -1,7 +1,12 @@
 export const PR_JSON_FIELDS =
   'number,state,mergedAt,mergeCommit,changedFiles,files,commits,headRefName'
 
-export type CommandResult = { ok: boolean; stdout: string; stderr: string }
+export type CommandResult = {
+  ok: boolean
+  stdout: string
+  stderr: string
+  exitCode?: number | null
+}
 export type CommandExecutor = (command: string, args: string[]) => Promise<CommandResult>
 
 export type RetrospectiveFactsOptions = {

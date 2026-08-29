@@ -6,14 +6,18 @@ export const shell: CommandExecutor = (command, args) =>
     const child = spawn(command, args)
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (data: Buffer) => {
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (data: string) => {
       stdout += data
     })
-    child.stderr.on('data', (data: Buffer) => {
+    child.stderr.on('data', (data: string) => {
       stderr += data
     })
-    child.on('close', (code) => resolve({ ok: code === 0, stdout, stderr }))
-    child.on('error', (error) => resolve({ ok: false, stdout, stderr: error.message }))
+    child.on('close', (exitCode) => resolve({ ok: exitCode === 0, stdout, stderr, exitCode }))
+    child.on('error', (error) =>
+      resolve({ ok: false, stdout, stderr: error.message, exitCode: null }),
+    )
   })
 
 export function rawBlock(command: string, args: string[], result: CommandResult): string {

@@ -62,7 +62,7 @@ describe('retrospective facts', () => {
     const output = await runRetrospectiveFacts({ noPr: true, execute })
     expect(output).toContain('Merged to main: yes (origin/main contains HEAD)')
     expect(output).toContain('Files changed from origin/main: unavailable')
-    expect(output).toContain('Top-level dirs changed: unavailable')
+    expect(output).toContain('Top-level dirs changed from origin/main: unavailable')
   })
 
   it('does not run the no-PR merge-base check without origin/main', async () => {
@@ -125,14 +125,15 @@ describe('retrospective facts', () => {
       'git merge-base --is-ancestor abc123 origin/main': { stdout: '' },
     })
     const output = await runRetrospectiveFacts({ pr: '123', execute })
+    expect(output).toContain('Commits ahead of origin/main: unavailable')
     expect(output).toContain(
-      "Commits ahead of origin/main: 100+ (gh's commits list caps at 100; actual count may be higher)",
+      "PR commits: 100+ (gh's commits list caps at 100; actual count may be higher)",
     )
     expect(output).toContain(
-      'Files changed from origin/main: 150 (partial: gh returned 1 of 150 changed files)',
+      'Files changed from GitHub API: 150 (partial: gh returned 1 of 150 changed files)',
     )
     expect(output).toContain(
-      'Top-level dirs changed: root (partial: gh returned 1 of 150 changed files)',
+      'Top-level dirs changed from GitHub API: root (partial: gh returned 1 of 150 changed files)',
     )
   })
 
@@ -181,12 +182,14 @@ describe('retrospective facts', () => {
     const { calls, execute } = makeExecutor({
       'git branch --show-current': { stdout: 'current' },
       'git rev-parse --verify --quiet refs/heads/topic': { ok: false },
+      'git fetch origin topic:refs/remotes/origin/topic': { ok: true },
       'git rev-parse --verify --quiet refs/remotes/origin/topic': { ok: true },
       'git rev-list --count origin/main..origin/topic': { stdout: '2' },
       'git diff --name-only origin/main...origin/topic': { stdout: 'src/a.mts' },
     })
     const output = await runRetrospectiveFacts({ branch: 'topic', execute })
     expect(output).toContain('Commits ahead of origin/main: 2')
+    expect(output).toContain('Fetch note: origin/main refreshed; origin/topic refreshed')
     expect(calls).toContain('git diff --name-only origin/main...origin/topic')
   })
 
@@ -194,7 +197,7 @@ describe('retrospective facts', () => {
     const { calls, execute } = makeExecutor({
       'git branch --show-current': { stdout: 'current' },
       'git rev-parse --verify --quiet refs/heads/missing': { ok: false },
-      'git rev-parse --verify --quiet refs/remotes/origin/missing': { ok: false },
+      'git fetch origin missing:refs/remotes/origin/missing': { ok: false },
     })
     const output = await runRetrospectiveFacts({ branch: 'missing', execute })
     expect(output).toContain('Commits ahead of origin/main: unavailable')
@@ -210,7 +213,7 @@ describe('retrospective facts', () => {
       'git status --porcelain --untracked-files=normal': { stdout: '' },
       'git reflog show origin/topic-branch': { stdout: '' },
       'git merge-base --is-ancestor abc123 origin/main': { ok: true },
-      'git merge-base --is-ancestor abc123 main': { ok: false },
+      'git merge-base --is-ancestor abc123 main': { ok: false, exitCode: 1 },
     })
     const output = await runRetrospectiveFacts({
       pr: '123',
@@ -230,7 +233,7 @@ describe('retrospective facts', () => {
       [gh]: { stdout: JSON.stringify(pr) },
       'git status --porcelain --untracked-files=normal': { stdout: '' },
       'git reflog show origin/topic-branch': { stdout: '' },
-      'git merge-base --is-ancestor abc123 origin/main': { ok: false },
+      'git merge-base --is-ancestor abc123 origin/main': { ok: false, exitCode: 1 },
     })
     await expect(runRetrospectiveFacts({ pr: '123', execute })).resolves.toContain(
       'Merged to main: no (origin/main lacks abc123)',
@@ -241,5 +244,52 @@ describe('retrospective facts', () => {
     vi.mocked(shell).mockResolvedValue({ ok: true, stdout: '', stderr: '' })
     await expect(runRetrospectiveFacts({ noPr: true })).resolves.toContain('PR: none')
     expect(shell).toHaveBeenCalled()
+  })
+
+  it('reports unknown merge-base failures as unavailable without a false local-main warning', async () => {
+    const gh = `gh pr view 123 --json ${fields}`
+    const warnings: string[] = []
+    const { execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'topic-branch' },
+      [gh]: { stdout: JSON.stringify(pr) },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+      'git reflog show origin/topic-branch': { stdout: '' },
+      'git merge-base --is-ancestor abc123 origin/main': { ok: false, exitCode: 2 },
+    })
+    await expect(
+      runRetrospectiveFacts({ pr: '123', execute, onWarning: warnings.push.bind(warnings) }),
+    ).resolves.toContain('Merged to main: unavailable')
+    expect(warnings).toEqual([])
+  })
+
+  it('does not claim local main lacks a merge when that ancestry check fails unexpectedly', async () => {
+    const gh = `gh pr view 123 --json ${fields}`
+    const warnings: string[] = []
+    const { execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'topic-branch' },
+      [gh]: { stdout: JSON.stringify(pr) },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+      'git reflog show origin/topic-branch': { stdout: '' },
+      'git merge-base --is-ancestor abc123 origin/main': { ok: true },
+      'git merge-base --is-ancestor abc123 main': { ok: false, exitCode: 2 },
+    })
+    await expect(
+      runRetrospectiveFacts({ pr: '123', execute, onWarning: warnings.push.bind(warnings) }),
+    ).resolves.toContain('Merged to main: yes (origin/main contains abc123)')
+    expect(warnings).toEqual([])
+  })
+
+  it('reports an unavailable no-PR merge check when Git fails unexpectedly', async () => {
+    const { execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'topic' },
+      'git reflog show origin/topic': { stdout: '' },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+      'git rev-list --count origin/main..HEAD': { stdout: '1' },
+      'git diff --name-only origin/main...HEAD': { stdout: '' },
+      'git merge-base --is-ancestor HEAD origin/main': { ok: false, exitCode: 2 },
+    })
+    await expect(runRetrospectiveFacts({ noPr: true, execute })).resolves.toContain(
+      'Merged to main: unavailable',
+    )
   })
 })

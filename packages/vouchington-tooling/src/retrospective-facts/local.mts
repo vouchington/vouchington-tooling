@@ -45,11 +45,10 @@ export async function localFacts(
   const branch =
     options.branch ??
     (options.pr && head !== 'unavailable' ? head : options.noPr ? localBranch : 'unavailable')
-  const range = options.branch
+  const resolved = options.branch
     ? await resolveNamedRef(options.branch, run)
-    : options.noPr
-      ? 'HEAD'
-      : undefined
+    : { range: options.noPr ? 'HEAD' : undefined, refreshed: false }
+  const range = resolved.range
   const commitsResult =
     !data && range && originMain
       ? await run('git', ['rev-list', '--count', `origin/main..${range}`])
@@ -81,28 +80,28 @@ export async function localFacts(
     {
       fetch: 'git fetch origin main:refs/remotes/origin/main',
       fetchStatus: fetch.ok ? 'ok' : 'failed',
-      fetchNote: fetch.ok
-        ? 'origin/main refreshed'
-        : originMain
-          ? 'using existing local origin/main ref after failed fetch'
-          : 'origin/main unavailable after failed fetch',
+      fetchNote: `${
+        fetch.ok
+          ? 'origin/main refreshed'
+          : originMain
+            ? 'using existing local origin/main ref after failed fetch'
+            : 'origin/main unavailable after failed fetch'
+      }${resolved.refreshed ? `; origin/${options.branch} refreshed` : ''}`,
       branch,
       pr: options.noPr ? 'none' : stringField(data, 'number'),
       state,
       mergedAt: stringField(data, 'mergedAt'),
       mergeCommit: merge,
       merged,
-      commits: data
-        ? count(data, 'commits')
-        : commitsResult?.ok
-          ? text(commitsResult)
-          : 'unavailable',
+      commits: data ? 'unavailable' : commitsResult?.ok ? text(commitsResult) : 'unavailable',
+      prCommits: data ? count(data, 'commits') : undefined,
       files: data
         ? apiFiles(data)
         : filesText === undefined
           ? 'unavailable'
           : String(lines(filesText).length),
       dirs: data ? dirs(data) : filesText === undefined ? 'unavailable' : topDirs(filesText),
+      changeSource: data ? 'api' : 'local',
       remote:
         reflog === undefined
           ? undefined
@@ -137,11 +136,14 @@ function lines(value: string): string[] {
 async function resolveNamedRef(
   name: string,
   run: (command: string, args: string[]) => Promise<CommandResult>,
-): Promise<string | undefined> {
-  if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`])).ok) return name
+): Promise<{ range: string | undefined; refreshed: boolean }> {
+  if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`])).ok)
+    return { range: name, refreshed: false }
+  const fetch = await run('git', ['fetch', 'origin', `${name}:refs/remotes/origin/${name}`])
+  if (!fetch.ok) return { range: undefined, refreshed: false }
   if ((await run('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${name}`])).ok)
-    return `origin/${name}`
-  return undefined
+    return { range: `origin/${name}`, refreshed: true }
+  return { range: undefined, refreshed: false }
 }
 
 async function mergeFact(
@@ -153,20 +155,19 @@ async function mergeFact(
 ): Promise<string> {
   if (merge && originMain) {
     const inOrigin = await run('git', ['merge-base', '--is-ancestor', merge, 'origin/main'])
-    if (!inOrigin.ok) return `no (origin/main lacks ${merge})`
-    if (!(await run('git', ['merge-base', '--is-ancestor', merge, 'main'])).ok)
+    if (!inOrigin.ok)
+      return inOrigin.exitCode === 1 ? `no (origin/main lacks ${merge})` : 'unavailable'
+    const inLocalMain = await run('git', ['merge-base', '--is-ancestor', merge, 'main'])
+    if (!inLocalMain.ok && inLocalMain.exitCode === 1)
       options.onWarning?.(
         `Warning: local main lacks PR merge commit ${merge}, but origin/main contains it.`,
       )
     return `yes (origin/main contains ${merge})`
   }
-  if (
-    !data &&
-    options.noPr &&
-    !options.branch &&
-    originMain &&
-    (await run('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main'])).ok
-  )
-    return 'yes (origin/main contains HEAD)'
+  if (!data && options.noPr && !options.branch && originMain) {
+    const headInOrigin = await run('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main'])
+    if (headInOrigin.ok) return 'yes (origin/main contains HEAD)'
+    if (headInOrigin.exitCode !== 1) return 'unavailable'
+  }
   return 'unmerged at time of retro'
 }
