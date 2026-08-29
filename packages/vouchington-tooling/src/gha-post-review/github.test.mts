@@ -134,6 +134,38 @@ describe('github review adapter', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('returns the live head without expected refs for legacy callers', () => {
+    const io = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+    })
+    expect(io.getHeadSha()).toBe(HEAD_SHA)
+  })
+
+  it('retries transient pull-ref read failures', () => {
+    let attempts = 0
+    const io = createGhPostReviewIo({
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+      exec: () => {
+        attempts += 1
+        if (attempts < 3) throw new Error('temporary GitHub API failure')
+        return `${HEAD_SHA}\t${BASE_SHA}`
+      },
+    })
+    expect(io.getHeadSha()).toBe(HEAD_SHA)
+    expect(attempts).toBe(3)
+  })
+
   it('rejects a non-SHA head', () => {
     const io = createGhPostReviewIo({
       repository: 'o/r',

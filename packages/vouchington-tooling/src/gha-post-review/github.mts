@@ -51,6 +51,23 @@ export function writePostedOutput(posted: boolean, outputPath = process.env.GITH
   appendFileSync(outputPath, `posted=${posted ? 'true' : 'false'}\n`)
 }
 
+function readPullRefs(repository: string, prNumber: string, exec: GhExec): string[] {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return exec([
+        'api',
+        `repos/${repository}/pulls/${prNumber}`,
+        '--jq',
+        '[.head.sha, .base.sha] | @tsv',
+      ]).split('\t')
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
 export function createGhPostReviewIo(options: {
   repository: string
   prNumber: string
@@ -85,12 +102,7 @@ export function createGhPostReviewIo(options: {
       if (expectedBaseSha && !/^[0-9a-f]{40}$/u.test(expectedBaseSha)) {
         throw new ReviewPayloadError('EXPECTED_BASE_SHA must be a full lowercase commit SHA.')
       }
-      const refs = exec([
-        'api',
-        `repos/${repository}/pulls/${prNumber}`,
-        '--jq',
-        '[.head.sha, .base.sha] | @tsv',
-      ]).split('\t')
+      const refs = readPullRefs(repository, prNumber, exec)
       const [headSha = '', baseSha = ''] = refs
       if (!/^[0-9a-f]{40}$/u.test(headSha)) {
         throw new ReviewPayloadError(`Could not resolve PR head SHA (got "${headSha}").`)
