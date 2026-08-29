@@ -50,6 +50,15 @@ describe('snapshot record format', () => {
     if (parsedManifest.type !== 'manifest') throw new Error('expected manifest')
     consumeSnapshotRecord(parsedSession, snapshotState)
     consumeSnapshotRecord(parsedEntry, snapshotState)
+    consumeSnapshotRecord(parsedManifest, snapshotState)
+    expect(snapshotState).toEqual({
+      sessions: 1,
+      entries: 1,
+      records: 2,
+      lastSessionCreatedAt: Date.parse(timestamp),
+      lastEntryCreatedAt: Date.parse(timestamp),
+      currentSessionId: session.id,
+    })
     expect(snapshotLine(parsedManifest)).toBe(`${JSON.stringify(parsedManifest)}\n`)
     expect(countsFor({ sessions: 1, entries: 1 }, 42)).toEqual({
       sessions: 1,
@@ -122,6 +131,8 @@ describe('snapshot record format', () => {
     [{ ...manifest, selection: { archived: false, agent: 1 } }],
     [{ ...manifest, selection: { archived: false, parentSessionId: 1 } }],
     [{ ...manifest, selection: { archived: false, inactiveForHours: 0 } }],
+    [{ ...manifest, selection: { archived: false, version: 1 } }],
+    [{ ...manifest, selection: { archived: false, data: 1 } }],
     [{ ...manifest, counts: { sessions: -1, entries: 1, records: 1 } }],
   ])('rejects malformed complete manifests', (invalidManifest) => {
     expect(() => assertManifest(invalidManifest as never, state())).toThrow('complete terminal')

@@ -215,4 +215,18 @@ describe('retrospective facts', () => {
       'Warning: local main lacks PR merge commit abc123, but origin/main contains it.',
     ])
   })
+
+  it('reports a merged PR absent from origin/main', async () => {
+    const gh = `gh pr view 123 --json ${fields}`
+    const { execute } = makeExecutor({
+      'git branch --show-current': { stdout: 'topic-branch' },
+      [gh]: { stdout: JSON.stringify(pr) },
+      'git status --porcelain --untracked-files=normal': { stdout: '' },
+      'git reflog show origin/topic-branch': { stdout: '' },
+      'git merge-base --is-ancestor abc123 origin/main': { ok: false },
+    })
+    await expect(runRetrospectiveFacts({ pr: '123', execute })).resolves.toContain(
+      'Merged to main: no (origin/main lacks abc123)',
+    )
+  })
 })
