@@ -42,6 +42,16 @@ describe('parseCli', () => {
       kind: 'error',
       message: 'link-skill requires --source-root and --target-root',
     })
+    expect(parseCli(['node', 'vouchington', 'link-skill', '--source-root', 'skills'])).toEqual({
+      kind: 'error',
+      message: 'link-skill requires a skill name',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'link-skill', 'agent-workflow', '--other', 'value']),
+    ).toEqual({
+      kind: 'error',
+      message: 'unknown link-skill option: --other',
+    })
   })
 
   it('parses runner-port-policy flags', () => {

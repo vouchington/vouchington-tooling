@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -78,6 +78,41 @@ describe('runCli', () => {
         'true',
       ]),
     ).toBe(0)
+  })
+
+  it('links a named skill through the CLI dispatch', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'vouchington-link-cli-'))
+    const sourceRoot = join(directory, 'source')
+    const targetRoot = join(directory, 'target')
+    await mkdir(join(sourceRoot, 'agent-workflow'), { recursive: true })
+    await writeFile(join(sourceRoot, 'agent-workflow', 'SKILL.md'), '# Agent workflow\n')
+    await writeFile(
+      join(sourceRoot, 'manifest.json'),
+      JSON.stringify({
+        version: 1,
+        skills: [
+          {
+            name: 'agent-workflow',
+            plugin: 'workflow',
+            pluginVersion: '1.0.0',
+            path: 'agent-workflow/SKILL.md',
+          },
+        ],
+      }),
+    )
+    await expect(
+      runCli([
+        'node',
+        'vouchington',
+        'link-skill',
+        'agent-workflow',
+        '--source-root',
+        sourceRoot,
+        '--target-root',
+        targetRoot,
+      ]),
+    ).resolves.toBe(0)
+    expect(stdout.mock.calls.at(-1)?.[0]).toBe(`linked ${join(targetRoot, 'agent-workflow')}\n`)
   })
 
   it('maps a missing process status to exit 1 and surfaces spawn errors', async () => {

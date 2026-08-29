@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readlink, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -70,6 +70,12 @@ describe('skill discovery', () => {
     await mkdir(join(blocked, 'agent-workflow'), { recursive: true })
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: blocked }),
+    ).rejects.toThrow('already exists')
+    const mismatched = join(targetRoot, 'mismatched')
+    await mkdir(mismatched, { recursive: true })
+    await symlink(join(sourceRoot, 'other'), join(mismatched, 'agent-workflow'), 'dir')
+    await expect(
+      linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot: mismatched }),
     ).rejects.toThrow('already exists')
     await expect(linkSkill({ name: 'unknown', sourceRoot, targetRoot })).rejects.toThrow(
       'Unknown skill',
