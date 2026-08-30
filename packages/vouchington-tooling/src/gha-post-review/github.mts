@@ -51,7 +51,7 @@ export function writePostedOutput(posted: boolean, outputPath = process.env.GITH
   appendFileSync(outputPath, `posted=${posted ? 'true' : 'false'}\n`)
 }
 
-function readPullRefs(repository: string, prNumber: string, exec: GhExec): string[] {
+function readPullState(repository: string, prNumber: string, exec: GhExec): string[] {
   let lastError: unknown
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -59,7 +59,7 @@ function readPullRefs(repository: string, prNumber: string, exec: GhExec): strin
         'api',
         `repos/${repository}/pulls/${prNumber}`,
         '--jq',
-        '[.head.sha, .base.sha] | @tsv',
+        '[.head.sha, .base.sha, .draft, .state] | @tsv',
       ]).split('\t')
     } catch (error) {
       lastError = error
@@ -102,13 +102,19 @@ export function createGhPostReviewIo(options: {
       if (expectedBaseSha && !/^[0-9a-f]{40}$/u.test(expectedBaseSha)) {
         throw new ReviewPayloadError('EXPECTED_BASE_SHA must be a full lowercase commit SHA.')
       }
-      const refs = readPullRefs(repository, prNumber, exec)
-      const [headSha = '', baseSha = ''] = refs
+      const state = readPullState(repository, prNumber, exec)
+      const [headSha = '', baseSha = '', draft = '', pullState = ''] = state
       if (!/^[0-9a-f]{40}$/u.test(headSha)) {
         throw new ReviewPayloadError(`Could not resolve PR head SHA (got "${headSha}").`)
       }
       if (!/^[0-9a-f]{40}$/u.test(baseSha)) {
         throw new ReviewPayloadError(`Could not resolve PR base SHA (got "${baseSha}").`)
+      }
+      if (draft !== 'false') {
+        throw new ReviewPayloadError('Pull request became a draft before posting the review.')
+      }
+      if (pullState !== 'open') {
+        throw new ReviewPayloadError('Pull request closed before posting the review.')
       }
       if (expectedHeadSha && headSha !== expectedHeadSha) {
         throw new ReviewPayloadError('PR head changed before posting the selected review.')

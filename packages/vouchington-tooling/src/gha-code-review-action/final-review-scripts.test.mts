@@ -133,6 +133,8 @@ describe('native gate require', () => {
       GATE_OUTCOME: 'success',
       GATE_STATUS: 'review',
       MARK_OUTCOME: 'failure',
+      CLEANUP_OUTCOME: 'success',
+      REQUESTED_LABEL: 'final-code-review:requested',
     })
     expect(result.status).not.toBe(0)
   })
@@ -143,6 +145,8 @@ describe('native gate require', () => {
         GATE_OUTCOME: 'success',
         GATE_STATUS: 'review',
         MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'success',
+        REQUESTED_LABEL: 'final-code-review:requested',
       }).status,
     ).toBe(0)
   })

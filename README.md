@@ -143,7 +143,10 @@ native jobs attach to the default branch, its
 terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
 the action publishes that required check on the selector's exact pull-request head. The source
 `pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
-and the ready transition must produce a fresh validated completion dispatch.
+and the ready transition must produce a fresh validated completion dispatch. The pending label
+records observable review state; exact selected-head checks suppress duplicate work. The terminal
+gate clears pending state on success or failure unless a newer head owns it. Consumers should use a trusted draft/close lifecycle workflow
+with the same concurrency group as final review so those events cancel provider work immediately.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
@@ -227,7 +230,8 @@ When an orchestrator selects an exact pull request revision, it must pass both e
 together and set `trusted_prompt_ref` to `expected_base_sha`. The reusable workflow rejects a
 changed head or base before the agent starts and requires the trusted prompt ref to match that base.
 The agent checkout is pinned to the selected head. At the write boundary, the poster verifies both
-selected refs and binds the review commit ID to the selected head SHA. A validation failure exits
+selected refs, requires the pull request to remain open and ready, and binds the review commit ID
+to the selected head SHA. A validation failure exits
 before the review agent runs or before a review is posted.
 For `workflow_call`, `tooling_ref` must be the immutable full SHA used to pin the reusable
 workflow so both nested action checkouts resolve the tooling repository rather than the caller

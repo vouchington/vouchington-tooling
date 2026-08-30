@@ -290,9 +290,14 @@ esac`
       SELECTED_BASE_SHA: '${{ inputs.selected_base_sha }}',
       DEFAULT_BRANCH: '${{ inputs.default_branch }}',
     })
-    expect(gate.runs?.steps?.[1]?.env).toMatchObject({
+    const markStep = gate.runs?.steps?.find((step) => step.run?.includes('mark-complete.sh'))
+    const cleanupStep = gate.runs?.steps?.find((step) => step.run?.includes('clear-requested.sh'))
+    expect(markStep?.env).toMatchObject({
       COMPLETE_LABEL: '${{ inputs.complete_label }}',
+    })
+    expect(cleanupStep?.env).toMatchObject({
       REQUESTED_LABEL: '${{ inputs.requested_label }}',
+      SELECTED_HEAD_SHA: '${{ inputs.selected_head_sha }}',
     })
     const publish = readFileSyncNode(`${root}/final-review-gate/publish-check.sh`, 'utf8')
     const requireGate = readFileSyncNode(`${root}/final-review-gate/require.sh`, 'utf8')
@@ -319,6 +324,8 @@ esac`
         GATE_OUTCOME: 'success',
         GATE_STATUS: 'review',
         MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'success',
+        REQUESTED_LABEL: 'final-code-review:requested',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -342,7 +349,9 @@ esac`
         GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
         GATE_OUTCOME: 'success',
         GATE_STATUS: 'untrusted',
-        MARK_OUTCOME: 'failure',
+        MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'failure',
+        REQUESTED_LABEL: 'final-code-review:requested',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -352,13 +361,12 @@ esac`
     expect(output).toContain('conclusion=failure')
   })
 
-  it('removes the pending label after recording trusted completion', async () => {
+  it('records trusted completion before terminal pending-label cleanup', async () => {
     const { calls } = await runWithMockGh(
       '.github/actions/final-review-gate/mark-complete.sh',
       `case "$*" in
         *"pulls/7"*) printf '%s\\n' '${pr}' ;;
         *"--method POST"*"/labels"*"labels[]=final-code-review:complete"*) : ;;
-        *"--method DELETE"*"/labels/final-code-review%3Arequested"*) : ;;
         *) echo "unexpected gh call: $*" >&2; exit 64 ;;
       esac`,
       {
@@ -372,11 +380,78 @@ esac`
         DEFAULT_BRANCH: 'main',
         GATE_STATUS: 'review',
         COMPLETE_LABEL: 'final-code-review:complete',
-        REQUESTED_LABEL: 'final-code-review:requested',
       },
     )
     expect(calls).toContain('labels[]=final-code-review:complete')
+    expect(calls).not.toContain('--method DELETE')
+  })
+
+  it('clears pending state on the selected head even after a terminal failure', async () => {
+    const { calls } = await runWithMockGh(
+      '.github/actions/final-review-gate/clear-requested.sh',
+      `case "$*" in
+        *"pulls/7"*) printf '%s\\n' '${pr}' ;;
+        *"--method DELETE"*"/labels/final-code-review%3Arequested"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        PR_NUMBER: '7',
+        SELECTED_HEAD_SHA: head,
+        REQUESTED_LABEL: 'final-code-review:requested',
+      },
+    )
     expect(calls).toContain('labels/final-code-review%3Arequested')
+  })
+
+  it('preserves pending state owned by a newer pull-request head', async () => {
+    const newer = JSON.stringify({ ...JSON.parse(pr), head: { sha: 'c'.repeat(40) } })
+    const { calls } = await runWithMockGh(
+      '.github/actions/final-review-gate/clear-requested.sh',
+      `case "$*" in
+        *"pulls/7"*) printf '%s\\n' '${newer}' ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        PR_NUMBER: '7',
+        SELECTED_HEAD_SHA: head,
+        REQUESTED_LABEL: 'final-code-review:requested',
+      },
+    )
+    expect(calls).not.toContain('--method DELETE')
+  })
+
+  it('allows successful publication when pending labels are disabled', async () => {
+    const { output } = await runWithMockGh(
+      '.github/actions/final-review-gate/publish-check.sh',
+      `case "$*" in
+        *"check-runs"*"conclusion=success"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        GATE_OUTCOME: 'success',
+        GATE_STATUS: 'review',
+        MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'skipped',
+        REQUESTED_LABEL: '',
+        CHECK_NAME: 'Code Reviewed',
+        SELECTED_HEAD_SHA: head,
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_RUN_ID: '123',
+      },
+    )
+    expect(output).toContain('conclusion=success')
   })
 })
 
