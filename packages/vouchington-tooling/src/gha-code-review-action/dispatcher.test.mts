@@ -12,7 +12,10 @@ type Workflow = {
     }
   >
   on?: {
-    workflow_call?: { inputs?: Record<string, { type?: string }> }
+    workflow_call?: {
+      inputs?: Record<string, { type?: string }>
+      outputs?: Record<string, { value?: string }>
+    }
     workflow_dispatch?: { inputs?: Record<string, { type?: string }> }
   }
 }
@@ -33,5 +36,22 @@ describe('claude code review dispatcher', () => {
     )
     expect(workflow.jobs?.['claude-review']?.with?.compatibility_warning).toBe(false)
     expect(text).not.toContain('required_review: ${{ inputs.required_review }}')
+  })
+
+  it('forwards the nested workflow outputs to callers', () => {
+    expect(workflow.on?.workflow_call?.outputs).toEqual({
+      agent_outcome: {
+        description: 'Advisory Claude review-agent outcome.',
+        value: '${{ jobs.claude-review.outputs.agent_outcome }}',
+      },
+      payload_artifact_id: {
+        description: 'Review payload artifact ID when a payload was produced.',
+        value: '${{ jobs.claude-review.outputs.payload_artifact_id }}',
+      },
+      poster_outcome: {
+        description: 'Advisory Claude review-poster outcome.',
+        value: '${{ jobs.claude-review.outputs.poster_outcome }}',
+      },
+    })
   })
 })
