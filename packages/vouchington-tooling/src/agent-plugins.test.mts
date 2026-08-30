@@ -266,14 +266,18 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
     expect(skill).toMatch(/30 minutes/i)
     expect(skill).toMatch(/GitHub-hosted runners?[\s\S]*public repositories?/i)
-    expect(skill).toMatch(/every executable external `uses:` reference[\s\S]*40-character Git SHA/i)
-    expect(skill).toMatch(/machine-maintainable version[\s\S]*# v4\.2\.0/i)
+    expect(skill).toMatch(
+      /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
+    )
+    expect(skill).toMatch(/machine-maintainable\s+version[\s\S]*# v4\.2\.0/i)
+    expect(skill).toMatch(/`docker:\/\/\.\.\.` actions[\s\S]*`@sha256:` image digest/i)
     expect(skill).toMatch(/Dependabot/i)
     expect(skill).toMatch(/tests?[\s\S]*must not assert[^\n]*exact SHA or version/i)
     expect(skill).toMatch(/exact source revision[\s\S]*`with\.ref`/i)
     expect(skill).toMatch(/required job or check name[\s\S]*fan-in/i)
     expect(skill).toMatch(/underlying phase[\s\S]*deadline of no more than 30 minutes/i)
     expect(skill).toMatch(/must not hide a longer-running[\s\S]*another service/i)
+    expect(skill).toMatch(/top-level `jobs\.<job_id>\.uses`[\s\S]*cannot accept `timeout-minutes`/i)
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {

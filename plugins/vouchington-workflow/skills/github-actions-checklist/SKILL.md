@@ -16,7 +16,9 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   pull-request content.
 - Load [github-actions-authoring](../github-actions-authoring/SKILL.md) when changing orchestration.
   Do not poll remote workflow, deployment, lease, service, or health state.
-- Give every job a timeout of no more than 30 minutes. If the underlying operation cannot terminate
+- Give every concrete job a timeout of no more than 30 minutes. A caller job that invokes a reusable
+  workflow through top-level `jobs.<job_id>.uses` cannot accept `timeout-minutes`; enforce the bound
+  on every concrete job inside the called workflow. If the underlying operation cannot terminate
   inside that bound, decompose it into event-driven phases; lowering or moving the timeout alone does
   not fix the design. Preserve a required job or check name with a bounded fan-in job when splitting
   work would otherwise change the repository's merge contract. Each underlying phase must also have
@@ -25,9 +27,10 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   operation in another service.
 - Use GitHub-hosted runners only for public repositories. Private repositories use the consumer's
   approved self-hosted or disposable runner labels.
-- Pin every executable external `uses:` reference—anything other than a local `./...` action—to a
-  full lowercase 40-character Git SHA followed immediately by its machine-maintainable version
-  comment, such as `# v4.2.0`, so Dependabot can update both. Keep GitHub Actions dependency updates
+- Pin every repository-backed external `uses:` reference—anything other than a local `./...`
+  action—to a full lowercase 40-character Git SHA followed immediately by its machine-maintainable
+  version comment, such as `# v4.2.0`, so Dependabot can update both. Pin `docker://...` actions to an
+  immutable `@sha256:` image digest instead of a Git SHA. Keep GitHub Actions dependency updates
   enabled.
 - Workflow tests and fixtures must not assert an action dependency's exact SHA or version. Assert
   the action identity and Git SHA shape, or derive the dependency ref from the workflow under test,
