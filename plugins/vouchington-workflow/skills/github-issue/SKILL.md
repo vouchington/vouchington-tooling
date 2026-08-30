@@ -5,7 +5,7 @@ description: Search, create, update, link, or assess GitHub issues using the rep
 
 # GitHub issues
 
-Use for durable follow-ups and pull-request linkage. Read repository-local instructions, issue
+Use for durable follow-ups and pull-request linkage. Read local `AGENTS.md`, `CLAUDE.md`, issue
 templates, and repository-routing policy before making any remote mutation.
 
 ## Mutation authority

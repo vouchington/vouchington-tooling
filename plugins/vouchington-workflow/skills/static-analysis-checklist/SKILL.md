@@ -5,7 +5,7 @@ description: Use when adding, changing, replacing, or removing static-analysis r
 
 # Static analysis checklist
 
-Use when changing a static-analysis invariant. Read repository-local instructions, analyzer
+Use when changing a static-analysis invariant. Read local `AGENTS.md`, `CLAUDE.md`, analyzer
 documentation, rule inventory, and fixture conventions before selecting an implementation.
 
 1. State the invariant and search for an existing analyzer, rule, or guard that owns it. Prefer the

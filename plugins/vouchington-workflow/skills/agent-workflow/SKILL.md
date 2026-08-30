@@ -5,14 +5,14 @@ description: 'Shared workflow guidance for repository implementation: inspect lo
 
 # Agent workflow
 
-Use this skill before implementation work. It supplies portable defaults; repository-local instruction
-files, the contribution guide, and CI configuration define the actual commands,
+Use this skill before implementation work. It supplies portable defaults; the repository's
+`AGENTS.md`, `CLAUDE.md`, contribution guide, and CI configuration define the actual commands,
 branching, review, and release policy.
 
 1. Inspect the current checkout and its status without discarding local work. Follow the consumer
    repository's instructions for branch and worktree topology; do not create either implicitly.
-2. Read every applicable repository-local instruction file from the repository root through each
-   changed file, then relevant documentation and tests. Apply the closest instruction only when rules
+2. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through each changed
+   file, then relevant documentation and tests. Apply the closest instruction only when rules
    conflict, and treat all applicable local instructions as higher priority than this skill.
 3. Confirm the accepted task's boundary. Reuse existing ownership and utilities; ask before
    widening scope or making an irreversible external change.

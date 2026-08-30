@@ -6,7 +6,7 @@ description: Audit CI failures or noisy logs, identify the root cause, and recom
 # Review CI logs
 
 Use when investigating CI failures, repeated workflow noise, or misleading diagnostics. Read local
-repository-local instructions, workflow guidance, and CI documentation before inspecting runs.
+`AGENTS.md`, `CLAUDE.md`, workflow guidance, and CI documentation before inspecting runs.
 
 1. Confirm the repository and select representative failed and successful runs within a bounded
    window. For a supplied run, inspect only that run.

@@ -6,7 +6,7 @@ description: Use when changing JavaScript package metadata, dependencies, script
 # Package metadata checklist
 
 Use before changing `package.json`, a lockfile, workspace metadata, or a package entrypoint. Read
-every applicable repository-local instruction file from the repository root through the owning package,
+every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the owning package,
 applying the closest file only when rules conflict. Those instructions own package-manager version,
 dependency age/version policy, registry, release process, and package layout.
 

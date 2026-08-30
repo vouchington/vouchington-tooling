@@ -6,7 +6,7 @@ description: Record and retrieve concise contemporaneous session findings when t
 # Session journal
 
 Use when the current repository provides a journal, blackboard, or equivalent durable session
-record. Read repository-local instructions for the provider, credential, retention, and
+record. Read local `AGENTS.md` and `CLAUDE.md` for the provider, credential, retention, and
 subagent-identity rules.
 
 1. Append a concise note when a check fails, permission is denied, scope changes, a repeated fix is

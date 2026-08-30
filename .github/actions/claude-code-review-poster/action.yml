@@ -34,7 +34,7 @@ runs:
   steps:
     - name: Post review with Claude App token
       id: poster
-      uses: ./.github/actions/code-review-poster
+      uses: $/.github/actions/code-review-poster
       with:
         compatibility_warning: 'false'
         pr_number: ${{ inputs.pr_number }}

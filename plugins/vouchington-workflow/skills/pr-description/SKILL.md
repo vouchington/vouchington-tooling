@@ -6,7 +6,7 @@ description: Draft or review a self-contained pull-request description with summ
 # Pull-request description
 
 Use before opening or updating a pull request, or when reviewing PR hand-off quality. Read local
-repository-local instructions, pull-request template, and issue-linking policy first.
+`AGENTS.md`, `CLAUDE.md`, pull-request template, and issue-linking policy first.
 
 Include enough context for a reviewer with no prior conversation:
 

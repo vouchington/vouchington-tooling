@@ -200,7 +200,6 @@ describe('vouchington-workflow plugin', () => {
     for (const skill of skills) {
       expect(skill).toContain('AGENTS.md')
       expect(skill).toContain('CLAUDE.md')
-      expect(skill).toMatch(/repository-local|local instructions/i)
       expect(skill.replaceAll(/(?:AGENTS|CLAUDE)\.md/giu, '')).not.toMatch(/\b(?:claude|codex)\b/i)
       expect(skill).not.toMatch(/\.agents\/skills|\.github\/workflows\/RUNNERS|filaments|voucha/i)
       expect(skill).not.toMatch(

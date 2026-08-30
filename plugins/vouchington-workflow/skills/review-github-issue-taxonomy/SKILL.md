@@ -6,7 +6,7 @@ description: Audit GitHub labels, milestones, and path-label automation and retu
 # Review GitHub issue taxonomy
 
 Use when the taxonomy itself needs review. Remain read-only unless the caller explicitly authorizes
-local configuration edits or live taxonomy mutation; read repository-local instructions first.
+local configuration edits or live taxonomy mutation; read local `AGENTS.md` and `CLAUDE.md` first.
 
 1. Confirm repository identity and fetch live labels, descriptions, colors, usage, milestones, and
    their current scope.
