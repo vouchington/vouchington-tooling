@@ -19,8 +19,8 @@ repository-neutral security-finding skill. `vouchington-workflow` provides reusa
 commit, GitHub Actions, package-metadata, npm-publishing, static-analysis, planning, issue-management,
 blackboard journaling, retrospective and follow-up review, CI-log review, and
 pull-request-description skills. All plugins use one canonical
-`skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in
-`AGENTS.md`, `CLAUDE.md`, or thin wrapper skills. The portable issue workflow verifies live
+`skills/` tree for every supported host; consumer repositories add their local mechanics and policy
+in repository-local instruction files or thin wrapper skills. The portable issue workflow verifies live
 collaborator authority before creation, routes denied external work to a verified consumer tracker,
 uses existing labels without extra approval, and requires explicit approval before creating labels.
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
@@ -36,7 +36,12 @@ Playwright, Storybook, Swift, and .NET specializations. `vouchington-database` s
 performance and UUIDv7 partitioning guidance. Consumer wrappers own runner configuration, fixtures,
 database policy, and commands.
 
-### Install
+These integrations are opt-in. Installing a package or cloning this repository does not enable an AI
+coding platform, transcript adapter, workflow, or CI provider. Select only the plugin directories,
+transcript formats, and provider-specific Actions adapters that your repository explicitly adopts;
+generic skills remain host-neutral and read the consuming repository's local instructions.
+
+### Install (opt-in)
 
 Codex:
 
@@ -105,13 +110,13 @@ The payload contract requires every finding to be an inline comment so repositor
 thread resolution. There is no `@claude` mention workflow.
 
 ```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/code-review@<sha>
+- uses: vouchington/vouchington-tooling/.github/actions/claude-code-review@<sha>
   with:
     pr_number: ${{ inputs.pr_number }}
     trusted_prompt_ref: ${{ github.sha }}
     claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-- uses: vouchington/vouchington-tooling/.github/actions/code-review-poster@<sha>
+- uses: vouchington/vouchington-tooling/.github/actions/claude-code-review-poster@<sha>
   with:
     pr_number: ${{ inputs.pr_number }}
     artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
@@ -125,6 +130,13 @@ thread resolution. There is no `@claude` mention workflow.
     timeout_seconds: '1200'
     payload_artifact_name: opencode
     openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
+
+- uses: vouchington/vouchington-tooling/.github/actions/review-poster@<sha>
+  with:
+    pr_number: ${{ inputs.pr_number }}
+    artifact_id: ${{ steps.opencode.outputs.payload_artifact_id }}
+    provider_name: OpenCode OpenRouter
+    post_token: ${{ github.token }}
 
 - uses: vouchington/vouchington-tooling/.github/actions/dependabot-automerge@<sha>
   with:
@@ -193,6 +205,10 @@ events cancel provider work immediately.
     fan-in-job: tests
 ```
 
+The older `code-review` action, `code-review-poster` action, and `code-review.yml` reusable
+workflow remain as one-release compatibility entrypoints and emit deprecation warnings. New callers
+must select the explicit Claude adapter or the provider-neutral poster.
+
 `dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
 auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
 branch before using the dedicated token to enable eligible auto-merge or disable stale auto-merge.
@@ -216,7 +232,7 @@ Or call the two-job reusable workflow:
 ```yaml
 jobs:
   review:
-    uses: vouchington/vouchington-tooling/.github/workflows/code-review.yml@<sha>
+    uses: vouchington/vouchington-tooling/.github/workflows/claude-code-review.yml@<sha>
     with:
       pr_number: ${{ inputs.pr_number }}
       expected_head_sha: ${{ inputs.expected_head_sha }}
@@ -246,7 +262,9 @@ validates that exact run and publishes `Code Reviewed` directly on the selected 
 Forks, Dependabot, and Renovate never receive review secrets or a provider checkout; their exact
 tested heads can still receive the required check.
 
-The setup expects these organization Actions variables and fails when any is missing or malformed:
+AI review lanes are disabled by default. A missing enablement variable is treated as `false`; a
+non-empty value other than `true` or `false` fails validation. Model and effort settings are required
+only for lanes explicitly enabled with `true`:
 
 - `CLAUDE_CODE_REVIEW_ENABLED` (`true` or `false`)
 - `CLAUDE_CODE_REVIEW_MODEL` (`haiku`, `sonnet`, or `opus`)

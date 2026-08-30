@@ -5,7 +5,7 @@ description: Review recently completed work and repository instructions for genu
 
 # Revisit follow-ups
 
-Use to turn explicit deferred work into a curated backlog. Read local `AGENTS.md`, `CLAUDE.md`,
+Use to turn explicit deferred work into a curated backlog. Read repository-local instructions,
 issue policy, and review-record conventions first.
 
 1. Confirm the requested lookback window and collect only explicit deferred-action signals from

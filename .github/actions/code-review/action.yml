@@ -1,5 +1,5 @@
-name: Code Review
-description: Run a Claude-compatible pull request code review with a file-built prompt.
+name: Legacy Claude Code Review
+description: Deprecated compatibility entrypoint; use the claude-code-review action.
 outputs:
   agent_outcome:
     description: Aggregate agent and payload-transport outcome
@@ -9,6 +9,10 @@ outputs:
     value: ${{ steps.upload-payload.outputs.artifact-id }}
 
 inputs:
+  compatibility_warning:
+    description: Emit the legacy-path deprecation warning
+    required: false
+    default: 'true'
   pr_number:
     description: Pull request number to review
     required: true
@@ -79,6 +83,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Warn about deprecated review action
+      if: inputs.compatibility_warning == 'true'
+      shell: bash
+      run: echo '::warning::.github/actions/code-review is deprecated; use .github/actions/claude-code-review.'
+
     - name: Stash existing trusted prompt directory
       shell: bash
       run: bash "$GITHUB_ACTION_PATH/stash-trusted-prompt-dir.sh"

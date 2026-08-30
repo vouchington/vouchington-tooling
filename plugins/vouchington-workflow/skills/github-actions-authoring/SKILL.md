@@ -7,7 +7,7 @@ description: Author or redesign GitHub Actions workflows around event-driven orc
 
 Never poll in CI. A workflow must react to a state transition, not repeatedly ask whether remote
 state has changed. Read [github-actions-checklist](../github-actions-checklist/SKILL.md) first, then
-every applicable `AGENTS.md` and `CLAUDE.md`. Repository-local policy and the consumer wrapper own
+all applicable repository-local instructions. Repository policy and the consumer wrapper own
 runner labels, permissions, action pins, concurrency, secrets, and required-check names.
 
 ## Design the event graph

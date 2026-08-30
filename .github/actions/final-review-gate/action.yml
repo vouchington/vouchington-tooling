@@ -34,6 +34,9 @@ inputs:
     description: Optional pending-review label removed after a successful terminal gate.
     required: false
     default: ''
+  provider_results_json:
+    description: JSON array of advisory provider {name, outcome} results
+    required: false
 outputs:
   gate_outcome:
     description: Outcome of the advisory validation step
@@ -58,6 +61,7 @@ runs:
         SELECTED_HEAD_SHA: ${{ inputs.selected_head_sha }}
         SELECTED_BASE_SHA: ${{ inputs.selected_base_sha }}
         DEFAULT_BRANCH: ${{ inputs.default_branch }}
+        PROVIDER_RESULTS_JSON: ${{ inputs.provider_results_json }}
       run: bash "${GITHUB_ACTION_PATH}/gate.sh"
     - name: Mark final review complete
       id: mark-complete

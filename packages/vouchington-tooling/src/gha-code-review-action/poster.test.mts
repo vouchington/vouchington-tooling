@@ -21,6 +21,10 @@ type Action = {
 
 const action = load(readFileSync('.github/actions/code-review-poster/action.yml', 'utf8')) as Action
 const agent = load(readFileSync('.github/actions/code-review/action.yml', 'utf8')) as Action
+const neutral = load(readFileSync('.github/actions/review-poster/action.yml', 'utf8')) as Action
+const claude = load(
+  readFileSync('.github/actions/claude-code-review-poster/action.yml', 'utf8'),
+) as Action
 const steps = action.runs?.steps ?? []
 const stepByName = new Map(steps.map((step) => [step.name, step]))
 
@@ -30,7 +34,7 @@ describe('code-review-poster action', () => {
     expect(download?.with).toEqual({
       'artifact-ids': '${{ inputs.artifact_id }}',
       path: '${{ runner.temp }}/code-review-payload-download',
-      'github-token': '${{ github.token }}',
+      'github-token': '${{ inputs.github_token || github.token }}',
       repository: '${{ github.repository }}',
       'run-id': '${{ github.run_id }}',
     })
@@ -48,6 +52,26 @@ describe('code-review-poster action', () => {
     expect(action.inputs?.expected_head_sha).toMatchObject({ default: '' })
     expect(action.inputs?.expected_base_sha).toMatchObject({ default: '' })
     expect(action.inputs?.token_source).toMatchObject({ default: 'claude-app' })
+    expect(action.inputs?.compatibility_warning).toMatchObject({ default: 'true' })
+  })
+
+  it('provides explicit neutral and Claude poster entrypoints', () => {
+    const neutralSteps = neutral.runs?.steps ?? []
+    const validation = neutralSteps.find((step) => step.name === 'Validate explicit poster inputs')
+    const neutralPoster = neutralSteps.find((step) => step.id === 'poster')
+    expect(validation?.run).toContain('post_token is required')
+    expect(neutralPoster?.uses).toBe('$/.github/actions/code-review-poster')
+    expect(neutralPoster?.with).toMatchObject({
+      compatibility_warning: 'false',
+      token_source: 'github-token',
+      github_token: '${{ inputs.post_token }}',
+    })
+    const claudePoster = claude.runs?.steps?.find((step) => step.id === 'poster')
+    expect(claudePoster?.uses).toBe('$/.github/actions/code-review-poster')
+    expect(claudePoster?.with).toMatchObject({
+      compatibility_warning: 'false',
+      token_source: 'claude-app',
+    })
   })
 
   it('reuses the code-review Node resolver', () => {

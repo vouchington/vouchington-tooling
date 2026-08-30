@@ -1,6 +1,8 @@
 set -euo pipefail
 # shellcheck source=gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/gh-retry.sh"
+# shellcheck source=legacy-provider-results.sh
+source "$(dirname "${BASH_SOURCE[0]}")/legacy-provider-results.sh"
 if [ "$IS_DRAFT" = true ]; then exit 0; fi
 if [ "$EVENT_STATE" != open ]; then exit 0; fi
 if [ "$EVENT_BASE_REF" != "$DEFAULT_BRANCH" ]; then exit 0; fi
@@ -45,19 +47,25 @@ case "$GATE_STATUS" in
   review) ;;
   *) echo "::error::Unknown final review status: $GATE_STATUS"; exit 1 ;;
 esac
-provider_failed() {
-  [ "$1" = success ] || return 0
-  [ "$2" = success ] || return 0
-  [ -z "$3" ] && return 1
-  [ "$4" = success ] || return 0
-  return 1
-}
-if [ "$CLAUDE_ENABLED" = true ] && [ "$CLAUDE_RESULT" != success ]; then
-  echo '::warning::Claude review did not complete successfully.'
+provider_results_json="${PROVIDER_RESULTS_JSON:-}"
+if [ -z "$provider_results_json" ]; then
+  echo '::warning::provider_results_json is required; using deprecated legacy provider environment.'
+  provider_results_json="$(legacy_provider_results)"
 fi
-if [ "$OPENROUTER_ENABLED" = true ] && provider_failed "$OPENROUTER_ACTION" "$OPENROUTER_AGENT" "$OPENROUTER_ARTIFACT" "$OPENROUTER_POSTER"; then
-  echo '::warning::OpenCode OpenRouter review did not complete successfully.'
+if ! jq -e '
+  type == "array" and
+  all(.[]; type == "object" and (keys | sort == ["name", "outcome"]) and
+    (.name | type == "string" and length > 0 and (test("[\\r\\n]") | not)) and
+    (.outcome | type == "string" and length > 0 and (test("[\\r\\n]") | not)))
+' >/dev/null <<< "$provider_results_json"; then
+  echo '::error::provider_results_json must be a JSON array of non-empty {name, outcome} strings.'
+  exit 1
 fi
-if [ "$ZEN_ENABLED" = true ] && provider_failed "$ZEN_ACTION" "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER"; then
-  echo '::warning::OpenCode Zen review did not complete successfully.'
-fi
+while IFS= read -r provider_result; do
+  provider_name="$(jq -r '.name' <<< "$provider_result")"
+  provider_outcome="$(jq -r '.outcome' <<< "$provider_result")"
+  if [ "$provider_outcome" != success ]; then
+    provider_name="${provider_name//'%'/'%25'}"
+    echo "::warning::$provider_name review did not complete successfully."
+  fi
+done < <(jq -c '.[]' <<< "$provider_results_json")

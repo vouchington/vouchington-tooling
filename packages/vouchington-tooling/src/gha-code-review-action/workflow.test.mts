@@ -72,6 +72,15 @@ describe('code-review reusable workflow', () => {
     expect(
       workflow.jobs?.poster?.steps?.some((step) => step.uses?.includes('code-review-poster')),
     ).toBe(true)
+    expect(workflow.on?.workflow_call?.inputs?.compatibility_warning).toMatchObject({
+      default: true,
+    })
+    expect(
+      workflow.jobs?.review?.steps?.some(
+        (step) => step.name === 'Warn about deprecated review workflow',
+      ),
+    ).toBe(true)
+    expect(reviewUses).toContain('./.vouchington-tooling/.github/actions/claude-code-review')
   })
 
   it('rejects stale selected refs before reviewing or posting', () => {

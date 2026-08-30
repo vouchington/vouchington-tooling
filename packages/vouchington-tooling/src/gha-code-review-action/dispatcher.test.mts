@@ -12,6 +12,7 @@ type Workflow = {
     }
   >
   on?: {
+    workflow_call?: { inputs?: Record<string, { type?: string }> }
     workflow_dispatch?: { inputs?: Record<string, { type?: string }> }
   }
 }
@@ -21,12 +22,16 @@ const workflow = load(text) as Workflow
 
 describe('claude code review dispatcher', () => {
   it('stringifies required_review at the reusable workflow_call boundary', () => {
+    expect(workflow.on?.workflow_call?.inputs?.tooling_ref?.type).toBe('string')
     expect(workflow.on?.workflow_dispatch?.inputs?.required_review?.type).toBe('boolean')
     expect(workflow.jobs?.['claude-review']?.uses).toBe('./.github/workflows/code-review.yml')
     expect(workflow.jobs?.['claude-review']?.with?.required_review).toBe(
       "${{ (inputs.required_review == true || inputs.required_review == 'true') && 'true' || 'false' }}",
     )
-    expect(workflow.jobs?.['claude-review']?.with?.tooling_ref).toBe('${{ github.sha }}')
+    expect(workflow.jobs?.['claude-review']?.with?.tooling_ref).toBe(
+      '${{ inputs.tooling_ref || github.sha }}',
+    )
+    expect(workflow.jobs?.['claude-review']?.with?.compatibility_warning).toBe(false)
     expect(text).not.toContain('required_review: ${{ inputs.required_review }}')
   })
 })

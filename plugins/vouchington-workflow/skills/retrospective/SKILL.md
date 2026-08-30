@@ -6,7 +6,7 @@ description: Produce a concise evidence-based retrospective for a completed task
 # Retrospective
 
 Use at task completion or session close-out when the repository has a retrospective workflow.
-Read the local `AGENTS.md`, `CLAUDE.md`, and journal guidance first.
+Read repository-local instructions and journal guidance first.
 
 1. Check whether a retrospective already exists and append only a material delta when local policy
    calls for that behavior.

@@ -2,6 +2,7 @@ import { ReviewPayloadError } from '../gha-review-payload/index.mts'
 
 export type ReviewPostToken = { source: 'github-token'; token: string } | { source: 'claude-app' }
 
+/** @deprecated Select an explicit posting adapter instead of the legacy token-source router. */
 export function resolveReviewPostToken(env: NodeJS.ProcessEnv = process.env): ReviewPostToken {
   const source = env.CODE_REVIEW_TOKEN_SOURCE || 'claude-app'
   if (source === 'github-token') {

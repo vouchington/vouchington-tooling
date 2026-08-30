@@ -42,18 +42,7 @@ printf '{"head":{"sha":"%s"},"base":{"sha":"%s","ref":"main","repo":{"full_name"
       PR_NUMBER: '1',
       SELECTED_HEAD_SHA: HEAD,
       SELECTED_BASE_SHA: BASE,
-      CLAUDE_ENABLED: 'false',
-      CLAUDE_RESULT: '',
-      OPENROUTER_ENABLED: 'true',
-      OPENROUTER_ACTION: 'success',
-      OPENROUTER_AGENT: 'success',
-      OPENROUTER_ARTIFACT: '',
-      OPENROUTER_POSTER: '',
-      ZEN_ENABLED: 'true',
-      ZEN_ACTION: 'success',
-      ZEN_AGENT: 'success',
-      ZEN_ARTIFACT: '',
-      ZEN_POSTER: '',
+      PROVIDER_RESULTS_JSON: '[]',
       ...overrides,
     })
   } finally {
@@ -62,16 +51,45 @@ printf '{"head":{"sha":"%s"},"base":{"sha":"%s","ref":"main","repo":{"full_name"
 }
 
 describe('advisory-provider fan-in', () => {
-  it('warns when Claude fails instead of failing the native gate', () => {
-    const result = runGate({ CLAUDE_ENABLED: 'true', CLAUDE_RESULT: 'failure' })
+  it('accepts an explicit empty provider list', () => {
+    const result = runGate()
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('::warning::Claude review did not complete successfully')
+    expect(result.stdout).not.toContain('::warning::')
   })
 
-  it('warns when an enabled OpenRouter agent fails before producing an artifact', () => {
-    const result = runGate({ OPENROUTER_AGENT: 'failure' })
+  it('warns when a named provider fails instead of failing the native gate', () => {
+    const result = runGate({
+      PROVIDER_RESULTS_JSON: '[{"name":"Review platform","outcome":"failure"}]',
+    })
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('::warning::OpenCode OpenRouter review')
+    expect(result.stdout).toContain(
+      '::warning::Review platform review did not complete successfully',
+    )
+  })
+
+  it.each([
+    ['not JSON'],
+    ['{}'],
+    ['[{"name":"Review platform"}]'],
+    ['[{"name":"","outcome":"success"}]'],
+    ['[{"name":"Review platform","outcome":false}]'],
+    ['[{"name":"Review\\nplatform","outcome":"failure"}]'],
+    ['[{"name":"Review platform","outcome":"success","extra":true}]'],
+  ])('fails closed for malformed provider results: %s', (providerResults) => {
+    const result = runGate({ PROVIDER_RESULTS_JSON: providerResults })
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toContain('::error::provider_results_json')
+  })
+
+  it('warns when using the deprecated legacy provider environment', () => {
+    const result = runGate({
+      PROVIDER_RESULTS_JSON: '',
+      CLAUDE_ENABLED: 'true',
+      CLAUDE_RESULT: 'failure',
+    })
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('::warning::provider_results_json is required')
+    expect(result.stdout).toContain('::warning::Claude review did not complete successfully')
   })
 
   it('passes an untrusted PR without requiring review settings', () => {

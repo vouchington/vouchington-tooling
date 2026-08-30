@@ -1,7 +1,11 @@
-name: Code Review Poster
-description: Download, validate, and post a review payload from trusted action code.
+name: Legacy Code Review Poster
+description: Deprecated compatibility entrypoint; use an explicit review poster adapter.
 
 inputs:
+  compatibility_warning:
+    description: Emit the legacy-path deprecation warning
+    required: false
+    default: 'true'
   pr_number:
     description: Pull request number to review
     required: true
@@ -16,6 +20,10 @@ inputs:
     description: Review POST credential. claude-app mints an App token via OIDC; github-token uses GITHUB_TOKEN.
     required: false
     default: claude-app
+  github_token:
+    description: Explicit GitHub token for github-token posting; legacy callers fall back to github.token
+    required: false
+    default: ''
   expected_head_sha:
     description: Exact pull request head SHA that may receive the review
     required: false
@@ -35,6 +43,11 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Warn about deprecated poster action
+      if: inputs.compatibility_warning == 'true'
+      shell: bash
+      run: echo '::warning::.github/actions/code-review-poster is deprecated; use .github/actions/review-poster or .github/actions/claude-code-review-poster.'
+
     - name: Clear stale review payload
       shell: bash
       run: |
@@ -50,7 +63,7 @@ runs:
       with:
         artifact-ids: ${{ inputs.artifact_id }}
         path: ${{ runner.temp }}/code-review-payload-download
-        github-token: ${{ github.token }}
+        github-token: ${{ inputs.github_token || github.token }}
         repository: ${{ github.repository }}
         run-id: ${{ github.run_id }}
 
@@ -99,7 +112,7 @@ runs:
       continue-on-error: true
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.github_token || github.token }}
         PR_NUMBER: ${{ inputs.pr_number }}
         CODE_REVIEW_PAYLOAD_PATH: ${{ runner.temp }}/code-review-payload-ready/code-review-payload.json
         CODE_REVIEW_TOKEN_SOURCE: ${{ inputs.token_source }}

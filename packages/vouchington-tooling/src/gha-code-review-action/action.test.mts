@@ -25,10 +25,24 @@ type CompositeAction = {
 
 const actionText = readFileSync('.github/actions/code-review/action.yml', 'utf8')
 const action = load(actionText) as CompositeAction
+const explicitAction = load(
+  readFileSync('.github/actions/claude-code-review/action.yml', 'utf8'),
+) as CompositeAction
 const steps = action.runs?.steps ?? []
 const stepByName = new Map(steps.map((step) => [step.name, step]))
 
 describe('code-review action', () => {
+  it('keeps the legacy path while exposing an explicit same-ref Claude adapter', () => {
+    expect(action.inputs?.compatibility_warning).toMatchObject({ default: 'true' })
+    expect(stepByName.get('Warn about deprecated review action')?.run).toContain('deprecated')
+    const explicit = explicitAction.runs?.steps?.find((step) => step.id === 'review')
+    expect(explicit?.uses).toBe('$/.github/actions/code-review')
+    expect(explicit?.with).toMatchObject({ compatibility_warning: 'false' })
+    expect(explicitAction.outputs?.agent_outcome?.value).toBe(
+      '${{ steps.review.outputs.agent_outcome }}',
+    )
+  })
+
   it('does not accept a prompt input and always supplies a constructed prompt', () => {
     expect(action.inputs).not.toHaveProperty('prompt')
     expect(actionText).not.toContain('issue_comment')

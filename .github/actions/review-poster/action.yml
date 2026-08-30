@@ -1,0 +1,57 @@
+name: Review Poster
+description: Post a validated review payload with an explicitly supplied GitHub token.
+
+inputs:
+  pr_number:
+    description: Pull request number to review
+    required: true
+  artifact_id:
+    description: Same-run review payload artifact ID
+    required: true
+  provider_name:
+    description: Provider name to show in workflow diagnostics
+    required: true
+  post_token:
+    description: GitHub token used to download and post the review
+    required: true
+  expected_head_sha:
+    description: Exact pull request head SHA that may receive the review
+    required: false
+    default: ''
+  expected_base_sha:
+    description: Exact pull request base SHA required when the review is posted
+    required: false
+    default: ''
+
+outputs:
+  poster_outcome:
+    description: Aggregate download, validation, and posting outcome
+    value: ${{ steps.poster.outputs.poster_outcome }}
+  posted:
+    description: Whether a review was posted
+    value: ${{ steps.poster.outputs.posted }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate explicit poster inputs
+      shell: bash
+      env:
+        POST_TOKEN: ${{ inputs.post_token }}
+        PROVIDER_NAME: ${{ inputs.provider_name }}
+      run: |
+        set -euo pipefail
+        [ -n "$POST_TOKEN" ] || { echo '::error::post_token is required.'; exit 1; }
+        [ -n "$PROVIDER_NAME" ] || { echo '::error::provider_name is required.'; exit 1; }
+    - name: Post review with GitHub token
+      id: poster
+      uses: $/.github/actions/code-review-poster
+      with:
+        compatibility_warning: 'false'
+        pr_number: ${{ inputs.pr_number }}
+        artifact_id: ${{ inputs.artifact_id }}
+        provider_name: ${{ inputs.provider_name }}
+        token_source: github-token
+        github_token: ${{ inputs.post_token }}
+        expected_head_sha: ${{ inputs.expected_head_sha }}
+        expected_base_sha: ${{ inputs.expected_base_sha }}

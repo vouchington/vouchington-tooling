@@ -5,7 +5,7 @@ description: Use before staging and committing changes to verify scope, validati
 
 # Git commit checklist
 
-Use before every commit. Read local `AGENTS.md`, `CLAUDE.md`, contribution guidance, and hook
+Use before every commit. Read repository-local instructions, contribution guidance, and hook
 output first; they own commit format, required trailers, file-size limits, and validation commands.
 
 1. Inspect `git status` and the complete diff. Stage only files that implement the accepted task.
