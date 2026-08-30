@@ -28,6 +28,16 @@ runner labels, permissions, action pins, concurrency, secrets, and required-chec
    deployments and services. A scheduled reconciliation workflow may repair missed events, but it
    must inspect a snapshot once and exit; it must not wait for convergence.
 
+## Persistent workspaces
+
+Check out the full tree and prevent sparse-checkout configuration with a YAML-aware policy over
+tracked workflow and action files. Correct the producer of unsafe workspace state: writable workspace
+bind mounts use a non-root identity whose ownership and write access are compatible with the runner.
+Do not make each job traverse the whole workspace before checkout to repair permissions. Drain and
+migrate an already contaminated runner once. At runtime, repair may cover bounded known generated
+paths; a workspace-wide fallback must stay failure-gated, same-filesystem, directory-only, and batched,
+with path-count and timing evidence in its diagnostics.
+
 ## Reject polling designs
 
 Do not add a sleep-and-read loop, repeated run/check/deployment/lease/service queries, a CLI waiter,

@@ -43,6 +43,16 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   operation in another service.
 - Use GitHub-hosted runners only for public repositories. Private repositories use the consumer's
   approved self-hosted or disposable runner labels.
+- Persistent workspaces must check out the full tree. Do not configure sparse checkout; enforce that
+  prohibition with a YAML-aware check over intended tracked workflow and action files, with fixtures
+  for accepted and rejected shapes.
+- Fix workspace ownership at the producer. A container with a writable workspace bind mount must use
+  a non-root identity whose ownership and write access are compatible with the runner workspace. Do not
+  add an unconditional, pre-checkout, workspace-wide permission or ownership traversal to recover
+  persistent runners. Migrate an already contaminated workspace once while the runner is drained.
+  Normal runtime repair may cover bounded known generated paths. A necessary workspace-wide fallback
+  must stay failure-gated, same-filesystem, directory-only, and batched, and record path count and timing
+  evidence.
 - Pin every repository-backed external `uses:` reference—anything other than a local `./...`
   action—to a full lowercase 40-character Git SHA followed immediately by its machine-maintainable
   version comment, such as `# v4.2.0`, so Dependabot can update both. Pin `docker://...` actions to an
