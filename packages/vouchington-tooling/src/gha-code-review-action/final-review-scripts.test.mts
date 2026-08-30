@@ -149,7 +149,7 @@ describe('native gate require', () => {
 })
 
 describe('trusted default-branch selection', () => {
-  it('rejects a non-pull_request_target event before invoking GitHub CLI', () => {
+  it('rejects an unsupported event before invoking GitHub CLI', () => {
     const result = run(selectScript, {
       COMPLETE_LABEL: 'final-code-review:complete',
       EVENT_HEAD_SHA: '',
@@ -163,7 +163,22 @@ describe('trusted default-branch selection', () => {
       TESTS_WAIT_SECONDS: '0',
     })
     expect(result.status).not.toBe(0)
-    expect(result.stdout).toContain('Final Code Review requires a pull_request_target event')
+    expect(result.stdout).toContain(
+      'Final Code Review requires a pull_request or pull_request_target event',
+    )
+  })
+
+  it('accepts a pull_request event', () => {
+    const { result } = runSelector(
+      `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_CALLS"
+printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[]}'
+`,
+      { EVENT_NAME: 'pull_request' },
+    )
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
   })
 
   it('retries a transient startup 403 before deferring a draft', () => {

@@ -225,6 +225,9 @@ default-branch `pull_request_target` workflow creates the native
 `Final Code Review / Code Reviewed` job for every pull request head. Forks, Dependabot, and Renovate
 never receive review secrets or a provider checkout; that same native job passes only after their
 exact-head tests succeed.
+The `final-review-select` composite accepts both `pull_request` for trusted same-repository CI and
+`pull_request_target` for base-owned orchestration; callers retain responsibility for choosing the
+appropriate event and permissions boundary.
 
 The setup expects these organization Actions variables and fails when any is missing or malformed:
 
