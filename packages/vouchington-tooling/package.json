@@ -76,6 +76,11 @@
       "import": "./dist/gha-runtime-audit/index.mjs",
       "default": "./dist/gha-runtime-audit/index.mjs"
     },
+    "./gha-workspace-policy": {
+      "types": "./dist/gha-workspace-policy/index.d.mts",
+      "import": "./dist/gha-workspace-policy/index.mjs",
+      "default": "./dist/gha-workspace-policy/index.mjs"
+    },
     "./vitest-blob-manifest": {
       "types": "./dist/vitest-blob-manifest/index.d.mts",
       "import": "./dist/vitest-blob-manifest/index.mjs",
