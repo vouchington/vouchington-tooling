@@ -210,12 +210,12 @@ describe('agent blackboard client', () => {
     expect(append).toHaveBeenCalledOnce()
   })
 
-  it('normalizes an injected missing optional peer error', async () => {
+  it('normalizes an injected missing optional package error', async () => {
     const loadClient = async (): Promise<BlackboardClientModule> => {
       throw Object.assign(new Error('not installed'), { code: 'ERR_MODULE_NOT_FOUND' })
     }
     await expect(probeBlackboard(env, { loadClient })).rejects.toThrow(
-      'optional agent-blackboard peer',
+      'optional agent-blackboard package',
     )
   })
 
