@@ -1,0 +1,46 @@
+name: Stop Final Review
+
+on:
+  pull_request_target:
+    types: [converted_to_draft, closed]
+
+permissions: {}
+
+concurrency:
+  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  clear:
+    if: >-
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      github.event.pull_request.base.repo.full_name == github.repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Clear final-review lifecycle labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          delete_label() {
+            local encoded error_file status
+            encoded="$(jq -rn --arg value "$1" '$value | @uri')"
+            error_file="$(mktemp "${RUNNER_TEMP}/label-delete.XXXXXX")"
+            status=0
+            gh api --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels/${encoded}" \
+              --silent 2>"$error_file" || status=$?
+            if [ "$status" -ne 0 ] && ! grep -q 'HTTP 404' "$error_file"; then
+              cat "$error_file" >&2
+              rm -f "$error_file"
+              return "$status"
+            fi
+            rm -f "$error_file"
+          }
+          delete_label final-code-review:requested
+          delete_label final-code-review:complete

@@ -1,22 +1,17 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const selectScript = resolve('.github/actions/final-review-select/select.sh')
 const gateScript = resolve('.github/actions/final-review-gate/gate.sh')
 const requireScript = resolve('.github/actions/final-review-gate/require.sh')
-
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 const BASE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
 function run(script: string, env: Record<string, string>) {
-  return spawnSync('bash', [script], {
-    encoding: 'utf8',
-    env: { ...process.env, ...env },
-  })
+  return spawnSync('bash', [script], { encoding: 'utf8', env: { ...process.env, ...env } })
 }
 
 function runGate(overrides: Record<string, string> = {}) {
@@ -66,45 +61,6 @@ printf '{"head":{"sha":"%s"},"base":{"sha":"%s","ref":"main","repo":{"full_name"
   }
 }
 
-function runSelector(ghSource: string, overrides: Record<string, string> = {}) {
-  const directory = mkdtempSync(join(tmpdir(), 'final-review-selector-'))
-  const gh = join(directory, 'gh')
-  const output = join(directory, 'output')
-  const calls = join(directory, 'calls')
-  writeFileSync(gh, ghSource)
-  chmodSync(gh, 0o755)
-  try {
-    return {
-      result: run(selectScript, {
-        PATH: `${directory}${delimiter}${process.env.PATH ?? ''}`,
-        COMPLETE_LABEL: 'final-code-review:complete',
-        CI_WORKFLOW: 'ci.yml',
-        EVENT_ACTION: 'synchronize',
-        EVENT_HEAD_SHA: HEAD,
-        EVENT_NAME: 'pull_request_target',
-        GH_CALLS: calls,
-        GH_RETRY_ATTEMPTS: '3',
-        GH_RETRY_BACKOFF_SECONDS: '0',
-        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
-        GH_TOKEN: 'github-actions-token',
-        GITHUB_OUTPUT: output,
-        GITHUB_REPOSITORY: 'owner/repo',
-        DEFAULT_BRANCH: 'main',
-        PR_NUMBER: '1',
-        READY_AT: '2026-08-29T22:35:00Z',
-        TESTS_JOB_NAME: 'tests',
-        TESTS_WAIT_ATTEMPTS: '1',
-        TESTS_WAIT_SECONDS: '0',
-        ...overrides,
-      }),
-      output: readFileSync(output, 'utf8'),
-      calls: readFileSync(calls, 'utf8').trim().split('\n'),
-    }
-  } finally {
-    rmSync(directory, { force: true, recursive: true })
-  }
-}
-
 describe('advisory-provider fan-in', () => {
   it('warns when Claude fails instead of failing the native gate', () => {
     const result = runGate({ CLAUDE_ENABLED: 'true', CLAUDE_RESULT: 'failure' })
@@ -149,124 +105,5 @@ describe('native gate require', () => {
         REQUESTED_LABEL: 'final-code-review:requested',
       }).status,
     ).toBe(0)
-  })
-})
-
-describe('trusted default-branch selection', () => {
-  it('rejects an unsupported event before invoking GitHub CLI', () => {
-    const result = run(selectScript, {
-      COMPLETE_LABEL: 'final-code-review:complete',
-      EVENT_HEAD_SHA: '',
-      EVENT_NAME: 'workflow_dispatch',
-      GH_TOKEN: 'github-actions-token',
-      GITHUB_OUTPUT: '/dev/null',
-      GITHUB_REPOSITORY: 'owner/repo',
-      DEFAULT_BRANCH: 'main',
-      PR_NUMBER: '1',
-      TESTS_WAIT_ATTEMPTS: '1',
-      TESTS_WAIT_SECONDS: '0',
-    })
-    expect(result.status).not.toBe(0)
-    expect(result.stdout).toContain(
-      'Final Code Review requires a pull_request or pull_request_target event',
-    )
-  })
-
-  it('accepts a pull_request event', () => {
-    const { result } = runSelector(
-      `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$GH_CALLS"
-printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[]}'
-`,
-      { EVENT_NAME: 'pull_request' },
-    )
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
-  })
-
-  it('falls back to GITHUB_EVENT_NAME', () => {
-    const { result } = runSelector(
-      `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$GH_CALLS"
-printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[]}'
-`,
-      { EVENT_NAME: '', GITHUB_EVENT_NAME: 'pull_request' },
-    )
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
-  })
-
-  it('retries a transient startup 403 before deferring a draft', () => {
-    const { result, calls } = runSelector(`#!/usr/bin/env bash
-count=0
-[ ! -f "$GH_CALLS" ] || count="$(wc -l < "$GH_CALLS" | tr -d ' ')"
-printf '%s\\n' "$*" >> "$GH_CALLS"
-if [ "$count" -eq 0 ]; then
-  echo 'gh: Resource not accessible by integration (HTTP 403)' >&2
-  exit 1
-fi
-printf '%s\\n' '{"head":{"sha":"${HEAD}","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[]}'
-`)
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('GitHub API HTTP 403; retrying attempt 2/3')
-    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
-    expect(calls).toHaveLength(2)
-  })
-
-  it('clears stale completion state before deferring a draft', () => {
-    const { result, calls } = runSelector(`#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$GH_CALLS"
-if [[ "$*" == *"--jq .head.sha"* ]]; then
-  printf '%s\\n' ${HEAD}
-elif [[ "$*" == *"--method DELETE"* ]]; then
-  exit 0
-else
-  printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[{"name":"final-code-review:complete"}]}'
-fi
-`)
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
-    expect(calls.some((call) => call.includes('--method DELETE'))).toBe(true)
-  })
-
-  it('rechecks an in-progress exact-head CI run until its tests job succeeds', () => {
-    const pr = `{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":false,"state":"open","user":{"login":"human"},"labels":[]}`
-    const { result, output, calls } = runSelector(
-      `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$GH_CALLS"
-if [[ "$*" == *"commits/${HEAD}/pulls"* ]]; then
-  printf '%s\\n' '[{"number":1,"state":"open","head":{"sha":"${HEAD}","repo":{"full_name":"owner/repo"}}}]'
-elif [[ "$*" == *"actions/workflows/ci.yml/runs"* ]]; then
-  if [[ "$*" == *"status=completed"* ]]; then
-    printf '%s\\n' '{"workflow_runs":[]}'
-  else
-    printf '%s\\n' '{"workflow_runs":[{"id":123,"run_attempt":1,"status":"in_progress","created_at":"2026-08-29T22:36:00Z","head_branch":"topic","head_repository":{"full_name":"owner/repo"},"pull_requests":[{"number":1}]}]}'
-  fi
-elif [[ "$1 $2" == "run view" ]]; then
-  views="$(grep -c '^run view ' "$GH_CALLS")"
-  if [ "$views" -eq 1 ]; then
-    printf '%s\\n' '{"jobs":[{"name":"tests","status":"in_progress","conclusion":""}]}'
-  else
-    printf '%s\\n' '{"jobs":[{"name":"tests","status":"completed","conclusion":"success"}]}'
-  fi
-else
-  printf '%s\\n' '${pr}'
-fi
-`,
-      { TESTS_WAIT_ATTEMPTS: '2' },
-    )
-
-    expect(
-      result.status,
-      JSON.stringify({ calls, output, stderr: result.stderr, stdout: result.stdout }),
-    ).toBe(0)
-    expect(output).toContain('should_review=true')
-    expect(output).toContain('gate_status=review')
-    expect(calls.filter((call) => call.startsWith('run view '))).toHaveLength(2)
-    expect(calls.find((call) => call.includes('actions/workflows/ci.yml/runs'))).not.toContain(
-      'status=completed',
-    )
   })
 })

@@ -1,8 +1,8 @@
 name: Final Code Review
 
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
+  repository_dispatch:
+    types: [final-review-requested]
 
 permissions:
   actions: read
@@ -10,22 +10,18 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: final-code-review-${{ github.event.client_payload.pr_number }}-${{ github.event.client_payload.head_sha }}
   cancel-in-progress: true
 
 jobs:
   select-final-review:
     name: Select final review
-    if: >-
-      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 5
     permissions:
       actions: read
-      checks: read
       contents: read
-      issues: write
-      pull-requests: write
+      pull-requests: read
     outputs:
       should_review: ${{ steps.select.outputs.should_review }}
       gate_status: ${{ steps.select.outputs.gate_status }}
@@ -33,34 +29,21 @@ jobs:
       head_sha: ${{ steps.select.outputs.head_sha }}
       base_sha: ${{ steps.select.outputs.base_sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 1
       - name: Select final review
         id: select
-        uses: ./.github/actions/final-review-select
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          EVENT_ACTION: ${{ github.event.action }}
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          READY_AT: ${{ github.event.pull_request.updated_at }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          COMPLETE_LABEL: final-code-review:complete
-          CI_WORKFLOW: ci.yml
-          TESTS_JOB_NAME: tests
-          GH_RETRY_ATTEMPTS: '3'
-          GH_RETRY_BACKOFF_SECONDS: '5'
-          GH_RETRY_TRANSPORT_MARKERS: |
-            net/http: TLS handshake timeout
-            net/http: timeout awaiting response headers
-            connection reset by peer
-            unexpected EOF
-            i/o timeout
-          TESTS_WAIT_ATTEMPTS: '160'
-          TESTS_WAIT_SECONDS: '30'
+        uses: vouchington/vouchington-tooling/.github/actions/select-final-review@f98f5c18e1f10ced362d43d646ca49611adf4876
+        with:
+          read-token: ${{ github.token }}
+          pr-number: ${{ github.event.client_payload.pr_number }}
+          event-action: ${{ github.event.action }}
+          event-head-sha: ${{ github.event.client_payload.head_sha }}
+          source-run-id: ${{ github.event.client_payload.source_run_id }}
+          source-run-attempt: ${{ github.event.client_payload.source_run_attempt }}
+          source-base-sha: ${{ github.event.client_payload.base_sha }}
+          default-branch: ${{ github.event.repository.default_branch }}
+          workflow-path: .github/workflows/ci.yml
+          workflow-event: pull_request
+          fan-in-job: tests
 
   validate-review-settings:
     name: Validate code review settings
@@ -98,47 +81,29 @@ jobs:
           [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
 
   claude-code-review:
-    name: Dispatch Claude Code Review
+    name: Claude Code Review
     needs: [select-final-review, validate-review-settings]
     if: >-
       needs.select-final-review.outputs.should_review == 'true' &&
       vars.CLAUDE_CODE_REVIEW_ENABLED == 'true'
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
     permissions:
-      actions: write
+      actions: read
       contents: read
-      pull-requests: read
-    outputs:
-      conclusion: ${{ steps.dispatch.outputs.conclusion }}
-      run_url: ${{ steps.dispatch.outputs.run_url }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Dispatch and wait for trusted Claude review
-        id: dispatch
-        uses: ./.github/actions/final-review-dispatch-claude
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.select-final-review.outputs.pr_number }}
-          EXPECTED_HEAD_SHA: ${{ needs.select-final-review.outputs.head_sha }}
-          EXPECTED_BASE_SHA: ${{ needs.select-final-review.outputs.base_sha }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          MODEL: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
-          EFFORT: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}
-          GH_RETRY_ATTEMPTS: '3'
-          GH_RETRY_BACKOFF_SECONDS: '5'
-          GH_RETRY_TRANSPORT_MARKERS: |
-            net/http: TLS handshake timeout
-            net/http: timeout awaiting response headers
-            connection reset by peer
-            unexpected EOF
-            i/o timeout
-          WAIT_ATTEMPTS: '180'
-          WAIT_SECONDS: '15'
+      pull-requests: write
+      id-token: write
+    uses: ./.github/workflows/code-review.yml
+    with:
+      pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+      expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
+      expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
+      tooling_ref: f98f5c18e1f10ced362d43d646ca49611adf4876
+      trusted_prompt_ref: ${{ needs.select-final-review.outputs.base_sha }}
+      model: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
+      effort: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}
+      runs_on: '["ubuntu-latest"]'
+      required_review: ${{ 'false' }}
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   opencode-code-review:
     name: OpenCode OpenRouter Review
@@ -383,11 +348,7 @@ jobs:
           exit 1
 
   code-reviewed:
-    name: >-
-      ${{ github.event.pull_request.draft == false &&
-      github.event.pull_request.state == 'open' &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch &&
-      'Code Reviewed' || 'Ignore ineligible final review' }}
+    name: Code Reviewed
     needs:
       - select-final-review
       - validate-review-settings
@@ -400,6 +361,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      checks: write
+      contents: read
       issues: write
       pull-requests: write
     steps:
@@ -418,12 +381,13 @@ jobs:
           default_branch: ${{ github.event.repository.default_branch }}
           complete_label: final-code-review:complete
           requested_label: final-code-review:requested
+          check_name: Code Reviewed
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
-          IS_DRAFT: ${{ github.event.pull_request.draft }}
-          EVENT_STATE: ${{ github.event.pull_request.state }}
-          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          IS_DRAFT: 'false'
+          EVENT_STATE: open
+          EVENT_BASE_REF: ${{ github.event.repository.default_branch }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GATE_STATUS: ${{ needs.select-final-review.outputs.gate_status }}
           GH_TOKEN: ${{ github.token }}
@@ -440,7 +404,12 @@ jobs:
             unexpected EOF
             i/o timeout
           CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
-          CLAUDE_RESULT: ${{ needs.claude-code-review.outputs.conclusion }}
+          CLAUDE_RESULT: >-
+            ${{ needs.claude-code-review.result == 'success' &&
+            needs.claude-code-review.outputs.agent_outcome == 'success' &&
+            (needs.claude-code-review.outputs.payload_artifact_id == '' ||
+            needs.claude-code-review.outputs.poster_outcome == 'success') &&
+            'success' || 'failure' }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
           OPENROUTER_ACTION: ${{ needs.opencode-code-review.outputs.action_outcome }}
           OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}

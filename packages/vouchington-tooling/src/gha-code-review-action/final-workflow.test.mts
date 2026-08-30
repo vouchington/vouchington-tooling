@@ -6,197 +6,174 @@ import { describe, expect, it } from 'vitest'
 type Step = {
   env?: Record<string, string>
   id?: string
-  if?: string
-  name?: string
-  run?: string
   uses?: string
   with?: Record<string, string>
 }
-
 type Job = {
   'continue-on-error'?: boolean
   if?: string
   name?: string
-  needs?: string[]
   permissions?: Record<string, string>
   'runs-on'?: string | string[]
   steps?: Step[]
+  'timeout-minutes'?: number
+  uses?: string
+  with?: Record<string, string>
 }
-
 type Workflow = {
   concurrency?: { 'cancel-in-progress'?: boolean; group?: string }
   jobs?: Record<string, Job>
   on?: {
     pull_request_target?: { types?: string[] }
-    workflow_run?: unknown
+    repository_dispatch?: { types?: string[] }
+    workflow_run?: { types?: string[]; workflows?: string[] }
   }
 }
 
-const finalReviewText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
-const finalReview = load(finalReviewText) as Workflow
-const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8')) as Workflow
-const selectAction = readFileSync('.github/actions/final-review-select/action.yml', 'utf8')
+const finalText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
+const finalReview = load(finalText) as Workflow
+const requestText = readFileSync('.github/workflows/request-final-review.yml', 'utf8')
+const request = load(requestText) as Workflow
+const cleanupText = readFileSync('.github/workflows/clear-final-review-labels.yml', 'utf8')
+const cleanup = load(cleanupText) as Workflow
+const labelerText = readFileSync('.github/workflows/labeler.yml', 'utf8')
+const reusableReview = load(readFileSync('.github/workflows/code-review.yml', 'utf8')) as Workflow
+const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
+const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
-const selectScript = readFileSync('.github/actions/final-review-select/select.sh', 'utf8')
-const waitScript = readFileSync('.github/actions/final-review-select/wait-for-tests.sh', 'utf8')
-const dispatchScript = readFileSync(
-  '.github/actions/final-review-dispatch-claude/dispatch-claude.sh',
-  'utf8',
-)
 const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
+function expectPinnedExternalAction(text: string, action: string, requireVersionComment = false) {
+  const escapedAction = action.replaceAll('.', '\\.')
+  const comment = requireVersionComment ? '\\s+#\\s+v[0-9][^\\s]*' : ''
+  expect(text).toMatch(
+    new RegExp(`^\\s*(?:-\\s+)?uses: ${escapedAction}@[0-9a-f]{40}${comment}\\s*$`, 'm'),
+  )
+}
 
-describe('final code review workflow', () => {
-  it('creates the native required gate from trusted default-branch code for every PR head', () => {
-    expect(finalReview.on?.pull_request_target?.types).toEqual([
-      'opened',
-      'reopened',
-      'synchronize',
-      'ready_for_review',
-      'converted_to_draft',
-      'closed',
-    ])
+describe('event-driven final code review', () => {
+  it('routes one completed CI event into one correlated review dispatch', () => {
+    expect(request.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
+    expect(request.concurrency).toEqual({
+      group: 'request-final-review-${{ github.event.workflow_run.head_sha }}',
+      'cancel-in-progress': false,
+    })
+    const router = request.jobs?.request
+    expect(router?.if).toBe("github.event.workflow_run.event == 'pull_request'")
+    expect(router?.permissions).toMatchObject({
+      actions: 'read',
+      checks: 'read',
+      contents: 'write',
+      issues: 'write',
+      'pull-requests': 'write',
+    })
+    expectPinnedExternalAction(
+      requestText,
+      'vouchington/vouchington-tooling/.github/actions/request-final-review',
+    )
+    expect(router?.steps?.[0]?.with).toMatchObject({
+      'source-workflow-path': '.github/workflows/ci.yml',
+      'source-run-attempt': '${{ github.event.workflow_run.run_attempt }}',
+      'fan-in-job': 'tests',
+      'review-check-name': 'Code Reviewed',
+    })
+    expect(router?.steps?.[0]?.with).not.toHaveProperty('pr-number')
+  })
+
+  it('selects only the exact dispatched run without waiting for CI', () => {
+    expect(finalReview.on?.repository_dispatch?.types).toEqual(['final-review-requested'])
     expect(finalReview.concurrency).toEqual({
+      group:
+        'final-code-review-${{ github.event.client_payload.pr_number }}-${{ github.event.client_payload.head_sha }}',
+      'cancel-in-progress': true,
+    })
+    const selector = finalReview.jobs?.['select-final-review']
+    const step = selector?.steps?.find(({ id }) => id === 'select')
+    expectPinnedExternalAction(
+      finalText,
+      'vouchington/vouchington-tooling/.github/actions/select-final-review',
+    )
+    expect(step?.with).toMatchObject({
+      'source-run-id': '${{ github.event.client_payload.source_run_id }}',
+      'source-run-attempt': '${{ github.event.client_payload.source_run_attempt }}',
+      'source-base-sha': '${{ github.event.client_payload.base_sha }}',
+      'workflow-path': '.github/workflows/ci.yml',
+      'fan-in-job': 'tests',
+    })
+    expect(finalText).not.toMatch(/WAIT_(ATTEMPTS|SECONDS)|TESTS_WAIT/)
+    expect(existsSync('.github/actions/final-review-select/action.yml')).toBe(false)
+  })
+
+  it('calls Claude as a reusable dependency instead of dispatching and polling', () => {
+    const claude = finalReview.jobs?.['claude-code-review']
+    expect(claude?.uses).toBe('./.github/workflows/code-review.yml')
+    expect(claude?.with).toMatchObject({
+      required_review: "${{ 'false' }}",
+      trusted_prompt_ref: '${{ needs.select-final-review.outputs.base_sha }}',
+    })
+    expect(claude?.with?.tooling_ref).toMatch(/^[0-9a-f]{40}$/)
+    expect(existsSync('.github/actions/final-review-dispatch-claude/action.yml')).toBe(false)
+    expect(finalText).toContain("needs.claude-code-review.outputs.agent_outcome == 'success'")
+    expect(finalText).toContain('needs.claude-code-review.outputs.payload_artifact_id')
+    expect(finalText).toContain("needs.claude-code-review.outputs.poster_outcome == 'success'")
+  })
+
+  it('publishes the required check on the selected pull-request head', () => {
+    const gate = finalReview.jobs?.['code-reviewed']
+    expect(gate?.name).toBe('Code Reviewed')
+    expect(gate?.if).toContain('always()')
+    expect(gate?.permissions).toMatchObject({
+      checks: 'write',
+      contents: 'read',
+      issues: 'write',
+      'pull-requests': 'write',
+    })
+    const gateStep = gate?.steps?.find(({ uses }) => uses === './.github/actions/final-review-gate')
+    expect(gateStep?.with).toMatchObject({
+      token: '${{ github.token }}',
+      pr_number: '${{ needs.select-final-review.outputs.pr_number }}',
+      selected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
+      selected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
+      complete_label: 'final-code-review:complete',
+      requested_label: 'final-code-review:requested',
+      check_name: 'Code Reviewed',
+    })
+    expect(gateAction).toContain('Publish selected-head check')
+  })
+
+  it('keeps provider failures advisory and covers draft lifecycle changes', () => {
+    expect(gateScript).toContain('review did not complete successfully')
+    expect(gateScript).not.toContain('A required code review provider failed')
+    expect(ci.jobs?.tests?.name).toBe('tests')
+    expect(ciText).toContain('ready_for_review')
+    expect(ciText).toContain('converted_to_draft')
+  })
+
+  it('cancels review work and clears labels on trusted draft or close events', () => {
+    expect(cleanup.on?.pull_request_target?.types).toEqual(['converted_to_draft', 'closed'])
+    expect(cleanup.concurrency).toEqual({
       group:
         'final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}',
       'cancel-in-progress': true,
     })
-
-    const gate = finalReview.jobs?.['code-reviewed']
-    expect(gate?.name).toContain("&& 'Code Reviewed'")
-    expect(gate?.name).toContain("|| 'Ignore ineligible final review'")
-    expect(gate?.if).toContain('always()')
-    expect(gate?.permissions).toEqual({
+    expect(cleanup.jobs?.clear?.permissions).toEqual({
       issues: 'write',
       'pull-requests': 'write',
     })
-    expect(finalReviewText).not.toContain('repos/$GITHUB_REPOSITORY/check-runs')
-    expect(existsSync('.github/workflows/ci-request-final-code-review.yml')).toBe(false)
+    expect(cleanupText).toContain('final-code-review:requested')
+    expect(cleanupText).toContain('final-code-review:complete')
+    expect(cleanupText).not.toContain('actions/checkout')
+    expect(cleanupText).not.toMatch(/sleep|poll|WAIT_/i)
   })
 
-  it('grants issues and pull-requests write so completion labels do not 403', () => {
-    expect(finalReview.jobs?.['select-final-review']?.permissions).toMatchObject({
-      issues: 'write',
-      'pull-requests': 'write',
-    })
-    expect(finalReview.jobs?.['code-reviewed']?.permissions).toMatchObject({
-      issues: 'write',
-      'pull-requests': 'write',
-    })
-    expect(selectAction).toContain('issues: write and pull-requests: write')
-    expect(gateAction).toContain('issues: write and pull-requests: write')
-    expect(selectAction).toContain('33269571876')
-    expect(gateAction).toContain('33269571876')
-  })
-
-  it('selects only a trusted, tested exact head through the extracted composite', () => {
-    const selector = finalReview.jobs?.['select-final-review']
-    const selectStep = selector?.steps?.find((step) => step.id === 'select')
-
-    expect(selector?.permissions?.actions).toBe('read')
-    expect(selector?.steps?.some((step) => step.uses?.includes('actions/checkout'))).toBe(true)
-    expect(selectStep?.uses).toBe('./.github/actions/final-review-select')
-    expect(waitScript).toContain('actions/workflows/$ci_workflow/runs')
-    expect(waitScript).toContain('-f "head_sha=$head_sha"')
-    expect(waitScript).toContain('-f event=pull_request')
-    expect(waitScript).not.toContain('status=completed')
-    expect(waitScript).toContain('any(.pull_requests[]?; .number == $pr)')
-    expect(waitScript).toContain('$tests')
-    expect(waitScript).toContain('FORBIDDEN_SUCCESS_JOB')
-    expect(selectScript).not.toContain('ci-expensive-deferred')
-    expect(waitScript).not.toContain('ci-expensive-deferred')
-    expect(selectScript).toContain('export head_sha head_repository head_ref base_sha')
-    expect(selectScript.indexOf('is_untrusted=true')).toBeLessThan(
-      selectScript.indexOf('gate_status untrusted'),
-    )
-  })
-
-  it('passes forks and dependency bots only after tests without provider secrets', () => {
-    expect(selectScript).toContain('if [ "$is_cross_repository" = true ]')
-    for (const login of [
-      'dependabot',
-      'dependabot[bot]',
-      'app/dependabot',
-      'renovate',
-      'renovate[bot]',
-      'app/renovate',
-    ]) {
-      expect(selectScript).toContain(login)
-    }
-    expect(selectScript).toContain('output gate_status untrusted')
-    expect(finalReview.jobs?.['validate-review-settings']?.if).toContain(
-      "gate_status != 'untrusted'",
-    )
-  })
-
-  it('runs OpenRouter and Zen as parallel advisory lanes', () => {
-    const providers = ['opencode-code-review', 'opencode-zen-code-review']
-    for (const provider of providers) {
-      expect(finalReview.jobs?.[provider]?.needs).toEqual([
-        'select-final-review',
-        'validate-review-settings',
-      ])
-      expect(finalReview.jobs?.[provider]?.['continue-on-error']).toBe(true)
-    }
-    expect(finalReview.jobs?.['opencode-code-review-poster']?.['continue-on-error']).toBe(true)
-    expect(finalReview.jobs?.['opencode-zen-code-review-poster']?.['continue-on-error']).toBe(true)
-    for (const posterName of ['opencode-code-review-poster', 'opencode-zen-code-review-poster']) {
-      const poster = finalReview.jobs?.[posterName]?.steps?.find((step) =>
-        step.uses?.includes('code-review-poster'),
-      )
-      expect(poster?.with).toMatchObject({
-        expected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
-        expected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
-      })
+  it('keeps every concrete review job bounded and pins external action dependencies', () => {
+    for (const workflow of [finalReview, request, cleanup, reusableReview]) {
+      for (const job of Object.values(workflow.jobs ?? {})) {
+        if (job['runs-on'] === undefined) continue
+        expect(job['timeout-minutes']).toEqual(expect.any(Number))
+        expect(job['timeout-minutes']).toBeLessThanOrEqual(30)
+      }
     }
 
-    expect(gateScript).toContain('Review selection failed')
-    expect(gateScript).toContain('gh_capture_retry none gh api --method GET')
-    expect(gateScript).toContain('Review settings are invalid')
-    expect(gateScript).toContain('review did not complete successfully')
-    expect(gateScript).not.toContain('A required code review provider failed')
-  })
-
-  it('uses GitHub-hosted runners throughout this public repository workflow', () => {
-    for (const job of Object.values(finalReview.jobs ?? {})) {
-      expect(job['runs-on']).toBe('ubuntu-latest')
-    }
-  })
-
-  it.each([
-    ['opencode-code-review', 'OPENROUTER_FREE_API_KEY', 'OPENCODE_CODE_REVIEW_MODEL'],
-    ['opencode-zen-code-review', 'OPENCODE_FREE_API_KEY', 'OPENCODE_ZEN_CODE_REVIEW_MODEL'],
-  ])('isolates %s from write permissions and PR-controlled actions', (jobName, secret, model) => {
-    const job = finalReview.jobs?.[jobName]
-    expect(job?.permissions?.['pull-requests']).toBe('read')
-    expect(job?.permissions?.issues).toBe('read')
-    const reviewStep = job?.steps?.find((step) => step.uses?.includes('opencode-code-review'))
-    expect(reviewStep?.uses).toBe('./.trusted-review-action/.github/actions/opencode-code-review')
-    expect(reviewStep?.with?.model).toBe(`\${{ vars.${model} }}`)
-    expect(Object.values(reviewStep?.with ?? {})).toContain(`\${{ secrets.${secret} }}`)
-  })
-
-  it('dispatches Claude with string required_review and keeps it advisory', () => {
-    const dispatch = finalReview.jobs?.['claude-code-review']
-    expect(dispatch?.['continue-on-error']).toBe(true)
-    expect(dispatch?.steps?.find((step) => step.id === 'dispatch')?.uses).toBe(
-      './.github/actions/final-review-dispatch-claude',
-    )
-    expect(dispatchScript).toContain('required_review: "true"')
-    expect(dispatchScript).not.toContain('--argjson')
-    expect(JSON.stringify(dispatch)).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')
-  })
-
-  it('routes a successful exact ready-head CI fan-in into the native gate', () => {
-    expect(ci.jobs).not.toHaveProperty('untrusted-code-reviewed')
-    expect(ci.jobs).not.toHaveProperty('request-final-code-review')
-    expect(finalReview.on?.workflow_run).toBeUndefined()
-  })
-})
-
-describe('CI final review fan-in', () => {
-  it('cancels stale CI runs but exposes the stable tests gate', () => {
-    expect(ci.concurrency?.['cancel-in-progress']).toBe(true)
-    expect(ci.jobs?.tests?.name).toBe('tests')
-    expect(ci.jobs?.tests?.needs).toEqual(['test', 'actionlint'])
+    expectPinnedExternalAction(labelerText, 'actions/labeler', true)
   })
 })
