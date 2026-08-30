@@ -132,6 +132,40 @@ thread resolution. There is no `@claude` mention workflow.
     manual_update_rules: '[{"packageEcosystem":"nuget","directory":"/native"}]'
 ```
 
+Final review is event-driven. A trusted `workflow_run: completed` router uses
+`request-final-review` to validate the exact source run and fan-in job before replacing the request
+label. The resulting `pull_request_target: labeled` workflow uses `select-final-review` to inspect
+one completed validation snapshot; it never waits or polls for CI.
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
+  with:
+    read-token: ${{ github.token }}
+    write-token: ${{ github.token }}
+    source-run-id: ${{ github.event.workflow_run.id }}
+    source-head-sha: ${{ github.event.workflow_run.head_sha }}
+    source-head-repository: ${{ github.event.workflow_run.head_repository.full_name }}
+    default-branch: ${{ github.event.repository.default_branch }}
+    source-workflow-path: .github/workflows/ci.yml
+    fan-in-job: tests
+    requested-label: final-code-review:requested
+    complete-label: final-code-review:complete
+    review-workflow-path: .github/workflows/final-code-review.yml
+    review-check-name: Code Reviewed
+
+- uses: vouchington/vouchington-tooling/.github/actions/select-final-review@<sha>
+  with:
+    read-token: ${{ github.token }}
+    pr-number: ${{ github.event.pull_request.number }}
+    event-action: ${{ github.event.action }}
+    event-label: ${{ github.event.label.name }}
+    event-head-sha: ${{ github.event.pull_request.head.sha }}
+    requested-label: final-code-review:requested
+    default-branch: ${{ github.event.repository.default_branch }}
+    workflow-path: .github/workflows/ci.yml
+    fan-in-job: tests
+```
+
 `dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
 auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
 branch before using the dedicated token to enable eligible auto-merge or disable stale auto-merge.
