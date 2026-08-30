@@ -85,7 +85,7 @@ jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$SOURCE_RUN_ATTEMPT" \
   '([.[].jobs[] | select(.run_attempt == $attempt and .name == $job)] | sort_by(.id) | last | .conclusion) == "success"' \
   >/dev/null <<<"$jobs" || stop untested "::error::Validation fan-in $FAN_IN_JOB did not pass."
 if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" --argjson attempt "$SOURCE_RUN_ATTEMPT" \
-  'any(.[].jobs[]; .run_attempt == $attempt and .name == $job and .conclusion == "success")' >/dev/null <<<"$jobs"; then
+  'any(.[].jobs[]; .run_attempt <= $attempt and .name == $job and .conclusion == "success")' >/dev/null <<<"$jobs"; then
   stop forbidden "::error::Forbidden job $FORBIDDEN_SUCCESS_JOB succeeded."
 fi
 

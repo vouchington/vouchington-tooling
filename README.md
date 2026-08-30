@@ -140,7 +140,9 @@ label and emitting a correlated `repository_dispatch`. GitHub permits dispatch e
 for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
 `pull-requests: read`. Because a dispatch workflow's native jobs attach to the default branch, its
 terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
-the action publishes that required check on the selector's exact pull-request head.
+the action publishes that required check on the selector's exact pull-request head. The source
+`pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
+and the ready transition must produce a fresh validated completion dispatch.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
@@ -162,7 +164,6 @@ the action publishes that required check on the selector's exact pull-request he
   with:
     read-token: ${{ github.token }}
     pr-number: ${{ github.event.client_payload.pr_number }}
-    event-name: ${{ github.event_name }}
     event-action: ${{ github.event.action }}
     event-head-sha: ${{ github.event.client_payload.head_sha }}
     source-run-id: ${{ github.event.client_payload.source_run_id }}

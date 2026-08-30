@@ -8,10 +8,6 @@ inputs:
   pr-number:
     description: Pull request number from the trusted event payload.
     required: true
-  event-name:
-    description: repository_dispatch for review requests or pull_request_target for lifecycle cleanup.
-    required: false
-    default: pull_request_target
   event-action:
     description: Trusted dispatch type or pull request event action.
     required: true
@@ -91,7 +87,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.read-token }}
         PR_NUMBER: ${{ inputs.pr-number }}
-        EVENT_NAME: ${{ inputs.event-name }}
+        EVENT_NAME: ${{ github.event_name }}
         EVENT_ACTION: ${{ inputs.event-action }}
         EVENT_HEAD_SHA: ${{ inputs.event-head-sha }}
         REQUEST_EVENT_TYPE: ${{ inputs.request-event-type }}

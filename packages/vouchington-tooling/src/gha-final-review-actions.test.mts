@@ -68,6 +68,8 @@ describe('event-driven final-review actions', () => {
       'forbidden-success-job': { default: '' },
       'retry-attempts': { default: '3' },
     })
+    expect(select.inputs).not.toHaveProperty('event-name')
+    expect(select.runs?.steps?.[0]?.env?.['EVENT_NAME']).toBe('${{ github.event_name }}')
     expect(select.inputs).not.toHaveProperty('poll-attempts')
     expect(select.inputs).not.toHaveProperty('poll-seconds')
     expect(Object.keys(select.outputs ?? {})).toEqual([
@@ -83,6 +85,7 @@ describe('event-driven final-review actions', () => {
     expect(script).toContain('.run_attempt == $attempt')
     expect(script).toContain('.base.sha == $base')
     expect(script).toContain('repository_dispatch')
+    expect(script).toContain('.run_attempt <= $attempt')
     expect(script).toContain('--paginate --slurp')
     expect(script).not.toContain('2>&1')
     expect(script).not.toContain('POLL_')
@@ -107,7 +110,6 @@ describe('event-driven final-review actions', () => {
       READ_TOKEN: '${{ inputs.read-token }}',
       WRITE_TOKEN: '${{ inputs.write-token }}',
     })
-
     const script = readFileSyncNode(`${root}/request-final-review/request-final-review.sh`, 'utf8')
     expect(script).toContain('GH_TOKEN="$WRITE_TOKEN" gh_retry')
     expect(script).toContain(
@@ -117,6 +119,7 @@ describe('event-driven final-review actions', () => {
     expect(script).toContain('Could not resolve exactly one open pull request')
     expect(script).toContain('check-runs')
     expect(script).toContain('client_payload[source_run_id]')
+    expect(script).toContain('.run_attempt <= $attempt')
     expect(script).toContain('--paginate --slurp')
     expect(script).not.toContain('2>&1')
   })
