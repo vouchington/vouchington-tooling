@@ -45,7 +45,7 @@ runs:
         [ -n "$PROVIDER_NAME" ] || { echo '::error::provider_name is required.'; exit 1; }
     - name: Post review with GitHub token
       id: poster
-      uses: $/.github/actions/code-review-poster
+      uses: ./.github/actions/code-review-poster
       with:
         compatibility_warning: 'false'
         pr_number: ${{ inputs.pr_number }}

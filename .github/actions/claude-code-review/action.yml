@@ -82,7 +82,7 @@ runs:
   steps:
     - name: Run Claude Code Review
       id: review
-      uses: $/.github/actions/code-review
+      uses: ./.github/actions/code-review
       with:
         compatibility_warning: 'false'
         pr_number: ${{ inputs.pr_number }}
