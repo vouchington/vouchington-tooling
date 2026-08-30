@@ -161,6 +161,11 @@
       "import": "./dist/gha-post-review/index.mjs",
       "default": "./dist/gha-post-review/index.mjs"
     },
+    "./gha-claude-post-review": {
+      "types": "./dist/gha-claude-post-review/index.d.mts",
+      "import": "./dist/gha-claude-post-review/index.mjs",
+      "default": "./dist/gha-claude-post-review/index.mjs"
+    },
     "./http-link-pagination": {
       "types": "./dist/http-link-pagination/index.d.mts",
       "import": "./dist/http-link-pagination/index.mjs",

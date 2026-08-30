@@ -136,16 +136,23 @@ export function createGhPostReviewIo(options: {
   }
 }
 
+/** @deprecated Use postReviewWithTokenFromEnv or postClaudeReviewFromEnv explicitly. */
 export async function postReviewFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   exec: GhExec = createGhExec(),
   claudeIo = createActionsClaudeTokenIo(env),
 ): Promise<{ posted: boolean }> {
+  const token = resolveReviewPostToken(env)
+  if (token.source === 'github-token') return postReviewWithTokenFromEnv(env, exec, token.token)
+  return await postClaudeReviewFromEnv(env, exec, claudeIo)
+}
+
+function createPostWithToken(env: NodeJS.ProcessEnv, exec: GhExec) {
   const repository = requireEnv('GITHUB_REPOSITORY', env)
   const prNumber = requireEnv('PR_NUMBER', env)
   const payloadPath = requireEnv('CODE_REVIEW_PAYLOAD_PATH', env)
   const payloadBytes = readRegularReviewPayload(payloadPath, 'required')!
-  const postWithToken = (token: string) =>
+  return (token: string) =>
     runPostReview(
       payloadPath,
       createGhPostReviewIo({
@@ -159,7 +166,28 @@ export async function postReviewFromEnv(
         expectedBaseSha: env.EXPECTED_BASE_SHA ?? '',
       }),
     )
-  const token = resolveReviewPostToken(env)
-  if (token.source === 'github-token') return postWithToken(token.token)
-  return await withClaudeAppToken(claudeIo, postWithToken)
+}
+
+function withTokenEnv(exec: GhExec, env: NodeJS.ProcessEnv, token: string): GhExec {
+  const tokenEnv = { ...env, GH_TOKEN: token, GITHUB_TOKEN: token }
+  return (args, options) => exec(args, { ...options, env: { ...options?.env, ...tokenEnv } })
+}
+
+export function postReviewWithTokenFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  exec: GhExec = createGhExec(),
+  token = env.GH_TOKEN || env.GITHUB_TOKEN,
+): { posted: boolean } {
+  if (!token) throw new ReviewPayloadError('GH_TOKEN or GITHUB_TOKEN is required.')
+  return createPostWithToken(env, withTokenEnv(exec, env, token))(token)
+}
+
+export async function postClaudeReviewFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  exec: GhExec = createGhExec(),
+  claudeIo = createActionsClaudeTokenIo(env),
+): Promise<{ posted: boolean }> {
+  return await withClaudeAppToken(claudeIo, (token) =>
+    createPostWithToken(env, withTokenEnv(exec, env, token))(token),
+  )
 }

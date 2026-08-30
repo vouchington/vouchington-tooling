@@ -1,6 +1,71 @@
 name: Claude Code Review
 
 on:
+  workflow_call:
+    outputs:
+      agent_outcome:
+        description: Advisory Claude review-agent outcome.
+        value: ${{ jobs.claude-review.outputs.agent_outcome }}
+      payload_artifact_id:
+        description: Review payload artifact ID when a payload was produced.
+        value: ${{ jobs.claude-review.outputs.payload_artifact_id }}
+      poster_outcome:
+        description: Advisory Claude review-poster outcome.
+        value: ${{ jobs.claude-review.outputs.poster_outcome }}
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      expected_head_sha:
+        required: false
+        type: string
+        default: ''
+      expected_base_sha:
+        required: false
+        type: string
+        default: ''
+      tooling_ref:
+        description: Immutable full SHA of vouchington/vouchington-tooling
+        required: true
+        type: string
+      trusted_prompt_ref:
+        required: false
+        type: string
+        default: ${{ github.sha }}
+      prompt_path:
+        required: false
+        type: string
+        default: .agents/skills/agent-workflow/code-review-prompt.md
+      inline_prompt_path:
+        required: false
+        type: string
+        default: docs/prompts/code-review-inline-comments.md
+      extra_prompt:
+        required: false
+        type: string
+        default: ''
+      model:
+        required: false
+        type: string
+        default: opus
+      effort:
+        required: false
+        type: string
+        default: xhigh
+      runs_on:
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
+      required_review:
+        required: false
+        type: string
+        default: 'false'
+    secrets:
+      claude_code_oauth_token:
+        required: false
+      provider_api_token:
+        required: false
   workflow_dispatch:
     inputs:
       pr_number:
@@ -64,11 +129,16 @@ jobs:
       pr_number: ${{ inputs.pr_number }}
       expected_head_sha: ${{ inputs.expected_head_sha }}
       expected_base_sha: ${{ inputs.expected_base_sha }}
-      tooling_ref: ${{ github.sha }}
-      trusted_prompt_ref: ${{ inputs.expected_base_sha || github.sha }}
+      tooling_ref: ${{ inputs.tooling_ref || github.sha }}
+      trusted_prompt_ref: ${{ inputs.trusted_prompt_ref || inputs.expected_base_sha || github.sha }}
       model: ${{ inputs.model }}
       effort: ${{ inputs.effort }}
-      runs_on: '["ubuntu-latest"]'
+      runs_on: ${{ inputs.runs_on || '["ubuntu-latest"]' }}
       required_review: ${{ (inputs.required_review == true || inputs.required_review == 'true') && 'true' || 'false' }}
+      compatibility_warning: false
+      prompt_path: ${{ inputs.prompt_path || '.agents/skills/agent-workflow/code-review-prompt.md' }}
+      inline_prompt_path: ${{ inputs.inline_prompt_path || 'docs/prompts/code-review-inline-comments.md' }}
+      extra_prompt: ${{ inputs.extra_prompt || '' }}
     secrets:
-      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      claude_code_oauth_token: ${{ secrets.claude_code_oauth_token || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      provider_api_token: ${{ secrets.provider_api_token }}

@@ -71,14 +71,29 @@ jobs:
           ZEN_MODEL: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_MODEL }}
         run: |
           set -euo pipefail
-          boolean() { case "$2" in true|false) ;; *) echo "::error::$1 must be exactly true or false"; exit 1;; esac; }
-          boolean CLAUDE_CODE_REVIEW_ENABLED "$CLAUDE_ENABLED"
-          boolean OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
-          boolean OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
-          case "$CLAUDE_MODEL" in haiku|sonnet|opus) ;; *) echo '::error::CLAUDE_CODE_REVIEW_MODEL must be haiku, sonnet, or opus'; exit 1;; esac
-          case "$CLAUDE_EFFORT" in low|medium|high|xhigh|max) ;; *) echo '::error::CLAUDE_CODE_REVIEW_EFFORT must be low, medium, high, xhigh, or max'; exit 1;; esac
-          [ -n "$OPENROUTER_MODEL" ] || { echo '::error::OPENCODE_CODE_REVIEW_MODEL is required'; exit 1; }
-          [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
+          enabled() {
+            case "$2" in
+              true) normalized_enabled=true ;;
+              ''|false) normalized_enabled=false ;;
+              *) echo "::error::$1 must be true, false, or unset"; exit 1 ;;
+            esac
+          }
+          enabled CLAUDE_CODE_REVIEW_ENABLED "$CLAUDE_ENABLED"
+          claude_enabled="$normalized_enabled"
+          enabled OPENCODE_CODE_REVIEW_ENABLED "$OPENROUTER_ENABLED"
+          openrouter_enabled="$normalized_enabled"
+          enabled OPENCODE_ZEN_CODE_REVIEW_ENABLED "$ZEN_ENABLED"
+          zen_enabled="$normalized_enabled"
+          if [ "$claude_enabled" = true ]; then
+            case "$CLAUDE_MODEL" in haiku|sonnet|opus) ;; *) echo '::error::CLAUDE_CODE_REVIEW_MODEL must be haiku, sonnet, or opus'; exit 1;; esac
+            case "$CLAUDE_EFFORT" in low|medium|high|xhigh|max) ;; *) echo '::error::CLAUDE_CODE_REVIEW_EFFORT must be low, medium, high, xhigh, or max'; exit 1;; esac
+          fi
+          if [ "$openrouter_enabled" = true ]; then
+            [ -n "$OPENROUTER_MODEL" ] || { echo '::error::OPENCODE_CODE_REVIEW_MODEL is required'; exit 1; }
+          fi
+          if [ "$zen_enabled" = true ]; then
+            [ -n "$ZEN_MODEL" ] || { echo '::error::OPENCODE_ZEN_CODE_REVIEW_MODEL is required'; exit 1; }
+          fi
 
   claude-code-review:
     name: Claude Code Review
@@ -370,6 +385,46 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+      - name: Normalize provider outcomes
+        id: provider-results
+        env:
+          CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
+          CLAUDE_RESULT: >-
+            ${{ needs.claude-code-review.result == 'success' &&
+            needs.claude-code-review.outputs.agent_outcome == 'success' &&
+            (needs.claude-code-review.outputs.payload_artifact_id == '' ||
+            needs.claude-code-review.outputs.poster_outcome == 'success') &&
+            'success' || 'failure' }}
+          OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
+          OPENROUTER_ACTION: ${{ needs.opencode-code-review.outputs.action_outcome }}
+          OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
+          OPENROUTER_ARTIFACT: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
+          OPENROUTER_POSTER: ${{ needs.opencode-code-review-poster.outputs.poster_outcome }}
+          ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
+          ZEN_ACTION: ${{ needs.opencode-zen-code-review.outputs.action_outcome }}
+          ZEN_AGENT: ${{ needs.opencode-zen-code-review.outputs.agent_outcome }}
+          ZEN_ARTIFACT: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
+          ZEN_POSTER: ${{ needs.opencode-zen-code-review-poster.outputs.poster_outcome }}
+        run: |
+          set -euo pipefail
+          provider_results_json='[]'
+          enabled() { [ "$1" = true ]; }
+          add_result() {
+            provider_results_json="$(jq -c --arg name "$1" --arg outcome "$2" '. + [{ name: $name, outcome: $outcome }]' <<< "$provider_results_json")"
+          }
+          opencode_outcome() {
+            if [ "$1" != success ] || [ "$2" != success ]; then printf failure
+            elif [ -n "$3" ] && [ "$4" != success ]; then printf failure
+            else printf success; fi
+          }
+          if enabled "$CLAUDE_ENABLED"; then add_result Claude "${CLAUDE_RESULT:-failure}"; fi
+          if enabled "$OPENROUTER_ENABLED"; then
+            add_result 'OpenCode OpenRouter' "$(opencode_outcome "$OPENROUTER_ACTION" "$OPENROUTER_AGENT" "$OPENROUTER_ARTIFACT" "$OPENROUTER_POSTER")"
+          fi
+          if enabled "$ZEN_ENABLED"; then
+            add_result 'OpenCode Zen' "$(opencode_outcome "$ZEN_ACTION" "$ZEN_AGENT" "$ZEN_ARTIFACT" "$ZEN_POSTER")"
+          fi
+          printf 'provider_results_json=%s\n' "$provider_results_json" >> "$GITHUB_OUTPUT"
       - name: Run native final review gate
         uses: ./.github/actions/final-review-gate
         with:
@@ -382,6 +437,7 @@ jobs:
           complete_label: final-code-review:complete
           requested_label: final-code-review:requested
           check_name: Code Reviewed
+          provider_results_json: ${{ steps.provider-results.outputs.provider_results_json }}
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
@@ -403,20 +459,3 @@ jobs:
             connection reset by peer
             unexpected EOF
             i/o timeout
-          CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
-          CLAUDE_RESULT: >-
-            ${{ needs.claude-code-review.result == 'success' &&
-            needs.claude-code-review.outputs.agent_outcome == 'success' &&
-            (needs.claude-code-review.outputs.payload_artifact_id == '' ||
-            needs.claude-code-review.outputs.poster_outcome == 'success') &&
-            'success' || 'failure' }}
-          OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
-          OPENROUTER_ACTION: ${{ needs.opencode-code-review.outputs.action_outcome }}
-          OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}
-          OPENROUTER_ARTIFACT: ${{ needs.opencode-code-review.outputs.payload_artifact_id }}
-          OPENROUTER_POSTER: ${{ needs.opencode-code-review-poster.outputs.poster_outcome }}
-          ZEN_ENABLED: ${{ vars.OPENCODE_ZEN_CODE_REVIEW_ENABLED }}
-          ZEN_ACTION: ${{ needs.opencode-zen-code-review.outputs.action_outcome }}
-          ZEN_AGENT: ${{ needs.opencode-zen-code-review.outputs.agent_outcome }}
-          ZEN_ARTIFACT: ${{ needs.opencode-zen-code-review.outputs.payload_artifact_id }}
-          ZEN_POSTER: ${{ needs.opencode-zen-code-review-poster.outputs.poster_outcome }}

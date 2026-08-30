@@ -154,7 +154,8 @@ import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
-import { runPostReview } from 'vouchington-tooling/gha-post-review'
+import { postReviewWithTokenFromEnv, runPostReview } from 'vouchington-tooling/gha-post-review'
+import { postClaudeReviewFromEnv } from 'vouchington-tooling/gha-claude-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import {
   cmdUpload,
@@ -211,8 +212,9 @@ touch. Recording and report log reads are synchronous: on contention they block 
 event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
-boundaries. Review posting lives in `gha-post-review` and talks to GitHub only through caller-supplied
-credentials (job token or a minted Claude GitHub App token).
+boundaries. Neutral review posting lives in `gha-post-review` and requires a caller-supplied GitHub
+token. Claude App OIDC is an explicitly selected `gha-claude-post-review` adapter; the legacy
+token-source router remains deprecated for one release line.
 
 `vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
 filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw

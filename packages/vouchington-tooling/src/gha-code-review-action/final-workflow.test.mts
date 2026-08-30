@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 
 import { parse as load } from 'yaml'
@@ -6,6 +7,8 @@ import { describe, expect, it } from 'vitest'
 type Step = {
   env?: Record<string, string>
   id?: string
+  name?: string
+  run?: string
   uses?: string
   with?: Record<string, string>
 }
@@ -48,6 +51,26 @@ function expectPinnedExternalAction(text: string, action: string, requireVersion
   expect(text).toMatch(
     new RegExp(`^\\s*(?:-\\s+)?uses: ${escapedAction}@[0-9a-f]{40}${comment}\\s*$`, 'm'),
   )
+}
+
+function runSettings(overrides: Record<string, string> = {}) {
+  const step = finalReview.jobs?.['validate-review-settings']?.steps?.find(
+    (candidate) => candidate.name === 'Validate required organization variables',
+  )
+  return spawnSync('bash', ['-c', step?.run ?? 'exit 1'], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      CLAUDE_ENABLED: '',
+      CLAUDE_MODEL: '',
+      CLAUDE_EFFORT: '',
+      OPENROUTER_ENABLED: '',
+      OPENROUTER_MODEL: '',
+      ZEN_ENABLED: '',
+      ZEN_MODEL: '',
+      ...overrides,
+    },
+  })
 }
 
 describe('event-driven final code review', () => {
@@ -139,6 +162,7 @@ describe('event-driven final code review', () => {
       complete_label: 'final-code-review:complete',
       requested_label: 'final-code-review:requested',
       check_name: 'Code Reviewed',
+      provider_results_json: '${{ steps.provider-results.outputs.provider_results_json }}',
     })
     expect(gateAction).toContain('Publish selected-head check')
   })
@@ -149,6 +173,46 @@ describe('event-driven final code review', () => {
     expect(ci.jobs?.tests?.name).toBe('tests')
     expect(ciText).toContain('ready_for_review')
     expect(ciText).toContain('converted_to_draft')
+  })
+
+  it('normalizes optional provider configuration into explicit gate results', () => {
+    const settings = finalReview.jobs?.['validate-review-settings']?.steps?.find(
+      (step) => step.name === 'Validate required organization variables',
+    )
+    const resultBuilder = finalReview.jobs?.['code-reviewed']?.steps?.find(
+      (step) => step.id === 'provider-results',
+    )
+    expect(settings?.run).toContain("''|false")
+    expect(settings?.run).toContain('must be true, false, or unset')
+    expect(resultBuilder?.run).toContain('provider_results_json')
+    expect(resultBuilder?.env?.CLAUDE_RESULT).toContain('agent_outcome')
+  })
+
+  it('treats missing and disabled provider configuration as opt-in', () => {
+    expect(runSettings().status).toBe(0)
+    expect(
+      runSettings({
+        CLAUDE_ENABLED: 'false',
+        OPENROUTER_ENABLED: 'false',
+        ZEN_ENABLED: 'false',
+      }).status,
+    ).toBe(0)
+  })
+
+  it('validates settings only for enabled providers', () => {
+    expect(runSettings({ CLAUDE_ENABLED: 'yes' }).status).not.toBe(0)
+    expect(runSettings({ CLAUDE_ENABLED: 'true' }).status).not.toBe(0)
+    expect(
+      runSettings({
+        CLAUDE_ENABLED: 'true',
+        CLAUDE_MODEL: 'sonnet',
+        CLAUDE_EFFORT: 'medium',
+        OPENROUTER_ENABLED: 'true',
+        OPENROUTER_MODEL: 'provider/model',
+        ZEN_ENABLED: 'true',
+        ZEN_MODEL: 'provider/model',
+      }).status,
+    ).toBe(0)
   })
 
   it('cancels review work and clears labels on trusted draft or close events', () => {

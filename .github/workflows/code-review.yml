@@ -75,6 +75,11 @@ on:
         required: false
         type: string
         default: Claude
+      compatibility_warning:
+        description: Emit the legacy workflow-path deprecation warning
+        required: false
+        type: boolean
+        default: true
     secrets:
       claude_code_oauth_token:
         required: false
@@ -160,6 +165,10 @@ jobs:
             exit 1
           }
 
+      - name: Warn about deprecated review workflow
+        if: github.event_name == 'workflow_dispatch' || inputs.compatibility_warning != false
+        run: echo '::warning::.github/workflows/code-review.yml is deprecated; use .github/workflows/claude-code-review.yml.'
+
       - name: Validate selected pull request refs
         if: inputs.expected_head_sha != '' || inputs.expected_base_sha != ''
         env:
@@ -213,7 +222,7 @@ jobs:
 
       - name: Run Code Review
         id: agent
-        uses: ./.vouchington-tooling/.github/actions/code-review
+        uses: ./.vouchington-tooling/.github/actions/claude-code-review
         with:
           pr_number: ${{ inputs.pr_number }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}
@@ -272,6 +281,7 @@ jobs:
         id: poster
         uses: ./.vouchington-tooling/.github/actions/code-review-poster
         with:
+          compatibility_warning: 'false'
           pr_number: ${{ inputs.pr_number }}
           artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}

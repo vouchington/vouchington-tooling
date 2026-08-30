@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest'
 import {
   createGhExec,
   createGhPostReviewIo,
+  postClaudeReviewFromEnv,
   postReviewFromEnv,
+  postReviewWithTokenFromEnv,
   postWithGh,
   writePostedOutput,
   type GhExec,
@@ -368,6 +370,63 @@ describe('postReviewFromEnv', () => {
       ).resolves.toEqual({ posted: true })
     } finally {
       rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('provides separate explicit token and Claude adapters', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-review-explicit-'))
+    const payloadPath = join(dir, 'code-review-payload.json')
+    const env = {
+      GITHUB_REPOSITORY: 'o/r',
+      PR_NUMBER: '4',
+      CODE_REVIEW_PAYLOAD_PATH: payloadPath,
+      GH_TOKEN: 'environment-token',
+      GH_HOST: 'github.example',
+    }
+    const tokens: string[] = []
+    const hosts: string[] = []
+    const exec: GhExec = (args, options) => {
+      tokens.push(options?.env?.GH_TOKEN ?? '')
+      hosts.push(options?.env?.GH_HOST ?? '')
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}\tfalse\topen`
+      if (args.includes('/files?per_page=100')) return '[]'
+      return ''
+    }
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    expect(postReviewWithTokenFromEnv(env, exec, 'explicit-token')).toEqual({ posted: true })
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    expect(postReviewWithTokenFromEnv(env, exec)).toEqual({ posted: true })
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    expect(
+      postReviewWithTokenFromEnv({ ...env, GH_TOKEN: '', GITHUB_TOKEN: 'fallback-token' }, exec),
+    ).toEqual({ posted: true })
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    const claudeIo: ClaudeTokenIo = {
+      async getOidcToken() {
+        return 'oidc'
+      },
+      async fetch() {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { token: 'app-token' }
+          },
+        }
+      },
+      mask() {},
+    }
+    try {
+      await expect(postClaudeReviewFromEnv(env, exec, claudeIo)).resolves.toEqual({ posted: true })
+      expect(new Set(tokens)).toEqual(
+        new Set(['explicit-token', 'environment-token', 'fallback-token', 'app-token']),
+      )
+      expect(new Set(hosts)).toEqual(new Set(['github.example']))
+      expect(() => postReviewWithTokenFromEnv(env, exec, '')).toThrow(
+        'GH_TOKEN or GITHUB_TOKEN is required.',
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
