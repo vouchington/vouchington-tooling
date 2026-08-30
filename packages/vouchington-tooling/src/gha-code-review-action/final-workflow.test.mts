@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest'
 type Step = {
   env?: Record<string, string>
   id?: string
+  name?: string
+  run?: string
   uses?: string
   with?: Record<string, string>
 }
