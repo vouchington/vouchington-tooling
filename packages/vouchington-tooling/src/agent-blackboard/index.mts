@@ -143,13 +143,8 @@ async function loadClient(
 }
 
 async function defaultClientLoader(resolveFrom?: string | URL): Promise<BlackboardClientModule> {
-  let specifier = 'agent-blackboard'
-  try {
-    const consumerRequire = createRequire(resolveFrom ?? resolve(process.cwd(), 'package.json'))
-    specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
-  } catch (error) {
-    if (!isMissingModuleError(error)) throw error
-  }
+  const consumerRequire = createRequire(resolveFrom ?? resolve(process.cwd(), 'package.json'))
+  const specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
   return (await import(specifier)) as BlackboardClientModule
 }
 

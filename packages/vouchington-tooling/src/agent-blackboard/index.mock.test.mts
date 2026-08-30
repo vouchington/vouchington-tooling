@@ -259,14 +259,6 @@ describe('agent blackboard client', () => {
     ).resolves.toBeUndefined()
   })
 
-  it('falls back to the package development dependency', async () => {
-    directory = await mkdtemp(join(tmpdir(), 'blackboard-package-fallback-'))
-
-    await expect(
-      probeBlackboard({}, { resolveFrom: join(directory, 'script.mjs') }),
-    ).rejects.toThrow('AGENT_BLACKBOARD_URL is not set')
-  })
-
   it('preserves invalid consumer package errors', async () => {
     directory = await mkdtemp(join(tmpdir(), 'blackboard-invalid-consumer-'))
     const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
