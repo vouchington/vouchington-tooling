@@ -8,13 +8,23 @@ nonnegative() { [[ "$1" =~ ^[0-9]+$ ]]; }
 workflow_path() { [[ "$1" == .github/workflows/*.yml || "$1" == .github/workflows/*.yaml ]]; }
 
 gh_retry() {
-  local attempt=1 status captured
+  local accepted="$1" attempt=1 status captured error_output stdout_file stderr_file
+  shift
+  stdout_file="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/gha-retry-stdout.XXXXXX")"
+  stderr_file="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/gha-retry-stderr.XXXXXX")"
   while true; do
-    status=0; captured="$("$@" 2>&1)" || status=$?
-    if [ "$status" -eq 0 ]; then GH_OUTPUT="$captured"; return 0; fi
+    status=0; "$@" >"$stdout_file" 2>"$stderr_file" || status=$?
+    captured="$(cat "$stdout_file")"; error_output="$(cat "$stderr_file")"
+    if [ "$status" -eq 0 ]; then
+      GH_OUTPUT="$captured"; [ -z "$error_output" ] || printf '%s\n' "$error_output" >&2
+      rm -f "$stdout_file" "$stderr_file"; return 0
+    fi
+    if [ "$accepted" != none ] && grep -q "HTTP $accepted" <<<"$error_output"; then
+      GH_OUTPUT=''; rm -f "$stdout_file" "$stderr_file"; return 0
+    fi
     if [ "$attempt" -ge "$RETRY_ATTEMPTS" ] || ! grep -Eq \
-      'HTTP (403|429|5[0-9]{2})|TLS handshake timeout|timeout awaiting response headers|connection reset by peer|unexpected EOF|i/o timeout' <<<"$captured"; then
-      printf '%s\n' "$captured" >&2; return "$status"
+      'HTTP (403|429|5[0-9]{2})|TLS handshake timeout|timeout awaiting response headers|connection reset by peer|unexpected EOF|i/o timeout' <<<"$error_output"; then
+      rm -f "$stdout_file" "$stderr_file"; printf '%s\n' "$error_output" >&2; return "$status"
     fi
     echo "::warning::GitHub API request failed; retrying attempt $((attempt + 1))/$RETRY_ATTEMPTS."
     sleep "$((attempt * RETRY_BACKOFF_SECONDS))"; attempt=$((attempt + 1))
@@ -29,7 +39,7 @@ if [ -z "${GH_TOKEN:?}" ] || [ -z "${FAN_IN_JOB:?}" ] || [ -z "${REQUESTED_LABEL
   echo '::error::Invalid token, fan-in, label, or retry configuration.'; exit 1
 fi
 
-gh_retry gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 pr_json="$GH_OUTPUT"
 head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
 head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
@@ -59,17 +69,17 @@ case "$EVENT_ACTION" in
 esac
 
 workflow_file="${WORKFLOW_PATH##*/}"
-gh_retry gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_file/runs" \
-  -f "head_sha=$head_sha" -f "event=$WORKFLOW_EVENT" -f per_page=100
+gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_file/runs" \
+  -f "head_sha=$head_sha" -f "event=$WORKFLOW_EVENT" -f per_page=100 --paginate --slurp
 run="$(jq -c --argjson pr "$PR_NUMBER" --arg head "$head_sha" --arg path "$WORKFLOW_PATH" \
   --arg event "$WORKFLOW_EVENT" --arg head_repo "$head_repository" --arg head_ref "$head_ref" '
-  [.workflow_runs[] | select(.path == $path and .head_sha == $head and .event == $event and
+  [.[].workflow_runs[] | select(.path == $path and .head_sha == $head and .event == $event and
     .status == "completed" and (any(.pull_requests[]?; .number == $pr) or
     ((.pull_requests | length) == 0 and .head_repository.full_name == $head_repo and
     .head_branch == $head_ref)))] | sort_by(.created_at, .id) | last // empty' <<<"$GH_OUTPUT")"
 [ -n "$run" ] || stop untested "::error::No completed validation run exists for $head_sha."
 run_id="$(jq -r '.id' <<<"$run")"; run_attempt="$(jq -r '.run_attempt' <<<"$run")"
-gh_retry gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs" \
+gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp
 jobs="$GH_OUTPUT"
 jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$run_attempt" \
@@ -80,7 +90,7 @@ if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" -
   stop forbidden "::error::Forbidden job $FORBIDDEN_SUCCESS_JOB succeeded."
 fi
 
-gh_retry gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 current="$GH_OUTPUT"
 [ "$(jq -r '.state' <<<"$current")" = open ] || stop closed 'Pull request closed during selection.'
 [ "$(jq -r '.draft' <<<"$current")" = false ] || stop deferred 'Pull request became a draft during selection.'

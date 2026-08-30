@@ -1,4 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { readFileSync as readFileSyncNode } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
 
 import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -10,7 +15,41 @@ type Action = {
 }
 
 function action(path: string): Action {
-  return load(readFileSync(path, 'utf8')) as Action
+  return load(readFileSyncNode(path, 'utf8')) as Action
+}
+
+const execFileAsync = promisify(execFile)
+const head = 'a'.repeat(40)
+const base = 'b'.repeat(40)
+const pr = JSON.stringify({
+  state: 'open',
+  draft: false,
+  user: { login: 'author' },
+  head: { sha: head, ref: 'topic', repo: { full_name: 'owner/repo' } },
+  base: { sha: base, ref: 'main', repo: { full_name: 'owner/repo' } },
+})
+
+async function runWithMockGh(script: string, mock: string, env: Record<string, string>) {
+  const directory = await mkdtemp(join(tmpdir(), 'final-review-action-'))
+  const output = join(directory, 'output')
+  const gh = join(directory, 'gh')
+  await writeFile(gh, `#!/usr/bin/env bash\nset -euo pipefail\necho mock-warning >&2\n${mock}`)
+  await chmod(gh, 0o755)
+  try {
+    await execFileAsync('bash', [script], {
+      env: {
+        ...process.env,
+        ...env,
+        GITHUB_OUTPUT: output,
+        GITHUB_REPOSITORY: 'owner/repo',
+        PATH: `${directory}:${process.env['PATH'] ?? ''}`,
+        RUNNER_TEMP: directory,
+      },
+    })
+    return await readFile(output, 'utf8')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 }
 
 describe('event-driven final-review actions', () => {
@@ -36,10 +75,12 @@ describe('event-driven final-review actions', () => {
       'base_sha',
     ])
 
-    const script = readFileSync(`${root}/select-final-review/select-final-review.sh`, 'utf8')
+    const script = readFileSyncNode(`${root}/select-final-review/select-final-review.sh`, 'utf8')
     expect(script).toContain('.status == "completed"')
     expect(script).toContain('sort_by(.created_at, .id) | last')
     expect(script).toContain('EVENT_LABEL')
+    expect(script).toContain('--paginate --slurp')
+    expect(script).not.toContain('2>&1')
     expect(script).not.toContain('POLL_')
     expect(script).not.toMatch(/for attempt in.*seq/)
   })
@@ -61,7 +102,7 @@ describe('event-driven final-review actions', () => {
       WRITE_TOKEN: '${{ inputs.write-token }}',
     })
 
-    const script = readFileSync(`${root}/request-final-review/request-final-review.sh`, 'utf8')
+    const script = readFileSyncNode(`${root}/request-final-review/request-final-review.sh`, 'utf8')
     expect(script).toContain('GH_TOKEN="$WRITE_TOKEN" gh_retry')
     expect(script).toContain(
       'Source workflow identity, event, head, or completion state did not match.',
@@ -69,5 +110,79 @@ describe('event-driven final-review actions', () => {
     expect(script).toContain('.head_repository.full_name == $head_repo')
     expect(script).toContain('Could not resolve exactly one open pull request')
     expect(script).toContain('check-runs')
+    expect(script).toContain('--paginate --slurp')
+    expect(script).not.toContain('2>&1')
+  })
+
+  it('executes selection with stderr-safe paginated snapshots', async () => {
+    const mock = `
+case "$*" in
+  *"pulls/7"*) printf '%s\\n' '${pr}' ;;
+  *"actions/workflows/ci.yml/runs"*) printf '%s\\n' '[{"workflow_runs":[{"id":88,"run_attempt":2,"path":".github/workflows/ci.yml","head_sha":"${head}","event":"pull_request","status":"completed","created_at":"2026-01-01T00:00:00Z","pull_requests":[{"number":7}],"head_repository":{"full_name":"owner/repo"},"head_branch":"topic"}]}]' ;;
+  *"actions/runs/88/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":2,"name":"tests","conclusion":"success"}]}]' ;;
+  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+esac`
+    const output = await runWithMockGh(
+      '.github/actions/select-final-review/select-final-review.sh',
+      mock,
+      {
+        GH_TOKEN: 'read',
+        PR_NUMBER: '7',
+        EVENT_NAME: 'pull_request_target',
+        EVENT_ACTION: 'labeled',
+        EVENT_LABEL: 'final-code-review:requested',
+        EVENT_HEAD_SHA: head,
+        REQUESTED_LABEL: 'final-code-review:requested',
+        DEFAULT_BRANCH: 'main',
+        WORKFLOW_PATH: '.github/workflows/ci.yml',
+        WORKFLOW_EVENT: 'pull_request',
+        FAN_IN_JOB: 'tests',
+        FORBIDDEN_SUCCESS_JOB: '',
+        RETRY_ATTEMPTS: '3',
+        RETRY_BACKOFF_SECONDS: '0',
+        UNTRUSTED_ACTORS: '',
+      },
+    )
+    expect(output).toContain('should_review=true')
+    expect(output).toContain('gate_status=review')
+  })
+
+  it('executes routing and URL-encodes label mutations', async () => {
+    const mock = `
+case "$*" in
+  *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"success"}]}]' ;;
+  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1}' ;;
+  *"pulls/7"*) printf '%s\\n' '${pr}' ;;
+  *"commits/${head}/check-runs"*) printf '%s\\n' '[{"check_runs":[]}]' ;;
+  *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
+  *"--method POST"*"/labels"*) : ;;
+  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+esac`
+    const output = await runWithMockGh(
+      '.github/actions/request-final-review/request-final-review.sh',
+      mock,
+      {
+        READ_TOKEN: 'read',
+        WRITE_TOKEN: 'write',
+        SOURCE_RUN_ID: '99',
+        TESTED_HEAD_SHA: head,
+        SOURCE_HEAD_REPOSITORY: 'owner/repo',
+        DEFAULT_BRANCH: 'main',
+        SOURCE_WORKFLOW_PATH: '.github/workflows/ci.yml',
+        SOURCE_WORKFLOW_EVENT: 'pull_request',
+        PR_NUMBER: '7',
+        FAN_IN_JOB: 'tests',
+        FORBIDDEN_SUCCESS_JOB: '',
+        REQUESTED_LABEL: 'final-code-review:requested',
+        COMPLETE_LABEL: 'final-code-review:complete',
+        REVIEW_WORKFLOW_PATH: '.github/workflows/final-code-review.yml',
+        REVIEW_WORKFLOW_EVENT: 'pull_request_target',
+        REVIEW_CHECK_NAME: 'Code Reviewed',
+        RETRY_ATTEMPTS: '3',
+        RETRY_BACKOFF_SECONDS: '0',
+      },
+    )
+    expect(output).toContain('requested=true')
+    expect(output).toContain('decision=requested')
   })
 })
