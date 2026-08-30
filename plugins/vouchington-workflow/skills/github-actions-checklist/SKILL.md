@@ -27,9 +27,10 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   one combined result.
 - For pull requests, configure test concurrency with `cancel-in-progress: true` so a superseded head
   does not consume runner capacity. On `main`, test runs must never use `cancel-in-progress: true`;
-  every pushed revision must reach a terminal result. When one workflow handles both events, use
-  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` or an equivalent exact event
-  predicate instead of setting it unconditionally.
+  every pushed revision must reach a terminal result. Require distinct concurrency groups or an explicit
+  queueing mechanism for `main` runs rather than relying only on `cancel-in-progress: false`. When one
+  workflow handles both events, keep cancellation enabled only for pull-request groups, using
+  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` or an equivalent exact event predicate.
 - Give every concrete job a timeout of no more than 30 minutes. A caller job that invokes a reusable
   workflow through top-level `jobs.<job_id>.uses` cannot accept `timeout-minutes`; enforce the bound
   on every concrete job inside the called workflow. If the underlying operation cannot terminate
