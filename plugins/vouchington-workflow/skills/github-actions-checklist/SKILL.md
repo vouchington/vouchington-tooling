@@ -26,7 +26,7 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   when they are required checks, and use a real bounded fan-in job only when the merge contract needs
   one combined result.
 - For pull requests, configure test concurrency with `cancel-in-progress: true` so a superseded head
-  does not consume runner capacity. On `main`, test runs must never use `cancel-in-progress: true`;
+  does not consume runner capacity. On `main`, or the consumer's configured default branch, test runs must never use `cancel-in-progress: true`;
   every pushed revision must reach a terminal result. Require distinct concurrency groups or an explicit
   queueing mechanism for `main` runs rather than relying only on `cancel-in-progress: false`. When one
   workflow handles both events, keep cancellation enabled only for pull-request groups, using
