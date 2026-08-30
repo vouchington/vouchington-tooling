@@ -68,8 +68,11 @@ describe('code-review action', () => {
     expect(worktree).toContain('mktemp -d "${TMPDIR:-/tmp}/code-review-wt.XXXXXX"')
     expect(worktree).not.toContain('/tmp/code-review-wt')
     expect(stepByName.get('Stage trusted action runtime')?.run).toContain('stage-runtime.sh')
-    expect(stepByName.get('Clear leftover review payload')?.run).toContain('.vouchington-tooling')
+    expect(stepByName.get('Clear leftover review payload')?.run).not.toContain(
+      '.vouchington-tooling',
+    )
     expect(stepByName.get('Clean review payload files')?.run).toContain('cleanup-worktrees.sh')
+    expect(stepByName.get('Clean review payload files')?.run).not.toContain('.vouchington-tooling')
     expect(actionText).not.toMatch(/cp "\$GITHUB_ACTION_PATH\/worktree-create\.sh"/)
   })
 

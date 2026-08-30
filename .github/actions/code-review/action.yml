@@ -161,7 +161,6 @@ runs:
       run: |
         set -euo pipefail
         rm -f "${GITHUB_WORKSPACE}/code-review-payload.json"
-        rm -rf "${GITHUB_WORKSPACE}/.vouchington-tooling"
 
     - name: Isolate Claude Code install home
       if: steps.review-prompt.outputs.available == 'true'
@@ -309,7 +308,6 @@ runs:
         bash "${VOUCHINGTON_ACTION_PATH:?}/restore-trusted-prompt-dir.sh"
         rm -rf \
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
-          "${GITHUB_WORKSPACE}/.vouchington-tooling" \
           "${RUNNER_TEMP}/code-review-payload" \
           "${RUNNER_TEMP}/code-review-prompt.md" \
           "${RUNNER_TEMP}/vouchington-tooling-runtime"

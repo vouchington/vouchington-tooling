@@ -51,6 +51,10 @@ describe('opencode-code-review action', () => {
     expect(stepByName.get('Clean review payload files')?.run).toContain(
       'restore-trusted-prompt-dir.sh',
     )
+    expect(stepByName.get('Clear leftover review payload')?.run).not.toContain(
+      '.vouchington-tooling',
+    )
+    expect(stepByName.get('Clean review payload files')?.run).not.toContain('.vouchington-tooling')
   })
 
   it('materializes PR context with the job token and keeps gh away from the model', () => {
