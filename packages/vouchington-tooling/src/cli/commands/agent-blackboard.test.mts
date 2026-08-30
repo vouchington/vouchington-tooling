@@ -34,7 +34,7 @@ describe('agent-blackboard CLI', () => {
     setJournalReaderForTest()
   })
 
-  it('rejects malformed commands before loading the optional peer', async () => {
+  it('rejects malformed commands before loading the optional integration dependency', async () => {
     await expect(runAgentBlackboardCommand(['journal', 'entries'])).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--session-id is required')
   })

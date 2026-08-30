@@ -128,7 +128,7 @@ async function loadClient(
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND')
       throw new Error(
-        'agent-blackboard is not installed; install the optional agent-blackboard peer dependency',
+        'agent-blackboard is not installed; install it alongside vouchington-tooling to use this integration',
         { cause: error },
       )
     throw error
