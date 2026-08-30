@@ -250,7 +250,24 @@ esac`
     expect(calls.match(/--method DELETE/g)).toHaveLength(2)
     expect(calls).not.toContain('/dispatches')
   })
-
+  it('rejects a live pull request that no longer targets the default branch', async () => {
+    const nonDefault = pr.replace('"ref":"main"', '"ref":"release"')
+    const mock = `
+case "$*" in
+  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
+  *"pulls/7"*) printf '%s\\n' '${nonDefault}' ;;
+  *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
+  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+esac`
+    const { output, calls } = await runWithMockGh(
+      '.github/actions/request-final-review/request-final-review.sh',
+      mock,
+      requestEnv(),
+    )
+    expect(output).toContain('decision=ineligible')
+    expect(calls.match(/--method DELETE/g)).toHaveLength(2)
+    expect(calls).not.toContain('/dispatches')
+  })
   it('does not let an older failed attempt clear labels owned by a newer rerun', async () => {
     const mock = `
 case "$*" in

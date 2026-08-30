@@ -72,12 +72,19 @@ jq -e --arg path "$SOURCE_WORKFLOW_PATH" --arg event "$SOURCE_WORKFLOW_EVENT" --
 }
 
 if [ -z "$PR_NUMBER" ]; then
-  gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/commits/$TESTED_HEAD_SHA/pulls" \
-    -f per_page=100 --paginate --slurp
-  matches="$(jq -c --arg sha "$TESTED_HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --arg base "$DEFAULT_BRANCH" --arg head_repo "$SOURCE_HEAD_REPOSITORY" \
-    '[.[][] | select(.state == "open" and .head.sha == $sha and .head.repo.full_name == $head_repo and .base.repo.full_name == $repo and .base.ref == $base)]' <<<"$GH_OUTPUT")"
-  [ "$(jq 'length' <<<"$matches")" -eq 1 ] || { echo '::error::Could not resolve exactly one open pull request for the source head.'; exit 1; }
-  PR_NUMBER="$(jq -r '.[0].number' <<<"$matches")"
+  associated_prs="$(jq -c '[.pull_requests[]?.number] | unique' <<<"$source_run")"
+  case "$(jq 'length' <<<"$associated_prs")" in
+    1) PR_NUMBER="$(jq -r '.[0]' <<<"$associated_prs")" ;;
+    0)
+      gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/commits/$TESTED_HEAD_SHA/pulls" \
+        -f per_page=100 --paginate --slurp
+      matches="$(jq -c --arg sha "$TESTED_HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --arg head_repo "$SOURCE_HEAD_REPOSITORY" \
+        '[.[][] | select(.state == "open" and .head.sha == $sha and .head.repo.full_name == $head_repo and .base.repo.full_name == $repo)]' <<<"$GH_OUTPUT")"
+      [ "$(jq 'length' <<<"$matches")" -eq 1 ] || { echo '::error::Could not resolve exactly one open pull request for the source head.'; exit 1; }
+      PR_NUMBER="$(jq -r '.[0].number' <<<"$matches")"
+      ;;
+    *) echo '::error::Source workflow is associated with multiple pull requests.'; exit 1 ;;
+  esac
 fi
 [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo '::error::pr-number must be positive.'; exit 1; }
 output pr_number "$PR_NUMBER"
@@ -92,10 +99,33 @@ jq -e --argjson pr "$PR_NUMBER" --arg base "$base_sha" \
   'any(.pull_requests[]?; .number == $pr and .base.sha == $base)' >/dev/null <<<"$source_run" || \
   stop stale 'Source workflow is not bound to the current pull request base.'
 if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
+  ensure_current_source_attempt
   for label in "$REQUESTED_LABEL" "$COMPLETE_LABEL"; do
     clear_label "$label"
   done
   stop draft 'Pull request is a draft; final-review labels were cleared.'
+fi
+if ! jq -e --arg branch "$DEFAULT_BRANCH" --arg repo "$GITHUB_REPOSITORY" \
+  '.base.ref == $branch and .base.repo.full_name == $repo' >/dev/null <<<"$pr_json"; then
+  ensure_current_source_attempt
+  gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+  pr_json="$GH_OUTPUT"
+  [ "$(jq -r '.state' <<<"$pr_json")" = open ] || stop closed 'Pull request closed before ineligible-state cleanup.'
+  [ "$(jq -r '.head.sha' <<<"$pr_json")" = "$TESTED_HEAD_SHA" ] || stop stale 'Pull request head changed before ineligible-state cleanup.'
+  if ! jq -e --arg branch "$DEFAULT_BRANCH" --arg repo "$GITHUB_REPOSITORY" \
+    '.base.ref == $branch and .base.repo.full_name == $repo' >/dev/null <<<"$pr_json"; then
+    clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
+    stop ineligible 'Pull request does not target the repository default branch.'
+  fi
+  if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
+    clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
+    stop draft 'Pull request became a draft before ineligible-state cleanup.'
+  fi
+  base_sha="$(jq -r '.base.sha' <<<"$pr_json")"
+  [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Pull request base must be a full lowercase commit SHA.'; exit 1; }
+  jq -e --argjson pr "$PR_NUMBER" --arg base "$base_sha" \
+    'any(.pull_requests[]?; .number == $pr and .base.sha == $base)' >/dev/null <<<"$source_run" || \
+    stop stale 'Source workflow is not bound to the refreshed pull request base.'
 fi
 gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp
@@ -129,6 +159,7 @@ done < <(jq -r --arg name "$REVIEW_CHECK_NAME" \
   [.status, (.conclusion // "none"), (try (.details_url | capture("/actions/runs/(?<id>[0-9]+)(/|$)").id) catch "")] | @tsv' <<<"$GH_OUTPUT")
 case "$review_state" in active|success) stop duplicate "Skipping duplicate final review ($review_state)." ;; esac
 
+ensure_current_source_attempt
 for label in "$COMPLETE_LABEL" "$REQUESTED_LABEL"; do
   clear_label "$label"
 done
@@ -138,6 +169,9 @@ final_state="$GH_OUTPUT"
 [ "$(jq -r '.draft' <<<"$final_state")" = false ] || stop draft 'Pull request became a draft before label creation.'
 [ "$(jq -r '.head.sha' <<<"$final_state")" = "$TESTED_HEAD_SHA" ] || stop stale 'Pull request head changed before label creation.'
 [ "$(jq -r '.base.sha' <<<"$final_state")" = "$base_sha" ] || stop stale 'Pull request base changed before dispatch.'
+jq -e --arg branch "$DEFAULT_BRANCH" --arg repo "$GITHUB_REPOSITORY" \
+  '.base.ref == $branch and .base.repo.full_name == $repo' >/dev/null <<<"$final_state" || \
+  stop ineligible 'Pull request stopped targeting the repository default branch before dispatch.'
 mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=$REQUESTED_LABEL" --silent
 mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
   -f "event_type=$DISPATCH_EVENT_TYPE" -F "client_payload[pr_number]=$PR_NUMBER" \
