@@ -52,6 +52,11 @@ clear_label() {
   mutate 404 gh api --method DELETE \
     "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded" --silent
 }
+ensure_current_source_attempt() {
+  gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
+  [ "$(jq -r '.run_attempt' <<<"$GH_OUTPUT")" = "$SOURCE_RUN_ATTEMPT" ] || \
+    stop stale 'A newer source workflow attempt owns final-review label state.'
+}
 
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
 source_run="$GH_OUTPUT"
@@ -99,11 +104,13 @@ jobs="$GH_OUTPUT"
 jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$source_attempt" \
   '([.[].jobs[] | select(.run_attempt == $attempt and .name == $job)] | sort_by(.id) | last | .conclusion) == "success"' \
   >/dev/null <<<"$jobs" || {
+  ensure_current_source_attempt
   clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
   stop ineligible "Source fan-in $FAN_IN_JOB did not pass."
 }
 if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" --argjson attempt "$source_attempt" \
   'any(.[].jobs[]; .run_attempt <= $attempt and .name == $job and .conclusion == "success")' >/dev/null <<<"$jobs"; then
+  ensure_current_source_attempt
   clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
   stop ineligible "Forbidden source job $FORBIDDEN_SUCCESS_JOB succeeded."
 fi

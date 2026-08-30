@@ -251,6 +251,26 @@ esac`
     expect(calls).not.toContain('/dispatches')
   })
 
+  it('does not let an older failed attempt clear labels owned by a newer rerun', async () => {
+    const mock = `
+case "$*" in
+  *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"failure"}]}]' ;;
+  *"actions/runs/99"*)
+    count="$(grep -c 'actions/runs/99$' "$RUNNER_TEMP/calls")"
+    attempt=1; [ "$count" -eq 1 ] || attempt=2
+    printf '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":%s,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}\\n' "$attempt" ;;
+  *"pulls/7"*) printf '%s\\n' '${pr}' ;;
+  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+esac`
+    const { output, calls } = await runWithMockGh(
+      '.github/actions/request-final-review/request-final-review.sh',
+      mock,
+      requestEnv(),
+    )
+    expect(output).toContain('decision=stale')
+    expect(calls).not.toContain('--method DELETE')
+  })
+
   it('publishes the required check on the selected pull-request head', () => {
     const gate = action(`${root}/final-review-gate/action.yml`)
     expect(gate.inputs).toMatchObject({
@@ -279,7 +299,9 @@ esac`
     expect(publish).toContain('repos/$GITHUB_REPOSITORY/check-runs')
     expect(publish).toContain('head_sha=$SELECTED_HEAD_SHA')
     expect(publish).toContain('GATE_STATUS')
+    expect(publish).toContain('untrusted) if [ "$MARK_OUTCOME" = success ]')
     expect(requireGate).toContain('CHECK_CONCLUSION')
+    expect(requireGate).toContain('review|untrusted) [ "$MARK_OUTCOME" = success ]')
   })
 
   it('executes selected-head check publication after a successful gate', async () => {
@@ -304,6 +326,30 @@ esac`
       },
     )
     expect(output).toContain('conclusion=success')
+  })
+
+  it('publishes failure when untrusted pending-label cleanup fails', async () => {
+    const { output } = await runWithMockGh(
+      '.github/actions/final-review-gate/publish-check.sh',
+      `case "$*" in
+        *"check-runs"*"head_sha=${head}"*"conclusion=failure"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        GATE_OUTCOME: 'success',
+        GATE_STATUS: 'untrusted',
+        MARK_OUTCOME: 'failure',
+        CHECK_NAME: 'Code Reviewed',
+        SELECTED_HEAD_SHA: head,
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_RUN_ID: '123',
+      },
+    )
+    expect(output).toContain('conclusion=failure')
   })
 
   it('removes the pending label after recording trusted completion', async () => {
