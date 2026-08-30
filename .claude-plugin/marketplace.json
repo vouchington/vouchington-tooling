@@ -16,7 +16,7 @@
     },
     {
       "name": "vouchington-workflow",
-      "description": "Repository-neutral implementation, planning, issue, retrospective, CI, and PR workflow skills.",
+      "description": "Repository-neutral implementation, publishing, planning, issue, retrospective, CI, and PR workflow skills.",
       "source": "./plugins/vouchington-workflow",
       "category": "productivity",
       "homepage": "https://github.com/vouchington/vouchington-tooling"

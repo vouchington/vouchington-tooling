@@ -16,7 +16,7 @@ The repository also publishes the public [`security-triage`](./plugins/security-
 [`vouchington-testing`](./plugins/vouchington-testing), and
 [`vouchington-database`](./plugins/vouchington-database) agent plugins. `security-triage` has one
 repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
-commit, GitHub Actions, package-metadata, static-analysis, planning, issue-management,
+commit, GitHub Actions, package-metadata, npm-publishing, static-analysis, planning, issue-management,
 blackboard journaling, retrospective and follow-up review, CI-log review, and
 pull-request-description skills. All plugins use one canonical
 `skills/` tree for Codex and Claude; consumer repositories add their local mechanics and policy in

@@ -123,7 +123,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.4.0')
+      expect(manifest.version).toBe('0.5.0')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -144,6 +144,7 @@ describe('vouchington-workflow plugin', () => {
       'github-actions-authoring',
       'github-actions-checklist',
       'github-issue',
+      'npm-publishing',
       'organize-github-issues',
       'package-json-checklist',
       'planning',
@@ -232,10 +233,26 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.4.0',
+        pluginVersion: '0.5.0',
         prerequisites: ['github-actions-checklist'],
       }),
     )
+  })
+
+  it('hands npm bootstrap mutations to a human with resolved working-directory and OTP prompts', async () => {
+    const skill = await readSkill('npm-publishing')
+    const cd = skill.indexOf('cd /absolute/repository/root')
+    const publish = skill.indexOf('npm publish ./relative/package-directory --access public --otp=')
+    const trust = skill.indexOf('npm trust github @scope/package')
+
+    expect(skill).toContain('Do not run `npm publish` or `npm trust`')
+    expect(skill).toContain('npm pack --dry-run <package-directory>')
+    expect(skill.match(/--otp=$/gm)).toHaveLength(2)
+    expect(cd).toBeGreaterThan(-1)
+    expect(publish).toBeGreaterThan(cd)
+    expect(trust).toBeGreaterThan(publish)
+    expect(skill).toContain('--allow-publish')
+    expect(skill).toContain('consumer wrapper')
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {

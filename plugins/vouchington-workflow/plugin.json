@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vouchington-workflow",
-  "version": "0.4.0",
-  "description": "Portable implementation, planning, issue, retrospective, event-driven CI, and PR workflow skills for Codex and Claude.",
+  "version": "0.5.0",
+  "description": "Portable implementation, planning, publishing, issue, retrospective, event-driven CI, and PR workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington"
   },
