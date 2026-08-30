@@ -239,13 +239,10 @@ workflow SHA. Manual dispatches may omit it and use the same-repository dispatch
 
 This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
 parallel only after the exact pull request head has a successful `tests` fan-in. A trusted
-default-branch `pull_request_target` workflow creates the native
-`Final Code Review / Code Reviewed` job for every pull request head. Forks, Dependabot, and Renovate
-never receive review secrets or a provider checkout; that same native job passes only after their
-exact-head tests succeed.
-The `final-review-select` composite accepts both `pull_request` for trusted same-repository CI and
-`pull_request_target` for base-owned orchestration; callers retain responsibility for choosing the
-appropriate event and permissions boundary.
+default-branch `workflow_run` router emits one correlated `repository_dispatch`; the final workflow
+validates that exact run and publishes `Code Reviewed` directly on the selected pull request head.
+Forks, Dependabot, and Renovate never receive review secrets or a provider checkout; their exact
+tested heads can still receive the required check.
 
 The setup expects these organization Actions variables and fails when any is missing or malformed:
 
@@ -262,9 +259,10 @@ secrets, plus `CLAUDE_CODE_OAUTH_TOKEN` when Claude review is enabled. Provider 
 review-comment posting are advisory: failures are reported as warnings but do not fail
 `Code Reviewed`. Workflow selection, settings, exact-test provenance, live-head validation, and
 adding `final-code-review:complete` remain fail-closed. Label mutations need both `issues: write`
-and `pull-requests: write` (`issues: write` alone 403s PR labels). There is no PAT router or
-synthetic check publisher for the required context. Claude `workflow_call` `required_review` is a
-string so `workflow_dispatch` input leaves remain strings.
+and `pull-requests: write` (`issues: write` alone 403s PR labels). The router uses `GITHUB_TOKEN`,
+and the terminal gate publishes the required check with `checks: write`. Claude is a native
+reusable-workflow dependency, and its `workflow_call` `required_review` input is a string so manual
+`workflow_dispatch` input leaves remain strings.
 
 ## CLI
 
