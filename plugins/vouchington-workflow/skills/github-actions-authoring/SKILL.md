@@ -14,11 +14,15 @@ runner labels, permissions, action pins, concurrency, secrets, and required-chec
 
 1. Name the producer, the durable transition it emits, and the consumer that owns the next action.
 2. Use `needs` for jobs in one workflow and `workflow_call` for a reusable workflow whose caller
-   must await its result.
+   must await its result. When a consumer must run after failure or skip, give it an explicit status
+   condition and inspect `needs.<job>.result`; the implicit success condition skips it otherwise.
 3. Use `workflow_run` when a completed workflow is the trusted event boundary. Validate the exact
    source workflow, repository, branch or pull-request head, conclusion, and artifacts before acting.
-4. Use `repository_dispatch` only for a cross-repository transition. Authenticate the sender, pass
-   immutable correlation data, validate it against the source, and make duplicate delivery safe.
+   The receiving workflow must already exist on the default branch, and GitHub starts at most three
+   chained `workflow_run` levels; plan rollout explicitly and collapse deeper chains into one DAG.
+4. Use `repository_dispatch` for a cross-repository transition or authenticated external callback.
+   Authenticate the sender, pass immutable correlation data, validate it against the source, and make
+   duplicate delivery safe.
 5. Prefer provider-native completion events, callbacks, queues, or state-machine transitions for
    deployments and services. A scheduled reconciliation workflow may repair missed events, but it
    must inspect a snapshot once and exit; it must not wait for convergence.

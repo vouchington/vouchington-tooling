@@ -221,6 +221,10 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toContain('workflow_call')
     expect(skill).toContain('workflow_run')
     expect(skill).toContain('repository_dispatch')
+    expect(skill).toContain('needs.<job>.result')
+    expect(skill).toContain('default branch')
+    expect(skill).toContain('three')
+    expect(skill).toContain('external callback')
     expect(skill).toMatch(/bounded retries/i)
     expect(skill).toMatch(/local process readiness/i)
     expect(skills).toContainEqual(
