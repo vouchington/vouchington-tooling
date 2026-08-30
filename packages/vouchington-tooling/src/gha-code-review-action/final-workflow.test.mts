@@ -98,6 +98,7 @@ describe('final code review workflow', () => {
     expect(waitScript).toContain('actions/workflows/$ci_workflow/runs')
     expect(waitScript).toContain('-f "head_sha=$head_sha"')
     expect(waitScript).toContain('-f event=pull_request')
+    expect(waitScript).not.toContain('status=completed')
     expect(waitScript).toContain('any(.pull_requests[]?; .number == $pr)')
     expect(waitScript).toContain('$tests')
     expect(waitScript).toContain('FORBIDDEN_SUCCESS_JOB')
