@@ -111,6 +111,9 @@ describe('security-triage plugin', () => {
 })
 
 describe('vouchington-workflow plugin', () => {
+  const readSkill = (name: string): Promise<string> =>
+    readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
+
   it('uses one canonical skill source in every supported host manifest', async () => {
     const [codex, claude, agent] = await Promise.all([
       readJson(join(workflowPlugin, '.codex-plugin/plugin.json')),
@@ -120,7 +123,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.3.0')
+      expect(manifest.version).toBe('0.4.0')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -138,6 +141,7 @@ describe('vouchington-workflow plugin', () => {
       'agent-workflow',
       'blackboard',
       'git-commit-checklist',
+      'github-actions-authoring',
       'github-actions-checklist',
       'github-issue',
       'organize-github-issues',
@@ -205,9 +209,36 @@ describe('vouchington-workflow plugin', () => {
     expect(skills[0]).not.toContain('assigned non-main worktree')
   })
 
+  it('requires event-driven GitHub Actions authoring', async () => {
+    const [skill, manifest] = await Promise.all([
+      readSkill('github-actions-authoring'),
+      readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
+    ])
+    const skills = manifest.skills as Array<Record<string, unknown>>
+
+    expect(skill).toContain('Never poll in CI')
+    expect(skill).toContain('event-driven')
+    expect(skill).toContain('workflow_call')
+    expect(skill).toContain('workflow_run')
+    expect(skill).toContain('repository_dispatch')
+    expect(skill).toContain('needs.<job>.result')
+    expect(skill).toContain('default branch')
+    expect(skill).toContain('three')
+    expect(skill).toContain('external callback')
+    expect(skill).toMatch(/repository_dispatch[\s\S]*default branch/)
+    expect(skill).toMatch(/bounded retries/i)
+    expect(skill).toMatch(/local process readiness/i)
+    expect(skills).toContainEqual(
+      expect.objectContaining({
+        name: 'github-actions-authoring',
+        plugin: 'vouchington-workflow',
+        pluginVersion: '0.4.0',
+        prerequisites: ['github-actions-checklist'],
+      }),
+    )
+  })
+
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
-    const readSkill = (name: string): Promise<string> =>
-      readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
     const [issue, organize, taxonomy, revisit, distill] = await Promise.all([
       readSkill('github-issue'),
       readSkill('organize-github-issues'),
