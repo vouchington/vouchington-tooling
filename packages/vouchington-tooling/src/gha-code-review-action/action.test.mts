@@ -57,9 +57,9 @@ describe('code-review action', () => {
     expect(stepByName.get('Stash existing trusted prompt directory')?.run).toContain(
       'stash-trusted-prompt-dir.sh',
     )
-    expect(stepByName.get('Clean review payload files')?.run).toContain(
-      'restore-trusted-prompt-dir.sh',
-    )
+    const cleanup = stepByName.get('Clean review payload files')?.run
+    expect(cleanup).toContain('bash "${VOUCHINGTON_ACTION_PATH:?}/restore-trusted-prompt-dir.sh"')
+    expect(cleanup).not.toContain('bash "$GITHUB_ACTION_PATH/restore-trusted-prompt-dir.sh"')
     const home = stepByName.get('Isolate Claude Code install home')
     expect(home?.run).toContain('worktree-create.sh')
     expect(home?.run).toContain('VOUCHINGTON_ACTION_PATH')
@@ -79,6 +79,13 @@ describe('code-review action', () => {
     expect(stage?.run).toContain('gha-review-payload/cli.mts')
     expect(stage?.run).toContain(' optional ')
     expect(actionText).not.toContain('install-vouchington-tooling.sh')
+  })
+
+  it('allows only the GitHub Actions actor to invoke the trusted dispatched review as a bot', () => {
+    const review = stepByName.get('Run Code Review')
+    expect(review?.uses).toContain('anthropics/claude-code-action@')
+    expect(review?.with?.allowed_bots).toBe('github-actions')
+    expect(review?.with?.allowed_bots).not.toBe('*')
   })
 
   it('resolves a numeric Node version from the action repository', () => {
