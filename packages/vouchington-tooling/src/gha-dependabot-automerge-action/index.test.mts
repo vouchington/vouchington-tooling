@@ -41,10 +41,9 @@ describe('Dependabot auto-merge action policy', () => {
       expectAutoMergeEnabled(await runPolicy([candidate]))
   })
 
-  it('allows patch updates at any version, including a prerelease target', async () => {
+  it('allows stable patch updates at any version, including build metadata', async () => {
     for (const candidate of [
-      update('1.4.1', '1.4.2-beta.1', 'version-update:semver-patch'),
-      update('1.4.1-beta.1', '1.4.2', 'version-update:semver-patch'),
+      update('0.4.1', '0.4.2', 'version-update:semver-patch'),
       update('1.4.1+build.1', '1.4.2+build.2', 'version-update:semver-patch'),
     ])
       expectAutoMergeEnabled(await runPolicy([candidate]))
@@ -54,11 +53,15 @@ describe('Dependabot auto-merge action policy', () => {
     const result = await runPolicy([
       update('0.44.1', '0.45.0', 'version-update:semver-minor', 'prestable'),
       update('1.4.0-beta.1', '1.5.0-beta.1', 'version-update:semver-minor', 'prerelease'),
+      update('1.4.1', '1.4.2-beta.1', 'version-update:semver-patch', 'prerelease patch'),
+      update('1.4.1-beta.1', '1.4.2', 'version-update:semver-patch', 'prerelease source'),
       update('1.9.0', '2.0.0', 'version-update:semver-major', 'major'),
     ])
     expectHumanAction(result)
     expect(result.infos.join('\n')).toContain('prestable')
     expect(result.infos.join('\n')).toContain('prerelease')
+    expect(result.infos.join('\n')).toContain('prerelease patch')
+    expect(result.infos.join('\n')).toContain('prerelease source')
     expect(result.infos.join('\n')).toContain('major')
   })
 

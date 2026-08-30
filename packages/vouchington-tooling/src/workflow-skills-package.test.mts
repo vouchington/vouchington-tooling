@@ -44,7 +44,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(27)
+      expect(packaged).toHaveLength(28)
       expect(packaged).toEqual(canonical)
       const manifest = JSON.parse(
         readFileSync(join(packageRoot, 'skill-manifest.json'), 'utf8'),
@@ -62,6 +62,7 @@ describe('workflow skills package contract', () => {
         manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
       )
       expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
+      expect(prerequisites.get('dependabot')).toEqual(['github-actions-checklist'])
       expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
       expect(prerequisites.get('vitest-test-authoring')).toEqual(['test-authoring'])
       expect(prerequisites.get('github-issue')).toEqual([])
