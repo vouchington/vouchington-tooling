@@ -22,6 +22,7 @@ type Workflow = {
   concurrency?: { 'cancel-in-progress'?: boolean; group?: string }
   jobs?: Record<string, Job>
   on?: {
+    pull_request_target?: { types?: string[] }
     repository_dispatch?: { types?: string[] }
     workflow_run?: { types?: string[]; workflows?: string[] }
   }
@@ -30,6 +31,8 @@ type Workflow = {
 const finalText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
 const finalReview = load(finalText) as Workflow
 const request = load(readFileSync('.github/workflows/request-final-review.yml', 'utf8')) as Workflow
+const cleanupText = readFileSync('.github/workflows/clear-final-review-labels.yml', 'utf8')
+const cleanup = load(cleanupText) as Workflow
 const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
 const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
@@ -130,5 +133,17 @@ describe('event-driven final code review', () => {
     expect(ci.jobs?.tests?.name).toBe('tests')
     expect(ciText).toContain('ready_for_review')
     expect(ciText).toContain('converted_to_draft')
+  })
+
+  it('clears final-review labels from a trusted close event', () => {
+    expect(cleanup.on?.pull_request_target?.types).toEqual(['closed'])
+    expect(cleanup.jobs?.clear?.permissions).toEqual({
+      issues: 'write',
+      'pull-requests': 'write',
+    })
+    expect(cleanupText).toContain('final-code-review:requested')
+    expect(cleanupText).toContain('final-code-review:complete')
+    expect(cleanupText).not.toContain('actions/checkout')
+    expect(cleanupText).not.toMatch(/sleep|poll|WAIT_/i)
   })
 })
