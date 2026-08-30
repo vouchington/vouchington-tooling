@@ -58,12 +58,8 @@ while [ "$attempt" -le "$TESTS_WAIT_ATTEMPTS" ]; do
     "repos/$GITHUB_REPOSITORY/actions/workflows/$ci_workflow/runs" \
     -f "head_sha=$head_sha" -f event=pull_request -f per_page=20; then
     runs_json="$GH_RETRY_OUTPUT"
-    while IFS= read -r run_record; do
-      [ -n "$run_record" ] || continue
-      run_id="${run_record%%:*}"
-      run_attempt_and_status="${run_record#*:}"
-      run_attempt="${run_attempt_and_status%%:*}"
-      run_status="${run_attempt_and_status#*:}"
+    while IFS=: read -r run_id run_attempt run_status; do
+      [ -n "$run_id" ] || continue
       run_key="$run_id:$run_attempt"
       case "$inspected_runs" in
         *"|$run_key|"*) continue ;;
