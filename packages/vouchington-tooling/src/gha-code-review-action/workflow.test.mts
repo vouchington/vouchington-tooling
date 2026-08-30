@@ -38,6 +38,7 @@ describe('code-review reusable workflow', () => {
       'expected_head_sha',
       'expected_base_sha',
       'trusted_prompt_ref',
+      'tooling_ref',
       'model',
       'effort',
       'required_review',
@@ -108,8 +109,27 @@ describe('code-review reusable workflow', () => {
     )
   })
 
-  it('loads nested composites from the workflow SHA, not the caller SHA', () => {
-    expect(text).toContain('ref: ${{ github.workflow_sha }}')
+  it('loads nested composites from an explicit tooling SHA, never the caller workflow SHA', () => {
+    expect(workflow.on?.workflow_call?.inputs?.tooling_ref).toMatchObject({
+      required: true,
+      type: 'string',
+    })
+    expect(workflow.on?.workflow_dispatch?.inputs?.tooling_ref).toMatchObject({
+      required: false,
+      type: 'string',
+      default: '',
+    })
+    expect(text).not.toContain('github.workflow_sha')
+    expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \|\| github\.sha \}\}/g)).toHaveLength(2)
+    const toolingRefGuards = [workflow.jobs?.review, workflow.jobs?.poster].map((job) =>
+      job?.steps?.find((step) => step.name === 'Validate immutable tooling ref'),
+    )
+    expect(toolingRefGuards).toHaveLength(2)
+    for (const guard of toolingRefGuards) {
+      expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref || github.sha }}')
+      expect(guard?.run).toContain('tooling_ref must be a full lowercase commit SHA')
+      expect(guard?.run).toContain('^[0-9a-f]{40}$')
+    }
     expect(text).toContain('repository: vouchington/vouchington-tooling')
   })
 

@@ -17,6 +17,10 @@ on:
         required: false
         type: string
         default: ''
+      tooling_ref:
+        description: Immutable full SHA of vouchington/vouchington-tooling for nested actions
+        required: true
+        type: string
       trusted_prompt_ref:
         description: Set explicitly to expected_base_sha whenever selected SHAs are provided
         required: false
@@ -84,6 +88,11 @@ on:
         default: ''
       trusted_prompt_ref:
         description: Set explicitly to expected_base_sha whenever selected SHAs are provided
+        required: false
+        type: string
+        default: ''
+      tooling_ref:
+        description: Optional immutable full SHA of this repository for nested actions
         required: false
         type: string
         default: ''
@@ -173,11 +182,21 @@ jobs:
           ref: ${{ inputs.expected_head_sha || github.sha }}
           fetch-depth: 1
 
+      - name: Validate immutable tooling ref
+        env:
+          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::tooling_ref must be a full lowercase commit SHA.'
+            exit 1
+          }
+
       - name: Checkout review actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vouchington/vouchington-tooling
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ inputs.tooling_ref || github.sha }}
           path: .vouchington-tooling
           fetch-depth: 1
 
@@ -219,11 +238,21 @@ jobs:
       poster_outcome: ${{ steps.poster.outputs.poster_outcome }}
       posted: ${{ steps.poster.outputs.posted }}
     steps:
+      - name: Validate immutable tooling ref
+        env:
+          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::tooling_ref must be a full lowercase commit SHA.'
+            exit 1
+          }
+
       - name: Checkout review actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vouchington/vouchington-tooling
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ inputs.tooling_ref || github.sha }}
           path: .vouchington-tooling
           fetch-depth: 1
 

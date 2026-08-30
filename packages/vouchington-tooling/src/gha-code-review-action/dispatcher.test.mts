@@ -26,6 +26,7 @@ describe('claude code review dispatcher', () => {
     expect(workflow.jobs?.['claude-review']?.with?.required_review).toBe(
       "${{ (inputs.required_review == true || inputs.required_review == 'true') && 'true' || 'false' }}",
     )
+    expect(workflow.jobs?.['claude-review']?.with?.tooling_ref).toBe('${{ github.sha }}')
     expect(text).not.toContain('required_review: ${{ inputs.required_review }}')
   })
 })

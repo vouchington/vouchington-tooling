@@ -158,6 +158,7 @@ jobs:
       pr_number: ${{ inputs.pr_number }}
       expected_head_sha: ${{ inputs.expected_head_sha }}
       expected_base_sha: ${{ inputs.expected_base_sha }}
+      tooling_ref: <40-character-tooling-commit-sha>
       trusted_prompt_ref: ${{ inputs.expected_base_sha }}
       runs_on: '["self-hosted","Claude Code"]'
     secrets:
@@ -170,6 +171,9 @@ changed head or base before the agent starts and requires the trusted prompt ref
 The agent checkout is pinned to the selected head. At the write boundary, the poster verifies both
 selected refs and binds the review commit ID to the selected head SHA. A validation failure exits
 before the review agent runs or before a review is posted.
+For `workflow_call`, `tooling_ref` must be the immutable full SHA used to pin the reusable
+workflow so both nested action checkouts resolve the tooling repository rather than the caller
+workflow SHA. Manual dispatches may omit it and use the same-repository dispatch SHA.
 
 This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
 parallel only after the exact pull request head has a successful `tests` fan-in. A trusted
