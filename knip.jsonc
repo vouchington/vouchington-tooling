@@ -5,6 +5,8 @@
   "ignoreDependencies": ["eslint", "pr-shepherd"],
   "workspaces": {
     "packages/vouchington-tooling": {
+      // Loaded from the consumer package boundary only when the opt-in integration runs.
+      "ignoreDependencies": ["agent-blackboard"],
       "entry": [
         "src/index.mts!",
         "src/cli/index.mts!",

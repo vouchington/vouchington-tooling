@@ -1,4 +1,7 @@
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { assertSessionId } from './session-id.mts'
 
 export { cleanupSnapshotPartitions, partitionSnapshot } from './snapshot.mts'
@@ -126,7 +129,7 @@ async function loadClient(
   try {
     return await loader()
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND')
+    if (isMissingModuleError(error))
       throw new Error(
         'agent-blackboard is not installed; install it alongside vouchington-tooling to use this integration',
         { cause: error },
@@ -136,5 +139,20 @@ async function loadClient(
 }
 
 async function defaultClientLoader(): Promise<BlackboardClientModule> {
-  return (await import('agent-blackboard')) as BlackboardClientModule
+  let specifier = 'agent-blackboard'
+  try {
+    const consumerRequire = createRequire(resolve(process.cwd(), 'package.json'))
+    specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
+  } catch (error) {
+    if (!isMissingModuleError(error)) throw error
+  }
+  return (await import(specifier)) as BlackboardClientModule
+}
+
+function isMissingModuleError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'MODULE_NOT_FOUND')
+  )
 }
