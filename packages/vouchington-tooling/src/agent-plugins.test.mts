@@ -123,7 +123,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.5.1')
+      expect(manifest.version).toBe('0.6.0')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -140,6 +140,7 @@ describe('vouchington-workflow plugin', () => {
     expect(skillNames).toEqual([
       'agent-workflow',
       'blackboard',
+      'dependabot',
       'git-commit-checklist',
       'github-actions-authoring',
       'github-actions-checklist',
@@ -233,7 +234,34 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.5.1',
+        pluginVersion: '0.6.0',
+        prerequisites: ['github-actions-checklist'],
+      }),
+    )
+  })
+
+  it('defines a portable fail-closed Dependabot policy', async () => {
+    const [skill, manifest] = await Promise.all([
+      readSkill('dependabot'),
+      readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
+    ])
+    const skills = manifest.skills as Array<Record<string, unknown>>
+
+    expect(skill).toContain('open-pull-requests-limit')
+    expect(skill).toContain('security-updates')
+    expect(skill).toContain('version-updates')
+    expect(skill).toContain('minor')
+    expect(skill).toContain('patch')
+    expect(skill).toContain('major')
+    expect(skill).toContain('OIDC')
+    expect(skill).toContain('DEPENDABOT_AUTOMERGE_TOKEN')
+    expect(skill).toContain('pull_request_target')
+    expect(skill).toContain('consumer wrapper')
+    expect(skills).toContainEqual(
+      expect.objectContaining({
+        name: 'dependabot',
+        plugin: 'vouchington-workflow',
+        pluginVersion: '0.6.0',
         prerequisites: ['github-actions-checklist'],
       }),
     )
