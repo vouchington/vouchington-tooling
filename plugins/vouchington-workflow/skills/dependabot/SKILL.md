@@ -37,6 +37,9 @@ groups:
     patterns: ['vitest', '@vitest/*', '@vitejs/*']
   react:
     patterns: ['react', 'react-dom']
+  react-security:
+    applies-to: 'security-updates'
+    patterns: ['react', 'react-dom']
   react-email:
     patterns: ['react-email', '@react-email/*']
 ```
@@ -51,8 +54,10 @@ groups:
 - Use `update-types` only as an optional eligibility filter inside a package-family group, such as
   keeping that family's major updates independent. The version type must not be the reason otherwise
   unrelated dependencies share a pull request.
-- Group security updates only when the same package-family relationship makes a joint upgrade safe;
-  never combine unrelated vulnerability fixes into a generic security group.
+- Groups default to `applies-to: version-updates`. When the same package-family relationship also
+  makes a joint security upgrade safe, define a separately named family group such as
+  `react-security` with the same package patterns and `applies-to: security-updates`. Never combine
+  unrelated vulnerability fixes into a generic security group.
 - Group first-party packages together only when they share an owning release train and are expected
   to be consumed atomically. A grouped pull request is auto-mergeable only when every included update
   is eligible.

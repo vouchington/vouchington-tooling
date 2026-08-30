@@ -253,7 +253,7 @@ describe('vouchington-workflow plugin', () => {
     )?.[1]
     if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
     const example = parse(exampleSource) as {
-      groups?: Record<string, { patterns?: string[] }>
+      groups?: Record<string, { 'applies-to'?: string; patterns?: string[] }>
     } | null
 
     expect(skill).toContain('open-pull-requests-limit')
@@ -269,6 +269,10 @@ describe('vouchington-workflow plugin', () => {
       oxc: { patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint'] },
       vitest: { patterns: ['vitest', '@vitest/*', '@vitejs/*'] },
       react: { patterns: ['react', 'react-dom'] },
+      'react-security': {
+        'applies-to': 'security-updates',
+        patterns: ['react', 'react-dom'],
+      },
       'react-email': { patterns: ['react-email', '@react-email/*'] },
     })
     const patterns = Object.values(example?.groups ?? {}).flatMap((group) => group.patterns ?? [])
