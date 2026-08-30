@@ -69,6 +69,7 @@ describe('event-driven final code review', () => {
     expectPinnedExternalAction(
       requestText,
       'vouchington/vouchington-tooling/.github/actions/request-final-review',
+      true,
     )
     expect(router?.steps?.[0]?.with).toMatchObject({
       'source-workflow-path': '.github/workflows/ci.yml',
@@ -91,6 +92,7 @@ describe('event-driven final code review', () => {
     expectPinnedExternalAction(
       finalText,
       'vouchington/vouchington-tooling/.github/actions/select-final-review',
+      true,
     )
     expect(step?.with).toMatchObject({
       'source-run-id': '${{ github.event.client_payload.source_run_id }}',
@@ -111,6 +113,7 @@ describe('event-driven final code review', () => {
       trusted_prompt_ref: '${{ needs.select-final-review.outputs.base_sha }}',
     })
     expect(claude?.with?.tooling_ref).toMatch(/^[0-9a-f]{40}$/)
+    expect(finalText).toMatch(/^\s*tooling_ref:\s+[0-9a-f]{40}\s+#\s+v[0-9][^\s]*\s*$/m)
     expect(existsSync('.github/actions/final-review-dispatch-claude/action.yml')).toBe(false)
     expect(finalText).toContain("needs.claude-code-review.outputs.agent_outcome == 'success'")
     expect(finalText).toContain('needs.claude-code-review.outputs.payload_artifact_id')

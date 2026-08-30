@@ -24,7 +24,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Route exact completed CI run
-        uses: vouchington/vouchington-tooling/.github/actions/request-final-review@f98f5c18e1f10ced362d43d646ca49611adf4876
+        uses: vouchington/vouchington-tooling/.github/actions/request-final-review@60c61e6f929913e4e06e30a2b80d7bf3addc0b63 # v0.3.5
         with:
           read-token: ${{ github.token }}
           write-token: ${{ github.token }}
