@@ -381,8 +381,13 @@ describe('postReviewFromEnv', () => {
       PR_NUMBER: '4',
       CODE_REVIEW_PAYLOAD_PATH: payloadPath,
       GH_TOKEN: 'environment-token',
+      GH_HOST: 'github.example',
     }
-    const exec: GhExec = (args) => {
+    const tokens: string[] = []
+    const hosts: string[] = []
+    const exec: GhExec = (args, options) => {
+      tokens.push(options?.env?.GH_TOKEN ?? '')
+      hosts.push(options?.env?.GH_HOST ?? '')
       if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
       if (args.includes('/files?per_page=100')) return '[]'
       return ''
@@ -413,6 +418,10 @@ describe('postReviewFromEnv', () => {
     }
     try {
       await expect(postClaudeReviewFromEnv(env, exec, claudeIo)).resolves.toEqual({ posted: true })
+      expect(new Set(tokens)).toEqual(
+        new Set(['explicit-token', 'environment-token', 'fallback-token', 'app-token']),
+      )
+      expect(new Set(hosts)).toEqual(new Set(['github.example']))
       expect(() => postReviewWithTokenFromEnv(env, exec, '')).toThrow(
         'GH_TOKEN or GITHUB_TOKEN is required.',
       )
