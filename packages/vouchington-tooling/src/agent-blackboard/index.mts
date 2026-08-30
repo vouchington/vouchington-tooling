@@ -1,4 +1,7 @@
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { assertSessionId } from './session-id.mts'
 
 export { cleanupSnapshotPartitions, partitionSnapshot } from './snapshot.mts'
@@ -22,7 +25,10 @@ export type BlackboardClientModule = {
   }
 }
 type BlackboardClientLoader = () => Promise<BlackboardClientModule>
-export type BlackboardClientDependencies = { loadClient?: BlackboardClientLoader }
+export type BlackboardClientDependencies = {
+  loadClient?: BlackboardClientLoader
+  resolveFrom?: string | URL
+}
 
 export function resolveBlackboardConnection(
   env: NodeJS.ProcessEnv = process.env,
@@ -38,7 +44,7 @@ export async function probeBlackboard(
   env?: NodeJS.ProcessEnv,
   dependencies?: BlackboardClientDependencies,
 ): Promise<void> {
-  const { Sessions } = await loadClient(dependencies?.loadClient)
+  const { Sessions } = await loadClient(dependencies)
   await new Sessions(resolveBlackboardConnection(env)).list({ limit: 1 })
 }
 
@@ -65,7 +71,7 @@ export async function appendJournal(input: {
   }
   if (!markdown) throw new Error(`note file is empty: ${input.markdownFile}`)
   const connection = resolveBlackboardConnection(input.env)
-  const { Sessions, Entries } = await loadClient(input.dependencies?.loadClient)
+  const { Sessions, Entries } = await loadClient(input.dependencies)
   await new Sessions(connection).ensure({
     id: input.sessionId,
     parentSessionId: input.parentSessionId ?? null,
@@ -85,7 +91,7 @@ export async function readJournal(
   dependencies?: BlackboardClientDependencies,
 ): Promise<unknown[]> {
   assertSessionId(sessionId)
-  const { Entries } = await loadClient(dependencies?.loadClient)
+  const { Entries } = await loadClient(dependencies)
   const entries: unknown[] = []
   for await (const entry of new Entries(resolveBlackboardConnection(env)).get({
     sessionId,
@@ -121,20 +127,31 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
 }
 
 async function loadClient(
-  loader: BlackboardClientLoader = defaultClientLoader,
+  dependencies: BlackboardClientDependencies = {},
 ): Promise<BlackboardClientModule> {
+  const loader = dependencies.loadClient ?? (() => defaultClientLoader(dependencies.resolveFrom))
   try {
     return await loader()
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND')
+    if (isMissingModuleError(error))
       throw new Error(
-        'agent-blackboard is not installed; install the optional agent-blackboard peer dependency',
+        'agent-blackboard is not installed; install it alongside vouchington-tooling to use this integration',
         { cause: error },
       )
     throw error
   }
 }
 
-async function defaultClientLoader(): Promise<BlackboardClientModule> {
-  return (await import('agent-blackboard')) as BlackboardClientModule
+async function defaultClientLoader(resolveFrom?: string | URL): Promise<BlackboardClientModule> {
+  const consumerRequire = createRequire(resolveFrom ?? resolve(process.cwd(), 'package.json'))
+  const specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
+  return (await import(specifier)) as BlackboardClientModule
+}
+
+function isMissingModuleError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'MODULE_NOT_FOUND')
+  )
 }

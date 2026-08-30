@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -28,6 +28,7 @@ import type { BlackboardClientModule } from './index.mts'
 
 const env = { AGENT_BLACKBOARD_URL: 'https://blackboard.test', AGENT_BLACKBOARD_TOKEN: 'secret' }
 const sessionId = 'session:one'
+const originalCwd = process.cwd()
 let directory: string | undefined
 
 afterEach(async () => {
@@ -35,6 +36,7 @@ afterEach(async () => {
   client.list.mockReset()
   client.append.mockReset()
   client.entries = []
+  process.chdir(originalCwd)
   if (directory) await rm(directory, { recursive: true, force: true })
   directory = undefined
 })
@@ -210,13 +212,65 @@ describe('agent blackboard client', () => {
     expect(append).toHaveBeenCalledOnce()
   })
 
-  it('normalizes an injected missing optional peer error', async () => {
-    const loadClient = async (): Promise<BlackboardClientModule> => {
-      throw Object.assign(new Error('not installed'), { code: 'ERR_MODULE_NOT_FOUND' })
-    }
-    await expect(probeBlackboard(env, { loadClient })).rejects.toThrow(
-      'optional agent-blackboard peer',
+  it.each(['ERR_MODULE_NOT_FOUND', 'MODULE_NOT_FOUND'])(
+    'normalizes an injected %s integration dependency error',
+    async (code) => {
+      const loadClient = async (): Promise<BlackboardClientModule> => {
+        throw Object.assign(new Error('not installed'), { code })
+      }
+      await expect(probeBlackboard(env, { loadClient })).rejects.toThrow(
+        'install it alongside vouchington-tooling',
+      )
+    },
+  )
+
+  it('loads the integration from the consumer package context', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-consumer-'))
+    const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
+    await mkdir(packageDirectory, { recursive: true })
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({ name: 'agent-blackboard', type: 'module', exports: './index.mjs' }),
     )
+    await writeFile(
+      join(packageDirectory, 'index.mjs'),
+      'export class Sessions { async list() { return [] } }\nexport class Entries {}\n',
+    )
+    process.chdir(directory)
+
+    await expect(probeBlackboard(env)).resolves.toBeUndefined()
+  })
+
+  it('loads the integration from an explicit caller package context', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-caller-'))
+    const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
+    await mkdir(packageDirectory, { recursive: true })
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({ name: 'agent-blackboard', type: 'module', exports: './index.mjs' }),
+    )
+    await writeFile(
+      join(packageDirectory, 'index.mjs'),
+      'export class Sessions { async list() { return [] } }\nexport class Entries {}\n',
+    )
+
+    await expect(
+      probeBlackboard(env, { resolveFrom: join(directory, 'script.mjs') }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('preserves invalid consumer package errors', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-invalid-consumer-'))
+    const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
+    await mkdir(packageDirectory, { recursive: true })
+    await writeFile(join(packageDirectory, 'package.json'), '{')
+    process.chdir(directory)
+
+    await expect(
+      probeBlackboard(env, { resolveFrom: join(directory, 'script.mjs') }),
+    ).rejects.toMatchObject({
+      code: 'ERR_INVALID_PACKAGE_CONFIG',
+    })
   })
 
   it('preserves unexpected injected loader errors', async () => {

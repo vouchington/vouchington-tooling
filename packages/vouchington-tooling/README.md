@@ -89,6 +89,8 @@ as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
 need `agent-blackboard@^0.3.1`. Snapshot cleanup accepts only package-generated temporary paths.
+Programmatic callers launched from a different workspace directory pass their own module URL as
+`dependencies: { resolveFrom: import.meta.url }`; the CLI defaults to the current package context.
 It captures a target under a private tombstone, validates partition names, permissions, JSONL,
 ordering, terminal manifests, and the identity-bound cleanup receipt before deleting files, and
 restores the original path on a validation failure. Once deletion begins, it retains a private
