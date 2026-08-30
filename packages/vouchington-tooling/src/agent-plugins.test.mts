@@ -284,7 +284,9 @@ describe('vouchington-workflow plugin', () => {
     expect(patterns).toContain('@react-email/*')
     expect(patterns).not.toContain('*')
     for (const [name, group] of Object.entries(example?.groups ?? {})) {
-      expect(name).not.toMatch(/(?:^|-)minor-and-patch$/)
+      expect(name).not.toMatch(
+        /(?:^|-)minor-and-patch$|^(?:security(?:-updates)?|all-patches|version-updates)$/,
+      )
       expect(group).not.toHaveProperty('update-types')
     }
     expect(normalized).toMatch(/omit `update-types`[^.]*major, minor, and patch/i)
