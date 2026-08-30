@@ -59,7 +59,10 @@ describe('event-driven final-review actions', () => {
     const select = action(`${root}/select-final-review/action.yml`)
     expect(select.inputs).toMatchObject({
       'read-token': { required: true },
-      'requested-label': { required: true },
+      'request-event-type': { default: 'final-review-requested' },
+      'source-run-id': { default: '' },
+      'source-run-attempt': { default: '' },
+      'source-base-sha': { default: '' },
       'workflow-path': { required: true },
       'fan-in-job': { required: true },
       'forbidden-success-job': { default: '' },
@@ -77,8 +80,9 @@ describe('event-driven final-review actions', () => {
 
     const script = readFileSyncNode(`${root}/select-final-review/select-final-review.sh`, 'utf8')
     expect(script).toContain('.status == "completed"')
-    expect(script).toContain('sort_by(.created_at, .id) | last')
-    expect(script).toContain('EVENT_LABEL')
+    expect(script).toContain('.run_attempt == $attempt')
+    expect(script).toContain('.base.sha == $base')
+    expect(script).toContain('repository_dispatch')
     expect(script).toContain('--paginate --slurp')
     expect(script).not.toContain('2>&1')
     expect(script).not.toContain('POLL_')
@@ -95,6 +99,8 @@ describe('event-driven final-review actions', () => {
       'fan-in-job': { required: true },
       'review-workflow-path': { required: true },
       'review-check-name': { required: true },
+      'review-workflow-event': { default: 'repository_dispatch' },
+      'dispatch-event-type': { default: 'final-review-requested' },
       'retry-attempts': { default: '3' },
     })
     expect(request.runs?.steps?.[0]?.env).toMatchObject({
@@ -110,6 +116,7 @@ describe('event-driven final-review actions', () => {
     expect(script).toContain('.head_repository.full_name == $head_repo')
     expect(script).toContain('Could not resolve exactly one open pull request')
     expect(script).toContain('check-runs')
+    expect(script).toContain('client_payload[source_run_id]')
     expect(script).toContain('--paginate --slurp')
     expect(script).not.toContain('2>&1')
   })
@@ -118,8 +125,8 @@ describe('event-driven final-review actions', () => {
     const mock = `
 case "$*" in
   *"pulls/7"*) printf '%s\\n' '${pr}' ;;
-  *"actions/workflows/ci.yml/runs"*) printf '%s\\n' '[{"workflow_runs":[{"id":88,"run_attempt":2,"path":".github/workflows/ci.yml","head_sha":"${head}","event":"pull_request","status":"completed","created_at":"2026-01-01T00:00:00Z","pull_requests":[{"number":7}],"head_repository":{"full_name":"owner/repo"},"head_branch":"topic"}]}]' ;;
-  *"actions/runs/88/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":2,"name":"tests","conclusion":"success"}]}]' ;;
+  *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":2,"name":"tests","conclusion":"success"}]}]' ;;
+  *"actions/runs/99"*) printf '%s\\n' '{"id":99,"run_attempt":2,"path":".github/workflows/ci.yml","head_sha":"${head}","event":"pull_request","status":"completed","pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
   *) echo "unexpected gh call: $*" >&2; exit 64 ;;
 esac`
     const output = await runWithMockGh(
@@ -128,11 +135,13 @@ esac`
       {
         GH_TOKEN: 'read',
         PR_NUMBER: '7',
-        EVENT_NAME: 'pull_request_target',
-        EVENT_ACTION: 'labeled',
-        EVENT_LABEL: 'final-code-review:requested',
+        EVENT_NAME: 'repository_dispatch',
+        EVENT_ACTION: 'final-review-requested',
         EVENT_HEAD_SHA: head,
-        REQUESTED_LABEL: 'final-code-review:requested',
+        REQUEST_EVENT_TYPE: 'final-review-requested',
+        SOURCE_RUN_ID: '99',
+        SOURCE_RUN_ATTEMPT: '2',
+        SOURCE_BASE_SHA: base,
         DEFAULT_BRANCH: 'main',
         WORKFLOW_PATH: '.github/workflows/ci.yml',
         WORKFLOW_EVENT: 'pull_request',
@@ -151,11 +160,12 @@ esac`
     const mock = `
 case "$*" in
   *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"success"}]}]' ;;
-  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1}' ;;
+  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
   *"pulls/7"*) printf '%s\\n' '${pr}' ;;
   *"commits/${head}/check-runs"*) printf '%s\\n' '[{"check_runs":[]}]' ;;
   *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
   *"--method POST"*"/labels"*) : ;;
+  *"--method POST"*"/dispatches"*"event_type=final-review-requested"*) : ;;
   *) echo "unexpected gh call: $*" >&2; exit 64 ;;
 esac`
     const output = await runWithMockGh(
@@ -176,13 +186,49 @@ esac`
         REQUESTED_LABEL: 'final-code-review:requested',
         COMPLETE_LABEL: 'final-code-review:complete',
         REVIEW_WORKFLOW_PATH: '.github/workflows/final-code-review.yml',
-        REVIEW_WORKFLOW_EVENT: 'pull_request_target',
+        REVIEW_WORKFLOW_EVENT: 'repository_dispatch',
         REVIEW_CHECK_NAME: 'Code Reviewed',
+        DISPATCH_EVENT_TYPE: 'final-review-requested',
         RETRY_ATTEMPTS: '3',
         RETRY_BACKOFF_SECONDS: '0',
       },
     )
     expect(output).toContain('requested=true')
     expect(output).toContain('decision=requested')
+  })
+
+  it('publishes the required check on the selected pull-request head', () => {
+    const gate = action(`${root}/final-review-gate/action.yml`)
+    expect(gate.inputs).toMatchObject({ check_name: { default: '' } })
+    const publish = readFileSyncNode(`${root}/final-review-gate/publish-check.sh`, 'utf8')
+    const requireGate = readFileSyncNode(`${root}/final-review-gate/require.sh`, 'utf8')
+    expect(publish).toContain('repos/$GITHUB_REPOSITORY/check-runs')
+    expect(publish).toContain('head_sha=$SELECTED_HEAD_SHA')
+    expect(publish).toContain('GATE_STATUS')
+    expect(requireGate).toContain('CHECK_CONCLUSION')
+  })
+
+  it('executes selected-head check publication after a successful gate', async () => {
+    const output = await runWithMockGh(
+      '.github/actions/final-review-gate/publish-check.sh',
+      `case "$*" in
+        *"check-runs"*"head_sha=${head}"*"conclusion=success"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        GATE_OUTCOME: 'success',
+        GATE_STATUS: 'review',
+        MARK_OUTCOME: 'success',
+        CHECK_NAME: 'Code Reviewed',
+        SELECTED_HEAD_SHA: head,
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_RUN_ID: '123',
+      },
+    )
+    expect(output).toContain('conclusion=success')
   })
 })

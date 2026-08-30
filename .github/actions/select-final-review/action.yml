@@ -1,5 +1,5 @@
 name: Select final review
-description: Select one exact pull-request head from a completed validation snapshot without polling.
+description: Select one exact pull-request head from a correlated validation-completion dispatch.
 
 inputs:
   read-token:
@@ -9,23 +9,32 @@ inputs:
     description: Pull request number from the trusted event payload.
     required: true
   event-name:
-    description: Expected event name; must be pull_request_target.
+    description: repository_dispatch for review requests or pull_request_target for lifecycle cleanup.
     required: false
     default: pull_request_target
   event-action:
-    description: Trusted pull request event action.
+    description: Trusted dispatch type or pull request event action.
     required: true
-  event-label:
-    description: Trusted event label name for labeled events.
-    required: false
-    default: ''
   event-head-sha:
     description: Trusted event head SHA.
     required: false
     default: ''
-  requested-label:
-    description: Exact label that starts final review after validation.
-    required: true
+  request-event-type:
+    description: Exact repository_dispatch event type emitted by the completion router.
+    required: false
+    default: final-review-requested
+  source-run-id:
+    description: Exact completed validation run ID from the dispatch payload.
+    required: false
+    default: ''
+  source-run-attempt:
+    description: Exact completed validation attempt from the dispatch payload.
+    required: false
+    default: ''
+  source-base-sha:
+    description: Exact tested base SHA from the dispatch payload.
+    required: false
+    default: ''
   default-branch:
     description: Repository default branch.
     required: true
@@ -84,9 +93,11 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         EVENT_NAME: ${{ inputs.event-name }}
         EVENT_ACTION: ${{ inputs.event-action }}
-        EVENT_LABEL: ${{ inputs.event-label }}
         EVENT_HEAD_SHA: ${{ inputs.event-head-sha }}
-        REQUESTED_LABEL: ${{ inputs.requested-label }}
+        REQUEST_EVENT_TYPE: ${{ inputs.request-event-type }}
+        SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        SOURCE_RUN_ATTEMPT: ${{ inputs.source-run-attempt }}
+        SOURCE_BASE_SHA: ${{ inputs.source-base-sha }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
         WORKFLOW_PATH: ${{ inputs.workflow-path }}
         WORKFLOW_EVENT: ${{ inputs.workflow-event }}

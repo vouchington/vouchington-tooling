@@ -14,7 +14,8 @@ fi
 if ! workflow_path "${SOURCE_WORKFLOW_PATH:?}" || ! workflow_path "${REVIEW_WORKFLOW_PATH:?}"; then
   echo '::error::Workflow paths must be under .github/workflows.'; exit 1
 fi
-[ -n "${READ_TOKEN:?}" ] && [ -n "${WRITE_TOKEN:?}" ] && [ -n "${FAN_IN_JOB:?}" ] && [ -n "${REQUESTED_LABEL:?}" ] && [ -n "${REVIEW_CHECK_NAME:?}" ] || {
+[ -n "${READ_TOKEN:?}" ] && [ -n "${WRITE_TOKEN:?}" ] && [ -n "${FAN_IN_JOB:?}" ] && \
+  [ -n "${REQUESTED_LABEL:?}" ] && [ -n "${REVIEW_CHECK_NAME:?}" ] && [ -n "${DISPATCH_EVENT_TYPE:?}" ] || {
   echo '::error::Required token or final-review identity is missing.'; exit 1
 }
 
@@ -46,6 +47,7 @@ mutate() { GH_TOKEN="$WRITE_TOKEN" gh_retry "$@"; }
 
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
 source_run="$GH_OUTPUT"
+source_attempt="$(jq -r '.run_attempt' <<<"$source_run")"
 jq -e --arg path "$SOURCE_WORKFLOW_PATH" --arg event "$SOURCE_WORKFLOW_EVENT" --arg sha "$TESTED_HEAD_SHA" \
   --arg head_repo "$SOURCE_HEAD_REPOSITORY" \
   '.path == $path and .event == $event and .head_sha == $sha and .head_repository.full_name == $head_repo and .status == "completed"' \
@@ -68,6 +70,11 @@ gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 pr_json="$GH_OUTPUT"
 [ "$(jq -r '.state' <<<"$pr_json")" = open ] || stop closed 'Pull request is no longer open.'
 [ "$(jq -r '.head.sha' <<<"$pr_json")" = "$TESTED_HEAD_SHA" ] || stop stale 'Source result is stale for the current pull request head.'
+base_sha="$(jq -r '.base.sha' <<<"$pr_json")"
+[[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Pull request base must be a full lowercase commit SHA.'; exit 1; }
+jq -e --argjson pr "$PR_NUMBER" --arg base "$base_sha" \
+  'any(.pull_requests[]?; .number == $pr and .base.sha == $base)' >/dev/null <<<"$source_run" || \
+  stop stale 'Source workflow is not bound to the current pull request base.'
 if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
   for label in "$REQUESTED_LABEL" "$COMPLETE_LABEL"; do
     [ -z "$label" ] || mutate 404 gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$(jq -rn --arg value "$label" '$value | @uri')" --silent
@@ -77,7 +84,7 @@ fi
 
 gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp
-jobs="$GH_OUTPUT"; source_attempt="$(jq -r '.run_attempt' <<<"$source_run")"
+jobs="$GH_OUTPUT"
 jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$source_attempt" \
   '([.[].jobs[] | select(.run_attempt == $attempt and .name == $job)] | sort_by(.id) | last | .conclusion) == "success"' \
   >/dev/null <<<"$jobs" || stop ineligible "Source fan-in $FAN_IN_JOB did not pass."
@@ -109,6 +116,11 @@ final_state="$GH_OUTPUT"
 [ "$(jq -r '.state' <<<"$final_state")" = open ] || stop closed 'Pull request closed before label creation.'
 [ "$(jq -r '.draft' <<<"$final_state")" = false ] || stop draft 'Pull request became a draft before label creation.'
 [ "$(jq -r '.head.sha' <<<"$final_state")" = "$TESTED_HEAD_SHA" ] || stop stale 'Pull request head changed before label creation.'
+[ "$(jq -r '.base.sha' <<<"$final_state")" = "$base_sha" ] || stop stale 'Pull request base changed before dispatch.'
 mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=$REQUESTED_LABEL" --silent
+mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
+  -f "event_type=$DISPATCH_EVENT_TYPE" -F "client_payload[pr_number]=$PR_NUMBER" \
+  -f "client_payload[head_sha]=$TESTED_HEAD_SHA" -f "client_payload[base_sha]=$base_sha" \
+  -F "client_payload[source_run_id]=$SOURCE_RUN_ID" -F "client_payload[source_run_attempt]=$source_attempt"
 output requested true; output decision requested
-echo "Requested final review for PR #$PR_NUMBER at $TESTED_HEAD_SHA."
+echo "Requested final review for PR #$PR_NUMBER at $TESTED_HEAD_SHA from run $SOURCE_RUN_ID attempt $source_attempt."

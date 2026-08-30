@@ -134,8 +134,13 @@ thread resolution. There is no `@claude` mention workflow.
 
 Final review is event-driven. A trusted `workflow_run: completed` router uses
 `request-final-review` to validate the exact source run and fan-in job before replacing the request
-label. The resulting `pull_request_target: labeled` workflow uses `select-final-review` to inspect
-one completed validation snapshot; it never waits or polls for CI.
+label and emitting a correlated `repository_dispatch`. GitHub permits dispatch events created with
+`GITHUB_TOKEN`, unlike label-created workflow events. The receiving workflow uses
+`select-final-review` to validate that exact run, attempt, head, and base; it never waits or polls
+for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
+`pull-requests: read`. Because a dispatch workflow's native jobs attach to the default branch, its
+terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
+the action publishes that required check on the selector's exact pull-request head.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
@@ -156,11 +161,13 @@ one completed validation snapshot; it never waits or polls for CI.
 - uses: vouchington/vouchington-tooling/.github/actions/select-final-review@<sha>
   with:
     read-token: ${{ github.token }}
-    pr-number: ${{ github.event.pull_request.number }}
+    pr-number: ${{ github.event.client_payload.pr_number }}
+    event-name: ${{ github.event_name }}
     event-action: ${{ github.event.action }}
-    event-label: ${{ github.event.label.name }}
-    event-head-sha: ${{ github.event.pull_request.head.sha }}
-    requested-label: final-code-review:requested
+    event-head-sha: ${{ github.event.client_payload.head_sha }}
+    source-run-id: ${{ github.event.client_payload.source_run_id }}
+    source-run-attempt: ${{ github.event.client_payload.source_run_attempt }}
+    source-base-sha: ${{ github.event.client_payload.base_sha }}
     default-branch: ${{ github.event.repository.default_branch }}
     workflow-path: .github/workflows/ci.yml
     fan-in-job: tests

@@ -31,24 +31,18 @@ gh_retry() {
   done
 }
 
-[ "${EVENT_NAME:?}" = pull_request_target ] || { echo '::error::Selection requires pull_request_target.'; exit 1; }
 [[ "${PR_NUMBER:?}" =~ ^[1-9][0-9]*$ ]] || { echo '::error::pr-number must be positive.'; exit 1; }
 workflow_path "${WORKFLOW_PATH:?}" || { echo '::error::workflow-path must name a workflow under .github/workflows.'; exit 1; }
-if [ -z "${GH_TOKEN:?}" ] || [ -z "${FAN_IN_JOB:?}" ] || [ -z "${REQUESTED_LABEL:?}" ] || \
+if [ -z "${GH_TOKEN:?}" ] || [ -z "${FAN_IN_JOB:?}" ] || [ -z "${DEFAULT_BRANCH:?}" ] || \
   ! positive "${RETRY_ATTEMPTS:?}" || ! nonnegative "${RETRY_BACKOFF_SECONDS:?}"; then
-  echo '::error::Invalid token, fan-in, label, or retry configuration.'; exit 1
+  echo '::error::Invalid token, branch, fan-in, or retry configuration.'; exit 1
 fi
 
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 pr_json="$GH_OUTPUT"
-head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
-head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
-head_repository="$(jq -r '.head.repo.full_name' <<<"$pr_json")"
-base_sha="$(jq -r '.base.sha' <<<"$pr_json")"
-base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
-base_repository="$(jq -r '.base.repo.full_name' <<<"$pr_json")"
-state="$(jq -r '.state' <<<"$pr_json")"
-is_draft="$(jq -r '.draft' <<<"$pr_json")"
+head_sha="$(jq -r '.head.sha' <<<"$pr_json")"; base_sha="$(jq -r '.base.sha' <<<"$pr_json")"
+base_ref="$(jq -r '.base.ref' <<<"$pr_json")"; base_repository="$(jq -r '.base.repo.full_name' <<<"$pr_json")"
+state="$(jq -r '.state' <<<"$pr_json")"; is_draft="$(jq -r '.draft' <<<"$pr_json")"
 is_cross_repository="$(jq -r '.head.repo.full_name != .base.repo.full_name' <<<"$pr_json")"
 actor="$(jq -r '.user.login' <<<"$pr_json")"
 [[ "$head_sha" =~ ^[0-9a-f]{40}$ && "$base_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -61,31 +55,36 @@ output pr_number "$PR_NUMBER"; output head_sha "$head_sha"; output base_sha "$ba
   stop stale "::error::Event head $EVENT_HEAD_SHA no longer matches PR head $head_sha."
 [ "$state" = open ] || stop closed 'Pull request is closed.'
 [ "$is_draft" = false ] || stop deferred 'Final review is deferred while the pull request is a draft.'
-case "$EVENT_ACTION" in
-  labeled) [ "$EVENT_LABEL" = "$REQUESTED_LABEL" ] || stop ignore 'Ignoring unrelated label event.' ;;
-  converted_to_draft) stop deferred 'Final review is deferred after draft conversion.' ;;
-  closed) stop closed 'Pull request is closed.' ;;
-  *) stop ignore "Ignoring pull request action $EVENT_ACTION." ;;
-esac
 
-workflow_file="${WORKFLOW_PATH##*/}"
-gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_file/runs" \
-  -f "head_sha=$head_sha" -f "event=$WORKFLOW_EVENT" -f per_page=100 --paginate --slurp
-run="$(jq -c --argjson pr "$PR_NUMBER" --arg head "$head_sha" --arg path "$WORKFLOW_PATH" \
-  --arg event "$WORKFLOW_EVENT" --arg head_repo "$head_repository" --arg head_ref "$head_ref" '
-  [.[].workflow_runs[] | select(.path == $path and .head_sha == $head and .event == $event and
-    .status == "completed" and (any(.pull_requests[]?; .number == $pr) or
-    ((.pull_requests | length) == 0 and .head_repository.full_name == $head_repo and
-    .head_branch == $head_ref)))] | sort_by(.created_at, .id) | last // empty' <<<"$GH_OUTPUT")"
-[ -n "$run" ] || stop untested "::error::No completed validation run exists for $head_sha."
-run_id="$(jq -r '.id' <<<"$run")"; run_attempt="$(jq -r '.run_attempt' <<<"$run")"
-gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs" \
+if [ "$EVENT_NAME" = pull_request_target ]; then
+  case "$EVENT_ACTION" in
+    converted_to_draft) stop deferred 'Final review is deferred after draft conversion.' ;;
+    closed) stop closed 'Pull request is closed.' ;;
+    *) stop ignore "Ignoring pull request action $EVENT_ACTION." ;;
+  esac
+fi
+[ "$EVENT_NAME" = repository_dispatch ] && [ "$EVENT_ACTION" = "$REQUEST_EVENT_TYPE" ] || \
+  stop ignore 'Ignoring unrelated final-review event.'
+if ! positive "$SOURCE_RUN_ID" || ! positive "$SOURCE_RUN_ATTEMPT" || \
+  [[ ! "$SOURCE_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  echo '::error::Dispatch source run, attempt, or base SHA is invalid.'; exit 1
+fi
+[ "$SOURCE_BASE_SHA" = "$base_sha" ] || stop stale 'Tested base no longer matches the pull request base.'
+
+gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
+run="$GH_OUTPUT"
+jq -e --arg path "$WORKFLOW_PATH" --arg event "$WORKFLOW_EVENT" --arg head "$head_sha" \
+  --arg base "$base_sha" --argjson pr "$PR_NUMBER" --argjson attempt "$SOURCE_RUN_ATTEMPT" '
+  .path == $path and .event == $event and .head_sha == $head and .status == "completed" and
+  .run_attempt == $attempt and any(.pull_requests[]?; .number == $pr and .base.sha == $base)' \
+  >/dev/null <<<"$run" || stop untested '::error::Dispatched validation run identity did not match.'
+gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp
 jobs="$GH_OUTPUT"
-jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$run_attempt" \
+jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$SOURCE_RUN_ATTEMPT" \
   '([.[].jobs[] | select(.run_attempt == $attempt and .name == $job)] | sort_by(.id) | last | .conclusion) == "success"' \
   >/dev/null <<<"$jobs" || stop untested "::error::Validation fan-in $FAN_IN_JOB did not pass."
-if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" --argjson attempt "$run_attempt" \
+if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" --argjson attempt "$SOURCE_RUN_ATTEMPT" \
   'any(.[].jobs[]; .run_attempt == $attempt and .name == $job and .conclusion == "success")' >/dev/null <<<"$jobs"; then
   stop forbidden "::error::Forbidden job $FORBIDDEN_SUCCESS_JOB succeeded."
 fi
@@ -102,4 +101,4 @@ while IFS= read -r candidate; do
 done <<<"$UNTRUSTED_ACTORS"
 [ "$untrusted" = true ] && stop untrusted 'Secret-backed review is unavailable for this pull request context.'
 output should_review true; output gate_status review
-echo "Selected PR #$PR_NUMBER at $head_sha from completed validation run $run_id attempt $run_attempt."
+echo "Selected PR #$PR_NUMBER at $head_sha from run $SOURCE_RUN_ID attempt $SOURCE_RUN_ATTEMPT."
