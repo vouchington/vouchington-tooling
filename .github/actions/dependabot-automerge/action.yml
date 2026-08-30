@@ -160,8 +160,9 @@ runs:
             else {
               const type = previous.major !== next.major ? 'version-update:semver-major' : previous.minor !== next.minor ? 'version-update:semver-minor' : 'version-update:semver-patch';
               if (update?.updateType !== type) reason = `metadata type ${String(update?.updateType)} does not match ${type}`;
+              else if (previous.prerelease.length > 0 || next.prerelease.length > 0) reason = 'prerelease updates require human action';
               else if (type === 'version-update:semver-major') reason = 'semantic-version major updates require human action';
-              else if (type === 'version-update:semver-minor' && (previous.major === 0 || next.prerelease.length > 0)) reason = 'unstable minor updates require human action';
+              else if (type === 'version-update:semver-minor' && previous.major === 0) reason = 'unstable minor updates require human action';
             }
             if (reason) reasons.push(`${name}: ${reason}`);
           }
