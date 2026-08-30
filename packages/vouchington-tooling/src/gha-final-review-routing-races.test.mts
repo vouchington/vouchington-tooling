@@ -79,7 +79,7 @@ describe('final-review routing races', () => {
 esac`
     const { output, calls } = await runWithMockGh(mock, { ...requestEnv(), PR_NUMBER: '' })
     expect(output).toContain('decision=ineligible')
-    expect(calls).not.toContain("commits/${head}/pulls")
+    expect(calls).not.toContain('commits/${head}/pulls')
     expect(calls).not.toContain('/dispatches')
   })
 
