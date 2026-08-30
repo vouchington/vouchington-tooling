@@ -8,7 +8,8 @@ nonnegative() { [[ "$1" =~ ^[0-9]+$ ]]; }
 workflow_path() { [[ "$1" == .github/workflows/*.yml || "$1" == .github/workflows/*.yaml ]]; }
 
 [[ "${TESTED_HEAD_SHA:?}" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::source-head-sha must be a full lowercase commit SHA.'; exit 1; }
-if ! positive "${SOURCE_RUN_ID:?}" || ! positive "${RETRY_ATTEMPTS:?}" || ! nonnegative "${RETRY_BACKOFF_SECONDS:?}"; then
+if ! positive "${SOURCE_RUN_ID:?}" || ! positive "${SOURCE_RUN_ATTEMPT:?}" || \
+  ! positive "${RETRY_ATTEMPTS:?}" || ! nonnegative "${RETRY_BACKOFF_SECONDS:?}"; then
   echo '::error::Invalid source run or retry configuration.'; exit 1
 fi
 if ! workflow_path "${SOURCE_WORKFLOW_PATH:?}" || ! workflow_path "${REVIEW_WORKFLOW_PATH:?}"; then
@@ -44,10 +45,25 @@ gh_retry() {
 }
 export GH_TOKEN="$READ_TOKEN"
 mutate() { GH_TOKEN="$WRITE_TOKEN" gh_retry "$@"; }
+clear_label() {
+  local encoded
+  [ -n "$1" ] || return 0
+  encoded="$(jq -rn --arg value "$1" '$value | @uri')"
+  mutate 404 gh api --method DELETE \
+    "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded" --silent
+}
+ensure_current_source_attempt() {
+  gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
+  [ "$(jq -r '.run_attempt' <<<"$GH_OUTPUT")" = "$SOURCE_RUN_ATTEMPT" ] || \
+    stop stale 'A newer source workflow attempt owns final-review label state.'
+}
 
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
 source_run="$GH_OUTPUT"
 source_attempt="$(jq -r '.run_attempt' <<<"$source_run")"
+if [ "$source_attempt" != "$SOURCE_RUN_ATTEMPT" ]; then
+  echo '::error::Source workflow run attempt did not match the completion event.'; exit 1
+fi
 jq -e --arg path "$SOURCE_WORKFLOW_PATH" --arg event "$SOURCE_WORKFLOW_EVENT" --arg sha "$TESTED_HEAD_SHA" \
   --arg head_repo "$SOURCE_HEAD_REPOSITORY" \
   '.path == $path and .event == $event and .head_sha == $sha and .head_repository.full_name == $head_repo and .status == "completed"' \
@@ -77,7 +93,7 @@ jq -e --argjson pr "$PR_NUMBER" --arg base "$base_sha" \
   stop stale 'Source workflow is not bound to the current pull request base.'
 if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
   for label in "$REQUESTED_LABEL" "$COMPLETE_LABEL"; do
-    [ -z "$label" ] || mutate 404 gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$(jq -rn --arg value "$label" '$value | @uri')" --silent
+    clear_label "$label"
   done
   stop draft 'Pull request is a draft; final-review labels were cleared.'
 fi
@@ -87,9 +103,15 @@ gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE
 jobs="$GH_OUTPUT"
 jq -e --arg job "$FAN_IN_JOB" --argjson attempt "$source_attempt" \
   '([.[].jobs[] | select(.run_attempt == $attempt and .name == $job)] | sort_by(.id) | last | .conclusion) == "success"' \
-  >/dev/null <<<"$jobs" || stop ineligible "Source fan-in $FAN_IN_JOB did not pass."
+  >/dev/null <<<"$jobs" || {
+  ensure_current_source_attempt
+  clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
+  stop ineligible "Source fan-in $FAN_IN_JOB did not pass."
+}
 if [ -n "$FORBIDDEN_SUCCESS_JOB" ] && jq -e --arg job "$FORBIDDEN_SUCCESS_JOB" --argjson attempt "$source_attempt" \
   'any(.[].jobs[]; .run_attempt <= $attempt and .name == $job and .conclusion == "success")' >/dev/null <<<"$jobs"; then
+  ensure_current_source_attempt
+  clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
   stop ineligible "Forbidden source job $FORBIDDEN_SUCCESS_JOB succeeded."
 fi
 
@@ -105,11 +127,11 @@ while IFS=$'\t' read -r status conclusion run_id; do
   break
 done < <(jq -r --arg name "$REVIEW_CHECK_NAME" \
   '[.[].check_runs[] | select(.name == $name and .app.slug == "github-actions")] | sort_by(.id) | reverse[] |
-  [.status, (.conclusion // "none"), (try (.details_url | capture("/actions/runs/(?<id>[0-9]+)/").id) catch "")] | @tsv' <<<"$GH_OUTPUT")
+  [.status, (.conclusion // "none"), (try (.details_url | capture("/actions/runs/(?<id>[0-9]+)(/|$)").id) catch "")] | @tsv' <<<"$GH_OUTPUT")
 case "$review_state" in active|success) stop duplicate "Skipping duplicate final review ($review_state)." ;; esac
 
 for label in "$COMPLETE_LABEL" "$REQUESTED_LABEL"; do
-  [ -z "$label" ] || mutate 404 gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$(jq -rn --arg value "$label" '$value | @uri')" --silent
+  clear_label "$label"
 done
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 final_state="$GH_OUTPUT"
@@ -121,6 +143,6 @@ mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/lab
 mutate none gh api --method POST "repos/$GITHUB_REPOSITORY/dispatches" \
   -f "event_type=$DISPATCH_EVENT_TYPE" -F "client_payload[pr_number]=$PR_NUMBER" \
   -f "client_payload[head_sha]=$TESTED_HEAD_SHA" -f "client_payload[base_sha]=$base_sha" \
-  -F "client_payload[source_run_id]=$SOURCE_RUN_ID" -F "client_payload[source_run_attempt]=$source_attempt"
+  -F "client_payload[source_run_id]=$SOURCE_RUN_ID" -F "client_payload[source_run_attempt]=$SOURCE_RUN_ATTEMPT"
 output requested true; output decision requested
 echo "Requested final review for PR #$PR_NUMBER at $TESTED_HEAD_SHA from run $SOURCE_RUN_ID attempt $source_attempt."

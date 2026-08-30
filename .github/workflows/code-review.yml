@@ -2,6 +2,16 @@ name: Code Review
 
 on:
   workflow_call:
+    outputs:
+      agent_outcome:
+        description: Advisory review-agent outcome.
+        value: ${{ jobs.review.outputs.agent_outcome }}
+      payload_artifact_id:
+        description: Review payload artifact ID when a payload was produced.
+        value: ${{ jobs.review.outputs.payload_artifact_id }}
+      poster_outcome:
+        description: Advisory review-poster outcome.
+        value: ${{ jobs.poster.outputs.poster_outcome }}
     inputs:
       pr_number:
         description: Pull request number to review

@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/gh-retry.sh"
 conclusion=failure
 if [ "$GATE_OUTCOME" = success ]; then
   case "$GATE_STATUS" in
-    untrusted) conclusion=success ;;
+    untrusted) if [ "$MARK_OUTCOME" = success ]; then conclusion=success; fi ;;
     review) if [ "$MARK_OUTCOME" = success ]; then conclusion=success; fi ;;
   esac
 fi

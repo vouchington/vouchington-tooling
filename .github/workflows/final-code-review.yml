@@ -411,6 +411,13 @@ jobs:
         uses: ./.github/actions/final-review-gate
         with:
           gate_status: ${{ needs.select-final-review.outputs.gate_status }}
+          token: ${{ github.token }}
+          pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+          selected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
+          selected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
+          default_branch: ${{ github.event.repository.default_branch }}
+          complete_label: final-code-review:complete
+          requested_label: final-code-review:requested
         env:
           SELECT_RESULT: ${{ needs.select-final-review.result }}
           SETTINGS_RESULT: ${{ needs.validate-review-settings.result }}
