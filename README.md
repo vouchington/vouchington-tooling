@@ -133,8 +133,8 @@ thread resolution. There is no `@claude` mention workflow.
 ```
 
 Final review is event-driven. A trusted `workflow_run: completed` router uses
-`request-final-review` to validate the exact source run and fan-in job before replacing the request
-label and emitting a correlated `repository_dispatch`. GitHub permits dispatch events created with
+`request-final-review` to validate the exact source run, fan-in job, and live default-branch target
+before replacing the request label and emitting a correlated `repository_dispatch`. GitHub permits dispatch events created with
 `GITHUB_TOKEN`, unlike label-created workflow events. The receiving workflow uses
 `select-final-review` to validate that exact run, attempt, head, and base; it never waits or polls
 for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
@@ -145,8 +145,9 @@ the action publishes that required check on the selector's exact pull-request he
 `pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
 and the ready transition must produce a fresh validated completion dispatch. The pending label
 records observable review state; exact selected-head checks suppress duplicate work. The terminal
-gate clears pending state on success or failure unless a newer head owns it. Consumers should use a trusted draft/close lifecycle workflow
-with the same concurrency group as final review so those events cancel provider work immediately.
+gate clears pending state on success or failure unless a newer head owns it. Consumers should use
+a trusted draft/close lifecycle workflow with the same concurrency group as final review so those
+events cancel provider work immediately.
 
 ```yaml
 - uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>

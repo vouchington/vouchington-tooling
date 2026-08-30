@@ -97,6 +97,12 @@ if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
   done
   stop draft 'Pull request is a draft; final-review labels were cleared.'
 fi
+if ! jq -e --arg branch "$DEFAULT_BRANCH" --arg repo "$GITHUB_REPOSITORY" \
+  '.base.ref == $branch and .base.repo.full_name == $repo' >/dev/null <<<"$pr_json"; then
+  ensure_current_source_attempt
+  clear_label "$REQUESTED_LABEL"; clear_label "$COMPLETE_LABEL"
+  stop ineligible 'Pull request does not target the repository default branch.'
+fi
 gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp
 jobs="$GH_OUTPUT"
