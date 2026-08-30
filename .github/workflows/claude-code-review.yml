@@ -64,6 +64,7 @@ jobs:
       pr_number: ${{ inputs.pr_number }}
       expected_head_sha: ${{ inputs.expected_head_sha }}
       expected_base_sha: ${{ inputs.expected_base_sha }}
+      tooling_ref: ${{ github.sha }}
       trusted_prompt_ref: ${{ inputs.expected_base_sha || github.sha }}
       model: ${{ inputs.model }}
       effort: ${{ inputs.effort }}
