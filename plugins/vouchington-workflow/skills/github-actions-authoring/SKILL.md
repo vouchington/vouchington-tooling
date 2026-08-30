@@ -22,7 +22,8 @@ runner labels, permissions, action pins, concurrency, secrets, and required-chec
    chained `workflow_run` levels; plan rollout explicitly and collapse deeper chains into one DAG.
 4. Use `repository_dispatch` for a cross-repository transition or authenticated external callback.
    Authenticate the sender, pass immutable correlation data, validate it against the source, and make
-   duplicate delivery safe.
+   duplicate delivery safe. Its receiving workflow must also already exist on the default branch,
+   so introduce and verify the receiver before enabling senders.
 5. Prefer provider-native completion events, callbacks, queues, or state-machine transitions for
    deployments and services. A scheduled reconciliation workflow may repair missed events, but it
    must inspect a snapshot once and exit; it must not wait for convergence.
