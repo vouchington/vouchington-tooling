@@ -99,116 +99,15 @@ Centralized Cursor marketplace publication is not part of this repository change
 
 ## GitHub Actions
 
-Pin by commit SHA. The public actions never take a free-text `prompt` input. Prompt text comes from
-trusted files on `trusted_prompt_ref`. `extra_prompt` is rejected unless the calling repository is
-private. This repository's automatic review pins its prompts to
-[`docs/prompts/code-review.md`](./docs/prompts/code-review.md) and
-[`docs/prompts/code-review-inline-comments.md`](./docs/prompts/code-review-inline-comments.md);
-the public actions retain the caller-owned `.agents/skills/agent-workflow/code-review-prompt.md`
-default for compatibility.
-The payload contract requires every finding to be an inline comment so repository rules can require
-thread resolution. There is no `@claude` mention workflow.
+Pin the public Dependabot automerge action by commit SHA.
 
 ```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/claude-code-review@<sha>
-  with:
-    pr_number: ${{ inputs.pr_number }}
-    trusted_prompt_ref: ${{ github.sha }}
-    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-- uses: vouchington/vouchington-tooling/.github/actions/claude-code-review-poster@<sha>
-  with:
-    pr_number: ${{ inputs.pr_number }}
-    artifact_id: ${{ steps.review.outputs.payload_artifact_id }}
-
-- id: opencode
-  uses: vouchington/vouchington-tooling/.github/actions/opencode-code-review@<sha>
-  with:
-    pr_number: ${{ inputs.pr_number }}
-    trusted_prompt_ref: ${{ github.sha }}
-    model: openrouter/stealth/ox-alpha
-    # Optional: OpenCode runtime cap in seconds (1-1500; default: 1200), plus a 30-second termination grace.
-    timeout_seconds: '1200'
-    payload_artifact_name: opencode
-    openrouter_api_key: ${{ secrets.OPENROUTER_FREE_API_KEY }}
-
-- uses: vouchington/vouchington-tooling/.github/actions/review-poster@<sha>
-  with:
-    pr_number: ${{ inputs.pr_number }}
-    artifact_id: ${{ steps.opencode.outputs.payload_artifact_id }}
-    provider_name: OpenCode OpenRouter
-    post_token: ${{ github.token }}
-
 - uses: vouchington/vouchington-tooling/.github/actions/dependabot-automerge@<sha>
   with:
     automerge_token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
     # Optional: JSON rules that require manual merge for an ecosystem/directory.
     manual_update_rules: '[{"packageEcosystem":"nuget","directory":"/native"}]'
 ```
-
-Final review is event-driven. A trusted `workflow_run: completed` router uses
-`request-final-review` to validate the exact source run, fan-in job, and live default-branch target
-before replacing the request label and emitting a correlated `repository_dispatch`. GitHub permits dispatch events created with
-`GITHUB_TOKEN`, unlike label-created workflow events. The receiving workflow uses
-`select-final-review` to validate that exact run, attempt, head, and base; it never waits or polls
-for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
-`pull-requests: write` so its PR label mutations are authorized. Because a dispatch workflow's
-native jobs attach to the default branch, its
-terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
-the action publishes that required check on the selector's exact pull-request head. The source
-`pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
-and the ready transition must produce a fresh validated completion dispatch. The pending label
-records observable review state; exact selected-head checks suppress duplicate work. The terminal
-gate clears pending state on success or failure unless a newer head owns it. Consumers should use
-a trusted draft/close lifecycle workflow with the same concurrency group as final review so those
-events cancel provider work immediately.
-
-```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
-  with:
-    read-token: ${{ github.token }}
-    write-token: ${{ github.token }}
-    source-run-id: ${{ github.event.workflow_run.id }}
-    source-run-attempt: ${{ github.event.workflow_run.run_attempt }}
-    source-head-sha: ${{ github.event.workflow_run.head_sha }}
-    source-head-repository: ${{ github.event.workflow_run.head_repository.full_name }}
-    default-branch: ${{ github.event.repository.default_branch }}
-    source-workflow-path: .github/workflows/ci.yml
-    fan-in-job: tests
-    requested-label: final-code-review:requested
-    complete-label: final-code-review:complete
-    review-workflow-path: .github/workflows/final-code-review.yml
-    review-check-name: Code Reviewed
-
-- uses: vouchington/vouchington-tooling/.github/actions/final-review-gate@<sha>
-  with:
-    gate_status: ${{ needs.select-final-review.outputs.gate_status }}
-    token: ${{ github.token }}
-    pr_number: ${{ needs.select-final-review.outputs.pr_number }}
-    selected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
-    selected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
-    default_branch: ${{ github.event.repository.default_branch }}
-    complete_label: final-code-review:complete
-    check_name: Code Reviewed
-    requested_label: final-code-review:requested
-
-- uses: vouchington/vouchington-tooling/.github/actions/select-final-review@<sha>
-  with:
-    read-token: ${{ github.token }}
-    pr-number: ${{ github.event.client_payload.pr_number }}
-    event-action: ${{ github.event.action }}
-    event-head-sha: ${{ github.event.client_payload.head_sha }}
-    source-run-id: ${{ github.event.client_payload.source_run_id }}
-    source-run-attempt: ${{ github.event.client_payload.source_run_attempt }}
-    source-base-sha: ${{ github.event.client_payload.base_sha }}
-    default-branch: ${{ github.event.repository.default_branch }}
-    workflow-path: .github/workflows/ci.yml
-    fan-in-job: tests
-```
-
-The older `code-review` action, `code-review-poster` action, and `code-review.yml` reusable
-workflow remain as one-release compatibility entrypoints and emit deprecation warnings. New callers
-must select the explicit Claude adapter or the provider-neutral poster.
 
 `dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
 auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
@@ -227,63 +126,6 @@ check out or execute pull-request code.
 
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
-
-Or call the two-job reusable workflow:
-
-```yaml
-jobs:
-  review:
-    uses: vouchington/vouchington-tooling/.github/workflows/claude-code-review.yml@<sha>
-    with:
-      pr_number: ${{ inputs.pr_number }}
-      expected_head_sha: ${{ inputs.expected_head_sha }}
-      expected_base_sha: ${{ inputs.expected_base_sha }}
-      tooling_ref: <40-character-tooling-commit-sha>
-      trusted_prompt_ref: ${{ inputs.expected_base_sha }}
-      runs_on: '["self-hosted","Claude Code"]'
-    secrets:
-      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-```
-
-When an orchestrator selects an exact pull request revision, it must pass both expected SHAs
-together and set `trusted_prompt_ref` to `expected_base_sha`. The reusable workflow rejects a
-changed head or base before the agent starts and requires the trusted prompt ref to match that base.
-The agent checkout is pinned to the selected head. At the write boundary, the poster verifies both
-selected refs, requires the pull request to remain open and ready, and binds the review commit ID
-to the selected head SHA. A validation failure exits
-before the review agent runs or before a review is posted.
-For `workflow_call`, `tooling_ref` must be the immutable full SHA used to pin the reusable
-workflow so both nested action checkouts resolve the tooling repository rather than the caller
-workflow SHA. Manual dispatches may omit it and use the same-repository dispatch SHA.
-
-This repository's automatic final review runs OpenCode through OpenRouter and OpenCode Zen in
-parallel only after the exact pull request head has a successful `tests` fan-in. A trusted
-default-branch `workflow_run` router emits one correlated `repository_dispatch`; the final workflow
-validates that exact run and publishes `Code Reviewed` directly on the selected pull request head.
-Forks, Dependabot, and Renovate never receive review secrets or a provider checkout; their exact
-tested heads can still receive the required check.
-
-AI review lanes are disabled by default. A missing enablement variable is treated as `false`; a
-non-empty value other than `true` or `false` fails validation. Model and effort settings are required
-only for lanes explicitly enabled with `true`:
-
-- `CLAUDE_CODE_REVIEW_ENABLED` (`true` or `false`)
-- `CLAUDE_CODE_REVIEW_MODEL` (`haiku`, `sonnet`, or `opus`)
-- `CLAUDE_CODE_REVIEW_EFFORT` (`low`, `medium`, `high`, `xhigh`, or `max`)
-- `OPENCODE_CODE_REVIEW_ENABLED` (`true` or `false`)
-- `OPENCODE_CODE_REVIEW_MODEL`
-- `OPENCODE_ZEN_CODE_REVIEW_ENABLED` (`true` or `false`)
-- `OPENCODE_ZEN_CODE_REVIEW_MODEL`
-
-It also expects `OPENROUTER_FREE_API_KEY` and `OPENCODE_FREE_API_KEY` as organization Actions
-secrets, plus `CLAUDE_CODE_OAUTH_TOKEN` when Claude review is enabled. Provider execution and
-review-comment posting are advisory: failures are reported as warnings but do not fail
-`Code Reviewed`. Workflow selection, settings, exact-test provenance, live-head validation, and
-adding `final-code-review:complete` remain fail-closed. Label mutations need both `issues: write`
-and `pull-requests: write` (`issues: write` alone 403s PR labels). The router uses `GITHUB_TOKEN`,
-and the terminal gate publishes the required check with `checks: write`. Claude is a native
-reusable-workflow dependency, and its `workflow_call` `required_review` input is a string so manual
-`workflow_dispatch` input leaves remain strings.
 
 ## CLI
 
