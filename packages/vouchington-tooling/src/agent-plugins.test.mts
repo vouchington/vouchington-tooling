@@ -2,6 +2,7 @@ import { access, readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const plugin = join(root, 'plugins/security-triage')
@@ -247,10 +248,16 @@ describe('vouchington-workflow plugin', () => {
       readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
     ])
     const skills = manifest.skills as Array<Record<string, unknown>>
+    const exampleSource = skill.match(
+      /## Group package families\r?\n[\s\S]*?```yaml\r?\n([\s\S]*?)\r?\n```/,
+    )?.[1]
+    if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
+    const example = parse(exampleSource) as {
+      groups?: Record<string, { 'applies-to'?: string; patterns?: string[] }>
+    } | null
 
     expect(skill).toContain('open-pull-requests-limit')
     expect(skill).toContain('security-updates')
-    expect(skill).toContain('version-updates')
     expect(skill).toContain('minor')
     expect(skill).toContain('patch')
     expect(skill).toContain('major')
@@ -258,6 +265,20 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toContain('DEPENDABOT_AUTOMERGE_TOKEN')
     expect(skill).toContain('pull_request_target')
     expect(skill).toContain('consumer wrapper')
+    expect(example?.groups).toEqual({
+      oxc: { patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint'] },
+      vitest: { patterns: ['vitest', '@vitest/*', '@vitejs/*'] },
+      react: { patterns: ['react', 'react-dom'] },
+      'react-security': {
+        'applies-to': 'security-updates',
+        patterns: ['react', 'react-dom'],
+      },
+      'react-email': { patterns: ['react-email', '@react-email/*'] },
+    })
+    const patterns = Object.values(example?.groups ?? {}).flatMap((group) => group.patterns ?? [])
+    expect(patterns).toContain('@vitest/*')
+    expect(patterns).toContain('@react-email/*')
+    expect(patterns).not.toContain('*')
     expect(skills).toContainEqual(
       expect.objectContaining({
         name: 'dependabot',
