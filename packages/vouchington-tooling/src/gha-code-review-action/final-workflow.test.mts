@@ -135,8 +135,13 @@ describe('event-driven final code review', () => {
     expect(ciText).toContain('converted_to_draft')
   })
 
-  it('clears final-review labels from a trusted close event', () => {
-    expect(cleanup.on?.pull_request_target?.types).toEqual(['closed'])
+  it('cancels review work and clears labels on trusted draft or close events', () => {
+    expect(cleanup.on?.pull_request_target?.types).toEqual(['converted_to_draft', 'closed'])
+    expect(cleanup.concurrency).toEqual({
+      group:
+        'final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}',
+      'cancel-in-progress': true,
+    })
     expect(cleanup.jobs?.clear?.permissions).toEqual({
       issues: 'write',
       'pull-requests': 'write',

@@ -1,14 +1,14 @@
-name: Clear Final Review Labels
+name: Stop Final Review
 
 on:
   pull_request_target:
-    types: [closed]
+    types: [converted_to_draft, closed]
 
 permissions: {}
 
 concurrency:
-  group: clear-final-review-labels-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  group: final-code-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
 
 jobs:
   clear:
