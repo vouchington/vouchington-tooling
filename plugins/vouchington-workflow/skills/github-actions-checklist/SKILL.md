@@ -16,6 +16,20 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   pull-request content.
 - Load [github-actions-authoring](../github-actions-authoring/SKILL.md) when changing orchestration.
   Do not poll remote workflow, deployment, lease, service, or health state.
+- Required checks must be actual workflow jobs that execute or aggregate the work they report.
+  Workflow code must not create or publish check runs or commit statuses merely to synthesize a
+  required context, copy another workflow's conclusion, or bypass the event graph. A purpose-built
+  external CI or analysis integration may report its own result; do not use its API as a relay for
+  work owned by GitHub Actions.
+- On `main`, or the consumer's configured default branch, split test jobs by domain such as web and
+  backend instead of hiding unrelated suites in one monolithic test job. Keep domain job names stable
+  when they are required checks, and use a real bounded fan-in job only when the merge contract needs
+  one combined result.
+- For pull requests, configure test concurrency with `cancel-in-progress: true` so a superseded head
+  does not consume runner capacity. On `main`, test runs must never use `cancel-in-progress: true`;
+  every pushed revision must reach a terminal result. When one workflow handles both events, use
+  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` or an equivalent exact event
+  predicate instead of setting it unconditionally.
 - Give every concrete job a timeout of no more than 30 minutes. A caller job that invokes a reusable
   workflow through top-level `jobs.<job_id>.uses` cannot accept `timeout-minutes`; enforce the bound
   on every concrete job inside the called workflow. If the underlying operation cannot terminate
@@ -43,8 +57,9 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
    conflict. Identify trusted and untrusted inputs and every credential boundary.
 2. Give each job the least permissions it needs. Keep untrusted pull-request content out of shell
    interpolation, privileged tokens, and write-capable steps.
-3. Apply the portable pinning, runner, trigger, and timeout baseline plus any stricter consumer
-   policy. Keep checkout refs, artifact boundaries, caches, and concurrency behavior explicit.
+3. Apply the portable check, test-topology, concurrency, pinning, runner, trigger, and timeout
+   baseline plus any stricter consumer policy. Keep checkout refs, artifact boundaries, caches, and
+   concurrency behavior explicit.
 4. Validate changed YAML with the local workflow checker and run the affected workflow tests or
    scripts. Update local CI documentation when behavior or operator expectations change.
 5. Review the final diff for privilege escalation, accidental secret exposure, unsafe quoting,
