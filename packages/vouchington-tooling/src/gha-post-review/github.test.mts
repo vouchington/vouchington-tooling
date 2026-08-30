@@ -380,6 +380,7 @@ describe('postReviewFromEnv', () => {
       GITHUB_REPOSITORY: 'o/r',
       PR_NUMBER: '4',
       CODE_REVIEW_PAYLOAD_PATH: payloadPath,
+      GH_TOKEN: 'environment-token',
     }
     const exec: GhExec = (args) => {
       if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
@@ -388,6 +389,12 @@ describe('postReviewFromEnv', () => {
     }
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     expect(postReviewWithTokenFromEnv(env, exec, 'explicit-token')).toEqual({ posted: true })
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    expect(postReviewWithTokenFromEnv(env, exec)).toEqual({ posted: true })
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    expect(
+      postReviewWithTokenFromEnv({ ...env, GH_TOKEN: '', GITHUB_TOKEN: 'fallback-token' }, exec),
+    ).toEqual({ posted: true })
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     const claudeIo: ClaudeTokenIo = {
       async getOidcToken() {
