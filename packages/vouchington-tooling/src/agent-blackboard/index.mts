@@ -25,7 +25,10 @@ export type BlackboardClientModule = {
   }
 }
 type BlackboardClientLoader = () => Promise<BlackboardClientModule>
-export type BlackboardClientDependencies = { loadClient?: BlackboardClientLoader }
+export type BlackboardClientDependencies = {
+  loadClient?: BlackboardClientLoader
+  resolveFrom?: string | URL
+}
 
 export function resolveBlackboardConnection(
   env: NodeJS.ProcessEnv = process.env,
@@ -41,7 +44,7 @@ export async function probeBlackboard(
   env?: NodeJS.ProcessEnv,
   dependencies?: BlackboardClientDependencies,
 ): Promise<void> {
-  const { Sessions } = await loadClient(dependencies?.loadClient)
+  const { Sessions } = await loadClient(dependencies)
   await new Sessions(resolveBlackboardConnection(env)).list({ limit: 1 })
 }
 
@@ -68,7 +71,7 @@ export async function appendJournal(input: {
   }
   if (!markdown) throw new Error(`note file is empty: ${input.markdownFile}`)
   const connection = resolveBlackboardConnection(input.env)
-  const { Sessions, Entries } = await loadClient(input.dependencies?.loadClient)
+  const { Sessions, Entries } = await loadClient(input.dependencies)
   await new Sessions(connection).ensure({
     id: input.sessionId,
     parentSessionId: input.parentSessionId ?? null,
@@ -88,7 +91,7 @@ export async function readJournal(
   dependencies?: BlackboardClientDependencies,
 ): Promise<unknown[]> {
   assertSessionId(sessionId)
-  const { Entries } = await loadClient(dependencies?.loadClient)
+  const { Entries } = await loadClient(dependencies)
   const entries: unknown[] = []
   for await (const entry of new Entries(resolveBlackboardConnection(env)).get({
     sessionId,
@@ -124,8 +127,9 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
 }
 
 async function loadClient(
-  loader: BlackboardClientLoader = defaultClientLoader,
+  dependencies: BlackboardClientDependencies = {},
 ): Promise<BlackboardClientModule> {
+  const loader = dependencies.loadClient ?? (() => defaultClientLoader(dependencies.resolveFrom))
   try {
     return await loader()
   } catch (error) {
@@ -138,10 +142,10 @@ async function loadClient(
   }
 }
 
-async function defaultClientLoader(): Promise<BlackboardClientModule> {
+async function defaultClientLoader(resolveFrom?: string | URL): Promise<BlackboardClientModule> {
   let specifier = 'agent-blackboard'
   try {
-    const consumerRequire = createRequire(resolve(process.cwd(), 'package.json'))
+    const consumerRequire = createRequire(resolveFrom ?? resolve(process.cwd(), 'package.json'))
     specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
   } catch (error) {
     if (!isMissingModuleError(error)) throw error

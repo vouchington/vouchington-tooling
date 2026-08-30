@@ -241,6 +241,32 @@ describe('agent blackboard client', () => {
     await expect(probeBlackboard(env)).resolves.toBeUndefined()
   })
 
+  it('loads the integration from an explicit caller package context', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-caller-'))
+    const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
+    await mkdir(packageDirectory, { recursive: true })
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({ name: 'agent-blackboard', type: 'module', exports: './index.mjs' }),
+    )
+    await writeFile(
+      join(packageDirectory, 'index.mjs'),
+      'export class Sessions { async list() { return [] } }\nexport class Entries {}\n',
+    )
+
+    await expect(
+      probeBlackboard(env, { resolveFrom: join(directory, 'script.mjs') }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('falls back to the package development dependency', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-package-fallback-'))
+
+    await expect(
+      probeBlackboard({}, { resolveFrom: join(directory, 'script.mjs') }),
+    ).rejects.toThrow('AGENT_BLACKBOARD_URL is not set')
+  })
+
   it('preserves invalid consumer package errors', async () => {
     directory = await mkdtemp(join(tmpdir(), 'blackboard-invalid-consumer-'))
     const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
@@ -248,7 +274,9 @@ describe('agent blackboard client', () => {
     await writeFile(join(packageDirectory, 'package.json'), '{')
     process.chdir(directory)
 
-    await expect(probeBlackboard(env)).rejects.toMatchObject({
+    await expect(
+      probeBlackboard(env, { resolveFrom: join(directory, 'script.mjs') }),
+    ).rejects.toMatchObject({
       code: 'ERR_INVALID_PACKAGE_CONFIG',
     })
   })
