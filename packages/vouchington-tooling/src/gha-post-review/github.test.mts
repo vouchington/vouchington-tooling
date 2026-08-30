@@ -388,7 +388,7 @@ describe('postReviewFromEnv', () => {
     const exec: GhExec = (args, options) => {
       tokens.push(options?.env?.GH_TOKEN ?? '')
       hosts.push(options?.env?.GH_HOST ?? '')
-      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}\tfalse\topen`
       if (args.includes('/files?per_page=100')) return '[]'
       return ''
     }
