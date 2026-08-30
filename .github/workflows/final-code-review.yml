@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Select final review
         id: select
-        uses: vouchington/vouchington-tooling/.github/actions/select-final-review@882e4d27eaca08f16253ec0c3d2fe784c598926e
+        uses: vouchington/vouchington-tooling/.github/actions/select-final-review@f98f5c18e1f10ced362d43d646ca49611adf4876
         with:
           read-token: ${{ github.token }}
           pr-number: ${{ github.event.client_payload.pr_number }}
@@ -96,7 +96,7 @@ jobs:
       pr_number: ${{ needs.select-final-review.outputs.pr_number }}
       expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
       expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
-      tooling_ref: 882e4d27eaca08f16253ec0c3d2fe784c598926e
+      tooling_ref: f98f5c18e1f10ced362d43d646ca49611adf4876
       trusted_prompt_ref: ${{ needs.select-final-review.outputs.base_sha }}
       model: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
       effort: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}

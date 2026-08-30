@@ -42,7 +42,6 @@ const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
 const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
 const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
-
 function expectPinnedExternalAction(text: string, action: string, requireVersionComment = false) {
   const escapedAction = action.replaceAll('.', '\\.')
   const comment = requireVersionComment ? '\\s+#\\s+v[0-9][^\\s]*' : ''
@@ -61,6 +60,12 @@ describe('event-driven final code review', () => {
     })
     const router = request.jobs?.request
     expect(router?.if).toContain("workflow_run.event == 'pull_request'")
+    expect(router?.if).toContain(
+      'workflow_run.pull_requests[0].base.ref == github.event.repository.default_branch',
+    )
+    expect(router?.if).toContain(
+      'workflow_run.pull_requests[0].base.repo.full_name == github.repository',
+    )
     expect(router?.permissions).toMatchObject({
       actions: 'read',
       checks: 'read',
