@@ -24,6 +24,8 @@ pull-request-description skills. All plugins use one canonical
 collaborator authority before creation, routes denied external work to a verified consumer tracker,
 uses existing labels without extra approval, and requires explicit approval before creating labels.
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
+The `github-actions-authoring` skill requires event-driven orchestration and prohibits remote-state
+polling in CI; it loads `github-actions-checklist` as a prerequisite.
 
 `security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
 handoff, while each consuming repository owns issue taxonomy and issue creation.
