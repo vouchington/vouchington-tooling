@@ -143,9 +143,9 @@ native jobs attach to the default branch, its
 terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
 the action publishes that required check on the selector's exact pull-request head. The source
 `pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
-and the ready transition must produce a fresh validated completion dispatch. The pending label is
-an active-request lock for the selected head; the terminal gate clears it on success or failure
-unless a newer head owns the label. Consumers should use a trusted draft/close lifecycle workflow
+and the ready transition must produce a fresh validated completion dispatch. The pending label
+records observable review state; exact selected-head checks suppress duplicate work. The terminal
+gate clears pending state on success or failure unless a newer head owns it. Consumers should use a trusted draft/close lifecycle workflow
 with the same concurrency group as final review so those events cancel provider work immediately.
 
 ```yaml

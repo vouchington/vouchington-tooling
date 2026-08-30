@@ -98,6 +98,7 @@ runs:
         GATE_OUTCOME: ${{ steps.gate.outcome }}
         MARK_OUTCOME: ${{ steps.mark-complete.outcome }}
         CLEANUP_OUTCOME: ${{ steps.clear-requested.outcome }}
+        REQUESTED_LABEL: ${{ inputs.requested_label }}
       run: bash "${GITHUB_ACTION_PATH}/publish-check.sh"
     - name: Require native gate outcome
       if: always()

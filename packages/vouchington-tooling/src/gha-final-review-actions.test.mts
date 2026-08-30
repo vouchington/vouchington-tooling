@@ -271,27 +271,6 @@ esac`
     expect(calls).not.toContain('--method DELETE')
   })
 
-  it('does not dispatch again while the exact pull request already has a pending review', async () => {
-    const pending = JSON.stringify({
-      ...JSON.parse(pr),
-      labels: [{ name: 'final-code-review:requested' }],
-    })
-    const mock = `
-case "$*" in
-  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
-  *"pulls/7"*) printf '%s\\n' '${pending}' ;;
-  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
-esac`
-    const { output, calls } = await runWithMockGh(
-      '.github/actions/request-final-review/request-final-review.sh',
-      mock,
-      requestEnv(),
-    )
-    expect(output).toContain('decision=duplicate')
-    expect(calls).not.toContain('/jobs')
-    expect(calls).not.toContain('/dispatches')
-  })
-
   it('publishes the required check on the selected pull-request head', () => {
     const gate = action(`${root}/final-review-gate/action.yml`)
     expect(gate.inputs).toMatchObject({
@@ -346,6 +325,7 @@ esac`
         GATE_STATUS: 'review',
         MARK_OUTCOME: 'success',
         CLEANUP_OUTCOME: 'success',
+        REQUESTED_LABEL: 'final-code-review:requested',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -371,6 +351,7 @@ esac`
         GATE_STATUS: 'untrusted',
         MARK_OUTCOME: 'success',
         CLEANUP_OUTCOME: 'failure',
+        REQUESTED_LABEL: 'final-code-review:requested',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -424,6 +405,53 @@ esac`
       },
     )
     expect(calls).toContain('labels/final-code-review%3Arequested')
+  })
+
+  it('preserves pending state owned by a newer pull-request head', async () => {
+    const newer = JSON.stringify({ ...JSON.parse(pr), head: { sha: 'c'.repeat(40) } })
+    const { calls } = await runWithMockGh(
+      '.github/actions/final-review-gate/clear-requested.sh',
+      `case "$*" in
+        *"pulls/7"*) printf '%s\\n' '${newer}' ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        PR_NUMBER: '7',
+        SELECTED_HEAD_SHA: head,
+        REQUESTED_LABEL: 'final-code-review:requested',
+      },
+    )
+    expect(calls).not.toContain('--method DELETE')
+  })
+
+  it('allows successful publication when pending labels are disabled', async () => {
+    const { output } = await runWithMockGh(
+      '.github/actions/final-review-gate/publish-check.sh',
+      `case "$*" in
+        *"check-runs"*"conclusion=success"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        GATE_OUTCOME: 'success',
+        GATE_STATUS: 'review',
+        MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'skipped',
+        REQUESTED_LABEL: '',
+        CHECK_NAME: 'Code Reviewed',
+        SELECTED_HEAD_SHA: head,
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_RUN_ID: '123',
+      },
+    )
+    expect(output).toContain('conclusion=success')
   })
 })
 
