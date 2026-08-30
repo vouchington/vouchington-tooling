@@ -32,9 +32,13 @@ gh_capture_retry() {
 }
 output pr_number "$PR_NUMBER"
 
-[ "$EVENT_NAME" = pull_request_target ] || {
-  echo '::error::Final Code Review requires a pull_request_target event.'; exit 1;
-}
+case "${EVENT_NAME:-$GITHUB_EVENT_NAME}" in
+  pull_request|pull_request_target) ;;
+  *)
+    echo '::error::Final Code Review requires a pull_request or pull_request_target event.'
+    exit 1
+    ;;
+esac
 
 gh_capture_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
 pr_json="$GH_RETRY_OUTPUT"
