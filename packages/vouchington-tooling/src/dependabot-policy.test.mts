@@ -69,6 +69,10 @@ describe('Dependabot policy', () => {
         'applies-to': 'version-updates',
         patterns: ['picomatch', '@types/picomatch'],
       },
+      'picomatch-security': {
+        'applies-to': 'security-updates',
+        patterns: ['picomatch', '@types/picomatch'],
+      },
     })
     expect(actions?.groups).toEqual({
       'artifact-actions': {

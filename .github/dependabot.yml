@@ -45,6 +45,11 @@ updates:
         patterns:
           - picomatch
           - '@types/picomatch'
+      picomatch-security:
+        applies-to: security-updates
+        patterns:
+          - picomatch
+          - '@types/picomatch'
   - package-ecosystem: github-actions
     directory: /
     schedule:
