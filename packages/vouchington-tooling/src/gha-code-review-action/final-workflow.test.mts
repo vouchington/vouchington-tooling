@@ -54,18 +54,11 @@ describe('event-driven final code review', () => {
   it('routes one completed CI event into one correlated review dispatch', () => {
     expect(request.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
     expect(request.concurrency).toEqual({
-      group:
-        'request-final-review-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}',
+      group: 'request-final-review-${{ github.event.workflow_run.head_sha }}',
       'cancel-in-progress': false,
     })
     const router = request.jobs?.request
-    expect(router?.if).toContain("workflow_run.event == 'pull_request'")
-    expect(router?.if).toContain(
-      'workflow_run.pull_requests[0].base.ref == github.event.repository.default_branch',
-    )
-    expect(router?.if).toContain(
-      'workflow_run.pull_requests[0].base.repo.full_name == github.repository',
-    )
+    expect(router?.if).toBe("github.event.workflow_run.event == 'pull_request'")
     expect(router?.permissions).toMatchObject({
       actions: 'read',
       checks: 'read',
@@ -83,6 +76,7 @@ describe('event-driven final code review', () => {
       'fan-in-job': 'tests',
       'review-check-name': 'Code Reviewed',
     })
+    expect(router?.steps?.[0]?.with).not.toHaveProperty('pr-number')
   })
 
   it('selects only the exact dispatched run without waiting for CI', () => {
