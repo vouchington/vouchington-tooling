@@ -4,6 +4,7 @@ import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 type Step = {
+  env?: Record<string, string>
   id?: string
   name?: string
   run?: string
@@ -31,6 +32,10 @@ describe('release workflow', () => {
 
     expect(bump?.run).toContain('git tag -a "${PACKAGE}-v${VERSION}"')
     expect(push?.run).toBe('git push --atomic origin HEAD:main "refs/tags/${PACKAGE}-v${VERSION}"')
+    expect(push?.env).toEqual({
+      PACKAGE: '${{ inputs.package }}',
+      VERSION: '${{ steps.bump.outputs.version }}',
+    })
     expect(push?.run).not.toContain('--follow-tags')
     expect(workflowText.match(/git push/g)).toHaveLength(1)
     expect(steps.indexOf(bump!)).toBeLessThan(steps.indexOf(push!))
