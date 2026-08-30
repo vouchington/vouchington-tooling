@@ -46,7 +46,7 @@ describe('event-driven final code review', () => {
       checks: 'read',
       contents: 'write',
       issues: 'write',
-      'pull-requests': 'read',
+      'pull-requests': 'write',
     })
     expect(router?.steps?.[0]?.uses).toBe(
       `vouchington/vouchington-tooling/.github/actions/request-final-review@${toolingSha}`,
