@@ -1,0 +1,108 @@
+name: Request final review
+description: Label one exact validated pull-request head for a final review workflow.
+
+inputs:
+  read-token:
+    description: Read-only GitHub token for repository, workflow, and check queries.
+    required: true
+  write-token:
+    description: Separate token used only for label mutations and repository dispatch.
+    required: true
+  source-run-id:
+    description: Completed trusted source workflow run ID.
+    required: true
+  source-head-sha:
+    description: Exact source workflow head SHA.
+    required: true
+  source-head-repository:
+    description: Source workflow head repository full name.
+    required: true
+  default-branch:
+    description: Repository default branch used when resolving the pull request.
+    required: true
+  source-workflow-path:
+    description: Exact source workflow path.
+    required: true
+  source-workflow-event:
+    description: Expected source workflow event.
+    required: false
+    default: pull_request
+  pr-number:
+    description: Optional trusted pull request number; otherwise resolve exactly one open pull request.
+    required: false
+    default: ''
+  fan-in-job:
+    description: Exact source fan-in job name that must succeed.
+    required: true
+  forbidden-success-job:
+    description: Optional source job name whose success rejects the request.
+    required: false
+    default: ''
+  requested-label:
+    description: Label that records a pending final review.
+    required: true
+  complete-label:
+    description: Label cleared before requesting a fresh review.
+    required: false
+    default: ''
+  review-workflow-path:
+    description: Exact final-review workflow path used to identify duplicate checks.
+    required: true
+  review-workflow-event:
+    description: Expected final-review workflow event.
+    required: false
+    default: repository_dispatch
+  dispatch-event-type:
+    description: repository_dispatch event type that starts final review.
+    required: false
+    default: final-review-requested
+  review-check-name:
+    description: Native check-run name that represents final-review completion.
+    required: true
+  retry-attempts:
+    description: Positive number of GitHub API attempts for transient failures.
+    required: false
+    default: '3'
+  retry-backoff-seconds:
+    description: Nonnegative backoff base in seconds.
+    required: false
+    default: '5'
+
+outputs:
+  requested:
+    description: Whether this invocation created a fresh final-review request.
+    value: ${{ steps.request.outputs.requested }}
+  decision:
+    description: requested, duplicate, draft, stale, ineligible, or closed.
+    value: ${{ steps.request.outputs.decision }}
+  pr-number:
+    description: Resolved pull request number when available.
+    value: ${{ steps.request.outputs.pr_number }}
+
+runs:
+  using: composite
+  steps:
+    - id: request
+      name: Request exact validated review
+      shell: bash
+      env:
+        READ_TOKEN: ${{ inputs.read-token }}
+        WRITE_TOKEN: ${{ inputs.write-token }}
+        SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        TESTED_HEAD_SHA: ${{ inputs.source-head-sha }}
+        SOURCE_HEAD_REPOSITORY: ${{ inputs.source-head-repository }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        SOURCE_WORKFLOW_PATH: ${{ inputs.source-workflow-path }}
+        SOURCE_WORKFLOW_EVENT: ${{ inputs.source-workflow-event }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        FAN_IN_JOB: ${{ inputs.fan-in-job }}
+        FORBIDDEN_SUCCESS_JOB: ${{ inputs.forbidden-success-job }}
+        REQUESTED_LABEL: ${{ inputs.requested-label }}
+        COMPLETE_LABEL: ${{ inputs.complete-label }}
+        REVIEW_WORKFLOW_PATH: ${{ inputs.review-workflow-path }}
+        REVIEW_WORKFLOW_EVENT: ${{ inputs.review-workflow-event }}
+        DISPATCH_EVENT_TYPE: ${{ inputs.dispatch-event-type }}
+        REVIEW_CHECK_NAME: ${{ inputs.review-check-name }}
+        RETRY_ATTEMPTS: ${{ inputs.retry-attempts }}
+        RETRY_BACKOFF_SECONDS: ${{ inputs.retry-backoff-seconds }}
+      run: bash "$GITHUB_ACTION_PATH/request-final-review.sh"

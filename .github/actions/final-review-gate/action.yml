@@ -8,6 +8,10 @@ inputs:
   gate_status:
     description: Native gate status from the selector composite
     required: true
+  check_name:
+    description: Optional required check-run name to publish on the selected pull-request head.
+    required: false
+    default: ''
 outputs:
   gate_outcome:
     description: Outcome of the advisory validation step
@@ -30,10 +34,23 @@ runs:
       continue-on-error: true
       shell: bash
       run: bash "${GITHUB_ACTION_PATH}/mark-complete.sh"
+    - name: Publish selected-head check
+      id: publish-check
+      if: ${{ always() && inputs.check_name != '' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        CHECK_NAME: ${{ inputs.check_name }}
+        GATE_OUTCOME: ${{ steps.gate.outcome }}
+        MARK_OUTCOME: ${{ steps.mark-complete.outcome }}
+      run: bash "${GITHUB_ACTION_PATH}/publish-check.sh"
     - name: Require native gate outcome
       if: always()
       shell: bash
       env:
         GATE_OUTCOME: ${{ steps.gate.outcome }}
         MARK_OUTCOME: ${{ steps.mark-complete.outcome }}
+        CHECK_NAME: ${{ inputs.check_name }}
+        CHECK_OUTCOME: ${{ steps.publish-check.outcome }}
+        CHECK_CONCLUSION: ${{ steps.publish-check.outputs.conclusion }}
       run: bash "${GITHUB_ACTION_PATH}/require.sh"

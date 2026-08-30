@@ -132,6 +132,48 @@ thread resolution. There is no `@claude` mention workflow.
     manual_update_rules: '[{"packageEcosystem":"nuget","directory":"/native"}]'
 ```
 
+Final review is event-driven. A trusted `workflow_run: completed` router uses
+`request-final-review` to validate the exact source run and fan-in job before replacing the request
+label and emitting a correlated `repository_dispatch`. GitHub permits dispatch events created with
+`GITHUB_TOKEN`, unlike label-created workflow events. The receiving workflow uses
+`select-final-review` to validate that exact run, attempt, head, and base; it never waits or polls
+for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
+`pull-requests: read`. Because a dispatch workflow's native jobs attach to the default branch, its
+terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
+the action publishes that required check on the selector's exact pull-request head. The source
+`pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
+and the ready transition must produce a fresh validated completion dispatch.
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/request-final-review@<sha>
+  with:
+    read-token: ${{ github.token }}
+    write-token: ${{ github.token }}
+    source-run-id: ${{ github.event.workflow_run.id }}
+    source-head-sha: ${{ github.event.workflow_run.head_sha }}
+    source-head-repository: ${{ github.event.workflow_run.head_repository.full_name }}
+    default-branch: ${{ github.event.repository.default_branch }}
+    source-workflow-path: .github/workflows/ci.yml
+    fan-in-job: tests
+    requested-label: final-code-review:requested
+    complete-label: final-code-review:complete
+    review-workflow-path: .github/workflows/final-code-review.yml
+    review-check-name: Code Reviewed
+
+- uses: vouchington/vouchington-tooling/.github/actions/select-final-review@<sha>
+  with:
+    read-token: ${{ github.token }}
+    pr-number: ${{ github.event.client_payload.pr_number }}
+    event-action: ${{ github.event.action }}
+    event-head-sha: ${{ github.event.client_payload.head_sha }}
+    source-run-id: ${{ github.event.client_payload.source_run_id }}
+    source-run-attempt: ${{ github.event.client_payload.source_run_attempt }}
+    source-base-sha: ${{ github.event.client_payload.base_sha }}
+    default-branch: ${{ github.event.repository.default_branch }}
+    workflow-path: .github/workflows/ci.yml
+    fan-in-job: tests
+```
+
 `dependabot-automerge` fetches trusted Dependabot metadata with the workflow token, only enables
 auto-merge for patch updates at any version and minor updates with a stable target on major 1 or later, and rechecks the live bot-owned same-repository
 branch before using the dedicated token to enable eligible auto-merge or disable stale auto-merge.

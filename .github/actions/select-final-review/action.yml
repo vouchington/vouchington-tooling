@@ -1,0 +1,105 @@
+name: Select final review
+description: Select one exact pull-request head from a correlated validation-completion dispatch.
+
+inputs:
+  read-token:
+    description: Read-only GitHub token for pull-request and workflow queries.
+    required: true
+  pr-number:
+    description: Pull request number from the trusted event payload.
+    required: true
+  event-action:
+    description: Trusted dispatch type or pull request event action.
+    required: true
+  event-head-sha:
+    description: Trusted event head SHA.
+    required: false
+    default: ''
+  request-event-type:
+    description: Exact repository_dispatch event type emitted by the completion router.
+    required: false
+    default: final-review-requested
+  source-run-id:
+    description: Exact completed validation run ID from the dispatch payload.
+    required: false
+    default: ''
+  source-run-attempt:
+    description: Exact completed validation attempt from the dispatch payload.
+    required: false
+    default: ''
+  source-base-sha:
+    description: Exact tested base SHA from the dispatch payload.
+    required: false
+    default: ''
+  default-branch:
+    description: Repository default branch.
+    required: true
+  workflow-path:
+    description: Exact completed validation workflow path.
+    required: true
+  workflow-event:
+    description: Event that starts the validation workflow.
+    required: false
+    default: pull_request
+  fan-in-job:
+    description: Exact validation fan-in job name that must succeed.
+    required: true
+  forbidden-success-job:
+    description: Optional job name whose success rejects review selection.
+    required: false
+    default: ''
+  retry-attempts:
+    description: Positive number of GitHub API attempts for transient failures.
+    required: false
+    default: '3'
+  retry-backoff-seconds:
+    description: Nonnegative backoff base in seconds.
+    required: false
+    default: '5'
+  untrusted-actors:
+    description: Newline-separated actor logins that must not receive secret-backed review.
+    required: false
+    default: "dependabot\ndependabot[bot]\napp/dependabot\nrenovate\nrenovate[bot]\napp/renovate"
+
+outputs:
+  should_review:
+    description: Whether trusted review work may run.
+    value: ${{ steps.select.outputs.should_review }}
+  gate_status:
+    description: One of review, untrusted, deferred, stale, closed, ignore, untested, or forbidden.
+    value: ${{ steps.select.outputs.gate_status }}
+  pr_number:
+    description: Selected pull request number.
+    value: ${{ steps.select.outputs.pr_number }}
+  head_sha:
+    description: Selected exact head SHA.
+    value: ${{ steps.select.outputs.head_sha }}
+  base_sha:
+    description: Selected exact base SHA.
+    value: ${{ steps.select.outputs.base_sha }}
+
+runs:
+  using: composite
+  steps:
+    - id: select
+      name: Select exact validated head
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.read-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        EVENT_NAME: ${{ github.event_name }}
+        EVENT_ACTION: ${{ inputs.event-action }}
+        EVENT_HEAD_SHA: ${{ inputs.event-head-sha }}
+        REQUEST_EVENT_TYPE: ${{ inputs.request-event-type }}
+        SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        SOURCE_RUN_ATTEMPT: ${{ inputs.source-run-attempt }}
+        SOURCE_BASE_SHA: ${{ inputs.source-base-sha }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        WORKFLOW_PATH: ${{ inputs.workflow-path }}
+        WORKFLOW_EVENT: ${{ inputs.workflow-event }}
+        FAN_IN_JOB: ${{ inputs.fan-in-job }}
+        FORBIDDEN_SUCCESS_JOB: ${{ inputs.forbidden-success-job }}
+        RETRY_ATTEMPTS: ${{ inputs.retry-attempts }}
+        RETRY_BACKOFF_SECONDS: ${{ inputs.retry-backoff-seconds }}
+        UNTRUSTED_ACTORS: ${{ inputs.untrusted-actors }}
+      run: bash "$GITHUB_ACTION_PATH/select-final-review.sh"
