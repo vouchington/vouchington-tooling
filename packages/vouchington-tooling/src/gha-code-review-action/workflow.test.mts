@@ -17,6 +17,7 @@ type Workflow = {
         if?: string
         name?: string
         run?: string
+        shell?: string
         uses?: string
         with?: Record<string, unknown>
       }>
@@ -121,11 +122,14 @@ describe('code-review reusable workflow', () => {
     })
     expect(text).not.toContain('github.workflow_sha')
     expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \|\| github\.sha \}\}/g)).toHaveLength(2)
-    const toolingRefGuards = [workflow.jobs?.review, workflow.jobs?.poster].map((job) =>
+    const toolingRefJobs = [workflow.jobs?.review, workflow.jobs?.poster]
+    const toolingRefGuards = toolingRefJobs.map((job) =>
       job?.steps?.find((step) => step.name === 'Validate immutable tooling ref'),
     )
     expect(toolingRefGuards).toHaveLength(2)
-    for (const guard of toolingRefGuards) {
+    for (const [index, guard] of toolingRefGuards.entries()) {
+      expect(toolingRefJobs[index]?.steps?.indexOf(guard!)).toBe(0)
+      expect(guard?.shell).toBe('bash')
       expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref || github.sha }}')
       expect(guard?.run).toContain('tooling_ref must be a full lowercase commit SHA')
       expect(guard?.run).toContain('^[0-9a-f]{40}$')

@@ -139,6 +139,17 @@ jobs:
       agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
     steps:
+      - name: Validate immutable tooling ref
+        shell: bash
+        env:
+          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::tooling_ref must be a full lowercase commit SHA.'
+            exit 1
+          }
+
       - name: Validate selected pull request refs
         if: inputs.expected_head_sha != '' || inputs.expected_base_sha != ''
         env:
@@ -181,16 +192,6 @@ jobs:
         with:
           ref: ${{ inputs.expected_head_sha || github.sha }}
           fetch-depth: 1
-
-      - name: Validate immutable tooling ref
-        env:
-          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
-        run: |
-          set -euo pipefail
-          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
-            echo '::error::tooling_ref must be a full lowercase commit SHA.'
-            exit 1
-          }
 
       - name: Checkout review actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -239,6 +240,7 @@ jobs:
       posted: ${{ steps.poster.outputs.posted }}
     steps:
       - name: Validate immutable tooling ref
+        shell: bash
         env:
           TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
         run: |
