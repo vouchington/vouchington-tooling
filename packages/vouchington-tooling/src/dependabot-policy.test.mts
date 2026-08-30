@@ -10,7 +10,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 type Group = {
   'applies-to': string
   patterns: string[]
-  'update-types': string[]
 }
 
 type Update = {
@@ -41,34 +40,56 @@ describe('Dependabot policy', () => {
     }
   })
 
-  it('groups non-breaking and security updates without grouping majors', () => {
+  it('groups only compatible package and action families', () => {
+    const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
+    const actions = config.updates.find(
+      (update) => update['package-ecosystem'] === 'github-actions',
+    )
+
+    expect(npm?.groups).toEqual({
+      oxc: {
+        'applies-to': 'version-updates',
+        patterns: ['oxfmt', 'oxlint', 'oxlint-tsgolint'],
+      },
+      'oxc-security': {
+        'applies-to': 'security-updates',
+        patterns: ['oxfmt', 'oxlint', 'oxlint-tsgolint'],
+      },
+      vitest: {
+        'applies-to': 'version-updates',
+        patterns: ['vitest', '@vitest/*'],
+      },
+      'vitest-security': {
+        'applies-to': 'security-updates',
+        patterns: ['vitest', '@vitest/*'],
+      },
+      csv: { 'applies-to': 'version-updates', patterns: ['csv-*'] },
+      'csv-security': { 'applies-to': 'security-updates', patterns: ['csv-*'] },
+      picomatch: {
+        'applies-to': 'version-updates',
+        patterns: ['picomatch', '@types/picomatch'],
+      },
+    })
+    expect(actions?.groups).toEqual({
+      'artifact-actions': {
+        'applies-to': 'version-updates',
+        patterns: ['actions/download-artifact', 'actions/upload-artifact'],
+      },
+      'artifact-actions-security': {
+        'applies-to': 'security-updates',
+        patterns: ['actions/download-artifact', 'actions/upload-artifact'],
+      },
+    })
     for (const update of config.updates) {
-      const groups = Object.values(update.groups)
-      expect(groups).toContainEqual(
-        expect.objectContaining({
-          'applies-to': 'version-updates',
-          patterns: ['*'],
-          'update-types': ['minor', 'patch'],
-        }),
-      )
-      expect(groups).toContainEqual(
-        expect.objectContaining({
-          'applies-to': 'security-updates',
-          patterns: ['*'],
-          'update-types': ['minor', 'patch'],
-        }),
-      )
-      expect(groups.flatMap((group) => group['update-types'])).not.toContain('major')
+      expect(Object.values(update.groups).flatMap((group) => group.patterns)).not.toContain('*')
     }
   })
 
   it('exempts only the verified first-party npm release', () => {
     const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
     expect(npm?.cooldown.exclude).toEqual(['pr-shepherd'])
-    expect(npm?.groups['first-party-minor-and-patch']).toEqual({
-      'applies-to': 'version-updates',
-      patterns: ['pr-shepherd'],
-      'update-types': ['minor', 'patch'],
-    })
+    expect(Object.values(npm?.groups ?? {}).flatMap((group) => group.patterns)).not.toContain(
+      'pr-shepherd',
+    )
   })
 })

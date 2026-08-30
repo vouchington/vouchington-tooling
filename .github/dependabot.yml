@@ -10,27 +10,41 @@ updates:
         - pr-shepherd
     open-pull-requests-limit: 5
     groups:
-      first-party-minor-and-patch:
+      oxc:
         applies-to: version-updates
         patterns:
-          - pr-shepherd
-        update-types:
-          - minor
-          - patch
-      npm-minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-      npm-security:
+          - oxfmt
+          - oxlint
+          - oxlint-tsgolint
+      oxc-security:
         applies-to: security-updates
         patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
+          - oxfmt
+          - oxlint
+          - oxlint-tsgolint
+      vitest:
+        applies-to: version-updates
+        patterns:
+          - vitest
+          - '@vitest/*'
+      vitest-security:
+        applies-to: security-updates
+        patterns:
+          - vitest
+          - '@vitest/*'
+      csv:
+        applies-to: version-updates
+        patterns:
+          - 'csv-*'
+      csv-security:
+        applies-to: security-updates
+        patterns:
+          - 'csv-*'
+      picomatch:
+        applies-to: version-updates
+        patterns:
+          - picomatch
+          - '@types/picomatch'
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -39,17 +53,13 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     groups:
-      github-actions-minor-and-patch:
+      artifact-actions:
         applies-to: version-updates
         patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-      github-actions-security:
+          - actions/download-artifact
+          - actions/upload-artifact
+      artifact-actions-security:
         applies-to: security-updates
         patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
+          - actions/download-artifact
+          - actions/upload-artifact
