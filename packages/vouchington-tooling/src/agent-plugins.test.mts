@@ -313,6 +313,8 @@ describe('vouchington-workflow plugin', () => {
     expect(normalized).toMatch(/main.*test jobs?.*domain/i)
     expect(normalized).toMatch(/pull requests?.*cancel-in-progress/i)
     expect(normalized).toMatch(/main.*must never.*cancel-in-progress/i)
+    expect(normalized).toMatch(/default-branch runs?.*shared concurrency group/i)
+    expect(normalized).toMatch(/revision-unique.*immutable commit SHA/i)
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
