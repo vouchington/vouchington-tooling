@@ -2,6 +2,7 @@ import { access, readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const plugin = join(root, 'plugins/security-triage')
@@ -247,10 +248,13 @@ describe('vouchington-workflow plugin', () => {
       readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
     ])
     const skills = manifest.skills as Array<Record<string, unknown>>
+    const exampleSource = skill.match(/```yaml\n([\s\S]*?)\n```/)?.[1]
+    const example = parse(exampleSource ?? '') as {
+      groups?: Record<string, { patterns?: string[] }>
+    }
 
     expect(skill).toContain('open-pull-requests-limit')
     expect(skill).toContain('security-updates')
-    expect(skill).toContain('version-updates')
     expect(skill).toContain('minor')
     expect(skill).toContain('patch')
     expect(skill).toContain('major')
@@ -258,6 +262,13 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toContain('DEPENDABOT_AUTOMERGE_TOKEN')
     expect(skill).toContain('pull_request_target')
     expect(skill).toContain('consumer wrapper')
+    expect(example.groups).toEqual({
+      oxlint: { patterns: ['oxlint', 'oxlint-tsgolint'] },
+      react: { patterns: ['react', 'react-dom', '@types/react', '@types/react-dom'] },
+    })
+    expect(
+      Object.values(example.groups ?? {}).flatMap((group) => group.patterns ?? []),
+    ).not.toContain('*')
     expect(skills).toContainEqual(
       expect.objectContaining({
         name: 'dependabot',

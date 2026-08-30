@@ -1,6 +1,6 @@
 ---
 name: dependabot
-description: Configure or audit Dependabot coverage, cooldowns, grouping, trusted CI, and conservative auto-merge policy for a repository.
+description: Configure or audit Dependabot coverage, cooldowns, package-family grouping, trusted CI, and conservative auto-merge policy for a repository.
 ---
 
 # Dependabot policy
@@ -23,16 +23,33 @@ first-party publishers, manual-update exceptions, runner policy, required checks
 4. Keep security updates enabled and immediate. Do not use a custom age gate to delay vulnerability
    fixes.
 
-## Group compatible updates
+## Group package families
 
-- Give every ecosystem at least one useful group. Group compatible minor and patch version updates
-  with `applies-to: version-updates` and `update-types: [minor, patch]`.
-- Leave major version updates outside those groups so each breaking change remains independently
-  reviewable and manual.
-- Define a separately named `applies-to: security-updates` group. Prefer minor and patch security
-  groups so a breaking security upgrade cannot hold unrelated non-breaking fixes.
-- Put narrower compatibility families and first-party packages before a catch-all group. A grouped
-  pull request is auto-mergeable only when every included update is eligible.
+Build groups around packages that form one compatibility family or release train, not around version
+types. Inspect manifests, peer dependencies, lockfiles, and upstream release practices to identify
+packages that should move together. For example:
+
+```yaml
+groups:
+  oxlint:
+    patterns: ['oxlint', 'oxlint-tsgolint']
+  react:
+    patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+```
+
+- Name each group after the package, toolchain, framework, or verified release family it represents.
+  Use narrow package patterns and put more specific families before broader ones.
+- Do not create generic `minor-and-patch`, `security-updates`, or other version-based buckets. Do not
+  use `patterns: ['*']` merely to ensure every update belongs to a group. Leave unrelated packages
+  ungrouped so Dependabot opens independently reviewable pull requests for them.
+- Use `update-types` only as an optional eligibility filter inside a package-family group, such as
+  keeping that family's major updates independent. The version type must not be the reason otherwise
+  unrelated dependencies share a pull request.
+- Group security updates only when the same package-family relationship makes a joint upgrade safe;
+  never combine unrelated vulnerability fixes into a generic security group.
+- Group first-party packages together only when they share an owning release train and are expected
+  to be consumed atomically. A grouped pull request is auto-mergeable only when every included update
+  is eligible.
 
 ## Exempt verified first-party releases
 
