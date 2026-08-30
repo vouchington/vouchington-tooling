@@ -111,6 +111,9 @@ describe('security-triage plugin', () => {
 })
 
 describe('vouchington-workflow plugin', () => {
+  const readSkill = (name: string): Promise<string> =>
+    readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
+
   it('uses one canonical skill source in every supported host manifest', async () => {
     const [codex, claude, agent] = await Promise.all([
       readJson(join(workflowPlugin, '.codex-plugin/plugin.json')),
@@ -208,7 +211,7 @@ describe('vouchington-workflow plugin', () => {
 
   it('requires event-driven GitHub Actions authoring', async () => {
     const [skill, manifest] = await Promise.all([
-      readFile(join(workflowPlugin, 'skills/github-actions-authoring/SKILL.md'), 'utf8'),
+      readSkill('github-actions-authoring'),
       readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
     ])
     const skills = manifest.skills as Array<Record<string, unknown>>
@@ -231,8 +234,6 @@ describe('vouchington-workflow plugin', () => {
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
-    const readSkill = (name: string): Promise<string> =>
-      readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
     const [issue, organize, taxonomy, revisit, distill] = await Promise.all([
       readSkill('github-issue'),
       readSkill('organize-github-issues'),
