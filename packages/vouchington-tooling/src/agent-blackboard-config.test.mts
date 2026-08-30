@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync as readFileSyncFromDisk } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
+
+const readFileSync = (path: string, encoding: 'utf8') =>
+  readFileSyncFromDisk(new URL(`../../../${path}`, import.meta.url), encoding)
 
 const tools = [
   'entry_append',
