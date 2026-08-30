@@ -181,6 +181,19 @@ printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owne
     expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
   })
 
+  it('falls back to GITHUB_EVENT_NAME', () => {
+    const { result } = runSelector(
+      `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_CALLS"
+printf '%s\\n' '{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":true,"state":"open","user":{"login":"human"},"labels":[]}'
+`,
+      { EVENT_NAME: '', GITHUB_EVENT_NAME: 'pull_request' },
+    )
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
+  })
+
   it('retries a transient startup 403 before deferring a draft', () => {
     const { result, calls } = runSelector(`#!/usr/bin/env bash
 count=0

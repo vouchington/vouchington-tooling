@@ -32,7 +32,7 @@ gh_capture_retry() {
 }
 output pr_number "$PR_NUMBER"
 
-case "$EVENT_NAME" in
+case "${EVENT_NAME:-$GITHUB_EVENT_NAME}" in
   pull_request|pull_request_target) ;;
   *)
     echo '::error::Final Code Review requires a pull_request or pull_request_target event.'
