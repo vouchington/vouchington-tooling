@@ -66,7 +66,7 @@ printf '{"head":{"sha":"%s"},"base":{"sha":"%s","ref":"main","repo":{"full_name"
   }
 }
 
-function runSelector(ghSource: string) {
+function runSelector(ghSource: string, overrides: Record<string, string> = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'final-review-selector-'))
   const gh = join(directory, 'gh')
   const output = join(directory, 'output')
@@ -78,6 +78,8 @@ function runSelector(ghSource: string) {
       result: run(selectScript, {
         PATH: `${directory}${delimiter}${process.env.PATH ?? ''}`,
         COMPLETE_LABEL: 'final-code-review:complete',
+        CI_WORKFLOW: 'ci.yml',
+        EVENT_ACTION: 'synchronize',
         EVENT_HEAD_SHA: HEAD,
         EVENT_NAME: 'pull_request_target',
         GH_CALLS: calls,
@@ -89,8 +91,11 @@ function runSelector(ghSource: string) {
         GITHUB_REPOSITORY: 'owner/repo',
         DEFAULT_BRANCH: 'main',
         PR_NUMBER: '1',
+        READY_AT: '2026-08-29T22:35:00Z',
+        TESTS_JOB_NAME: 'tests',
         TESTS_WAIT_ATTEMPTS: '1',
         TESTS_WAIT_SECONDS: '0',
+        ...overrides,
       }),
       output: readFileSync(output, 'utf8'),
       calls: readFileSync(calls, 'utf8').trim().split('\n'),
@@ -192,5 +197,44 @@ fi
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('Final code review is deferred while the PR is a draft')
     expect(calls.some((call) => call.includes('--method DELETE'))).toBe(true)
+  })
+
+  it('rechecks an in-progress exact-head CI run until its tests job succeeds', () => {
+    const pr = `{"head":{"sha":"${HEAD}","ref":"topic","repo":{"full_name":"owner/repo"}},"base":{"sha":"${BASE}","ref":"main","repo":{"full_name":"owner/repo"}},"draft":false,"state":"open","user":{"login":"human"},"labels":[]}`
+    const { result, output, calls } = runSelector(
+      `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GH_CALLS"
+if [[ "$*" == *"commits/${HEAD}/pulls"* ]]; then
+  printf '%s\\n' '[{"number":1,"state":"open","head":{"sha":"${HEAD}","repo":{"full_name":"owner/repo"}}}]'
+elif [[ "$*" == *"actions/workflows/ci.yml/runs"* ]]; then
+  if [[ "$*" == *"status=completed"* ]]; then
+    printf '%s\\n' '{"workflow_runs":[]}'
+  else
+    printf '%s\\n' '{"workflow_runs":[{"id":123,"run_attempt":1,"status":"in_progress","created_at":"2026-08-29T22:36:00Z","head_branch":"topic","head_repository":{"full_name":"owner/repo"},"pull_requests":[{"number":1}]}]}'
+  fi
+elif [[ "$1 $2" == "run view" ]]; then
+  views="$(grep -c '^run view ' "$GH_CALLS")"
+  if [ "$views" -eq 1 ]; then
+    printf '%s\\n' '{"jobs":[{"name":"tests","status":"in_progress","conclusion":""}]}'
+  else
+    printf '%s\\n' '{"jobs":[{"name":"tests","status":"completed","conclusion":"success"}]}'
+  fi
+else
+  printf '%s\\n' '${pr}'
+fi
+`,
+      { TESTS_WAIT_ATTEMPTS: '2' },
+    )
+
+    expect(
+      result.status,
+      JSON.stringify({ calls, output, stderr: result.stderr, stdout: result.stdout }),
+    ).toBe(0)
+    expect(output).toContain('should_review=true')
+    expect(output).toContain('gate_status=review')
+    expect(calls.filter((call) => call.startsWith('run view '))).toHaveLength(2)
+    expect(calls.find((call) => call.includes('actions/workflows/ci.yml/runs'))).not.toContain(
+      'status=completed',
+    )
   })
 })

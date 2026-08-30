@@ -56,12 +56,14 @@ while [ "$attempt" -le "$TESTS_WAIT_ATTEMPTS" ]; do
   fi
   if gh_capture_retry none gh api --method GET \
     "repos/$GITHUB_REPOSITORY/actions/workflows/$ci_workflow/runs" \
-    -f "head_sha=$head_sha" -f event=pull_request -f status=completed -f per_page=20; then
+    -f "head_sha=$head_sha" -f event=pull_request -f per_page=20; then
     runs_json="$GH_RETRY_OUTPUT"
     while IFS= read -r run_record; do
       [ -n "$run_record" ] || continue
       run_id="${run_record%%:*}"
-      run_attempt="${run_record#*:}"
+      run_attempt_and_status="${run_record#*:}"
+      run_attempt="${run_attempt_and_status%%:*}"
+      run_status="${run_attempt_and_status#*:}"
       run_key="$run_id:$run_attempt"
       case "$inspected_runs" in
         *"|$run_key|"*) continue ;;
@@ -85,14 +87,16 @@ while [ "$attempt" -le "$TESTS_WAIT_ATTEMPTS" ]; do
         tests_passed=true
         break
       fi
-      inspected_runs="${inspected_runs}|${run_key}|"
+      if [ "$run_status" = completed ]; then
+        inspected_runs="${inspected_runs}|${run_key}|"
+      fi
     done < <(jq -r --argjson pr "$PR_NUMBER" --arg head_repo "$head_repository" --arg head_ref "$head_ref" --arg action "$EVENT_ACTION" --arg ready_at "$READY_AT" --argjson empty_ok "$empty_association_allowed" \
       '.workflow_runs[] | select(
         (any(.pull_requests[]?; .number == $pr) or
          ($empty_ok and (.pull_requests | length) == 0 and .head_repository.full_name == $head_repo and .head_branch == $head_ref)) and
         (($action != "opened" and $action != "ready_for_review" and $action != "reopened") or
          .created_at >= $ready_at)) |
-        "\(.id):\(.run_attempt)"' <<< "$runs_json")
+        "\(.id):\(.run_attempt):\(.status)"' <<< "$runs_json")
   else
     echo '::warning::Could not list exact-head CI runs; retrying.'
   fi
