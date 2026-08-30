@@ -124,7 +124,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.6.1')
+      expect(manifest.version).toBe('0.6.2')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -236,7 +236,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.6.1',
+        pluginVersion: '0.6.2',
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -283,7 +283,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'dependabot',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.6.1',
+        pluginVersion: '0.6.2',
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -336,6 +336,30 @@ describe('vouchington-workflow plugin', () => {
     expect(normalized).toMatch(/main.*must never.*cancel-in-progress/i)
     expect(normalized).toMatch(/default-branch runs?.*shared concurrency group/i)
     expect(normalized).toMatch(/revision-unique.*immutable commit SHA/i)
+  })
+
+  it('defines evidence-backed persistent-workspace prevention and recovery policy', async () => {
+    const [checklist, authoring, logs, analysis] = await Promise.all([
+      readSkill('github-actions-checklist'),
+      readSkill('github-actions-authoring'),
+      readSkill('review-ci-logs'),
+      readSkill('static-analysis-checklist'),
+    ])
+
+    expect(checklist).toMatch(/full tree[\s\S]*sparse checkout/i)
+    expect(checklist).toMatch(/writable workspace bind mount[\s\S]*non-root identity/i)
+    expect(checklist).toMatch(/unconditional[\s\S]*pre-checkout[\s\S]*workspace-wide/i)
+    expect(checklist).toMatch(/bounded known generated paths/i)
+    expect(checklist).toMatch(
+      /failure-gated[\s\S]*same-filesystem[\s\S]*directory-only[\s\S]*batched/i,
+    )
+    expect(authoring).toMatch(/YAML-aware[\s\S]*tracked workflow and action files/i)
+    expect(authoring).toMatch(/non-root identity[\s\S]*whole workspace[\s\S]*before checkout/i)
+    expect(logs).toMatch(/producer[\s\S]*sparse state or unsafe ownership/i)
+    expect(logs).toMatch(/path-count and timing evidence/i)
+    expect(analysis).toMatch(/parse YAML[\s\S]*tracked\s+configuration files/i)
+    expect(analysis).toMatch(/sparse-checkout inputs[\s\S]*writable workspace mounts/i)
+    expect(analysis).toMatch(/accepted and rejected fixtures/i)
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
