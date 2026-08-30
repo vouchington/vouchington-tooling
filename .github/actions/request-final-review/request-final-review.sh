@@ -46,8 +46,11 @@ gh_retry() {
 export GH_TOKEN="$READ_TOKEN"
 mutate() { GH_TOKEN="$WRITE_TOKEN" gh_retry "$@"; }
 clear_label() {
-  [ -z "$1" ] || mutate 404 gh api --method DELETE \
-    "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$(jq -rn --arg value "$1" '$value | @uri')" --silent
+  local encoded
+  [ -n "$1" ] || return 0
+  encoded="$(jq -rn --arg value "$1" '$value | @uri')"
+  mutate 404 gh api --method DELETE \
+    "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded" --silent
 }
 
 gh_retry none gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"

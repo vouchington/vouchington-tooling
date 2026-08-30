@@ -165,6 +165,12 @@ and the ready transition must produce a fresh validated completion dispatch.
 - uses: vouchington/vouchington-tooling/.github/actions/final-review-gate@<sha>
   with:
     gate_status: ${{ needs.select-final-review.outputs.gate_status }}
+    token: ${{ github.token }}
+    pr_number: ${{ needs.select-final-review.outputs.pr_number }}
+    selected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
+    selected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
+    default_branch: ${{ github.event.repository.default_branch }}
+    complete_label: final-code-review:complete
     check_name: Code Reviewed
     requested_label: final-code-review:requested
 

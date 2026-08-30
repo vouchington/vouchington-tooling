@@ -254,8 +254,25 @@ esac`
   it('publishes the required check on the selected pull-request head', () => {
     const gate = action(`${root}/final-review-gate/action.yml`)
     expect(gate.inputs).toMatchObject({
+      token: { required: true },
+      pr_number: { required: true },
+      selected_head_sha: { required: true },
+      selected_base_sha: { required: true },
+      default_branch: { required: true },
+      complete_label: { required: true },
       check_name: { default: '' },
       requested_label: { default: '' },
+    })
+    expect(gate.runs?.steps?.[0]?.env).toMatchObject({
+      GH_TOKEN: '${{ inputs.token }}',
+      PR_NUMBER: '${{ inputs.pr_number }}',
+      SELECTED_HEAD_SHA: '${{ inputs.selected_head_sha }}',
+      SELECTED_BASE_SHA: '${{ inputs.selected_base_sha }}',
+      DEFAULT_BRANCH: '${{ inputs.default_branch }}',
+    })
+    expect(gate.runs?.steps?.[1]?.env).toMatchObject({
+      COMPLETE_LABEL: '${{ inputs.complete_label }}',
+      REQUESTED_LABEL: '${{ inputs.requested_label }}',
     })
     const publish = readFileSyncNode(`${root}/final-review-gate/publish-check.sh`, 'utf8')
     const requireGate = readFileSyncNode(`${root}/final-review-gate/require.sh`, 'utf8')
