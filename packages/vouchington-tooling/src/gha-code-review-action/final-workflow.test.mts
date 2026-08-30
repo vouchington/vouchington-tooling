@@ -37,7 +37,7 @@ const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
 const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
 const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
-const toolingSha = '9d29212da3c8b8dc119e3c3a206bcb8795a41df3'
+const toolingSha = '882e4d27eaca08f16253ec0c3d2fe784c598926e'
 
 describe('event-driven final code review', () => {
   it('routes one completed CI event into one correlated review dispatch', () => {
