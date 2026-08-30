@@ -241,6 +241,18 @@ describe('agent blackboard client', () => {
     await expect(probeBlackboard(env)).resolves.toBeUndefined()
   })
 
+  it('preserves invalid consumer package errors', async () => {
+    directory = await mkdtemp(join(tmpdir(), 'blackboard-invalid-consumer-'))
+    const packageDirectory = join(directory, 'node_modules', 'agent-blackboard')
+    await mkdir(packageDirectory, { recursive: true })
+    await writeFile(join(packageDirectory, 'package.json'), '{')
+    process.chdir(directory)
+
+    await expect(probeBlackboard(env)).rejects.toMatchObject({
+      code: 'ERR_INVALID_PACKAGE_CONFIG',
+    })
+  })
+
   it('preserves unexpected injected loader errors', async () => {
     await expect(
       probeBlackboard(env, {
