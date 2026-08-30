@@ -5,6 +5,8 @@ coverage/
 .env
 .env.local
 .DS_Store
-.codex/
+.codex/*
+!.codex/config.toml
 .claude/*
+!.claude/settings.json
 !.claude/skills

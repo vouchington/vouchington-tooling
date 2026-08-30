@@ -7,7 +7,7 @@ npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
 # optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
-npm install agent-blackboard@^0.3.1
+npm install agent-blackboard@^0.5.0
 ```
 
 ## CLI
@@ -88,7 +88,7 @@ GitHub reports a merged PR whose `baseRefName` is `main`; a merged PR into anoth
 as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
-need `agent-blackboard@^0.3.1`. Snapshot cleanup accepts only package-generated temporary paths.
+need `agent-blackboard@^0.5.0`. Snapshot cleanup accepts only package-generated temporary paths.
 Programmatic callers launched from a different workspace directory pass their own module URL as
 `dependencies: { resolveFrom: import.meta.url }`; the CLI defaults to the current package context.
 It captures a target under a private tombstone, validates partition names, permissions, JSONL,

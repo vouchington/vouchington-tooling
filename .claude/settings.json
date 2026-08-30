@@ -1,0 +1,15 @@
+{
+  "enabledMcpjsonServers": ["agent-blackboard"],
+  "permissions": {
+    "allow": [
+      "mcp__agent-blackboard__entry_append",
+      "mcp__agent-blackboard__entry_get",
+      "mcp__agent-blackboard__session_archive",
+      "mcp__agent-blackboard__session_create",
+      "mcp__agent-blackboard__session_ensure",
+      "mcp__agent-blackboard__session_patch",
+      "mcp__agent-blackboard__session_search",
+      "mcp__agent-blackboard__snapshot_export"
+    ]
+  }
+}

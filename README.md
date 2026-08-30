@@ -42,12 +42,19 @@ coding platform, transcript adapter, workflow, or CI provider. Select only the p
 transcript formats, and provider-specific Actions adapters that your repository explicitly adopts;
 generic skills remain host-neutral and read the consuming repository's local instructions.
 
+This repository adopts Agent Blackboard for durable agent-session notes. Install the upstream
+`agent-blackboard` plugin alongside `vouchington-workflow`; the former owns the MCP operations and
+the latter owns the provider-neutral journaling policy. Checked-in Codex and Claude configuration
+preauthorizes the current eight-tool MCP catalog. Credential-management commands remain CLI-only.
+
 ### Install (opt-in)
 
 Codex:
 
 ```bash
 codex plugin marketplace add vouchington/vouchington-tooling --ref main
+codex plugin marketplace add jonathanong/agent-blackboard --ref main
+codex plugin add agent-blackboard@agent-blackboard
 codex plugin add security-triage@vouchington
 codex plugin add vouchington-workflow@vouchington
 codex plugin add vouchington-testing@vouchington
@@ -58,6 +65,8 @@ Claude:
 
 ```bash
 claude plugin marketplace add vouchington/vouchington-tooling --sparse .claude-plugin plugins
+claude plugin marketplace add jonathanong/agent-blackboard
+claude plugin install agent-blackboard@agent-blackboard
 claude plugin install security-triage@vouchington
 claude plugin install vouchington-workflow@vouchington
 claude plugin install vouchington-testing@vouchington

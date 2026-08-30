@@ -1,0 +1,26 @@
+[plugins."agent-blackboard@agent-blackboard"]
+enabled = true
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.entry_append]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.entry_get]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_archive]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_create]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_ensure]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_patch]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_search]
+approval_mode = "approve"
+
+[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.snapshot_export]
+approval_mode = "approve"
