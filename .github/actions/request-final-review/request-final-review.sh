@@ -97,6 +97,10 @@ if [ "$(jq -r '.draft' <<<"$pr_json")" != false ]; then
   done
   stop draft 'Pull request is a draft; final-review labels were cleared.'
 fi
+if jq -e --arg label "$REQUESTED_LABEL" \
+  'any(.labels[]?.name; . == $label)' >/dev/null <<<"$pr_json"; then
+  stop duplicate 'Skipping duplicate final review while a request is already pending.'
+fi
 
 gh_retry none gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
   -f filter=all -f per_page=100 --paginate --slurp

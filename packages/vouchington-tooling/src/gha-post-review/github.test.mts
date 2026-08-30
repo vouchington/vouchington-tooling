@@ -16,6 +16,7 @@ import type { ClaudeTokenIo } from './claude-token.mts'
 
 const HEAD_SHA = 'b'.repeat(40)
 const BASE_SHA = 'a'.repeat(40)
+const OPEN_PULL = `${HEAD_SHA}\t${BASE_SHA}\tfalse\topen`
 
 function makeExec(handler: (args: readonly string[]) => string): GhExec {
   return (args) => handler(args)
@@ -113,7 +114,7 @@ describe('github review adapter', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, '{"body":"ok","comments":[]}')
     const exec = makeExec((args) => {
-      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
+      if (args.some((arg) => arg.includes('@tsv'))) return OPEN_PULL
       return '[]'
     })
     const io = createGhPostReviewIo({
@@ -141,7 +142,7 @@ describe('github review adapter', () => {
       payloadPath: '/tmp/x',
       payloadBytes: Buffer.from('{}'),
       token: 'tok',
-      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+      exec: () => OPEN_PULL,
     })
     expect(io.getHeadSha()).toBe(HEAD_SHA)
   })
@@ -159,7 +160,7 @@ describe('github review adapter', () => {
       exec: () => {
         attempts += 1
         if (attempts < 3) throw new Error('temporary GitHub API failure')
-        return `${HEAD_SHA}\t${BASE_SHA}`
+        return OPEN_PULL
       },
     })
     expect(io.getHeadSha()).toBe(HEAD_SHA)
@@ -188,7 +189,7 @@ describe('github review adapter', () => {
       payloadPath: '/tmp/x',
       payloadBytes: Buffer.from('{}'),
       token: 'tok',
-      exec: () => `not-a-sha\t${BASE_SHA}`,
+      exec: () => `not-a-sha\t${BASE_SHA}\tfalse\topen`,
     })
     expect(() => io.getHeadSha()).toThrow('Could not resolve PR head SHA')
   })
@@ -205,7 +206,7 @@ describe('github review adapter', () => {
       ...options,
       expectedHeadSha: HEAD_SHA,
       expectedBaseSha: BASE_SHA,
-      exec: () => `${'c'.repeat(40)}\t${BASE_SHA}`,
+      exec: () => `${'c'.repeat(40)}\t${BASE_SHA}\tfalse\topen`,
     })
     expect(() => staleHead.getHeadSha()).toThrow('PR head changed before posting')
 
@@ -213,9 +214,32 @@ describe('github review adapter', () => {
       ...options,
       expectedHeadSha: HEAD_SHA,
       expectedBaseSha: BASE_SHA,
-      exec: () => `${HEAD_SHA}\t${'d'.repeat(40)}`,
+      exec: () => `${HEAD_SHA}\t${'d'.repeat(40)}\tfalse\topen`,
     })
     expect(() => staleBase.getHeadSha()).toThrow('PR base changed before posting')
+  })
+
+  it('rejects a draft or closed pull request at the review write boundary', () => {
+    const options = {
+      repository: 'o/r',
+      prNumber: '9',
+      payloadPath: '/tmp/x',
+      payloadBytes: Buffer.from('{}'),
+      token: 'tok',
+      expectedHeadSha: HEAD_SHA,
+      expectedBaseSha: BASE_SHA,
+    }
+    const draft = createGhPostReviewIo({
+      ...options,
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}\ttrue\topen`,
+    })
+    expect(() => draft.getHeadSha()).toThrow('became a draft before posting')
+
+    const closed = createGhPostReviewIo({
+      ...options,
+      exec: () => `${HEAD_SHA}\t${BASE_SHA}\tfalse\tclosed`,
+    })
+    expect(() => closed.getHeadSha()).toThrow('closed before posting')
   })
 
   it('rejects invalid pull request selection inputs', () => {
@@ -227,7 +251,7 @@ describe('github review adapter', () => {
       payloadPath: '/tmp/x',
       payloadBytes: Buffer.from('{}'),
       token: 'tok',
-      exec: () => `${HEAD_SHA}\t${BASE_SHA}`,
+      exec: () => OPEN_PULL,
     }
     expect(() =>
       createGhPostReviewIo({ ...options, prNumber: '../9', exec: noExec }).getHeadSha(),
@@ -236,7 +260,7 @@ describe('github review adapter', () => {
       createGhPostReviewIo({
         ...options,
         prNumber: '9',
-        exec: () => `${HEAD_SHA}\tnot-a-sha`,
+        exec: () => `${HEAD_SHA}\tnot-a-sha\tfalse\topen`,
       }).getHeadSha(),
     ).toThrow('Could not resolve PR base SHA')
     expect(() =>
@@ -289,7 +313,7 @@ describe('postReviewFromEnv', () => {
     const payloadPath = join(dir, 'code-review-payload.json')
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     const exec: GhExec = (args) => {
-      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}`
+      if (args.some((arg) => arg.includes('@tsv'))) return OPEN_PULL
       if (args.includes('/files?per_page=100')) return '[]'
       return ''
     }

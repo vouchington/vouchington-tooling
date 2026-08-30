@@ -271,6 +271,27 @@ esac`
     expect(calls).not.toContain('--method DELETE')
   })
 
+  it('does not dispatch again while the exact pull request already has a pending review', async () => {
+    const pending = JSON.stringify({
+      ...JSON.parse(pr),
+      labels: [{ name: 'final-code-review:requested' }],
+    })
+    const mock = `
+case "$*" in
+  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
+  *"pulls/7"*) printf '%s\\n' '${pending}' ;;
+  *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+esac`
+    const { output, calls } = await runWithMockGh(
+      '.github/actions/request-final-review/request-final-review.sh',
+      mock,
+      requestEnv(),
+    )
+    expect(output).toContain('decision=duplicate')
+    expect(calls).not.toContain('/jobs')
+    expect(calls).not.toContain('/dispatches')
+  })
+
   it('publishes the required check on the selected pull-request head', () => {
     const gate = action(`${root}/final-review-gate/action.yml`)
     expect(gate.inputs).toMatchObject({
@@ -290,9 +311,14 @@ esac`
       SELECTED_BASE_SHA: '${{ inputs.selected_base_sha }}',
       DEFAULT_BRANCH: '${{ inputs.default_branch }}',
     })
-    expect(gate.runs?.steps?.[1]?.env).toMatchObject({
+    const markStep = gate.runs?.steps?.find((step) => step.run?.includes('mark-complete.sh'))
+    const cleanupStep = gate.runs?.steps?.find((step) => step.run?.includes('clear-requested.sh'))
+    expect(markStep?.env).toMatchObject({
       COMPLETE_LABEL: '${{ inputs.complete_label }}',
+    })
+    expect(cleanupStep?.env).toMatchObject({
       REQUESTED_LABEL: '${{ inputs.requested_label }}',
+      SELECTED_HEAD_SHA: '${{ inputs.selected_head_sha }}',
     })
     const publish = readFileSyncNode(`${root}/final-review-gate/publish-check.sh`, 'utf8')
     const requireGate = readFileSyncNode(`${root}/final-review-gate/require.sh`, 'utf8')
@@ -319,6 +345,7 @@ esac`
         GATE_OUTCOME: 'success',
         GATE_STATUS: 'review',
         MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'success',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -342,7 +369,8 @@ esac`
         GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
         GATE_OUTCOME: 'success',
         GATE_STATUS: 'untrusted',
-        MARK_OUTCOME: 'failure',
+        MARK_OUTCOME: 'success',
+        CLEANUP_OUTCOME: 'failure',
         CHECK_NAME: 'Code Reviewed',
         SELECTED_HEAD_SHA: head,
         GITHUB_SERVER_URL: 'https://github.com',
@@ -352,13 +380,12 @@ esac`
     expect(output).toContain('conclusion=failure')
   })
 
-  it('removes the pending label after recording trusted completion', async () => {
+  it('records trusted completion before terminal pending-label cleanup', async () => {
     const { calls } = await runWithMockGh(
       '.github/actions/final-review-gate/mark-complete.sh',
       `case "$*" in
         *"pulls/7"*) printf '%s\\n' '${pr}' ;;
         *"--method POST"*"/labels"*"labels[]=final-code-review:complete"*) : ;;
-        *"--method DELETE"*"/labels/final-code-review%3Arequested"*) : ;;
         *) echo "unexpected gh call: $*" >&2; exit 64 ;;
       esac`,
       {
@@ -372,10 +399,30 @@ esac`
         DEFAULT_BRANCH: 'main',
         GATE_STATUS: 'review',
         COMPLETE_LABEL: 'final-code-review:complete',
-        REQUESTED_LABEL: 'final-code-review:requested',
       },
     )
     expect(calls).toContain('labels[]=final-code-review:complete')
+    expect(calls).not.toContain('--method DELETE')
+  })
+
+  it('clears pending state on the selected head even after a terminal failure', async () => {
+    const { calls } = await runWithMockGh(
+      '.github/actions/final-review-gate/clear-requested.sh',
+      `case "$*" in
+        *"pulls/7"*) printf '%s\\n' '${pr}' ;;
+        *"--method DELETE"*"/labels/final-code-review%3Arequested"*) : ;;
+        *) echo "unexpected gh call: $*" >&2; exit 64 ;;
+      esac`,
+      {
+        GH_TOKEN: 'write',
+        GH_RETRY_ATTEMPTS: '3',
+        GH_RETRY_BACKOFF_SECONDS: '0',
+        GH_RETRY_TRANSPORT_MARKERS: 'unexpected EOF',
+        PR_NUMBER: '7',
+        SELECTED_HEAD_SHA: head,
+        REQUESTED_LABEL: 'final-code-review:requested',
+      },
+    )
     expect(calls).toContain('labels/final-code-review%3Arequested')
   })
 })

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 [ "$GATE_OUTCOME" = success ]
+[ -z "$REQUESTED_LABEL" ] || [ "$CLEANUP_OUTCOME" = success ]
 case "$GATE_STATUS" in
   review|untrusted) [ "$MARK_OUTCOME" = success ] ;;
 esac

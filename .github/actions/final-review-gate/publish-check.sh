@@ -4,7 +4,7 @@ set -euo pipefail
 # shellcheck source=gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/gh-retry.sh"
 conclusion=failure
-if [ "$GATE_OUTCOME" = success ]; then
+if [ "$GATE_OUTCOME" = success ] && [ "$CLEANUP_OUTCOME" = success ]; then
   case "$GATE_STATUS" in
     untrusted) if [ "$MARK_OUTCOME" = success ]; then conclusion=success; fi ;;
     review) if [ "$MARK_OUTCOME" = success ]; then conclusion=success; fi ;;
