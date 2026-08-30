@@ -124,7 +124,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.6.0')
+      expect(manifest.version).toBe('0.6.1')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -236,7 +236,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.6.0',
+        pluginVersion: '0.6.1',
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -283,7 +283,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'dependabot',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.6.0',
+        pluginVersion: '0.6.1',
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -311,6 +311,7 @@ describe('vouchington-workflow plugin', () => {
 
   it('defines portable GitHub Actions policy without freezing dependency updates', async () => {
     const skill = await readSkill('github-actions-checklist')
+    const normalized = skill.replaceAll(/\s+/g, ' ')
 
     expect(skill).toMatch(/`pull_request`[\s\S]*private repositories?/i)
     expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
@@ -328,6 +329,13 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/underlying phase[\s\S]*deadline of no more than 30 minutes/i)
     expect(skill).toMatch(/must not hide a longer-running[\s\S]*another service/i)
     expect(skill).toMatch(/top-level `jobs\.<job_id>\.uses`[\s\S]*cannot accept `timeout-minutes`/i)
+    expect(normalized).toMatch(/required checks?.*actual workflow jobs?/i)
+    expect(normalized).toMatch(/must not (create|publish|synthesize).*check (runs?|statuses?)/i)
+    expect(normalized).toMatch(/main.*test jobs?.*domain/i)
+    expect(normalized).toMatch(/pull requests?.*cancel-in-progress/i)
+    expect(normalized).toMatch(/main.*must never.*cancel-in-progress/i)
+    expect(normalized).toMatch(/default-branch runs?.*shared concurrency group/i)
+    expect(normalized).toMatch(/revision-unique.*immutable commit SHA/i)
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {

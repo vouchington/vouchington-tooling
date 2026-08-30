@@ -26,7 +26,8 @@ uses existing labels without extra approval, and requires explicit approval befo
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
 The `github-actions-authoring` skill requires event-driven orchestration and prohibits remote-state
 polling in CI; it loads `github-actions-checklist` as a prerequisite. The checklist also defines the
-portable trigger, 30-minute timeout, runner, action-pinning, and dependency-update test policy.
+portable trigger, 30-minute timeout, runner, action-pinning, dependency-update testing, real required
+checks, domain-oriented test jobs, and branch-aware concurrency policies.
 
 `security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
 handoff, while each consuming repository owns issue taxonomy and issue creation.
