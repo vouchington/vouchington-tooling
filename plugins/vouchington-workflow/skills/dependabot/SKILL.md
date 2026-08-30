@@ -31,17 +31,23 @@ packages that should move together. For example:
 
 ```yaml
 groups:
-  oxlint:
-    patterns: ['oxlint', 'oxlint-tsgolint']
+  oxc:
+    patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint']
+  vitest:
+    patterns: ['vitest', '@vitest/*', '@vitejs/*']
   react:
-    patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+    patterns: ['react', 'react-dom']
+  react-email:
+    patterns: ['react-email', '@react-email/*']
 ```
 
 - Name each group after the package, toolchain, framework, or verified release family it represents.
-  Use narrow package patterns and put more specific families before broader ones.
+  Prefer narrow namespace or prefix wildcards such as `@vitest/*` when that wildcard maps to one
+  compatibility family, and put more specific families before broader ones.
 - Do not create generic `minor-and-patch`, `security-updates`, or other version-based buckets. Do not
-  use `patterns: ['*']` merely to ensure every update belongs to a group. Leave unrelated packages
-  ungrouped so Dependabot opens independently reviewable pull requests for them.
+  use the bare catch-all `patterns: ['*']` merely to ensure every update belongs to a group. Narrow
+  family wildcards are expected. Leave unrelated packages ungrouped so Dependabot opens independently
+  reviewable pull requests for them.
 - Use `update-types` only as an optional eligibility filter inside a package-family group, such as
   keeping that family's major updates independent. The version type must not be the reason otherwise
   unrelated dependencies share a pull request.

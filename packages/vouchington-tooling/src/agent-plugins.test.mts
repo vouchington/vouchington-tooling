@@ -248,8 +248,11 @@ describe('vouchington-workflow plugin', () => {
       readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
     ])
     const skills = manifest.skills as Array<Record<string, unknown>>
-    const exampleSource = skill.match(/```yaml\n([\s\S]*?)\n```/)?.[1]
-    const example = parse(exampleSource ?? '') as {
+    const exampleSource = skill.match(
+      /## Group package families\r?\n[\s\S]*?```yaml\r?\n([\s\S]*?)\r?\n```/,
+    )?.[1]
+    if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
+    const example = parse(exampleSource) as {
       groups?: Record<string, { patterns?: string[] }>
     }
 
@@ -263,12 +266,15 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toContain('pull_request_target')
     expect(skill).toContain('consumer wrapper')
     expect(example.groups).toEqual({
-      oxlint: { patterns: ['oxlint', 'oxlint-tsgolint'] },
-      react: { patterns: ['react', 'react-dom', '@types/react', '@types/react-dom'] },
+      oxc: { patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint'] },
+      vitest: { patterns: ['vitest', '@vitest/*', '@vitejs/*'] },
+      react: { patterns: ['react', 'react-dom'] },
+      'react-email': { patterns: ['react-email', '@react-email/*'] },
     })
-    expect(
-      Object.values(example.groups ?? {}).flatMap((group) => group.patterns ?? []),
-    ).not.toContain('*')
+    const patterns = Object.values(example.groups ?? {}).flatMap((group) => group.patterns ?? [])
+    expect(patterns).toContain('@vitest/*')
+    expect(patterns).toContain('@react-email/*')
+    expect(patterns).not.toContain('*')
     expect(skills).toContainEqual(
       expect.objectContaining({
         name: 'dependabot',
