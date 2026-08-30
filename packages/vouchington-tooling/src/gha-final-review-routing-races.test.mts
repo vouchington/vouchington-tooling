@@ -71,9 +71,7 @@ async function runWithMockGh(mock: string, env: Record<string, string>) {
 describe('final-review routing races', () => {
   it('resolves a retargeted pull request before applying default-branch eligibility', async () => {
     const nonDefault = pr.replace('"ref":"main"', '"ref":"release"')
-    const resolved = nonDefault.replace('"state":"open"', '"number":7,"state":"open"')
     const mock = `case "$*" in
-  *"commits/${head}/pulls"*) printf '%s\\n' '[[${resolved}]]' ;;
   *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
   *"pulls/7"*) printf '%s\\n' '${nonDefault}' ;;
   *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
@@ -81,21 +79,39 @@ describe('final-review routing races', () => {
 esac`
     const { output, calls } = await runWithMockGh(mock, { ...requestEnv(), PR_NUMBER: '' })
     expect(output).toContain('decision=ineligible')
+    expect(calls).not.toContain("commits/${head}/pulls")
     expect(calls).not.toContain('/dispatches')
   })
 
   it('rechecks the default-branch ref immediately before dispatch', async () => {
     const nonDefault = pr.replace('"ref":"main"', '"ref":"release"')
     const mock = `case "$*" in
-  *"actions/runs/99/jobs"*) printf '%s\\n' '[[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"success"}]}]]' ;;
+  *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"success"}]}]' ;;
   *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
   *"pulls/7"*) count="$(grep -c 'pulls/7$' "$RUNNER_TEMP/calls")"; [ "$count" -eq 1 ] && printf '%s\\n' '${pr}' || printf '%s\\n' '${nonDefault}' ;;
-  *"commits/${head}/check-runs"*) printf '%s\\n' '[[{"check_runs":[]}]]' ;;
+  *"commits/${head}/check-runs"*) printf '%s\\n' '[{"check_runs":[]}]' ;;
   *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
   *) exit 64 ;;
 esac`
     const { output, calls } = await runWithMockGh(mock, requestEnv())
     expect(output).toContain('decision=ineligible')
     expect(calls).not.toContain('/dispatches')
+  })
+
+  it('does not clear lifecycle labels after a PR retargets back to the default branch', async () => {
+    const nonDefault = pr.replace('"ref":"main"', '"ref":"release"')
+    const mock = `case "$*" in
+  *"actions/runs/99/jobs"*) printf '%s\\n' '[{"jobs":[{"id":1,"run_attempt":1,"name":"tests","conclusion":"success"}]}]' ;;
+  *"actions/runs/99"*) printf '%s\\n' '{"path":".github/workflows/ci.yml","event":"pull_request","head_sha":"${head}","head_repository":{"full_name":"owner/repo"},"status":"completed","run_attempt":1,"pull_requests":[{"number":7,"base":{"sha":"${base}"}}]}' ;;
+  *"pulls/7"*) count="$(grep -c 'pulls/7$' "$RUNNER_TEMP/calls")"; [ "$count" -eq 1 ] && printf '%s\\n' '${nonDefault}' || printf '%s\\n' '${pr}' ;;
+  *"commits/${head}/check-runs"*) printf '%s\\n' '[{"check_runs":[]}]' ;;
+  *"--method DELETE"*"/labels/final-code-review%3A"*) : ;;
+  *"--method POST"*"/labels"*) : ;;
+  *"--method POST"*"/dispatches"*) : ;;
+  *) exit 64 ;;
+esac`
+    const { output, calls } = await runWithMockGh(mock, requestEnv())
+    expect(output).toContain('decision=requested')
+    expect(calls).toContain('/dispatches')
   })
 })
