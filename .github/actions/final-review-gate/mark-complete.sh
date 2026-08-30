@@ -21,5 +21,12 @@ pr_json="$GH_RETRY_OUTPUT"
 [ "$(jq -r '.state' <<< "$pr_json")" = open ] || {
   echo '::error::PR closed before completing labels.'; exit 1;
 }
-gh_capture_retry none gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
-  -f "labels[]=$COMPLETE_LABEL" --silent
+if [ "$GATE_STATUS" = review ]; then
+  gh_capture_retry none gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" \
+    -f "labels[]=$COMPLETE_LABEL" --silent
+fi
+if [ -n "$REQUESTED_LABEL" ]; then
+  encoded="$(jq -rn --arg value "$REQUESTED_LABEL" '$value | @uri')"
+  gh_capture_retry 404 gh api --method DELETE \
+    "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels/$encoded" --silent
+fi

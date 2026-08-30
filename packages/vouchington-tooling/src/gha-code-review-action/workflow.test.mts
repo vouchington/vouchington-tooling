@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 type Workflow = {
   on?: {
-    workflow_call?: { inputs?: Record<string, unknown>; secrets?: Record<string, unknown> }
+    workflow_call?: {
+      inputs?: Record<string, unknown>
+      outputs?: Record<string, unknown>
+      secrets?: Record<string, unknown>
+    }
     workflow_dispatch?: { inputs?: Record<string, unknown> }
     issue_comment?: unknown
   }
@@ -148,5 +152,22 @@ describe('code-review reusable workflow', () => {
     expect(callInput?.type).toBe('string')
     expect(callInput?.default).toBe('false')
     expect(dispatchInput?.type).toBe('boolean')
+  })
+
+  it('exposes advisory agent and poster outcomes to reusable-workflow callers', () => {
+    expect(workflow.on?.workflow_call?.outputs).toEqual({
+      agent_outcome: {
+        description: 'Advisory review-agent outcome.',
+        value: '${{ jobs.review.outputs.agent_outcome }}',
+      },
+      payload_artifact_id: {
+        description: 'Review payload artifact ID when a payload was produced.',
+        value: '${{ jobs.review.outputs.payload_artifact_id }}',
+      },
+      poster_outcome: {
+        description: 'Advisory review-poster outcome.',
+        value: '${{ jobs.poster.outputs.poster_outcome }}',
+      },
+    })
   })
 })

@@ -11,6 +11,9 @@ inputs:
   source-run-id:
     description: Completed trusted source workflow run ID.
     required: true
+  source-run-attempt:
+    description: Exact completed source workflow run attempt from the triggering event.
+    required: true
   source-head-sha:
     description: Exact source workflow head SHA.
     required: true
@@ -89,6 +92,7 @@ runs:
         READ_TOKEN: ${{ inputs.read-token }}
         WRITE_TOKEN: ${{ inputs.write-token }}
         SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        SOURCE_RUN_ATTEMPT: ${{ inputs.source-run-attempt }}
         TESTED_HEAD_SHA: ${{ inputs.source-head-sha }}
         SOURCE_HEAD_REPOSITORY: ${{ inputs.source-head-repository }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}

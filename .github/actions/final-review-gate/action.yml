@@ -12,6 +12,10 @@ inputs:
     description: Optional required check-run name to publish on the selected pull-request head.
     required: false
     default: ''
+  requested_label:
+    description: Optional pending-review label removed after a successful terminal gate.
+    required: false
+    default: ''
 outputs:
   gate_outcome:
     description: Outcome of the advisory validation step
@@ -30,9 +34,14 @@ runs:
       run: bash "${GITHUB_ACTION_PATH}/gate.sh"
     - name: Mark final review complete
       id: mark-complete
-      if: ${{ steps.gate.outcome == 'success' && inputs.gate_status == 'review' }}
+      if: >-
+        ${{ steps.gate.outcome == 'success' &&
+        (inputs.gate_status == 'review' || inputs.gate_status == 'untrusted') }}
       continue-on-error: true
       shell: bash
+      env:
+        GATE_STATUS: ${{ inputs.gate_status }}
+        REQUESTED_LABEL: ${{ inputs.requested_label }}
       run: bash "${GITHUB_ACTION_PATH}/mark-complete.sh"
     - name: Publish selected-head check
       id: publish-check

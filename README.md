@@ -138,7 +138,8 @@ label and emitting a correlated `repository_dispatch`. GitHub permits dispatch e
 `GITHUB_TOKEN`, unlike label-created workflow events. The receiving workflow uses
 `select-final-review` to validate that exact run, attempt, head, and base; it never waits or polls
 for CI. The router job needs `actions: read`, `checks: read`, `contents: write`, `issues: write`, and
-`pull-requests: read`. Because a dispatch workflow's native jobs attach to the default branch, its
+`pull-requests: write` so its PR label mutations are authorized. Because a dispatch workflow's
+native jobs attach to the default branch, its
 terminal `final-review-gate` invocation must set `check_name: Code Reviewed`; with `checks: write`
 the action publishes that required check on the selector's exact pull-request head. The source
 `pull_request` workflow must subscribe to `ready_for_review`; draft completions clear review state,
@@ -150,6 +151,7 @@ and the ready transition must produce a fresh validated completion dispatch.
     read-token: ${{ github.token }}
     write-token: ${{ github.token }}
     source-run-id: ${{ github.event.workflow_run.id }}
+    source-run-attempt: ${{ github.event.workflow_run.run_attempt }}
     source-head-sha: ${{ github.event.workflow_run.head_sha }}
     source-head-repository: ${{ github.event.workflow_run.head_repository.full_name }}
     default-branch: ${{ github.event.repository.default_branch }}
@@ -159,6 +161,12 @@ and the ready transition must produce a fresh validated completion dispatch.
     complete-label: final-code-review:complete
     review-workflow-path: .github/workflows/final-code-review.yml
     review-check-name: Code Reviewed
+
+- uses: vouchington/vouchington-tooling/.github/actions/final-review-gate@<sha>
+  with:
+    gate_status: ${{ needs.select-final-review.outputs.gate_status }}
+    check_name: Code Reviewed
+    requested_label: final-code-review:requested
 
 - uses: vouchington/vouchington-tooling/.github/actions/select-final-review@<sha>
   with:
