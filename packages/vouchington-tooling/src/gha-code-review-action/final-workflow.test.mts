@@ -14,7 +14,9 @@ type Job = {
   if?: string
   name?: string
   permissions?: Record<string, string>
+  'runs-on'?: string | string[]
   steps?: Step[]
+  'timeout-minutes'?: number
   uses?: string
   with?: Record<string, string>
 }
@@ -30,14 +32,24 @@ type Workflow = {
 
 const finalText = readFileSync('.github/workflows/final-code-review.yml', 'utf8')
 const finalReview = load(finalText) as Workflow
-const request = load(readFileSync('.github/workflows/request-final-review.yml', 'utf8')) as Workflow
+const requestText = readFileSync('.github/workflows/request-final-review.yml', 'utf8')
+const request = load(requestText) as Workflow
 const cleanupText = readFileSync('.github/workflows/clear-final-review-labels.yml', 'utf8')
 const cleanup = load(cleanupText) as Workflow
+const labelerText = readFileSync('.github/workflows/labeler.yml', 'utf8')
+const reusableReview = load(readFileSync('.github/workflows/code-review.yml', 'utf8')) as Workflow
 const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
 const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
 const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
-const toolingSha = '882e4d27eaca08f16253ec0c3d2fe784c598926e'
+
+function expectPinnedExternalAction(text: string, action: string, requireVersionComment = false) {
+  const escapedAction = action.replaceAll('.', '\\.')
+  const comment = requireVersionComment ? '\\s+#\\s+v[0-9][^\\s]*' : ''
+  expect(text).toMatch(
+    new RegExp(`^\\s*(?:-\\s+)?uses: ${escapedAction}@[0-9a-f]{40}${comment}\\s*$`, 'm'),
+  )
+}
 
 describe('event-driven final code review', () => {
   it('routes one completed CI event into one correlated review dispatch', () => {
@@ -56,8 +68,9 @@ describe('event-driven final code review', () => {
       issues: 'write',
       'pull-requests': 'write',
     })
-    expect(router?.steps?.[0]?.uses).toBe(
-      `vouchington/vouchington-tooling/.github/actions/request-final-review@${toolingSha}`,
+    expectPinnedExternalAction(
+      requestText,
+      'vouchington/vouchington-tooling/.github/actions/request-final-review',
     )
     expect(router?.steps?.[0]?.with).toMatchObject({
       'source-workflow-path': '.github/workflows/ci.yml',
@@ -76,8 +89,9 @@ describe('event-driven final code review', () => {
     })
     const selector = finalReview.jobs?.['select-final-review']
     const step = selector?.steps?.find(({ id }) => id === 'select')
-    expect(step?.uses).toBe(
-      `vouchington/vouchington-tooling/.github/actions/select-final-review@${toolingSha}`,
+    expectPinnedExternalAction(
+      finalText,
+      'vouchington/vouchington-tooling/.github/actions/select-final-review',
     )
     expect(step?.with).toMatchObject({
       'source-run-id': '${{ github.event.client_payload.source_run_id }}',
@@ -94,10 +108,10 @@ describe('event-driven final code review', () => {
     const claude = finalReview.jobs?.['claude-code-review']
     expect(claude?.uses).toBe('./.github/workflows/code-review.yml')
     expect(claude?.with).toMatchObject({
-      tooling_ref: toolingSha,
       required_review: "${{ 'false' }}",
       trusted_prompt_ref: '${{ needs.select-final-review.outputs.base_sha }}',
     })
+    expect(claude?.with?.tooling_ref).toMatch(/^[0-9a-f]{40}$/)
     expect(existsSync('.github/actions/final-review-dispatch-claude/action.yml')).toBe(false)
     expect(finalText).toContain("needs.claude-code-review.outputs.agent_outcome == 'success'")
     expect(finalText).toContain('needs.claude-code-review.outputs.payload_artifact_id')
@@ -150,5 +164,17 @@ describe('event-driven final code review', () => {
     expect(cleanupText).toContain('final-code-review:complete')
     expect(cleanupText).not.toContain('actions/checkout')
     expect(cleanupText).not.toMatch(/sleep|poll|WAIT_/i)
+  })
+
+  it('keeps every concrete review job bounded and pins external action dependencies', () => {
+    for (const workflow of [finalReview, request, cleanup, reusableReview]) {
+      for (const job of Object.values(workflow.jobs ?? {})) {
+        if (job['runs-on'] === undefined) continue
+        expect(job['timeout-minutes']).toEqual(expect.any(Number))
+        expect(job['timeout-minutes']).toBeLessThanOrEqual(30)
+      }
+    }
+
+    expectPinnedExternalAction(labelerText, 'actions/labeler', true)
   })
 })
