@@ -47,13 +47,14 @@ groups:
 - Name each group after the package, toolchain, framework, or verified release family it represents.
   Prefer narrow namespace or prefix wildcards such as `@vitest/*` when that wildcard maps to one
   compatibility family, and put more specific families before broader ones.
-- Do not create generic `minor-and-patch`, `security-updates`, or other version-based buckets. Do not
-  use the bare catch-all `patterns: ['*']` merely to ensure every update belongs to a group. Narrow
-  family wildcards are expected. Leave unrelated packages ungrouped so Dependabot opens independently
-  reviewable pull requests for them.
-- Use `update-types` only as an optional eligibility filter inside a package-family group, such as
-  keeping that family's major updates independent. The version type must not be the reason otherwise
-  unrelated dependencies share a pull request.
+- Do not create generic groups such as `other-minor-and-patch`, `minor-and-patch`,
+  `security-minor-and-patch`, or `security-updates`. Do not use the bare catch-all
+  `patterns: ['*']` merely to ensure every update belongs to a group. Narrow family wildcards are
+  expected. Leave unrelated packages ungrouped so Dependabot opens independently reviewable pull
+  requests for them.
+- Omit `update-types` from package-family groups so each family receives major, minor, and patch
+  updates. Major updates remain human-reviewed under the auto-merge policy; excluding them from a
+  family group only makes the release train harder to update coherently.
 - Groups default to `applies-to: version-updates`. When the same package-family relationship also
   makes a joint security upgrade safe, define a separately named family group such as
   `react-security` with the same package patterns and `applies-to: security-updates`. Never combine

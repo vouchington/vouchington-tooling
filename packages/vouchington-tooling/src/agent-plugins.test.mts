@@ -253,8 +253,12 @@ describe('vouchington-workflow plugin', () => {
     )?.[1]
     if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
     const example = parse(exampleSource) as {
-      groups?: Record<string, { 'applies-to'?: string; patterns?: string[] }>
+      groups?: Record<
+        string,
+        { 'applies-to'?: string; patterns?: string[]; 'update-types'?: string[] }
+      >
     } | null
+    const normalized = skill.replaceAll(/\s+/g, ' ')
 
     expect(skill).toContain('open-pull-requests-limit')
     expect(skill).toContain('security-updates')
@@ -279,6 +283,13 @@ describe('vouchington-workflow plugin', () => {
     expect(patterns).toContain('@vitest/*')
     expect(patterns).toContain('@react-email/*')
     expect(patterns).not.toContain('*')
+    for (const [name, group] of Object.entries(example?.groups ?? {})) {
+      expect(name).not.toMatch(
+        /(?:^|-)minor-and-patch$|^(?:security(?:-updates)?|all-patches|version-updates)$/,
+      )
+      expect(group).not.toHaveProperty('update-types')
+    }
+    expect(normalized).toMatch(/omit `update-types`[^.]*major, minor, and patch/i)
     expect(skills).toContainEqual(
       expect.objectContaining({
         name: 'dependabot',
