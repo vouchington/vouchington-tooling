@@ -82,7 +82,7 @@ runs:
       run: |
         set -euo pipefail
         rm -f "${GITHUB_WORKSPACE}/code-review-payload.json"
-        rm -rf "${GITHUB_WORKSPACE}/.review-context" "${GITHUB_WORKSPACE}/.vouchington-tooling"
+        rm -rf "${GITHUB_WORKSPACE}/.review-context"
 
     - name: Isolate OpenCode install home
       if: steps.review-prompt.outputs.available == 'true'
@@ -264,7 +264,6 @@ runs:
         rm -rf \
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
           "${GITHUB_WORKSPACE}/.review-context" \
-          "${GITHUB_WORKSPACE}/.vouchington-tooling" \
           "${RUNNER_TEMP}/code-review-payload" \
           "${RUNNER_TEMP}/opencode-review-prompt.md"
         bash "$GITHUB_ACTION_PATH/../code-review/restore-trusted-prompt-dir.sh"
