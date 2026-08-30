@@ -3,7 +3,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
-type Step = { id?: string; uses?: string; with?: Record<string, string> }
+type Step = {
+  env?: Record<string, string>
+  id?: string
+  uses?: string
+  with?: Record<string, string>
+}
 type Job = {
   'continue-on-error'?: boolean
   if?: string
@@ -29,14 +34,14 @@ const ciText = readFileSync('.github/workflows/ci.yml', 'utf8')
 const ci = load(ciText) as Workflow
 const gateAction = readFileSync('.github/actions/final-review-gate/action.yml', 'utf8')
 const gateScript = readFileSync('.github/actions/final-review-gate/gate.sh', 'utf8')
-const toolingSha = '427fcbae49b6753dfde85ec6f9f2d35584dcd4dc'
+const toolingSha = '9d29212da3c8b8dc119e3c3a206bcb8795a41df3'
 
 describe('event-driven final code review', () => {
   it('routes one completed CI event into one correlated review dispatch', () => {
     expect(request.on?.workflow_run).toEqual({ workflows: ['CI'], types: ['completed'] })
     expect(request.concurrency).toEqual({
       group:
-        'request-final-review-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}',
+        'request-final-review-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}',
       'cancel-in-progress': false,
     })
     const router = request.jobs?.request
@@ -53,6 +58,7 @@ describe('event-driven final code review', () => {
     )
     expect(router?.steps?.[0]?.with).toMatchObject({
       'source-workflow-path': '.github/workflows/ci.yml',
+      'source-run-attempt': '${{ github.event.workflow_run.run_attempt }}',
       'fan-in-job': 'tests',
       'review-check-name': 'Code Reviewed',
     })
@@ -90,6 +96,9 @@ describe('event-driven final code review', () => {
       trusted_prompt_ref: '${{ needs.select-final-review.outputs.base_sha }}',
     })
     expect(existsSync('.github/actions/final-review-dispatch-claude/action.yml')).toBe(false)
+    expect(finalText).toContain("needs.claude-code-review.outputs.agent_outcome == 'success'")
+    expect(finalText).toContain('needs.claude-code-review.outputs.payload_artifact_id')
+    expect(finalText).toContain("needs.claude-code-review.outputs.poster_outcome == 'success'")
   })
 
   it('publishes the required check on the selected pull-request head', () => {
@@ -103,7 +112,15 @@ describe('event-driven final code review', () => {
       'pull-requests': 'write',
     })
     const gateStep = gate?.steps?.find(({ uses }) => uses === './.github/actions/final-review-gate')
-    expect(gateStep?.with?.check_name).toBe('Code Reviewed')
+    expect(gateStep?.with).toMatchObject({
+      token: '${{ github.token }}',
+      pr_number: '${{ needs.select-final-review.outputs.pr_number }}',
+      selected_head_sha: '${{ needs.select-final-review.outputs.head_sha }}',
+      selected_base_sha: '${{ needs.select-final-review.outputs.base_sha }}',
+      complete_label: 'final-code-review:complete',
+      requested_label: 'final-code-review:requested',
+      check_name: 'Code Reviewed',
+    })
     expect(gateAction).toContain('Publish selected-head check')
   })
 

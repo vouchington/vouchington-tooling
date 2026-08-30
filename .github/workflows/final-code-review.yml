@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Select final review
         id: select
-        uses: vouchington/vouchington-tooling/.github/actions/select-final-review@427fcbae49b6753dfde85ec6f9f2d35584dcd4dc
+        uses: vouchington/vouchington-tooling/.github/actions/select-final-review@9d29212da3c8b8dc119e3c3a206bcb8795a41df3
         with:
           read-token: ${{ github.token }}
           pr-number: ${{ github.event.client_payload.pr_number }}
@@ -96,7 +96,7 @@ jobs:
       pr_number: ${{ needs.select-final-review.outputs.pr_number }}
       expected_head_sha: ${{ needs.select-final-review.outputs.head_sha }}
       expected_base_sha: ${{ needs.select-final-review.outputs.base_sha }}
-      tooling_ref: 427fcbae49b6753dfde85ec6f9f2d35584dcd4dc
+      tooling_ref: 9d29212da3c8b8dc119e3c3a206bcb8795a41df3
       trusted_prompt_ref: ${{ needs.select-final-review.outputs.base_sha }}
       model: ${{ vars.CLAUDE_CODE_REVIEW_MODEL }}
       effort: ${{ vars.CLAUDE_CODE_REVIEW_EFFORT }}
@@ -404,7 +404,12 @@ jobs:
             unexpected EOF
             i/o timeout
           CLAUDE_ENABLED: ${{ vars.CLAUDE_CODE_REVIEW_ENABLED }}
-          CLAUDE_RESULT: ${{ needs.claude-code-review.result }}
+          CLAUDE_RESULT: >-
+            ${{ needs.claude-code-review.result == 'success' &&
+            needs.claude-code-review.outputs.agent_outcome == 'success' &&
+            (needs.claude-code-review.outputs.payload_artifact_id == '' ||
+            needs.claude-code-review.outputs.poster_outcome == 'success') &&
+            'success' || 'failure' }}
           OPENROUTER_ENABLED: ${{ vars.OPENCODE_CODE_REVIEW_ENABLED }}
           OPENROUTER_ACTION: ${{ needs.opencode-code-review.outputs.action_outcome }}
           OPENROUTER_AGENT: ${{ needs.opencode-code-review.outputs.agent_outcome }}

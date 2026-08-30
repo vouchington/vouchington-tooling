@@ -8,7 +8,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: request-final-review-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  group: request-final-review-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -24,11 +24,12 @@ jobs:
       pull-requests: write
     steps:
       - name: Route exact completed CI run
-        uses: vouchington/vouchington-tooling/.github/actions/request-final-review@427fcbae49b6753dfde85ec6f9f2d35584dcd4dc
+        uses: vouchington/vouchington-tooling/.github/actions/request-final-review@9d29212da3c8b8dc119e3c3a206bcb8795a41df3
         with:
           read-token: ${{ github.token }}
           write-token: ${{ github.token }}
           source-run-id: ${{ github.event.workflow_run.id }}
+          source-run-attempt: ${{ github.event.workflow_run.run_attempt }}
           source-head-sha: ${{ github.event.workflow_run.head_sha }}
           source-head-repository: ${{ github.event.workflow_run.head_repository.full_name }}
           default-branch: ${{ github.event.repository.default_branch }}
