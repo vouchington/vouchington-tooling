@@ -54,4 +54,8 @@ describe('manifest-version expectation parser', () => {
     expect(findExpectations('/')).toEqual([])
     expect(findExpectations("const broken = /unfinished\nexpect(value).toBe('ok')")).toHaveLength(1)
   })
+
+  it('recognizes an optional matcher chain', () => {
+    expect(findExpectations("expect(value)?.toBe('ok')")).toHaveLength(1)
+  })
 })

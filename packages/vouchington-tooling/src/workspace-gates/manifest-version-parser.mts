@@ -1,7 +1,7 @@
 export type Expectation = { expression: string; expected: string; index: number }
 
 const EXPECTATION_MATCHER =
-  /^\s*(?:\?\.)?\.\s*(?:not\s*\.\s*)?to(?:Be|Equal|StrictEqual|MatchObject|Contain|ContainEqual|HaveProperty)\s*\(/u
+  /^\s*(?:\.|\?\.)\s*(?:not\s*\.\s*)?to(?:Be|Equal|StrictEqual|MatchObject|Contain|ContainEqual|HaveProperty)\s*\(/u
 
 function previousToken(source: string, index: number): string | undefined {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
