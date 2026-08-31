@@ -161,6 +161,37 @@ describe('native binary health', () => {
     await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual([])
   })
 
+  it('keeps ownerless bins conservative', async () => {
+    const root = await makeRoot()
+    const bin = join(root, 'node_modules', '.bin', 'addon.node')
+    await mkdir(join(root, 'node_modules', '.bin'), { recursive: true })
+    await writeFile(bin, MACHO)
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual(
+      expect.arrayContaining([bin]),
+    )
+  })
+
+  it('recognizes scoped pnpm package owners', async () => {
+    const root = await makeRoot()
+    const scoped = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      '@scope+native@1.0.0',
+      'node_modules',
+      '@scope',
+      'native',
+    )
+    await mkdir(scoped, { recursive: true })
+    await Promise.all([
+      writeFile(join(scoped, 'package.json'), '{"os":["darwin"]}'),
+      writeFile(join(scoped, 'addon.node'), MACHO),
+    ])
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(scoped, 'addon.node'),
+    )
+  })
+
   it('reads each mismatched package owner once', async () => {
     const root = await makeRoot()
     const store = join(root, 'node_modules', '.pnpm', 'native@1.0.0', 'node_modules', 'native')

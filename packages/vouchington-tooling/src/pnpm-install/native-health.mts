@@ -103,8 +103,9 @@ export async function mismatchedNativeBinaries(
   }
 
   const cwd = await searchRoot(nodeModules)
+  const pattern = cwd === nodeModules ? ['**/*.{node,bin}', '.bin/*.{node,bin}'] : '**/*.{node,bin}'
   const mismatches: Array<{ owner: string | undefined; pathname: string }> = []
-  for await (const relative of glob('**/*.{node,bin}', { cwd })) {
+  for await (const relative of glob(pattern, { cwd })) {
     const pathname = path.join(cwd, relative)
     const magic = await readMagic(pathname)
     if (magic === undefined) continue
