@@ -61,9 +61,14 @@ export async function makeFixture() {
     PNPM_CALLS: join(root, 'pnpm.calls'),
     PNPM_DEPENDENCY: dependency,
     PNPM_DEPENDENCY_LINK: dependencyLink,
+    PNPM_DELETE_NATIVE: '0',
     PNPM_LOG: pnpmLog,
     PNPM_NODE_MODULES: join(root, 'node_modules'),
+    PNPM_NATIVE_ADDON: '',
+    PNPM_NATIVE_REPLACEMENT: '',
     PNPM_PENDING_BUILDS: '',
+    PNPM_FORCE_BREAK_LINK: '0',
+    PNPM_REPAIR_NATIVE: '0',
     PNPM_REPAIR_LINK: '0',
     PNPM_REBUILD_BREAK_LINK: '0',
     PNPM_WORKSPACES_JSON: JSON.stringify(workspaces),
@@ -77,6 +82,23 @@ export async function makeFixture() {
     root,
     summary,
   }
+}
+
+export async function configureNativeRepair(
+  fixture: Awaited<ReturnType<typeof makeFixture>>,
+  addon: string,
+) {
+  const replacement = join(fixture.root, 'native-replacement.node')
+  const magic =
+    process.platform === 'darwin'
+      ? Buffer.from([0xcf, 0xfa, 0xed, 0xfe])
+      : process.platform === 'win32'
+        ? Buffer.from([0x4d, 0x5a])
+        : Buffer.from([0x7f, 0x45, 0x4c, 0x46])
+  await writeFile(replacement, magic)
+  fixture.env.PNPM_NATIVE_ADDON = addon
+  fixture.env.PNPM_NATIVE_REPLACEMENT = replacement
+  fixture.env.PNPM_REPAIR_NATIVE = '1'
 }
 
 export async function runInstaller(

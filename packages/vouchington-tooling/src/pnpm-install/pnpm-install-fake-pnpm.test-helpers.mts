@@ -41,6 +41,12 @@ case " $* " in
     if [ "\${PNPM_REBUILD_BREAK_LINK:-0}" = 1 ]; then rm -f "$PNPM_DEPENDENCY_LINK"; fi
     ;;
   *' --force '*)
+    if [ "\${PNPM_DELETE_NATIVE:-0}" = 1 ]; then
+      rm -f "$PNPM_NATIVE_ADDON"
+    elif [ "\${PNPM_REPAIR_NATIVE:-0}" = 1 ]; then
+      cp "$PNPM_NATIVE_REPLACEMENT" "$PNPM_NATIVE_ADDON"
+    fi
+    if [ "\${PNPM_FORCE_BREAK_LINK:-0}" = 1 ]; then rm -f "$PNPM_DEPENDENCY_LINK"; fi
     if [ "\${PNPM_REPAIR_LINK:-0}" = 1 ]; then
       mkdir -p "$(dirname "$PNPM_DEPENDENCY_LINK")"
       rm -f "$PNPM_DEPENDENCY_LINK"

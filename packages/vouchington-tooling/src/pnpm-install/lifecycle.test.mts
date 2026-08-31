@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  configureNativeRepair,
   installCalls,
   makeFixture,
   resetInstallCalls,
@@ -54,15 +55,16 @@ describe('pnpm install lifecycle', () => {
           ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
+      await configureNativeRepair(fixture, join(store, 'addon.node'))
       const repaired = await runInstaller(fixture)
       expect(repaired.stderr).toContain(
-        'persistent optional native binaries do not match this runtime; reconciling',
+        'persistent optional native binaries do not match this runtime; reconciled',
       )
       expect(repaired.stderr).toContain('"action":"reconcile"')
       expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
       expect(repaired.stderr).toContain('"reason":"native-health-mismatch"')
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
     } finally {
@@ -414,8 +416,13 @@ describe('pnpm install lifecycle', () => {
           ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
+      await configureNativeRepair(fixture, addon)
+      await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: false })
-      await rm(addon)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+      ])
       await resetInstallCalls(fixture)
       const result = await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([

@@ -1,11 +1,13 @@
 import { scheduler } from 'node:timers/promises'
 
 import { runPnpm } from './exec.mts'
+import { nativeBinariesMatchRuntime, repairedNativeBinariesMatchRuntime } from './native-health.mts'
+import { buildLedgersAllowNativeRepair } from './pending-builds.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
 import {
-  baseInstallArgs,
   findWorkspaceLinkMismatches,
+  forcedInstallArgs,
   logWorkspaceLinkMismatches,
   type CommandResult,
   type InstallOptions,
@@ -40,20 +42,49 @@ export async function reconcileOrFail(
   options: InstallOptions,
   runCapture: (args: string[]) => Promise<CommandResult>,
 ) {
-  const forced = ['install', '--frozen-lockfile', '--force', ...baseInstallArgs.slice(2)]
   await install(
-    [...forced, '--ignore-scripts', '--ignore-pnpmfile'],
+    [...forcedInstallArgs, '--ignore-scripts', '--ignore-pnpmfile'],
     options,
     'script-free reconciliation',
   )
   await install(
-    withScriptPolicy(forced, options.installScripts),
+    withScriptPolicy(forcedInstallArgs, options.installScripts),
     options,
     'strict persistent reconciliation',
   )
-  const remaining = await findWorkspaceLinkMismatches(runCapture)
+  await verifyInstallHealth(runCapture, 'persistent reconciliation')
+}
+
+async function verifyInstallHealth(
+  runCapture: (args: string[]) => Promise<CommandResult>,
+  phase: string,
+  repairedNativePaths: string[] = [],
+) {
+  const [nativesMatch, remaining] = await Promise.all([
+    repairedNativePaths.length > 0
+      ? repairedNativeBinariesMatchRuntime(repairedNativePaths)
+      : nativeBinariesMatchRuntime(),
+    findWorkspaceLinkMismatches(runCapture),
+  ])
+  if (!nativesMatch) fail(`${phase} completed with mismatched native binaries`)
   if (remaining.length > 0) {
     logWorkspaceLinkMismatches(remaining)
-    fail('persistent reconciliation completed with invalid workspace links')
+    fail(`${phase} completed with invalid workspace links`)
   }
+}
+
+export async function repairIsolatedNativeMismatch(
+  options: InstallOptions,
+  runCapture: (args: string[]) => Promise<CommandResult>,
+  mismatchedNativePaths: string[],
+) {
+  if (!(await buildLedgersAllowNativeRepair())) return false
+  if ((await findWorkspaceLinkMismatches(runCapture)).length > 0) return false
+  await install(
+    withScriptPolicy(forcedInstallArgs, options.installScripts),
+    options,
+    'native health reconciliation',
+  )
+  await verifyInstallHealth(runCapture, 'native health reconciliation', mismatchedNativePaths)
+  return true
 }

@@ -22,13 +22,13 @@ export type WorkspaceLinkMismatch = {
 export type Workspace = { name: string; path: string }
 type DeclaredDependency = { name: string; spec: string }
 
-export const baseInstallArgs = [
-  'install',
-  '--frozen-lockfile',
+const commonInstallArgs = [
   '--prefer-offline',
   '--prod=false',
   '--config.disallow-workspace-cycles=false',
 ]
+export const baseInstallArgs = ['install', '--frozen-lockfile', ...commonInstallArgs]
+export const forcedInstallArgs = ['install', '--frozen-lockfile', '--force', ...commonInstallArgs]
 
 const usage =
   'usage: vouchington pnpm-install --runner-lifecycle persistent|ephemeral|ephemeral-full --install-scripts true|false [--ephemeral-workspaces <newline-separated selectors>] [--command-timeout-seconds <nonnegative integer>] [--max-attempts <positive integer>]'

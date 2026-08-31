@@ -6,6 +6,7 @@ import {
   expectedNativeFamily,
   nativeBinariesMatchRuntime,
   nativeFamilyFromMagic,
+  repairedNativeBinariesMatchRuntime,
 } from './native-health.mts'
 
 const dirs: string[] = []
@@ -24,7 +25,7 @@ afterEach(async () => {
 })
 
 describe('native binary health', () => {
-  it('classifies ELF, Mach-O, and PE magics', () => {
+  it('classifies ELF, Mach-O, and PE magics', async () => {
     expect(nativeFamilyFromMagic(ELF)).toBe('elf')
     expect(nativeFamilyFromMagic(MACHO)).toBe('macho')
     expect(nativeFamilyFromMagic(PE)).toBe('pe')
@@ -36,6 +37,7 @@ describe('native binary health', () => {
     expect(expectedNativeFamily('darwin')).toBe('macho')
     expect(expectedNativeFamily('win32')).toBe('pe')
     expect(expectedNativeFamily('aix')).toBeUndefined()
+    await expect(repairedNativeBinariesMatchRuntime([], 'aix')).resolves.toBe(true)
   })
 
   it('treats a missing or non-directory node_modules as healthy', async () => {
