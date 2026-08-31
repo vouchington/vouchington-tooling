@@ -253,6 +253,7 @@ describe('vouchington-workflow plugin', () => {
     )?.[1]
     if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
     const example = parse(exampleSource) as {
+      cooldown?: { exclude?: string[] }
       groups?: Record<
         string,
         { 'applies-to'?: string; patterns?: string[]; 'update-types'?: string[] }
@@ -270,6 +271,7 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toContain('pull_request_target')
     expect(skill).toContain('consumer wrapper')
     expect(example?.groups).toEqual({
+      'first-party': { patterns: ['@acme/*', 'acme-cli'] },
       oxc: { patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint'] },
       vitest: { patterns: ['vitest', '@vitest/*', '@vitejs/*'] },
       react: { patterns: ['react', 'react-dom'] },
@@ -279,6 +281,7 @@ describe('vouchington-workflow plugin', () => {
       },
       'react-email': { patterns: ['react-email', '@react-email/*'] },
     })
+    expect(example?.cooldown?.exclude).toEqual(example?.groups?.['first-party']?.patterns)
     const patterns = Object.values(example?.groups ?? {}).flatMap((group) => group.patterns ?? [])
     expect(patterns).toContain('@vitest/*')
     expect(patterns).toContain('@react-email/*')
@@ -290,6 +293,7 @@ describe('vouchington-workflow plugin', () => {
       expect(group).not.toHaveProperty('update-types')
     }
     expect(normalized).toMatch(/omit `update-types`[^.]*major, minor, and patch/i)
+    expect(normalized).toMatch(/first-party.*?`cooldown\.exclude`[^.]*zero-day/i)
     expect(skills).toContainEqual(
       expect.objectContaining({
         name: 'dependabot',

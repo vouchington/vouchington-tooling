@@ -30,7 +30,12 @@ types. Inspect manifests, peer dependencies, lockfiles, and upstream release pra
 packages that should move together. For example:
 
 ```yaml
+cooldown:
+  default-days: 2
+  exclude: ['@acme/*', 'acme-cli']
 groups:
+  first-party:
+    patterns: ['@acme/*', 'acme-cli']
   oxc:
     patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint']
   vitest:
@@ -59,17 +64,20 @@ groups:
   makes a joint security upgrade safe, define a separately named family group such as
   `react-security` with the same package patterns and `applies-to: security-updates`. Never combine
   unrelated vulnerability fixes into a generic security group.
-- Group first-party packages together only when they share an owning release train and are expected
-  to be consumed atomically. A grouped pull request is auto-mergeable only when every included update
-  is eligible.
+- Keep verified first-party packages in a dedicated `first-party` group. For a namespace wholly
+  controlled by the owner, prefer its scoped wildcard such as `@acme/*`; keep unscoped packages as
+  explicit names. Use the same patterns in `cooldown.exclude` so first-party updates have zero-day
+  eligibility while third-party packages retain the configured release delay. A grouped pull
+  request is auto-mergeable only when every included update is eligible.
 
 ## Exempt verified first-party releases
 
 Use `cooldown.exclude` only for first-party packages whose owning repository and default-branch
 release workflow have been verified. The workflow must publish that package through OIDC with
-`id-token: write` and without a long-lived registry token. Prefer exact package names; do not exempt
-an author or namespace merely because it is usually first-party. Keep the consumer-owned registry,
-documentation, cooldown exclusions, and first-party group synchronized.
+`id-token: write` and without a long-lived registry token. A namespace wildcard is appropriate only
+when the owner controls the entire namespace and intends future packages to inherit the exemption;
+otherwise use exact package names. Keep the consumer-owned registry, documentation, cooldown
+exclusions, and first-party group synchronized.
 
 ## Preserve the trust boundary
 
