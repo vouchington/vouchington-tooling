@@ -183,6 +183,10 @@ import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackb
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 ```
 
+`checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
+dependency declared by a non-fixture package manifest. Assert dependency membership or placement,
+or derive a configuration or documentation package spec from that manifest instead.
+
 `session-friction` is an opt-in capture and reporting library. Callers supply the session id,
 absolute log directory, host-independent observation, and journal loader; it does not inspect host
 environment variables, install hooks, or connect to a journal service by itself. Invoking
