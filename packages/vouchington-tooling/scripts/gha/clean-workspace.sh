@@ -65,11 +65,53 @@ workspace_sentinel_key() {
   shasum -a 256 | awk '{print $1}'
 }
 
-if ! git reset --hard HEAD; then
+clear_sparse_checkout_state() {
+  "${full_checkout_git[@]}" sparse-checkout disable >/dev/null 2>&1 || true
+  local key
+  for key in core.sparseCheckout core.sparseCheckoutCone; do
+    git config --worktree --unset-all "${key}" || true
+    git config --local --unset-all "${key}" || true
+    if git config --worktree --get "${key}" >/dev/null 2>&1 ||
+      git config --local --get "${key}" >/dev/null 2>&1; then
+      echo "::error::Sparse checkout config ${key} remains enabled after cleanup."
+      return 1
+    fi
+  done
+}
+
+index_requires_recovery() {
+  "${full_checkout_git[@]}" update-index --refresh >/dev/null 2>&1 || return 0
+  if "${full_checkout_git[@]}" ls-files -v | grep -q '^S '; then
+    return 0
+  fi
+  "${full_checkout_git[@]}" diff-index --quiet --ignore-submodules=all HEAD -- || return 0
+  return 1
+}
+
+recover_full_index() {
+  local started_at=${SECONDS}
+  local tracked_paths
+  tracked_paths="$("${full_checkout_git[@]}" ls-tree -r --name-only HEAD | wc -l | tr -d ' ')"
+  rm -f -- "$(git rev-parse --git-path index)"
+  "${full_checkout_git[@]}" read-tree --empty
+  "${full_checkout_git[@]}" reset --hard HEAD
+  echo "::warning::Full workspace index recovery restored ${tracked_paths} tracked paths in $((SECONDS - started_at))s."
+}
+
+full_checkout_git=(git -c core.sparseCheckout=false -c core.sparseCheckoutCone=false)
+clear_sparse_checkout_state
+reset_failed=false
+if ! "${full_checkout_git[@]}" reset --hard HEAD; then
   echo "::warning::git reset --hard failed; reclaiming workspace write bits and retrying once."
   restore_workspace_write_bits ||
     echo "::warning::Could not restore workspace write bits completely; retrying git reset with the repaired subset."
-  git reset --hard HEAD
+  if ! "${full_checkout_git[@]}" reset --hard HEAD; then
+    reset_failed=true
+  fi
+fi
+if [ "${reset_failed}" = "true" ] || index_requires_recovery; then
+  echo "::warning::Git index corruption remained after bounded cleanup; starting full recovery."
+  recover_full_index
 fi
 excludes=()
 # Trust-gate: a fork pull request is the only untrusted case.
@@ -152,6 +194,10 @@ if ! git clean -ffdx "${excludes[@]+"${excludes[@]}"}"; then
   restore_workspace_write_bits ||
     echo "::warning::Could not restore workspace write bits completely; retrying git clean with the repaired subset."
   git clean -ffdx "${excludes[@]+"${excludes[@]}"}"
+fi
+if index_requires_recovery; then
+  echo "::warning::Git index corruption detected after clean; starting full recovery."
+  recover_full_index
 fi
 # Runs that preserve node_modules retain them for install speed.
 # Drop TypeScript incremental build info inside those preserved trees

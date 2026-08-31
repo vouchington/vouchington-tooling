@@ -127,6 +127,8 @@ export type {
   RuntimeJobResult,
   RuntimeSample,
 } from './gha-runtime-audit/index.mts'
+export { checkGhaWorkspacePolicy } from './gha-workspace-policy/index.mts'
+export type { GhaWorkspacePolicyOptions } from './gha-workspace-policy/index.mts'
 export {
   createVitestBlobManifest,
   createVitestReportAttempt,

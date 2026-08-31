@@ -25,6 +25,7 @@ import {
   runPostReview,
   summarizeDiagnosticReport,
   waitForProcessGroupExit,
+  checkGhaWorkspacePolicy,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -58,5 +59,6 @@ describe('package exports', () => {
     expect(typeof summarizeDiagnosticReport).toBe('function')
     expect(typeof isProcessGroupAlive).toBe('function')
     expect(typeof waitForProcessGroupExit).toBe('function')
+    expect(typeof checkGhaWorkspacePolicy).toBe('function')
   })
 })
