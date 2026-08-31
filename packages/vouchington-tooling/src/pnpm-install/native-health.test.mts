@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   expectedNativeFamily,
+  mismatchedNativeBinaries,
   nativeBinariesMatchRuntime,
   nativeFamilyFromMagic,
   repairedNativeBinariesMatchRuntime,
@@ -66,6 +67,147 @@ describe('native binary health', () => {
     await mkdir(store, { recursive: true })
     await writeFile(join(store, 'addon.node'), process.platform === 'darwin' ? ELF : MACHO)
     await expect(nativeBinariesMatchRuntime(root)).resolves.toBe(false)
+  })
+
+  it('ignores mismatches owned by packages excluded from this platform', async () => {
+    const root = await makeRoot()
+    const excluded = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      'darwin-only@1.0.0',
+      'node_modules',
+      'darwin-only',
+    )
+    const generic = join(root, 'node_modules', '.pnpm', 'generic@1.0.0', 'node_modules', 'generic')
+    const compatible = join(root, 'node_modules', '.pnpm', 'linux@1.0.0', 'node_modules', 'linux')
+    const any = join(root, 'node_modules', '.pnpm', 'any@1.0.0', 'node_modules', 'any')
+    const negated = join(root, 'node_modules', '.pnpm', 'negated@1.0.0', 'node_modules', 'negated')
+    const mixed = join(root, 'node_modules', '.pnpm', 'mixed@1.0.0', 'node_modules', 'mixed')
+    const stringValue = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      'string@1.0.0',
+      'node_modules',
+      'string',
+    )
+    await Promise.all([
+      mkdir(excluded, { recursive: true }),
+      mkdir(generic, { recursive: true }),
+      mkdir(compatible, { recursive: true }),
+      mkdir(any, { recursive: true }),
+      mkdir(negated, { recursive: true }),
+      mkdir(mixed, { recursive: true }),
+      mkdir(stringValue, { recursive: true }),
+    ])
+    await Promise.all([
+      writeFile(join(excluded, 'package.json'), '{"os":["darwin"]}'),
+      writeFile(join(excluded, 'addon.node'), MACHO),
+      writeFile(join(generic, 'package.json'), '{}'),
+      writeFile(join(generic, 'addon.node'), MACHO),
+      writeFile(join(compatible, 'package.json'), '{"os":["linux"]}'),
+      writeFile(join(compatible, 'addon.node'), MACHO),
+      writeFile(join(any, 'package.json'), '{"os":["any"]}'),
+      writeFile(join(any, 'addon.node'), MACHO),
+      writeFile(join(negated, 'package.json'), '{"os":["any","!linux"]}'),
+      writeFile(join(negated, 'addon.node'), MACHO),
+      writeFile(join(mixed, 'package.json'), '{"os":["any","!darwin"]}'),
+      writeFile(join(mixed, 'addon.node'), MACHO),
+      writeFile(join(stringValue, 'package.json'), '{"os":"darwin"}'),
+      writeFile(join(stringValue, 'addon.node'), MACHO),
+    ])
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual(
+      expect.arrayContaining([join(generic, 'addon.node'), join(compatible, 'addon.node')]),
+    )
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(excluded, 'addon.node'),
+    )
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual(
+      expect.arrayContaining([join(any, 'addon.node')]),
+    )
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(negated, 'addon.node'),
+    )
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(mixed, 'addon.node'),
+    )
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(stringValue, 'addon.node'),
+    )
+  })
+
+  it('uses the package owner instead of nested package metadata', async () => {
+    const root = await makeRoot()
+    const store = join(root, 'node_modules', '.pnpm', 'native@1.0.0', 'node_modules', 'native')
+    await mkdir(store, { recursive: true })
+    await mkdir(join(store, 'tools'), { recursive: true })
+    await Promise.all([
+      writeFile(join(store, 'package.json'), '{"os":["darwin"]}'),
+      writeFile(join(store, 'tools', 'package.json'), '{"os":["linux"]}'),
+      writeFile(join(store, 'tools', 'addon.node'), MACHO),
+    ])
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual([])
+  })
+
+  it('uses package metadata from ordinary node_modules layouts', async () => {
+    const root = await makeRoot()
+    const packageDir = join(root, 'node_modules', 'darwin-only')
+    await mkdir(packageDir, { recursive: true })
+    await Promise.all([
+      writeFile(join(packageDir, 'package.json'), '{"os":["darwin"]}'),
+      writeFile(join(packageDir, 'addon.node'), MACHO),
+    ])
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual([])
+  })
+
+  it('keeps ownerless bins conservative', async () => {
+    const root = await makeRoot()
+    const bin = join(root, 'node_modules', '.bin', 'addon.node')
+    await mkdir(join(root, 'node_modules', '.bin'), { recursive: true })
+    await writeFile(bin, MACHO)
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.toEqual(
+      expect.arrayContaining([bin]),
+    )
+  })
+
+  it('recognizes scoped pnpm package owners', async () => {
+    const root = await makeRoot()
+    const scoped = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      '@scope+native@1.0.0',
+      'node_modules',
+      '@scope',
+      'native',
+    )
+    await mkdir(scoped, { recursive: true })
+    await Promise.all([
+      writeFile(join(scoped, 'package.json'), '{"os":["darwin"]}'),
+      writeFile(join(scoped, 'addon.node'), MACHO),
+    ])
+    await expect(mismatchedNativeBinaries(root, 'linux')).resolves.not.toContain(
+      join(scoped, 'addon.node'),
+    )
+  })
+
+  it('reads each mismatched package owner once', async () => {
+    const root = await makeRoot()
+    const store = join(root, 'node_modules', '.pnpm', 'native@1.0.0', 'node_modules', 'native')
+    await mkdir(store, { recursive: true })
+    await Promise.all([
+      writeFile(join(store, 'first.node'), MACHO),
+      writeFile(join(store, 'second.node'), MACHO),
+    ])
+    const owners: string[] = []
+    await expect(
+      mismatchedNativeBinaries(root, 'linux', async (owner) => {
+        owners.push(owner)
+        return false
+      }),
+    ).resolves.toHaveLength(2)
+    expect(owners).toEqual([store])
   })
 
   it('skips dangling native paths and unknown platforms', async () => {
