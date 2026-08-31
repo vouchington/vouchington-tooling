@@ -255,7 +255,7 @@
     "csv-parse": "7.0.2",
     "csv-stringify": "6.8.3",
     "dockerfile-ast": "0.7.1",
-    "picomatch": "4.0.5",
+    "picomatch": "4.0.7",
     "yaml": "2.9.0"
   },
   "devDependencies": {
