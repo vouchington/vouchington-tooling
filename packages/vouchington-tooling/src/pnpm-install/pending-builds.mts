@@ -24,6 +24,23 @@ export async function pendingBuilds(): Promise<PendingBuilds> {
   }
 }
 
+export async function ignoredBuildsAreClean() {
+  try {
+    const value: unknown = parse(
+      await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
+    )
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    const ignored = (value as Record<string, unknown>).ignoredBuilds
+    return (
+      Array.isArray(ignored) &&
+      ignored.length === 0 &&
+      ignored.every((id) => typeof id === 'string')
+    )
+  } catch {
+    return false
+  }
+}
+
 async function lockfileDependencyIds() {
   try {
     const lockfile: unknown = parse(

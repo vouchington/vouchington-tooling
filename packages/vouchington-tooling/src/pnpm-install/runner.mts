@@ -6,24 +6,15 @@ import {
 } from './metadata.mts'
 import { runPnpm } from './exec.mts'
 import { nativeBinariesMatchRuntime } from './native-health.mts'
-import {
-  clearPendingDependencyBuilds,
-  pendingBuildDelta,
-  pendingBuilds,
-  validDependencyBuildIds,
-} from './pending-builds.mts'
-import { install, reconcileOrFail, withScriptPolicy } from './install-operations.mts'
-import {
-  baseInstallArgs,
-  findWorkspaceLinkMismatches,
-  logWorkspaceLinkMismatches,
-  type InstallOptions,
-} from './support.mts'
+// oxfmt-ignore
+import { clearPendingDependencyBuilds, pendingBuildDelta, pendingBuilds, validDependencyBuildIds } from './pending-builds.mts'
+// oxfmt-ignore
+import { install, reconcileOrFail, repairIsolatedNativeMismatch, withScriptPolicy } from './install-operations.mts'
+// oxfmt-ignore
+import { baseInstallArgs, findWorkspaceLinkMismatches, logWorkspaceLinkMismatches, type InstallOptions } from './support.mts'
 import { persistentInstallTransition, persistentProvenanceDiagnostic } from './transition.mts'
-
 // oxfmt-ignore
 const fail = (message: string): never => { throw new Error(message) }
-
 async function persistent(options: InstallOptions) {
   if (options.ephemeralWorkspaces.trim())
     fail('ephemeral-workspaces is only valid for ephemeral runners')
@@ -32,6 +23,21 @@ async function persistent(options: InstallOptions) {
   const fingerprint = await persistentMetadataFingerprintV4(runCapture)
   const provenance = await persistentMetadataStatusV4(fingerprint)
   const nativesMatch = await nativeBinariesMatchRuntime()
+  const repairedNativeMismatch =
+    !nativesMatch &&
+    provenance.kind === 'matching' &&
+    (await repairIsolatedNativeMismatch(options, runCapture))
+  if (repairedNativeMismatch) {
+    console.warn('persistent optional native binaries do not match this runtime; reconciling')
+    console.warn(
+      persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {
+        action: 'reconcile',
+        reason: 'native-health-mismatch',
+      }),
+    )
+    await writePersistentMetadataStampV4(fingerprint, options.installScripts, true, [])
+    return 'persistent native health reconciled'
+  }
   const provisionalTransition = persistentInstallTransition(provenance, options.installScripts)
   let transition = nativesMatch
     ? provisionalTransition
@@ -44,7 +50,6 @@ async function persistent(options: InstallOptions) {
   }
   const provenanceOk =
     provenance.kind === 'matching' && transition.action !== 'reconcile' && nativesMatch
-
   const cold = !provenanceOk && (await persistentDependencyTreeIsCold())
   if (!provenanceOk && !cold) {
     const finalTransition =
@@ -137,7 +142,6 @@ async function persistent(options: InstallOptions) {
     )
     return provenance.kind === 'absent' ? 'persistent cold' : 'persistent ordinary'
   }
-
   logWorkspaceLinkMismatches(stale)
   console.warn(
     persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {

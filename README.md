@@ -187,6 +187,10 @@ For persistent `pnpm-install`, v4 metadata tracks structural inputs separately f
 uses one script-suppressed verification install followed by `pnpm rebuild --pending --recursive`.
 When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
 rerunning first-party workspace hooks.
+An isolated native-binary mismatch uses one strict forced install only when structural provenance
+matches, workspace links are valid, and pnpm records an explicit empty `ignoredBuilds` ledger;
+otherwise it retains the script-free then strict reconciliation. Native and workspace-link health
+are verified before its metadata stamp is refreshed.
 The command emits a structured non-secret provenance diagnostic identifying changed structural
 categories, the last script policy, script capability, and native-binary health.
 

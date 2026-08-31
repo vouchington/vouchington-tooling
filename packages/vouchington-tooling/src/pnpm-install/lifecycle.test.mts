@@ -54,6 +54,9 @@ describe('pnpm install lifecycle', () => {
           ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
+      fixture.env.PNPM_NATIVE_ADDON = join(store, 'addon.node')
+      fixture.env.PNPM_REPAIR_NATIVE = '1'
       const repaired = await runInstaller(fixture)
       expect(repaired.stderr).toContain(
         'persistent optional native binaries do not match this runtime; reconciling',
@@ -62,7 +65,6 @@ describe('pnpm install lifecycle', () => {
       expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
       expect(repaired.stderr).toContain('"reason":"native-health-mismatch"')
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
         'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
       ])
     } finally {
@@ -414,8 +416,14 @@ describe('pnpm install lifecycle', () => {
           ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
+      fixture.env.PNPM_NATIVE_ADDON = addon
+      fixture.env.PNPM_REPAIR_NATIVE = '1'
+      await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: false })
-      await rm(addon)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+      ])
       await resetInstallCalls(fixture)
       const result = await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([

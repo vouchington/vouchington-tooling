@@ -1,6 +1,8 @@
 import { scheduler } from 'node:timers/promises'
 
 import { runPnpm } from './exec.mts'
+import { nativeBinariesMatchRuntime } from './native-health.mts'
+import { ignoredBuildsAreClean } from './pending-builds.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
 import {
@@ -51,9 +53,35 @@ export async function reconcileOrFail(
     options,
     'strict persistent reconciliation',
   )
+  if (!(await nativeBinariesMatchRuntime()))
+    fail('persistent reconciliation completed with mismatched native binaries')
   const remaining = await findWorkspaceLinkMismatches(runCapture)
   if (remaining.length > 0) {
     logWorkspaceLinkMismatches(remaining)
     fail('persistent reconciliation completed with invalid workspace links')
   }
+}
+
+export async function repairIsolatedNativeMismatch(
+  options: InstallOptions,
+  runCapture: (args: string[]) => Promise<CommandResult>,
+) {
+  if (!(await ignoredBuildsAreClean())) return false
+  if ((await findWorkspaceLinkMismatches(runCapture)).length > 0) return false
+  const forced = ['install', '--frozen-lockfile', '--force', ...baseInstallArgs.slice(2)]
+  await install(
+    withScriptPolicy(forced, options.installScripts),
+    options,
+    'native health reconciliation',
+  )
+  const [nativesMatch, stale] = await Promise.all([
+    nativeBinariesMatchRuntime(),
+    findWorkspaceLinkMismatches(runCapture),
+  ])
+  if (!nativesMatch) fail('native health reconciliation completed with mismatched native binaries')
+  if (stale.length > 0) {
+    logWorkspaceLinkMismatches(stale)
+    fail('native health reconciliation completed with invalid workspace links')
+  }
+  return true
 }
