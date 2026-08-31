@@ -25,13 +25,13 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   backend instead of hiding unrelated suites in one monolithic test job. Keep domain job names stable
   when they are required checks, and use a real bounded fan-in job only when the merge contract needs
   one combined result.
-- For pull requests, configure test concurrency with `cancel-in-progress: true` so a superseded head
-  does not consume runner capacity. On `main`, or the consumer's configured default branch, test runs
-  must never use `cancel-in-progress: true`; every pushed revision must reach a terminal result. Do not
-  assign default-branch runs to a shared concurrency group: omit concurrency, use a revision-unique
-  group containing the immutable commit SHA, or use an explicit queue. When one workflow handles both
-  events, keep shared concurrency groups and cancellation only for pull requests; a conditional
-  `cancel-in-progress` expression alone does not prevent GitHub from replacing an older pending run.
+- Serialize test runs for the same pull request or default branch with a stable concurrency group. For
+  pull requests, use `cancel-in-progress: true` so a superseded head replaces the active run. On
+  `main`, or the consumer's configured default branch, use `cancel-in-progress: false` so the active
+  run finishes before the newest pending revision starts. GitHub may replace an older pending main
+  run with the newest pending revision; preserving every intermediate queued revision is not required.
+  When one workflow handles both events, make `cancel-in-progress` conditional on the pull-request
+  event while keeping the PR number or branch ref in the concurrency group.
 - Give every concrete job a timeout of no more than 30 minutes. A caller job that invokes a reusable
   workflow through top-level `jobs.<job_id>.uses` cannot accept `timeout-minutes`; enforce the bound
   on every concrete job inside the called workflow. If the underlying operation cannot terminate
