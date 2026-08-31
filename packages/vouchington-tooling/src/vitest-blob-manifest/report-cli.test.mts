@@ -163,5 +163,8 @@ describe('Vitest report CLI adapters', () => {
         GITHUB_RUN_ATTEMPT: '',
       }),
     ).toThrow('GITHUB_RUN_ATTEMPT is required')
+    expect(() => runPrepareVitestReportsCli([primary, fallback, output], identity)).toThrow(
+      'VITEST_REPORT_EXPECTATIONS is required',
+    )
   })
 })
