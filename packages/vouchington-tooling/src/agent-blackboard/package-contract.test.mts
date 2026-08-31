@@ -15,7 +15,7 @@ describe('Agent Blackboard package contract', () => {
       await readFile(new URL('../../package.json', import.meta.url), 'utf8'),
     ) as PackageManifest
 
-    expect(manifest.devDependencies?.['agent-blackboard']).toBe('^0.5.0')
+    expect(manifest.devDependencies).toHaveProperty('agent-blackboard')
     expect(manifest.dependencies?.['agent-blackboard']).toBeUndefined()
     expect(manifest.optionalDependencies?.['agent-blackboard']).toBeUndefined()
     expect(manifest.peerDependencies?.['agent-blackboard']).toBeUndefined()

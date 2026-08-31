@@ -22,8 +22,17 @@ describe('agent-blackboard repository configuration', () => {
       mcpServers?: Record<string, { args?: string[]; env?: Record<string, string> }>
     }
     const server = config.mcpServers?.['agent-blackboard']
+    const packageJson = JSON.parse(
+      readFileSync('packages/vouchington-tooling/package.json', 'utf8'),
+    ) as { devDependencies?: Record<string, string> }
+    const declaredVersion = packageJson.devDependencies?.['agent-blackboard']
+    if (!declaredVersion) throw new Error('agent-blackboard must be a development dependency')
 
-    expect(server?.args).toEqual(['-y', 'agent-blackboard@0.5.0', 'mcp'])
+    expect(server?.args).toEqual([
+      '-y',
+      `agent-blackboard@${declaredVersion.replace(/^[~^]/u, '')}`,
+      'mcp',
+    ])
     expect(server?.env).toEqual({
       AGENT_BLACKBOARD_URL: '${AGENT_BLACKBOARD_URL}',
       AGENT_BLACKBOARD_TOKEN: '${AGENT_BLACKBOARD_TOKEN}',
@@ -58,7 +67,7 @@ describe('agent-blackboard repository configuration', () => {
       readFileSync('packages/vouchington-tooling/package.json', 'utf8'),
     ) as Record<string, Record<string, string> | undefined>
 
-    expect(packageJson.devDependencies?.['agent-blackboard']).toBe('^0.5.0')
+    expect(packageJson.devDependencies).toHaveProperty('agent-blackboard')
     expect(packageJson.dependencies?.['agent-blackboard']).toBeUndefined()
     expect(packageJson.optionalDependencies?.['agent-blackboard']).toBeUndefined()
     expect(packageJson.peerDependencies?.['agent-blackboard']).toBeUndefined()

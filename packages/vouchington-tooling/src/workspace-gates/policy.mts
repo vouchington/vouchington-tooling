@@ -2,6 +2,7 @@ import { validateReleaseAgeExemptionGroups } from '../pnpm-install/index.mts'
 import type { SharedContext } from '../shared-context/index.mts'
 import { checkDependabotCrosslist } from './dependabot.mts'
 import { checkExcludeRegistry } from './exclude-registry.mts'
+import { checkManifestDependencyVersionAssertions } from './manifest-version-assertions.mts'
 import {
   checkActiveFirstPartyGraph,
   checkTemporaryReleaseAgeSelectorsInLockfile,
@@ -19,6 +20,8 @@ export async function checkWorkspaceGatesPolicy(
 ): Promise<{ errors: string[] }> {
   const errors: string[] = []
   const resolved = resolveWorkspaceGatesOptions(options)
+
+  checkManifestDependencyVersionAssertions(ctx, errors)
 
   if (shouldValidateTemporaryGroups(options) && options.temporaryGroups !== undefined) {
     for (const error of validateReleaseAgeExemptionGroups(options.temporaryGroups)) {
