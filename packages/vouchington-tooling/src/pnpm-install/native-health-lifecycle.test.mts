@@ -49,7 +49,7 @@ describe('native health repair lifecycle', () => {
     }
   })
 
-  it.each([undefined, 'ignoredBuilds: nope\n', 'ignoredBuilds: [native]\n'])(
+  it.each([undefined, '[]\n', 'ignoredBuilds: nope\n', 'ignoredBuilds: [native]\n'])(
     'keeps the two-pass repair when ignored-build state is unsafe',
     async (modules) => {
       const fixture = await makeFixture()
