@@ -31,11 +31,7 @@ export async function ignoredBuildsAreClean() {
     )
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
     const ignored = (value as Record<string, unknown>).ignoredBuilds
-    return (
-      Array.isArray(ignored) &&
-      ignored.length === 0 &&
-      ignored.every((id) => typeof id === 'string')
-    )
+    return Array.isArray(ignored) && ignored.length === 0
   } catch {
     return false
   }
