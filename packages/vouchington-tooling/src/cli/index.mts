@@ -14,6 +14,8 @@ import { runPostReviewCommand } from './commands/post-review.mts'
 import { runStageReviewPayloadCommand } from './commands/stage-review-payload.mts'
 import { runSwiftSemanticEqualCommand } from './commands/swift-semantic-equal.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
+import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
+import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
 import { runRetrospectiveTranscriptCommand } from './commands/retrospective-transcript.mts'
 import { runLinkSkill } from './commands/link-skill.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
@@ -95,6 +97,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runPnpmInstallCli(parsed.args)
     case 'vitest-blob-manifest':
       return runVitestBlobManifestCommand(parsed.args)
+    case 'vitest-report-attempt':
+      return runVitestReportAttemptCommand(parsed.args)
+    case 'prepare-vitest-reports':
+      return runPrepareVitestReportsCommand(parsed.args)
     case 'nuget-central-version':
       return runNugetCentralVersionCommand(parsed.args)
     case 'swift-semantic-equal':

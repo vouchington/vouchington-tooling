@@ -30,6 +30,9 @@ vouchington prepare-trivy-db
 vouchington gha-artifacts-cleanup run --run-id 123 --keep-pattern 'plan-*' --delete-pattern 'coverage-*'
 vouchington http-origin --field cdn_origin https://images.example.com
 vouchington vitest-blob-manifest <suite> [reports-directory]
+vouchington vitest-report-attempt write <directory> <suite>
+vouchington vitest-report-attempt read <root>
+vouchington prepare-vitest-reports [primary-directory] [fallback-directory] [output-directory]
 vouchington pnpm-install --runner-lifecycle persistent --install-scripts true
 vouchington check-cache-size /tmp/cache 1048576 node-modules
 vouchington make-shard-matrix 4

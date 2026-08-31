@@ -6,6 +6,12 @@ vi.mock('./commands/pnpm-install.mts', () => ({
 vi.mock('./commands/vitest-blob-manifest.mts', () => ({
   runVitestBlobManifestCommand: vi.fn(() => 0),
 }))
+vi.mock('./commands/vitest-report-attempt.mts', () => ({
+  runVitestReportAttemptCommand: vi.fn(() => 0),
+}))
+vi.mock('./commands/prepare-vitest-reports.mts', () => ({
+  runPrepareVitestReportsCommand: vi.fn(() => 0),
+}))
 vi.mock('./commands/retrospective-facts.mts', () => ({
   runRetrospectiveFactsCommand: vi.fn(async () => 0),
 }))
@@ -16,6 +22,8 @@ vi.mock('./commands/agent-blackboard.mts', () => ({
 import { runCli } from './index.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
+import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
+import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 
@@ -23,6 +31,8 @@ describe('runCli extract command dispatch', () => {
   afterEach(() => {
     vi.mocked(runPnpmInstallCli).mockClear()
     vi.mocked(runVitestBlobManifestCommand).mockClear()
+    vi.mocked(runVitestReportAttemptCommand).mockClear()
+    vi.mocked(runPrepareVitestReportsCommand).mockClear()
     vi.mocked(runRetrospectiveFactsCommand).mockClear()
     vi.mocked(runAgentBlackboardCommand).mockClear()
   })
@@ -42,6 +52,10 @@ describe('runCli extract command dispatch', () => {
     expect(vi.mocked(runPnpmInstallCli)).toHaveBeenCalledOnce()
     expect(runCli(['node', 'vouchington', 'vitest-blob-manifest', 'tooling'])).toBe(0)
     expect(vi.mocked(runVitestBlobManifestCommand)).toHaveBeenCalledWith(['tooling'])
+    expect(runCli(['node', 'vouchington', 'vitest-report-attempt', 'read', 'markers'])).toBe(0)
+    expect(runVitestReportAttemptCommand).toHaveBeenCalledWith(['read', 'markers'])
+    expect(runCli(['node', 'vouchington', 'prepare-vitest-reports'])).toBe(0)
+    expect(runPrepareVitestReportsCommand).toHaveBeenCalledWith([])
   })
 
   it('forwards retrospective facts and agent-blackboard command arguments', async () => {
