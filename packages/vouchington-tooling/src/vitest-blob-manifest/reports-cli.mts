@@ -1,5 +1,6 @@
 import { VITEST_SUITE_PATTERN } from './constants.mts'
 import { prepareVitestReports } from './reports.mts'
+import { parseGitHubRunAttempt } from './run-attempt.mts'
 
 interface ExpectationContext {
   readonly version: 'vitest-report-expectations:v2'
@@ -57,9 +58,7 @@ export function runPrepareVitestReportsCli(
     ...extra
   ] = args
   if (extra.length > 0) throw new Error('Expected at most three Vitest report directories')
-  const currentAttempt = Number(required(env, 'GITHUB_RUN_ATTEMPT'))
-  if (!Number.isSafeInteger(currentAttempt) || currentAttempt < 1)
-    throw new Error('GITHUB_RUN_ATTEMPT must be a positive integer')
+  const currentAttempt = parseGitHubRunAttempt(env.GITHUB_RUN_ATTEMPT)
   const result = prepareVitestReports({
     primaryDir,
     fallbackDir,

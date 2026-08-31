@@ -27,6 +27,45 @@ describe('Vitest report CLI adapters', () => {
     return directory
   }
 
+  it.each(['02', '2.0', ' 2', '2 ', '0x2', '1e0', '0', '-2', 'NaN', '9007199254740992'])(
+    'rejects non-canonical GitHub run attempt %j in both report commands',
+    (attempt) => {
+      expect(() =>
+        runVitestReportAttemptCli(['read', join(root(), 'markers')], {
+          ...identity,
+          GITHUB_RUN_ATTEMPT: attempt,
+        }),
+      ).toThrow('GITHUB_RUN_ATTEMPT must be a positive integer')
+      expect(() =>
+        runPrepareVitestReportsCli([], {
+          ...identity,
+          GITHUB_RUN_ATTEMPT: attempt,
+        }),
+      ).toThrow('GITHUB_RUN_ATTEMPT must be a positive integer')
+    },
+  )
+
+  it.each(['1', '2', '9007199254740991'])(
+    'accepts canonical GitHub run attempt %s in both report commands',
+    (attempt) => {
+      const directory = root()
+      const env = {
+        ...identity,
+        GITHUB_RUN_ATTEMPT: attempt,
+        VITEST_REPORT_EXPECTATIONS: JSON.stringify({
+          version: 'vitest-report-expectations:v2',
+          attempt: Number(attempt),
+          suites: [],
+        }),
+      }
+      runVitestReportAttemptCli(['write', join(directory, 'markers'), 'tooling'], env)
+      runPrepareVitestReportsCli(
+        [join(directory, 'primary'), join(directory, 'fallback'), join(directory, 'output')],
+        env,
+      )
+    },
+  )
+
   it('writes and reads strict report-attempt markers with required GitHub identity', () => {
     const directory = join(root(), 'markers')
     runVitestReportAttemptCli(['write', directory, 'tooling'], identity)

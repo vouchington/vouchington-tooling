@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { writeVitestBlobManifest } from './index.mts'
+import { parseGitHubRunAttempt } from './run-attempt.mts'
 
 function failRepository(): never {
   throw new Error('GITHUB_REPOSITORY is required')
@@ -23,10 +24,7 @@ export function runVitestBlobManifestCli(
   if (!suite || extra.length > 0 || !runId || !rawAttempt) {
     throw new Error('Usage: vouchington vitest-blob-manifest <suite> [reports-directory]')
   }
-  const runAttempt = Number(rawAttempt)
-  if (!Number.isSafeInteger(runAttempt) || runAttempt < 1) {
-    throw new Error('GITHUB_RUN_ATTEMPT must be a positive integer')
-  }
+  const runAttempt = parseGitHubRunAttempt(rawAttempt)
   writeVitestBlobManifest(directory, {
     suite,
     repository: env.GITHUB_REPOSITORY || failRepository(),

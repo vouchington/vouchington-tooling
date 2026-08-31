@@ -3,6 +3,7 @@ import {
   writeVitestReportAttempt,
   type VitestReportAttemptIdentity,
 } from './report-attempt.mts'
+import { parseGitHubRunAttempt } from './run-attempt.mts'
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]
@@ -15,7 +16,7 @@ function identity(env: NodeJS.ProcessEnv): VitestReportAttemptIdentity {
     repository: required(env, 'GITHUB_REPOSITORY'),
     revision: required(env, 'GITHUB_SHA'),
     runId: required(env, 'GITHUB_RUN_ID'),
-    attempt: Number(required(env, 'GITHUB_RUN_ATTEMPT')),
+    attempt: parseGitHubRunAttempt(env.GITHUB_RUN_ATTEMPT),
   }
 }
 
