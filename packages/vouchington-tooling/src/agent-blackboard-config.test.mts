@@ -23,7 +23,7 @@ describe('agent-blackboard repository configuration', () => {
     }
     const server = config.mcpServers?.['agent-blackboard']
     const packageJson = JSON.parse(
-      readFileSync('packages/vouchington-tooling/package.json', 'utf8'),
+      readFileSyncFromDisk(new URL('../package.json', import.meta.url), 'utf8'),
     ) as { devDependencies?: Record<string, string> }
     const declaredVersion = packageJson.devDependencies?.['agent-blackboard']
     if (!declaredVersion) throw new Error('agent-blackboard must be a development dependency')

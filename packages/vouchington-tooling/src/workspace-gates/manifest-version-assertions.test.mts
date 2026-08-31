@@ -33,12 +33,23 @@ function packageSpecAssertion(): string {
   return ['expect(config.args).toEqual([', "'example-dependency@1.2.3'", '])'].join('')
 }
 
+function templatePackageSpecAssertion(): string {
+  return ['expect(config.args).toContain(', '`example-dependency@1.2.3`', ')'].join('')
+}
+
 function entriesAssertion(): string {
   return [
     'expect(Object.entries(manifest.dependencies)).not.toEqual([',
     "['example-dependency', '^1.2.3']",
     '])',
   ].join('')
+}
+
+function propertyVersionAssertion(): string {
+  return [
+    'expect(manifest.dependencies)',
+    "  .toHaveProperty('example-dependency', '^1.2.3')",
+  ].join('\n')
 }
 
 async function checkFiles(files: Record<string, string>): Promise<string[]> {
@@ -82,11 +93,13 @@ describe('manifest dependency version assertions', () => {
         dependencyMapAssertion('dependencies'),
         dependencyMapAssertion('peerDependencies', 'example-peer'),
         entriesAssertion(),
+        propertyVersionAssertion(),
       ].join('\n'),
       'test/config.test.mts': packageSpecAssertion(),
+      'test/template.test.mts': templatePackageSpecAssertion(),
     })
 
-    expect(errors).toHaveLength(8)
+    expect(errors).toHaveLength(10)
     expect(errors.every((error) => error.includes('must not assert the exact version'))).toBe(true)
   })
 
@@ -129,5 +142,62 @@ describe('manifest dependency version assertions', () => {
         'failed to read test source for manifest dependency version assertions',
       ),
     ])
+  })
+
+  it('skips malformed manifests and reports unreadable tracked sources without a context reader', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'manifest-version-assertions-'))
+    roots.push(root)
+    await writeFile(
+      join(root, 'package.json'),
+      JSON.stringify({ dependencies: { 'example-dependency': '^1.2.3' } }),
+    )
+    await mkdir(join(root, 'broken'), { recursive: true })
+    await writeFile(join(root, 'broken/package.json'), '{')
+    await mkdir(join(root, 'scalar'), { recursive: true })
+    await writeFile(join(root, 'scalar/package.json'), '[]')
+    const errors: string[] = []
+
+    checkManifestDependencyVersionAssertions(
+      {
+        isInsideGitRepo: true,
+        repoRoot: root,
+        trackedFiles: [
+          'package.json',
+          'broken/package.json',
+          'scalar/package.json',
+          'missing/package.json',
+          'test/missing.test.mts',
+        ],
+        trackedFileSet: new Set([
+          'package.json',
+          'broken/package.json',
+          'scalar/package.json',
+          'missing/package.json',
+          'test/missing.test.mts',
+        ]),
+      },
+      errors,
+    )
+
+    expect(errors).toEqual([
+      expect.stringContaining(
+        'failed to read test source for manifest dependency version assertions',
+      ),
+    ])
+  })
+
+  it('does not inspect tests when no non-fixture manifest declares dependencies', () => {
+    const errors: string[] = []
+    checkManifestDependencyVersionAssertions(
+      {
+        isInsideGitRepo: true,
+        repoRoot: 'unused',
+        trackedFiles: ['test/fixture.test.mts'],
+        trackedFileSet: new Set(['test/fixture.test.mts']),
+        readTrackedFile: () => "expect(manifest.dependencies).toBe('^1.2.3')",
+      },
+      errors,
+    )
+    expect(errors).toEqual([])
   })
 })
