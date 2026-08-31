@@ -24,14 +24,21 @@ export async function pendingBuilds(): Promise<PendingBuilds> {
   }
 }
 
-export async function ignoredBuildsAreClean() {
+export async function buildLedgersAllowNativeRepair() {
   try {
     const value: unknown = parse(
       await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
     )
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-    const ignored = (value as Record<string, unknown>).ignoredBuilds
-    return Array.isArray(ignored) && ignored.length === 0
+    const record = value as Record<string, unknown>
+    const ignored = record.ignoredBuilds
+    const pending = record.pendingBuilds ?? []
+    return (
+      Array.isArray(ignored) &&
+      ignored.length === 0 &&
+      Array.isArray(pending) &&
+      pending.length === 0
+    )
   } catch {
     return false
   }

@@ -57,26 +57,45 @@ async function searchRoot(nodeModules: string) {
   }
 }
 
+export async function mismatchedNativeBinaries(root = process.cwd(), platform = process.platform) {
+  const expected = expectedNativeFamily(platform)
+  if (expected === undefined) return []
+  const nodeModules = path.join(root, 'node_modules')
+  try {
+    const info = await stat(nodeModules)
+    if (!info.isDirectory()) return []
+  } catch {
+    return []
+  }
+
+  const cwd = await searchRoot(nodeModules)
+  const mismatches: string[] = []
+  for await (const relative of glob('**/*.{node,bin}', { cwd })) {
+    const pathname = path.join(cwd, relative)
+    const magic = await readMagic(pathname)
+    if (magic === undefined) continue
+    const family = nativeFamilyFromMagic(magic)
+    if (family !== undefined && family !== expected) mismatches.push(pathname)
+  }
+  return mismatches
+}
+
 export async function nativeBinariesMatchRuntime(
   root = process.cwd(),
   platform = process.platform,
 ) {
+  return (await mismatchedNativeBinaries(root, platform)).length === 0
+}
+
+export async function repairedNativeBinariesMatchRuntime(
+  paths: string[],
+  platform = process.platform,
+) {
   const expected = expectedNativeFamily(platform)
   if (expected === undefined) return true
-  const nodeModules = path.join(root, 'node_modules')
-  try {
-    const info = await stat(nodeModules)
-    if (!info.isDirectory()) return true
-  } catch {
-    return true
+  for (const pathname of paths) {
+    const magic = await readMagic(pathname)
+    if (magic === undefined || nativeFamilyFromMagic(magic) !== expected) return false
   }
-
-  const cwd = await searchRoot(nodeModules)
-  for await (const relative of glob('**/*.{node,bin}', { cwd })) {
-    const magic = await readMagic(path.join(cwd, relative))
-    if (magic === undefined) continue
-    const family = nativeFamilyFromMagic(magic)
-    if (family !== undefined && family !== expected) return false
-  }
-  return true
+  return nativeBinariesMatchRuntime()
 }

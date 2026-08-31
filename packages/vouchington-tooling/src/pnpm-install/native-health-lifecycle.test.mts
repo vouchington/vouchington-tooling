@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  configureNativeRepair,
   installCalls,
   makeFixture,
   resetInstallCalls,
@@ -12,7 +13,10 @@ import {
 const forced =
   'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false'
 
-async function addMismatchedNative(fixture: Awaited<ReturnType<typeof makeFixture>>) {
+async function addMismatchedNative(
+  fixture: Awaited<ReturnType<typeof makeFixture>>,
+  repair = false,
+) {
   const addon = join(
     fixture.root,
     'node_modules',
@@ -29,7 +33,8 @@ async function addMismatchedNative(fixture: Awaited<ReturnType<typeof makeFixtur
       ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
       : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
   )
-  fixture.env.PNPM_NATIVE_ADDON = addon
+  if (repair) await configureNativeRepair(fixture, addon)
+  else fixture.env.PNPM_NATIVE_ADDON = addon
   return addon
 }
 
@@ -39,8 +44,7 @@ describe('native health repair lifecycle', () => {
     try {
       await runInstaller(fixture, { installScripts: false })
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
-      await addMismatchedNative(fixture)
-      fixture.env.PNPM_REPAIR_NATIVE = '1'
+      await addMismatchedNative(fixture, true)
       await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: false })
       await expect(installCalls(fixture)).resolves.toEqual([`${forced} --ignore-scripts`])
@@ -49,42 +53,63 @@ describe('native health repair lifecycle', () => {
     }
   })
 
-  it.each([undefined, '[]\n', 'ignoredBuilds: nope\n', 'ignoredBuilds: [native]\n'])(
-    'keeps the two-pass repair when ignored-build state is unsafe',
-    async (modules) => {
-      const fixture = await makeFixture()
-      try {
-        await runInstaller(fixture)
-        if (modules !== undefined)
-          await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), modules)
-        await addMismatchedNative(fixture)
-        fixture.env.PNPM_REPAIR_NATIVE = '1'
-        await resetInstallCalls(fixture)
-        await runInstaller(fixture)
-        await expect(installCalls(fixture)).resolves.toEqual([
-          `${forced} --ignore-scripts --ignore-pnpmfile`,
-          forced,
-        ])
-      } finally {
-        await rm(fixture.root, { force: true, recursive: true })
-      }
-    },
-  )
+  it.each([
+    undefined,
+    '[]\n',
+    'ignoredBuilds: nope\n',
+    'ignoredBuilds: [native]\n',
+    'ignoredBuilds: []\npendingBuilds: [native]\n',
+  ])('keeps the two-pass repair when ignored-build state is unsafe', async (modules) => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      if (modules !== undefined)
+        await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), modules)
+      await addMismatchedNative(fixture, true)
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        `${forced} --ignore-scripts --ignore-pnpmfile`,
+        forced,
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
 
   it('keeps the two-pass repair when workspace links are stale', async () => {
     const fixture = await makeFixture()
     try {
       await runInstaller(fixture)
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
-      await addMismatchedNative(fixture)
+      await addMismatchedNative(fixture, true)
       await rm(fixture.dependencyLink)
       fixture.env.PNPM_REPAIR_LINK = '1'
-      fixture.env.PNPM_REPAIR_NATIVE = '1'
       await resetInstallCalls(fixture)
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
         `${forced} --ignore-scripts --ignore-pnpmfile`,
         forced,
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('keeps the script-free two-pass repair when dependency builds are pending', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await writeFile(
+        join(fixture.root, 'node_modules', '.modules.yaml'),
+        'ignoredBuilds: []\npendingBuilds: [native]\n',
+      )
+      await addMismatchedNative(fixture, true)
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture, { installScripts: false })
+      await expect(installCalls(fixture)).resolves.toEqual([
+        `${forced} --ignore-scripts --ignore-pnpmfile`,
+        `${forced} --ignore-scripts`,
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -135,7 +160,7 @@ describe('native health repair lifecycle', () => {
     }
   })
 
-  it('does not refresh the stamp when the strict repair leaves a stale workspace link', async () => {
+  it('does not accept deleting the mismatched native as a successful repair', async () => {
     const fixture = await makeFixture()
     try {
       await runInstaller(fixture)
@@ -143,7 +168,26 @@ describe('native health repair lifecycle', () => {
       const before = await readFile(stamp, 'utf8')
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
       await addMismatchedNative(fixture)
-      fixture.env.PNPM_REPAIR_NATIVE = '1'
+      fixture.env.PNPM_DELETE_NATIVE = '1'
+      await resetInstallCalls(fixture)
+      await expect(runInstaller(fixture)).rejects.toThrow(
+        'native health reconciliation completed with mismatched native binaries',
+      )
+      await expect(readFile(stamp, 'utf8')).resolves.toBe(before)
+      await expect(installCalls(fixture)).resolves.toEqual([forced])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('does not refresh the stamp when the strict repair leaves a stale workspace link', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      const stamp = join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json')
+      const before = await readFile(stamp, 'utf8')
+      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
+      await addMismatchedNative(fixture, true)
       fixture.env.PNPM_FORCE_BREAK_LINK = '1'
       await resetInstallCalls(fixture)
       await expect(runInstaller(fixture)).rejects.toThrow(

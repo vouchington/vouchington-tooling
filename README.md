@@ -188,7 +188,7 @@ uses one script-suppressed verification install followed by `pnpm rebuild --pend
 When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
 rerunning first-party workspace hooks.
 An isolated native-binary mismatch uses one strict forced install only when structural provenance
-matches, workspace links are valid, and pnpm records an explicit empty `ignoredBuilds` ledger;
+matches, workspace links are valid, and pnpm records empty `ignoredBuilds` and `pendingBuilds` ledgers;
 otherwise it retains the script-free then strict reconciliation. Native and workspace-link health
 are verified before its metadata stamp is refreshed.
 The command emits a structured non-secret provenance diagnostic identifying changed structural

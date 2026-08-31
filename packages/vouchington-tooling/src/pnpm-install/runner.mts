@@ -5,7 +5,7 @@ import {
   writePersistentMetadataStampV4,
 } from './metadata.mts'
 import { runPnpm } from './exec.mts'
-import { nativeBinariesMatchRuntime } from './native-health.mts'
+import { mismatchedNativeBinaries } from './native-health.mts'
 // oxfmt-ignore
 import { clearPendingDependencyBuilds, pendingBuildDelta, pendingBuilds, validDependencyBuildIds } from './pending-builds.mts'
 // oxfmt-ignore
@@ -22,13 +22,14 @@ async function persistent(options: InstallOptions) {
   const runCapture = (args: string[]) => runPnpm(args, options, true)
   const fingerprint = await persistentMetadataFingerprintV4(runCapture)
   const provenance = await persistentMetadataStatusV4(fingerprint)
-  const nativesMatch = await nativeBinariesMatchRuntime()
+  const mismatchedNatives = await mismatchedNativeBinaries()
+  const nativesMatch = mismatchedNatives.length === 0
   const repairedNativeMismatch =
     !nativesMatch &&
     provenance.kind === 'matching' &&
-    (await repairIsolatedNativeMismatch(options, runCapture))
+    (await repairIsolatedNativeMismatch(options, runCapture, mismatchedNatives))
   if (repairedNativeMismatch) {
-    console.warn('persistent optional native binaries do not match this runtime; reconciling')
+    console.warn('persistent optional native binaries do not match this runtime; reconciled')
     console.warn(
       persistentProvenanceDiagnostic(provenance, options.installScripts, nativesMatch, {
         action: 'reconcile',

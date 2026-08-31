@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  configureNativeRepair,
   installCalls,
   makeFixture,
   resetInstallCalls,
@@ -55,11 +56,10 @@ describe('pnpm install lifecycle', () => {
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
-      fixture.env.PNPM_NATIVE_ADDON = join(store, 'addon.node')
-      fixture.env.PNPM_REPAIR_NATIVE = '1'
+      await configureNativeRepair(fixture, join(store, 'addon.node'))
       const repaired = await runInstaller(fixture)
       expect(repaired.stderr).toContain(
-        'persistent optional native binaries do not match this runtime; reconciling',
+        'persistent optional native binaries do not match this runtime; reconciled',
       )
       expect(repaired.stderr).toContain('"action":"reconcile"')
       expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
@@ -417,8 +417,7 @@ describe('pnpm install lifecycle', () => {
           : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
       )
       await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'ignoredBuilds: []\n')
-      fixture.env.PNPM_NATIVE_ADDON = addon
-      fixture.env.PNPM_REPAIR_NATIVE = '1'
+      await configureNativeRepair(fixture, addon)
       await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: false })
       await expect(installCalls(fixture)).resolves.toEqual([
