@@ -1,4 +1,4 @@
-import { glob, open, stat } from 'node:fs/promises'
+import { glob, open, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 const ELF = Buffer.from([0x7f, 0x45, 0x4c, 0x46])
@@ -57,7 +57,41 @@ async function searchRoot(nodeModules: string) {
   }
 }
 
-export async function mismatchedNativeBinaries(root = process.cwd(), platform = process.platform) {
+function excludesPlatform(os: unknown, platform: string) {
+  const values = typeof os === 'string' ? [os] : Array.isArray(os) ? os : undefined
+  if (values === undefined || !values.every((value) => typeof value === 'string')) return false
+  if (values.length === 1 && values[0] === 'any') return false
+  if (values.includes(`!${platform}`)) return true
+  return values.some((value) => !value.startsWith('!')) && !values.includes(platform)
+}
+
+function packageRoot(pathname: string, searchRoot: string) {
+  const segments = path.relative(searchRoot, pathname).split(path.sep)
+  const nodeModules = segments.lastIndexOf('node_modules')
+  const packageStart = nodeModules === -1 ? 0 : nodeModules + 1
+  const name = segments[packageStart]
+  if (name === undefined || name === '.bin') return undefined
+  const packageLength = name.startsWith('@') ? 2 : 1
+  if (segments.length <= packageStart + packageLength) return undefined
+  return path.join(searchRoot, ...segments.slice(0, packageStart + packageLength))
+}
+
+async function packageExcludesPlatform(owner: string, platform: string) {
+  try {
+    const manifest = JSON.parse(await readFile(path.join(owner, 'package.json'), 'utf8')) as {
+      os?: unknown
+    }
+    return excludesPlatform(manifest.os, platform)
+  } catch {
+    return false
+  }
+}
+
+export async function mismatchedNativeBinaries(
+  root = process.cwd(),
+  platform = process.platform,
+  readPackageExclusion = packageExcludesPlatform,
+) {
   const expected = expectedNativeFamily(platform)
   if (expected === undefined) return []
   const nodeModules = path.join(root, 'node_modules')
@@ -69,15 +103,30 @@ export async function mismatchedNativeBinaries(root = process.cwd(), platform = 
   }
 
   const cwd = await searchRoot(nodeModules)
-  const mismatches: string[] = []
+  const mismatches: Array<{ owner: string | undefined; pathname: string }> = []
   for await (const relative of glob('**/*.{node,bin}', { cwd })) {
     const pathname = path.join(cwd, relative)
     const magic = await readMagic(pathname)
     if (magic === undefined) continue
     const family = nativeFamilyFromMagic(magic)
-    if (family !== undefined && family !== expected) mismatches.push(pathname)
+    if (family !== undefined && family !== expected) {
+      mismatches.push({ owner: packageRoot(pathname, cwd), pathname })
+    }
   }
+  const owners = [
+    ...new Set(mismatches.flatMap(({ owner }) => (owner === undefined ? [] : [owner]))),
+  ]
+  const exclusions = new Map<string, boolean>(
+    await Promise.all(
+      owners.map(async (owner): Promise<[string, boolean]> => [
+        owner,
+        await readPackageExclusion(owner, platform),
+      ]),
+    ),
+  )
   return mismatches
+    .filter(({ owner }) => owner === undefined || !exclusions.get(owner))
+    .map(({ pathname }) => pathname)
 }
 
 export async function nativeBinariesMatchRuntime(
