@@ -10,29 +10,27 @@ const TEST_OR_FIXTURE_DIRECTORY =
 const DEPENDENCY_FIELD =
   /\b(?:dependencies|devDependencies|optionalDependencies|peerDependencies)\b/u
 const EXPECTATION_MATCHER =
-  /^(?:\?\.)?\.\s*to(?:Be|Equal|StrictEqual|MatchObject|Contain|ContainEqual)\s*\(/u
+  /^(?:\?\.)?\.\s*(?:not\s*\.\s*)?to(?:Be|Equal|StrictEqual|MatchObject|Contain|ContainEqual)\s*\(/u
 const SEMVER_LITERAL = /^[~^<>=*v\s]*\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/u
 const STRING_LITERAL =
   /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\$]*(?:\\.[^`\\$]*)*)`/gu
 
 type Expectation = { expression: string; expected: string; index: number }
 function readTrackedSource(ctx: SharedContext, file: string): string | null {
-  if (ctx.readTrackedFile) return ctx.readTrackedFile(file)
   try {
-    return readFileSync(join(ctx.repoRoot, file), 'utf8')
+    return ctx.readTrackedFile
+      ? ctx.readTrackedFile(file)
+      : readFileSync(join(ctx.repoRoot, file), 'utf8')
   } catch {
     return null
   }
 }
-
-function sourceLine(source: string, offset: number): number {
-  return source.slice(0, offset).split('\n').length
-}
-
 function skipStringOrComment(source: string, index: number): number {
   const marker = source[index]
-  if (marker === '/' && source[index + 1] === '/')
-    return source.indexOf('\n', index + 2) || source.length
+  if (marker === '/' && source[index + 1] === '/') {
+    const end = source.indexOf('\n', index + 2)
+    return end === -1 ? source.length : end
+  }
   if (marker === '/' && source[index + 1] === '*') {
     const end = source.indexOf('*/', index + 2)
     return end === -1 ? source.length : end + 2
@@ -47,7 +45,6 @@ function skipStringOrComment(source: string, index: number): number {
   }
   return source.length
 }
-
 function closingParenthesis(source: string, open: number): number {
   let depth = 1
   for (let cursor = open + 1; cursor < source.length; cursor += 1) {
@@ -62,7 +59,6 @@ function closingParenthesis(source: string, open: number): number {
   }
   return -1
 }
-
 function expectations(source: string): Expectation[] {
   const found: Expectation[] = []
   for (let cursor = 0; cursor < source.length; cursor += 1) {
@@ -91,7 +87,6 @@ function expectations(source: string): Expectation[] {
   }
   return found
 }
-
 function dependencyNames(ctx: SharedContext): Set<string> {
   const names = new Set<string>()
   for (const file of ctx.trackedFiles) {
@@ -119,9 +114,13 @@ function dependencyNames(ctx: SharedContext): Set<string> {
   }
   return names
 }
-
 function literalValues(source: string): string[] {
   return [...source.matchAll(STRING_LITERAL)].map((match) => match[1] ?? match[2] ?? match[3] ?? '')
+}
+function expectedDependencyNames(values: readonly string[], names: ReadonlySet<string>): string[] {
+  return values.some((value) => SEMVER_LITERAL.test(value))
+    ? values.filter((value) => names.has(value))
+    : []
 }
 function indexedDependencyNames(expression: string, names: ReadonlySet<string>): string[] {
   const found = new Set<string>()
@@ -175,6 +174,7 @@ export function checkManifestDependencyVersionAssertions(
           for (const name of indexedDependencyNames(expectation.expression, names))
             asserted.add(name)
         }
+        for (const name of expectedDependencyNames(values, names)) asserted.add(name)
         for (const name of objectVersionNames(expectation.expected, names)) asserted.add(name)
       }
       for (const value of literalValues(expectation.expected)) {
@@ -190,7 +190,7 @@ export function checkManifestDependencyVersionAssertions(
         }
       }
       for (const name of asserted) {
-        const line = sourceLine(source, expectation.index)
+        const line = source.slice(0, expectation.index).split('\n').length
         errors.push(
           `::error file=${file},line=${line}::${file}:${line}: tests must not assert the exact version of declared dependency "${name}"; assert dependency membership or derive the value from the manifest instead`,
         )

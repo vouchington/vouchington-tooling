@@ -33,6 +33,14 @@ function packageSpecAssertion(): string {
   return ['expect(config.args).toEqual([', "'example-dependency@1.2.3'", '])'].join('')
 }
 
+function entriesAssertion(): string {
+  return [
+    'expect(Object.entries(manifest.dependencies)).not.toEqual([',
+    "['example-dependency', '^1.2.3']",
+    '])',
+  ].join('')
+}
+
 async function checkFiles(files: Record<string, string>): Promise<string[]> {
   const root = await mkdtemp(join(tmpdir(), 'manifest-version-assertions-'))
   roots.push(root)
@@ -73,11 +81,12 @@ describe('manifest dependency version assertions', () => {
         source,
         dependencyMapAssertion('dependencies'),
         dependencyMapAssertion('peerDependencies', 'example-peer'),
+        entriesAssertion(),
       ].join('\n'),
       'test/config.test.mts': packageSpecAssertion(),
     })
 
-    expect(errors).toHaveLength(7)
+    expect(errors).toHaveLength(8)
     expect(errors.every((error) => error.includes('must not assert the exact version'))).toBe(true)
   })
 
@@ -94,6 +103,8 @@ describe('manifest dependency version assertions', () => {
         "['synthetic']).toBe('^1.2.3')",
       ].join(''),
       'docs/README.md': 'npm install example-dependency@1.2.3',
+      'test/comment.test.mts':
+        "// expect(manifest.dependencies['example-dependency']).toBe('^1.2.3')",
     })
 
     expect(errors).toEqual([])
