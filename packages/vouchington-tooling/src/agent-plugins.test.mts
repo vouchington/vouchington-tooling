@@ -344,9 +344,9 @@ describe('vouchington-workflow plugin', () => {
     expect(normalized).toMatch(/must not (create|publish|synthesize).*check (runs?|statuses?)/i)
     expect(normalized).toMatch(/main.*test jobs?.*domain/i)
     expect(normalized).toMatch(/pull requests?.*cancel-in-progress/i)
-    expect(normalized).toMatch(/main.*must never.*cancel-in-progress/i)
-    expect(normalized).toMatch(/default-branch runs?.*shared concurrency group/i)
-    expect(normalized).toMatch(/revision-unique.*immutable commit SHA/i)
+    expect(normalized).toMatch(/main.*cancel-in-progress: false/i)
+    expect(normalized).toMatch(/older pending main run.*newest pending revision/i)
+    expect(normalized).toMatch(/preserving every intermediate queued revision is not required/i)
   })
 
   it('defines evidence-backed persistent-workspace prevention and recovery policy', async () => {
