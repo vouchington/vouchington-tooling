@@ -32,8 +32,11 @@ type SourceOptions = {
 }
 
 class SourceFailure extends Error {
-  constructor(readonly reason: VitestReportRejectionReason) {
+  readonly reason: VitestReportRejectionReason
+
+  constructor(reason: VitestReportRejectionReason) {
     super(reason)
+    this.reason = reason
   }
 }
 function bundle(root: string, source: VitestReportSource): Candidate[] {

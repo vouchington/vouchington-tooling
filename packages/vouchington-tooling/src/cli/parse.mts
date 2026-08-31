@@ -13,6 +13,8 @@ export type ParsedCli =
   | { kind: 'script'; command: ScriptCommand; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
+  | { kind: 'vitest-report-attempt'; args: string[] }
+  | { kind: 'prepare-vitest-reports'; args: string[] }
   | { kind: 'nuget-central-version'; args: string[] }
   | { kind: 'swift-semantic-equal'; args: string[] }
   | { kind: 'post-review'; args: string[] }
@@ -83,6 +85,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
   if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
+  if (command === 'vitest-report-attempt') return { kind: 'vitest-report-attempt', args: rest }
+  if (command === 'prepare-vitest-reports') return { kind: 'prepare-vitest-reports', args: rest }
   if (command === 'nuget-central-version') return { kind: 'nuget-central-version', args: rest }
   if (command === 'swift-semantic-equal') return { kind: 'swift-semantic-equal', args: rest }
   if (command === 'post-review') return { kind: 'post-review', args: rest }

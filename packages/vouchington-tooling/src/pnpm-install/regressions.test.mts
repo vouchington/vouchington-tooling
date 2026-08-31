@@ -48,6 +48,22 @@ async function makeLinkFixture(spec: string, target: 'dependency' | 'registry' |
 }
 
 describe('pnpm install regression boundaries', () => {
+  it('loads the pnpm-install route with strip-only TypeScript support', async () => {
+    await expect(
+      execFileAsync('node', [
+        '--experimental-strip-types',
+        installer,
+        'pnpm-install',
+        '--runner-lifecycle',
+        'invalid',
+        '--install-scripts',
+        'true',
+      ]),
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('usage: vouchington pnpm-install'),
+    })
+  })
+
   it('ignores same-named registry dependencies without workspace protocol', async () => {
     const fixture = await makeLinkFixture('999.0.0', 'registry')
     try {

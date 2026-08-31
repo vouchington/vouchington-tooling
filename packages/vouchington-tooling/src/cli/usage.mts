@@ -15,6 +15,8 @@ Commands:
   gha-artifacts-cleanup         Delete classified GitHub Actions artifacts
   http-origin                   Validate an optional HTTP(S) origin
   vitest-blob-manifest          Stamp a vitest-blob-manifest:v1 identity file
+  vitest-report-attempt         Write or read a Vitest report-attempt marker
+  prepare-vitest-reports        Validate and select Vitest report JSON files
   pnpm-install                  Install a pnpm workspace with retry and release-age fail-fast
   check-cache-size              Measure a path and decide whether to save a GHA cache
   make-shard-matrix             Emit a [1..N] GitHub Actions shard matrix
@@ -74,6 +76,8 @@ gha-artifacts-cleanup run --run-id <id> [--keep-pattern glob] [--delete-pattern 
 gha-artifacts-cleanup sweep --older-than-hours <n> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
 http-origin [--field NAME] [value]
 vitest-blob-manifest <suite> [reports-directory]
+vitest-report-attempt <write DIRECTORY SUITE|read ROOT>
+prepare-vitest-reports [primary-directory] [fallback-directory] [output-directory]
 pnpm-install --runner-lifecycle persistent|ephemeral|ephemeral-full --install-scripts true|false
 check-cache-size <path> <max-bytes> <label>
 make-shard-matrix <total>

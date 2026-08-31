@@ -15,16 +15,47 @@ describe('vitest-blob-manifest CLI', () => {
     if (root) rmSync(root, { recursive: true, force: true })
   })
 
-  it('stamps a bundle from GitHub identity and rejects invalid usage', () => {
+  function fixture(): { env: NodeJS.ProcessEnv; reports: string } {
     root = mkdtempSync(join(tmpdir(), 'vitest-blob-cli-'))
     const reports = join(root, 'reports')
     mkdirSync(reports)
     writeFileSync(join(reports, 'tooling.json'), '{}')
-    const env = {
-      GITHUB_REPOSITORY: 'owner/repo',
-      GITHUB_RUN_ATTEMPT: '2',
-      GITHUB_RUN_ID: '9131',
+    return {
+      env: {
+        GITHUB_REPOSITORY: 'owner/repo',
+        GITHUB_RUN_ATTEMPT: '2',
+        GITHUB_RUN_ID: '9131',
+      },
+      reports,
     }
+  }
+
+  it.each(['02', '2.0', ' 2', '2 ', '0x2', '1e0', '0', '-2', 'NaN', '9007199254740992'])(
+    'rejects non-canonical GitHub run attempt %j',
+    (attempt) => {
+      const { env, reports } = fixture()
+      expect(() =>
+        runVitestBlobManifestCli(
+          ['tooling', reports],
+          { ...env, GITHUB_RUN_ATTEMPT: attempt },
+          revision,
+        ),
+      ).toThrow('GITHUB_RUN_ATTEMPT must be a positive integer')
+    },
+  )
+
+  it.each(['1', '2', '9007199254740991'])('accepts canonical GitHub run attempt %s', (attempt) => {
+    const { env, reports } = fixture()
+    runVitestBlobManifestCli(
+      ['tooling', reports],
+      { ...env, GITHUB_RUN_ATTEMPT: attempt },
+      revision,
+    )
+    expect(inspectVitestBlobBundle(reports).manifest.run.attempt).toBe(Number(attempt))
+  })
+
+  it('stamps a bundle from GitHub identity and rejects invalid usage', () => {
+    const { env, reports } = fixture()
     runVitestBlobManifestCli(['tooling', reports], env, revision)
     expect(inspectVitestBlobBundle(reports).manifest).toMatchObject({
       repository: 'owner/repo',
@@ -36,6 +67,16 @@ describe('vitest-blob-manifest CLI', () => {
       runVitestBlobManifestCli(['tooling', reports], { ...env, GITHUB_RUN_ATTEMPT: '0' }, revision),
     ).toThrow('positive integer')
     expect(() => runVitestBlobManifestCli([], env, revision)).toThrow('Usage')
+    expect(() =>
+      runVitestBlobManifestCli(['tooling', reports], { ...env, GITHUB_RUN_ATTEMPT: '' }, revision),
+    ).toThrow('Usage')
+    expect(() =>
+      runVitestBlobManifestCli(
+        ['tooling', reports],
+        { ...env, GITHUB_RUN_ATTEMPT: undefined },
+        revision,
+      ),
+    ).toThrow('Usage')
     expect(() =>
       runVitestBlobManifestCli(['tooling', reports], { ...env, GITHUB_REPOSITORY: '' }, revision),
     ).toThrow('GITHUB_REPOSITORY is required')
