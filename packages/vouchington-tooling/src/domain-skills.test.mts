@@ -113,7 +113,7 @@ describe('domain skill plugins', () => {
       /(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:save|persist|store|retain|record|embed|include|export|publish)\b[^.!?]*\b(?:raw|unredacted)\b/i,
     )
     expect(normalized).not.toMatch(
-      /\b(?:raw|unredacted)\b[^.!?]*\b(?:evidence|logs?|content|data|command output|environment details?|provider payloads?|transcript content)\b[^.!?]*(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:be\s+)?(?:saved|persisted|stored|retained|recorded|embedded|included|exported|published)\b/i,
+      /\b(?:raw|unredacted)\b[^.!?]*\b(?:evidence|logs?|content|data|command output|environment details?|provider payloads?|transcript content)\b[^.!?]*(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted|acceptable|okay)(?:\s+to)?\b)/i,
     )
   })
 })
