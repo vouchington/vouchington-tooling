@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 const execFile = promisify(execFileCallback)
 const scriptPath = resolve('packages/vouchington-tooling/scripts/allocate-browser-safe-ports.py')
+const pythonScriptPath = JSON.stringify(scriptPath)
 const runnerPortPolicyPath = resolve('packages/vouchington-tooling/scripts/runner-port-policy.json')
 
 function parsePorts(stdout: string): number[] {
@@ -70,7 +71,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(3, 1000, runner_slot=50))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(3, 1000, runner_slot=50))`,
     ])
 
     expect(parsePorts(stdout)).toEqual([2984, 2985, 2986])
@@ -79,7 +80,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('', '/srv/actions-runner/8/_work/repo'))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('', '/srv/actions-runner/8/_work/repo'))`,
     ])
 
     expect(stdout.trim()).toBe('8')
@@ -88,7 +89,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('/srv/actions-runners/9/_work/repo/repo', '/tmp'))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('/srv/actions-runners/9/_work/repo/repo', '/tmp'))`,
     ])
 
     expect(stdout.trim()).toBe('9')
@@ -97,7 +98,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('/srv/actions-runners/blue/_work/repo/repo', ''))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); print(allocator.detect_runner_slot('/srv/actions-runners/blue/_work/repo/repo', ''))`,
     ])
 
     expect(stdout.trim()).toBe('None')
@@ -106,7 +107,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); ports = iter([2200, 4045, 4046]); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', next(ports)), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(1, 3))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); ports = iter([2200, 4045, 4046]); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', next(ports)), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(1, 3))`,
     ])
 
     const [port] = parsePorts(stdout)
@@ -117,7 +118,7 @@ describe('allocate-browser-safe-ports.py', () => {
       execFile('python3', [
         '-B',
         '-c',
-        `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.detect_runner_slot('/srv/actions-runner/01/_work/repo', '')`,
+        `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.detect_runner_slot('/srv/actions-runner/01/_work/repo', '')`,
       ]),
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('runner slot 01 must use canonical decimal spelling'),
@@ -127,7 +128,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: (_ for _ in ()).throw(OSError()) if address[1] == 2200 else setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(2, 1000, runner_slot=1))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: (_ for _ in ()).throw(OSError()) if address[1] == 2200 else setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(2, 1000, runner_slot=1))`,
     ])
 
     expect(parsePorts(stdout)).toEqual([2201, 2202])
@@ -171,7 +172,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(2, 1000, runner_slot=2))`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: setattr(self, 'port', address[1]), 'getsockname': lambda self: ('', self.port), 'close': lambda self: None}); print(*allocator.allocate_ports(2, 1000, runner_slot=2))`,
     ])
 
     expect(parsePorts(stdout)).toEqual([2216, 2217])
@@ -181,7 +182,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util, json, pathlib, tempfile; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator);\nwith tempfile.TemporaryDirectory() as directory:\n path = pathlib.Path(directory) / 'policy.json'; path.write_text(json.dumps({'reservedPortStart': True, 'reservedPortEnd': 2999, 'portsPerRunner': 16, 'minimumRunnerSlot': 1, 'maximumRunnerSlot': 50}))\n try:\n  allocator.load_runner_port_policy(path)\n except RuntimeError as error:\n  print(error)`,
+      `import importlib.util, json, pathlib, tempfile; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator);\nwith tempfile.TemporaryDirectory() as directory:\n path = pathlib.Path(directory) / 'policy.json'; path.write_text(json.dumps({'reservedPortStart': True, 'reservedPortEnd': 2999, 'portsPerRunner': 16, 'minimumRunnerSlot': 1, 'maximumRunnerSlot': 50}))\n try:\n  allocator.load_runner_port_policy(path)\n except RuntimeError as error:\n  print(error)`,
     ])
 
     expect(stdout).toContain('invalid runner port policy')
@@ -219,7 +220,7 @@ describe('allocate-browser-safe-ports.py', () => {
     const { stdout } = await execFile('python3', [
       '-B',
       '-c',
-      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}'); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: (_ for _ in ()).throw(OSError()), 'close': lambda self: None});\nfor runner_slot, max_attempts in ((1, 7), (None, 7)):\n try:\n  allocator.allocate_ports(1, max_attempts, runner_slot)\n except RuntimeError as error:\n  print(error)`,
+      `import importlib.util; spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath}); allocator = importlib.util.module_from_spec(spec); spec.loader.exec_module(allocator); allocator.socket.socket = type('Socket', (), {'bind': lambda self, address: (_ for _ in ()).throw(OSError()), 'close': lambda self: None});\nfor runner_slot, max_attempts in ((1, 7), (None, 7)):\n try:\n  allocator.allocate_ports(1, max_attempts, runner_slot)\n except RuntimeError as error:\n  print(error)`,
     ])
 
     expect(stdout.trim().split('\n')).toStrictEqual([
@@ -234,7 +235,7 @@ describe('allocate-browser-safe-ports.py', () => {
       '-c',
       [
         'import importlib.util, os',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'allocator.Path.is_file = lambda self: True',
@@ -262,7 +263,7 @@ describe('allocate-browser-safe-ports.py', () => {
       '-c',
       [
         'import importlib.util',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'calls = []',

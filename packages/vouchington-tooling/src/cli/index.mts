@@ -21,6 +21,9 @@ import { runLinkSkill } from './commands/link-skill.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
+import { runRequireUpToDate } from './commands/require-up-to-date.mts'
+import { runAstGrepExamplesCommand } from './commands/ast-grep-examples.mts'
+import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
 import { printUsage } from './usage.mts'
@@ -121,6 +124,18 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runRetrospectiveFactsCommand(parsed.args)
     case 'agent-blackboard':
       return runAgentBlackboardCommand(parsed.args)
+    case 'require-up-to-date':
+      return runRequireUpToDate(parsed)
+    case 'gitleaks-directory-scan':
+      return runScript('bash', packageScriptPath('scripts/gitleaks-directory-scan.sh'), [
+        '--config',
+        parsed.config,
+        ...(parsed.directory === undefined ? [] : ['--root', parsed.directory]),
+      ])
+    case 'ast-grep-examples':
+      return runAstGrepExamplesCommand(parsed)
+    case 'gha-workspace-policy':
+      return runGhaWorkspacePolicy(parsed)
   }
 }
 

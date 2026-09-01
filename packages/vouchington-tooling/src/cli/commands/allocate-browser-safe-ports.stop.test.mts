@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const execFile = promisify(execFileCallback)
 const scriptPath = resolve('packages/vouchington-tooling/scripts/allocate-browser-safe-ports.py')
+const pythonScriptPath = JSON.stringify(scriptPath)
 
 describe('allocate-browser-safe-ports.py --stop wait', () => {
   it('does not wait for bindable ports when --stop finds no live holder', async () => {
@@ -14,7 +15,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       [
         'import importlib.util, tempfile',
         'from pathlib import Path',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'hold_dir = Path(tempfile.mkdtemp(prefix="port-stop-"))',
@@ -38,7 +39,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       [
         'import importlib.util, os, tempfile',
         'from pathlib import Path',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'hold_dir = Path(tempfile.mkdtemp(prefix="port-stop-sib-"))',
@@ -81,7 +82,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       [
         'import importlib.util, os, tempfile',
         'from pathlib import Path',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'hold_dir = Path(tempfile.mkdtemp(prefix="port-stop-to-"))',
@@ -114,7 +115,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       '-c',
       [
         'import importlib.util',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'allocator.run_owner_probe = lambda command: "4321\\n4321\\n" if "-t" in command else ""',
@@ -147,7 +148,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       '-c',
       [
         'import importlib.util',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'def probe(command):',
@@ -169,7 +170,7 @@ describe('allocate-browser-safe-ports.py --stop wait', () => {
       [
         'import importlib.util, tempfile',
         'from pathlib import Path',
-        `spec = importlib.util.spec_from_file_location('allocator', '${scriptPath}')`,
+        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
         'allocator = importlib.util.module_from_spec(spec)',
         'spec.loader.exec_module(allocator)',
         'hold_dir = Path(tempfile.mkdtemp(prefix="port-rel-"))',

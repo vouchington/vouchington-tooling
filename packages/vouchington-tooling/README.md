@@ -19,6 +19,10 @@ vouchington runner-port-policy --file ./policy.json
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
+vouchington require-up-to-date --remote origin --branch main
+vouchington gitleaks-directory-scan --config .gitleaks.toml
+vouchington ast-grep-examples --rules ast-grep-tests --config sgconfig.yml
+vouchington gha-workspace-policy
 vouchington gha-output name
 vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
@@ -78,6 +82,14 @@ non-expired artifacts across the run, keeps the first result for each name (matc
 download`), and extracts each selected name into its own directory. Ordinary absence is reported as
 `availability=unavailable`. Artifact listing retries up to three times with bounded backoff;
 exhausted transport errors, invalid names, and cancellation remain hard failures.
+
+`require-up-to-date` fetches the requested remote branch and fails unless its fetched tip is an
+ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-index and current
+nonignored-working-tree mirrors with an explicit config; `--directory` selects the repository root.
+`ast-grep-examples` runs native `ast-grep test`, then validates each scoped rule's `files:` and
+`ignores:` examples with project `languageGlobs` replay from its root `--config`.
+`gha-workspace-policy` checks tracked workflow and composite-action files in the current repository;
+pass `--root`, `--workflow-directory`, or `--action-directory` for consumer-owned layouts.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
@@ -177,6 +189,9 @@ import { rateLimitDelay } from 'vouchington-tooling/gha-rate-limit'
 import { parseCheckpoint } from 'vouchington-tooling/gha-pr-checkpoint'
 import { checkWorkspaceGatesPolicy } from 'vouchington-tooling/workspace-gates'
 import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-policy'
+import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
+import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
+import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'

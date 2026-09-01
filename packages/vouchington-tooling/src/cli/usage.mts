@@ -4,6 +4,10 @@ Commands:
   runner-port-policy   Print or validate a runner port policy
   with-host-lock       Run a command under a host-wide lock
   gha-runtime-audit             Audit successful GitHub Actions job runtimes
+  require-up-to-date            Require HEAD to include a fetched remote branch
+  gitleaks-directory-scan       Scan a directory with Gitleaks
+  ast-grep-examples             Run AST-grep rule examples
+  gha-workspace-policy          Check GitHub Actions workspace safety policy
   gha-output                    Write a collision-safe multiline GITHUB_OUTPUT record
   gha-needs-results             Fail if required GitHub Actions job results failed
   download-with-diagnostics     Download a URL and report HTTP status on failure
@@ -63,6 +67,11 @@ gha-runtime-audit
   [--branch main]
   --pr-workflow <name|/regex/>     Repeatable
   --push-workflow <name|/regex/>   Repeatable
+
+require-up-to-date --remote <name> --branch <name>
+gitleaks-directory-scan --config <path> [--directory <path>]
+ast-grep-examples --rules <directory> --config <path>
+gha-workspace-policy [--root <directory>] [--workflow-directory <directory>] [--action-directory <directory>]
 
 gha-output <name>
 gha-needs-results [label]

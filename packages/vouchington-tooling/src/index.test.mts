@@ -26,6 +26,9 @@ import {
   summarizeDiagnosticReport,
   waitForProcessGroupExit,
   checkGhaWorkspacePolicy,
+  astGrepExamplesArguments,
+  gitleaksDirectoryScanArguments,
+  requireUpToDate,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -60,5 +63,8 @@ describe('package exports', () => {
     expect(typeof isProcessGroupAlive).toBe('function')
     expect(typeof waitForProcessGroupExit).toBe('function')
     expect(typeof checkGhaWorkspacePolicy).toBe('function')
+    expect(typeof requireUpToDate).toBe('function')
+    expect(gitleaksDirectoryScanArguments({ config: '.gitleaks.toml' })).toContain('--config')
+    expect(astGrepExamplesArguments({ rules: 'rules', config: 'sgconfig.yml' })).toContain('test')
   })
 })
