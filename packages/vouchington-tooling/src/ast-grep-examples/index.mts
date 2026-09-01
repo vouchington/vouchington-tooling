@@ -29,6 +29,9 @@ interface LoadedRule {
   ruleFile: string
   rule: Rule
 }
+interface ValidatedLoadedRule extends LoadedRule {
+  invalid: string
+}
 interface AstGrepResult {
   status: number | null
   stdout?: string
@@ -118,14 +121,12 @@ function writeNativeTests(rules: LoadedRule[], testDir: string, semanticDir: str
   }
 }
 function scanScopedRule(
-  loaded: LoadedRule,
+  loaded: ValidatedLoadedRule,
   root: string,
   languageGlobs: Record<string, string[]>,
   execute: AstGrepExamplesExecutor,
 ): void {
-  const { rule } = loaded
-  const invalid = rule.examples?.find((example) => !example.isValid)?.code
-  if (!invalid) throw new Error(`${rule.id}: missing invalid example`)
+  const { invalid, rule } = loaded
   const expected = new Map<string, boolean>()
   for (const example of rule.examples ?? []) {
     assertExample(rule, example)
@@ -163,16 +164,15 @@ export function runAstGrepExamples(options: AstGrepExamplesOptions): number {
     yamlLoad(readFileSync(config, 'utf8')) as { languageGlobs?: Record<string, string[]> }
   ).languageGlobs
   if (!languageGlobs) throw new Error(`${config}: missing languageGlobs`)
-  const rules = loadRules(rulesDirectory)
-  for (const { rule } of rules) {
+  const rules = loadRules(rulesDirectory).map((loaded): ValidatedLoadedRule => {
+    const { rule } = loaded
     const examples = rule.examples ?? []
     for (const example of examples) assertExample(rule, example)
-    if (
-      !examples.some((example) => example.isValid) ||
-      !examples.some((example) => !example.isValid)
-    )
+    const invalid = examples.find((example) => !example.isValid)
+    if (!examples.some((example) => example.isValid) || invalid === undefined)
       throw new Error(`${rule.id}: examples require valid and invalid cases`)
-  }
+    return { ...loaded, invalid: invalid.code }
+  })
   const execute = options.execute ?? defaultExecute(options.executable ?? 'ast-grep')
   const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
   try {

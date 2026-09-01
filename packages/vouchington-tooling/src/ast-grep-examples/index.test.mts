@@ -40,6 +40,24 @@ describe('ast-grep-examples', () => {
     )
   })
 
+  it('requires language globs in the ast-grep configuration', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
+    try {
+      const rules = join(root, 'rules')
+      mkdirSync(rules)
+      writeFileSync(join(root, 'sgconfig.yml'), '{}\n')
+      writeFileSync(
+        join(rules, 'no-foo.yml'),
+        'id: no-foo\nlanguage: JavaScript\nrule: { pattern: foo }\nexamples:\n  - { code: foo, isValid: false, file: invalid.js }\n  - { code: bar, isValid: true, file: valid.js }\n',
+      )
+      expect(() => runAstGrepExamples({ rules, config: join(root, 'sgconfig.yml') })).toThrow(
+        'missing languageGlobs',
+      )
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects example paths that escape the temporary rule directory', () => {
     const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
     try {
@@ -197,7 +215,7 @@ describe('ast-grep-examples', () => {
       writeFileSync(join(root, 'sgconfig.yml'), 'languageGlobs:\n  JavaScript: ["**/*.js"]\n')
       writeFileSync(
         join(rules, 'no-foo.yml'),
-        'id: no-foo\nlanguage: JavaScript\nrule: { pattern: foo }\nfiles: ["**/*.js"]\nexamples:\n  - { code: foo, isValid: false, file: found.js }\n  - { code: bar, isValid: true, file: found.js }\n',
+        'id: no-foo\nlanguage: JavaScript\nrule: { pattern: foo }\nfiles: ["**/*.js"]\nignores: ["ignored.js"]\nexamples:\n  - { code: foo, isValid: false, file: found.js }\n  - { code: bar, isValid: true, file: found.js }\n  - { code: baz, isValid: true, file: ignored.js }\n',
       )
       try {
         return runAstGrepExamples({
@@ -213,8 +231,15 @@ describe('ast-grep-examples', () => {
     expect(() => makeRun({ status: 2, stderr: 'scan failure' })).toThrow(
       'ast-grep scan failed (exit 2): scan failure',
     )
+    expect(() => makeRun({ status: 2 })).toThrow('ast-grep scan failed (exit 2):')
     expect(() => makeRun({ status: 0, stdout: '[]' })).toThrow(
       'expected found.js to produce a finding',
     )
+    expect(() =>
+      makeRun({
+        status: 0,
+        stdout: JSON.stringify([{ file: 'found.js' }, { file: 'ignored.js' }]),
+      }),
+    ).toThrow('expected ignored.js not to produce a finding')
   })
 })
