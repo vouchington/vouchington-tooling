@@ -7,4 +7,5 @@ failure paths, authorization, and security-relevant validation rather than priva
 Start with a failing test when the behavior is testable. Finish only when the production path, its
 public contract, documentation, and generated artifacts move together. Do not leave placeholders or
 test-only production branches. For every acceptance criterion, retain evidence from a focused test,
-review, or explicitly justified manual check.
+review, or explicitly justified manual check — evidence only counts if it is falsifiable, so confirm
+the assertion is not [tautological](tautological-tests.md) before treating it as coverage.

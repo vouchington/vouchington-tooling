@@ -14,3 +14,8 @@ Consumer wrappers own solution layout, test frameworks, native dependencies, and
 
 Keep portable library tests separate from rendered application tests; batch compatible native targets
 in one selection pass so a shared build validates the same source set.
+
+Before finishing an assertion, name a concrete defect in the code under test that would make it fail;
+an `Assert.True(true)` or a re-implemented computation compared against itself passes for every input
+and proves nothing, so treat [tautological tests](../test-authoring/references/tautological-tests.md)
+as a defect even when coverage looks satisfied.
