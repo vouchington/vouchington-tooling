@@ -70,6 +70,17 @@ describe('domain skill plugins', () => {
       expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
     }
   })
+
+  it('keeps raw retrospective evidence out of durable records', async () => {
+    const retrospective = await readSkill('vouchington-workflow', 'retrospective/SKILL.md')
+    const normalized = retrospective.replaceAll(/\s+/g, ' ')
+
+    expect(normalized).toMatch(/raw evidence.*local verification/i)
+    expect(normalized).toMatch(/save only.*structured facts.*redacted summaries/i)
+    expect(normalized).toMatch(
+      /never embed unredacted.*logs.*command output.*environment dumps.*provider payloads.*transcript content/i,
+    )
+  })
 })
 
 async function readJson(path: string): Promise<{ plugins: Array<{ name: string }> }> {

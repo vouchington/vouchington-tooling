@@ -17,5 +17,10 @@ Read the local `AGENTS.md`, `CLAUDE.md`, and journal guidance first.
 4. Save through the repository's required durable mechanism and report the record identifier plus
    any follow-up decisions.
 
+Use raw evidence only for local verification. Save only bounded structured facts or redacted summaries
+in a durable retrospective; never embed unredacted logs, command output, environment dumps, provider
+payloads, or transcript content there.
+
 Do not prescribe transcript access, retention, a report schema, a journal provider, or issue
-filing policy. Consumer wrappers add those local contracts.
+filing policy. Consumer wrappers add those local contracts without weakening this minimization
+boundary.
