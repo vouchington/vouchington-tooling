@@ -13,3 +13,6 @@ fixtures small enough to make failures readable.
 Consumer wrappers own test targets, coverage thresholds, view-inspection libraries, and fixture APIs.
 
 Read [network test doubles](references/network-test-doubles.md) for cancellation and shared-state safety.
+
+Read [tautological tests](../test-authoring/references/tautological-tests.md) before finishing any
+assertion that is not obviously falsifiable by a defect in the code under test.

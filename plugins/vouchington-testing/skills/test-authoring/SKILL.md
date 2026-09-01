@@ -15,3 +15,6 @@ A consumer wrapper owns those choices.
 
 Read [core practice](references/core-practice.md) for the shared boundary, completion, and evidence
 rules before choosing a runner-specific approach.
+
+Read [tautological tests](references/tautological-tests.md) before finishing any test whose
+assertion is not obviously falsifiable by a defect in the code under test.
