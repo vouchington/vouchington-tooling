@@ -38,7 +38,7 @@
     "oxfmt": "^0.65.0",
     "oxlint": "^1.80.0",
     "oxlint-tsgolint": "^7.0.2001",
-    "pr-shepherd": "^0.46.0",
+    "pr-shepherd": "^0.46.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },
