@@ -70,6 +70,26 @@ describe('domain skill plugins', () => {
       expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
     }
   })
+
+  it('keeps raw retrospective evidence out of durable records', async () => {
+    const retrospective = await readSkill('vouchington-workflow', 'retrospective/SKILL.md')
+    const normalized = retrospective.replaceAll(/\s+/g, ' ')
+
+    expect(normalized).toMatch(/use raw evidence only for local verification/i)
+    expect(normalized).toMatch(/save only bounded structured facts or redacted summaries/i)
+    expect(normalized).toMatch(
+      /never embed unredacted logs, command output, environment dumps, provider payloads, or transcript content there/i,
+    )
+    expect(normalized).not.toMatch(
+      /(?<!not )(?<!never )\b(?:save|persist|store|retain|record|embed|include)\s+(?:any\s+|all\s+|the\s+|only\s+)?(?:raw|unredacted)\b/i,
+    )
+    expect(normalized).not.toMatch(
+      /(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:save|persist|store|retain|record|embed|include)\b[^.!?]*\b(?:raw|unredacted)\b/i,
+    )
+    expect(normalized).not.toMatch(
+      /\b(?:raw|unredacted)\b[^.!?]*\b(?:evidence|logs?|content|data|command output|environment dumps?|provider payloads?|transcript content)\b[^.!?]*(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:be\s+)?(?:saved|persisted|stored|retained|recorded|embedded|included)\b/i,
+    )
+  })
 })
 
 async function readJson(path: string): Promise<{ plugins: Array<{ name: string }> }> {
