@@ -14,11 +14,17 @@ Use when completed retrospectives or journals should become durable follow-up wo
 3. Verify each candidate against the current base and search existing issues and open changes before
    drafting. Skip work that is complete, explicitly rejected, or already covered.
 4. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
-   evidence embedded in the body. Route every authorized creation through
+   validation. Route every authorized creation through
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 5. Archive only records that were fully processed under the repository's retention rules; report
    created, updated, skipped, and deferred themes with reasons.
 
+Use source records only for local verification and leave them in the repository's approved journal
+or retention system. Public issue bodies contain only the minimum bounded facts or redacted summaries
+needed to establish the problem, proposed work, relevant areas, and validation. Never embed
+unredacted logs, command output, environment details, provider payloads, or transcript content.
+
 This skill supplies no journal API, issue repository, labels, milestones, archival command, or
-approval model. A consumer wrapper provides those details.
+approval model. Consumer wrappers cannot weaken this export boundary; they provide only those local
+details.
