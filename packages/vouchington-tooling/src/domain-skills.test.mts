@@ -80,6 +80,15 @@ describe('domain skill plugins', () => {
     expect(normalized).toMatch(
       /never embed unredacted logs, command output, environment dumps, provider payloads, or transcript content there/i,
     )
+    expect(normalized).not.toMatch(
+      /(?<!not )(?<!never )\b(?:save|persist|store|retain|record|embed|include)\s+(?:any\s+|all\s+|the\s+|only\s+)?(?:raw|unredacted)\b/i,
+    )
+    expect(normalized).not.toMatch(
+      /(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:save|persist|store|retain|record|embed|include)\b[^.!?]*\b(?:raw|unredacted)\b/i,
+    )
+    expect(normalized).not.toMatch(
+      /\b(?:raw|unredacted)\b[^.!?]*\b(?:evidence|logs?|content|data|command output|environment dumps?|provider payloads?|transcript content)\b[^.!?]*(?:\b(?:may|can|should|must)\b(?!\s+(?:not|never)\b)|\b(?:is|are)\s+(?!not\s+)(?:allowed|permitted)\s+to\b)[^.!?]*\b(?:be\s+)?(?:saved|persisted|stored|retained|recorded|embedded|included)\b/i,
+    )
   })
 })
 
