@@ -28,8 +28,9 @@ describe('ast-grep-examples', () => {
         }),
       ).toBe(0)
       expect(calls.map((args) => args[0])).toEqual(['test', 'scan'])
-      expect(calls[1]).toContain('--hidden')
-      expect(calls[1]).not.toContain('hidden')
+      expect(calls[1]).toContain('--no-ignore')
+      expect(calls[1]).toContain('hidden')
+      expect(calls[1]).not.toContain('--hidden')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
