@@ -72,6 +72,9 @@ describe('require-up-to-date', () => {
 
       expect(() => requireUpToDate({ remote: 'origin', branch: 'main', cwd: root })).not.toThrow()
       expect(() =>
+        requireUpToDate({ remote: 'missing-remote', branch: 'main', cwd: root }),
+      ).toThrow('git fetch failed with exit code 128')
+      expect(() =>
         requireUpToDate({
           remote: 'origin',
           branch: 'main',
