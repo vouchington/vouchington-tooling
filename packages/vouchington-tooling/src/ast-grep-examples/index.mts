@@ -136,7 +136,7 @@ function scanScopedRule(
   fs.copyFileSync(loaded.ruleFile, join(root, 'rule.yml'))
   fs.writeFileSync(join(root, 'sgconfig.yml'), yamlDump({ languageGlobs }))
   const result = execute(
-    ['scan', '--rule', 'rule.yml', '--config', 'sgconfig.yml', '--json', '--no-ignore', '--hidden'],
+    ['scan', '--rule', 'rule.yml', '--config', 'sgconfig.yml', '--json', '--no-ignore', 'hidden'],
     root,
   )
   if (result.status === null || result.status > 1)
