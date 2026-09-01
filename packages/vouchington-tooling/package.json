@@ -81,6 +81,21 @@
       "import": "./dist/gha-workspace-policy/index.mjs",
       "default": "./dist/gha-workspace-policy/index.mjs"
     },
+    "./require-up-to-date": {
+      "types": "./dist/require-up-to-date/index.d.mts",
+      "import": "./dist/require-up-to-date/index.mjs",
+      "default": "./dist/require-up-to-date/index.mjs"
+    },
+    "./gitleaks-directory-scan": {
+      "types": "./dist/gitleaks-directory-scan/index.d.mts",
+      "import": "./dist/gitleaks-directory-scan/index.mjs",
+      "default": "./dist/gitleaks-directory-scan/index.mjs"
+    },
+    "./ast-grep-examples": {
+      "types": "./dist/ast-grep-examples/index.d.mts",
+      "import": "./dist/ast-grep-examples/index.mjs",
+      "default": "./dist/ast-grep-examples/index.mjs"
+    },
     "./vitest-blob-manifest": {
       "types": "./dist/vitest-blob-manifest/index.d.mts",
       "import": "./dist/vitest-blob-manifest/index.mjs",

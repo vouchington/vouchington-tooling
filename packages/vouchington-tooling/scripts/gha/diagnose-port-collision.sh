@@ -208,8 +208,12 @@ done
 {
   echo "# Docker diagnostics (best effort)"
   if command -v docker >/dev/null 2>&1; then
-    run_bounded 10 docker version --format 'server={{.Server.Version}}' 2>&1 || true
-    docker_ps_output=$(run_bounded 10 docker ps --no-trunc --format 'container={{.ID}} names={{.Names}} ports={{.Ports}}' 2>&1 || true)
+    docker_probe_timeout_seconds=${VOUCHINGTON_DOCKER_DIAGNOSTIC_TIMEOUT_SECONDS:-10}
+    case "$docker_probe_timeout_seconds" in
+      ''|*[!0-9]*|0) docker_probe_timeout_seconds=10 ;;
+    esac
+    run_bounded "$docker_probe_timeout_seconds" docker version --format 'server={{.Server.Version}}' 2>&1 || true
+    docker_ps_output=$(run_bounded "$docker_probe_timeout_seconds" docker ps --no-trunc --format 'container={{.ID}} names={{.Names}} ports={{.Ports}}' 2>&1 || true)
     for port in "${valid_ports[@]}"; do
       echo "published_port=$port"
       printf '%s\n' "$docker_ps_output" | awk -v port="$port" '/^probe=/ || $0 ~ "(^|[^0-9])" port "->"' || true

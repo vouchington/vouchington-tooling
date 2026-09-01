@@ -4,7 +4,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listenOnRunnerUnreservedEphemeralPort } from '../../runner-port-policy/index.mts'
 
@@ -13,6 +13,17 @@ const scriptPath = join(
   process.cwd(),
   'packages/vouchington-tooling/scripts/gha/diagnose-port-collision.sh',
 )
+const previousDockerTimeout = process.env.VOUCHINGTON_DOCKER_DIAGNOSTIC_TIMEOUT_SECONDS
+
+beforeAll(() => {
+  process.env.VOUCHINGTON_DOCKER_DIAGNOSTIC_TIMEOUT_SECONDS = '1'
+})
+
+afterAll(() => {
+  if (previousDockerTimeout === undefined)
+    delete process.env.VOUCHINGTON_DOCKER_DIAGNOSTIC_TIMEOUT_SECONDS
+  else process.env.VOUCHINGTON_DOCKER_DIAGNOSTIC_TIMEOUT_SECONDS = previousDockerTimeout
+})
 
 async function listenOnEphemeralPort(): Promise<{
   server: ReturnType<typeof createServer>

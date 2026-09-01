@@ -3,6 +3,15 @@ import {
   type ParsedGhaArtifactsCleanup,
 } from './parse-gha-artifacts-cleanup.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
+import {
+  parseAstGrepExamples,
+  parseGhaWorkspacePolicy,
+  parseGitleaksDirectoryScan,
+  parseHttpOrigin,
+  parseLinkSkill,
+  parseRequireUpToDate,
+  parseRunnerPortPolicy,
+} from './parse-options.mts'
 
 export type ParsedCli =
   | { kind: 'help' }
@@ -24,6 +33,15 @@ export type ParsedCli =
   | { kind: 'link-skill'; name: string; sourceRoot: string; targetRoot: string }
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
+  | { kind: 'require-up-to-date'; remote: string; branch: string }
+  | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }
+  | { kind: 'ast-grep-examples'; rules: string; config: string }
+  | {
+      kind: 'gha-workspace-policy'
+      root?: string
+      workflowDirectories?: string[]
+      actionDirectories?: string[]
+    }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
 
@@ -97,89 +115,13 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'link-skill') return parseLinkSkill(rest)
   if (command === 'retrospective-facts') return { kind: 'retrospective-facts', args: rest }
   if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args: rest }
+  if (command === 'require-up-to-date') return parseRequireUpToDate(rest)
+  if (command === 'gitleaks-directory-scan') return parseGitleaksDirectoryScan(rest)
+  if (command === 'ast-grep-examples') return parseAstGrepExamples(rest)
+  if (command === 'gha-workspace-policy') return parseGhaWorkspacePolicy(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
   }
   return { kind: 'error', message: `unknown command: ${command}` }
-}
-
-function parseLinkSkill(args: readonly string[]): ParsedCli {
-  const [name, ...flags] = args
-  if (name === undefined || name.startsWith('-'))
-    return { kind: 'error', message: 'link-skill requires a skill name' }
-  let sourceRoot: string | undefined
-  let targetRoot: string | undefined
-  for (let index = 0; index < flags.length; index += 1) {
-    const flag = flags[index]
-    const value = flags[index + 1]
-    if (flag !== '--source-root' && flag !== '--target-root')
-      return { kind: 'error', message: `unknown link-skill option: ${flag}` }
-    if (value === undefined) return { kind: 'error', message: `${flag} requires a path` }
-    if (flag === '--source-root') sourceRoot = value
-    else targetRoot = value
-    index += 1
-  }
-  if (sourceRoot === undefined || targetRoot === undefined)
-    return { kind: 'error', message: 'link-skill requires --source-root and --target-root' }
-  return { kind: 'link-skill', name, sourceRoot, targetRoot }
-}
-
-function parseRunnerPortPolicy(args: readonly string[]): ParsedCli {
-  let file: string | undefined
-  let reserved: number | undefined
-  for (let index = 0; index < args.length; index += 1) {
-    const flag = args[index]
-    if (flag === '--file') {
-      const value = args[index + 1]
-      if (value === undefined) return { kind: 'error', message: '--file requires a path' }
-      file = value
-      index += 1
-      continue
-    }
-    if (flag === '--reserved') {
-      const value = args[index + 1]
-      if (value === undefined) return { kind: 'error', message: '--reserved requires a port' }
-      const port = Number(value)
-      if (!Number.isInteger(port))
-        return { kind: 'error', message: '--reserved must be an integer' }
-      reserved = port
-      index += 1
-      continue
-    }
-    if (flag === '--help' || flag === '-h') return { kind: 'help' }
-    return { kind: 'error', message: `unknown runner-port-policy option: ${flag}` }
-  }
-  return {
-    kind: 'runner-port-policy',
-    ...(file === undefined ? {} : { file }),
-    ...(reserved === undefined ? {} : { reserved }),
-  }
-}
-
-function parseHttpOrigin(args: readonly string[]): ParsedCli {
-  let field = 'origin'
-  const values: string[] = []
-  let index = 0
-  while (index < args.length) {
-    const flag = args[index]!
-    index += 1
-    if (flag === '--help' || flag === '-h') return { kind: 'help' }
-    if (flag === '--field') {
-      const value = args[index]
-      if (value === undefined) return { kind: 'error', message: '--field requires a name' }
-      field = value
-      index += 1
-      continue
-    }
-    if (flag === '--') {
-      values.push(...args.slice(index))
-      break
-    }
-    if (flag.startsWith('-'))
-      return { kind: 'error', message: `unknown http-origin option: ${flag}` }
-    values.push(flag)
-  }
-  if (values.length > 1) return { kind: 'error', message: 'http-origin accepts at most one value' }
-  return { kind: 'http-origin', field, value: values[0] ?? '' }
 }

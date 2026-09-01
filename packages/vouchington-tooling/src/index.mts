@@ -129,6 +129,18 @@ export type {
 } from './gha-runtime-audit/index.mts'
 export { checkGhaWorkspacePolicy } from './gha-workspace-policy/index.mts'
 export type { GhaWorkspacePolicyOptions } from './gha-workspace-policy/index.mts'
+export { requireUpToDate } from './require-up-to-date/index.mts'
+export type { GitExecutor, RequireUpToDateOptions } from './require-up-to-date/index.mts'
+export {
+  gitleaksDirectoryScanArguments,
+  runGitleaksDirectoryScan,
+} from './gitleaks-directory-scan/index.mts'
+export type {
+  DirectoryScanExecutor,
+  GitleaksDirectoryScanOptions,
+} from './gitleaks-directory-scan/index.mts'
+export { astGrepExamplesArguments, runAstGrepExamples } from './ast-grep-examples/index.mts'
+export type { AstGrepExamplesExecutor, AstGrepExamplesOptions } from './ast-grep-examples/index.mts'
 export {
   createVitestBlobManifest,
   createVitestReportAttempt,
