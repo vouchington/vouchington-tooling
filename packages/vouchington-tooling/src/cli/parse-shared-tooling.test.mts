@@ -53,6 +53,10 @@ describe('shared tooling command parsing', () => {
       kind: 'error',
       message: '--config requires a path',
     })
+    expect(parseCli(['node', 'vouchington', 'gitleaks-directory-scan', '--unknown'])).toEqual({
+      kind: 'error',
+      message: 'unknown gitleaks-directory-scan option: --unknown',
+    })
 
     expect(parseCli(['node', 'vouchington', 'ast-grep-examples', '--rules', 'rules'])).toEqual({
       kind: 'error',
@@ -75,6 +79,10 @@ describe('shared tooling command parsing', () => {
         'sgconfig.yml',
       ]),
     ).toEqual({ kind: 'ast-grep-examples', rules: 'rules', config: 'sgconfig.yml' })
+    expect(parseCli(['node', 'vouchington', 'ast-grep-examples', '--unknown'])).toEqual({
+      kind: 'error',
+      message: 'unknown ast-grep-examples option: --unknown',
+    })
 
     expect(parseCli(['node', 'vouchington', 'gha-workspace-policy'])).toEqual({
       kind: 'gha-workspace-policy',
@@ -100,6 +108,10 @@ describe('shared tooling command parsing', () => {
       root: 'repo',
       workflowDirectories: ['.github/workflows', 'ci/workflows'],
       actionDirectories: ['.github/actions', 'ci/actions'],
+    })
+    expect(parseCli(['node', 'vouchington', 'gha-workspace-policy', '--unknown'])).toEqual({
+      kind: 'error',
+      message: 'unknown gha-workspace-policy option: --unknown',
     })
   })
 })
