@@ -41,6 +41,16 @@ describe('shared tooling command wrappers', () => {
   it('passes ast-grep options and its result through unchanged', () => {
     expect(runAstGrepExamplesCommand({ rules: 'rules', config: 'sgconfig.yml' })).toBe(7)
     expect(runAstGrepExamples).toHaveBeenCalledWith({ rules: 'rules', config: 'sgconfig.yml' })
+    vi.mocked(runAstGrepExamples).mockImplementationOnce(() => {
+      throw new Error('invalid examples')
+    })
+    expect(runAstGrepExamplesCommand({ rules: 'rules', config: 'sgconfig.yml' })).toBe(1)
+    expect(stderr).toHaveBeenCalledWith('invalid examples\n')
+    vi.mocked(runAstGrepExamples).mockImplementationOnce(() => {
+      throw 'ast-grep unavailable'
+    })
+    expect(runAstGrepExamplesCommand({ rules: 'rules', config: 'sgconfig.yml' })).toBe(1)
+    expect(stderr).toHaveBeenCalledWith('ast-grep unavailable\n')
   })
 
   it('uses the current directory and empty policy options by default', async () => {

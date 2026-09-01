@@ -139,8 +139,10 @@ function scanScopedRule(
     ['scan', '--rule', 'rule.yml', '--config', 'sgconfig.yml', '--json', '--no-ignore', '--hidden'],
     root,
   )
-  if (result.status !== null && result.status > 1)
-    throw new Error(`ast-grep scan failed (exit ${result.status}): ${result.stderr ?? ''}`)
+  if (result.status === null || result.status > 1)
+    throw new Error(
+      `ast-grep scan failed (exit ${result.status ?? 'signal'}): ${result.stderr ?? ''}`,
+    )
   const found = new Set(
     result.stdout?.trim()
       ? (JSON.parse(result.stdout) as Array<{ file: string }>).map((f) =>

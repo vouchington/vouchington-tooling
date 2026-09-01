@@ -28,6 +28,8 @@ describe('ast-grep-examples', () => {
         }),
       ).toBe(0)
       expect(calls.map((args) => args[0])).toEqual(['test', 'scan'])
+      expect(calls[1]).toContain('--hidden')
+      expect(calls[1]).not.toContain('hidden')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -220,7 +222,7 @@ describe('ast-grep-examples', () => {
   })
 
   it('rejects a failed scoped scan and a mismatched scan result', () => {
-    const makeRun = (result: { status: number; stderr?: string; stdout?: string }) => {
+    const makeRun = (result: { status: number | null; stderr?: string; stdout?: string }) => {
       const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
       const rules = join(root, 'rules')
       mkdirSync(rules)
@@ -244,6 +246,7 @@ describe('ast-grep-examples', () => {
       'ast-grep scan failed (exit 2): scan failure',
     )
     expect(() => makeRun({ status: 2 })).toThrow('ast-grep scan failed (exit 2):')
+    expect(() => makeRun({ status: null })).toThrow('ast-grep scan failed (exit signal):')
     expect(() => makeRun({ status: 0, stdout: '[]' })).toThrow(
       'expected found.js to produce a finding',
     )
