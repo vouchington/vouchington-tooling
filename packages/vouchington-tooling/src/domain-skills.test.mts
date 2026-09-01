@@ -75,10 +75,10 @@ describe('domain skill plugins', () => {
     const retrospective = await readSkill('vouchington-workflow', 'retrospective/SKILL.md')
     const normalized = retrospective.replaceAll(/\s+/g, ' ')
 
-    expect(normalized).toMatch(/raw evidence.*local verification/i)
-    expect(normalized).toMatch(/save only.*structured facts.*redacted summaries/i)
+    expect(normalized).toMatch(/use raw evidence only for local verification/i)
+    expect(normalized).toMatch(/save only bounded structured facts or redacted summaries/i)
     expect(normalized).toMatch(
-      /never embed unredacted.*logs.*command output.*environment dumps.*provider payloads.*transcript content/i,
+      /never embed unredacted logs, command output, environment dumps, provider payloads, or transcript content there/i,
     )
   })
 })
