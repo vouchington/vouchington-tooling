@@ -61,6 +61,14 @@ describe('runCli shared tooling dispatch', () => {
       expect.stringMatching(/gitleaks-directory-scan\.sh$/u),
       ['--config', 'gitleaks.toml', '--root', 'staged'],
     )
+    expect(
+      runCli(['node', 'vouchington', 'gitleaks-directory-scan', '--config', 'gitleaks.toml']),
+    ).toBe(14)
+    expect(runScript).toHaveBeenCalledWith(
+      'bash',
+      expect.stringMatching(/gitleaks-directory-scan\.sh$/u),
+      ['--config', 'gitleaks.toml'],
+    )
 
     expect(
       runCli([

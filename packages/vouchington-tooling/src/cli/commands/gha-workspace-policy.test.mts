@@ -35,4 +35,23 @@ describe('gha-workspace-policy CLI', () => {
       { workflowDirectories: ['ci/workflows'], actionDirectories: ['ci/actions'] },
     )
   })
+
+  it('uses the production context and policy implementations by default', async () => {
+    await expect(runGhaWorkspacePolicy({ root: process.cwd() })).resolves.toBe(0)
+  })
+
+  it('writes policy failures to process stderr by default', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await expect(
+      runGhaWorkspacePolicy(
+        { root: '/repo' },
+        {
+          buildContext: async () => ({}) as never,
+          check: async () => ({ errors: ['policy failure'] }),
+        },
+      ),
+    ).resolves.toBe(1)
+    expect(stderr).toHaveBeenCalledWith('policy failure\n')
+    stderr.mockRestore()
+  })
 })

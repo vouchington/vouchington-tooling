@@ -31,6 +31,11 @@ describe('shared tooling command wrappers', () => {
     })
     expect(runRequireUpToDate({ remote: 'origin', branch: 'main' })).toBe(1)
     expect(stderr).toHaveBeenCalledWith('not current\n')
+    vi.mocked(requireUpToDate).mockImplementationOnce(() => {
+      throw 'git unavailable'
+    })
+    expect(runRequireUpToDate({ remote: 'origin', branch: 'main' })).toBe(1)
+    expect(stderr).toHaveBeenCalledWith('git unavailable\n')
   })
 
   it('passes ast-grep options and its result through unchanged', () => {

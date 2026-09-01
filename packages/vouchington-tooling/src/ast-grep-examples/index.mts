@@ -1,13 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import {
-  copyFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import * as fs from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import picomatch from 'picomatch'
@@ -29,7 +21,8 @@ interface LoadedRule {
   ruleFile: string
   rule: Rule
 }
-interface ValidatedLoadedRule extends LoadedRule {
+interface ValidatedLoadedRule extends Omit<LoadedRule, 'rule'> {
+  rule: Rule & { examples: AstGrepExample[] }
   invalid: string
 }
 interface AstGrepResult {
@@ -65,12 +58,12 @@ function eligible(rule: Rule, file: string): boolean {
   )
 }
 function loadRules(directory: string): LoadedRule[] {
-  return (readdirSync(directory, { recursive: true }) as string[])
+  return (fs.readdirSync(directory, { recursive: true }) as string[])
     .filter((file) => /\.ya?ml$/u.test(file))
     .toSorted()
     .map((file) => {
       const ruleFile = join(directory, file)
-      return { ruleFile, rule: yamlLoad(readFileSync(ruleFile, 'utf8')) as Rule }
+      return { ruleFile, rule: yamlLoad(fs.readFileSync(ruleFile, 'utf8')) as Rule }
     })
 }
 function assertExample(rule: Rule, example: AstGrepExample): void {
@@ -97,11 +90,15 @@ function defaultExecute(executable: string): AstGrepExamplesExecutor {
     return result
   }
 }
-function writeNativeTests(rules: LoadedRule[], testDir: string, semanticDir: string): void {
+function writeNativeTests(
+  rules: ValidatedLoadedRule[],
+  testDir: string,
+  semanticDir: string,
+): void {
   for (const { rule } of rules) {
     if (!/^[A-Za-z0-9_.-]+$/u.test(rule.id))
       throw new Error('rule id must be a filesystem-safe name')
-    const examples = rule.examples ?? []
+    const { examples } = rule
     const invalid = [
       ...new Set(examples.filter((example) => !example.isValid).map((example) => example.code)),
     ]
@@ -115,9 +112,9 @@ function writeNativeTests(rules: LoadedRule[], testDir: string, semanticDir: str
           .map((example) => example.code),
       ),
     ]
-    writeFileSync(join(testDir, `${rule.id}.yml`), yamlDump({ id: rule.id, valid, invalid }))
+    fs.writeFileSync(join(testDir, `${rule.id}.yml`), yamlDump({ id: rule.id, valid, invalid }))
     const { examples: _examples, files: _files, ignores: _ignores, ...semanticRule } = rule
-    writeFileSync(join(semanticDir, `${rule.id}.yml`), yamlDump(semanticRule))
+    fs.writeFileSync(join(semanticDir, `${rule.id}.yml`), yamlDump(semanticRule))
   }
 }
 function scanScopedRule(
@@ -128,16 +125,16 @@ function scanScopedRule(
 ): void {
   const { invalid, rule } = loaded
   const expected = new Map<string, boolean>()
-  for (const example of rule.examples ?? []) {
+  for (const example of rule.examples) {
     assertExample(rule, example)
     const file = example.file.replace(/\\/g, '/').replace(/^\.\//, '')
     expected.set(file, eligible(rule, file))
     const path = join(root, file)
-    mkdirSync(dirname(path), { recursive: true })
-    writeFileSync(path, invalid)
+    fs.mkdirSync(dirname(path), { recursive: true })
+    fs.writeFileSync(path, invalid)
   }
-  copyFileSync(loaded.ruleFile, join(root, 'rule.yml'))
-  writeFileSync(join(root, 'sgconfig.yml'), yamlDump({ languageGlobs }))
+  fs.copyFileSync(loaded.ruleFile, join(root, 'rule.yml'))
+  fs.writeFileSync(join(root, 'sgconfig.yml'), yamlDump({ languageGlobs }))
   const result = execute(
     ['scan', '--rule', 'rule.yml', '--config', 'sgconfig.yml', '--json', '--no-ignore', 'hidden'],
     root,
@@ -161,7 +158,7 @@ export function runAstGrepExamples(options: AstGrepExamplesOptions): number {
   const rulesDirectory = resolve(needPath(options.rules, '--rules'))
   const config = resolve(needPath(options.config, '--config'))
   const languageGlobs = (
-    yamlLoad(readFileSync(config, 'utf8')) as { languageGlobs?: Record<string, string[]> }
+    yamlLoad(fs.readFileSync(config, 'utf8')) as { languageGlobs?: Record<string, string[]> }
   ).languageGlobs
   if (!languageGlobs) throw new Error(`${config}: missing languageGlobs`)
   const rules = loadRules(rulesDirectory).map((loaded): ValidatedLoadedRule => {
@@ -171,18 +168,18 @@ export function runAstGrepExamples(options: AstGrepExamplesOptions): number {
     const invalid = examples.find((example) => !example.isValid)
     if (!examples.some((example) => example.isValid) || invalid === undefined)
       throw new Error(`${rule.id}: examples require valid and invalid cases`)
-    return { ...loaded, invalid: invalid.code }
+    return { ...loaded, rule: { ...rule, examples }, invalid: invalid.code }
   })
   const execute = options.execute ?? defaultExecute(options.executable ?? 'ast-grep')
-  const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
+  const root = fs.mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
   try {
     const tests = join(root, 'native-tests')
     const semantic = join(root, 'semantic-rules')
-    mkdirSync(tests)
-    mkdirSync(semantic)
+    fs.mkdirSync(tests)
+    fs.mkdirSync(semantic)
     writeNativeTests(rules, tests, semantic)
     const nativeConfig = join(root, 'sgconfig.yml')
-    writeFileSync(nativeConfig, yamlDump({ ruleDirs: [semantic] }))
+    fs.writeFileSync(nativeConfig, yamlDump({ ruleDirs: [semantic] }))
     const native = execute(
       ['test', '--config', nativeConfig, '--test-dir', tests, '--skip-snapshot-tests'],
       process.cwd(),
@@ -190,11 +187,11 @@ export function runAstGrepExamples(options: AstGrepExamplesOptions): number {
     if (native.status !== 0) throw new Error(`${native.stdout ?? ''}\n${native.stderr ?? ''}`)
     for (const loaded of rules.filter(({ rule }) => rule.files?.length || rule.ignores?.length)) {
       const scopedRoot = join(root, 'path-scans', loaded.rule.id)
-      mkdirSync(scopedRoot, { recursive: true })
+      fs.mkdirSync(scopedRoot, { recursive: true })
       scanScopedRule(loaded, scopedRoot, languageGlobs, execute)
     }
     return 0
   } finally {
-    rmSync(root, { force: true, recursive: true })
+    fs.rmSync(root, { force: true, recursive: true })
   }
 }

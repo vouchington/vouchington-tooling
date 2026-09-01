@@ -76,8 +76,9 @@ describe('ast-grep-examples', () => {
     }
   })
 
-  it('uses the default executor for successful native tests', () => {
+  it('uses the default executable and executor for successful native tests', () => {
     const root = mkdtempSync(join(tmpdir(), 'ast-grep-examples-'))
+    const originalPath = process.env.PATH
     try {
       const rules = join(root, 'rules')
       const executable = join(root, 'ast-grep')
@@ -89,8 +90,11 @@ describe('ast-grep-examples', () => {
       )
       writeFileSync(executable, '#!/bin/sh\nexit 0\n')
       chmodSync(executable, 0o755)
-      expect(runAstGrepExamples({ rules, config: join(root, 'sgconfig.yml'), executable })).toBe(0)
+      process.env.PATH = `${root}:${originalPath ?? ''}`
+      expect(runAstGrepExamples({ rules, config: join(root, 'sgconfig.yml') })).toBe(0)
     } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
       rmSync(root, { force: true, recursive: true })
     }
   })
@@ -141,6 +145,7 @@ describe('ast-grep-examples', () => {
 
   it('requires both valid and invalid examples', () => {
     for (const [name, examples] of [
+      ['missing-examples', undefined],
       ['missing-valid', '{ code: foo, isValid: false, file: invalid.js }'],
       ['missing-invalid', '{ code: foo, isValid: true, file: valid.js }'],
     ]) {
@@ -151,7 +156,7 @@ describe('ast-grep-examples', () => {
         writeFileSync(join(root, 'sgconfig.yml'), 'languageGlobs:\n  JavaScript: ["**/*.js"]\n')
         writeFileSync(
           join(rules, 'no-foo.yml'),
-          `id: no-foo\nlanguage: JavaScript\nrule: { pattern: foo }\nexamples:\n  - ${examples}\n`,
+          `id: no-foo\nlanguage: JavaScript\nrule: { pattern: foo }\n${examples === undefined ? '' : `examples:\n  - ${examples}\n`}`,
         )
         expect(() => runAstGrepExamples({ rules, config: join(root, 'sgconfig.yml') })).toThrow(
           'examples require valid and invalid cases',
@@ -202,6 +207,13 @@ describe('ast-grep-examples', () => {
           execute: () => ({ status: 1, stderr: 'native failure' }),
         }),
       ).toThrow('native failure')
+      expect(() =>
+        runAstGrepExamples({
+          rules,
+          config: join(root, 'sgconfig.yml'),
+          execute: () => ({ status: 1, stdout: 'native stdout' }),
+        }),
+      ).toThrow('native stdout')
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -241,5 +253,6 @@ describe('ast-grep-examples', () => {
         stdout: JSON.stringify([{ file: 'found.js' }, { file: 'ignored.js' }]),
       }),
     ).toThrow('expected ignored.js not to produce a finding')
+    expect(() => makeRun({ status: 0 })).toThrow('expected found.js to produce a finding')
   })
 })
