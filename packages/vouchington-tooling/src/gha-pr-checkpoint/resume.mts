@@ -3,7 +3,7 @@ import {
   sortedCheckpointCandidates,
   type Checkpoint,
   type GitHubComment,
-} from './index.mts'
+} from './codec.mts'
 
 export type CheckpointSelectionContext = {
   repository: string

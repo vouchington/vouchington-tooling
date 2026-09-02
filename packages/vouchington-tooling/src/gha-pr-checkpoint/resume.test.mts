@@ -5,7 +5,7 @@ import {
   renderCheckpoint,
   type Checkpoint,
   type GitHubComment,
-} from './index.mts'
+} from './codec.mts'
 import { selectResumeCheckpoint, type CheckpointSelectionContext } from './resume.mts'
 
 const startSha = 'a'.repeat(40)

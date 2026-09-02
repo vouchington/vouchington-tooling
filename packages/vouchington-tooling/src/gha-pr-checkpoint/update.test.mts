@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CHECKPOINT_MARKER, parseCheckpoint, renderCheckpoint, type Checkpoint } from './index.mts'
+import { CHECKPOINT_MARKER, parseCheckpoint, renderCheckpoint, type Checkpoint } from './codec.mts'
 import { updateExactCheckpoint, type CheckpointUpdateContext } from './update.mts'
 
 const startSha = 'a'.repeat(40)
@@ -95,6 +95,15 @@ describe('updateExactCheckpoint', () => {
     expect(() => updateExactCheckpoint(trustedComment(), context(), 'running', {})).toThrow(
       /Running checkpoint requires/u,
     )
+  })
+
+  it('rejects a malformed or non-https session URL', () => {
+    expect(() =>
+      updateExactCheckpoint(trustedComment(), context(), 'running', {
+        id: sessionId,
+        url: `http://harness.example.com/sessions/${sessionId}`,
+      }),
+    ).toThrow(/Session URL must be/u)
   })
 
   it('allows transitioning to failed without a session', () => {

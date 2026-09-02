@@ -5,7 +5,7 @@ import {
   type Checkpoint,
   type CheckpointStatus,
   type GitHubComment,
-} from './index.mts'
+} from './codec.mts'
 
 export type CheckpointUpdateContext = {
   actor: string
@@ -37,10 +37,13 @@ export function updateExactCheckpoint(
     checkpoint.headRef !== context.headRef ||
     checkpoint.startSha !== context.headSha
   ) {
-    throw new Error('Checkpoint comment does not match the active shepherd binding')
+    throw new Error('Checkpoint comment does not match the active run binding')
   }
   if (status === 'running' && (!session.id || !session.url)) {
-    throw new Error('Running checkpoint requires a Harness session id and URL')
+    throw new Error('Running checkpoint requires a session id and URL')
+  }
+  if (session.url && (!URL.canParse(session.url) || !session.url.startsWith('https:'))) {
+    throw new Error('Session URL must be a parseable https URL')
   }
   const next: Checkpoint = {
     ...checkpoint,
