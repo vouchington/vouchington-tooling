@@ -2,6 +2,7 @@ import {
   isTrustedCheckpointComment,
   sortedCheckpointCandidates,
   type Checkpoint,
+  type CheckpointCodecOptions,
   type GitHubComment,
 } from './codec.mts'
 
@@ -18,8 +19,9 @@ export type CheckpointSelectionContext = {
 export function selectResumeCheckpoint(
   comments: GitHubComment[],
   context: CheckpointSelectionContext,
+  options: CheckpointCodecOptions = {},
 ): { checkpoint: Checkpoint; commentId: number } | undefined {
-  const candidates = sortedCheckpointCandidates(comments)
+  const candidates = sortedCheckpointCandidates(comments, options)
   for (const { comment, checkpoint } of candidates) {
     if (
       !isTrustedCheckpointComment(comment, context) ||

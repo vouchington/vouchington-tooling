@@ -91,6 +91,13 @@ describe('updateExactCheckpoint', () => {
     )
   })
 
+  it('rejects a comment with no body at all', () => {
+    const comment = trustedComment({ body: undefined })
+    expect(() => updateExactCheckpoint(comment, context(), 'failed', {})).toThrow(
+      /Checkpoint comment/u,
+    )
+  })
+
   it('requires a session id and URL to transition to running', () => {
     expect(() => updateExactCheckpoint(trustedComment(), context(), 'running', {})).toThrow(
       /Running checkpoint requires/u,
@@ -109,5 +116,37 @@ describe('updateExactCheckpoint', () => {
   it('allows transitioning to failed without a session', () => {
     const rendered = updateExactCheckpoint(trustedComment(), context(), 'failed', {})
     expect(parseCheckpoint(rendered)?.status).toBe('failed')
+  })
+})
+
+describe('updateExactCheckpoint with a caller-supplied codec marker', () => {
+  const customMarker = 'acme-checkpoint:v1'
+
+  function customComment(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 42,
+      user: { login: 'github-actions[bot]', type: 'Bot' },
+      performed_via_github_app: { slug: 'github-actions' },
+      body: renderCheckpoint(checkpoint(), { marker: customMarker }),
+      ...overrides,
+    }
+  }
+
+  it('updates a checkpoint rendered with a caller-supplied marker when the same marker is passed', () => {
+    const rendered = updateExactCheckpoint(
+      customComment(),
+      context(),
+      'failed',
+      {},
+      { marker: customMarker },
+    )
+    const updated = parseCheckpoint(rendered, { marker: customMarker })
+    expect(updated?.status).toBe('failed')
+  })
+
+  it('rejects a caller-marker checkpoint when no marker option is passed', () => {
+    expect(() => updateExactCheckpoint(customComment(), context(), 'failed', {})).toThrow(
+      /Checkpoint comment/u,
+    )
   })
 })
