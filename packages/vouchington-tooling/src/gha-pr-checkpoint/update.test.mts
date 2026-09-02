@@ -91,6 +91,13 @@ describe('updateExactCheckpoint', () => {
     )
   })
 
+  it('rejects a comment with no body at all', () => {
+    const comment = trustedComment({ body: undefined })
+    expect(() => updateExactCheckpoint(comment, context(), 'failed', {})).toThrow(
+      /Checkpoint comment/u,
+    )
+  })
+
   it('requires a session id and URL to transition to running', () => {
     expect(() => updateExactCheckpoint(trustedComment(), context(), 'running', {})).toThrow(
       /Running checkpoint requires/u,
