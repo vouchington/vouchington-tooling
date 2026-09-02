@@ -184,3 +184,6 @@ function matchesPattern(pattern: RegExp, value: string): boolean {
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
+
+export { selectResumeCheckpoint, type CheckpointSelectionContext } from './resume.mts'
+export { updateExactCheckpoint, type CheckpointUpdateContext } from './update.mts'
