@@ -161,3 +161,55 @@ describe('selectResumeCheckpoint', () => {
     expect(selectResumeCheckpoint([{ id: 1, body: 'just a comment' }], context())).toBeUndefined()
   })
 })
+
+describe('selectResumeCheckpoint with caller-supplied codec options', () => {
+  const customMarker = 'acme-checkpoint:v1'
+  const sessionIdPattern = /^acme-[0-9a-f]{8}$/u
+
+  it('matches a checkpoint rendered with a caller-supplied marker', () => {
+    const result = selectResumeCheckpoint(
+      [
+        {
+          id: 42,
+          ...trustedBot(),
+          body: renderCheckpoint(checkpoint(), { marker: customMarker }),
+          created_at: '2026-07-26T05:35:55Z',
+        },
+      ],
+      context(),
+      { marker: customMarker },
+    )
+    expect(result?.commentId).toBe(42)
+  })
+
+  it('does not match a caller-marker checkpoint when no marker option is passed', () => {
+    const result = selectResumeCheckpoint(
+      [
+        {
+          id: 42,
+          ...trustedBot(),
+          body: renderCheckpoint(checkpoint(), { marker: customMarker }),
+          created_at: '2026-07-26T05:35:55Z',
+        },
+      ],
+      context(),
+    )
+    expect(result).toBeUndefined()
+  })
+
+  it('rejects a session id that does not match a caller-supplied pattern', () => {
+    const result = selectResumeCheckpoint(
+      [
+        {
+          id: 42,
+          ...trustedBot(),
+          body: renderCheckpoint(checkpoint()),
+          created_at: '2026-07-26T05:35:55Z',
+        },
+      ],
+      context(),
+      { sessionIdPattern },
+    )
+    expect(result).toBeUndefined()
+  })
+})

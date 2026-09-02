@@ -3,6 +3,7 @@ import {
   parseCheckpoint,
   renderCheckpoint,
   type Checkpoint,
+  type CheckpointCodecOptions,
   type CheckpointStatus,
   type GitHubComment,
 } from './codec.mts'
@@ -23,8 +24,9 @@ export function updateExactCheckpoint(
   context: CheckpointUpdateContext,
   status: Extract<CheckpointStatus, 'failed' | 'running'>,
   session: { id?: string; url?: string },
+  options: CheckpointCodecOptions = {},
 ): string {
-  const checkpoint = parseCheckpoint(comment.body ?? '')
+  const checkpoint = parseCheckpoint(comment.body ?? '', options)
   if (
     !checkpoint ||
     comment.id !== context.commentId ||
