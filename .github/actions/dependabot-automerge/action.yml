@@ -192,7 +192,7 @@ runs:
             throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status}): invalid JSON response`, { cause: error });
           }
           const errors = Array.isArray(result?.errors) ? result.errors.map(error => error?.message).filter(Boolean) : [];
-          const alreadyMergeablePattern = /^Pull request Pull request is in (?:clean|unstable) status$/;
+          const alreadyMergeablePattern = /^Pull request (?:Pull request )?is in (?:clean|unstable) status$/;
           if (response.ok && errors.length > 0 && errors.every(message => alreadyMergeablePattern.test(message))) {
             core.warning(`Done: pull request is already mergeable, auto-merge not needed (${errors.join('; ')})`);
             return;

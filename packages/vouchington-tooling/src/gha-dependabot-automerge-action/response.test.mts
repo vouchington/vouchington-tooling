@@ -42,6 +42,16 @@ describe('Dependabot auto-merge mutation response', () => {
     }
   })
 
+  it('also tolerates the message without the duplicated "Pull request" prefix', async () => {
+    const result = await runPolicy(metadata, {}, {}, 'merge-token', {
+      payload: { errors: [{ message: 'Pull request is in clean status' }] },
+    })
+    expect(result.failures).toEqual([])
+    expect(result.warnings).toContain(
+      'Done: pull request is already mergeable, auto-merge not needed (Pull request is in clean status)',
+    )
+  })
+
   it('still fails closed when only one of several GraphQL errors is the already-mergeable rejection', async () => {
     await expect(
       runPolicy(metadata, {}, {}, 'merge-token', {
