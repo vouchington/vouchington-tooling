@@ -87,14 +87,14 @@ jobs:
           VERSION=$(node -p "require('./packages/${PACKAGE}/package.json').version")
           git add "packages/${PACKAGE}/package.json" pnpm-lock.yaml
           git commit -m "chore(release): ${PACKAGE} v${VERSION}"
-          git tag -a "${PACKAGE}-v${VERSION}" -m "${PACKAGE} v${VERSION}"
+          git tag -a "${PACKAGE}/v${VERSION}" -m "${PACKAGE} v${VERSION}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Push release commit and tag atomically
         env:
           PACKAGE: ${{ inputs.package }}
           VERSION: ${{ steps.bump.outputs.version }}
-        run: git push --atomic origin HEAD:main "refs/tags/${PACKAGE}-v${VERSION}"
+        run: git push --atomic origin HEAD:main "refs/tags/${PACKAGE}/v${VERSION}"
 
       - name: Publish with npm OIDC
         working-directory: packages/${{ inputs.package }}
@@ -104,6 +104,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          gh release create "${{ inputs.package }}-v${{ steps.bump.outputs.version }}" \
+          gh release create "${{ inputs.package }}/v${{ steps.bump.outputs.version }}" \
             --title "${{ inputs.package }} v${{ steps.bump.outputs.version }}" \
             --generate-notes
