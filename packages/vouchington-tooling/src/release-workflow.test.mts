@@ -29,9 +29,10 @@ describe('release workflow', () => {
     const bump = steps.find((step) => step.id === 'bump')
     const push = steps.find((step) => step.run?.startsWith('git push '))
     const publish = steps.find((step) => step.name === 'Publish with npm OIDC')
+    const release = steps.find((step) => step.name === 'Create GitHub release')
 
-    expect(bump?.run).toContain('git tag -a "${PACKAGE}-v${VERSION}"')
-    expect(push?.run).toBe('git push --atomic origin HEAD:main "refs/tags/${PACKAGE}-v${VERSION}"')
+    expect(bump?.run).toContain('git tag -a "${PACKAGE}/v${VERSION}"')
+    expect(push?.run).toBe('git push --atomic origin HEAD:main "refs/tags/${PACKAGE}/v${VERSION}"')
     expect(push?.env).toEqual({
       PACKAGE: '${{ inputs.package }}',
       VERSION: '${{ steps.bump.outputs.version }}',
@@ -40,5 +41,22 @@ describe('release workflow', () => {
     expect(workflowText.match(/git push/g)).toHaveLength(1)
     expect(steps.indexOf(bump!)).toBeLessThan(steps.indexOf(push!))
     expect(steps.indexOf(push!)).toBeLessThan(steps.indexOf(publish!))
+
+    expect(release?.run).toContain(
+      'gh release create "${{ inputs.package }}/v${{ steps.bump.outputs.version }}"',
+    )
+  })
+
+  it('uses a slash-separated tag so Dependabot recognizes it as a version', () => {
+    const steps = workflow.jobs?.release?.steps ?? []
+    const bump = steps.find((step) => step.id === 'bump')
+
+    // Mirrors Dependabot::GithubActions::Version.remove_leading_v, which strips a
+    // slash-delimited monorepo prefix but never a hyphen-joined one.
+    const dependabotRecognizesVersion = (tag: string) => /^(?:.*\/)?v?[0-9]/.test(tag)
+
+    expect(dependabotRecognizesVersion('vouchington-tooling/v0.7.0')).toBe(true)
+    expect(dependabotRecognizesVersion('vouchington-tooling-v0.7.0')).toBe(false)
+    expect(bump?.run).toContain('"${PACKAGE}/v${VERSION}"')
   })
 })
