@@ -192,6 +192,11 @@ runs:
             throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status}): invalid JSON response`, { cause: error });
           }
           const errors = Array.isArray(result?.errors) ? result.errors.map(error => error?.message).filter(Boolean) : [];
+          const alreadyMergeablePattern = /^Pull request (?:Pull request )?is in (?:clean|unstable) status$/;
+          if (response.ok && errors.length > 0 && errors.every(message => alreadyMergeablePattern.test(message))) {
+            core.warning(`Done: pull request is already mergeable, auto-merge not needed (${errors.join('; ')})`);
+            return;
+          }
           if (!response.ok || errors.length > 0) throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status})${errors.length > 0 ? `: ${errors.join('; ')}` : ''}`);
           const payload = result?.data?.enablePullRequestAutoMerge;
           if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !Object.hasOwn(payload, 'clientMutationId')) throw new Error(`Unable to enable Dependabot auto-merge (HTTP ${response.status}): unexpected response envelope`);
