@@ -32,11 +32,16 @@ describe('CI required-result gate action', () => {
 
   it('accepts skipped results and rejects failures and cancellations in every mode', () => {
     for (const mode of ['required', 'build']) {
-      expect(
-        spawnSync('bash', [scriptPath], {
-          env: { MODE: mode, RESULTS: '{"dependency":{"result":"skipped"}}' },
-        }).status,
-      ).toBe(0)
+      const accepted = spawnSync('bash', [scriptPath], {
+        encoding: 'utf8',
+        env: { MODE: mode, RESULTS: '{"dependency":{"result":"skipped"}}' },
+      })
+      expect(accepted.status).toBe(0)
+      expect(accepted.stdout).toContain(
+        mode === 'build'
+          ? 'All build jobs passed or were skipped'
+          : 'All required jobs passed or were skipped',
+      )
       for (const value of ['failure', 'cancelled', 'timed_out', 'unknown']) {
         expect(
           spawnSync('bash', [scriptPath], {

@@ -139,17 +139,22 @@ the merge gate; consumers should not add a separate workflow that auto-approves 
 
 ### Required-result gate
 
-Pin `ci-required-result-gate` by commit SHA to give a required fan-in job a strict, compact
+Pin `ci-required-result-gate` by its full 40-character commit SHA to give a required fan-in job a strict, compact
 dependency-result contract. The action accepts only a non-empty JSON object whose entries contain
 exactly a `result` of `success` or `skipped`; failures, cancellations, missing results, and malformed
 input fail the gate. It is dependency-free and resolves its checked-in shell script from
 `GITHUB_ACTION_PATH`, so it does not require checkout or Node dependencies.
 
 ```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/ci-required-result-gate@<sha>
+- uses: vouchington/vouchington-tooling/.github/actions/ci-required-result-gate@<40-character-commit-sha> # v1.0.0
   with:
-    results: ${{ toJSON(needs) }}
+    results: >-
+      {"tests":{"result":"${{ needs.tests.result }}"},"lint":{"result":"${{ needs.lint.result }}"}}
 ```
+
+Keep the full commit SHA authoritative; the trailing release comment is only a human-readable update
+hint. Build the compact object explicitly from each dependency's `result` instead of passing
+`toJSON(needs)`, which may contain unsupported fields or exceed process environment limits.
 
 Use `mode: build` only when preserving an existing build-gate name or message contract; it applies
 the same `success`/`skipped` acceptance rule.
