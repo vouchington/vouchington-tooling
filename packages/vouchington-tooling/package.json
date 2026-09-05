@@ -262,6 +262,11 @@
       "import": "./dist/vitest-diagnostics/index.mjs",
       "default": "./dist/vitest-diagnostics/index.mjs"
     },
+    "./gh-cli": {
+      "types": "./dist/gh-cli/index.d.mts",
+      "import": "./dist/gh-cli/index.mjs",
+      "default": "./dist/gh-cli/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

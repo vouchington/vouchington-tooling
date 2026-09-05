@@ -455,3 +455,20 @@ export type {
   DiagnosticReportLimitOptions,
   DiagnosticReportSummary,
 } from './vitest-diagnostics/index.mts'
+export { createCommandRunner, runGh, runGit } from './gh-cli/index.mts'
+export type { ExecFileText, RunTextCommand } from './gh-cli/index.mts'
+export { getDiffAgainstBase } from './gh-cli/index.mts'
+export {
+  assertHeadPushed,
+  buildGhPrCreateArgs,
+  createPullRequest,
+  DetachedHeadError,
+  HeadNotPushedError,
+  resolveHeadBranch,
+} from './gh-cli/index.mts'
+export type {
+  AssertHeadPushedOptions,
+  BuildGhPrCreateArgsOptions,
+  CreatePullRequestExecutors,
+  CreatePullRequestOptions,
+} from './gh-cli/index.mts'

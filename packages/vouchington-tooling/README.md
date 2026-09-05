@@ -207,6 +207,7 @@ import {
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
+import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
 ```
 
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
