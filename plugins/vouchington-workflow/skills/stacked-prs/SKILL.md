@@ -12,25 +12,32 @@ merge.
 
 A stack is a sequence of branches, each submitted as its own pull request, where every PR but the
 bottom-most one targets the PR below it as its base branch instead of targeting the default branch
-directly. That parent-branch base is the hazard: a mid-stack PR's base ref is an unmerged branch,
-not the default branch, so a generic "merge this PR" action taken on a mid-stack layer can land it
-into that unmerged parent instead of where it needs to go. Before treating any merge action on a
-stacked PR as safe, confirm its actual base branch, and treat a base that is not the default branch
-as a sign the PR is mid-stack.
+directly. GitHub tracks a chain like this as a single stack, and its own documentation on merging
+stacked pull requests is explicit about what a merge then does: "the selected pull request and all
+unmerged pull requests below it land on the base branch together as a single operation, ordered
+from the bottom up," and merging one is only possible once everything below it already satisfies
+whatever this repository requires to merge — you cannot merge an isolated middle layer on its own.
+That is dedicated stack-merge behavior, not the ordinary single-branch merge semantics a generic
+"merge this PR" action assumes, and it comes with its own restrictions: GitHub does not support
+auto-merge for stacked pull requests at all, and a plain, non-stack-aware merge mechanism is not
+guaranteed to reproduce this cascade correctly. A mid-stack PR's base ref being an unmerged branch,
+not the default branch, is the sign to slow down and confirm the merge path in use actually
+understands stacks before treating it as routine.
 
 Drain a stack from the bottom, one layer at a time, merging each bottom-most layer as soon as it
 becomes ready rather than waiting for every layer above it to be ready first. A stack should stay as
 short as it can be: every layer that remains unmerged keeps accumulating rebase surface, CI cost,
 and drift against the default branch, and that cost compounds for every layer still stacked above
-it.
+it. Because stacked pull requests do not auto-merge, draining only happens through a deliberate
+merge action taken each time a layer becomes ready — nothing lands on its own just because it is
+ready.
 
-Only merging the bottom-most layer into the default branch actually drains anything: that merge
-lands the bottom layer, and the parent-branch bases above it can now be retargeted onto the default
-branch as that layer closes. Merging a higher layer instead lands it into its own parent branch, not
-the default branch, and leaves every layer below it exactly as open and unmerged as before — no
-progress toward the default branch has been made, even though a PR closed. So whatever merge
-selector or target is used to drain the stack must name the bottom-most unmerged layer specifically,
-not an arbitrary or more convenient one.
+Merging a given layer lands that layer and every unmerged layer below it in the same operation, so
+whatever merge target is used must name the bottom-most unmerged layer specifically, not a higher
+one, to land exactly the increment intended for that drain step: naming a higher layer either merges
+more than intended, when everything below also happens to be ready, or is simply unavailable, when
+it is not. Once a layer merges, GitHub retargets the next unmerged layer onto the default branch
+directly, so it becomes the new bottom — treat it the same way on the next drain step.
 
 When a drain stalls — something on the stack needs human attention, or a layer closes without
 merging — but the bottom-most layer is otherwise ready to merge, stop before yielding: report the
