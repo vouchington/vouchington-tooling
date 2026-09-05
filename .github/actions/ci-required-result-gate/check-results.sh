@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ -z "${RESULTS:-}" ]; then
-  echo "::error::RESULTS is required"
+  echo "::error::RESULTS is required" >&2
   exit 1
 fi
 
