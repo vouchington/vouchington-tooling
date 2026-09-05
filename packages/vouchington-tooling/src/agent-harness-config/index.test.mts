@@ -11,8 +11,9 @@ import {
 import { parseAgentHarnessConfigArguments, runAgentHarnessConfigCli } from './cli.mts'
 import { applyJsonPatches } from './merge-json.mts'
 import { applyTomlPatches, readTomlKey } from './merge-toml.mts'
-import { parseTomlValue } from './toml-value.mts'
+import { formatTomlValue, parseTomlValue } from './toml-value.mts'
 import { CURSOR_APPROVAL_MODE, DEFAULT_EXTRA_WRITABLE_ROOTS } from './policy.mts'
+import * as policy from './policy.mts'
 
 async function tempDir(prefix: string): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix))
@@ -258,6 +259,22 @@ describe('CLI', () => {
       await runAgentHarnessConfigCli(['check', '--global', '--home', home, '--harness', 'cursor']),
     ).toBe(0)
   })
+
+  it('checks a repo without harness or home flags', async () => {
+    const root = await tempDir('harness-cli-repo-')
+    expect(await runAgentHarnessConfigCli(['check', '--repo', root])).toBe(1)
+    expect(stdout.mock.calls.map(String).join('')).toMatch(/missing /)
+  })
+
+  it('stringifies non-Error CLI failures', async () => {
+    const spy = vi.spyOn(policy, 'dumpHarnessPolicy').mockImplementation(() => {
+      throw 'boom'
+    })
+    expect(await runAgentHarnessConfigCli(['dump'])).toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toBe('boom\n')
+    spy.mockRestore()
+    expect(dumpHarnessPolicy().cursor.approvalMode).toBe(CURSOR_APPROVAL_MODE)
+  })
 })
 
 describe('edge coverage', () => {
@@ -269,10 +286,25 @@ describe('edge coverage', () => {
     expect(() => applyJsonPatches('[]', [{ path: ['a'], value: 1 }], 'x.json')).toThrow(
       /JSON object/,
     )
+    expect(formatTomlValue(false)).toBe('false')
+    expect(formatTomlValue(true)).toBe('true')
     expect(parseTomlValue(`'~/.cargo'`, 0).value).toBe('~/.cargo')
     expect(parseTomlValue('"a\\nb\\tc\\\\"', 0).value).toBe('a\nb\tc\\')
+    expect(parseTomlValue('false', 0).value).toBe(false)
     expect(() => parseTomlValue('"unterminated', 0)).toThrow(/unterminated/)
+    expect(() => parseTomlValue('"\\', 0)).toThrow(/unterminated/)
     expect(() => parseTomlValue('[1]', 0)).toThrow(/array value/)
+    expect(() => parseTomlValue('123', 0)).toThrow(/unsupported TOML value/)
+    expect(
+      applyTomlPatches(
+        '[]\n[sandbox]\nprofile = "ask"\n',
+        [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
+        'p.toml',
+      ).text,
+    ).toContain('workspace-write')
+    expect(
+      applyTomlPatches('', [{ key: 'enabled', table: '', value: false }], 'root.toml').text,
+    ).toContain('enabled = false')
     const noNl = applyTomlPatches(
       'sandbox_mode = "read-only"',
       [

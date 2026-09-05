@@ -65,9 +65,8 @@ export function readTomlKey(text: string, table: string, key: string): unknown {
 
 function appendTable(text: string, table: string, assignment: string): string {
   const prefix = text === '' || text.endsWith('\n') ? text : `${text}\n`
-  const header = table === '' ? '' : `[${table}]\n`
-  const blank = prefix !== '' && table !== '' && !prefix.endsWith('\n\n') ? '\n' : ''
-  return `${prefix}${blank}${header}${assignment}\n`
+  const blank = prefix !== '' && !prefix.endsWith('\n\n') ? '\n' : ''
+  return `${prefix}${blank}[${table}]\n${assignment}\n`
 }
 
 function upsertTomlKey(text: string, table: string, key: string, value: TomlValue): string {
