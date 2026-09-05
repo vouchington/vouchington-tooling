@@ -2,9 +2,16 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { applyHarnessConfig, checkHarnessConfig, dumpHarnessPolicy } from './index.mts'
+import {
+  applyHarnessConfig,
+  checkHarnessConfig,
+  dumpHarnessPolicy,
+  planHarnessConfig,
+} from './index.mts'
 import { parseAgentHarnessConfigArguments, runAgentHarnessConfigCli } from './cli.mts'
+import { applyJsonPatches } from './merge-json.mts'
 import { applyTomlPatches, readTomlKey } from './merge-toml.mts'
+import { parseTomlValue } from './toml-value.mts'
 import { CURSOR_APPROVAL_MODE, DEFAULT_EXTRA_WRITABLE_ROOTS } from './policy.mts'
 
 async function tempDir(prefix: string): Promise<string> {
@@ -221,6 +228,11 @@ describe('CLI', () => {
     expect(() => parseAgentHarnessConfigArguments(['apply', '--harness', 'nope'])).toThrow(
       /unknown harness/,
     )
+    expect(() => parseAgentHarnessConfigArguments(['check', '--repo'])).toThrow(/requires a value/)
+    expect(() => parseAgentHarnessConfigArguments(['check', '--wat'])).toThrow(/unknown/)
+    expect(() => parseAgentHarnessConfigArguments([])).toThrow(
+      /unknown agent-harness-config action/,
+    )
   })
 
   it('dumps policy JSON and rejects a missing target', async () => {
@@ -231,5 +243,78 @@ describe('CLI', () => {
     expect(dumped.cursor.approvalMode).toBe('auto-review')
     expect(await runAgentHarnessConfigCli(['check'])).toBe(2)
     expect(String(stderr.mock.calls[0]?.[0])).toContain('--global')
+  })
+
+  it('checks drift then applies under an isolated home', async () => {
+    const home = await tempDir('harness-cli-home-')
+    expect(
+      await runAgentHarnessConfigCli(['check', '--global', '--home', home, '--harness', 'cursor']),
+    ).toBe(1)
+    expect(stdout.mock.calls.map(String).join('')).toMatch(/approvalMode/)
+    expect(
+      await runAgentHarnessConfigCli(['apply', '--global', '--home', home, '--harness', 'cursor']),
+    ).toBe(0)
+    expect(
+      await runAgentHarnessConfigCli(['check', '--global', '--home', home, '--harness', 'cursor']),
+    ).toBe(0)
+  })
+})
+
+describe('edge coverage', () => {
+  it('covers JSON, TOML, and repo/global remaining branches', async () => {
+    expect(dumpHarnessPolicy(['/tmp/extra']).extraWritableRoots).toEqual(['/tmp/extra'])
+    expect(planHarnessConfig({ kind: 'global' }).files.length).toBeGreaterThan(0)
+    expect(applyJsonPatches('', [], 'x.json').text).toBe('{}\n')
+    expect(applyJsonPatches('{}', [{ path: [], value: 1 }], 'x.json').drifts).toHaveLength(1)
+    expect(() => applyJsonPatches('[]', [{ path: ['a'], value: 1 }], 'x.json')).toThrow(
+      /JSON object/,
+    )
+    expect(parseTomlValue(`'~/.cargo'`, 0).value).toBe('~/.cargo')
+    expect(parseTomlValue('"a\\nb\\tc\\\\"', 0).value).toBe('a\nb\tc\\')
+    expect(() => parseTomlValue('"unterminated', 0)).toThrow(/unterminated/)
+    expect(() => parseTomlValue('[1]', 0)).toThrow(/array value/)
+    const noNl = applyTomlPatches(
+      'sandbox_mode = "read-only"',
+      [
+        { key: 'sandbox_mode', table: '', value: 'workspace-write' },
+        { key: 'profile', table: 'sandbox', value: 'workspace-write' },
+      ],
+      'c.toml',
+    )
+    expect(noNl.text).toContain('sandbox_mode = "workspace-write"')
+    expect(noNl.text).toContain('[sandbox]')
+    const quoted = applyTomlPatches(
+      "read_write = ['~/.cargo']\n[]\n",
+      [{ key: 'read_write', table: '', value: ['~/.cargo'] }],
+      's.toml',
+    )
+    expect(quoted.drifts).toEqual([])
+    expect(
+      applyTomlPatches(
+        '[sandbox]profile = "ask"',
+        [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
+        'p.toml',
+      ).text,
+    ).toContain('workspace-write')
+    expect(
+      applyTomlPatches(
+        '[ui]\npermission_mode = "ask"',
+        [{ key: 'enabled', table: 'auto_mode', value: true }],
+        'u.toml',
+      ).text,
+    ).toContain('[auto_mode]')
+    const home = await tempDir('harness-edges-')
+    await applyHarnessConfig({ kind: 'global' }, { harnesses: ['claude'], home })
+    const root = await tempDir('harness-repo-all-')
+    await applyHarnessConfig({ kind: 'repo', root }, { extraWritableRoots: ['/tmp/extra-root'] })
+    const sandbox = await readFile(join(root, '.grok', 'sandbox.toml'), 'utf8')
+    expect(readTomlKey(sandbox, 'profiles.workspace-write', 'read_write')).toEqual([
+      '/tmp/extra-root',
+    ])
+    await mkdir(join(home, '.cursor'), { recursive: true })
+    await mkdir(join(home, '.cursor', 'cli-config.json'))
+    await expect(
+      applyHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home }),
+    ).rejects.toThrow()
   })
 })
