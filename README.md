@@ -109,6 +109,12 @@ Centralized Cursor marketplace publication is not part of this repository change
 
 ## GitHub Actions
 
+Pin composite actions by commit SHA and keep a trailing `# vX.Y.Z` comment.
+Git tags are `vouchington-tooling/vX.Y.Z` (slash-separated) so Dependabot can
+parse them. Hyphenated `vouchington-tooling-vX.Y.Z` tags from before v0.6.2 are
+historical. The `Backfill slash release tags` workflow aliases those hyphen tags
+onto the same commits without creating GitHub Releases or publishing to npm.
+
 Pin the public Dependabot automerge action by commit SHA.
 
 ```yaml

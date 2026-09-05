@@ -1,0 +1,56 @@
+name: Backfill slash release tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print planned tag creates without writing or pushing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backfill-slash-release-tags
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Check RELEASE_TOKEN is set
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN secret is not set. It needs Contents Read & Write on this repository." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: main
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Backfill slash aliases
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          extra=--dry-run
+          if [ "$DRY_RUN" != true ]; then
+            extra=--push
+          fi
+          bash packages/vouchington-tooling/scripts/gha/backfill-slash-release-tags.sh \
+            --package vouchington-tooling \
+            --package eslint-plugin-vouchington \
+            "$extra"
