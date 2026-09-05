@@ -1,7 +1,7 @@
 {
   "name": "vouchington-workflow",
-  "version": "0.6.3",
-  "description": "Portable implementation, dependency automation, planning, publishing, issue, retrospective, event-driven CI, and PR workflow skills for Codex and Claude.",
+  "version": "0.7.0",
+  "description": "Portable implementation, dependency automation, planning, publishing, issue, retrospective, event-driven CI, stacked-PR, and PR workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington",
     "url": "https://github.com/vouchington"
@@ -18,6 +18,7 @@
     "issues",
     "retrospective",
     "pull-requests",
+    "stacked-prs",
     "npm",
     "dependabot"
   ],
@@ -25,7 +26,7 @@
   "interface": {
     "displayName": "Workflow foundations",
     "shortDescription": "Portable repository workflow guidance.",
-    "longDescription": "Repository-neutral skills for implementation, commits, event-driven Actions, Dependabot policy, dependency metadata, npm publishing, static analysis, planning, issue management, retrospectives, CI-log review, and pull-request descriptions.",
+    "longDescription": "Repository-neutral skills for implementation, commits, event-driven Actions, Dependabot policy, dependency metadata, npm publishing, static analysis, planning, issue management, retrospectives, CI-log review, stacked pull-request draining, and pull-request descriptions.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],
