@@ -24,11 +24,13 @@ short as it can be: every layer that remains unmerged keeps accumulating rebase 
 and drift against the default branch, and that cost compounds for every layer still stacked above
 it.
 
-Merging a given layer typically lands that layer and every unmerged layer below it too, because that
-is what a base chain means: nothing above can land without pulling in everything below it. So
-whatever merge selector or target is used must name the bottom-most unmerged layer specifically, not
-an arbitrary or more convenient one — naming a higher layer lands multiple layers in one action
-instead of draining the stack one layer at a time.
+Only merging the bottom-most layer into the default branch actually drains anything: that merge
+lands the bottom layer, and the parent-branch bases above it can now be retargeted onto the default
+branch as that layer closes. Merging a higher layer instead lands it into its own parent branch, not
+the default branch, and leaves every layer below it exactly as open and unmerged as before — no
+progress toward the default branch has been made, even though a PR closed. So whatever merge
+selector or target is used to drain the stack must name the bottom-most unmerged layer specifically,
+not an arbitrary or more convenient one.
 
 When a drain stalls — something on the stack needs human attention, or a layer closes without
 merging — but the bottom-most layer is otherwise ready to merge, stop before yielding: report the
