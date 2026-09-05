@@ -25,6 +25,7 @@ export default defineConfig({
         'packages/*/src/dockerfile-parse/index.mts',
         'packages/*/src/workspace-gates/index.mts',
         'packages/*/src/workspace-gates/index.mts',
+        'packages/*/src/gh-cli/index.mts',
         'packages/*/src/**/*-types.mts',
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],

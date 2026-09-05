@@ -38,6 +38,7 @@
         "src/swift-semantic-equal/cli.mts!",
         "src/swift-source-offset/index.mts!",
         "src/swift-resolved-pin-delta/index.mts!",
+        "src/gh-cli/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

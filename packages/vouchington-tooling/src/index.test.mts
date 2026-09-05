@@ -30,6 +30,12 @@ import {
   astGrepPackPaths,
   gitleaksDirectoryScanArguments,
   requireUpToDate,
+  buildGhPrCreateArgs,
+  createPullRequest,
+  getDiffAgainstBase,
+  HeadNotPushedError,
+  runGh,
+  runGit,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -68,5 +74,11 @@ describe('package exports', () => {
     expect(gitleaksDirectoryScanArguments({ config: '.gitleaks.toml' })).toContain('--config')
     expect(astGrepExamplesArguments({ rules: 'rules', config: 'sgconfig.yml' })).toContain('test')
     expect(astGrepPackPaths().config).toMatch(/sgconfig\.yml$/)
+    expect(typeof runGh).toBe('function')
+    expect(typeof runGit).toBe('function')
+    expect(buildGhPrCreateArgs({ title: 't', bodyFile: 'body.md', head: 'x' })).toContain('--head')
+    expect(typeof createPullRequest).toBe('function')
+    expect(typeof getDiffAgainstBase).toBe('function')
+    expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
   })
 })

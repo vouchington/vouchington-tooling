@@ -286,6 +286,7 @@ import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
+import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
 ```
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
