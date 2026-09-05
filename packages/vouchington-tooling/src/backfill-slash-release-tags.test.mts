@@ -80,7 +80,10 @@ describe('backfill-slash-release-tags', () => {
     expect(runScript(repo, ['--unknown']).status).toBe(2)
     expect(runScript(repo, ['--package', 'pkg/name']).stderr).toContain('invalid package name')
     expect(runScript(repo, ['--package', 'pkg', '--dry-run', '--push']).stderr).toContain(
-      'cannot combine --dry-run and --push',
+      'cannot combine --dry-run with --write or --push',
+    )
+    expect(runScript(repo, ['--package', 'pkg', '--dry-run', '--write']).stderr).toContain(
+      'cannot combine --dry-run with --write or --push',
     )
   })
 
@@ -94,7 +97,7 @@ describe('backfill-slash-release-tags', () => {
     git(repo, ['tag', '-a', 'demo/v0.1.1', '-m', 'demo v0.1.1'])
     git(repo, ['tag', '-a', 'other-v9.9.9', '-m', 'other v9.9.9'])
 
-    const created = runScript(repo, ['--package', 'demo'])
+    const created = runScript(repo, ['--package', 'demo', '--write'])
     expect(created.status, created.stderr).toBe(0)
     expect(created.stdout).toContain(`create demo/v0.1.0 -> ${first}`)
     expect(created.stdout).toContain(`skip demo/v0.1.1 (already at ${second})`)
@@ -104,7 +107,7 @@ describe('backfill-slash-release-tags', () => {
     git(repo, ['tag', '-a', 'demo-v0.2.0', '-m', 'demo v0.2.0'])
     git(repo, ['commit', '--allow-empty', '-m', 'third'])
     git(repo, ['tag', '-a', 'demo/v0.2.0', '-m', 'other commit'])
-    const conflict = runScript(repo, ['--package', 'demo'])
+    const conflict = runScript(repo, ['--package', 'demo', '--write'])
     expect(conflict.status).toBe(1)
     expect(conflict.stderr).toContain('slash tag demo/v0.2.0 points at')
   })
@@ -114,6 +117,11 @@ describe('backfill-slash-release-tags', () => {
     const commit = head(repo)
     git(repo, ['tag', '-a', 'demo-v1.0.0', '-m', 'demo v1.0.0'])
     git(repo, ['tag', '-a', 'demo-v1.0.0-rc.1', '-m', 'demo v1.0.0-rc.1'])
+
+    const implicitDry = runScript(repo, ['--package', 'demo'])
+    expect(implicitDry.status, implicitDry.stderr).toBe(0)
+    expect(implicitDry.stdout).toContain(`create demo/v1.0.0 -> ${commit}`)
+    expect(git(repo, ['tag', '--list', 'demo/v*']).stdout.trim()).toBe('')
 
     const dry = runScript(repo, ['--package', 'demo', '--dry-run'])
     expect(dry.status, dry.stderr).toBe(0)
@@ -140,7 +148,7 @@ describe('backfill-slash-release-tags', () => {
   it('rejects hyphen tags that are not package-v-semver', () => {
     const repo = initRepo()
     git(repo, ['tag', '-a', 'demo-vnot-a-version', '-m', 'bad'])
-    const result = runScript(repo, ['--package', 'demo'])
+    const result = runScript(repo, ['--package', 'demo', '--write'])
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('is not <package>-v<semver>')
   })

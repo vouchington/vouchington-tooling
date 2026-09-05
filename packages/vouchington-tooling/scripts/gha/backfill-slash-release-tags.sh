@@ -2,11 +2,12 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: backfill-slash-release-tags.sh --package NAME [--package NAME] [--dry-run] [--push] [--remote NAME]" >&2
+  echo "usage: backfill-slash-release-tags.sh --package NAME [--package NAME]... [--dry-run] [--write] [--push] [--remote NAME]" >&2
 }
 
 packages=()
-dry_run=0
+explicit_dry=0
+do_write=0
 do_push=0
 remote=origin
 
@@ -18,7 +19,11 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --dry-run)
-      dry_run=1
+      explicit_dry=1
+      shift
+      ;;
+    --write)
+      do_write=1
       shift
       ;;
     --push)
@@ -46,9 +51,14 @@ if [ "${#packages[@]}" -eq 0 ]; then
   exit 2
 fi
 
-if [ "$dry_run" -eq 1 ] && [ "$do_push" -eq 1 ]; then
-  echo "cannot combine --dry-run and --push" >&2
+if [ "$explicit_dry" -eq 1 ] && { [ "$do_write" -eq 1 ] || [ "$do_push" -eq 1 ]; }; then
+  echo "cannot combine --dry-run with --write or --push" >&2
   exit 2
+fi
+
+dry_run=1
+if [ "$do_write" -eq 1 ] || [ "$do_push" -eq 1 ]; then
+  dry_run=0
 fi
 
 semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
@@ -69,10 +79,10 @@ for package in "${packages[@]}"; do
     fi
 
     slash_tag="${package}/v${version}"
-    commit="$(git rev-parse "${hyphen_tag}^{commit}")"
+    commit="$(git rev-parse "refs/tags/${hyphen_tag}^{commit}")"
 
     if git rev-parse -q --verify "refs/tags/${slash_tag}" >/dev/null; then
-      existing="$(git rev-parse "${slash_tag}^{commit}")"
+      existing="$(git rev-parse "refs/tags/${slash_tag}^{commit}")"
       if [ "$existing" != "$commit" ]; then
         echo "slash tag ${slash_tag} points at ${existing}, expected ${commit}" >&2
         exit 1
