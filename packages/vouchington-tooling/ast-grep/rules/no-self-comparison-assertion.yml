@@ -1,0 +1,53 @@
+id: no-self-comparison-assertion
+language: TypeScript
+severity: error
+message: 'This compares an expression against itself (e.g. expect(result.id).toBe(result.id)). ast-grep metavariables enforce identical text, so both sides read the same value the same way; nearly every real occurrence of this shape is a copy-paste bug where the second operand should have been an independently derived expected value. Compare against that instead, or a fixture-provided value the code under test did not produce. (Two syntactic shapes are exempted because they cannot be tautological by construction: an expression containing a call anywhere in it, e.g. expect(f(a)).toBe(f(a)) or expect((await load()).id).toBe((await load()).id), is a fresh invocation on each side and legitimately tests that the call is deterministic/pure; and a postfix/prefix increment or decrement, e.g. expect(index++).toBe(index++), advances state between the two reads. A getter or other stateful property access is NOT exempted -- ast-grep cannot see whether a given `.foo` is a plain field or a getter with side effects, and every real violation this rule has caught in this repo is a plain field, so this stays flagged by design; if you are deliberately asserting that such an accessor is stable across two reads, add an `ast-grep-ignore: no-self-comparison-assertion` comment with that rationale instead of weakening this rule.)'
+files:
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+rule:
+  pattern: 'expect($X).toBe($X)'
+constraints:
+  X:
+    not:
+      any:
+        - kind: 'true'
+        - kind: 'false'
+        - kind: 'number'
+        - kind: 'string'
+        - kind: 'null'
+        - kind: 'undefined'
+        - kind: 'call_expression'
+        - kind: 'update_expression'
+        - has:
+            kind: 'call_expression'
+            stopBy: end
+examples:
+  - code: 'expect(result.id).toBe(result.id)'
+    isValid: false
+    file: 'backend/services/example/__tests__/items.test.mts'
+  - code: 'expect(conversationId).toBe(conversationId)'
+    isValid: false
+    file: 'src/__tests__/routes.user-admin.part-5.test.mts'
+  - code: 'expect(result.id).toBe(expectedId)'
+    isValid: true
+    file: 'backend/services/example/__tests__/items.test.mts'
+  - code: 'expect(await run()).not.toBeNull()'
+    isValid: true
+    file: 'src/__tests__/routes.user-admin.part-5.test.mts'
+  - code: 'expect(buildCanonicalRequestString(...args)).toBe(buildCanonicalRequestString(...args))'
+    isValid: true
+    file: 'backend/services/example/request-canonical.test.mts'
+  - code: 'expect((await load()).id).toBe((await load()).id)'
+    isValid: true
+    file: 'backend/services/example/__tests__/items.test.mts'
+  - code: 'expect(result.id).toBe(result.id)'
+    isValid: true
+    file: 'backend/services/example/items.mts'
+  - code: 'expect(index++).toBe(index++)'
+    isValid: true
+    file: 'backend/services/example/__tests__/items.test.mts'

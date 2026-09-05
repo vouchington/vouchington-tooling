@@ -1,0 +1,33 @@
+id: no-runner-temp-nullish
+language: TypeScript
+severity: error
+message: 'Use logical OR for RUNNER_TEMP temp roots so an empty string falls back safely.'
+files:
+  - '**/*.ts'
+  - '**/*.tsx'
+  - '**/*.mts'
+  - '**/*.cts'
+rule:
+  any:
+    - pattern: $ENV.RUNNER_TEMP ?? $$$
+    - pattern: $ENV['RUNNER_TEMP'] ?? $$$
+    - pattern: $ENV["RUNNER_TEMP"] ?? $$$
+examples:
+  - code: 'const root = process.env.RUNNER_TEMP ?? os.tmpdir()'
+    isValid: false
+    file: 'src/setup.mts'
+  - code: 'const root = env.RUNNER_TEMP ?? env.TMPDIR'
+    isValid: false
+    file: 'src/env.mts'
+  - code: 'const root = process.env["RUNNER_TEMP"] ?? os.tmpdir()'
+    isValid: false
+    file: 'src/setup.mts'
+  - code: "const root = env['RUNNER_TEMP'] ?? env.TMPDIR"
+    isValid: false
+    file: 'src/env.mts'
+  - code: 'const root = process.env.RUNNER_TEMP || os.tmpdir()'
+    isValid: true
+    file: 'src/setup.mts'
+  - code: 'const root = env.RUNNER_TEMP || env.TMPDIR || tmpdir()'
+    isValid: true
+    file: 'src/env.mts'

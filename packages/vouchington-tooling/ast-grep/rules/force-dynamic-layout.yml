@@ -1,0 +1,57 @@
+id: force-dynamic-layout
+language: Tsx
+severity: error
+message: "layout file accesses request context but is missing `export const dynamic = 'force-dynamic'`"
+files:
+  - 'web/app/**/layout.tsx'
+ignores:
+  - 'web/app/layout.tsx'
+rule:
+  all:
+    - kind: program
+    - has:
+        stopBy: end
+        any:
+          - pattern: 'headers()'
+          - pattern: 'cookies()'
+          - pattern: 'getCurrentUser($$$)'
+    - not:
+        has:
+          # No stopBy:end — only check direct children of program so that a
+          # 'use client' string nested inside a function body does not exempt
+          # the layout. Top-level directives and exports are direct children.
+          any:
+            - kind: expression_statement
+              has:
+                any:
+                  - pattern: "'use client'"
+                  - pattern: '"use client"'
+            - pattern: "export const dynamic = 'force-dynamic'"
+examples:
+  - code: |
+      import { headers } from 'next/headers'
+      export const dynamic = 'force-dynamic'
+      export default function Layout({ children }) { return <div>{children}</div> }
+    isValid: true
+    file: 'web/app/dashboard/layout.tsx'
+  - code: |
+      import { headers } from 'next/headers'
+      export default function Layout({ children }) {
+        const h = headers()
+        return <div>{children}</div>
+      }
+    isValid: false
+    file: 'web/app/dashboard/layout.tsx'
+  - code: |
+      export default function Layout({ children }) { return <div>{children}</div> }
+    isValid: true
+    file: 'web/app/dashboard/layout.tsx'
+  - code: |
+      'use client'
+      import { headers } from 'next/headers'
+      export default function Layout({ children }) {
+        const h = headers()
+        return <div>{children}</div>
+      }
+    isValid: true
+    file: 'web/app/dashboard/layout.tsx'

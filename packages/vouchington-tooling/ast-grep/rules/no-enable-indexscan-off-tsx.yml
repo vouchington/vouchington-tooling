@@ -1,0 +1,33 @@
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.tsx` files; see no-enable-indexscan-off.yml for the companion
+# rule that covers `.ts/.mts/.cts` files.
+id: no-enable-indexscan-off-tsx
+language: Tsx
+severity: error
+message: >-
+  Do not use `enable_indexscan = off` — it disables index scans repo-wide within the transaction
+  (not just for HNSW vector search), forcing a full sequential scan. For HNSW overfiltering on a
+  small hard-capped result window, use `applyFilteredVectorScan()` from `@modules/search-utils`
+  (pgvector `hnsw.iterative_scan`) instead.
+rule:
+  any:
+    - kind: string
+    - kind: template_string
+  regex: '(?i)enable_indexscan[\s\S]{0,12}(=|to)[\s\S]{0,12}off'
+examples:
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan = off`
+    isValid: false
+    file: 'web/lib/__tests__/example.tsx'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan TO off`
+    isValid: false
+    file: 'web/lib/__tests__/example.tsx'
+  - code: |-
+      export function Example() {
+        return <div>hnsw.iterative_scan = strict_order</div>
+      }
+    isValid: true
+    file: 'web/components/example.tsx'

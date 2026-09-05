@@ -1,0 +1,39 @@
+id: web-no-window-open-navigation
+language: Tsx
+severity: error
+message: >
+  Use an ExternalLink component or <a target="_blank"> instead of window.open() for new-tab navigation.
+files:
+  - 'web/**/*.tsx'
+  - 'web/**/*.ts'
+ignores:
+  - '**/*.test.tsx'
+  - '**/*.test.ts'
+  - '**/*.stories.tsx'
+  - '**/*.stories.ts'
+rule:
+  any:
+    - pattern: window.open($URL, '_blank', $$$)
+    - pattern: window.open($URL, '_blank')
+examples:
+  - code: "window.open(url, '_blank', 'noopener,noreferrer')"
+    isValid: false
+    file: 'web/app/page.tsx'
+  - code: "window.open(url, '_blank')"
+    isValid: false
+    file: 'web/app/page.tsx'
+  - code: "window.open(href, '_blank', 'noopener,noreferrer')"
+    isValid: false
+    file: 'web/components/search/command-link-item.tsx'
+  - code: "window.open(messagesHref(conversation), '_blank')"
+    isValid: false
+    file: 'web/components/example/mod-queue-posts.tsx'
+  - code: "window.open(messagesHref(conversation), '_blank')"
+    isValid: false
+    file: 'web/components/example/mod-queue-reports.tsx'
+  - code: '<ExternalLink href={url}>Link</ExternalLink>'
+    isValid: true
+    file: 'web/app/page.tsx'
+  - code: '<a href={url} target="_blank" rel="noopener noreferrer">Link</a>'
+    isValid: true
+    file: 'web/app/page.tsx'

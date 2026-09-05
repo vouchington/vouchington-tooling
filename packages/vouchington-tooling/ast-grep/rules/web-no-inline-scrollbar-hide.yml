@@ -1,0 +1,41 @@
+id: web-no-inline-scrollbar-hide
+language: Tsx
+severity: error
+message: "Use the Tailwind 'scrollbar-hide' utility class instead of inline scrollbar-hiding CSS"
+files:
+  - 'web/**/*.tsx'
+ignores:
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/*.stories.tsx'
+rule:
+  # `pattern: 'style={$OBJ}'` does not work as a JSX attribute matcher in Tsx
+  # (ast-grep parses it as a TypeScript assignment). Use `kind: jsx_attribute`
+  # with an explicit `style` name check (attribute names are `property_identifier`
+  # in the TSX grammar) so that only the `style` attribute is flagged, not other
+  # JSX attributes that happen to contain those property names in their values.
+  all:
+    - kind: jsx_attribute
+    # No stopBy:end: the attribute name is an immediate child of jsx_attribute.
+    # Use regex (not pattern:) because `pattern: style` parses as an `identifier`
+    # AST node, which does not match the `property_identifier` grammar kind used
+    # for JSX attribute names.
+    - has:
+        kind: property_identifier
+        regex: '^style$'
+    # The scrollbar properties are nested inside the style object so stopBy:end
+    # is required to find them anywhere inside the attribute value.
+    - has:
+        stopBy: end
+        kind: property_identifier
+        regex: '^(scrollbarWidth|WebkitScrollbar|msOverflowStyle)$'
+examples:
+  - code: "<div style={{ scrollbarWidth: 'none' }} />"
+    isValid: false
+    file: 'web/app/page.tsx'
+  - code: "<div style={{ msOverflowStyle: 'none' }} />"
+    isValid: false
+    file: 'web/app/page.tsx'
+  - code: '<div className="scrollbar-hide" />'
+    isValid: true
+    file: 'web/app/page.tsx'

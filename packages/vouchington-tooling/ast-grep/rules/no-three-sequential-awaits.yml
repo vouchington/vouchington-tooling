@@ -1,0 +1,242 @@
+id: no-three-sequential-awaits
+language: TypeScript
+severity: error
+message: 'Avoid 3 sequential await statements; abstract dependent work or parallelize independent work with Promise.all().'
+files:
+  - '**/*.ts'
+  - '**/*.mts'
+  - '**/*.cts'
+ignores:
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+  - '**/*.mock.test.ts'
+  - '**/*.mock.test.mts'
+  - '**/*.mock.test.cts'
+  - '**/*.stories.ts'
+  - '**/*.stories.mts'
+  - 'backend/test-helpers/**'
+  - 'test-helpers/**'
+  - 'test-infra/**'
+  - 'web/test-helpers/**'
+  - '**/test-helpers/**'
+  - 'playwright/**'
+  - 'playwright/setup/**'
+  - 'integration-tests/**'
+  - 'seed/**'
+  - '**/seeds/**'
+  - 'backend/scripts/seeds/**'
+  - 'backend/scripts/seed/**'
+  - 'backend/scripts/explain-analyze/**'
+rule:
+  all:
+    - not:
+        follows:
+          stopBy: neighbor
+          any:
+            - all:
+                - pattern:
+                    context: await $P
+                    selector: expression_statement
+                - not:
+                    has:
+                      pattern: Promise.all($$)
+                - not:
+                    has:
+                      pattern: Promise.allSettled($$)
+            - all:
+                - pattern: const $W = await $P
+                - not:
+                    pattern: const $W = await Promise.all($$$)
+                - not:
+                    pattern: const $W = await Promise.allSettled($$$)
+            - all:
+                - pattern: let $W = await $P
+                - not:
+                    pattern: let $W = await Promise.all($$$)
+                - not:
+                    pattern: let $W = await Promise.allSettled($$$)
+            - all:
+                - pattern: var $W = await $P
+                - not:
+                    pattern: var $W = await Promise.all($$$)
+                - not:
+                    pattern: var $W = await Promise.allSettled($$$)
+            - all:
+                - pattern:
+                    context: $W = await $P
+                    selector: expression_statement
+                - not:
+                    pattern: $W = await Promise.all($$$)
+                - not:
+                    pattern: $W = await Promise.allSettled($$$)
+    - any:
+        - all:
+            - pattern:
+                context: await $A
+                selector: expression_statement
+            - not:
+                has:
+                  pattern: Promise.all($$)
+            - not:
+                has:
+                  pattern: Promise.allSettled($$)
+        - all:
+            - pattern: const $X = await $A
+            - not:
+                pattern: const $X = await Promise.all($$$)
+            - not:
+                pattern: const $X = await Promise.allSettled($$$)
+        - all:
+            - pattern: let $X = await $A
+            - not:
+                pattern: let $X = await Promise.all($$$)
+            - not:
+                pattern: let $X = await Promise.allSettled($$$)
+        - all:
+            - pattern: var $X = await $A
+            - not:
+                pattern: var $X = await Promise.all($$$)
+            - not:
+                pattern: var $X = await Promise.allSettled($$$)
+        - all:
+            - pattern:
+                context: $X = await $A
+                selector: expression_statement
+            - not:
+                pattern: $X = await Promise.all($$$)
+            - not:
+                pattern: $X = await Promise.allSettled($$$)
+    - precedes:
+        stopBy: neighbor
+        all:
+          - any:
+              - all:
+                  - pattern:
+                      context: await $B
+                      selector: expression_statement
+                  - not:
+                      has:
+                        pattern: Promise.all($$)
+                  - not:
+                      has:
+                        pattern: Promise.allSettled($$)
+              - all:
+                  - pattern: const $Y = await $B
+                  - not:
+                      pattern: const $Y = await Promise.all($$$)
+                  - not:
+                      pattern: const $Y = await Promise.allSettled($$$)
+              - all:
+                  - pattern: let $Y = await $B
+                  - not:
+                      pattern: let $Y = await Promise.all($$$)
+                  - not:
+                      pattern: let $Y = await Promise.allSettled($$$)
+              - all:
+                  - pattern: var $Y = await $B
+                  - not:
+                      pattern: var $Y = await Promise.all($$$)
+                  - not:
+                      pattern: var $Y = await Promise.allSettled($$$)
+              - all:
+                  - pattern:
+                      context: $Y = await $B
+                      selector: expression_statement
+                  - not:
+                      pattern: $Y = await Promise.all($$$)
+                  - not:
+                      pattern: $Y = await Promise.allSettled($$$)
+          - precedes:
+              stopBy: neighbor
+              any:
+                - all:
+                    - pattern:
+                        context: await $C
+                        selector: expression_statement
+                    - not:
+                        has:
+                          pattern: Promise.all($$)
+                    - not:
+                        has:
+                          pattern: Promise.allSettled($$)
+                - all:
+                    - pattern: const $Z = await $C
+                    - not:
+                        pattern: const $Z = await Promise.all($$$)
+                    - not:
+                        pattern: const $Z = await Promise.allSettled($$$)
+                - all:
+                    - pattern: let $Z = await $C
+                    - not:
+                        pattern: let $Z = await Promise.all($$$)
+                    - not:
+                        pattern: let $Z = await Promise.allSettled($$$)
+                - all:
+                    - pattern: var $Z = await $C
+                    - not:
+                        pattern: var $Z = await Promise.all($$$)
+                    - not:
+                        pattern: var $Z = await Promise.allSettled($$$)
+                - all:
+                    - pattern:
+                        context: $Z = await $C
+                        selector: expression_statement
+                    - not:
+                        pattern: $Z = await Promise.all($$$)
+                    - not:
+                        pattern: $Z = await Promise.allSettled($$$)
+constraints:
+  A:
+    not:
+      regex: '^Promise\.all(Settled)?\b'
+  B:
+    not:
+      regex: '^Promise\.all(Settled)?\b'
+  C:
+    not:
+      regex: '^Promise\.all(Settled)?\b'
+  P:
+    not:
+      regex: '^Promise\.all(Settled)?\b'
+examples:
+  - code: |
+      async function run() {
+        await one()
+        await two()
+        await three()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        const one = await loadOne()
+        const two = await loadTwo()
+        target.value = await loadThree()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await one()
+        await two()
+      }
+    isValid: true
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await one()
+        if (condition) await two()
+        await three()
+      }
+    isValid: true
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await Promise.all([one(), two(), three()])
+      }
+    isValid: true
+    file: 'backend/services/example.mts'

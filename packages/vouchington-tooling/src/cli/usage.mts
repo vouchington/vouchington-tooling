@@ -7,6 +7,7 @@ Commands:
   require-up-to-date            Require HEAD to include a fetched remote branch
   gitleaks-directory-scan       Scan a directory with Gitleaks
   ast-grep-examples             Run AST-grep rule examples
+  ast-grep-pack                 Print shipped unconditional AST-grep pack paths as JSON
   gha-workspace-policy          Check GitHub Actions workspace safety policy
   gha-output                    Write a collision-safe multiline GITHUB_OUTPUT record
   gha-needs-results             Fail if required GitHub Actions job results failed
@@ -71,6 +72,7 @@ gha-runtime-audit
 require-up-to-date --remote <name> --branch <name>
 gitleaks-directory-scan --config <path> [--directory <path>]
 ast-grep-examples --rules <directory> --config <path>
+ast-grep-pack
 gha-workspace-policy [--root <directory>] [--workflow-directory <directory>] [--action-directory <directory>]
 
 gha-output <name>

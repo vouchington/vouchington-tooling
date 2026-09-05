@@ -171,6 +171,7 @@ vouchington runner-port-policy
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
+vouchington ast-grep-pack
 vouchington gha-output name
 vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
@@ -270,6 +271,7 @@ import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-polic
 import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
 import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
 import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
+import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'

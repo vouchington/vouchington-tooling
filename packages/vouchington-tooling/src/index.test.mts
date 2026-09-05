@@ -27,6 +27,7 @@ import {
   waitForProcessGroupExit,
   checkGhaWorkspacePolicy,
   astGrepExamplesArguments,
+  astGrepPackPaths,
   gitleaksDirectoryScanArguments,
   requireUpToDate,
 } from './index.mts'
@@ -66,5 +67,6 @@ describe('package exports', () => {
     expect(typeof requireUpToDate).toBe('function')
     expect(gitleaksDirectoryScanArguments({ config: '.gitleaks.toml' })).toContain('--config')
     expect(astGrepExamplesArguments({ rules: 'rules', config: 'sgconfig.yml' })).toContain('test')
+    expect(astGrepPackPaths().config).toMatch(/sgconfig\.yml$/)
   })
 })

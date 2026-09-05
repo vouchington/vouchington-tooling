@@ -83,6 +83,12 @@ describe('shared tooling command parsing', () => {
       kind: 'error',
       message: 'unknown ast-grep-examples option: --unknown',
     })
+    expect(parseCli(['node', 'vouchington', 'ast-grep-pack'])).toEqual({ kind: 'ast-grep-pack' })
+    expect(parseCli(['node', 'vouchington', 'ast-grep-pack', '--help'])).toEqual({ kind: 'help' })
+    expect(parseCli(['node', 'vouchington', 'ast-grep-pack', '--rules'])).toEqual({
+      kind: 'error',
+      message: 'unknown ast-grep-pack option: --rules',
+    })
 
     expect(parseCli(['node', 'vouchington', 'gha-workspace-policy'])).toEqual({
       kind: 'gha-workspace-policy',

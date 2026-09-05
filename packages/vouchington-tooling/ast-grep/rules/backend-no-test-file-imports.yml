@@ -1,0 +1,44 @@
+id: backend-no-test-file-imports
+language: TypeScript
+severity: error
+message: 'Do not import backend test files from backend Vitest files; move shared helpers to test-helpers or a support module.'
+files:
+  - 'backend/**/*.test.mts'
+  - 'backend/**/__tests__/**/*.mts'
+rule:
+  any:
+    - all:
+        - kind: import_statement
+        - regex: "['\"`](?:\\.\\./|\\./)[^'\"`]*\\.test\\.mts['\"`]"
+    - all:
+        - kind: export_statement
+        - regex: "['\"`](?:\\.\\./|\\./)[^'\"`]*\\.test\\.mts['\"`]"
+    - pattern: 'import($PATH)'
+      regex: "['\"`](?:\\.\\./|\\./)[^'\"`]*\\.test\\.mts['\"`]"
+    - pattern: 'require($PATH)'
+      regex: "['\"`](?:\\.\\./|\\./)[^'\"`]*\\.test\\.mts['\"`]"
+examples:
+  - code: "import { createTestUser } from './user.test.mts'"
+    isValid: false
+    file: 'backend/services/example/__tests__/user-login.test.mts'
+  - code: "import * as suite from './search.part-2.test.mts'"
+    isValid: false
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "import type { Helper } from '../helpers.test.mts'"
+    isValid: false
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "export { createThing } from './thing.test.mts'"
+    isValid: false
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "const mod = await import('./search.test.mts')"
+    isValid: false
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "const mod = require('./search.test.mts')"
+    isValid: false
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "import { searchSuite } from '../search.test-suites.mts'"
+    isValid: true
+    file: 'backend/services/example/__tests__/search.test.mts'
+  - code: "const mod = await import('../search.test-suites.mts')"
+    isValid: true
+    file: 'backend/services/example/__tests__/search.test.mts'

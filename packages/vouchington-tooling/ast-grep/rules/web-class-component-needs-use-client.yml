@@ -1,0 +1,175 @@
+# NOTE: This is a prevention guard on an already-clean surface — the only App Router
+# class component today is `web/components/ui/error-boundary.tsx`, which already has
+# `'use client'`. The Storybook ratchet class lives under `web/storybook/**` and is
+# ignored. Zero live hits from `ast-grep scan` is expected and correct; the rule's
+# ability to fire is proven by the `isValid: false` examples below, not by live
+# scan hits.
+# Known misses, not implied coverage: `import { Component as C }` when the
+# local name is not `Component`/`PureComponent`, and `implements` clauses.
+# tree-sitter-tsx puts heritage under `class_heritage` → `extends_clause`.
+# `Component` is an `identifier`; `React.Component` uses `property_identifier`.
+# The `'use client'` exemption is the leading directive only: Next ignores a
+# later program-level string after an import or other statement. A comment may
+# precede the directive. `interface … extends ComponentProps` is not a
+# `class_declaration` and cannot match.
+id: web-class-component-needs-use-client
+language: Tsx
+severity: error
+message: >-
+  React class components must live in a `'use client'` module. `'use server'` is
+  a server-action directive and does not make a class a valid Server Component.
+files:
+  - 'web/**/*.tsx'
+ignores:
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/*.mock.test.tsx'
+  - '**/*.stories.tsx'
+  - 'web/storybook/**'
+rule:
+  kind: program
+  all:
+    - has:
+        stopBy: end
+        kind: class_declaration
+        has:
+          kind: class_heritage
+          has:
+            kind: extends_clause
+            has:
+              stopBy: end
+              any:
+                - kind: identifier
+                  regex: '^(?:Component|PureComponent)$'
+                - kind: property_identifier
+                  regex: '^(?:Component|PureComponent)$'
+    - not:
+        has:
+          kind: expression_statement
+          has:
+            any:
+              - pattern: "'use client'"
+              - pattern: '"use client"'
+          # Next only honors a leading directive. A later program-level
+          # string after an import or other statement is not a directive.
+          # `stopBy: end` looks past intervening comments so
+          # `import ...; // note; 'use client'` stays a violation. A
+          # file-leading comment before the directive still exempts.
+          not:
+            follows:
+              stopBy: end
+              any:
+                - kind: import_statement
+                - kind: export_statement
+                - kind: class_declaration
+                - kind: lexical_declaration
+                - kind: variable_declaration
+                - kind: function_declaration
+                - kind: interface_declaration
+                - kind: type_alias_declaration
+                - kind: expression_statement
+examples:
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/example.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      export default class FallbackBoundary extends Component<{ children: ReactNode }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/default-export.tsx'
+  - code: |
+      import { PureComponent, type ReactNode } from 'react'
+      export class PureBoundary extends PureComponent<{ children: ReactNode }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/pure-example.tsx'
+  - code: |
+      import React from 'react'
+      export class NsBoundary extends React.Component<{ children: React.ReactNode }> {
+        render() { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/react-ns.tsx'
+  - code: |
+      export class NestedDirective extends Component {
+        render() {
+          const mark = 'use client'
+          return mark
+        }
+      }
+    isValid: false
+    file: 'web/components/ui/nested-directive.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      'use client'
+      export class LateBoundary extends Component<{ children: ReactNode }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/late-directive.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      // explanation
+      'use client'
+      export class InterleavedBoundary extends Component<{ children: ReactNode }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: false
+    file: 'web/components/ui/interleaved-directive.tsx'
+  - code: |
+      'use client'
+      import { Component, type ReactNode } from 'react'
+      export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: true
+    file: 'web/components/ui/error-boundary.tsx'
+  - code: |
+      "use client"
+      import { Component, type ReactNode } from 'react'
+      export class QuotedBoundary extends Component<{ children: ReactNode }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: true
+    file: 'web/components/ui/quoted-boundary.tsx'
+  - code: |
+      import { type ComponentProps } from 'react'
+      interface Props extends ComponentProps<typeof Date> {
+        extra: boolean
+      }
+    isValid: true
+    file: 'web/components/ui/component-props.tsx'
+  - code: |
+      export interface ExternalLinkProps extends React.ComponentPropsWithoutRef<'a'> {
+        href: string
+      }
+    isValid: true
+    file: 'web/components/ui/external-link-props.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: true
+    file: 'web/components/ui/error-boundary.test.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: true
+    file: 'web/components/ui/error-boundary.stories.tsx'
+  - code: |
+      import { Component, type ReactNode } from 'react'
+      export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+        render(): ReactNode { return this.props.children }
+      }
+    isValid: true
+    file: 'web/storybook/component-story-ratchet-renderer.tsx'

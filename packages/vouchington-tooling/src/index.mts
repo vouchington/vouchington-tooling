@@ -141,6 +141,8 @@ export type {
 } from './gitleaks-directory-scan/index.mts'
 export { astGrepExamplesArguments, runAstGrepExamples } from './ast-grep-examples/index.mts'
 export type { AstGrepExamplesExecutor, AstGrepExamplesOptions } from './ast-grep-examples/index.mts'
+export { astGrepPackPaths, astGrepPackPathsFrom } from './ast-grep-pack/index.mts'
+export type { AstGrepPackPaths } from './ast-grep-pack/index.mts'
 export {
   createVitestBlobManifest,
   createVitestReportAttempt,

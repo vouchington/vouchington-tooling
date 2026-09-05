@@ -1,0 +1,42 @@
+id: no-sync-throw-assert-on-async-enqueue
+language: TypeScript
+severity: error
+message: 'Best-effort syntactic heuristic (not type-aware): this wraps a synchronous throw-assertion around a call that looks like a Promise-returning enqueue call. expect(() => fn()).not.toThrow() and .toThrow() only observe a synchronous throw and never see an async rejection, so this gives false confidence in the async contract. Await the call and assert on its resolved value instead, e.g. expect(await enqueueFoo()).toBeUndefined() or await expect(enqueueFoo()).resolves.toBeDefined().'
+files:
+  - 'backend/**/*.test.mts'
+rule:
+  # NOTE: member-call patterns MUST precede plain-call patterns in this list. ast-grep's `any:`
+  # does not backtrack across constraint failures: once an earlier arm structurally matches a node
+  # (even loosely, e.g. a bare-identifier pattern absorbing a qualified member-expression) and its
+  # constraint then fails, the match for that node is rejected outright rather than falling through
+  # to try a later, more specific arm. Listing the more specific member-call shape first avoids this.
+  any:
+    - pattern: 'expect(() => $OBJ.$CALL($$$ARGS)).not.toThrow()'
+    - pattern: 'expect(() => $OBJ.$CALL($$$ARGS)).toThrow()'
+    - pattern: 'expect(() => $CALL($$$ARGS)).not.toThrow()'
+    - pattern: 'expect(() => $CALL($$$ARGS)).toThrow()'
+constraints:
+  CALL:
+    all:
+      - regex: '^enqueue\w*$'
+      - not:
+          regex: 'BestEffort'
+examples:
+  - code: 'expect(() => enqueueBulkSourceSyncs([])).not.toThrow()'
+    isValid: false
+    file: 'backend/queues/example/enqueues.generated.test.mts'
+  - code: 'expect(() => queueModule.enqueueBulkSourceSyncs([])).not.toThrow()'
+    isValid: false
+    file: 'backend/queues/example/enqueues.test.mts'
+  - code: "expect(() => assertSafeUrlSync('http://example.com/path')).not.toThrow()"
+    isValid: true
+    file: 'backend/services/example/ssrf.test.mts'
+  - code: 'expect(await enqueueBulkSourceSyncs([])).toBeUndefined()'
+    isValid: true
+    file: 'backend/queues/example/enqueues.generated.test.mts'
+  - code: 'expect(() => enqueueBulkSourceSyncs([])).not.toThrow()'
+    isValid: true
+    file: 'backend/queues/example/enqueues.mts'
+  - code: "expect(() => enqueueReportResolutionNotificationsBestEffort([{ user_id: crypto.randomUUID(), id: crypto.randomUUID() }], () => { throw new Error('queue unavailable') })).not.toThrow()"
+    isValid: true
+    file: 'backend/services/example/__tests__/resolve.test.mts'

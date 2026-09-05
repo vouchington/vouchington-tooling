@@ -1,0 +1,43 @@
+# NOTE: `__tests__` directories must contain tests only. Shared helpers, registries,
+# fixtures, and other imported support modules belong in a nearby `test-helpers/`
+# directory so test roots stay easy to scan.
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.ts/.mts/.cts` files; see no-exports-in-tests-folder-tsx.yml for
+# the companion rule that covers `.tsx` files.
+id: no-exports-in-tests-folder
+language: TypeScript
+severity: error
+message: 'Do not export from files under __tests__; move shared test support to a test-helpers directory.'
+files:
+  - '**/__tests__/**/*.ts'
+  - '**/__tests__/**/*.mts'
+  - '**/__tests__/**/*.cts'
+rule:
+  all:
+    - kind: export_statement
+    - not:
+        pattern: export {}
+examples:
+  - code: 'export const makeThing = () => ({})'
+    isValid: false
+    file: 'backend/services/example/__tests__/user-helpers.mts'
+  - code: 'export type Helper = { id: string }'
+    isValid: false
+    file: 'web/lib/__tests__/manifest-registry.ts'
+  - code: "export { makeThing } from './thing'"
+    isValid: false
+    file: 'src/__tests__/helpers.mts'
+  - code: |
+      describe('script rendering', () => {
+        it('renders shell exports', () => {
+          expect(`export NEXT_PORT=3901`).toContain('export')
+        })
+      })
+    isValid: true
+    file: 'src/__tests__/stop-services.test.mts'
+  - code: 'const makeThing = () => ({})'
+    isValid: true
+    file: 'backend/services/example/__tests__/users.test.mts'
+  - code: 'export {}'
+    isValid: true
+    file: 'backend/services/example/__tests__/global-script.test.mts'

@@ -1,0 +1,38 @@
+id: force-dynamic-pages
+language: Tsx
+severity: error
+message: "page file must export `export const dynamic = 'force-dynamic'`"
+files:
+  - 'web/app/**/page.tsx'
+rule:
+  all:
+    - kind: program
+    - not:
+        has:
+          any:
+            - kind: expression_statement
+              has:
+                any:
+                  - pattern: "'use client'"
+                  - pattern: '"use client"'
+            - pattern: "export const dynamic = 'force-dynamic'"
+examples:
+  - code: |
+      export const dynamic = 'force-dynamic'
+      export default function Page() { return <div /> }
+    isValid: true
+    file: 'web/app/home/page.tsx'
+  - code: |
+      'use client'
+      export default function Page() { return <div /> }
+    isValid: true
+    file: 'web/app/home/page.tsx'
+  - code: |
+      "use client"
+      export default function Page() { return <div /> }
+    isValid: true
+    file: 'web/app/home/page.tsx'
+  - code: |
+      export default function Page() { return <div /> }
+    isValid: false
+    file: 'web/app/home/page.tsx'

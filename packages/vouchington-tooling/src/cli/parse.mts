@@ -5,6 +5,7 @@ import {
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
 import {
   parseAstGrepExamples,
+  parseAstGrepPack,
   parseGhaWorkspacePolicy,
   parseGitleaksDirectoryScan,
   parseHttpOrigin,
@@ -36,6 +37,7 @@ export type ParsedCli =
   | { kind: 'require-up-to-date'; remote: string; branch: string }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }
   | { kind: 'ast-grep-examples'; rules: string; config: string }
+  | { kind: 'ast-grep-pack' }
   | {
       kind: 'gha-workspace-policy'
       root?: string
@@ -118,6 +120,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'require-up-to-date') return parseRequireUpToDate(rest)
   if (command === 'gitleaks-directory-scan') return parseGitleaksDirectoryScan(rest)
   if (command === 'ast-grep-examples') return parseAstGrepExamples(rest)
+  if (command === 'ast-grep-pack') return parseAstGrepPack(rest)
   if (command === 'gha-workspace-policy') return parseGhaWorkspacePolicy(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
