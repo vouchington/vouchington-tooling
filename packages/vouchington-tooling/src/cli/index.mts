@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readPackageVersion } from '../package-version.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
+import { runAgentHarnessConfigCommand } from './commands/agent-harness-config.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
@@ -91,6 +92,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runRunnerPortPolicy(parsed)
     case 'with-host-lock':
       return runWithHostLock(parsed.args)
+    case 'agent-harness-config':
+      return runAgentHarnessConfigCommand(parsed.args)
     case 'gha-runtime-audit':
       return runGhaRuntimeAudit(parsed)
     case 'script': {

@@ -19,6 +19,7 @@
   "files": [
     "ast-grep",
     "dist",
+    "docs",
     "skills",
     "scripts",
     "README.md"
@@ -101,6 +102,11 @@
       "types": "./dist/ast-grep-pack/index.d.mts",
       "import": "./dist/ast-grep-pack/index.mjs",
       "default": "./dist/ast-grep-pack/index.mjs"
+    },
+    "./agent-harness-config": {
+      "types": "./dist/agent-harness-config/index.d.mts",
+      "import": "./dist/agent-harness-config/index.mjs",
+      "default": "./dist/agent-harness-config/index.mjs"
     },
     "./vitest-blob-manifest": {
       "types": "./dist/vitest-blob-manifest/index.d.mts",

@@ -178,6 +178,7 @@ vouchington --version
 vouchington runner-port-policy
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
+vouchington agent-harness-config check --global
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
 vouchington ast-grep-pack
 vouchington gha-output name
@@ -245,6 +246,7 @@ import { isRunnerReservedPort, runnerPortPolicy } from 'vouchington-tooling/runn
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
+import { applyHarnessConfig, dumpHarnessPolicy } from 'vouchington-tooling/agent-harness-config'
 import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
 import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
 import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'

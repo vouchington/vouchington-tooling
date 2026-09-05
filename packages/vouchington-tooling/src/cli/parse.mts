@@ -20,6 +20,7 @@ export type ParsedCli =
   | { kind: 'error'; message: string }
   | { kind: 'runner-port-policy'; file?: string; reserved?: number }
   | { kind: 'with-host-lock'; args: string[] }
+  | { kind: 'agent-harness-config'; args: string[] }
   | { kind: 'script'; command: ScriptCommand; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
@@ -102,6 +103,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   const [command, ...rest] = args
   if (command === 'runner-port-policy') return parseRunnerPortPolicy(rest)
   if (command === 'with-host-lock') return { kind: 'with-host-lock', args: rest }
+  if (command === 'agent-harness-config') return { kind: 'agent-harness-config', args: rest }
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
   if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
