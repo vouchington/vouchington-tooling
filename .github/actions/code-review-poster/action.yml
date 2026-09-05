@@ -1,11 +1,7 @@
-name: Legacy Code Review Poster
-description: Deprecated compatibility entrypoint; use an explicit review poster adapter.
+name: Code Review Poster
+description: Downloads a same-run code review payload artifact, validates it, and posts it as a pull request review.
 
 inputs:
-  compatibility_warning:
-    description: Emit the legacy-path deprecation warning
-    required: false
-    default: 'true'
   pr_number:
     description: Pull request number to review
     required: true
@@ -21,7 +17,7 @@ inputs:
     required: false
     default: claude-app
   github_token:
-    description: Explicit GitHub token for github-token posting; legacy callers fall back to github.token
+    description: Explicit GitHub token for github-token posting; falls back to github.token when unset
     required: false
     default: ''
   expected_head_sha:
@@ -43,11 +39,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Warn about deprecated poster action
-      if: inputs.compatibility_warning == 'true'
-      shell: bash
-      run: echo '::warning::.github/actions/code-review-poster is deprecated; use .github/actions/review-poster or .github/actions/claude-code-review-poster.'
-
     - name: Clear stale review payload
       shell: bash
       run: |

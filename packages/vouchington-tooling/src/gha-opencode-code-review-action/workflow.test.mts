@@ -178,7 +178,6 @@ describe('opencode-code-review reusable workflow', () => {
     expect(posterStep?.['continue-on-error']).toBe(true)
     expect(posterStep?.uses).toBe('./.vouchington-tooling/.github/actions/code-review-poster')
     expect(posterStep?.with).toMatchObject({
-      compatibility_warning: 'false',
       pr_number: '${{ inputs.pr_number }}',
       artifact_id: '${{ needs.review.outputs.payload_artifact_id }}',
       provider_name: '${{ inputs.provider }}',
