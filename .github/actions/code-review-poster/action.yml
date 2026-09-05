@@ -1,0 +1,155 @@
+name: Legacy Code Review Poster
+description: Deprecated compatibility entrypoint; use an explicit review poster adapter.
+
+inputs:
+  compatibility_warning:
+    description: Emit the legacy-path deprecation warning
+    required: false
+    default: 'true'
+  pr_number:
+    description: Pull request number to review
+    required: true
+  artifact_id:
+    description: Same-run review payload artifact ID
+    required: true
+  provider_name:
+    description: Provider name to show in workflow diagnostics
+    required: false
+    default: Claude
+  token_source:
+    description: Review POST credential. claude-app mints an App token via OIDC; github-token uses GITHUB_TOKEN.
+    required: false
+    default: claude-app
+  github_token:
+    description: Explicit GitHub token for github-token posting; legacy callers fall back to github.token
+    required: false
+    default: ''
+  expected_head_sha:
+    description: Exact pull request head SHA that may receive the review
+    required: false
+    default: ''
+  expected_base_sha:
+    description: Exact pull request base SHA required when the review is posted
+    required: false
+    default: ''
+outputs:
+  poster_outcome:
+    description: Aggregate download, validation, and posting outcome
+    value: ${{ steps.poster-result.outputs.poster_outcome }}
+  posted:
+    description: Whether a review was posted
+    value: ${{ steps.poster-result.outputs.posted }}
+
+runs:
+  using: composite
+  steps:
+    - name: Warn about deprecated poster action
+      if: inputs.compatibility_warning == 'true'
+      shell: bash
+      run: echo '::warning::.github/actions/code-review-poster is deprecated; use .github/actions/review-poster or .github/actions/claude-code-review-poster.'
+
+    - name: Clear stale review payload
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf \
+          "${RUNNER_TEMP}/code-review-payload-download" \
+          "${RUNNER_TEMP}/code-review-payload-ready"
+
+    - name: Download review payload
+      id: download-payload
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        artifact-ids: ${{ inputs.artifact_id }}
+        path: ${{ runner.temp }}/code-review-payload-download
+        github-token: ${{ inputs.github_token || github.token }}
+        repository: ${{ github.repository }}
+        run-id: ${{ github.run_id }}
+
+    - name: Resolve trusted Node version
+      id: trusted-node-version
+      if: always() && steps.download-payload.outcome == 'success'
+      continue-on-error: true
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/../code-review/resolve-node-version.sh"
+
+    - name: Setup Node for poster
+      id: setup-node
+      if: >-
+        always() &&
+        steps.download-payload.outcome == 'success' &&
+        steps.trusted-node-version.outcome == 'success'
+      continue-on-error: true
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ steps.trusted-node-version.outputs.version }}
+        package-manager-cache: false
+
+    - name: Validate downloaded review payload
+      id: validate-payload
+      if: >-
+        always() &&
+        steps.download-payload.outcome == 'success' &&
+        steps.setup-node.outcome == 'success'
+      continue-on-error: true
+      shell: bash
+      env:
+        SOURCE: ${{ runner.temp }}/code-review-payload-download/code-review-payload.json
+        DESTINATION: ${{ runner.temp }}/code-review-payload-ready
+      run: |
+        set -euo pipefail
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/gha-review-payload/cli.mts" \
+          required "$SOURCE" "$DESTINATION"
+
+    - name: Post batched review
+      id: post
+      if: >-
+        always() &&
+        steps.validate-payload.outcome == 'success' &&
+        steps.validate-payload.outputs.staged == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token || github.token }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        CODE_REVIEW_PAYLOAD_PATH: ${{ runner.temp }}/code-review-payload-ready/code-review-payload.json
+        CODE_REVIEW_TOKEN_SOURCE: ${{ inputs.token_source }}
+        EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
+      run: |
+        set -euo pipefail
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/gha-post-review/cli.mts"
+
+    - name: Record poster outcome
+      id: poster-result
+      if: always()
+      shell: bash
+      env:
+        POST_OUTCOME: ${{ steps.post.outcome }}
+        POSTED: ${{ steps.post.outputs.posted }}
+        PROVIDER_NAME: ${{ inputs.provider_name }}
+      run: |
+        set -euo pipefail
+        poster_outcome=failure
+        posted=false
+        if [ "$POST_OUTCOME" = "success" ] && [ "$POSTED" = "true" ]; then
+          poster_outcome=success
+          posted=true
+        else
+          echo "::warning::$PROVIDER_NAME review poster did not complete; no review was posted."
+          echo "⚠️ $PROVIDER_NAME review poster did not complete; no review was posted." >> "$GITHUB_STEP_SUMMARY"
+        fi
+        echo "poster_outcome=$poster_outcome" >> "$GITHUB_OUTPUT"
+        echo "posted=$posted" >> "$GITHUB_OUTPUT"
+
+    - name: Clean local review payload
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf \
+          "${RUNNER_TEMP}/code-review-payload-download" \
+          "${RUNNER_TEMP}/code-review-payload-ready"

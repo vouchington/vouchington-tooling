@@ -1,0 +1,178 @@
+name: OpenCode Code Review
+
+on:
+  workflow_call:
+    inputs:
+      provider:
+        description: OpenCode provider. opencode-zen or openrouter.
+        required: true
+        type: string
+      model:
+        description: OpenCode model id in provider/model form, e.g. opencode/muse-spark-1.3-contributor-free
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      tooling_ref:
+        description: Immutable full SHA of vouchington/vouchington-tooling for nested actions
+        required: true
+        type: string
+      runs_on:
+        description: JSON array of runner labels
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
+      timeout_minutes:
+        description: Maximum OpenCode runtime in minutes, converted to the composite action's timeout_seconds
+        required: false
+        type: string
+        default: '60'
+    secrets:
+      code_review_api_key:
+        description: API key for the selected provider. Missing secret skips the review.
+        required: false
+
+permissions: {}
+
+jobs:
+  review:
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      pull-requests: read
+    concurrency:
+      group: opencode-code-review-${{ inputs.provider }}
+      queue: max
+      cancel-in-progress: false
+    outputs:
+      agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
+      payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
+    steps:
+      - name: Validate immutable tooling ref
+        shell: bash
+        env:
+          TOOLING_REF: ${{ inputs.tooling_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::tooling_ref must be a full lowercase commit SHA.'
+            exit 1
+          }
+
+      - name: Compute review timeout
+        id: timeout
+        shell: bash
+        env:
+          TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+        run: |
+          set -euo pipefail
+          case "$TIMEOUT_MINUTES" in
+            ''|*[!0-9]*)
+              timeout_seconds=3600
+              ;;
+            *)
+              timeout_seconds=$((TIMEOUT_MINUTES * 60))
+              if [ "$timeout_seconds" -lt 1 ] || [ "$timeout_seconds" -gt 3600 ]; then
+                timeout_seconds=3600
+              fi
+              ;;
+          esac
+          echo "seconds=$timeout_seconds" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pull request refs
+        id: pr-refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          refs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '[.head.sha, .base.sha] | @tsv' 2>/dev/null || true)"
+          head_sha=''
+          base_sha=''
+          if [ -n "$refs" ]; then
+            IFS=$'\t' read -r head_sha base_sha <<< "$refs"
+          fi
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || head_sha=''
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || base_sha=''
+          if [ -z "$base_sha" ]; then
+            echo '::notice::Could not resolve a trusted base ref for this pull request; OpenCode review will be skipped.'
+          fi
+          {
+            echo "head_sha=$head_sha"
+            echo "base_sha=$base_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout calling repo's PR ref
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pr-refs.outputs.head_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Checkout review actions
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vouchington/vouchington-tooling
+          ref: ${{ inputs.tooling_ref }}
+          path: .vouchington-tooling
+          fetch-depth: 1
+
+      - name: Run OpenCode Code Review
+        id: agent
+        continue-on-error: true
+        uses: ./.vouchington-tooling/.github/actions/opencode-code-review
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          provider_name: ${{ inputs.provider }}
+          model: ${{ inputs.model }}
+          timeout_seconds: ${{ steps.timeout.outputs.seconds }}
+          payload_artifact_name: ${{ inputs.pr_number }}-${{ inputs.provider }}
+          openrouter_api_key: ${{ inputs.provider == 'openrouter' && secrets.code_review_api_key || '' }}
+          opencode_api_key: ${{ inputs.provider == 'opencode-zen' && secrets.code_review_api_key || '' }}
+          trusted_prompt_ref: ${{ steps.pr-refs.outputs.base_sha }}
+
+  post:
+    needs: [review]
+    if: always() && needs.review.outputs.payload_artifact_id != ''
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Validate immutable tooling ref
+        shell: bash
+        env:
+          TOOLING_REF: ${{ inputs.tooling_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo '::error::tooling_ref must be a full lowercase commit SHA.'
+            exit 1
+          }
+
+      - name: Checkout review actions
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vouchington/vouchington-tooling
+          ref: ${{ inputs.tooling_ref }}
+          path: .vouchington-tooling
+          fetch-depth: 1
+
+      - name: Post Code Review
+        id: poster
+        continue-on-error: true
+        uses: ./.vouchington-tooling/.github/actions/code-review-poster
+        with:
+          compatibility_warning: 'false'
+          pr_number: ${{ inputs.pr_number }}
+          artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
+          provider_name: ${{ inputs.provider }}
+          token_source: github-token
