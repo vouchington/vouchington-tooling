@@ -17,7 +17,7 @@ The repository also publishes the public [`security-triage`](./plugins/security-
 [`vouchington-database`](./plugins/vouchington-database) agent plugins. `security-triage` has one
 repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
 commit, GitHub Actions, Dependabot, package-metadata, npm-publishing, static-analysis, planning, issue-management,
-blackboard journaling, retrospective and follow-up review, CI-log review, and
+blackboard journaling, retrospective and follow-up review, CI-log review, stacked-pull-request draining, and
 pull-request-description skills. All plugins use one canonical
 `skills/` tree for every supported host; consumer repositories add their local mechanics and policy
 in repository-local instruction files or thin wrapper skills. The portable issue workflow verifies live

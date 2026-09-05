@@ -4,7 +4,7 @@
     {
       "name": "agent-workflow",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "agent-workflow/SKILL.md"
     },
     {
@@ -17,13 +17,13 @@
     {
       "name": "blackboard",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "blackboard/SKILL.md"
     },
     {
       "name": "dependabot",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "dependabot/SKILL.md",
       "prerequisites": ["github-actions-checklist"]
     },
@@ -36,26 +36,26 @@
     {
       "name": "git-commit-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "git-commit-checklist/SKILL.md"
     },
     {
       "name": "github-actions-authoring",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "github-actions-authoring/SKILL.md",
       "prerequisites": ["github-actions-checklist"]
     },
     {
       "name": "github-actions-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "github-actions-checklist/SKILL.md"
     },
     {
       "name": "github-issue",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "github-issue/SKILL.md"
     },
     {
@@ -68,25 +68,25 @@
     {
       "name": "npm-publishing",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "npm-publishing/SKILL.md"
     },
     {
       "name": "organize-github-issues",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "organize-github-issues/SKILL.md"
     },
     {
       "name": "package-json-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "package-json-checklist/SKILL.md"
     },
     {
       "name": "planning",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "planning/SKILL.md"
     },
     {
@@ -110,43 +110,49 @@
     {
       "name": "pr-description",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "pr-description/SKILL.md"
     },
     {
       "name": "retrospective",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "retrospective/SKILL.md"
     },
     {
       "name": "retrospective-distill",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "retrospective-distill/SKILL.md"
     },
     {
       "name": "review-ci-logs",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "review-ci-logs/SKILL.md"
     },
     {
       "name": "review-github-issue-taxonomy",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "review-github-issue-taxonomy/SKILL.md"
     },
     {
       "name": "revisit-followups",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "revisit-followups/SKILL.md"
+    },
+    {
+      "name": "stacked-prs",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.7.0",
+      "path": "stacked-prs/SKILL.md"
     },
     {
       "name": "static-analysis-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.6.3",
+      "pluginVersion": "0.7.0",
       "path": "static-analysis-checklist/SKILL.md"
     },
     {

@@ -44,7 +44,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(28)
+      expect(packaged).toHaveLength(29)
       expect(packaged).toEqual(canonical)
       const manifest = JSON.parse(
         readFileSync(join(packageRoot, 'skill-manifest.json'), 'utf8'),
