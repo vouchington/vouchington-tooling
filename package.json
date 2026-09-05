@@ -26,7 +26,7 @@
     "oxfmt:check": "oxfmt --check",
     "knip": "knip",
     "dependency-cruiser": "depcruise packages",
-    "actionlint": "github-actionlint"
+    "actionlint": "github-actionlint -ignore 'unexpected key \"queue\" for \"concurrency\" section'"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
