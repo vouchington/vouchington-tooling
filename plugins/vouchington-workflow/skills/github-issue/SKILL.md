@@ -25,11 +25,16 @@ When an external creation target is denied, never write there. Search for and cr
 tracking issue in the current repository, or a consumer-selected tracker. Immediately before that
 write, refetch the destination repository and apply the issue-operation gate above. Include the
 intended upstream repository and a copy-ready report so a human can decide whether to file it. Before
-copying details to a less-restricted destination, remove private repository identity, paths, links,
-code, and findings; if redaction would make the report unusable, require explicit destination approval
-or return the draft without mutation. Authorization to file the external issue includes this tracking
-fallback unless the caller opts out; report the reroute explicitly. If no tracker passes, return the
-draft without mutation. Never fall back silently or to an unverified repository.
+naming that upstream repository anywhere in the report, resolve it and require the returned canonical
+identity to equal the name being written — a renamed repository's redirect resolves successfully under
+the stale name, so existence alone proves nothing. Report the canonical name after a rename; when the
+name does not resolve at all, route the follow-up to the current repository instead of naming an
+unreachable target. Before copying details to a less-restricted destination, remove private repository
+identity, paths, links, code, and findings; if redaction would make the report unusable, require
+explicit destination approval or return the draft without mutation. Authorization to file the external
+issue includes this tracking fallback unless the caller opts out; report the reroute explicitly. If no
+tracker passes, return the draft without mutation. Never fall back silently or to an unverified
+repository.
 
 ## Issue workflow
 
