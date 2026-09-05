@@ -1,11 +1,12 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { parse as yamlLoad } from 'yaml'
 import { runAstGrepExamples } from '../ast-grep-examples/index.mts'
 import { runAstGrepPackCommand } from '../cli/commands/ast-grep-pack.mts'
-import { astGrepPackPaths } from './index.mts'
+import { astGrepPackPaths, astGrepPackPathsFrom } from './index.mts'
 
 const astGrepExecutable = fileURLToPath(
   new URL('../../node_modules/@ast-grep/cli/ast-grep', import.meta.url),
@@ -48,6 +49,36 @@ describe('ast-grep pack', () => {
       expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toEqual(astGrepPackPaths())
     } finally {
       stdout.mockRestore()
+    }
+  })
+
+  it('fails closed when the pack is missing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ast-grep-pack-missing-'))
+    const rules = join(root, 'rules')
+    mkdirSync(rules)
+    writeFileSync(join(root, 'sgconfig.yml'), 'languageGlobs: {}\n')
+    expect(() => astGrepPackPathsFrom('/missing/rules', join(root, 'sgconfig.yml'))).toThrow(
+      'ast-grep pack is missing from the installed package',
+    )
+    expect(() => astGrepPackPathsFrom(rules, '/missing/sgconfig.yml')).toThrow(
+      'ast-grep pack is missing from the installed package',
+    )
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(
+        runAstGrepPackCommand(() => {
+          throw new Error('ast-grep pack is missing from the installed package')
+        }),
+      ).toBe(1)
+      expect(stderr).toHaveBeenCalledWith('ast-grep pack is missing from the installed package\n')
+      expect(
+        runAstGrepPackCommand(() => {
+          throw 'pack unavailable'
+        }),
+      ).toBe(1)
+      expect(stderr).toHaveBeenCalledWith('pack unavailable\n')
+    } finally {
+      stderr.mockRestore()
     }
   })
 })

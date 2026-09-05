@@ -6,11 +6,16 @@ export type AstGrepPackPaths = {
   readonly config: string
 }
 
-export function astGrepPackPaths(): AstGrepPackPaths {
-  const rules = fileURLToPath(new URL('../../ast-grep/rules', import.meta.url))
-  const config = fileURLToPath(new URL('../../ast-grep/sgconfig.yml', import.meta.url))
+export function astGrepPackPathsFrom(rules: string, config: string): AstGrepPackPaths {
   if (!existsSync(rules) || !existsSync(config)) {
     throw new Error('ast-grep pack is missing from the installed package')
   }
   return { rules, config }
+}
+
+export function astGrepPackPaths(): AstGrepPackPaths {
+  return astGrepPackPathsFrom(
+    fileURLToPath(new URL('../../ast-grep/rules', import.meta.url)),
+    fileURLToPath(new URL('../../ast-grep/sgconfig.yml', import.meta.url)),
+  )
 }
