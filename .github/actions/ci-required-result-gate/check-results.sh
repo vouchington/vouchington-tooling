@@ -20,7 +20,7 @@ if ! jq -e '
   length > 0 and
   all(.[]; type == "object" and keys == ["result"] and (.result == "success" or .result == "skipped"))
 ' <<< "$RESULTS" >/dev/null; then
-  echo "One or more ${label} were missing, malformed, or unsuccessful"
+  echo "::error::One or more ${label} were missing, malformed, or unsuccessful" >&2
   exit 1
 fi
 
