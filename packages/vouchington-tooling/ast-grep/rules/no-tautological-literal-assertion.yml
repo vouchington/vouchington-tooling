@@ -1,0 +1,38 @@
+id: no-tautological-literal-assertion
+language: TypeScript
+severity: error
+message: 'This asserts a literal against an identical literal (e.g. expect(true).toBe(true)), which can never fail and provides zero real coverage of the code under test. Assert on the actual value the code under test produced instead -- for example expect(await run()).not.toBeNull(), or a specific value or shape derived from calling the function being tested.'
+files:
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+rule:
+  pattern: 'expect($LIT).toBe($LIT)'
+constraints:
+  LIT:
+    any:
+      - kind: 'true'
+      - kind: 'false'
+      - kind: 'number'
+      - kind: 'string'
+      - kind: 'null'
+      - kind: 'undefined'
+examples:
+  - code: 'expect(true).toBe(true)'
+    isValid: false
+    file: 'src/__tests__/client-content-routes.test.mts'
+  - code: "expect('placeholder').toBe('placeholder')"
+    isValid: false
+    file: 'backend/services/example/__tests__/items.test.mts'
+  - code: 'expect(await run()).not.toBeNull()'
+    isValid: true
+    file: 'src/__tests__/client-content-routes.test.mts'
+  - code: 'expect(page2.results.length).toBeLessThanOrEqual(2)'
+    isValid: true
+    file: 'backend/services/example/get-trending-posts.test.mts'
+  - code: 'expect(true).toBe(true)'
+    isValid: true
+    file: 'backend/services/example/get-trending-posts.mts'

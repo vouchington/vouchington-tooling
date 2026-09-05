@@ -23,6 +23,7 @@ import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
 import { runAstGrepExamplesCommand } from './commands/ast-grep-examples.mts'
+import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
@@ -134,6 +135,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       ])
     case 'ast-grep-examples':
       return runAstGrepExamplesCommand(parsed)
+    case 'ast-grep-pack':
+      return runAstGrepPackCommand()
     case 'gha-workspace-policy':
       return runGhaWorkspacePolicy(parsed)
   }

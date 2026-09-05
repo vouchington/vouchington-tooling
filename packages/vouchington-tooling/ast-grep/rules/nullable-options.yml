@@ -1,0 +1,429 @@
+id: nullable-options
+language: TypeScript
+severity: error
+message: >-
+  This helper option member is declared optional-nullable (`T | null` with `?`), so a bare `??`/`||`
+  default silently erases an explicit `null` the same way it erases `undefined`. Use an explicit
+  `!== undefined` check so `null` is preserved, or add a `null-default-ok` (or `null intentionally
+  defaults`) allowlist comment on the line above (or the same line) if erasing `null` is intentional.
+files:
+  - 'backend/test-helpers/**/*.mts'
+  - 'backend/test-helpers/**/*.ts'
+  - 'test-helpers/**/*.mts'
+  - 'test-helpers/**/*.ts'
+ignores:
+  - '**/*.test.mts'
+  - '**/*.test.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.ts'
+  - '**/*.mock.test.mts'
+  - '**/*.mock.test.ts'
+utils:
+  # A direct null-ish type member: either the bare `null` keyword type, or a `literal_type` node
+  # wrapping it (tree-sitter wraps `null` in `literal_type` when it appears as a union member).
+  null-member:
+    any:
+      - kind: 'null'
+      - all:
+          - kind: literal_type
+          - has:
+              stopBy: neighbor
+              kind: 'null'
+  # Matches a `type_annotation` node only when its DIRECT type value -- or, if that direct value is
+  # a union type, one of its direct members -- is null-ish. Deliberately does NOT descend into
+  # unrelated nested generic/object types (e.g. `Array<string | null>` must NOT match: that `null`
+  # is nested inside the generic's type argument, not the property's own top-level union), mirroring
+  # the original `directTypeContainsNull` walker's union-member-only recursion.
+  nullable-property-type:
+    has:
+      stopBy: neighbor
+      any:
+        - matches: null-member
+        - all:
+            - kind: union_type
+            - has:
+                stopBy: neighbor
+                matches: null-member
+  # A `property_signature` declaring $PROP as optional (`?:`) with a nullable type. Reused for
+  # inline object-type literals and for same-file interface/type-alias bodies, so the
+  # nullable-member detection logic lives in exactly one place instead of being duplicated per call
+  # site.
+  declares-nullable-property:
+    all:
+      - kind: property_signature
+      - regex: '\?\s*:'
+      - has:
+          field: name
+          kind: property_identifier
+          pattern: $PROP
+      - has:
+          field: type
+          matches: nullable-property-type
+  # `$OBJ.$PROP` (dot notation) or `$OBJ['$PROP']` / `$OBJ["$PROP"]` (bracket notation with a
+  # string-literal key), mirroring the original `memberLabel` helper which resolved both forms via
+  # `propertyName` (Identifier or string Literal).
+  nullable-member-access:
+    any:
+      - all:
+          - kind: member_expression
+          - has:
+              field: object
+              kind: identifier
+              pattern: $OBJ
+          - has:
+              field: property
+              kind: property_identifier
+              pattern: $PROP
+      - all:
+          - kind: subscript_expression
+          - has:
+              field: object
+              kind: identifier
+              pattern: $OBJ
+          - has:
+              field: index
+              kind: string
+              has:
+                kind: string_fragment
+                pattern: $PROP
+  # A `type_identifier` naming a type directly, or the `name` of a `generic_type` (e.g. the
+  # `Options` in `Options<Date>`) -- tree-sitter wraps a referenced type's own name one level deeper
+  # when the reference carries type arguments, unlike an ESTree `TSTypeReference` whose `typeName`
+  # is unaffected by generics.
+  type-reference-name:
+    any:
+      - kind: type_identifier
+        pattern: $TYPENAME
+      - all:
+          - kind: generic_type
+          - has:
+              field: name
+              kind: type_identifier
+              pattern: $TYPENAME
+  # A same-file interface or type-alias declaration named $TYPENAME whose body/value declares $PROP
+  # as an optional-nullable member.
+  declares-nullable-property-via-reference:
+    inside:
+      stopBy: end
+      kind: program
+      has:
+        stopBy: end
+        any:
+          - all:
+              - kind: interface_declaration
+              - has:
+                  field: name
+                  pattern: $TYPENAME
+              - has:
+                  field: body
+                  stopBy: end
+                  has:
+                    stopBy: end
+                    matches: declares-nullable-property
+          - all:
+              - kind: type_alias_declaration
+              - has:
+                  field: name
+                  pattern: $TYPENAME
+              - has:
+                  field: value
+                  stopBy: end
+                  has:
+                    stopBy: end
+                    matches: declares-nullable-property
+  # Case A only: the matched member/subscript access must be inside a function whose OWN
+  # required_parameter binds both $OBJ (the parameter name) and the nullable-$PROP type (inline
+  # literal, or a same-file interface/type-alias reference) on the SAME parameter -- so two
+  # differently-typed parameters that happen to share a property name can't cross-associate.
+  declared-nullable-type-for-obj:
+    inside:
+      stopBy: end
+      all:
+        - any:
+            - kind: function_declaration
+            - kind: arrow_function
+            - kind: function_expression
+            - kind: method_definition
+        - has:
+            stopBy: end
+            kind: required_parameter
+            all:
+              - has:
+                  field: pattern
+                  kind: identifier
+                  pattern: $OBJ
+              - any:
+                  - has:
+                      field: type
+                      has:
+                        stopBy: end
+                        matches: declares-nullable-property
+                  - all:
+                      - has:
+                          field: type
+                          has:
+                            matches: type-reference-name
+                      - matches: declares-nullable-property-via-reference
+  # An allowlist comment (`null-default-ok` / `null intentionally defaults`) adjacent to the
+  # enclosing statement: either on the line above (a leading comment attaches as the PRECEDING
+  # sibling of the statement within its parent's children), or trailing on the same line (a
+  # same-line trailing comment attaches as the LAST CHILD of the statement itself, not as a
+  # following sibling -- confirmed via `ast-grep --debug-query=cst`).
+  null-default-ok-adjacent:
+    any:
+      - follows:
+          stopBy: neighbor
+          kind: comment
+          regex: '(?i)null-default-ok|null intentionally defaults'
+      - has:
+          stopBy: neighbor
+          kind: comment
+          regex: '(?i)null-default-ok|null intentionally defaults'
+rule:
+  any:
+    # Case A: `$OBJ.$PROP` / `$OBJ['$PROP']` default (member/subscript expression, including the
+    # `??=`/`||=` compound-assignment forms) where $OBJ is a known helper option-object parameter
+    # whose annotated type (inline literal or same-file interface/type-alias reference) declares
+    # $PROP as optional-nullable.
+    - all:
+        - any:
+            - all:
+                - kind: binary_expression
+                - has:
+                    field: operator
+                    regex: '^(?:\?\?|\|\|)$'
+                - has:
+                    field: left
+                    matches: nullable-member-access
+                - has:
+                    field: right
+                    not:
+                      kind: 'null'
+            - all:
+                - kind: augmented_assignment_expression
+                - has:
+                    field: operator
+                    regex: '^(?:\?\?=|\|\|=)$'
+                - has:
+                    field: left
+                    matches: nullable-member-access
+                - has:
+                    field: right
+                    not:
+                      kind: 'null'
+        - matches: declared-nullable-type-for-obj
+        - not:
+            inside:
+              stopBy: end
+              all:
+                - any:
+                    - kind: lexical_declaration
+                    - kind: variable_declaration
+                    - kind: expression_statement
+                    - kind: return_statement
+                    - kind: function_declaration
+                    - kind: arrow_function
+                    - kind: function_expression
+                    - kind: method_definition
+                    - kind: export_statement
+                - matches: null-default-ok-adjacent
+    # Case B: destructured object-pattern default (`{ $PROP = $DEFAULT }` or the renamed/aliased
+    # form `{ $PROP: $ALIAS = $DEFAULT }`) inside a function parameter, where the parameter's own
+    # type annotation (inline literal or same-file interface/type-alias reference) declares $PROP as
+    # optional-nullable. Unlike Case A, the destructured object itself has no name to constrain
+    # against the helper-option-object allowlist: this matches the original
+    # `checkObjectPatternDefaults`, which applies to every function parameter regardless of the
+    # destructured variable's own name. Because the matched node is always nested directly inside
+    # its own `required_parameter` (via `object_pattern`), an ancestor search for that
+    # `required_parameter` is inherently scoped to the correct parameter -- no separate $OBJ/$PROP
+    # binding is needed the way Case A needs one.
+    - all:
+        - any:
+            - all:
+                - kind: object_assignment_pattern
+                - has:
+                    field: left
+                    kind: shorthand_property_identifier_pattern
+                    pattern: $PROP
+                - has:
+                    field: right
+                    not:
+                      kind: 'null'
+            - all:
+                - kind: pair_pattern
+                - has:
+                    field: key
+                    kind: property_identifier
+                    pattern: $PROP
+                - has:
+                    field: value
+                    kind: assignment_pattern
+                    has:
+                      field: right
+                      not:
+                        kind: 'null'
+        - inside:
+            stopBy: end
+            kind: required_parameter
+            any:
+              - has:
+                  field: type
+                  has:
+                    stopBy: end
+                    matches: declares-nullable-property
+              - all:
+                  - has:
+                      field: type
+                      has:
+                        matches: type-reference-name
+                  - matches: declares-nullable-property-via-reference
+        - not:
+            inside:
+              stopBy: end
+              all:
+                - any:
+                    - kind: lexical_declaration
+                    - kind: variable_declaration
+                    - kind: expression_statement
+                    - kind: return_statement
+                    - kind: function_declaration
+                    - kind: arrow_function
+                    - kind: function_expression
+                    - kind: method_definition
+                    - kind: export_statement
+                - matches: null-default-ok-adjacent
+constraints:
+  OBJ:
+    regex: '^(?:data|input|options|params)$'
+examples:
+  - code: |
+      export function makeRow(data: { completedAt?: Date | null }) {
+        return { completed_at: data.completedAt ?? new Date() }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-inline.mts'
+  - code: |
+      interface InterfaceOptions {
+        completedAt?: Date | null
+      }
+
+      export function makeInterfaceRow(options: InterfaceOptions) {
+        return { completed_at: options.completedAt || new Date() }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-interface.mts'
+  - code: |
+      type TypeOptions = {
+        closedAt?: Date | null
+      }
+
+      export function makeTypeRow(params: TypeOptions) {
+        params.closedAt ??= new Date()
+        return params
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-type-alias.mts'
+  - code: |
+      type MakeRowOptions = {
+        completedAt?: Date | null
+      }
+
+      export function makeRow({ completedAt = new Date() }: MakeRowOptions) {
+        return { completed_at: completedAt }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-destructured.mts'
+  - code: |
+      type MakeRowOptions = {
+        completedAt?: Date | null
+      }
+
+      export function makeRow({ completedAt: closedAt = new Date() }: MakeRowOptions) {
+        return { completed_at: closedAt }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-destructured-aliased.mts'
+  - code: |
+      export function makeRow(data: { completedAt?: Date | null }) {
+        return { completed_at: data['completedAt'] ?? new Date() }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-bracket-notation.mts'
+  - code: |
+      type MakeRowOptions<T> = {
+        completedAt?: T | null
+      }
+
+      export function makeRow(options: MakeRowOptions<Date>) {
+        return { completed_at: options.completedAt ?? new Date() }
+      }
+    isValid: false
+    file: 'backend/test-helpers/entities/nullable-options-generic-reference.mts'
+  - code: |
+      export function makeRow(data: { completedAt?: Date | null; closedAt?: Date | null }) {
+        const completedAt = data.completedAt !== undefined ? data.completedAt : new Date()
+        const userErrorText = data.completedAt ?? null
+        return { completedAt, userErrorText }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-explicit-check.mts'
+  - code: |
+      export function makeRow(data: { closedAt?: Date | null }) {
+        // null-default-ok: this fixture intentionally treats null like missing input.
+        const closedAt = data.closedAt ?? new Date()
+        return { closedAt }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-allowlisted.mts'
+  - code: |
+      export function makeRow(data: { closedAt?: Date | null }) {
+        const closedAt = data.closedAt ?? new Date() // null-default-ok: same-line trailing form.
+        return { closedAt }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-allowlisted-trailing.mts'
+  - code: |
+      import type { ExternalOptions } from './types.mts'
+
+      export function makeImportedRow(options: ExternalOptions) {
+        return { completed_at: options.completedAt ?? new Date() }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-imported-type.mts'
+  - code: |
+      type LocalOptions = {
+        completedAt?: Date | null
+      }
+
+      export function makeUnionRow(options: LocalOptions | undefined) {
+        return { completed_at: options?.completedAt ?? new Date() }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-union-param.mts'
+  - code: |
+      export function makeRow(data: { values?: Array<string | null> }) {
+        return { values: data.values ?? [] }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-nested-union-not-flagged.mts'
+  - code: |
+      type FooType = { completedAt?: Date | null }
+      type BarType = { completedAt: Date }
+
+      export function makeRow(data: BarType, unrelated: FooType) {
+        return { completed_at: data.completedAt ?? new Date() }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options-cross-param-not-flagged.mts'
+  - code: |
+      export function makeRow(data: { completedAt?: Date | null }) {
+        return { completed_at: data.completedAt ?? new Date() }
+      }
+    isValid: true
+    file: 'backend/services/nullable-options-out-of-scope.mts'
+  - code: |
+      export function makeRow(data: { completedAt?: Date | null }) {
+        return { completed_at: data.completedAt ?? new Date() }
+      }
+    isValid: true
+    file: 'backend/test-helpers/entities/nullable-options.test.mts'

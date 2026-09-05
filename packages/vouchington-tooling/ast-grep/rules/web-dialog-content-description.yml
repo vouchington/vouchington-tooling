@@ -1,0 +1,56 @@
+id: web-dialog-content-description
+language: Tsx
+severity: error
+message: 'DialogContent and AlertDialogContent must include a DialogDescription or AlertDialogDescription child.'
+files:
+  - 'web/**/*.tsx'
+ignores:
+  - 'web/**/*.test.tsx'
+  - 'web/**/*.mock.test.tsx'
+  - 'web/**/*.stories.tsx'
+  - 'web/components/ui/**/*.tsx'
+rule:
+  any:
+    - all:
+        - pattern: '<DialogContent $$$ATTRS>$$$CHILDREN</DialogContent>'
+        - not:
+            has:
+              pattern: '<DialogDescription $$$>$$$</DialogDescription>'
+              stopBy: end
+    - all:
+        - pattern: '<AlertDialogContent $$$ATTRS>$$$CHILDREN</AlertDialogContent>'
+        - not:
+            has:
+              pattern: '<AlertDialogDescription $$$>$$$</AlertDialogDescription>'
+              stopBy: end
+examples:
+  - code: |
+      export function X() {
+        return <DialogContent><DialogHeader><DialogTitle>Title</DialogTitle></DialogHeader></DialogContent>
+      }
+    isValid: false
+    file: 'web/components/example-dialog.tsx'
+  - code: |
+      export function X() {
+        return <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Title</AlertDialogTitle></AlertDialogHeader></AlertDialogContent>
+      }
+    isValid: false
+    file: 'web/components/example-alert-dialog.tsx'
+  - code: |
+      export function X() {
+        return <DialogContent><DialogHeader><DialogTitle>Title</DialogTitle><DialogDescription>Help text</DialogDescription></DialogHeader></DialogContent>
+      }
+    isValid: true
+    file: 'web/components/example-dialog.tsx'
+  - code: |
+      export function X() {
+        return <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Title</AlertDialogTitle><AlertDialogDescription>Help text</AlertDialogDescription></AlertDialogHeader></AlertDialogContent>
+      }
+    isValid: true
+    file: 'web/components/example-alert-dialog.tsx'
+  - code: |
+      export function X() {
+        return <DialogContent><DialogHeader><DialogTitle>Title</DialogTitle></DialogHeader></DialogContent>
+      }
+    isValid: true
+    file: 'web/components/example-dialog.mock.test.tsx'

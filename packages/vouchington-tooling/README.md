@@ -22,6 +22,7 @@ vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\
 vouchington require-up-to-date --remote origin --branch main
 vouchington gitleaks-directory-scan --config .gitleaks.toml
 vouchington ast-grep-examples --rules ast-grep-tests --config sgconfig.yml
+vouchington ast-grep-pack
 vouchington gha-workspace-policy
 vouchington gha-output name
 vouchington gha-needs-results
@@ -88,6 +89,8 @@ ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-i
 nonignored-working-tree mirrors with an explicit config; `--directory` selects the repository root.
 `ast-grep-examples` runs native `ast-grep test`, then validates each scoped rule's `files:` and
 `ignores:` examples with project `languageGlobs` replay from its root `--config`.
+`ast-grep-pack` prints JSON `{ rules, config }` for the shipped unconditional rule pack. Point a
+consumer `sgconfig.yml` `ruleDirs` at `rules` and keep product-specific YAML locally.
 `gha-workspace-policy` checks tracked workflow and composite-action files in the current repository;
 pass `--root`, `--workflow-directory`, or `--action-directory` for consumer-owned layouts.
 
@@ -192,6 +195,7 @@ import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-polic
 import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
 import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
 import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
+import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'

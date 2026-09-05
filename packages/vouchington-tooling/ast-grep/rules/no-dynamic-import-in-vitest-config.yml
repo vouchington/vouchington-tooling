@@ -1,0 +1,30 @@
+id: no-dynamic-import-in-vitest-config
+language: TypeScript
+severity: error
+message: >-
+  vitest config files must use static imports — dynamic import() prevents
+  vitest-project-mapping from statically analyzing project structure
+files:
+  - '**/vitest.config.mts'
+  - '**/test-helpers/vitest-config/*.mts'
+rule:
+  pattern: import($$$)
+examples:
+  - code: "const { default: react } = await import('@vitejs/plugin-react')"
+    isValid: false
+    file: 'vitest.config.mts'
+  - code: "const [{ defineConfig }] = await Promise.all([import('vitest/config')])"
+    isValid: false
+    file: 'vitest.config.mts'
+  - code: "import react from '@vitejs/plugin-react'"
+    isValid: true
+    file: 'vitest.config.mts'
+  - code: "import { defineConfig } from 'vitest/config'"
+    isValid: true
+    file: 'vitest.config.mts'
+  - code: "const { default: react } = await import('@vitejs/plugin-react')"
+    isValid: false
+    file: 'test-helpers/vitest-config/backend-core-projects.mts'
+  - code: "import react from '@vitejs/plugin-react'"
+    isValid: true
+    file: 'test-helpers/vitest-config/backend-core-projects.mts'

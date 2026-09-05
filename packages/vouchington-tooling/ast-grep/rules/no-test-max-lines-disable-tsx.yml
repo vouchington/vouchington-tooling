@@ -1,0 +1,41 @@
+# NOTE: This rule flags eslint/oxlint disable directives that suppress max-lines
+# (or all rules) inside test files. Test files must stay within their line limit;
+# split the test or extract reusable helpers instead.
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.tsx` files; see no-test-max-lines-disable.yml for the
+# companion rule that covers `.ts/.mts/.cts` files.
+id: no-test-max-lines-disable-tsx
+language: Tsx
+severity: error
+message: 'Test files must not disable max-lines or all lint rules; split the test or extract reusable helpers instead.'
+files:
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/__tests__/**/*.tsx'
+rule:
+  kind: comment
+  any:
+    - regex: '^(?://|/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?\s*(?:\*/\s*$|--|\s*$)'
+    - regex: '^(?://|/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?:[^\n-]|-[^\n-])*(?:\s|,)(?:max-lines(?:[^-a-zA-Z0-9_]|$)|eslint/max-lines(?:[^-a-zA-Z0-9_]|$))'
+examples:
+  - code: '// oxlint-disable max-lines'
+    isValid: false
+    file: 'web/components/__tests__/foo.test.tsx'
+  - code: '// eslint-disable'
+    isValid: false
+    file: 'web/components/__tests__/foo.test.tsx'
+  - code: '// oxlint-disable vitest/expect-expect'
+    isValid: true
+    file: 'web/components/__tests__/foo.test.tsx'
+  - code: '// oxlint-disable no-console'
+    isValid: true
+    file: 'web/components/__tests__/foo.spec.tsx'
+  - code: '// eslint-disable max-lines-per-function'
+    isValid: true
+    file: 'web/components/__tests__/foo.test.tsx'
+  - code: '// eslint-disable eslint/max-lines-per-function'
+    isValid: true
+    file: 'web/components/__tests__/foo.test.tsx'
+  - code: '// oxlint-disable no-console -- split because of max-lines'
+    isValid: true
+    file: 'web/components/__tests__/foo.test.tsx'

@@ -1,0 +1,41 @@
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.ts/.mts/.cts` files; see no-enable-indexscan-off-tsx.yml for
+# the companion rule that covers `.tsx` files.
+id: no-enable-indexscan-off
+language: TypeScript
+severity: error
+message: >-
+  Do not use `enable_indexscan = off` — it disables index scans repo-wide within the transaction
+  (not just for HNSW vector search), forcing a full sequential scan. For HNSW overfiltering on a
+  small hard-capped result window, use `applyFilteredVectorScan()` from `@modules/search-utils`
+  (pgvector `hnsw.iterative_scan`) instead.
+rule:
+  any:
+    - kind: string
+    - kind: template_string
+  regex: '(?i)enable_indexscan[\s\S]{0,12}(=|to)[\s\S]{0,12}off'
+examples:
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan = off`
+    isValid: false
+    file: 'backend/services/example/tools/semantic.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan TO off`
+    isValid: false
+    file: 'backend/services/example/tools/semantic.mts'
+  - code: |-
+      const guard = "current_setting('enable_indexscan') = 'off'"
+    isValid: false
+    file: 'backend/test-helpers/entities/posts-semantic.test.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL hnsw.iterative_scan = strict_order`
+    isValid: true
+    file: 'backend/services/example/tools/semantic.mts'
+  - code: |-
+      // Do not disable index scans for vector search; use iterative scans instead.
+      const note = 'see applyFilteredVectorScan'
+    isValid: true
+    file: 'backend/src/vector-scan.mts'

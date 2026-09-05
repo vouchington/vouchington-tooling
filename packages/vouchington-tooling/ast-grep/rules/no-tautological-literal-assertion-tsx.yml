@@ -1,0 +1,31 @@
+id: no-tautological-literal-assertion-tsx
+language: Tsx
+severity: error
+message: 'This asserts a literal against an identical literal (e.g. expect(true).toBe(true)), which can never fail and provides zero real coverage of the code under test. Assert on the actual value the code under test produced instead -- for example expect(await run()).not.toBeNull(), or a specific value or shape derived from calling the function being tested.'
+files:
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+rule:
+  pattern: 'expect($LIT).toBe($LIT)'
+constraints:
+  LIT:
+    any:
+      - kind: 'true'
+      - kind: 'false'
+      - kind: 'number'
+      - kind: 'string'
+      - kind: 'null'
+      - kind: 'undefined'
+examples:
+  - code: 'expect(true).toBe(true)'
+    isValid: false
+    file: 'web/components/example/__tests__/add-to-list-menu-item.mock.test.tsx'
+  - code: "expect('placeholder').toBe('placeholder')"
+    isValid: false
+    file: 'web/components/example/__tests__/source-list-item.interactions.mock.test.tsx'
+  - code: 'expect(screen.getByRole("button")).toBeInTheDocument()'
+    isValid: true
+    file: 'web/components/example/__tests__/add-to-list-menu-item.mock.test.tsx'
+  - code: 'expect(true).toBe(true)'
+    isValid: true
+    file: 'web/components/example/add-to-list-menu-item.tsx'

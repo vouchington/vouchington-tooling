@@ -6,6 +6,9 @@ vi.mock('./commands/require-up-to-date.mts', () => ({
 vi.mock('./commands/ast-grep-examples.mts', () => ({
   runAstGrepExamplesCommand: vi.fn(() => 12),
 }))
+vi.mock('./commands/ast-grep-pack.mts', () => ({
+  runAstGrepPackCommand: vi.fn(() => 15),
+}))
 vi.mock('./commands/gha-workspace-policy.mts', () => ({
   runGhaWorkspacePolicy: vi.fn(async () => 13),
 }))
@@ -15,6 +18,7 @@ vi.mock('./commands/spawn-script.mts', () => ({
 
 import { runCli } from './index.mts'
 import { runAstGrepExamplesCommand } from './commands/ast-grep-examples.mts'
+import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
 import { runScript } from './commands/spawn-script.mts'
@@ -23,6 +27,7 @@ describe('runCli shared tooling dispatch', () => {
   afterEach(() => {
     vi.mocked(runRequireUpToDate).mockClear()
     vi.mocked(runAstGrepExamplesCommand).mockClear()
+    vi.mocked(runAstGrepPackCommand).mockClear()
     vi.mocked(runGhaWorkspacePolicy).mockClear()
     vi.mocked(runScript).mockClear()
   })
@@ -86,6 +91,8 @@ describe('runCli shared tooling dispatch', () => {
       rules: 'rules',
       config: 'sgconfig.yml',
     })
+    expect(runCli(['node', 'vouchington', 'ast-grep-pack'])).toBe(15)
+    expect(runAstGrepPackCommand).toHaveBeenCalledWith()
 
     await expect(runCli(['node', 'vouchington', 'gha-workspace-policy'])).resolves.toBe(13)
     expect(runGhaWorkspacePolicy).toHaveBeenCalledWith({ kind: 'gha-workspace-policy' })

@@ -1,0 +1,31 @@
+id: no-object-assign-new-error
+language: TypeScript
+severity: error
+message: 'Use http-errors/http-assert or an explicit typed error helper instead of Object.assign(new Error(...))'
+files:
+  - '**/*.mts'
+  - '**/*.ts'
+  - '**/*.tsx'
+ignores:
+  - '**/*.test.mts'
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.mock.test.mts'
+  - '**/*.mock.test.ts'
+  - '**/*.mock.test.tsx'
+  - '**/*.spec.mts'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - 'web/storybook/**'
+rule:
+  pattern: Object.assign(new Error($$$), $$$)
+examples:
+  - code: "throw Object.assign(new Error('missing'), { status: 404 })"
+    isValid: false
+    file: backend/services/example.mts
+  - code: "throw createHttpError(404, 'missing')"
+    isValid: true
+    file: backend/services/example.mts
+  - code: "const error = new Error('suppressed'); error.tags = { suppressLogging: true }"
+    isValid: true
+    file: backend/test-helpers/suppressed-error.mts

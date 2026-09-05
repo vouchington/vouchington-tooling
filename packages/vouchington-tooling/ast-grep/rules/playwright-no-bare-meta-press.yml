@@ -1,0 +1,29 @@
+id: playwright-no-bare-meta-press
+language: TypeScript
+severity: error
+message: "use 'ControlOrMeta+' instead of 'Meta+' in Playwright .press() calls; bare Meta+ fails on Linux CI"
+files:
+  - '**/*.spec.mts'
+rule:
+  any:
+    - pattern: $OBJ.press($ARG)
+    - pattern: $OBJ.press($ARG, $$$REST)
+constraints:
+  ARG:
+    regex: '[^A-Za-z]Meta\+'
+examples:
+  - code: "await input.press('Meta+Enter')"
+    isValid: false
+    file: 'playwright/tests/forms/form.spec.mts'
+  - code: "await input.press('Meta+Enter', { delay: 10 })"
+    isValid: false
+    file: 'playwright/tests/forms/form.spec.mts'
+  - code: "await input.press('Shift+Meta+Enter')"
+    isValid: false
+    file: 'playwright/tests/forms/form.spec.mts'
+  - code: "await input.press('ControlOrMeta+Enter')"
+    isValid: true
+    file: 'playwright/tests/forms/form.spec.mts'
+  - code: "await input.press('Shift+ControlOrMeta+Enter')"
+    isValid: true
+    file: 'playwright/tests/forms/form.spec.mts'

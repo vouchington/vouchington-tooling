@@ -1,0 +1,53 @@
+# NOTE: This rule flags eslint/oxlint disable directives that suppress max-lines
+# (or all rules) inside test files. Test files must stay within their line limit;
+# split the test or extract reusable helpers instead.
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.ts/.mts/.cts` files; see no-test-max-lines-disable-tsx.yml for
+# the companion rule that covers `.tsx` files.
+id: no-test-max-lines-disable
+language: TypeScript
+severity: error
+message: 'Test files must not disable max-lines or all lint rules; split the test or extract reusable helpers instead.'
+files:
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+  - '**/__tests__/**/*.ts'
+  - '**/__tests__/**/*.mts'
+  - '**/__tests__/**/*.cts'
+rule:
+  kind: comment
+  any:
+    - regex: '^(?://|/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?\s*(?:\*/\s*$|--|\s*$)'
+    - regex: '^(?://|/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?:[^\n-]|-[^\n-])*(?:\s|,)(?:max-lines(?:[^-a-zA-Z0-9_]|$)|eslint/max-lines(?:[^-a-zA-Z0-9_]|$))'
+examples:
+  - code: '// oxlint-disable max-lines'
+    isValid: false
+    file: 'backend/services/users.test.ts'
+  - code: '// eslint-disable'
+    isValid: false
+    file: 'backend/services/users.test.mts'
+  - code: '// oxlint-disable-next-line max-lines'
+    isValid: false
+    file: 'backend/services/users.spec.ts'
+  - code: '/* eslint-disable eslint/max-lines */'
+    isValid: false
+    file: 'backend/__tests__/foo.ts'
+  - code: '// oxlint-disable vitest/expect-expect'
+    isValid: true
+    file: 'backend/services/users.test.ts'
+  - code: '// oxlint-disable no-console'
+    isValid: true
+    file: 'backend/services/users.test.mts'
+  - code: '// eslint-disable max-lines-per-function'
+    isValid: true
+    file: 'backend/services/users.test.ts'
+  - code: '// eslint-disable eslint/max-lines-per-function'
+    isValid: true
+    file: 'backend/services/users.test.ts'
+  - code: '// oxlint-disable no-console -- split because of max-lines'
+    isValid: true
+    file: 'backend/services/users.test.ts'

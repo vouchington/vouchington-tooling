@@ -1,0 +1,31 @@
+id: storybook-no-webpack-final
+language: TypeScript
+severity: error
+message: 'Storybook must use viteFinal, not webpackFinal; this project uses @storybook/nextjs-vite'
+files:
+  - '**/.storybook/main.ts'
+  - '**/.storybook/main.mts'
+  - '**/.storybook/main.cts'
+rule:
+  regex: '^webpackFinal$|^["''`]webpackFinal["''`]$'
+  any:
+    - kind: property_identifier
+    - kind: shorthand_property_identifier
+    - kind: identifier
+    - kind: string
+examples:
+  - code: 'const config = { webpackFinal: (c) => c }'
+    isValid: false
+    file: 'web/.storybook/main.ts'
+  - code: "const config = { 'webpackFinal': (c) => c }"
+    isValid: false
+    file: 'web/.storybook/main.ts'
+  - code: 'const webpackFinal = (c) => c; export default { framework, webpackFinal }'
+    isValid: false
+    file: 'web/.storybook/main.ts'
+  - code: 'const config = { viteFinal: (c) => c }'
+    isValid: true
+    file: 'web/.storybook/main.ts'
+  - code: '// webpackFinal'
+    isValid: true
+    file: 'web/.storybook/main.ts'

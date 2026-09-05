@@ -1,0 +1,42 @@
+# NOTE: `__tests__` directories must contain tests only. Shared helpers, registries,
+# fixtures, and other imported support modules belong in a nearby `test-helpers/`
+# directory so test roots stay easy to scan.
+# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
+# only scans `.tsx` files; see no-exports-in-tests-folder.yml for the companion
+# rule that covers `.ts/.mts/.cts` files.
+id: no-exports-in-tests-folder-tsx
+language: Tsx
+severity: error
+message: 'Do not export from files under __tests__; move shared test support to a test-helpers directory.'
+files:
+  - '**/__tests__/**/*.tsx'
+rule:
+  all:
+    - kind: export_statement
+    - not:
+        pattern: export {}
+examples:
+  - code: |
+      export function renderThing() {
+        return <div />
+      }
+    isValid: false
+    file: 'web/components/example/__tests__/comment-tree-test-helpers.tsx'
+  - code: 'export type RenderThing = () => JSX.Element'
+    isValid: false
+    file: 'web/components/__tests__/render-helpers.tsx'
+  - code: |
+      it('renders shell exports', () => {
+        expect(`export NEXT_PORT=3901`).toContain('export')
+      })
+    isValid: true
+    file: 'web/components/example/__tests__/comment-tree.test.tsx'
+  - code: |
+      function renderThing() {
+        return <div />
+      }
+    isValid: true
+    file: 'web/components/example/__tests__/comment-tree.test.tsx'
+  - code: 'export {}'
+    isValid: true
+    file: 'web/components/example/__tests__/global-jsx.test.tsx'

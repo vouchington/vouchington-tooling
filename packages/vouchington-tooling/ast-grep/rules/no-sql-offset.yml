@@ -1,0 +1,65 @@
+id: no-sql-offset
+language: TypeScript
+severity: error
+message: 'Do not use SQL OFFSET in backend sql templates; use cursor pagination, LIMIT + 1, COUNT, EXISTS, or ROW_NUMBER() instead'
+files:
+  - 'backend/**/*.ts'
+  - 'backend/**/*.mts'
+  - 'backend/**/*.cts'
+rule:
+  all:
+    - kind: template_string
+    # This repo's SQL templates parameterize with `${...}`; numeric literals catch raw
+    # examples and fixtures without flagging ordinary prose such as "offset by".
+    - regex: '(?i)\bOFFSET\s+(?:\$\{|[0-9])'
+    - inside:
+        kind: call_expression
+        stopBy: end
+        has:
+          kind: identifier
+          regex: '^sql$'
+          stopBy: neighbor
+examples:
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`
+        SELECT id FROM posts
+        ORDER BY id DESC
+        OFFSET ${limit}
+      `
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`
+        SELECT id FROM posts
+        ORDER BY id DESC
+        OFFSET 10
+      `
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`
+        SELECT id FROM posts
+        ORDER BY id DESC
+        LIMIT ${limit + 1}
+      `
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: |-
+      export function copyBuffer(chunks: Uint8Array[]) {
+        let offset = 0
+        for (const chunk of chunks) offset += chunk.byteLength
+        return offset
+      }
+    isValid: true
+    file: 'backend/services/example/domain-verification-well-known.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`
+        INSERT INTO examples (body)
+        VALUES ('offset by a travel credit')
+      `
+    isValid: true
+    file: 'backend/src/example.mts'

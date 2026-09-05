@@ -17,6 +17,7 @@
     "vouchington": "dist/cli/index.mjs"
   },
   "files": [
+    "ast-grep",
     "dist",
     "skills",
     "scripts",
@@ -95,6 +96,11 @@
       "types": "./dist/ast-grep-examples/index.d.mts",
       "import": "./dist/ast-grep-examples/index.mjs",
       "default": "./dist/ast-grep-examples/index.mjs"
+    },
+    "./ast-grep-pack": {
+      "types": "./dist/ast-grep-pack/index.d.mts",
+      "import": "./dist/ast-grep-pack/index.mjs",
+      "default": "./dist/ast-grep-pack/index.mjs"
     },
     "./vitest-blob-manifest": {
       "types": "./dist/vitest-blob-manifest/index.d.mts",
@@ -274,6 +280,7 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@ast-grep/cli": "0.45.3",
     "@types/picomatch": "^4.0.3",
     "agent-blackboard": "^0.5.0"
   },

@@ -1,0 +1,82 @@
+id: web-icon-button-tooltip
+language: Tsx
+severity: error
+message: 'Use TooltipButton or an aria-label/aria-labelledby accessible name for icon-only buttons.'
+files:
+  - 'web/**/*.tsx'
+ignores:
+  - 'web/**/*.test.tsx'
+  - 'web/**/*.mock.test.tsx'
+  - 'web/**/*.stories.tsx'
+  - 'web/components/ui/**/*.tsx'
+rule:
+  any:
+    - all:
+        - any:
+            - kind: jsx_opening_element
+            - kind: jsx_self_closing_element
+        - has:
+            field: name
+            regex: '^Button$'
+        - has:
+            kind: jsx_attribute
+            regex: '^size=["''](?:icon|touchIcon)["'']'
+        - not:
+            has:
+              kind: jsx_attribute
+              regex: '^asChild$'
+        - not:
+            has:
+              kind: jsx_attribute
+              regex: '^aria-label='
+        - not:
+            has:
+              kind: jsx_attribute
+              regex: '^aria-labelledby='
+        - not:
+            inside:
+              kind: jsx_element
+              has:
+                kind: jsx_opening_element
+                has:
+                  field: name
+                  regex: '^TooltipTrigger$'
+    - all:
+        - any:
+            - kind: jsx_opening_element
+            - kind: jsx_self_closing_element
+        - has:
+            field: name
+            regex: '^TooltipButton$'
+        - has:
+            kind: jsx_attribute
+            regex: '^size=["''](?:icon|touchIcon)["'']'
+        - not:
+            has:
+              kind: jsx_attribute
+              regex: '^tooltip='
+examples:
+  - code: 'export function X() { return <Button size="icon" /> }'
+    isValid: false
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <Button size="touchIcon" /> }'
+    isValid: false
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <Button size="icon" aria-label="Save" /> }'
+    isValid: true
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <TooltipButton size="icon" /> }'
+    isValid: false
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <TooltipButton size="icon" tooltip="Save" /> }'
+    isValid: true
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <TooltipTrigger><Button size="icon" /></TooltipTrigger> }'
+    isValid: true
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <Button size="default" /> }'
+    isValid: true
+    file: 'web/components/example/save-button.tsx'
+  - code: 'export function X() { return <Button size="icon" /> }'
+    isValid: true
+    file: 'web/components/ui/button.tsx'

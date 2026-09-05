@@ -1,0 +1,74 @@
+id: web-clickable-needs-pointer
+language: Tsx
+severity: error
+message: >-
+  Clickable elements need a pointer cursor. Use a real <button>/<Button>, or
+  add `cursor-pointer` (native buttons and [role=button] already get it from
+  globals.css).
+files:
+  - 'web/**/*.tsx'
+ignores:
+  - 'web/components/ui/**'
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/*.stories.tsx'
+rule:
+  all:
+    - any:
+        - kind: jsx_opening_element
+        - kind: jsx_self_closing_element
+    - has:
+        field: name
+        regex: '^(div|span|li|ul|ol|tr|td|th|section|article|header|footer|aside|nav|main|p|figure)$'
+    - has:
+        kind: jsx_attribute
+        regex: '^onClick'
+    - not:
+        has:
+          kind: jsx_attribute
+          regex: 'cursor-pointer'
+    - not:
+        has:
+          kind: jsx_attribute
+          regex: '^role=[''"]button[''"]'
+examples:
+  - code: |
+      <div onClick={fn}>click me</div>
+    isValid: false
+    file: web/app/clickable-example.tsx
+  - code: |
+      <span onClick={fn} className="text-sm">click me</span>
+    isValid: false
+    file: web/app/clickable-example.tsx
+  - code: |
+      <div onClick={fn} role="menuitem">click me</div>
+    isValid: false
+    file: web/app/clickable-example.tsx
+  - code: |
+      <div onClick={fn} className="cursor-pointer">click me</div>
+    isValid: true
+    file: web/app/clickable-example.tsx
+  - code: |
+      <button onClick={fn}>click me</button>
+    isValid: true
+    file: web/app/clickable-example.tsx
+  - code: |
+      <Button onClick={fn}>click me</Button>
+    isValid: true
+    file: web/app/clickable-example.tsx
+  - code: |
+      <div onClick={fn} role="button">click me</div>
+    isValid: true
+    file: web/app/clickable-example.tsx
+  - code: |
+      <div onClick={fn}>click me</div>
+    isValid: true
+    file: web/components/ui/foo.tsx
+  - code: |
+      <div onClick={fn}>click me</div>
+    isValid: true
+    file: SomeComponent.test.tsx
+  - code: |
+      <div onClick={fn}>click me</div>
+    isValid: true
+    file: SomeComponent.stories.tsx

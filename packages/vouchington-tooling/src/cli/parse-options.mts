@@ -93,6 +93,12 @@ export function parseGitleaksDirectoryScan(args: readonly string[]): ParsedCli {
   }
 }
 
+export function parseAstGrepPack(args: readonly string[]): ParsedCli {
+  const options = parseOptions(args, [], 'ast-grep-pack', 'value')
+  if ('kind' in options) return options
+  return { kind: 'ast-grep-pack' }
+}
+
 export function parseAstGrepExamples(args: readonly string[]): ParsedCli {
   const options = parseOptions(args, ['rules', 'config'], 'ast-grep-examples', 'path')
   if ('kind' in options) return options

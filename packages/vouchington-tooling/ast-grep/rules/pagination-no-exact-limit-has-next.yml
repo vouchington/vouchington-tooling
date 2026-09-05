@@ -1,0 +1,111 @@
+id: pagination-no-exact-limit-has-next
+language: TypeScript
+severity: error
+message: 'Do not infer another page from an exact page-size boundary; fetch limit + 1 and test rows.length > limit.'
+files:
+  - 'backend/**/*.mts'
+ignores:
+  - 'backend/**/*.test.mts'
+  - 'backend/**/__tests__/**'
+rule:
+  all:
+    - any:
+        - pattern: $ROWS.length === $BOUND
+        - pattern: $ROWS.length == $BOUND
+        - pattern: $ROWS.length >= $BOUND
+        - pattern: $BOUND === $ROWS.length
+        - pattern: $BOUND == $ROWS.length
+        - pattern: $BOUND <= $ROWS.length
+    - any:
+        - inside:
+            kind: variable_declarator
+            stopBy: end
+            has:
+              kind: identifier
+              regex: '^has(?:More|NextPage)$'
+              stopBy: neighbor
+        - inside:
+            kind: assignment_expression
+            stopBy: end
+            has:
+              field: left
+              kind: identifier
+              regex: '^has(?:More|NextPage)$'
+        - inside:
+            kind: pair
+            stopBy: end
+            has:
+              kind: property_identifier
+              regex: '^(?:has_next_page|hasNextPage)$'
+              stopBy: neighbor
+constraints:
+  BOUND:
+    any:
+      - all:
+          - regex: '(?i)(?:limit|pageSize)'
+          - not:
+              kind: binary_expression
+      - all:
+          - kind: number
+          - regex: '^[1-9][0-9]*$'
+examples:
+  - code: 'const hasMore = messages.length === effectiveLimit'
+    isValid: false
+    file: 'backend/api/v1/example/list.mts'
+  - code: 'const hasNextPage = rows.length >= limit'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'hasMore = users.length === 100'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasMore = effectiveLimit === messages.length'
+    isValid: false
+    file: 'backend/api/v1/example/list.mts'
+  - code: 'const hasNextPage = options.pageSize <= rows.length'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasMore = rows.length == options.pagination.limit'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasNextPage = getEffectiveLimit(options) == rows.length'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const options = { hasNextPage: rows.length === limit }'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const pageInfo = { has_next_page: limit <= rows.length }'
+    isValid: false
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasNextPage = rows.length > limit'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'hasMore = users.length > limit'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'const nextCursor = userIds.length === limit ? userIds.at(-1) : null'
+    isValid: true
+    file: 'backend/services/example/find-users-needing-recalculation.mts'
+  - code: 'const hasMore = rows.length === 0'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasMore = rows.length >= minimumResults'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasMore = rows.length === limit + 1'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'const options = { hasMoreRows: rows.length === limit }'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'nextCursor = users.length === 100 ? users.at(-1)?.id : null'
+    isValid: true
+    file: 'backend/services/example/search.mts'
+  - code: 'const hasMore = messages.length === effectiveLimit'
+    isValid: true
+    file: 'backend/api/v1/example/list.test.mts'
+  - code: 'hasMore = users.length === 100'
+    isValid: true
+    file: 'backend/services/example/search.test.mts'
+  - code: 'const hasNextPage = rows.length === limit'
+    isValid: true
+    file: 'backend/services/example/search.mock.test.mts'
