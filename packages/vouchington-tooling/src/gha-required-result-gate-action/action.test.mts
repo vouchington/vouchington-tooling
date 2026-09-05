@@ -43,11 +43,12 @@ describe('CI required-result gate action', () => {
           : 'All required jobs passed or were skipped',
       )
       for (const value of ['failure', 'cancelled', 'timed_out', 'unknown']) {
-        expect(
-          spawnSync('bash', [scriptPath], {
-            env: { MODE: mode, RESULTS: `{"dependency":{"result":"${value}"}}` },
-          }).status,
-        ).toBe(1)
+        const rejected = spawnSync('bash', [scriptPath], {
+          encoding: 'utf8',
+          env: { MODE: mode, RESULTS: `{"dependency":{"result":"${value}"}}` },
+        })
+        expect(rejected.status).toBe(1)
+        expect(rejected.stderr).toContain('::error::One or more')
       }
     }
   })
