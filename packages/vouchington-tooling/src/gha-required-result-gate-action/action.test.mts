@@ -68,4 +68,15 @@ describe('CI required-result gate action', () => {
       }).status,
     ).toBe(2)
   })
+
+  it('documents a package-version pin comment, not an action-local v1.0.0', () => {
+    const readme = readFileSync('README.md', 'utf8')
+    const example = readme
+      .split('\n')
+      .find((line) => line.includes('ci-required-result-gate@') && line.includes('# v'))
+
+    expect(example).toMatch(/ci-required-result-gate@<40-character-commit-sha> # vX\.Y\.Z$/)
+    expect(readme).not.toMatch(/ci-required-result-gate@[^\n]*# v1\.0\.0/)
+    expect(readme).toContain('vouchington-tooling/vX.Y.Z')
+  })
 })

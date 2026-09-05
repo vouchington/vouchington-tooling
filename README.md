@@ -118,7 +118,7 @@ onto the same commits without creating GitHub Releases or publishing to npm.
 Pin the public Dependabot automerge action by commit SHA.
 
 ```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/dependabot-automerge@<sha>
+- uses: vouchington/vouchington-tooling/.github/actions/dependabot-automerge@<sha> # vX.Y.Z
   with:
     automerge_token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
     # Optional: JSON rules that require manual merge for an ecosystem/directory.
@@ -152,14 +152,16 @@ malformed input fail the gate. It is dependency-free and resolves its checked-in
 `GITHUB_ACTION_PATH`, so it does not require checkout or Node dependencies.
 
 ```yaml
-- uses: vouchington/vouchington-tooling/.github/actions/ci-required-result-gate@<40-character-commit-sha> # v1.0.0
+- uses: vouchington/vouchington-tooling/.github/actions/ci-required-result-gate@<40-character-commit-sha> # vX.Y.Z
   with:
     results: >-
       {"tests":{"result":"${{ needs.tests.result }}"},"lint":{"result":"${{ needs.lint.result }}"}}
 ```
 
-Keep the full commit SHA authoritative; the trailing release comment is only a human-readable update
-hint. Build the compact object explicitly from each dependency's `result` instead of passing
+Keep the full commit SHA authoritative. The trailing comment must be this package's release
+version (`# vX.Y.Z` for tag `vouchington-tooling/vX.Y.Z`) so Dependabot can compare it. An
+action-local `# v1.0.0` looks newer than `0.y.z` package tags, so Dependabot never proposes a
+bump. Build the compact object explicitly from each dependency's `result` instead of passing
 `toJSON(needs)`, which may contain unsupported fields or exceed process environment limits.
 The caller owns key-set completeness: keep a repository test that compares the explicit keys with
 the fan-in job's declared `needs`. A second hand-built expected-key input would duplicate the same
