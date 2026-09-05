@@ -1,0 +1,20 @@
+name: CI required-result gate
+description: Fail a required CI check when its explicit compact dependency results are unsuccessful.
+
+inputs:
+  results:
+    description: Compact JSON object containing dependency result fields.
+    required: true
+  mode:
+    description: required permits only success/skipped; build preserves its failure/cancelled contract.
+    default: required
+
+runs:
+  using: composite
+  steps:
+    - name: Check required results
+      shell: bash
+      env:
+        RESULTS: ${{ inputs.results }}
+        MODE: ${{ inputs.mode }}
+      run: bash "$GITHUB_ACTION_PATH/check-results.sh"

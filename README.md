@@ -137,6 +137,23 @@ check out or execute pull-request code.
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
 
+### Required-result gate
+
+Pin `ci-required-result-gate` by commit SHA to give a required fan-in job a strict, compact
+dependency-result contract. The action accepts only a non-empty JSON object whose entries contain
+exactly a `result` of `success` or `skipped`; failures, cancellations, missing results, and malformed
+input fail the gate. It is dependency-free and resolves its checked-in shell script from
+`GITHUB_ACTION_PATH`, so it does not require checkout or Node dependencies.
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/ci-required-result-gate@<sha>
+  with:
+    results: ${{ toJSON(needs) }}
+```
+
+Use `mode: build` only when preserving an existing build-gate name or message contract; it applies
+the same `success`/`skipped` acceptance rule.
+
 ## CLI
 
 ```bash
