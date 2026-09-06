@@ -33,6 +33,7 @@ export function parseArtifactPatternsJson(value: unknown): {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('patterns file must be a JSON object with keep and delete arrays')
   }
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted patterns object
   const record = value as Record<string, unknown>
   return {
     keepPatterns: stringArray(record.keep, 'keep'),

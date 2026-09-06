@@ -16,6 +16,7 @@ export function createWatchdogLifecycle() {
     complete: (onError: (error: unknown) => void) => {
       complete = true
       if (!cleanup) return
+      // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- preserve the registered cleanup before clearing mutable lifecycle state
       const next = cleanup
       cleanup = undefined
       run(next, onError)

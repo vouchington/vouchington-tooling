@@ -81,6 +81,7 @@ async function runLintLinks(
     })
     stdout = result.stdout
   } catch (error: unknown) {
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain captured process output when adapting the fixture failure
     const execError = error as { stdout?: string; code?: number }
     stdout = execError.stdout ?? ''
     exitCode = execError.code ?? 1

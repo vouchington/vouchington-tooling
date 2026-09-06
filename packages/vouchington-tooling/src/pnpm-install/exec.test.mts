@@ -98,10 +98,9 @@ describe('runPnpm', () => {
     const proc = child()
     mockedSpawn.mockReturnValue(proc as never)
     const pending = runPnpm(['install'], { ...options, commandTimeoutSeconds: 1 })
-    const result = pending
     await vi.advanceTimersByTimeAsync(1000)
     proc.emit('close', 0)
-    await expect(result).resolves.toMatchObject({ code: expect.any(Number) })
+    await expect(pending).resolves.toMatchObject({ code: expect.any(Number) })
     vi.useRealTimers()
   })
 

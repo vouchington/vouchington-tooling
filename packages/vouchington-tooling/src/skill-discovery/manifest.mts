@@ -76,12 +76,14 @@ async function validateManifestEntries(root: string, entries: SkillManifestEntry
 
 function isManifest(value: unknown): value is SkillManifest {
   if (value === null || typeof value !== 'object') return false
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the candidate schema type after the runtime object check
   const manifest = value as Partial<SkillManifest>
   return manifest.version === 1 && Array.isArray(manifest.skills) && manifest.skills.every(isEntry)
 }
 
 function isEntry(value: unknown): value is SkillManifestEntry {
   if (value === null || typeof value !== 'object') return false
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the candidate schema type after the runtime object check
   const entry = value as Partial<SkillManifestEntry>
   return (
     [entry.name, entry.plugin, entry.pluginVersion, entry.path].every(

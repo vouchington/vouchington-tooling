@@ -101,6 +101,7 @@ export async function persistentMetadataFingerprintV4(runCapture: CaptureCommand
 
 function validStamp(value: unknown): value is PersistentMetadataStamp {
   if (typeof value !== 'object' || value === null) return false
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the candidate stamp type before complete field validation
   const stamp = value as Partial<PersistentMetadataStamp>
   return (
     stamp.version === 4 &&

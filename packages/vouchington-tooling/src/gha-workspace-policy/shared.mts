@@ -53,6 +53,7 @@ export function visitRunSteps(
   if (!jobs || typeof jobs !== 'object') return
   for (const [jobId, value] of Object.entries(jobs as Record<string, unknown>)) {
     if (!value || typeof value !== 'object') continue
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a job record view after the runtime object check
     const job = value as Record<string, unknown>
     if (typeof job.uses === 'string') continue
     visitSteps(`job "${jobId}"`, job.steps, visitor)

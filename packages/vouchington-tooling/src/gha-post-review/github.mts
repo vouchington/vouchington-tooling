@@ -39,6 +39,7 @@ export function postWithGh(
     )
     return { ok: true, status: 201, body: '' }
   } catch (error) {
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- isolate the process-error shape assertion at the catch boundary
     const err = error as { stdout?: string; stderr?: string; message?: string }
     const text = `${err.stdout ?? ''}${err.stderr ?? ''}${err.message ?? ''}`
     const status = Number(/HTTP\s+(\d{3})/u.exec(text)?.[1] ?? 0)

@@ -15,6 +15,7 @@ export function extractDropIndexMetadata(content: string): SqlDropIndexMetadata[
     /* v8 ignore next 2 */
     if (!node || !('DropStmt' in node) || node.DropStmt.removeType !== 'OBJECT_INDEX') continue
     for (const object of node.DropStmt.objects ?? []) {
+      // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish an unknown boundary before runtime shape validation
       const objectValue: unknown = object
       const items =
         isRecord(objectValue) && isRecord(objectValue['List'])
@@ -22,6 +23,7 @@ export function extractDropIndexMetadata(content: string): SqlDropIndexMetadata[
           : undefined
       if (!Array.isArray(items)) continue
       const names = items.flatMap((item) => {
+        // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish an unknown boundary before runtime shape validation
         const itemValue: unknown = item
         const value =
           isRecord(itemValue) && isRecord(itemValue['String'])

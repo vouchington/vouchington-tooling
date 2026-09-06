@@ -37,6 +37,7 @@ export function oidcTokenRequest(env: NodeJS.ProcessEnv): { url: string; token: 
 
 function readToken(payload: unknown): string {
   if (payload === null || typeof payload !== 'object') return ''
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted response object
   const record = payload as Record<string, unknown>
   const token = record.token ?? record.app_token ?? record.value
   return typeof token === 'string' ? token : ''
@@ -44,6 +45,7 @@ function readToken(payload: unknown): string {
 
 function readErrorMessage(payload: unknown): string {
   if (payload === null || typeof payload !== 'object') return ''
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted response object
   const record = payload as Record<string, unknown>
   if (typeof record.message === 'string' && record.message.length > 0) return record.message
   const nested = record.error

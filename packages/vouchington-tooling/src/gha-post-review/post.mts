@@ -8,8 +8,11 @@ import {
 } from '../gha-review-payload/index.mts'
 
 export {
+  // oxlint-disable-next-line no-mistakes/ts-no-export-renaming -- preserve the package's established public compatibility name
   MAX_REVIEW_COMMENTS as MAX_COMMENTS,
+  // oxlint-disable-next-line no-mistakes/ts-no-export-renaming -- preserve the package's established public compatibility name
   MAX_REVIEW_PAYLOAD_BYTES as MAX_PAYLOAD_BYTES,
+  // oxlint-disable-next-line no-mistakes/ts-no-export-renaming -- preserve the package's established public compatibility name
   ReviewPayloadError as PostReviewError,
   type ReviewComment,
   type SanitizedReview,

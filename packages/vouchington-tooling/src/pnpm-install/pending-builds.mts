@@ -30,6 +30,7 @@ export async function buildLedgersAllowNativeRepair() {
       await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
     )
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the pnpm manifest object
     const record = value as Record<string, unknown>
     const ignored = record.ignoredBuilds
     const pending = record.pendingBuilds ?? []
@@ -72,6 +73,7 @@ export async function clearPendingDependencyBuilds(ids: string[]) {
   try {
     const value: unknown = parse(await readFile(filename, 'utf8'))
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the pnpm manifest object
     const record = value as Record<string, unknown>
     if (
       !Array.isArray(record.pendingBuilds) ||

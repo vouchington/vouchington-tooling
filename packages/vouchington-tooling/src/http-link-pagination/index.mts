@@ -136,6 +136,7 @@ function skipWhitespace(value: string, index: number): number {
 }
 
 function readToken(value: string, index: number): { value: string; end: number } | null {
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- preserve the token start while advancing the cursor
   const start = index
   while (index < value.length && isTokenCharacter(value[index]!)) index += 1
   return index === start ? null : { value: value.slice(start, index), end: index }

@@ -31,7 +31,7 @@ function assertResumeFile(info: Awaited<ReturnType<typeof lstat>>, links = 1): v
   )
     throw new Error('partition directory cleanup resume metadata is unsafe')
 }
-async function read(receipt: SnapshotCleanupReceipt): Promise<void> {
+export async function requireResumeReceipt(receipt: SnapshotCleanupReceipt): Promise<void> {
   const path = pathFor(receipt)
   let before = await filesystem.lstat(path)
   if (before.nlink === 2) {
@@ -92,17 +92,14 @@ export async function writeResumeReceipt(receipt: SnapshotCleanupReceipt): Promi
     await file?.close()
     await filesystem.unlink(temporary).catch(() => undefined)
   }
-  await read(receipt)
+  await requireResumeReceipt(receipt)
 }
 export async function removeResumeReceipt(receipt: SnapshotCleanupReceipt): Promise<void> {
   try {
-    await read(receipt)
+    await requireResumeReceipt(receipt)
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error
   }
   await filesystem.rm(pathFor(receipt), { force: false })
-}
-export async function requireResumeReceipt(receipt: SnapshotCleanupReceipt): Promise<void> {
-  await read(receipt)
 }

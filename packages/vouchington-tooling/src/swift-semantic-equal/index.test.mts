@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { runSwiftSemanticEqualCommand } from '../cli/commands/swift-semantic-equal.mts'
 import { runSwiftSemanticEqualCli } from './cli.mts'
 import { normalizeSwiftSource } from './normalize.mts'
 
@@ -39,7 +38,6 @@ describe('runSwiftSemanticEqualCli', () => {
 
   it('returns 1 for argument errors, missing files, or a real source change', () => {
     expect(runSwiftSemanticEqualCli(['base', 'head'])).toBe(1)
-    expect(runSwiftSemanticEqualCommand(['base', 'head'])).toBe(1)
     expect(runSwiftSemanticEqualCli(['base', 'head', 'App.ts'])).toBe(1)
     const gitShow = ((_cmd: string, args: readonly string[]) =>
       String(args[1]).startsWith('base:')

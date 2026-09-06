@@ -2,18 +2,18 @@
 import { readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { runAgentHarnessConfigCli } from '../agent-harness-config/cli.mts'
+import { runPostReviewCli } from '../gha-post-review/cli.mts'
+import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { readPackageVersion } from '../package-version.mts'
+import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
-import { runAgentHarnessConfigCommand } from './commands/agent-harness-config.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runScript } from './commands/spawn-script.mts'
 import { runNugetCentralVersionCommand } from './commands/nuget-central-version.mts'
-import { runPostReviewCommand } from './commands/post-review.mts'
-import { runStageReviewPayloadCommand } from './commands/stage-review-payload.mts'
-import { runSwiftSemanticEqualCommand } from './commands/swift-semantic-equal.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
 import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
@@ -93,7 +93,7 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
     case 'with-host-lock':
       return runWithHostLock(parsed.args)
     case 'agent-harness-config':
-      return runAgentHarnessConfigCommand(parsed.args)
+      return runAgentHarnessConfigCli(parsed.args)
     case 'gha-runtime-audit':
       return runGhaRuntimeAudit(parsed)
     case 'script': {
@@ -111,11 +111,11 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
     case 'nuget-central-version':
       return runNugetCentralVersionCommand(parsed.args)
     case 'swift-semantic-equal':
-      return runSwiftSemanticEqualCommand(parsed.args)
+      return runSwiftSemanticEqualCli(parsed.args)
     case 'post-review':
-      return runPostReviewCommand()
+      return runPostReviewCli()
     case 'stage-review-payload':
-      return runStageReviewPayloadCommand(parsed.args)
+      return runStageReviewPayloadCli(parsed.args)
     case 'http-origin':
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':
