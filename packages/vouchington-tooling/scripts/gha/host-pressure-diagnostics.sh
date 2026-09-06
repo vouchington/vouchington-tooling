@@ -11,10 +11,7 @@ section() {
 }
 
 is_number() {
-  case "$1" in
-    '' | *[!0-9.]*) return 1 ;;
-    *) return 0 ;;
-  esac
+  [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]
 }
 
 show_load_per_cpu() {
