@@ -23,11 +23,14 @@ show_load_per_cpu() {
   load15=$3
   cpu_count=$4
   printf 'load average: %s %s %s\n' "${load1:-unavailable}" "${load5:-unavailable}" "${load15:-unavailable}"
+  ratio=''
   if is_number "$load1" && is_number "$cpu_count" && [ "$cpu_count" != '0' ]; then
-    awk -v load="$load1" -v cpus="$cpu_count" 'BEGIN { printf "load1 per cpu: %.2f\n", load / cpus }'
-  else
-    printf 'load1 per cpu: unavailable\n'
+    # Capture rather than let awk print directly: a forked subprocess can
+    # fail or be killed under host pressure -- the exact condition this
+    # script exists to diagnose -- and produce no output on either branch.
+    ratio=$(awk -v load="$load1" -v cpus="$cpu_count" 'BEGIN { printf "%.2f", load / cpus }' 2>/dev/null || true)
   fi
+  printf 'load1 per cpu: %s\n' "${ratio:-unavailable}"
 }
 
 show_meminfo_field() {
