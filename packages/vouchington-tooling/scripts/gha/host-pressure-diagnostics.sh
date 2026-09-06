@@ -10,6 +10,26 @@ section() {
   printf '\n== %s ==\n' "$1"
 }
 
+is_number() {
+  case "$1" in
+    '' | *[!0-9.]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+show_load_per_cpu() {
+  load1=$1
+  load5=$2
+  load15=$3
+  cpu_count=$4
+  printf 'load average: %s %s %s\n' "${load1:-unavailable}" "${load5:-unavailable}" "${load15:-unavailable}"
+  if is_number "$load1" && is_number "$cpu_count" && [ "$cpu_count" != '0' ]; then
+    awk -v load="$load1" -v cpus="$cpu_count" 'BEGIN { printf "load1 per cpu: %.2f\n", load / cpus }'
+  else
+    printf 'load1 per cpu: unavailable\n'
+  fi
+}
+
 show_meminfo_field() {
   field=$1
   if [ -r /proc/meminfo ]; then
@@ -54,14 +74,24 @@ show_oom_lines() {
 
 show_top_rss_processes() {
   if have ps && have sort && have sed; then
-    ps ax -o pid= -o rss= -o comm= 2>/dev/null | sort -k2,2nr | sed -n '1,15p'
+    output=$(ps ax -o pid= -o rss= -o comm= 2>/dev/null | sort -k2,2nr | sed -n '1,15p')
   else
-    printf 'unavailable\n'
+    output=''
+  fi
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output"
+  else
+    printf 'unavailable: top rss processes\n'
   fi
 }
 
 show_runner_counts() {
-  ps ax -o comm= 2>/dev/null | awk '
+  process_list=$(ps ax -o comm= 2>/dev/null)
+  if [ -z "$process_list" ]; then
+    printf 'unavailable: process list\n'
+    return
+  fi
+  printf '%s\n' "$process_list" | awk '
     {
       command = $0
       sub(/^[[:space:]]+/, "", command)
@@ -137,18 +167,21 @@ case "$platform" in
     done
 
     section 'load and cpu'
+    loadavg_line=''
     if [ -r /proc/loadavg ]; then
-      printf 'load average: '
-      awk '{ print $1, $2, $3 }' /proc/loadavg 2>/dev/null || printf 'unavailable\n'
-    else
-      printf 'load average unavailable\n'
+      loadavg_line=$(awk '{ print $1, $2, $3 }' /proc/loadavg 2>/dev/null || true)
     fi
+    load1=$(printf '%s' "$loadavg_line" | awk '{ print $1 }')
+    load5=$(printf '%s' "$loadavg_line" | awk '{ print $2 }')
+    load15=$(printf '%s' "$loadavg_line" | awk '{ print $3 }')
     printf 'nproc: '
     if have nproc; then
-      nproc 2>/dev/null || printf 'unavailable\n'
+      cpu_count=$(nproc 2>/dev/null || true)
     else
-      getconf _NPROCESSORS_ONLN 2>/dev/null || printf 'unavailable\n'
+      cpu_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)
     fi
+    printf '%s\n' "${cpu_count:-unavailable}"
+    show_load_per_cpu "$load1" "$load5" "$load15" "$cpu_count"
 
     section 'kernel OOM evidence'
     show_oom_lines
@@ -160,13 +193,65 @@ case "$platform" in
   Darwin)
     section 'system basics'
     uptime 2>/dev/null || printf 'uptime unavailable\n'
-    printf 'hw.ncpu: '
-    sysctl -n hw.ncpu 2>/dev/null || printf 'unavailable\n'
     printf 'hw.memsize: '
     sysctl -n hw.memsize 2>/dev/null || printf 'unavailable\n'
     section 'swap and vm'
     vm_stat 2>/dev/null || printf 'vm_stat unavailable\n'
     sysctl vm.swapusage 2>/dev/null || printf 'vm.swapusage unavailable\n'
+
+    section 'load and cpu'
+    loadavg_raw=$(sysctl -n vm.loadavg 2>/dev/null || true)
+    load1=$(printf '%s' "$loadavg_raw" | awk '{ print $2 }')
+    load5=$(printf '%s' "$loadavg_raw" | awk '{ print $3 }')
+    load15=$(printf '%s' "$loadavg_raw" | awk '{ print $4 }')
+    printf 'hw.logicalcpu: '
+    logicalcpu=$(sysctl -n hw.logicalcpu 2>/dev/null || true)
+    printf '%s\n' "${logicalcpu:-unavailable}"
+    printf 'hw.physicalcpu: '
+    sysctl -n hw.physicalcpu 2>/dev/null || printf 'unavailable\n'
+    printf 'hw.ncpu: '
+    sysctl -n hw.ncpu 2>/dev/null || printf 'unavailable\n'
+    show_load_per_cpu "$load1" "$load5" "$load15" "$logicalcpu"
+    # Apple-Silicon performance/efficiency core split. These sysctls do not
+    # exist on Intel Macs and must degrade to unavailable there.
+    printf 'hw.perflevel0.logicalcpu: '
+    sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || printf 'unavailable\n'
+    printf 'hw.perflevel1.logicalcpu: '
+    sysctl -n hw.perflevel1.logicalcpu 2>/dev/null || printf 'unavailable\n'
+    # iostat -c 2 is the closest PSI analogue on Darwin: a since-boot row plus
+    # a 1-second live row with us/sy/id and 1m/5m/15m load. Do not gate this on
+    # `have timeout` -- base macOS ships no timeout binary (only gtimeout via
+    # coreutils/Homebrew), and `-c 2` is self-bounding at ~1s regardless.
+    if have iostat; then
+      if have timeout; then
+        timeout 5 iostat -c 2 2>/dev/null || printf 'iostat unavailable\n'
+      else
+        iostat -c 2 2>/dev/null || printf 'iostat unavailable\n'
+      fi
+    else
+      printf 'iostat unavailable\n'
+    fi
+
+    section 'memory pressure'
+    if have memory_pressure; then
+      memory_pressure -Q 2>/dev/null || printf 'memory_pressure unavailable\n'
+    else
+      printf 'memory_pressure unavailable\n'
+    fi
+    printf 'kern.memorystatus_vm_pressure_level: '
+    pressure_level=$(sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null || true)
+    case "$pressure_level" in
+      1) printf 'normal (1)\n' ;;
+      2) printf 'warning (2)\n' ;;
+      4) printf 'critical (4)\n' ;;
+      '') printf 'unavailable\n' ;;
+      *) printf 'unknown (%s)\n' "$pressure_level" ;;
+    esac
+    printf 'vm.compressor_bytes_used: '
+    sysctl -n vm.compressor_bytes_used 2>/dev/null || printf 'unavailable\n'
+    # No jetsam/OOM-kill log scrape here (unlike Linux show_oom_lines): `log
+    # show` is unbounded and slow, with no cheap bounded equivalent on macOS.
+
     section 'top rss processes'
     show_top_rss_processes
     section 'runner worker/listener counts'

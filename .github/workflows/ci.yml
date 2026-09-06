@@ -42,6 +42,34 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  test-macos:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Probe host-pressure-diagnostics.sh on real Darwin
+        continue-on-error: true
+        run: bash packages/vouchington-tooling/scripts/gha/host-pressure-diagnostics.sh
+      - run: |
+          pnpm exec vitest run --reporter=default --reporter=json \
+            --outputFile="${{ runner.temp }}/vitest-report.json" \
+            packages/vouchington-tooling/src/cli/commands/host-pressure-diagnostics.test.mts
+      - name: Require the real-Darwin test to have actually run
+        run: |
+          bash packages/vouchington-tooling/scripts/gha/assert-vitest-test-passed.sh \
+            "${{ runner.temp }}/vitest-report.json" \
+            'ci/host-pressure-diagnostics.sh quantifies real Darwin load, cpu, and memory pressure without an empty section'
+
   coverage:
     needs: test
     if: needs.test.result == 'success'
@@ -86,7 +114,7 @@ jobs:
   tests:
     name: tests
     if: ${{ !cancelled() }}
-    needs: [test, actionlint]
+    needs: [test, test-macos, actionlint]
     runs-on: ubuntu-slim
     timeout-minutes: 2
     permissions: {}
@@ -94,8 +122,10 @@ jobs:
       - name: Require all tests
         env:
           TEST_RESULT: ${{ needs.test.result }}
+          TEST_MACOS_RESULT: ${{ needs.test-macos.result }}
           ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
         run: |
           set -euo pipefail
           [ "$TEST_RESULT" = success ]
+          [ "$TEST_MACOS_RESULT" = success ]
           [ "$ACTIONLINT_RESULT" = success ]
