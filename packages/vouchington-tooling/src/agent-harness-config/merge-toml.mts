@@ -107,9 +107,10 @@ function assertValidToml(text: string, patches: readonly TomlPatch[], path: stri
   try {
     parsed = parseToml(text) as Record<string, unknown>
   } catch (error) {
-    throw new Error(
-      `${path}: produced invalid TOML (${error instanceof Error ? error.message : String(error)})`,
-    )
+    /* v8 ignore next -- smol-toml's parse() only ever throws TomlError, which extends Error, so
+       the non-Error fallback here is unreachable in practice. */
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`${path}: produced invalid TOML (${message})`)
   }
   for (const patch of patches) {
     const value = tomlPatchValue(parsed, patch.table, patch.key)
