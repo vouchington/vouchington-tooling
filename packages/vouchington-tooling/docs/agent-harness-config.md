@@ -84,12 +84,12 @@ The Grok profile is selected per invocation with `--sandbox workspace-write`.
 
 Repo (`--repo`):
 
-| File                    | Keys                                                                  |
-| ----------------------- | --------------------------------------------------------------------- |
-| `.claude/settings.json` | `sandbox.enabled`, `sandbox.failIfUnavailable`                        |
-| `.codex/config.toml`    | same Codex keys as global                                             |
-| `.grok/sandbox.toml`    | extra roots only (project config cannot set the default profile)      |
-| `.cursor/sandbox.json`  | `workspace_readwrite` extra roots and `networkPolicy.default = allow` |
+| File                    | Keys                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `.claude/settings.json` | `sandbox.enabled`, `sandbox.failIfUnavailable`, `sandbox.filesystem.allowWrite` |
+| `.codex/config.toml`    | same Codex keys as global                                                       |
+| `.grok/sandbox.toml`    | extra roots only (project config cannot set the default profile)                |
+| `.cursor/sandbox.json`  | `workspace_readwrite` extra roots and `networkPolicy.default = allow`           |
 
 Repo-local classifier settings have user-level prerequisites:
 

@@ -282,14 +282,14 @@ describe('JSON union merge', () => {
 })
 
 describe('check vs apply', () => {
-  it('check does not write and apply is idempotent', async () => {
+  it('check does not write and apply returns post-write status', async () => {
     const home = await tempDir('harness-check-')
     const checked = await checkHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
     expect(checked.compliant).toBe(false)
     await expect(readFile(join(home, '.cursor', 'cli-config.json'), 'utf8')).rejects.toThrow()
-    await applyHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
-    const after = await checkHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
-    expect(after.compliant).toBe(true)
+    const applied = await applyHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
+    expect(applied.compliant).toBe(true)
+    expect(applied.files).toMatchObject([{ action: 'create' }])
   })
 })
 

@@ -79,10 +79,13 @@ export async function applyHarnessConfig(
     const { exists, source } = await readOptional(file.path)
     const next = patched(file, source)
     const result = fileResult(file, exists, next.drifts)
-    files.push(result)
-    if (result.action === 'ok') continue
+    if (result.action === 'ok') {
+      files.push(result)
+      continue
+    }
     await mkdir(dirname(file.path), { recursive: true })
     await writeFile(file.path, next.text)
+    files.push({ ...result, action: exists ? 'update' : 'create' })
     written.push(file.path)
   }
   const prerequisites = await checkHarnessPrerequisites(
@@ -90,8 +93,7 @@ export async function applyHarnessConfig(
     options,
   )
   return {
-    compliant:
-      written.length === 0 && prerequisites.every((prerequisite) => prerequisite.satisfied),
+    compliant: prerequisites.every((prerequisite) => prerequisite.satisfied),
     files,
     prerequisites,
     target,
