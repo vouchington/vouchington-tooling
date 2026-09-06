@@ -33,6 +33,7 @@ export function dumpHarnessPolicy(
     claude: {
       defaultMode: CLAUDE_DEFAULT_MODE,
       sandboxEnabled: true,
+      sandboxFailIfUnavailable: true,
       useAutoModeDuringPlan: true,
     },
     codex: {
@@ -46,7 +47,8 @@ export function dumpHarnessPolicy(
       auto_mode_enabled: GROK_AUTO_MODE_ENABLED,
       default_auto_mode: GROK_DEFAULT_AUTO_MODE,
       permission_mode: GROK_PERMISSION_MODE,
-      sandbox_profile: GROK_SANDBOX_PROFILE,
+      sandbox_profile_defined: GROK_SANDBOX_PROFILE,
+      sandbox_profile_requires_cli_selection: true,
     },
   }
 }

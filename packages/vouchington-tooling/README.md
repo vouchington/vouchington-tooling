@@ -235,8 +235,10 @@ shell script or a workflow/action YAML file is left to the caller.
 config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
 home-directory configs; `--repo` updates a checkout. It does not copy allowlists, hooks, or plugins.
 Grok uses `permission_mode = "auto"` plus `auto_mode.enabled` and `default_auto_mode` so the
-classifier stays available in plan mode. Cursor uses `approvalMode = "auto-review"`; `unrestricted`
-disables the sandbox.
+classifier stays available in plan mode; its defined sandbox profile still requires
+`--sandbox workspace-write` at launch. Cursor uses global `approvalMode = "auto-review"`;
+`unrestricted` disables the sandbox. Repo checks surface user-level trust or mode prerequisites
+instead of claiming that repo files alone activate them.
 
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,

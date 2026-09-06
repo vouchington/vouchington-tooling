@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { applyJsonPatches } from './merge-json.mts'
 import { applyTomlPatches } from './merge-toml.mts'
 import { planGlobalFiles, planRepoFiles } from './paths.mts'
+import { checkHarnessPrerequisites } from './prerequisites.mts'
 import type {
   ApplyTarget,
   FilePlan,
@@ -53,7 +54,18 @@ export async function checkHarnessConfig(
     const { exists, source } = await readOptional(file.path)
     files.push(fileResult(file, exists, patched(file, source).drifts))
   }
-  return { compliant: files.every((file) => file.action === 'ok'), files, target }
+  const prerequisites = await checkHarnessPrerequisites(
+    target.kind === 'repo' ? target.root : undefined,
+    options,
+  )
+  return {
+    compliant:
+      files.every((file) => file.action === 'ok') &&
+      prerequisites.every((prerequisite) => prerequisite.satisfied),
+    files,
+    prerequisites,
+    target,
+  }
 }
 
 export async function applyHarnessConfig(
@@ -73,9 +85,15 @@ export async function applyHarnessConfig(
     await writeFile(file.path, next.text)
     written.push(file.path)
   }
+  const prerequisites = await checkHarnessPrerequisites(
+    target.kind === 'repo' ? target.root : undefined,
+    options,
+  )
   return {
-    compliant: written.length === 0,
+    compliant:
+      written.length === 0 && prerequisites.every((prerequisite) => prerequisite.satisfied),
     files,
+    prerequisites,
     target,
     written,
   }

@@ -89,14 +89,23 @@ export async function runAgentHarnessConfigCli(argv: readonly string[]): Promise
         parsed.action === 'apply'
           ? await applyHarnessConfig(target, options)
           : await checkHarnessConfig(target, options)
-      compliant &&= result.files.every((file) => file.action === 'ok')
+      compliant &&=
+        parsed.action === 'apply'
+          ? result.prerequisites.every((prerequisite) => prerequisite.satisfied)
+          : result.compliant
       for (const file of result.files) {
         if (file.action === 'ok') process.stdout.write(`ok ${file.path}\n`)
         else process.stdout.write(`${file.action} ${file.path}\n`)
         for (const drift of file.drifts) process.stdout.write(`${formatDrift(drift)}\n`)
       }
+      for (const prerequisite of result.prerequisites) {
+        const status = prerequisite.satisfied ? 'ok' : 'required'
+        process.stdout.write(
+          `${status} ${prerequisite.harness} prerequisite ${prerequisite.key}: ${prerequisite.message}\n`,
+        )
+      }
     }
-    return parsed.action === 'apply' || compliant ? 0 : 1
+    return compliant ? 0 : 1
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     return 2

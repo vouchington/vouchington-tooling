@@ -23,6 +23,7 @@ describe('dumpHarnessPolicy', () => {
   it('maps every harness to classifier-auto and sandbox, never YOLO keys', () => {
     const dump = JSON.stringify(dumpHarnessPolicy())
     expect(dumpHarnessPolicy().claude.defaultMode).toBe('auto')
+    expect(dumpHarnessPolicy().claude.sandboxFailIfUnavailable).toBe(true)
     expect(dumpHarnessPolicy().codex.approvals_reviewer).toBe('auto_review')
     expect(dumpHarnessPolicy().grok.permission_mode).toBe('auto')
     expect(dumpHarnessPolicy().grok.auto_mode_enabled).toBe(true)
@@ -65,10 +66,10 @@ describe('JSON apply', () => {
     await applyHarnessConfig({ kind: 'repo', root }, { harnesses: ['claude'] })
     const parsed = JSON.parse(await readFile(path, 'utf8')) as {
       permissions: { defaultMode: string }
-      sandbox: { enabled: boolean }
+      sandbox: { enabled: boolean; failIfUnavailable: boolean }
     }
     expect(parsed.permissions.defaultMode).toBe('plan')
-    expect(parsed.sandbox.enabled).toBe(true)
+    expect(parsed.sandbox).toMatchObject({ enabled: true, failIfUnavailable: true })
   })
 
   it('gives Claude the same writable roots as Codex/Grok/Cursor while keeping custom entries (B1)', async () => {
@@ -95,7 +96,7 @@ describe('JSON apply', () => {
     expect(again.written).toEqual([])
   })
 
-  it('keeps Cursor project allow/deny while setting auto-review', async () => {
+  it('leaves unsupported Cursor project CLI config untouched', async () => {
     const root = await tempDir('harness-cli-json-')
     const path = join(root, '.cursor', 'cli.json')
     await mkdir(join(root, '.cursor'), { recursive: true })
@@ -104,9 +105,7 @@ describe('JSON apply', () => {
       `${JSON.stringify({ permissions: { allow: ['Shell(git)'], deny: ['Shell(sudo)'] } }, null, 2)}\n`,
     )
     await applyHarnessConfig({ kind: 'repo', root }, { harnesses: ['cursor'] })
-    const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
-    expect(parsed).toMatchObject({
-      approvalMode: 'auto-review',
+    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({
       permissions: { allow: ['Shell(git)'], deny: ['Shell(sudo)'] },
     })
   })
@@ -141,7 +140,7 @@ describe('TOML apply', () => {
     expect(text).toContain('yolo = false')
     expect(text).toContain('[[marketplace.sources]]')
     expect(text).toContain('[mcp_servers.CodSpeed]')
-    expect(readTomlKey(text, 'sandbox', 'profile')).toBe('workspace-write')
+    expect(readTomlKey(text, 'sandbox', 'profile')).toBeUndefined()
     const sandbox = await readFile(join(home, '.grok', 'sandbox.toml'), 'utf8')
     expect(readTomlKey(sandbox, 'profiles.workspace-write', 'extends')).toBe('workspace')
     expect(readTomlKey(sandbox, 'profiles.workspace-write', 'read_write')).toEqual([
@@ -294,6 +293,40 @@ describe('check vs apply', () => {
   })
 })
 
+describe('repo prerequisites', () => {
+  it('requires Codex project trust without writing it', async () => {
+    const home = await tempDir('harness-codex-trust-home-')
+    const root = await tempDir('harness-codex-trust-repo-')
+    await applyHarnessConfig({ kind: 'repo', root }, { harnesses: ['codex'], home })
+    const missing = await checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['codex'], home })
+    expect(missing.prerequisites).toMatchObject([{ satisfied: false }])
+    const path = join(home, '.codex', 'config.toml')
+    await mkdir(join(home, '.codex'), { recursive: true })
+    await writeFile(path, `[projects.${JSON.stringify(root)}]\ntrust_level = "trusted"\n`)
+    const trusted = await checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['codex'], home })
+    expect(trusted.prerequisites).toMatchObject([{ satisfied: true }])
+    expect(trusted.compliant).toBe(true)
+    expect(
+      (await applyHarnessConfig({ kind: 'repo', root }, { harnesses: ['codex'], home })).compliant,
+    ).toBe(true)
+  })
+
+  it('surfaces manual Grok activation and Cursor global mode', async () => {
+    const home = await tempDir('harness-prerequisite-home-')
+    const root = await tempDir('harness-prerequisite-repo-')
+    const grok = await checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['grok'], home })
+    expect(grok.prerequisites).toMatchObject([{ satisfied: false }])
+    const missing = await checkHarnessConfig(
+      { kind: 'repo', root },
+      { harnesses: ['cursor'], home },
+    )
+    expect(missing.prerequisites).toMatchObject([{ satisfied: false }])
+    await applyHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
+    const cursor = await checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['cursor'], home })
+    expect(cursor.prerequisites).toMatchObject([{ satisfied: true }])
+  })
+})
+
 describe('CLI', () => {
   const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
   const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
@@ -368,6 +401,12 @@ describe('CLI', () => {
     const root = await tempDir('harness-cli-repo-')
     expect(await runAgentHarnessConfigCli(['check', '--repo', root])).toBe(1)
     expect(stdout.mock.calls.map(String).join('')).toMatch(/missing /)
+  })
+
+  it('returns nonzero when apply leaves a manual prerequisite', async () => {
+    const root = await tempDir('harness-cli-grok-repo-')
+    expect(await runAgentHarnessConfigCli(['apply', '--repo', root, '--harness', 'grok'])).toBe(1)
+    expect(stdout.mock.calls.map(String).join('')).toMatch(/required grok prerequisite/)
   })
 
   it('stringifies non-Error CLI failures', async () => {

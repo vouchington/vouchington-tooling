@@ -11,7 +11,6 @@ import {
   GROK_AUTO_MODE_ENABLED,
   GROK_DEFAULT_AUTO_MODE,
   GROK_PERMISSION_MODE,
-  GROK_SANDBOX_PROFILE,
 } from './policy.mts'
 import { HARNESS_IDS, type FilePlan, type HarnessConfigOptions, type HarnessId } from './types.mts'
 
@@ -67,6 +66,7 @@ export function planGlobalFiles(options?: HarnessConfigOptions): FilePlan[] {
       patches: [
         { path: ['permissions', 'defaultMode'], value: CLAUDE_DEFAULT_MODE },
         { path: ['sandbox', 'enabled'], value: true },
+        { path: ['sandbox', 'failIfUnavailable'], value: true },
         { merge: 'union', path: ['sandbox', 'filesystem', 'allowWrite'], value: roots },
         { path: ['useAutoModeDuringPlan'], value: true },
       ],
@@ -83,7 +83,6 @@ export function planGlobalFiles(options?: HarnessConfigOptions): FilePlan[] {
         { key: 'permission_mode', table: 'ui', value: GROK_PERMISSION_MODE },
         { key: 'enabled', table: 'auto_mode', value: GROK_AUTO_MODE_ENABLED },
         { key: 'default_auto_mode', table: '', value: GROK_DEFAULT_AUTO_MODE },
-        { key: 'profile', table: 'sandbox', value: GROK_SANDBOX_PROFILE },
       ],
       path: join(home, '.grok', 'config.toml'),
     })
@@ -111,6 +110,7 @@ export function planRepoFiles(root: string, options?: HarnessConfigOptions): Fil
       format: 'json',
       patches: [
         { path: ['sandbox', 'enabled'], value: true },
+        { path: ['sandbox', 'failIfUnavailable'], value: true },
         { merge: 'union', path: ['sandbox', 'filesystem', 'allowWrite'], value: roots },
       ],
       path: join(repo, '.claude', 'settings.json'),
@@ -121,11 +121,6 @@ export function planRepoFiles(root: string, options?: HarnessConfigOptions): Fil
   if (wants(harnesses, 'grok'))
     files.push({ ...grokSandboxPatches(roots), path: join(repo, '.grok', 'sandbox.toml') })
   if (wants(harnesses, 'cursor')) {
-    files.push({
-      format: 'json',
-      patches: [{ path: ['approvalMode'], value: CURSOR_APPROVAL_MODE }],
-      path: join(repo, '.cursor', 'cli.json'),
-    })
     files.push({
       format: 'json',
       patches: [

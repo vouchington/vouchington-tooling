@@ -45,7 +45,15 @@ export interface HarnessPlan {
 export interface HarnessCheckResult {
   readonly compliant: boolean
   readonly files: readonly FileResult[]
+  readonly prerequisites: readonly HarnessPrerequisite[]
   readonly target: ApplyTarget
+}
+
+export interface HarnessPrerequisite {
+  readonly harness: HarnessId
+  readonly key: string
+  readonly message: string
+  readonly satisfied: boolean
 }
 
 export interface HarnessApplyResult extends HarnessCheckResult {
@@ -62,6 +70,7 @@ export interface HarnessPolicyDump {
   readonly claude: {
     readonly defaultMode: 'auto'
     readonly sandboxEnabled: true
+    readonly sandboxFailIfUnavailable: true
     readonly useAutoModeDuringPlan: true
   }
   readonly codex: {
@@ -75,6 +84,7 @@ export interface HarnessPolicyDump {
     readonly auto_mode_enabled: true
     readonly default_auto_mode: true
     readonly permission_mode: 'auto'
-    readonly sandbox_profile: 'workspace-write'
+    readonly sandbox_profile_defined: 'workspace-write'
+    readonly sandbox_profile_requires_cli_selection: true
   }
 }
