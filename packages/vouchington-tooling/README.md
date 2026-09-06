@@ -208,7 +208,20 @@ import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-tr
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
+import {
+  shellScriptViolations,
+  workflowYamlViolations,
+} from 'vouchington-tooling/gh-api-shell-quoting'
 ```
+
+`shellScriptViolations`/`workflowYamlViolations` flag a `gh api` call whose argument carries an
+unquoted `?` or `&`: an unquoted `&` silently backgrounds the command and truncates the query
+(the call still exits 0), and an unquoted `?` fails loudly under zsh glob-nomatch but passes
+through unexpanded under bash. `workflowYamlViolations` decodes quoted and folded YAML `run:`
+scalars before scanning, so a hazard hidden by YAML's own quote-stripping is still caught; it
+throws on a `run:` value that is a YAML alias or a multiline PLAIN scalar, shapes it cannot yet
+scan safely. Both functions scan already-in-scope source text — deciding which files count as a
+shell script or a workflow/action YAML file is left to the caller.
 
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,

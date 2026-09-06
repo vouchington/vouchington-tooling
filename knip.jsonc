@@ -12,6 +12,7 @@
         "src/cli/index.mts!",
         "src/sql-ast/index.mts!",
         "src/sql-scanner/index.mts!",
+        "src/gh-api-shell-quoting/index.mts!",
         "src/gha-runtime-audit/index.mts!",
         "src/vitest-blob-manifest/index.mts!",
         "src/vitest-blob-manifest/cli.mts!",

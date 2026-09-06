@@ -267,6 +267,11 @@
       "import": "./dist/gh-cli/index.mjs",
       "default": "./dist/gh-cli/index.mjs"
     },
+    "./gh-api-shell-quoting": {
+      "types": "./dist/gh-api-shell-quoting/index.d.mts",
+      "import": "./dist/gh-api-shell-quoting/index.mjs",
+      "default": "./dist/gh-api-shell-quoting/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
