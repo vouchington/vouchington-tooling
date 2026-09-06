@@ -81,9 +81,27 @@ describe('code-review action', () => {
     expect(worktree).toContain('mktemp -d "${TMPDIR:-/tmp}/code-review-wt.XXXXXX"')
     expect(worktree).not.toContain('/tmp/code-review-wt')
     expect(stepByName.get('Stage trusted action runtime')?.run).toContain('stage-runtime.sh')
-    expect(stepByName.get('Clear leftover review payload')?.run).toContain('.vouchington-tooling')
     expect(stepByName.get('Clean review payload files')?.run).toContain('cleanup-worktrees.sh')
     expect(actionText).not.toMatch(/cp "\$GITHUB_ACTION_PATH\/worktree-create\.sh"/)
+  })
+
+  it('never deletes its own checked-out .vouchington-tooling directory', () => {
+    // A nested `actions/checkout` step earlier in this composite ("Checkout trusted review
+    // prompt") registers a job-level post-cleanup hook that fires after this composite's own
+    // last step and needs to re-resolve this action's manifest under
+    // .vouchington-tooling/.github/actions/code-review. Deleting that directory from inside the
+    // composite breaks that resolution with "Can't find 'action.yml' ... under '<path>'" even
+    // though the review itself succeeded. The caller workflow's own checkout of that path
+    // (default clean: true) owns its lifecycle across runs, so neither cleanup step here should
+    // touch it. Strip comment lines first so this assertion targets executed rm commands, not
+    // explanatory comments naming the very path they warn against deleting.
+    const stripComments = (run: string | undefined) => (run ?? '').replace(/^\s*#.*$/gm, '')
+    expect(stripComments(stepByName.get('Clear leftover review payload')?.run)).not.toContain(
+      '.vouchington-tooling',
+    )
+    expect(stripComments(stepByName.get('Clean review payload files')?.run)).not.toContain(
+      '.vouchington-tooling',
+    )
   })
 
   it('stages the payload through the same-ref CLI', () => {
