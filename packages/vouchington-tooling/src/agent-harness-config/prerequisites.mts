@@ -11,8 +11,6 @@ async function readOptional(path: string): Promise<string> {
     return await readFile(path, 'utf8')
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''
-    /* v8 ignore next -- callers cannot portably induce a non-ENOENT read failure in the
-       isolated config directories; this preserves the underlying filesystem error. */
     throw error
   }
 }

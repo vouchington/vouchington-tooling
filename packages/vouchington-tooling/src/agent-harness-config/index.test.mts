@@ -321,6 +321,11 @@ describe('repo prerequisites', () => {
       { harnesses: ['cursor'], home },
     )
     expect(missing.prerequisites).toMatchObject([{ satisfied: false }])
+    const blockedHome = join(home, 'not-a-directory')
+    await writeFile(blockedHome, 'file')
+    await expect(
+      checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['cursor'], home: blockedHome }),
+    ).rejects.toThrow()
     await applyHarnessConfig({ kind: 'global' }, { harnesses: ['cursor'], home })
     const cursor = await checkHarnessConfig({ kind: 'repo', root }, { harnesses: ['cursor'], home })
     expect(cursor.prerequisites).toMatchObject([{ satisfied: true }])
