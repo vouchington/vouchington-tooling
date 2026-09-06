@@ -213,11 +213,15 @@ case "$platform" in
     sysctl -n hw.ncpu 2>/dev/null || printf 'unavailable\n'
     show_load_per_cpu "$load1" "$load5" "$load15" "$logicalcpu"
     # Apple-Silicon performance/efficiency core split. These sysctls do not
-    # exist on Intel Macs and must degrade to unavailable there.
-    printf 'hw.perflevel0.logicalcpu: '
-    sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || printf 'unavailable\n'
-    printf 'hw.perflevel1.logicalcpu: '
-    sysctl -n hw.perflevel1.logicalcpu 2>/dev/null || printf 'unavailable\n'
+    # exist on Intel Macs and must degrade to unavailable there. On some
+    # runners the OID resolves with exit 0 but zero bytes of output rather
+    # than failing outright -- capture and fall back on emptiness, not just
+    # on a non-zero exit, or that case silently swallows the trailing
+    # newline and glues the next section onto this line.
+    perflevel0=$(sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || true)
+    printf 'hw.perflevel0.logicalcpu: %s\n' "${perflevel0:-unavailable}"
+    perflevel1=$(sysctl -n hw.perflevel1.logicalcpu 2>/dev/null || true)
+    printf 'hw.perflevel1.logicalcpu: %s\n' "${perflevel1:-unavailable}"
     # iostat -c 2 is the closest PSI analogue on Darwin: a since-boot row plus
     # a 1-second live row with us/sy/id and 1m/5m/15m load. Do not gate this on
     # `have timeout` -- base macOS ships no timeout binary (only gtimeout via

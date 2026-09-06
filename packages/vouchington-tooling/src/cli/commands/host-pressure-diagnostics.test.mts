@@ -204,6 +204,43 @@ esac
     expect(stdout).toContain('vm.compressor_bytes_used: 8885767232')
   }, 20_000)
 
+  it('treats a sysctl OID that exits 0 with empty output as unavailable, not a glued line', async () => {
+    const fakeBin = await makeHome()
+    const executable = async (name: string, source: string) => {
+      const path = join(fakeBin, name)
+      await writeFile(path, source)
+      await chmod(path, 0o755)
+    }
+    await executable('uname', '#!/usr/bin/env bash\nprintf "Darwin\\n"\n')
+    // Reproduces a real GitHub-hosted macOS runner observation: hw.perflevel1
+    // resolved as a valid OID (exit 0) but printed zero bytes, rather than
+    // failing outright like a genuinely unknown OID would. `|| printf
+    // 'unavailable\n'` only catches a non-zero exit, so this case needs its
+    // own regression coverage independent of "OID entirely unresolvable".
+    await executable(
+      'sysctl',
+      `#!/usr/bin/env bash
+case "$*" in
+  '-n hw.perflevel0.logicalcpu') printf '3\\n' ;;
+  '-n hw.perflevel1.logicalcpu') exit 0 ;;
+  *) exit 1 ;;
+esac
+`,
+    )
+
+    const { stdout } = await execFileAsync('bash', [diagnosticsScript], {
+      env: {
+        ...process.env,
+        LC_ALL: 'C',
+        PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}`,
+      },
+      maxBuffer: 1024 * 1024,
+    })
+
+    expect(stdout).toContain('hw.perflevel0.logicalcpu: 3\n')
+    expect(stdout).toContain('hw.perflevel1.logicalcpu: unavailable\n')
+  }, 20_000)
+
   it('reports explicit unavailable markers instead of empty sections or false zeros on Darwin', async () => {
     const fakeBin = await makeHome()
     // Resolve absolute paths up front: PATH below is restricted to exactly
