@@ -39,6 +39,7 @@ export function processAlterTableStmt(
     /* v8 ignore next */
     if (!constraint) continue
     if (constraint.contype === 'CONSTR_FOREIGN') {
+      // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- isolate the generated AST type escape at the foreign-key adapter boundary
       const constraintRecord = constraint as unknown as Record<string, unknown>
       result.foreignKeys.push(
         foreignKeyFromConstraint(

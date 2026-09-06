@@ -1,6 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "jsPlugins": ["eslint-plugin-no-mistakes"],
   "rules": {
+    "no-mistakes/ts-no-const-aliases": "error",
+    "no-mistakes/ts-no-export-renaming": "error",
+    "no-mistakes/ts-no-function-aliases": "error",
     "unicorn/prefer-node-protocol": "error",
     "radix": "error",
     "max-lines": ["error", 200]

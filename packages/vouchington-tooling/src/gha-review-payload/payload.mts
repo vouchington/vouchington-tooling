@@ -38,6 +38,7 @@ function isCommitId(value: string): boolean {
 
 function sanitizeComment(raw: unknown): ReviewComment | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted comment object
   const record = raw as Record<string, unknown>
   if (typeof record.path !== 'string' || record.path.length === 0 || record.path.includes('\0')) {
     return null
@@ -89,6 +90,7 @@ export function parseReviewPayload(bytes: Buffer, commitId: string): SanitizedRe
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new ReviewPayloadError('Payload must be a JSON object.')
   }
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted payload object
   const record = parsed as Record<string, unknown>
   const body = typeof record.body === 'string' ? record.body : ''
   if (record.comments !== undefined && !Array.isArray(record.comments)) {

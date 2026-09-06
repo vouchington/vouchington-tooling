@@ -18,6 +18,7 @@ export type ResolvedCursorOptions = CursorModuleConfig & {
 
 export function resolveCursorContractOptions(raw: unknown): ResolvedCursorOptions | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- Preserve the validated unknown-to-record boundary for option parsing.
   const record = raw as Record<string, unknown>
   const modules = stringArray(record.modules)
   const executors = stringArray(record.executors)

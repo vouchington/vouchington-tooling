@@ -25,6 +25,7 @@ export type FactoryOwnerOptions = FileMatchOptions & {
 
 export function resolveFactoryOwnerOptions(raw: unknown): FactoryOwnerOptions | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- Preserve the validated unknown-to-record boundary for option parsing.
   const record = raw as Record<string, unknown>
   const modules = stringArray(record.modules)
   const factories = stringArray(record.factories)

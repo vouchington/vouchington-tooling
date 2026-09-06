@@ -18,6 +18,7 @@ function parseContext(raw: string, attempt: number): ExpectationContext {
   const parsed = JSON.parse(raw) as unknown
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
     throw new Error('Vitest report expectation context must be an object')
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted JSON object
   const context = parsed as Record<string, unknown>
   if (
     Object.keys(context).toSorted().join('\0') !== ['attempt', 'suites', 'version'].join('\0') ||
@@ -38,6 +39,7 @@ function parseContext(raw: string, attempt: number): ExpectationContext {
     )
   )
     throw new Error('Vitest report expectation context has an invalid schema')
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain the validated expectation type after the complete schema check
   const typed = context as unknown as ExpectationContext
   const suites = typed.suites.map((expectation) => expectation.suite)
   if (new Set(suites).size !== suites.length || suites.join('\0') !== suites.toSorted().join('\0'))

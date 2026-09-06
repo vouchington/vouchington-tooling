@@ -18,6 +18,7 @@ export type BannedMemberOptions = FileMatchOptions & {
 
 export function resolveBannedMemberOptions(raw: unknown): BannedMemberOptions | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- Preserve the validated unknown-to-record boundary for option parsing.
   const record = raw as Record<string, unknown>
   const members = stringArray(record.members)
   if (!members?.length) return null

@@ -12,6 +12,7 @@ import {
   SCC_COMPLEXITY_LIMIT,
   CHECKPOINT_MARKER,
   classifyFrictionObservation,
+  dumpHarnessPolicy,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
@@ -64,6 +65,7 @@ describe('package exports', () => {
     expect(SCC_COMPLEXITY_LIMIT).toBe(50)
     expect(CHECKPOINT_MARKER).toBe('pr-checkpoint:v1')
     expect(typeof classifyFrictionObservation).toBe('function')
+    expect(dumpHarnessPolicy().cursor.approvalMode).toBe('auto-review')
     expect(typeof validateNugetUpdate).toBe('function')
     expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
     expect(typeof runPostReview).toBe('function')

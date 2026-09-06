@@ -20,6 +20,9 @@ importers:
       eslint:
         specifier: ^10.9.1
         version: 10.9.1(jiti@2.7.0)(supports-color@7.2.0)
+      eslint-plugin-no-mistakes:
+        specifier: ^0.55.0
+        version: 0.55.0(eslint@10.9.1(jiti@2.7.0)(supports-color@7.2.0))
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -72,6 +75,9 @@ importers:
       picomatch:
         specifier: 4.0.7
         version: 4.0.7
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
       yaml:
         specifier: 2.9.0
         version: 2.9.0
@@ -1254,6 +1260,12 @@ packages:
   escape-string-regexp@4.0.0:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
+
+  eslint-plugin-no-mistakes@0.55.0:
+    resolution: {integrity: sha512-V0vfKZtf2oryCa3VkjY+oVut32taExWBnKhZvdrZC0y8aSXDnZK2stFNISsPPniqD78xL1Ql8DiCy//JlYuGtg==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    peerDependencies:
+      eslint: '>=9'
 
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
@@ -2996,6 +3008,10 @@ snapshots:
   escape-html@1.0.3: {}
 
   escape-string-regexp@4.0.0: {}
+
+  eslint-plugin-no-mistakes@0.55.0(eslint@10.9.1(jiti@2.7.0)(supports-color@7.2.0)):
+    dependencies:
+      eslint: 10.9.1(jiti@2.7.0)(supports-color@7.2.0)
 
   eslint-scope@9.1.2:
     dependencies:

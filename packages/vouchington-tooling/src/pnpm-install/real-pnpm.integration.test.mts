@@ -47,6 +47,7 @@ async function runInstaller(
       },
     )
   } catch (error) {
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain captured process output when adapting the integration failure
     const result = error as { stderr?: string; stdout?: string }
     throw new Error(`pnpm-install fixture failed:\n${result.stdout ?? ''}${result.stderr ?? ''}`)
   }

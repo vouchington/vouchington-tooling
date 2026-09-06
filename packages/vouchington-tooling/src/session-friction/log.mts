@@ -33,6 +33,7 @@ function logPath(sessionId: string, directory: string): string {
 
 function validEvent(value: unknown): value is FrictionEvent {
   if (!value || typeof value !== 'object') return false
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after the runtime object check
   const record = value as Record<string, unknown>
   return (
     (record.kind === 'sandbox-escalation' || record.kind === 'sandbox-failure') &&

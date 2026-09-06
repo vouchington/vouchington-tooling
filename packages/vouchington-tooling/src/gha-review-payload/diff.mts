@@ -62,6 +62,7 @@ function asReviewFiles(parsed: unknown): ReviewFile[] {
   const items = Array.isArray(parsed) ? parsed : [parsed]
   return items.flatMap((item) => {
     if (item === null || typeof item !== 'object') return []
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted file entry
     const record = item as Record<string, unknown>
     if (typeof record.filename !== 'string' || record.filename.length === 0) return []
     const file: ReviewFile = { filename: record.filename }

@@ -107,6 +107,7 @@ export function validateCheckpoint(
   options: CheckpointCodecOptions = {},
 ): Checkpoint | undefined {
   if (!value || typeof value !== 'object') return undefined
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the candidate checkpoint type before complete field validation
   const checkpoint = value as Partial<Checkpoint>
   const marker = options.marker ?? CHECKPOINT_MARKER
   if (

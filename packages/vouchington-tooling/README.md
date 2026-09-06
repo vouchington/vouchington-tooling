@@ -18,6 +18,9 @@ vouchington runner-port-policy
 vouchington runner-port-policy --file ./policy.json
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
+vouchington agent-harness-config dump
+vouchington agent-harness-config check --global
+vouchington agent-harness-config apply --global --repo /path/to/checkout
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
 vouchington require-up-to-date --remote origin --branch main
 vouchington gitleaks-directory-scan --config .gitleaks.toml
@@ -144,6 +147,11 @@ import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-
 import { splitSqlStatements, stripSqlComments } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
 import {
+  applyHarnessConfig,
+  checkHarnessConfig,
+  dumpHarnessPolicy,
+} from 'vouchington-tooling/agent-harness-config'
+import {
   readVitestReportAttempts,
   writeVitestBlobManifest,
 } from 'vouchington-tooling/vitest-blob-manifest'
@@ -222,6 +230,15 @@ scalars before scanning, so a hazard hidden by YAML's own quote-stripping is sti
 throws on a `run:` value that is a YAML alias or a multiline PLAIN scalar, shapes it cannot yet
 scan safely. Both functions scan already-in-scope source text — deciding which files count as a
 shell script or a workflow/action YAML file is left to the caller.
+
+`agent-harness-config` merges classifier-auto and sandbox keys into Claude, Codex, Grok, and Cursor
+config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
+home-directory configs; `--repo` updates a checkout. It does not copy allowlists, hooks, or plugins.
+Grok uses `permission_mode = "auto"` plus `auto_mode.enabled` and `default_auto_mode` so the
+classifier stays available in plan mode; its defined sandbox profile still requires
+`--sandbox workspace-write` at launch. Cursor uses global `approvalMode = "auto-review"`;
+`unrestricted` disables the sandbox. Repo checks surface user-level trust or mode prerequisites
+instead of claiming that repo files alone activate them.
 
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,

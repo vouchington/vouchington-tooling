@@ -28,6 +28,7 @@ function pinPrunedAt(prodDir: string): boolean {
     throw new Error(`${modulesPath} is not a JSON object`)
   }
 
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the mutable manifest shape after validating the parsed object
   const manifest = parsed as { prunedAt?: string }
   manifest.prunedAt = EPOCH_PRUNED_AT
   fs.writeFileSync(modulesPath, `${JSON.stringify(manifest, null, 2)}\n`)

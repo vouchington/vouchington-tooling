@@ -69,6 +69,7 @@ export function validateRunnerPortPolicy(parsedPolicy: unknown, policyUrl?: URL)
   if (typeof parsedPolicy !== 'object' || parsedPolicy === null || Array.isArray(parsedPolicy)) {
     throwInvalidPolicy(policyUrl)
   }
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the untrusted policy object
   const policy = parsedPolicy as Record<string, unknown>
   const requiredKeys = [
     'reservedPortStart',
@@ -85,6 +86,7 @@ export function validateRunnerPortPolicy(parsedPolicy: unknown, policyUrl?: URL)
     throwInvalidPolicy(policyUrl)
   }
 
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain the validated policy type after the complete key and value checks
   const validatedPolicy = policy as unknown as RunnerPortPolicy
   const {
     reservedPortStart: start,

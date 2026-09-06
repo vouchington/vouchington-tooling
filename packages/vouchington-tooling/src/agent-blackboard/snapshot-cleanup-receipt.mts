@@ -45,7 +45,9 @@ function canonical(receipt: unknown, signature: boolean): string {
     !Array.isArray(partitions)
   )
     throw new Error('partition directory cleanup receipt is invalid')
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain the validated numeric type after runtime receipt checks
   const normalizedDirectoryDev = directoryDev as number
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- retain the validated numeric type after runtime receipt checks
   const normalizedDirectoryIno = directoryIno as number
   const normalized = partitions.map((partition) => {
     if (

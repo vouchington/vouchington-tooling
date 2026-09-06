@@ -118,6 +118,29 @@ export {
   sqlFragments,
   stripSqlComments,
 } from './sql-scanner/index.mts'
+export {
+  applyHarnessConfig,
+  checkHarnessConfig,
+  dumpHarnessPolicy,
+  planHarnessConfig,
+  DEFAULT_EXTRA_WRITABLE_ROOTS,
+  HARNESS_IDS,
+} from './agent-harness-config/index.mts'
+export type {
+  ApplyTarget,
+  FilePlan,
+  FileResult,
+  HarnessApplyResult,
+  HarnessCheckResult,
+  HarnessConfigOptions,
+  HarnessId,
+  HarnessPlan,
+  HarnessPolicyDump,
+  JsonPatch,
+  KeyDrift,
+  TomlPatch,
+  TomlValue,
+} from './agent-harness-config/index.mts'
 export { auditCiJobRuntime, parseWorkflowNameMatch } from './gha-runtime-audit/index.mts'
 export type {
   GhApiExecutor,
