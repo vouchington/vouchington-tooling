@@ -464,6 +464,7 @@ export {
   createPullRequest,
   DetachedHeadError,
   HeadNotPushedError,
+  HeadOutOfDateError,
   resolveHeadBranch,
 } from './gh-cli/index.mts'
 export type {

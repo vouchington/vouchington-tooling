@@ -12,6 +12,7 @@ import {
   createPullRequest,
   DetachedHeadError,
   HeadNotPushedError,
+  HeadOutOfDateError,
   resolveHeadBranch,
 } from './pr-create.mts'
 
@@ -39,25 +40,38 @@ describe('resolveHeadBranch', () => {
 })
 
 describe('assertHeadPushed', () => {
-  it('resolves when the branch exists on the remote', async () => {
+  it('resolves when the branch exists on the remote and matches the local branch', async () => {
     const runGit = fakeRunGit({
-      'ls-remote --heads origin feature/x':
+      'ls-remote --heads origin refs/heads/feature/x':
         '1111111111111111111111111111111111111111\trefs/heads/feature/x\n',
+      'rev-parse refs/heads/feature/x': '1111111111111111111111111111111111111111\n',
     })
     await expect(assertHeadPushed(runGit, { branch: 'feature/x' })).resolves.toBeUndefined()
   })
 
   it('throws HeadNotPushedError when the remote lookup is empty', async () => {
-    const runGit = fakeRunGit({ 'ls-remote --heads origin feature/x': '' })
+    const runGit = fakeRunGit({ 'ls-remote --heads origin refs/heads/feature/x': '' })
     await expect(assertHeadPushed(runGit, { branch: 'feature/x' })).rejects.toBeInstanceOf(
       HeadNotPushedError,
     )
   })
 
+  it('throws HeadOutOfDateError when the remote ref does not match the local branch', async () => {
+    const runGit = fakeRunGit({
+      'ls-remote --heads origin refs/heads/feature/x':
+        '1111111111111111111111111111111111111111\trefs/heads/feature/x\n',
+      'rev-parse refs/heads/feature/x': '2222222222222222222222222222222222222222\n',
+    })
+    await expect(assertHeadPushed(runGit, { branch: 'feature/x' })).rejects.toBeInstanceOf(
+      HeadOutOfDateError,
+    )
+  })
+
   it('honors a supplied remote instead of the origin default', async () => {
     const runGit = fakeRunGit({
-      'ls-remote --heads upstream feature/x':
+      'ls-remote --heads upstream refs/heads/feature/x':
         '2222222222222222222222222222222222222222\trefs/heads/feature/x\n',
+      'rev-parse refs/heads/feature/x': '2222222222222222222222222222222222222222\n',
     })
     await expect(
       assertHeadPushed(runGit, { branch: 'feature/x', remote: 'upstream' }),
@@ -121,8 +135,9 @@ describe('createPullRequest', () => {
     }
     const runGit = fakeRunGit({
       'branch --show-current': 'feature/x\n',
-      'ls-remote --heads origin feature/x':
+      'ls-remote --heads origin refs/heads/feature/x':
         '1111111111111111111111111111111111111111\trefs/heads/feature/x\n',
+      'rev-parse refs/heads/feature/x': '1111111111111111111111111111111111111111\n',
     })
     await expect(
       createPullRequest({ runGh, runGit }, { bodyFile: 'body.md', title: 't' }),
@@ -135,8 +150,9 @@ describe('createPullRequest', () => {
   it('uses a supplied head branch without resolving one via git', async () => {
     const runGh: RunTextCommand = async () => 'https://github.com/o/r/pull/2\n'
     const runGit = fakeRunGit({
-      'ls-remote --heads origin feature/y':
+      'ls-remote --heads origin refs/heads/feature/y':
         '3333333333333333333333333333333333333333\trefs/heads/feature/y\n',
+      'rev-parse refs/heads/feature/y': '3333333333333333333333333333333333333333\n',
     })
     await expect(
       createPullRequest({ runGh, runGit }, { bodyFile: 'body.md', head: 'feature/y', title: 't' }),
@@ -146,8 +162,9 @@ describe('createPullRequest', () => {
   it('honors a supplied remote when verifying the head is pushed', async () => {
     const runGh: RunTextCommand = async () => 'https://github.com/o/r/pull/3\n'
     const runGit = fakeRunGit({
-      'ls-remote --heads upstream feature/y':
+      'ls-remote --heads upstream refs/heads/feature/y':
         '4444444444444444444444444444444444444444\trefs/heads/feature/y\n',
+      'rev-parse refs/heads/feature/y': '4444444444444444444444444444444444444444\n',
     })
     await expect(
       createPullRequest(
@@ -161,10 +178,24 @@ describe('createPullRequest', () => {
     const runGh: RunTextCommand = async () => {
       throw new Error('gh should not be called')
     }
-    const runGit = fakeRunGit({ 'ls-remote --heads origin feature/y': '' })
+    const runGit = fakeRunGit({ 'ls-remote --heads origin refs/heads/feature/y': '' })
     await expect(
       createPullRequest({ runGh, runGit }, { bodyFile: 'body.md', head: 'feature/y', title: 't' }),
     ).rejects.toBeInstanceOf(HeadNotPushedError)
+  })
+
+  it('rejects before calling gh when the local branch is ahead of the pushed remote branch', async () => {
+    const runGh: RunTextCommand = async () => {
+      throw new Error('gh should not be called')
+    }
+    const runGit = fakeRunGit({
+      'ls-remote --heads origin refs/heads/feature/y':
+        '3333333333333333333333333333333333333333\trefs/heads/feature/y\n',
+      'rev-parse refs/heads/feature/y': '5555555555555555555555555555555555555555\n',
+    })
+    await expect(
+      createPullRequest({ runGh, runGit }, { bodyFile: 'body.md', head: 'feature/y', title: 't' }),
+    ).rejects.toBeInstanceOf(HeadOutOfDateError)
   })
 })
 
@@ -220,6 +251,19 @@ describe('createPullRequest — real git integration', () => {
     expect(branch).toBe('feature/unpushed')
     await expect(assertHeadPushed(realRunGit, { branch })).rejects.toBeInstanceOf(
       HeadNotPushedError,
+    )
+  })
+
+  it('fails assertHeadPushed against a real remote when the local branch has an unpushed commit', async () => {
+    await createRepoWithRemote()
+    await execFileAsync('git', ['checkout', '-b', 'feature/stale'])
+    await execFileAsync('git', ['push', '-u', 'origin', 'feature/stale'])
+    await execFileAsync('git', ['commit', '--allow-empty', '-m', 'a newer local commit'])
+
+    const branch = await resolveHeadBranch(realRunGit)
+    expect(branch).toBe('feature/stale')
+    await expect(assertHeadPushed(realRunGit, { branch })).rejects.toBeInstanceOf(
+      HeadOutOfDateError,
     )
   })
 })
