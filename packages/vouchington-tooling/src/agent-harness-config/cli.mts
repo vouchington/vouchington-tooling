@@ -99,9 +99,8 @@ export async function runAgentHarnessConfigCli(argv: readonly string[]): Promise
         for (const drift of file.drifts) process.stdout.write(`${formatDrift(drift)}\n`)
       }
       for (const prerequisite of result.prerequisites) {
-        const status = prerequisite.satisfied ? 'ok' : 'required'
         process.stdout.write(
-          `${status} ${prerequisite.harness} prerequisite ${prerequisite.key}: ${prerequisite.message}\n`,
+          `prerequisite ${prerequisite.harness} ${prerequisite.key} satisfied=${prerequisite.satisfied}: ${prerequisite.message}\n`,
         )
       }
     }

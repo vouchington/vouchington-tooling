@@ -411,7 +411,7 @@ describe('CLI', () => {
   it('returns nonzero when apply leaves a manual prerequisite', async () => {
     const root = await tempDir('harness-cli-grok-repo-')
     expect(await runAgentHarnessConfigCli(['apply', '--repo', root, '--harness', 'grok'])).toBe(1)
-    expect(stdout.mock.calls.map(String).join('')).toMatch(/required grok prerequisite/)
+    expect(stdout.mock.calls.map(String).join('')).toMatch(/prerequisite grok .*satisfied=false/)
   })
 
   it('stringifies non-Error CLI failures', async () => {
