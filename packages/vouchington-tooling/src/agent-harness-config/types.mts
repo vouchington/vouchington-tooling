@@ -7,6 +7,7 @@ export type ApplyTarget =
   | { readonly kind: 'repo'; readonly root: string }
 
 export interface JsonPatch {
+  readonly merge?: 'union'
   readonly path: readonly string[]
   readonly value: unknown
 }

@@ -67,6 +67,7 @@ export function planGlobalFiles(options?: HarnessConfigOptions): FilePlan[] {
       patches: [
         { path: ['permissions', 'defaultMode'], value: CLAUDE_DEFAULT_MODE },
         { path: ['sandbox', 'enabled'], value: true },
+        { merge: 'union', path: ['sandbox', 'filesystem', 'allowWrite'], value: roots },
         { path: ['useAutoModeDuringPlan'], value: true },
       ],
       path: join(home, '.claude', 'settings.json'),
@@ -108,7 +109,10 @@ export function planRepoFiles(root: string, options?: HarnessConfigOptions): Fil
   if (wants(harnesses, 'claude')) {
     files.push({
       format: 'json',
-      patches: [{ path: ['sandbox', 'enabled'], value: true }],
+      patches: [
+        { path: ['sandbox', 'enabled'], value: true },
+        { merge: 'union', path: ['sandbox', 'filesystem', 'allowWrite'], value: roots },
+      ],
       path: join(repo, '.claude', 'settings.json'),
     })
   }

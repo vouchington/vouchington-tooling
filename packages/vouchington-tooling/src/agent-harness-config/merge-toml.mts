@@ -1,3 +1,4 @@
+import { parse as parseToml } from 'smol-toml'
 import { sameValue } from './policy.mts'
 import { formatTomlValue, parseTomlValue } from './toml-value.mts'
 import type { KeyDrift, TomlPatch, TomlValue } from './types.mts'
@@ -82,6 +83,48 @@ function upsertTomlKey(text: string, table: string, key: string, value: TomlValu
   return `${text.slice(0, at)}${prefix}${assignment}\n${text.slice(at)}`
 }
 
+function tomlPatchValue(parsed: Record<string, unknown>, table: string, key: string): unknown {
+  let current: unknown = parsed
+  if (table !== '') {
+    for (const segment of table.split('.')) {
+      /* v8 ignore next 2 -- if `text` parsed, every ancestor of a dotted table header is
+         guaranteed to be a table too, so a real TOML parser can never hand back a non-object
+         mid-path here. */
+      if (current === null || typeof current !== 'object' || Array.isArray(current))
+        return undefined
+      current = (current as Record<string, unknown>)[segment]
+    }
+  }
+  /* v8 ignore next 2 -- assertValidToml only reaches a patch's table here once readTomlKey has
+     already proven (as a match, or by forcing the write that creates it) that the table is a
+     real nested object in this parsed document. */
+  if (current === null || typeof current !== 'object' || Array.isArray(current)) return undefined
+  return (current as Record<string, unknown>)[key]
+}
+
+function assertValidToml(text: string, patches: readonly TomlPatch[], path: string): void {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = parseToml(text) as Record<string, unknown>
+  } catch (error) {
+    throw new Error(
+      `${path}: produced invalid TOML (${error instanceof Error ? error.message : String(error)})`,
+    )
+  }
+  for (const patch of patches) {
+    const value = tomlPatchValue(parsed, patch.table, patch.key)
+    /* v8 ignore next 6 -- backstop for a formatTomlValue/parseToml encoding mismatch; formatTomlValue's
+       JSON.stringify-based escaping is a valid TOML basic string in every case this module writes,
+       so a real parser always reads back what we just wrote. */
+    if (!sameValue(value, patch.value)) {
+      const key = patch.table === '' ? patch.key : `${patch.table}.${patch.key}`
+      throw new Error(
+        `${path}: wrote ${key} but a real TOML parser reads back ${JSON.stringify(value)}`,
+      )
+    }
+  }
+}
+
 export function applyTomlPatches(
   source: string,
   patches: readonly TomlPatch[],
@@ -96,5 +139,6 @@ export function applyTomlPatches(
     drifts.push({ current, desired: patch.value, key, path })
     text = upsertTomlKey(text, patch.table, patch.key, patch.value)
   }
+  if (drifts.length > 0) assertValidToml(text, patches, path)
   return { drifts, text }
 }

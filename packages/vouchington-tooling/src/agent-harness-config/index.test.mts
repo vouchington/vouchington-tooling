@@ -71,6 +71,30 @@ describe('JSON apply', () => {
     expect(parsed.sandbox.enabled).toBe(true)
   })
 
+  it('gives Claude the same writable roots as Codex/Grok/Cursor while keeping custom entries (B1)', async () => {
+    const root = await tempDir('harness-claude-allowwrite-')
+    const path = join(root, '.claude', 'settings.json')
+    await mkdir(join(root, '.claude'), { recursive: true })
+    await writeFile(
+      path,
+      `${JSON.stringify({ sandbox: { enabled: false, filesystem: { allowWrite: ['/tmp/my-custom-root'] } } }, null, 2)}\n`,
+    )
+    await applyHarnessConfig(
+      { kind: 'repo', root },
+      { harnesses: ['claude'], extraWritableRoots: ['/tmp/extra-root'] },
+    )
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as {
+      sandbox: { enabled: boolean; filesystem: { allowWrite: string[] } }
+    }
+    expect(parsed.sandbox.enabled).toBe(true)
+    expect(parsed.sandbox.filesystem.allowWrite).toEqual(['/tmp/my-custom-root', '/tmp/extra-root'])
+    const again = await applyHarnessConfig(
+      { kind: 'repo', root },
+      { harnesses: ['claude'], extraWritableRoots: ['/tmp/extra-root'] },
+    )
+    expect(again.written).toEqual([])
+  })
+
   it('keeps Cursor project allow/deny while setting auto-review', async () => {
     const root = await tempDir('harness-cli-json-')
     const path = join(root, '.cursor', 'cli.json')
@@ -172,6 +196,86 @@ describe('TOML apply', () => {
         },
       ],
       'sandbox.toml',
+    )
+    expect(result.drifts).toEqual([])
+    expect(result.text).toBe(source)
+  })
+})
+
+describe('TOML apply validates output with a real parser', () => {
+  it('refuses to silently duplicate a dotted-key table (B4 regression)', () => {
+    expect(() =>
+      applyTomlPatches(
+        'sandbox.profile = "ask"\n',
+        [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
+        '~/.grok/config.toml',
+      ),
+    ).toThrow(/produced invalid TOML/)
+  })
+})
+
+describe('JSON union merge', () => {
+  it('creates the array when the current value is missing', () => {
+    const result = applyJsonPatches(
+      '{}',
+      [
+        {
+          merge: 'union',
+          path: ['sandbox', 'filesystem', 'allowWrite'],
+          value: ['/tmp/a', '/tmp/b'],
+        },
+      ],
+      'settings.json',
+    )
+    expect(result.drifts).toEqual([
+      {
+        current: undefined,
+        desired: ['/tmp/a', '/tmp/b'],
+        key: 'sandbox.filesystem.allowWrite',
+        path: 'settings.json',
+      },
+    ])
+    expect(JSON.parse(result.text)).toMatchObject({
+      sandbox: { filesystem: { allowWrite: ['/tmp/a', '/tmp/b'] } },
+    })
+  })
+
+  it('preserves existing custom entries while adding missing ones', () => {
+    const source = JSON.stringify({
+      sandbox: { filesystem: { allowWrite: ['/tmp/custom', '/tmp/a'] } },
+    })
+    const result = applyJsonPatches(
+      source,
+      [
+        {
+          merge: 'union',
+          path: ['sandbox', 'filesystem', 'allowWrite'],
+          value: ['/tmp/a', '/tmp/b'],
+        },
+      ],
+      'settings.json',
+    )
+    expect(result.drifts).toHaveLength(1)
+    const parsed = JSON.parse(result.text) as {
+      sandbox: { filesystem: { allowWrite: string[] } }
+    }
+    expect(parsed.sandbox.filesystem.allowWrite).toEqual(['/tmp/custom', '/tmp/a', '/tmp/b'])
+  })
+
+  it('is idempotent once every value is already present, regardless of order', () => {
+    const source = JSON.stringify({
+      sandbox: { filesystem: { allowWrite: ['/tmp/b', '/tmp/custom', '/tmp/a'] } },
+    })
+    const result = applyJsonPatches(
+      source,
+      [
+        {
+          merge: 'union',
+          path: ['sandbox', 'filesystem', 'allowWrite'],
+          value: ['/tmp/a', '/tmp/b'],
+        },
+      ],
+      'settings.json',
     )
     expect(result.drifts).toEqual([])
     expect(result.text).toBe(source)
@@ -295,13 +399,13 @@ describe('edge coverage', () => {
     expect(() => parseTomlValue('"\\', 0)).toThrow(/unterminated/)
     expect(() => parseTomlValue('[1]', 0)).toThrow(/array value/)
     expect(() => parseTomlValue('123', 0)).toThrow(/unsupported TOML value/)
-    expect(
-      applyTomlPatches(
-        '[]\n[sandbox]\nprofile = "ask"\n',
-        [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
-        'p.toml',
-      ).text,
-    ).toContain('workspace-write')
+    const preExisting = applyTomlPatches(
+      '[]\n[sandbox]\nprofile = "workspace-write"\n',
+      [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
+      'p.toml',
+    )
+    expect(preExisting.drifts).toEqual([])
+    expect(preExisting.text).toBe('[]\n[sandbox]\nprofile = "workspace-write"\n')
     expect(
       applyTomlPatches('', [{ key: 'enabled', table: '', value: false }], 'root.toml').text,
     ).toContain('enabled = false')
@@ -321,13 +425,13 @@ describe('edge coverage', () => {
       's.toml',
     )
     expect(quoted.drifts).toEqual([])
-    expect(
+    expect(() =>
       applyTomlPatches(
         '[sandbox]profile = "ask"',
         [{ key: 'profile', table: 'sandbox', value: 'workspace-write' }],
         'p.toml',
-      ).text,
-    ).toContain('workspace-write')
+      ),
+    ).toThrow(/produced invalid TOML/)
     expect(
       applyTomlPatches(
         '[ui]\npermission_mode = "ask"',
