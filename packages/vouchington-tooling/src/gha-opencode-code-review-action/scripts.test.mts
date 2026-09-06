@@ -76,6 +76,38 @@ describe('opencode-code-review scripts', () => {
     }
   })
 
+  it('proceeds without the inline overlay prompt when the trusted ref has no inline prompt file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opencode-prompt-no-inline-'))
+    const workspace = join(root, 'workspace')
+    const trusted = join(workspace, '.trusted-review-prompt')
+    const output = join(root, 'github-output')
+    mkdirSync(join(trusted, '.agents/skills/agent-workflow'), { recursive: true })
+    writeFileSync(join(trusted, '.agents/skills/agent-workflow/code-review-prompt.md'), 'PROMPT\n')
+    writeFileSync(output, '')
+    const env = {
+      ...process.env,
+      GITHUB_ACTION_PATH: resolve('.github/actions/opencode-code-review'),
+      GITHUB_OUTPUT: output,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: root,
+      REVIEW_TARGET: 'owner/repo#1',
+      PROMPT_PATH: '.agents/skills/agent-workflow/code-review-prompt.md',
+      INLINE_PROMPT_PATH: 'docs/prompts/code-review-inline-comments.md',
+      REPO_PRIVATE: 'false',
+    }
+    try {
+      const result = spawnSync('bash', [buildPrompt], { encoding: 'utf8', env })
+      expect(result.status).toBe(0)
+      expect(result.stderr + result.stdout).toContain('proceeding without it')
+      const prompt = readFileSync(join(root, 'opencode-review-prompt.md'), 'utf8')
+      expect(prompt).toContain('PROMPT')
+      expect(prompt).not.toContain('INLINE')
+      expect(readFileSync(output, 'utf8')).toContain('available=true')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('pins OpenCode releases and delegates install to the packaged GitHub-release helper', () => {
     expect(installText).toContain('anomalyco/opencode')
     expect(installText).toContain('install-github-release.sh')
