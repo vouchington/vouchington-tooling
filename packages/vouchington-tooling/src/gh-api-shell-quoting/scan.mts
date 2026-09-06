@@ -116,13 +116,14 @@ function scanLogicalLine(text: string, offsets: number[]): ShellQuotingHit[] {
           i += 2
           continue
         }
-        // A `&` preceded by whitespace is a delimiter — Bash's background operator ending a
-        // fully-formed command (`gh api "repos/x/y" &`) — not a query-string separator embedded
-        // in an unquoted argument. A `&` preceded by `>` or `<` is a file-descriptor-duplication
-        // redirect (`2>&1`, `>&2`, `<&3`), also never an argument character. Only an `&` embedded
-        // in an unquoted argument is unsafe.
-        const precededByDelimiter = i > 0 && /[ \t><]/.test(text[i - 1]!)
-        if (!precededByDelimiter)
+        // `2>&1`/`>&2`/`<&3` fd-duplication redirects don't end the argument list; whitespace-
+        // preceded `&` is Bash's background operator and does. Only an `&` embedded in an
+        // unquoted argument is unsafe.
+        if (i > 0 && /[><]/.test(text[i - 1]!)) {
+          i += 1
+          continue
+        }
+        if (!(i > 0 && /[ \t]/.test(text[i - 1]!)))
           hits.push({ offset: offsets[i]!, excerpt: excerptAround(text, i) })
         frame.scanningArgs = false
         i += 1

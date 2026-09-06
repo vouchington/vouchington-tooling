@@ -124,6 +124,20 @@ describe('gh api shell-quoting', () => {
     expect(shellScriptViolations(source)).toEqual([])
   })
 
+  it('keeps scanning for a later unsafe argument after a leading `2>&1` redirect', () => {
+    // A `&` preceded by `>` is a file-descriptor-duplication redirect, not a command terminator —
+    // an earlier version of this scanner incorrectly stopped scanning the call's argument list
+    // there, silently missing a real unquoted `?`/`&` violation later in the same command.
+    expect(shellScriptViolations('gh api 2>&1 repos/x/y?a=1&b=2\n')).toHaveLength(1)
+  })
+
+  it('stays silent on a backslash-escaped quote inside an otherwise fully-quoted argument', () => {
+    // The backslash-escape check runs before the double-quote-closing check, so `\"` does not
+    // prematurely end the quoted context and leak the rest of the argument as unquoted text.
+    const source = 'gh api "repos/\\"x\\"/y?a=1&b=2"\n'
+    expect(shellScriptViolations(source)).toEqual([])
+  })
+
   it('reports the correct file line for a workflow run: block violation', () => {
     const source = [
       'jobs:',
