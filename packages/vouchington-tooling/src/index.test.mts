@@ -34,6 +34,7 @@ import {
   createPullRequest,
   getDiffAgainstBase,
   HeadNotPushedError,
+  HeadOutOfDateError,
   runGh,
   runGit,
 } from './index.mts'
@@ -80,5 +81,6 @@ describe('package exports', () => {
     expect(typeof createPullRequest).toBe('function')
     expect(typeof getDiffAgainstBase).toBe('function')
     expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
+    expect(new HeadOutOfDateError('x', 'origin').name).toBe('HeadOutOfDateError')
   })
 })

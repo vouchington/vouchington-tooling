@@ -9,6 +9,7 @@ export {
   createPullRequest,
   DetachedHeadError,
   HeadNotPushedError,
+  HeadOutOfDateError,
   resolveHeadBranch,
 } from './pr-create.mts'
 export type {
