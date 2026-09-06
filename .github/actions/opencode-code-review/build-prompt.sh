@@ -17,17 +17,19 @@ if [ ! -f "$trusted_prompt" ]; then
   rm -rf "$trusted_root"
   exit 0
 fi
-if [ ! -f "$trusted_inline_prompt" ]; then
-  echo '::notice::Inline comment overlay prompt is not present on the trusted ref; skipping code review.'
-  echo 'available=false' >> "$GITHUB_OUTPUT"
-  rm -rf "$trusted_root"
-  exit 0
+if [ -f "$trusted_inline_prompt" ]; then
+  has_inline=true
+else
+  echo '::notice::Inline comment overlay prompt is not present on the trusted ref; proceeding without it.'
+  has_inline=false
 fi
 {
   printf 'Target: %s\n\n' "${REVIEW_TARGET:?}"
   cat "$trusted_prompt"
-  echo
-  cat "$trusted_inline_prompt"
+  if [ "$has_inline" = true ]; then
+    echo
+    cat "$trusted_inline_prompt"
+  fi
   if [ -n "${EXTRA_PROMPT:-}" ]; then
     printf '\n%s\n' "$EXTRA_PROMPT"
   fi
