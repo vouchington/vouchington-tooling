@@ -45,20 +45,25 @@ export type AssertHeadPushedOptions = {
 
 /**
  * Confirms `branch` has a matching, up-to-date ref on `remote` (default `origin`) via
- * `git ls-remote --heads` and `git rev-parse`. `ls-remote --heads` exits `0` with empty stdout
- * when there is no match, so a missing branch is checked via stdout rather than the exit code.
- * A remote ref that exists but points at a different commit than the local branch means local
- * HEAD has commits the remote does not — that fails with {@link HeadOutOfDateError} rather than
+ * `git ls-remote --heads` and `git rev-parse`. Both use the full `refs/heads/<branch>` path
+ * rather than the bare branch name: `ls-remote`'s pattern otherwise matches any ref whose name
+ * ends with `branch` (not just an exact `refs/heads/<branch>`), and bare `rev-parse <branch>`
+ * resolves `refs/tags/<branch>` before `refs/heads/<branch>` when a same-named tag exists, either
+ * of which could compare the wrong commit. `ls-remote --heads` exits `0` with empty stdout when
+ * there is no match, so a missing branch is checked via stdout rather than the exit code. A
+ * remote ref that exists but points at a different commit than the local branch means local HEAD
+ * has commits the remote does not — that fails with {@link HeadOutOfDateError} rather than
  * silently creating the pull request from the stale remote tip.
  */
 export async function assertHeadPushed(
   runGit: RunTextCommand,
   { branch, remote = 'origin' }: AssertHeadPushedOptions,
 ): Promise<void> {
-  const remoteLine = (await runGit(['ls-remote', '--heads', remote, branch])).trim()
+  const ref = `refs/heads/${branch}`
+  const remoteLine = (await runGit(['ls-remote', '--heads', remote, ref])).trim()
   if (remoteLine === '') throw new HeadNotPushedError(branch, remote)
   const [remoteSha] = remoteLine.split(/\s+/)
-  const localSha = (await runGit(['rev-parse', branch])).trim()
+  const localSha = (await runGit(['rev-parse', ref])).trim()
   if (localSha !== remoteSha) throw new HeadOutOfDateError(branch, remote)
 }
 
