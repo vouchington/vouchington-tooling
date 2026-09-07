@@ -74,9 +74,9 @@ For persistent `pnpm-install`, v5 metadata tracks structural inputs separately f
 uses one script-suppressed verification install followed by `pnpm rebuild --pending --recursive`.
 When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
 rerunning first-party workspace hooks.
-If that generic rebuild leaves only pnpm's root importer marker, one root-only pending rebuild runs
-the root lifecycle hook; every other residual ID remains a hard failure. An isolated native-binary
-mismatch uses one strict forced install only when structural provenance
+Before the generic rebuild, duplicate pending IDs accumulated by repeated script-free installs are
+collapsed without removing any unique workspace or dependency work. Every residual ID remains a
+hard failure. An isolated native-binary mismatch uses one strict forced install only when structural provenance
 matches, workspace links are valid, and pnpm records empty `ignoredBuilds` and `pendingBuilds` ledgers;
 otherwise it retains the script-free then strict reconciliation. Native and workspace-link health
 are verified before its metadata stamp is refreshed.

@@ -15,6 +15,13 @@ calls=0
 if [ -f "$PNPM_CALLS" ]; then calls="$(cat "$PNPM_CALLS")"; fi
 calls=$((calls + 1))
 printf '%s' "$calls" > "$PNPM_CALLS"
+case " $* " in
+  *' rebuild '*)
+    if [ -n "\${PNPM_REBUILD_INPUT:-}" ]; then
+      cp "$PNPM_NODE_MODULES/.modules.yaml" "$PNPM_REBUILD_INPUT"
+    fi
+    ;;
+esac
 print_release_age_violation() {
   printf '%s\\n' '✗ Lockfile failed supply-chain policy check (1 entries in 0.1s)'
   printf '%s\\n' '[ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 1 lockfile entries failed verification:'
@@ -40,9 +47,6 @@ elif [ ! -f "$PNPM_NODE_MODULES/.modules.yaml" ]; then
   printf 'pendingBuilds: []\\n' > "$PNPM_NODE_MODULES/.modules.yaml"
 fi
 case " $* " in
-  *' rebuild --pending --workspace-root '*)
-    printf 'pendingBuilds: [%s]\n' "\${PNPM_WORKSPACE_ROOT_REBUILD_PENDING_BUILDS:-}" > "$PNPM_NODE_MODULES/.modules.yaml"
-    ;;
   *' rebuild '*)
     if [ "\${PNPM_REPAIR_NATIVE_ON_REBUILD:-0}" = 1 ]; then
       cp "$PNPM_NATIVE_REPLACEMENT" "$PNPM_NATIVE_ADDON"

@@ -1,9 +1,14 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
-import { buildLedgersAllowNativeRepair, pendingBuilds } from './pending-builds.mts'
+import {
+  buildLedgersAllowNativeRepair,
+  dedupePendingBuilds,
+  pendingBuilds,
+} from './pending-builds.mts'
 
 const roots: string[] = []
 const previousCwd = process.cwd()
@@ -55,5 +60,25 @@ describe('pending builds', () => {
       await writeFile(join(root, 'node_modules', '.modules.yaml'), contents)
       expect(await buildLedgersAllowNativeRepair()).toBe(allowed)
     }
+  })
+
+  it('deduplicates IDs without dropping unique pending work', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-dedupe-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(
+      modules,
+      'custom: retained\npendingBuilds: [., ., backend, dependency, backend]\n',
+    )
+    await expect(dedupePendingBuilds()).resolves.toBe(true)
+    expect(parse(await readFile(modules, 'utf8'))).toMatchObject({ custom: 'retained' })
+    expect(await pendingBuilds()).toEqual({
+      ids: ['.', 'backend', 'dependency'],
+      kind: 'pending',
+    })
+    await writeFile(modules, 'pendingBuilds: invalid\n')
+    await expect(dedupePendingBuilds()).resolves.toBe(false)
   })
 })

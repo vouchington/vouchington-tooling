@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { parse } from 'yaml'
+import { parse, stringify } from 'yaml'
 
 export type PendingBuildState =
   | { kind: 'clear' }
@@ -41,6 +41,31 @@ async function buildLedgers(): Promise<BuildLedgers> {
 
 export async function pendingBuilds(): Promise<PendingBuildState> {
   return (await buildLedgers())?.pendingBuilds ?? { kind: 'unknown' }
+}
+
+export async function dedupePendingBuilds() {
+  const filename = path.join(process.cwd(), 'node_modules', '.modules.yaml')
+  try {
+    const value: unknown = parse(await readFile(filename, 'utf8'))
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- validate the parsed YAML object before normalizing its pending ledger
+    const record = value as Record<string, unknown>
+    const pending = record.pendingBuilds
+    if (!Array.isArray(pending) || !pending.every((id) => typeof id === 'string')) return false
+    const unique = [...new Set(pending)]
+    if (unique.length === pending.length) return true
+    record.pendingBuilds = unique
+    const temporary = `${filename}.${process.pid}.tmp`
+    try {
+      await writeFile(temporary, stringify(record))
+      await rename(temporary, filename)
+    } finally {
+      await rm(temporary, { force: true })
+    }
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function buildLedgersAllowNativeRepair() {
