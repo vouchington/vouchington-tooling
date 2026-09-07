@@ -9,6 +9,8 @@ type Lockfile = {
   snapshots?: Record<string, unknown>
 }
 
+const pnpmTemporaryPackageDirectory = /^.+_tmp_\d+_\d+$/
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -38,7 +40,12 @@ async function packageRootId(directory: string, ids: Set<string>) {
 async function installedPackageIds(directory: string, ids: Set<string>) {
   const entries = await readdir(directory, { withFileTypes: true })
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === '.bin') continue
+    if (
+      !entry.isDirectory() ||
+      entry.name === '.bin' ||
+      pnpmTemporaryPackageDirectory.test(entry.name)
+    )
+      continue
     const child = path.join(directory, entry.name)
     if (entry.name.startsWith('@')) await installedPackageIds(child, ids)
     else await packageRootId(child, ids)

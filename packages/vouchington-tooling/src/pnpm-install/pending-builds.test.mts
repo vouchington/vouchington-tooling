@@ -351,6 +351,30 @@ describe('pending builds', () => {
     })
   })
 
+  it('ignores pnpm 11.13.1 temporary unscoped and scoped package directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-pnpm-temporary-packages-'))
+    roots.push(root)
+    await writeCurrentGraph(root)
+    const virtualNodeModules = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      'no-mistakes@0.55.0',
+      'node_modules',
+    )
+    await Promise.all([
+      mkdir(join(virtualNodeModules, 'unscoped_tmp_123_0'), { recursive: true }),
+      mkdir(join(virtualNodeModules, '@scope', 'scoped_tmp_456_7'), { recursive: true }),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: [no-mistakes@0.35.0]\n',
+      ),
+    ])
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'clear' })
+  })
+
   it('fails closed without rewriting when the package tree cannot be classified', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-package-tree-unknown-'))
     roots.push(root)
