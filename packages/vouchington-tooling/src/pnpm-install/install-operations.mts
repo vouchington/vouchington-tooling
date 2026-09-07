@@ -79,7 +79,15 @@ export async function finalizePendingBuilds(
     fail(`${phase} completed without a clear pending build ledger`)
   if (options.installScripts && before.kind === 'pending') {
     await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
-    const after = await pendingBuilds()
+    let after = await pendingBuilds()
+    if (after.kind === 'pending' && after.ids.length === 1 && after.ids[0] === '.') {
+      await install(
+        ['rebuild', '--pending', '--workspace-root'],
+        options,
+        'pending workspace root rebuild',
+      )
+      after = await pendingBuilds()
+    }
     if (after.kind !== 'clear') fail(`${phase} completed without a clear pending build ledger`)
   }
   await verifyInstallHealth(runCapture, phase)

@@ -40,12 +40,17 @@ elif [ ! -f "$PNPM_NODE_MODULES/.modules.yaml" ]; then
   printf 'pendingBuilds: []\\n' > "$PNPM_NODE_MODULES/.modules.yaml"
 fi
 case " $* " in
+  *' rebuild --pending --workspace-root '*)
+    printf 'pendingBuilds: [%s]\n' "\${PNPM_WORKSPACE_ROOT_REBUILD_PENDING_BUILDS:-}" > "$PNPM_NODE_MODULES/.modules.yaml"
+    ;;
   *' rebuild '*)
     if [ "\${PNPM_REPAIR_NATIVE_ON_REBUILD:-0}" = 1 ]; then
       cp "$PNPM_NATIVE_REPLACEMENT" "$PNPM_NATIVE_ADDON"
     fi
     if [ "\${PNPM_REBUILD_INVALID_LEDGER:-0}" = 1 ]; then
       printf 'pendingBuilds: invalid\n' > "$PNPM_NODE_MODULES/.modules.yaml"
+    elif [ -n "\${PNPM_REBUILD_PENDING_BUILDS:-}" ]; then
+      printf 'pendingBuilds: [%s]\n' "$PNPM_REBUILD_PENDING_BUILDS" > "$PNPM_NODE_MODULES/.modules.yaml"
     else
       printf 'pendingBuilds: []\n' > "$PNPM_NODE_MODULES/.modules.yaml"
     fi
