@@ -4,6 +4,7 @@ import type {
   SccComplexityScope,
   SccComplexityValue,
 } from './types.mts'
+import { canonicalRepoPath, isInScope } from './paths.mts'
 
 export const SCC_COMPLEXITY_BASELINE_VERSION = 1 as const
 
@@ -15,11 +16,13 @@ export function parseSccComplexityBaseline(json: string): SccComplexityBaseline 
   if (!Array.isArray(parsed.entries)) throw new Error('baseline entries must be an array')
 
   const entries = parsed.entries.map(parseEntry)
-  const seen = new Set<string>()
+  const seen = new Map<string, Set<string>>()
   for (const entry of entries) {
-    const key = baselineKey(entry)
-    if (seen.has(key)) throw new Error(`baseline entry ${key} is duplicated`)
-    seen.add(key)
+    if (seen.get(entry.scope)?.has(entry.file))
+      throw new Error(`baseline entry ${entry.scope}:${entry.file} is duplicated`)
+    const files = seen.get(entry.scope) ?? new Set<string>()
+    files.add(entry.file)
+    seen.set(entry.scope, files)
   }
   return { entries, version: SCC_COMPLEXITY_BASELINE_VERSION }
 }
@@ -37,18 +40,11 @@ export function validateSccComplexityBaseline(
   }
 
   for (const entry of baseline.entries) {
-    const key = baselineKey(entry)
+    const key = `${entry.scope}:${entry.file}`
     const scope = scopeByName.get(entry.scope)
     if (!scope) throw new Error(`baseline entry ${key} is out of scope`)
     if (!trackedFileSet.has(entry.file)) throw new Error(`baseline entry ${key} is untracked`)
-    if (
-      !scope.includePaths.some(
-        (path) =>
-          path === '.' ||
-          entry.file === path ||
-          entry.file.startsWith(`${path.replace(/\/$/, '')}/`),
-      )
-    )
+    if (!isInScope(entry.file, scope.includePaths))
       throw new Error(`baseline entry ${key} is out of scope`)
     const value = valuesByScope.get(scope.name)?.find((item) => item.file === entry.file)
     if (!value) {
@@ -59,17 +55,35 @@ export function validateSccComplexityBaseline(
   }
 }
 
-export function baselineEntryByScopeAndFile(
-  baseline: SccComplexityBaseline | undefined,
-): ReadonlyMap<string, SccComplexityBaselineEntry> {
-  return new Map(baseline?.entries.map((entry) => [baselineKey(entry), entry]))
+export function normalizeSccComplexityBaseline(
+  baseline: SccComplexityBaseline,
+  repoRoot: string,
+): SccComplexityBaseline {
+  const entries = baseline.entries.map((entry) => ({
+    ...entry,
+    file: canonicalRepoPath(repoRoot, entry.file),
+  }))
+  const seen = new Map<string, Set<string>>()
+  for (const entry of entries) {
+    if (seen.get(entry.scope)?.has(entry.file))
+      throw new Error(`baseline entry ${entry.scope}:${entry.file} is duplicated`)
+    const files = seen.get(entry.scope) ?? new Set<string>()
+    files.add(entry.file)
+    seen.set(entry.scope, files)
+  }
+  return { entries, version: baseline.version }
 }
 
-export function baselineKey({
-  file,
-  scope,
-}: Pick<SccComplexityBaselineEntry, 'file' | 'scope'>): string {
-  return `${scope}:${file}`
+export function baselineEntryByScopeAndFile(
+  baseline: SccComplexityBaseline | undefined,
+): ReadonlyMap<string, ReadonlyMap<string, SccComplexityBaselineEntry>> {
+  const scopes = new Map<string, Map<string, SccComplexityBaselineEntry>>()
+  for (const entry of baseline?.entries ?? []) {
+    const files = scopes.get(entry.scope) ?? new Map<string, SccComplexityBaselineEntry>()
+    files.set(entry.file, entry)
+    scopes.set(entry.scope, files)
+  }
+  return scopes
 }
 
 function parseEntry(value: unknown, index: number): SccComplexityBaselineEntry {

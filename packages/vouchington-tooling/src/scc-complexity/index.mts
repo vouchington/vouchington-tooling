@@ -6,9 +6,10 @@ import { promisify } from 'node:util'
 import type { SharedContext } from '../shared-context/index.mts'
 import {
   baselineEntryByScopeAndFile,
-  baselineKey,
+  normalizeSccComplexityBaseline,
   validateSccComplexityBaseline,
 } from './baseline.mts'
+import { canonicalRepoPath, isInsideRepo } from './paths.mts'
 import { parseSccComplexityValues } from './parser.mts'
 import type {
   SccComplexityBaseline,
@@ -58,11 +59,15 @@ export async function checkSccComplexity(
     return { errors: [`::error::${ctx.repoRoot} is not inside a git repository`] }
   const dir = await mkdtemp(join(tmpdir(), options.tmpdirPrefix ?? DEFAULT_TMPDIR_PREFIX))
   try {
-    const scopes = scopesFor(options)
-    const results = await runScopes(ctx, options, scopes, dir, runScc)
-    if (options.baseline)
-      validateSccComplexityBaseline(options.baseline, scopes, ctx.trackedFileSet, results)
-    return { errors: formatViolations(results, scopes, options.baseline) }
+    const scopes = normalizeScopes(scopesFor(options), ctx.repoRoot)
+    const trackedFileSet = new Set(
+      [...ctx.trackedFileSet].map((file) => canonicalRepoPath(ctx.repoRoot, file)),
+    )
+    const baseline =
+      options.baseline && normalizeSccComplexityBaseline(options.baseline, ctx.repoRoot)
+    const results = await runScopes(ctx, options, scopes, dir, trackedFileSet, runScc)
+    if (baseline) validateSccComplexityBaseline(baseline, scopes, trackedFileSet, results)
+    return { errors: formatViolations(results, scopes, baseline) }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { errors: [`::error::scc-complexity failed: ${message}`] }
@@ -98,23 +103,36 @@ function scopesFor(options: SccComplexityOptions): readonly SccComplexityScope[]
   return options.scopes
 }
 
+function normalizeScopes(
+  scopes: readonly SccComplexityScope[],
+  repoRoot: string,
+): readonly SccComplexityScope[] {
+  return scopes.map((scope) => {
+    const includePaths = scope.includePaths.map((path) => canonicalRepoPath(repoRoot, path))
+    if (includePaths.some((path) => !isInsideRepo(path)))
+      throw new Error(`scope ${scope.name} includes a path outside the repository`)
+    return { ...scope, includePaths }
+  })
+}
+
 async function runScopes(
   ctx: SharedContext,
   options: SccComplexityOptions,
   scopes: readonly SccComplexityScope[],
   dir: string,
+  trackedFileSet: ReadonlySet<string>,
   runScc?: RunScc,
 ): Promise<Map<string, SccComplexityValue[]>> {
   const results = new Map<string, SccComplexityValue[]>()
-  for (const scope of scopes) {
-    const outputPath = join(dir, `${scope.name || 'default'}.json`)
+  for (const [index, scope] of scopes.entries()) {
+    const outputPath = join(dir, `scope-${index}.json`)
     const resolve =
       runScc ??
       ((path: string, current?: SccComplexityScope) =>
         runSccJson(ctx.repoRoot, path, options, current))
     results.set(
       scope.name,
-      parseSccComplexityValues(await resolve(outputPath, scope), ctx.trackedFileSet),
+      parseSccComplexityValues(await resolve(outputPath, scope), trackedFileSet, ctx.repoRoot),
     )
   }
   return results
@@ -130,7 +148,7 @@ function formatViolations(
     (results.get(scope.name) ?? []).flatMap((value) => {
       const limit = scope.limit ?? SCC_COMPLEXITY_LIMIT
       if (value.complexity <= limit) return []
-      const entry = entries.get(baselineKey({ file: value.file, scope: scope.name }))
+      const entry = entries.get(scope.name)?.get(value.file)
       if (entry && value.complexity <= entry.complexity) return []
       const prefix = scope.name ? `[${scope.name}] ` : ''
       const detail = entry
