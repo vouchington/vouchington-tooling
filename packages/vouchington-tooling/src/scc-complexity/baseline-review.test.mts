@@ -75,6 +75,27 @@ describe('scc-complexity baseline normalization', () => {
     ).resolves.toEqual({ errors: [] })
   })
 
+  it('uses the default limit while validating a baseline entry', async () => {
+    const baseline = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 51, file: 'src/app.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        { baseline, scopes: [{ includePaths: ['src'], name: 'tooling' }] },
+        () =>
+          Promise.resolve(
+            JSON.stringify([{ Files: [{ Complexity: 50, Location: 'src/app.mts' }] }]),
+          ),
+      ),
+    ).resolves.toEqual({
+      errors: ['::error::scc-complexity failed: baseline entry tooling:src/app.mts is stale'],
+    })
+  })
+
   it('rejects a tracked baseline entry when SCC no longer reports the file', async () => {
     const baseline = parseSccComplexityBaseline(
       JSON.stringify({

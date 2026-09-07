@@ -33,6 +33,7 @@ const DEFAULT_EXCLUDE_DIR = '.git,fixtures,__tests__,test-helpers'
 const DEFAULT_NOT_MATCH = String.raw`\.(test|spec)\.`
 const DEFAULT_TMPDIR_PREFIX = 'scc-complexity-'
 type RunScc = (outputPath: string, scope?: SccComplexityScope) => Promise<string>
+type SccScopeResult = { scope: SccComplexityScope; values: SccComplexityValue[] }
 export function buildSccArgs(options: SccComplexityOptions = {}): string[] {
   return [
     '--format',
@@ -66,8 +67,14 @@ export async function checkSccComplexity(
     const baseline =
       options.baseline && normalizeSccComplexityBaseline(options.baseline, ctx.repoRoot)
     const results = await runScopes(ctx, options, scopes, dir, trackedFileSet, runScc)
-    if (baseline) validateSccComplexityBaseline(baseline, scopes, trackedFileSet, results)
-    return { errors: formatViolations(results, scopes, baseline) }
+    if (baseline)
+      validateSccComplexityBaseline(
+        baseline,
+        scopes,
+        trackedFileSet,
+        new Map(results.map(({ scope, values }) => [scope.name, values])),
+      )
+    return { errors: formatViolations(results, baseline) }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { errors: [`::error::scc-complexity failed: ${message}`] }
@@ -122,30 +129,30 @@ async function runScopes(
   dir: string,
   trackedFileSet: ReadonlySet<string>,
   runScc?: RunScc,
-): Promise<Map<string, SccComplexityValue[]>> {
-  const results = new Map<string, SccComplexityValue[]>()
+): Promise<SccScopeResult[]> {
+  const results: SccScopeResult[] = []
   for (const [index, scope] of scopes.entries()) {
     const outputPath = join(dir, `scope-${index}.json`)
-    const resolve =
-      runScc ??
-      ((path: string, current?: SccComplexityScope) =>
-        runSccJson(ctx.repoRoot, path, options, current))
-    results.set(
-      scope.name,
-      parseSccComplexityValues(await resolve(outputPath, scope), trackedFileSet, ctx.repoRoot),
-    )
+    const resolve: RunScc = runScc ?? ((path) => runSccJson(ctx.repoRoot, path, options, scope))
+    results.push({
+      scope,
+      values: parseSccComplexityValues(
+        await resolve(outputPath, scope),
+        trackedFileSet,
+        ctx.repoRoot,
+      ),
+    })
   }
   return results
 }
 
 function formatViolations(
-  results: ReadonlyMap<string, readonly SccComplexityValue[]>,
-  scopes: readonly SccComplexityScope[],
+  results: readonly SccScopeResult[],
   baseline?: SccComplexityBaseline,
 ): string[] {
   const entries = baselineEntryByScopeAndFile(baseline)
-  return scopes.flatMap((scope) =>
-    (results.get(scope.name) ?? []).flatMap((value) => {
+  return results.flatMap(({ scope, values }) =>
+    values.flatMap((value) => {
       const limit = scope.limit ?? SCC_COMPLEXITY_LIMIT
       if (value.complexity <= limit) return []
       const entry = entries.get(scope.name)?.get(value.file)
@@ -163,17 +170,12 @@ async function runSccJson(
   repoRoot: string,
   outputPath: string,
   options: SccComplexityOptions,
-  scope?: SccComplexityScope,
+  scope: SccComplexityScope,
 ): Promise<string> {
   try {
     await execFileAsync(
       options.command ?? 'scc',
-      [
-        ...buildSccArgs({ ...options, ...scope }),
-        ...(scope?.includePaths ?? []),
-        '--output',
-        outputPath,
-      ],
+      [...buildSccArgs({ ...options, ...scope }), ...scope.includePaths, '--output', outputPath],
       { cwd: repoRoot, maxBuffer: 1024 * 1024 },
     )
   } catch (error) {
