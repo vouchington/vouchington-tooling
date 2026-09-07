@@ -228,6 +228,13 @@ import {
 } from 'vouchington-tooling/gh-api-shell-quoting'
 ```
 
+`checkSccComplexity` keeps its single repository-wide scan when `scopes` is omitted. Consumers
+that need separately ratcheted areas may provide named scopes with positional `includePaths`; SCC
+runs once per scope and reports the scope in each diagnostic. Parse a consumer-owned JSON baseline
+with `parseSccComplexityBaseline` and pass it as `baseline`. Baselines are versioned, record the
+maximum permitted complexity for each `{ scope, file }`, suppress only values at or below that
+ceiling, and reject malformed, duplicate, untracked, stale, or out-of-scope entries.
+
 `shellScriptViolations`/`workflowYamlViolations` flag a `gh api` call whose argument carries an
 unquoted `?` or `&`: an unquoted `&` silently backgrounds the command and truncates the query
 (the call still exits 0), and an unquoted `?` fails loudly under zsh glob-nomatch but passes

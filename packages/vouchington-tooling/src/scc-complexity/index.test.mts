@@ -1,6 +1,6 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -9,6 +9,8 @@ import {
   buildSccArgs,
   checkSccComplexity,
   parseSccComplexityViolations,
+  parseSccComplexityBaseline,
+  SCC_COMPLEXITY_BASELINE_VERSION,
   SCC_COMPLEXITY_LIMIT,
 } from './index.mts'
 
@@ -141,7 +143,7 @@ describe('scc-complexity', () => {
     const executable = join(binDir, 'scc')
     await writeFile(
       executable,
-      '#!/bin/sh\nprintf "%s\\n" "$@" > "$0.args"\nwhile [ "$1" != "--output" ]; do shift; done\nprintf \'[{"Files":[]}]\' > "$2"\n',
+      '#!/bin/sh\nprintf "%s\\n" "$@" >> "$0.args"\nwhile [ "$1" != "--output" ]; do shift; done\nprintf \'[{"Files":[]}]\' > "$2"\n',
     )
     await chmod(executable, 0o755)
 
@@ -167,6 +169,18 @@ describe('scc-complexity', () => {
       else process.env.PATH = previousPath
     }
     expect(SCC_COMPLEXITY_LIMIT).toBe(50)
+
+    await expect(
+      checkSccComplexity(ctx, {
+        command: executable,
+        scopes: [
+          { includePaths: ['src'], name: 'application' },
+          { includePaths: ['dev'], name: 'tooling' },
+        ],
+      }),
+    ).resolves.toEqual({ errors: [] })
+    await expect(readFile(`${executable}.args`, 'utf8')).resolves.toContain('src\n')
+    await expect(readFile(`${executable}.args`, 'utf8')).resolves.toContain('dev\n')
   })
 
   it('reports missing and nonzero scc executables through the default wrapper', async () => {
@@ -186,5 +200,290 @@ describe('scc-complexity', () => {
     })
     const report = await checkSccComplexity(ctx, { command: executable })
     expect(report.errors[0]).toContain('scc-complexity failed:')
+  })
+
+  it('runs each named scope with positional paths and labels diagnostics', async () => {
+    const ctx = await makeFixture(['dev/tool.mts', 'src/app.mts'])
+    const calls: Array<{ outputPath: string; scope: string | undefined }> = []
+
+    const report = await checkSccComplexity(
+      ctx,
+      {
+        scopes: [
+          { name: 'application', includePaths: ['src'] },
+          { name: 'tooling', includePaths: ['dev'], limit: 10 },
+        ],
+      },
+      (outputPath, scope) => {
+        calls.push({ outputPath, scope: scope?.name })
+        return Promise.resolve(
+          JSON.stringify([
+            {
+              Files: [
+                {
+                  Complexity: scope?.name === 'tooling' ? 11 : 51,
+                  Location: scope?.name === 'tooling' ? 'dev/tool.mts' : 'src/app.mts',
+                },
+              ],
+            },
+          ]),
+        )
+      },
+    )
+
+    expect(calls.map((call) => call.scope)).toEqual(['application', 'tooling'])
+    expect(report.errors).toEqual([
+      '::error file=src/app.mts::[application] src/app.mts: scc complexity 51 exceeds 50; simplify or split this file',
+      '::error file=dev/tool.mts::[tooling] dev/tool.mts: scc complexity 11 exceeds 10; simplify or split this file',
+    ])
+  })
+
+  it('uses index-derived output paths even when a scope name contains traversal', async () => {
+    const ctx = await makeFixture(['src/app.mts'])
+    const outputPaths: string[] = []
+    await expect(
+      checkSccComplexity(
+        ctx,
+        { scopes: [{ includePaths: ['src'], name: '../diagnostic-name' }] },
+        (outputPath) => {
+          outputPaths.push(outputPath)
+          return Promise.resolve(JSON.stringify([{ Files: [] }]))
+        },
+      ),
+    ).resolves.toEqual({ errors: [] })
+    expect(outputPaths.map((path) => basename(path))).toEqual(['scope-0.json'])
+  })
+
+  it('allows only non-regressing scoped baseline entries and rejects invalid entries', async () => {
+    const ctx = await makeFixture(['dev/tool.mts'])
+    const baseline = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'dev/tool.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    const options = { baseline, scopes: [{ name: 'tooling', includePaths: ['dev'], limit: 10 }] }
+    const report = JSON.stringify([{ Files: [{ Complexity: 12, Location: 'dev/tool.mts' }] }])
+
+    await expect(checkSccComplexity(ctx, options, () => Promise.resolve(report))).resolves.toEqual({
+      errors: [],
+    })
+    await expect(
+      checkSccComplexity(ctx, options, () =>
+        Promise.resolve(
+          JSON.stringify([{ Files: [{ Complexity: 13, Location: 'dev/tool.mts' }] }]),
+        ),
+      ),
+    ).resolves.toEqual({
+      errors: [
+        '::error file=dev/tool.mts::[tooling] dev/tool.mts: scc complexity 13 exceeds baseline ceiling 12',
+      ],
+    })
+    const stale = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'dev/missing.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(ctx, { ...options, baseline: stale }, () => Promise.resolve(report)),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: baseline entry tooling:dev/missing.mts is untracked',
+      ],
+    })
+  })
+
+  it('rejects malformed and duplicate baseline entries without suppressing scanner failures', () => {
+    expect(() => parseSccComplexityBaseline('{}')).toThrow('baseline version must be 1')
+    expect(() =>
+      parseSccComplexityBaseline(
+        JSON.stringify({
+          entries: [{ complexity: -1, file: 'dev/tool.mts', scope: 'tooling' }],
+          version: SCC_COMPLEXITY_BASELINE_VERSION,
+        }),
+      ),
+    ).toThrow('baseline entry 0 has an invalid complexity')
+    expect(() =>
+      parseSccComplexityBaseline(
+        JSON.stringify({
+          entries: [{ complexity: 12, file: '', scope: '' }],
+          version: SCC_COMPLEXITY_BASELINE_VERSION,
+        }),
+      ),
+    ).toThrow('baseline entry 0 has an invalid scope')
+    expect(() =>
+      parseSccComplexityBaseline(
+        JSON.stringify({
+          entries: [{ complexity: 12, file: '', scope: 'tooling' }],
+          version: SCC_COMPLEXITY_BASELINE_VERSION,
+        }),
+      ),
+    ).toThrow('baseline entry 0 has an invalid file')
+    expect(() =>
+      parseSccComplexityBaseline(
+        JSON.stringify({
+          entries: [
+            { complexity: 11, file: 'dev/tool.mts', scope: 'tooling' },
+            { complexity: 12, file: 'dev/tool.mts', scope: 'tooling' },
+          ],
+          version: SCC_COMPLEXITY_BASELINE_VERSION,
+        }),
+      ),
+    ).toThrow('baseline entry tooling:dev/tool.mts is duplicated')
+  })
+
+  it('reports invalid, stale, and out-of-scope baseline configuration', async () => {
+    const ctx = await makeFixture(['dev/tool.mts', 'src/app.mts'])
+    await expect(checkSccComplexity(ctx, { scopes: [] })).resolves.toEqual({
+      errors: ['::error::scc-complexity failed: scopes must not be empty'],
+    })
+    await expect(
+      checkSccComplexity(ctx, {
+        scopes: [
+          { includePaths: ['src'], name: 'duplicate' },
+          { includePaths: ['src'], name: 'duplicate' },
+        ],
+      }),
+    ).resolves.toEqual({
+      errors: ['::error::scc-complexity failed: scope name duplicate is invalid'],
+    })
+    await expect(
+      checkSccComplexity(ctx, { scopes: [{ includePaths: [], name: 'empty' }] }),
+    ).resolves.toEqual({
+      errors: ['::error::scc-complexity failed: scope empty must include at least one path'],
+    })
+    const stale = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'dev/tool.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        { baseline: stale, scopes: [{ includePaths: ['dev'], limit: 10, name: 'tooling' }] },
+        () =>
+          Promise.resolve(
+            JSON.stringify([{ Files: [{ Complexity: 10, Location: 'dev/tool.mts' }] }]),
+          ),
+      ),
+    ).resolves.toEqual({
+      errors: ['::error::scc-complexity failed: baseline entry tooling:dev/tool.mts is stale'],
+    })
+    const misplaced = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'src/app.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        { baseline: misplaced, scopes: [{ includePaths: ['dev'], limit: 10, name: 'tooling' }] },
+        () =>
+          Promise.resolve(
+            JSON.stringify([{ Files: [{ Complexity: 12, Location: 'src/app.mts' }] }]),
+          ),
+      ),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: baseline entry tooling:src/app.mts is out of scope',
+      ],
+    })
+  })
+
+  it('normalizes scoped paths and keeps colliding scope-file pairs distinct', async () => {
+    const ctx = await makeFixture(['src/app.mts', 'src/tool.mts'])
+    const normalized = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: './src\\tool.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        {
+          baseline: normalized,
+          scopes: [{ includePaths: ['./src/../src/'], limit: 10, name: 'tooling' }],
+        },
+        () =>
+          Promise.resolve(
+            JSON.stringify([{ Files: [{ Complexity: 12, Location: './src/../src/tool.mts' }] }]),
+          ),
+      ),
+    ).resolves.toEqual({ errors: [] })
+    const collisionSafe = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [
+          { complexity: 12, file: 'c', scope: 'a:b' },
+          { complexity: 12, file: 'b:c', scope: 'a' },
+        ],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        await makeFixture(['b:c', 'c']),
+        {
+          baseline: collisionSafe,
+          scopes: [
+            { includePaths: ['.'], limit: 10, name: 'a:b' },
+            { includePaths: ['.'], limit: 10, name: 'a' },
+          ],
+        },
+        (_, scope) =>
+          Promise.resolve(
+            JSON.stringify([
+              { Files: [{ Complexity: 12, Location: scope?.name === 'a:b' ? 'c' : 'b:c' }] },
+            ]),
+          ),
+      ),
+    ).resolves.toEqual({ errors: [] })
+  })
+
+  it('rejects tracked baseline entries that only appear in another scope and paths outside the repository', async () => {
+    const ctx = await makeFixture(['src/app.mts'])
+    const baseline = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'src/app.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        {
+          baseline,
+          scopes: [
+            { includePaths: ['.'], limit: 10, name: 'tooling' },
+            { includePaths: ['src'], limit: 10, name: 'application' },
+          ],
+        },
+        (_, scope) =>
+          Promise.resolve(
+            JSON.stringify([
+              {
+                Files:
+                  scope?.name === 'application'
+                    ? [{ Complexity: 12, Location: 'src/app.mts' }]
+                    : [],
+              },
+            ]),
+          ),
+      ),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: baseline entry tooling:src/app.mts is out of scope',
+      ],
+    })
+    await expect(
+      checkSccComplexity(ctx, { scopes: [{ includePaths: ['../outside'], name: 'outside' }] }),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: scope outside includes a path outside the repository',
+      ],
+    })
   })
 })

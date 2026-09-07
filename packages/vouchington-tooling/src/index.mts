@@ -424,10 +424,18 @@ export type {
 export {
   buildSccArgs,
   checkSccComplexity,
+  parseSccComplexityBaseline,
   parseSccComplexityViolations,
+  SCC_COMPLEXITY_BASELINE_VERSION,
   SCC_COMPLEXITY_LIMIT,
 } from './scc-complexity/index.mts'
-export type { SccComplexityOptions, SccComplexityViolation } from './scc-complexity/index.mts'
+export type {
+  SccComplexityBaseline,
+  SccComplexityBaselineEntry,
+  SccComplexityOptions,
+  SccComplexityScope,
+  SccComplexityViolation,
+} from './scc-complexity/index.mts'
 export { assertWorkflowCommandDrift, parseCiLocalArgs, runCiLocal } from './ci-local/index.mts'
 export type {
   CiLocalCommand,
