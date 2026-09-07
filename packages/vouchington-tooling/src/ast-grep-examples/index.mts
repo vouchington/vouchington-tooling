@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import picomatch from 'picomatch'
 import { parse as yamlLoad, stringify as yamlDump } from 'yaml'
 
+export { compareAstGrepCompanions } from './companion-parity.mts'
 interface AstGrepExample {
   code: string
   isValid: boolean
