@@ -29,6 +29,8 @@ export async function makeFixture() {
   const pnpmBin = join(root, 'bin')
   const pnpmLog = join(root, 'pnpm.log')
   const summary = join(root, 'summary.md')
+  const lockfile =
+    'lockfileVersion: 9\nimporters:\n  .: {}\n  backend: {}\n  packages/consumer: {}\n  packages/dependency: {}\npackages:\n  dependency: {}\n'
 
   await Promise.all([
     writeJson(join(root, 'package.json'), { name: 'fixture-root', private: true }),
@@ -36,10 +38,7 @@ export async function makeFixture() {
       join(root, 'pnpm-workspace.yaml'),
       'packages:\n  - packages/*\nminimumReleaseAge: 2880\n',
     ),
-    writeFile(
-      join(root, 'pnpm-lock.yaml'),
-      'lockfileVersion: 9\nimporters:\n  .: {}\n  backend: {}\n  packages/consumer: {}\n  packages/dependency: {}\npackages:\n  dependency: {}\n',
-    ),
+    writeFile(join(root, 'pnpm-lock.yaml'), lockfile),
     writeJson(join(consumer, 'package.json'), {
       name: '@fixture/consumer',
       dependencies: { '@fixture/dependency': 'workspace:^' },

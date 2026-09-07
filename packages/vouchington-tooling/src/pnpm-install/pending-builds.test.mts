@@ -139,26 +139,35 @@ describe('pending builds', () => {
     await expect(readFile(modules, 'utf8')).resolves.toBe(original)
   })
 
-  it('prunes only pending IDs absent from the current workspace lockfile', async () => {
+  it('prunes only pending IDs absent from workspace and installed lockfiles', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-pruning-'))
     roots.push(root)
     const modulesDir = join(root, 'node_modules')
-    await mkdir(modulesDir)
+    await mkdir(join(modulesDir, '.pnpm'), { recursive: true })
     process.chdir(root)
     const modules = join(modulesDir, '.modules.yaml')
     await writeFile(
       modules,
-      'custom: retained\npendingBuilds: [no-mistakes@0.55.0, current@1.0.0, backend, .]\n',
+      'custom: retained\nvirtualStoreDir: .pnpm\npendingBuilds: [no-mistakes@0.55.0, current@1.0.0, installed@1.0.0, backend, .]\n',
     )
     await writeFile(
       join(root, 'pnpm-lock.yaml'),
       'importers:\n  .: {}\n  backend: {}\npackages:\n  current@1.0.0: {}\n',
     )
+    await writeFile(
+      join(modulesDir, '.pnpm', 'lock.yaml'),
+      'importers:\n  .: {}\n  backend: {}\npackages:\n  current@1.0.0: {}\n  installed@1.0.0: {}\n',
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     await expect(pruneStalePendingBuilds()).resolves.toEqual({
-      ids: ['.', 'backend', 'current@1.0.0'],
+      ids: ['.', 'backend', 'current@1.0.0', 'installed@1.0.0'],
       kind: 'pending',
     })
+    expect(warn).toHaveBeenCalledWith(
+      'pending-build-ledger-pruned-stale IDs: ["no-mistakes@0.55.0"]',
+    )
+    warn.mockRestore()
     await expect(readFile(modules, 'utf8')).resolves.toContain('custom: retained')
     await expect(readFile(modules, 'utf8')).resolves.not.toContain('no-mistakes@0.55.0')
   })
@@ -169,7 +178,7 @@ describe('pending builds', () => {
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
-    await writeFile(modules, 'pendingBuilds: [no-mistakes@0.55.0]\n')
+    await writeFile(modules, 'virtualStoreDir: .pnpm\npendingBuilds: [no-mistakes@0.55.0]\n')
     await writeFile(join(root, 'pnpm-lock.yaml'), 'packages: nope\n')
 
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })

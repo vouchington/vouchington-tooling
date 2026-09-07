@@ -224,7 +224,7 @@ use two script-free forced reconciliation passes. If a scripts-enabled install o
 reconciliation leaves a parseable nonempty ledger, it completes pnpm's own generic
 `pnpm rebuild --pending --recursive` finalization. Before that rebuild, it safely deduplicates
 identical pending IDs. After rebuilding, it removes only residual IDs proven absent from pnpm's
-current workspace lockfile, without dropping live dependencies or workspace importers. This covers
+current workspace and installed virtual-store lockfiles, without dropping live dependencies or workspace importers. Removed stale IDs are reported. This covers
 pnpm 11.13.1's duplicate-importer and stale-package ledger behavior, then rechecks native and workspace-link health and
 requires an empty ledger. Unreadable or unresolved ledger state fails without refreshing the stamp
 for scripts-enabled runs. Scripts-disabled installs can finish with unreadable state, but

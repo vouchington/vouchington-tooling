@@ -73,8 +73,8 @@ For persistent `pnpm-install`, v5 metadata tracks structural inputs separately f
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
 uses two script-suppressed verification installs followed by `pnpm rebuild --pending --recursive`.
 Before rebuilding, duplicate pending IDs are collapsed. After rebuilding, IDs proven absent from
-the current workspace lockfile are removed; live dependency and workspace-importer IDs are
-retained. Any residual ID after the generic rebuild remains a reported hard failure. An isolated native-binary
+the current workspace and installed virtual-store lockfiles are reported and removed; live
+dependency and workspace-importer IDs are retained. Any residual ID after the generic rebuild remains a reported hard failure. An isolated native-binary
 mismatch uses one strict forced install only when structural provenance
 matches, workspace links are valid, and pnpm records empty `ignoredBuilds` and `pendingBuilds` ledgers;
 otherwise it retains the two script-free reconciliation passes. Native and workspace-link health

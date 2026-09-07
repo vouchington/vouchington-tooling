@@ -53,17 +53,27 @@ export async function pendingBuilds(): Promise<PendingBuildState> {
   return (await buildLedgers())?.pendingBuilds ?? { kind: 'unknown' }
 }
 
-async function currentBuildIds() {
+async function lockfileBuildIds(lockfilePath: string) {
   try {
-    const lockfile: unknown = parse(
-      await readFile(path.join(process.cwd(), 'pnpm-lock.yaml'), 'utf8'),
-    )
+    const lockfile: unknown = parse(await readFile(lockfilePath, 'utf8'))
     if (!isRecord(lockfile) || !isRecord(lockfile.importers) || !isRecord(lockfile.packages))
       return undefined
     return new Set([...Object.keys(lockfile.importers), ...Object.keys(lockfile.packages)])
   } catch {
     return undefined
   }
+}
+
+async function currentBuildIds(record: Record<string, unknown>) {
+  if (typeof record.virtualStoreDir !== 'string') return undefined
+  const [wanted, installed] = await Promise.all([
+    lockfileBuildIds(path.join(process.cwd(), 'pnpm-lock.yaml')),
+    lockfileBuildIds(
+      path.resolve(path.dirname(modulesPath()), record.virtualStoreDir, 'lock.yaml'),
+    ),
+  ])
+  if (wanted === undefined || installed === undefined) return undefined
+  return new Set([...wanted, ...installed])
 }
 
 async function rewritePendingBuilds(
@@ -97,8 +107,11 @@ export async function pruneStalePendingBuilds(): Promise<PendingBuildState> {
   const ledgers = await buildLedgers()
   if (ledgers === undefined || ledgers.pendingBuilds.kind !== 'pending')
     return ledgers?.pendingBuilds ?? { kind: 'unknown' }
-  const current = await currentBuildIds()
+  const current = await currentBuildIds(ledgers.record)
   if (current === undefined) return { kind: 'unknown' }
+  const stale = ledgers.pendingBuilds.ids.filter((id) => !current.has(id))
+  if (stale.length > 0)
+    console.warn(`pending-build-ledger-pruned-stale IDs: ${JSON.stringify(stale)}`)
   return rewritePendingBuilds(
     ledgers.record,
     ledgers.pendingBuilds.ids.length,
