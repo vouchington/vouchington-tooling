@@ -89,8 +89,9 @@ describe('pending build lifecycle safety', () => {
       try {
         fixture.env.PNPM_PENDING_BUILDS = 'dependency'
         fixture.env.PNPM_REBUILD_PENDING_BUILDS = residual
+        const expectedIds = residual.split(', ').toSorted()
         await expect(runInstaller(fixture)).rejects.toThrow(
-          'persistent install completed without a clear pending build ledger',
+          `persistent install completed without a clear pending build ledger; remaining IDs: ${JSON.stringify(expectedIds)}`,
         )
         await expect(installCalls(fixture)).resolves.toEqual([
           'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',

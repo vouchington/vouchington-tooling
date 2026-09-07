@@ -21,6 +21,14 @@ function fail(message: string): never {
   throw new Error(message)
 }
 
+function failPendingBuildLedger(
+  phase: string,
+  state: Awaited<ReturnType<typeof pendingBuilds>>,
+): never {
+  const ids = state.kind === 'pending' ? `; remaining IDs: ${JSON.stringify(state.ids)}` : ''
+  fail(`${phase} completed without a clear pending build ledger${ids}`)
+}
+
 export function withScriptPolicy(args: string[], installScripts: boolean) {
   return installScripts ? args : [...args, '--ignore-scripts']
 }
@@ -79,15 +87,13 @@ export async function finalizePendingBuilds(
   phase: string,
 ) {
   const before = await pendingBuilds()
-  if (options.installScripts && before.kind === 'unknown')
-    fail(`${phase} completed without a clear pending build ledger`)
+  if (options.installScripts && before.kind === 'unknown') failPendingBuildLedger(phase, before)
   if (options.installScripts && before.kind === 'pending') {
     const deduplicated = await deduplicatePendingBuilds()
-    if (deduplicated.kind !== 'pending')
-      fail(`${phase} completed without a clear pending build ledger`)
+    if (deduplicated.kind !== 'pending') failPendingBuildLedger(phase, deduplicated)
     await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
     const after = await pendingBuilds()
-    if (after.kind !== 'clear') fail(`${phase} completed without a clear pending build ledger`)
+    if (after.kind !== 'clear') failPendingBuildLedger(phase, after)
   }
   await verifyInstallHealth(runCapture, phase)
   return options.installScripts ? { kind: 'clear' as const } : before
