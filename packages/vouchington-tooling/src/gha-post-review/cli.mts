@@ -5,7 +5,7 @@ import { writePostedOutput, postReviewFromEnv } from './github.mts'
 export async function runPostReviewCli(env: NodeJS.ProcessEnv = process.env): Promise<number> {
   try {
     const result = await postReviewFromEnv(env)
-    writePostedOutput(result.posted, env.GITHUB_OUTPUT)
+    writePostedOutput(result.posted, result.commentCount, env.GITHUB_OUTPUT)
     return 0
   } catch (error) {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`)

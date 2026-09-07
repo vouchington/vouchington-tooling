@@ -90,6 +90,12 @@ describe('stage-runtime.sh', () => {
       expect(
         existsSync(join(dest, 'packages/vouchington-tooling/src/gha-review-payload/cli.mts')),
       ).toBe(true)
+      expect(
+        existsSync(join(dest, 'packages/vouchington-tooling/src/gha-post-review/github.mts')),
+      ).toBe(true)
+      expect(existsSync(join(dest, 'packages/vouchington-tooling/src/gha-check-run/cli.mts'))).toBe(
+        true,
+      )
       expect(existsSync(join(dest, '.github/actions/code-review/worktree-create.sh'))).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })

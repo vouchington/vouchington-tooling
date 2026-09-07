@@ -101,11 +101,13 @@ describe('github review adapter', () => {
     const dir = mkdtempSync(join(tmpdir(), 'posted-output-'))
     const output = join(dir, 'github-output')
     try {
-      writePostedOutput(true, '')
+      writePostedOutput(true, 0, '')
       writeFileSync(output, '')
-      writePostedOutput(true, output)
-      writePostedOutput(false, output)
-      expect(readFileSync(output, 'utf8')).toBe('posted=true\nposted=false\n')
+      writePostedOutput(true, 3, output)
+      writePostedOutput(false, 0, output)
+      expect(readFileSync(output, 'utf8')).toBe(
+        'posted=true\ncomment_count=3\nposted=false\ncomment_count=0\n',
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -333,7 +335,7 @@ describe('postReviewFromEnv', () => {
           },
           exec,
         ),
-      ).resolves.toEqual({ posted: true })
+      ).resolves.toEqual({ posted: true, commentCount: 0 })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -367,7 +369,7 @@ describe('postReviewFromEnv', () => {
           exec,
           claudeIo,
         ),
-      ).resolves.toEqual({ posted: true })
+      ).resolves.toEqual({ posted: true, commentCount: 0 })
     } finally {
       rmSync(dir2, { recursive: true, force: true })
     }
@@ -393,13 +395,16 @@ describe('postReviewFromEnv', () => {
       return ''
     }
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
-    expect(postReviewWithTokenFromEnv(env, exec, 'explicit-token')).toEqual({ posted: true })
+    expect(postReviewWithTokenFromEnv(env, exec, 'explicit-token')).toEqual({
+      posted: true,
+      commentCount: 0,
+    })
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
-    expect(postReviewWithTokenFromEnv(env, exec)).toEqual({ posted: true })
+    expect(postReviewWithTokenFromEnv(env, exec)).toEqual({ posted: true, commentCount: 0 })
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     expect(
       postReviewWithTokenFromEnv({ ...env, GH_TOKEN: '', GITHUB_TOKEN: 'fallback-token' }, exec),
-    ).toEqual({ posted: true })
+    ).toEqual({ posted: true, commentCount: 0 })
     writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
     const claudeIo: ClaudeTokenIo = {
       async getOidcToken() {
@@ -417,7 +422,10 @@ describe('postReviewFromEnv', () => {
       mask() {},
     }
     try {
-      await expect(postClaudeReviewFromEnv(env, exec, claudeIo)).resolves.toEqual({ posted: true })
+      await expect(postClaudeReviewFromEnv(env, exec, claudeIo)).resolves.toEqual({
+        posted: true,
+        commentCount: 0,
+      })
       expect(new Set(tokens)).toEqual(
         new Set(['explicit-token', 'environment-token', 'fallback-token', 'app-token']),
       )
@@ -425,6 +433,37 @@ describe('postReviewFromEnv', () => {
       expect(() => postReviewWithTokenFromEnv(env, exec, '')).toThrow(
         'GH_TOKEN or GITHUB_TOKEN is required.',
       )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('threads PROVIDER_NAME through to the posted review body', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-review-provider-'))
+    const payloadPath = join(dir, 'code-review-payload.json')
+    writeFileSync(payloadPath, JSON.stringify({ body: 'Verdict.', comments: [] }))
+    const posted: string[] = []
+    const exec: GhExec = (args, options) => {
+      if (args.some((arg) => arg.includes('@tsv'))) return `${HEAD_SHA}\t${BASE_SHA}\tfalse\topen`
+      if (args.includes('/files?per_page=100')) return '[]'
+      if (args.includes('POST')) posted.push(options?.input ?? '')
+      return ''
+    }
+    try {
+      expect(
+        postReviewWithTokenFromEnv(
+          {
+            GITHUB_REPOSITORY: 'o/r',
+            PR_NUMBER: '4',
+            CODE_REVIEW_PAYLOAD_PATH: payloadPath,
+            PROVIDER_NAME: 'Claude',
+          },
+          exec,
+          'tok',
+        ),
+      ).toEqual({ posted: true, commentCount: 0 })
+      expect(posted).toHaveLength(1)
+      expect(JSON.parse(posted[0] ?? '{}').body).toBe('**Claude review**\n\nVerdict.')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

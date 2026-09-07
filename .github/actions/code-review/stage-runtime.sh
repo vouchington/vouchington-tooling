@@ -9,6 +9,13 @@ cp "$src/.nvmrc" "$dest/"
 cp -R "$src/.github/actions/code-review" "$dest/.github/actions/"
 cp -R "$src/packages/vouchington-tooling/src/gha-review-payload" \
   "$dest/packages/vouchington-tooling/src/"
+# gha-check-run imports GhExec/createGhExec from gha-post-review, which in turn
+# imports gha-review-payload above; stage both so the post-run check-run CLI
+# resolves entirely from this pre-Claude-run copy.
+cp -R "$src/packages/vouchington-tooling/src/gha-post-review" \
+  "$dest/packages/vouchington-tooling/src/"
+cp -R "$src/packages/vouchington-tooling/src/gha-check-run" \
+  "$dest/packages/vouchington-tooling/src/"
 action="$dest/.github/actions/code-review"
 {
   printf 'root=%s\n' "$dest"

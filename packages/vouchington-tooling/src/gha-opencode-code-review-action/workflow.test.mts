@@ -84,10 +84,15 @@ describe('opencode-code-review reusable workflow', () => {
       queue: 'max',
       'cancel-in-progress': false,
     })
-    expect(review?.permissions).toEqual({ contents: 'read', 'pull-requests': 'read' })
+    expect(review?.permissions).toEqual({
+      checks: 'write',
+      contents: 'read',
+      'pull-requests': 'read',
+    })
     expect(review?.outputs).toEqual({
       agent_outcome: '${{ steps.agent.outputs.agent_outcome }}',
       payload_artifact_id: '${{ steps.agent.outputs.payload_artifact_id }}',
+      check_run_id: '${{ steps.agent.outputs.check_run_id }}',
     })
     const steps = review?.steps ?? []
     expect(steps[0]?.name).toBe('Validate immutable tooling ref')
@@ -171,6 +176,7 @@ describe('opencode-code-review reusable workflow', () => {
     expect(post?.['timeout-minutes']).toBe(5)
     expect(post?.permissions).toEqual({
       actions: 'read',
+      checks: 'write',
       contents: 'read',
       'pull-requests': 'write',
     })
