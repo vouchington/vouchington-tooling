@@ -283,6 +283,14 @@ describe('scc-complexity', () => {
     expect(() =>
       parseSccComplexityBaseline(
         JSON.stringify({
+          entries: [{ complexity: -1, file: 'dev/tool.mts', scope: 'tooling' }],
+          version: SCC_COMPLEXITY_BASELINE_VERSION,
+        }),
+      ),
+    ).toThrow('baseline entry 0 has an invalid complexity')
+    expect(() =>
+      parseSccComplexityBaseline(
+        JSON.stringify({
           entries: [
             { complexity: 11, file: 'dev/tool.mts', scope: 'tooling' },
             { complexity: 12, file: 'dev/tool.mts', scope: 'tooling' },

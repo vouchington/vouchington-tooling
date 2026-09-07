@@ -78,7 +78,11 @@ function parseEntry(value: unknown, index: number): SccComplexityBaselineEntry {
     throw new Error(`baseline entry ${index} has an invalid scope`)
   if (typeof value.file !== 'string' || value.file.length === 0)
     throw new Error(`baseline entry ${index} has an invalid file`)
-  if (typeof value.complexity !== 'number' || !Number.isFinite(value.complexity))
+  if (
+    typeof value.complexity !== 'number' ||
+    !Number.isSafeInteger(value.complexity) ||
+    value.complexity < 0
+  )
     throw new Error(`baseline entry ${index} has an invalid complexity`)
   return { complexity: value.complexity, file: value.file, scope: value.scope }
 }
