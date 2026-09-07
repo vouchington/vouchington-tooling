@@ -66,22 +66,28 @@ describe('pending builds', () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-dedupe-'))
     roots.push(root)
     process.chdir(root)
-    await expect(dedupePendingBuilds()).resolves.toBe(false)
+    await expect(dedupePendingBuilds()).rejects.toThrow(
+      'pending build ledger could not be normalized',
+    )
     await mkdir(join(root, 'node_modules'))
     const modules = join(root, 'node_modules', '.modules.yaml')
     await writeFile(modules, '[]\n')
-    await expect(dedupePendingBuilds()).resolves.toBe(false)
+    await expect(dedupePendingBuilds()).rejects.toThrow(
+      'pending build ledger could not be normalized',
+    )
     await writeFile(
       modules,
       'custom: retained\npendingBuilds: [., ., backend, dependency, backend]\n',
     )
-    await expect(dedupePendingBuilds()).resolves.toBe(true)
+    await expect(dedupePendingBuilds()).resolves.toBeUndefined()
     expect(parse(await readFile(modules, 'utf8'))).toMatchObject({ custom: 'retained' })
     expect(await pendingBuilds()).toEqual({
       ids: ['.', 'backend', 'dependency'],
       kind: 'pending',
     })
     await writeFile(modules, 'pendingBuilds: invalid\n')
-    await expect(dedupePendingBuilds()).resolves.toBe(false)
+    await expect(dedupePendingBuilds()).rejects.toThrow(
+      'pending build ledger could not be normalized',
+    )
   })
 })

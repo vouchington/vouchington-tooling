@@ -82,8 +82,7 @@ export async function finalizePendingBuilds(
   if (options.installScripts && before.kind === 'unknown')
     fail(`${phase} completed without a clear pending build ledger`)
   if (options.installScripts && before.kind === 'pending') {
-    if (!(await dedupePendingBuilds()))
-      fail(`${phase} completed without a clear pending build ledger`)
+    await dedupePendingBuilds()
     await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
     const after = await pendingBuilds()
     if (after.kind !== 'clear') fail(`${phase} completed without a clear pending build ledger`)

@@ -47,13 +47,15 @@ export async function dedupePendingBuilds() {
   const filename = path.join(process.cwd(), 'node_modules', '.modules.yaml')
   try {
     const value: unknown = parse(await readFile(filename, 'utf8'))
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    if (typeof value !== 'object' || value === null || Array.isArray(value))
+      throw new Error('pending build ledger is not an object')
     // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- validate the parsed YAML object before normalizing its pending ledger
     const record = value as Record<string, unknown>
     const pending = record.pendingBuilds
-    if (!Array.isArray(pending) || !pending.every((id) => typeof id === 'string')) return false
+    if (!Array.isArray(pending) || !pending.every((id) => typeof id === 'string'))
+      throw new Error('pending build IDs are invalid')
     const unique = [...new Set(pending)]
-    if (unique.length === pending.length) return true
+    if (unique.length === pending.length) return
     record.pendingBuilds = unique
     const temporary = `${filename}.${process.pid}.tmp`
     try {
@@ -62,9 +64,8 @@ export async function dedupePendingBuilds() {
     } finally {
       await rm(temporary, { force: true })
     }
-    return true
   } catch {
-    return false
+    throw new Error('pending build ledger could not be normalized')
   }
 }
 
