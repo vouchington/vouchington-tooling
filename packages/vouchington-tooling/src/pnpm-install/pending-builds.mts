@@ -1,122 +1,54 @@
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { parse, stringify } from 'yaml'
+import { parse } from 'yaml'
 
-export type PendingBuilds = { kind: 'known'; ids: Set<string> } | { kind: 'unknown' }
-export type PendingBuildDelta =
+export type PendingBuildState =
+  | { kind: 'clear' }
+  | { ids: string[]; kind: 'pending' }
   | { kind: 'unknown' }
-  | { kind: 'known'; dependencyIds: string[]; workspaceIds: string[] }
 
-export async function pendingBuilds(): Promise<PendingBuilds> {
+type BuildLedgers =
+  | { ignoredBuilds: string[] | undefined; pendingBuilds: PendingBuildState }
+  | undefined
+
+async function buildLedgers(): Promise<BuildLedgers> {
   try {
     const value: unknown = parse(
       await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
     )
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      return { kind: 'unknown' }
-    const pending = (value as Record<string, unknown>).pendingBuilds ?? []
-    if (!Array.isArray(pending) || !pending.every((id) => typeof id === 'string'))
-      return { kind: 'unknown' }
-    return { kind: 'known', ids: new Set(pending) }
-  } catch {
-    return { kind: 'unknown' }
-  }
-}
-
-export async function buildLedgersAllowNativeRepair() {
-  try {
-    const value: unknown = parse(
-      await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
-    )
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the pnpm manifest object
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- validate the parsed YAML object before reading its fields
     const record = value as Record<string, unknown>
-    const ignored = record.ignoredBuilds
-    const pending = record.pendingBuilds ?? []
-    return (
-      Array.isArray(ignored) &&
-      ignored.length === 0 &&
-      Array.isArray(pending) &&
-      pending.length === 0
+    const ignored = Object.hasOwn(record, 'ignoredBuilds') ? record.ignoredBuilds : undefined
+    const pending = Object.hasOwn(record, 'pendingBuilds') ? record.pendingBuilds : []
+    if (
+      (ignored !== undefined &&
+        (!Array.isArray(ignored) || !ignored.every((id) => typeof id === 'string'))) ||
+      !Array.isArray(pending) ||
+      !pending.every((id) => typeof id === 'string')
     )
-  } catch {
-    return false
-  }
-}
-
-async function lockfileDependencyIds() {
-  try {
-    const lockfile: unknown = parse(
-      await readFile(path.join(process.cwd(), 'pnpm-lock.yaml'), 'utf8'),
-    )
-    if (typeof lockfile !== 'object' || lockfile === null || !('packages' in lockfile))
       return undefined
-    const packages = lockfile.packages
-    if (typeof packages !== 'object' || packages === null || Array.isArray(packages))
-      return undefined
-    return new Set(Object.keys(packages))
+    return {
+      ignoredBuilds: ignored,
+      pendingBuilds:
+        pending.length === 0 ? { kind: 'clear' } : { ids: pending.toSorted(), kind: 'pending' },
+    }
   } catch {
     return undefined
   }
 }
 
-export async function validDependencyBuildIds(ids: [string, ...string[]]) {
-  const packages = await lockfileDependencyIds()
-  if (!packages || !ids.every((id) => packages.has(id))) return undefined
-  const [first, ...remaining] = ids.toSorted()
-  return [first, ...remaining] as [string, ...string[]]
+export async function pendingBuilds(): Promise<PendingBuildState> {
+  return (await buildLedgers())?.pendingBuilds ?? { kind: 'unknown' }
 }
 
-export async function clearPendingDependencyBuilds(ids: string[]) {
-  const filename = path.join(process.cwd(), 'node_modules', '.modules.yaml')
-  try {
-    const value: unknown = parse(await readFile(filename, 'utf8'))
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-    // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after validating the pnpm manifest object
-    const record = value as Record<string, unknown>
-    if (
-      !Array.isArray(record.pendingBuilds) ||
-      !record.pendingBuilds.every((id) => typeof id === 'string')
-    )
-      return false
-    const ignored = record.ignoredBuilds ?? []
-    if (
-      !Array.isArray(ignored) ||
-      !ignored.every((id) => typeof id === 'string') ||
-      ids.some((id) => ignored.includes(id))
-    )
-      return false
-    record.pendingBuilds = record.pendingBuilds.filter((id) => !ids.includes(id))
-    const temporary = `${filename}.${process.pid}.tmp`
-    try {
-      await writeFile(temporary, stringify(record))
-      await rename(temporary, filename)
-    } finally {
-      await rm(temporary, { force: true })
-    }
-    return true
-  } catch {
-    return false
-  }
-}
-
-export async function pendingBuildDelta(
-  before: PendingBuilds,
-  after: PendingBuilds,
-): Promise<PendingBuildDelta> {
-  if (before.kind !== 'known' || after.kind !== 'known') return { kind: 'unknown' }
-  const packages = await lockfileDependencyIds()
-  if (!packages) return { kind: 'unknown' }
-  const dependencyIds: string[] = []
-  const workspaceIds: string[] = []
-  for (const id of after.ids) {
-    if (before.ids.has(id)) continue
-    ;(packages.has(id) ? dependencyIds : workspaceIds).push(id)
-  }
-  return {
-    kind: 'known',
-    dependencyIds: dependencyIds.toSorted(),
-    workspaceIds: workspaceIds.toSorted(),
-  }
+export async function buildLedgersAllowNativeRepair() {
+  const ledgers = await buildLedgers()
+  return (
+    ledgers !== undefined &&
+    ledgers.ignoredBuilds !== undefined &&
+    ledgers.ignoredBuilds.length === 0 &&
+    ledgers.pendingBuilds.kind === 'clear'
+  )
 }

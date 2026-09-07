@@ -18,10 +18,9 @@ type ComponentName = (typeof componentNames)[number]
 type StructuralProvenance = Record<ComponentName, string>
 type PersistentMetadataStamp = {
   lastInvocationInstallScripts: boolean
-  pendingDependencyBuilds?: string[]
   provenance: StructuralProvenance
-  scriptsEnabledInstallSucceeded: boolean
-  version: 4
+  scriptsEnabledInstallVerified: boolean
+  version: 5
 }
 
 function persistentMetadataStampPath() {
@@ -61,7 +60,7 @@ function runtimePlatformIdentity() {
   })
 }
 
-export async function persistentMetadataFingerprintV4(runCapture: CaptureCommand) {
+export async function persistentMetadataFingerprintV5(runCapture: CaptureCommand) {
   const workspaces = (await listWorkspaces(runCapture)).toSorted((left, right) =>
     left.path.localeCompare(right.path),
   )
@@ -104,15 +103,12 @@ function validStamp(value: unknown): value is PersistentMetadataStamp {
   // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish the candidate stamp type before complete field validation
   const stamp = value as Partial<PersistentMetadataStamp>
   return (
-    stamp.version === 4 &&
+    stamp.version === 5 &&
     typeof stamp.lastInvocationInstallScripts === 'boolean' &&
-    typeof stamp.scriptsEnabledInstallSucceeded === 'boolean' &&
+    typeof stamp.scriptsEnabledInstallVerified === 'boolean' &&
     typeof stamp.provenance === 'object' &&
     stamp.provenance !== null &&
-    componentNames.every((name) => typeof stamp.provenance?.[name] === 'string') &&
-    (stamp.pendingDependencyBuilds === undefined ||
-      (Array.isArray(stamp.pendingDependencyBuilds) &&
-        stamp.pendingDependencyBuilds.every((id) => typeof id === 'string')))
+    componentNames.every((name) => typeof stamp.provenance?.[name] === 'string')
   )
 }
 
@@ -129,12 +125,7 @@ async function readPersistentMetadataState() {
   }
 }
 
-async function readPersistentMetadataStamp() {
-  const state = await readPersistentMetadataState()
-  return state.kind === 'stamp' ? state.stamp : undefined
-}
-
-export async function persistentMetadataStatusV4(
+export async function persistentMetadataStatusV5(
   provenance: StructuralProvenance,
 ): Promise<ProvenanceStatus> {
   const state = await readPersistentMetadataState()
@@ -147,33 +138,20 @@ export async function persistentMetadataStatusV4(
     : {
         kind: 'matching',
         lastInvocationInstallScripts: stamp.lastInvocationInstallScripts,
-        pendingDependencyBuilds: stamp.pendingDependencyBuilds ?? [],
-        scriptsEnabledInstallSucceeded: stamp.scriptsEnabledInstallSucceeded,
+        scriptsEnabledInstallVerified: stamp.scriptsEnabledInstallVerified,
       }
 }
 
-export async function writePersistentMetadataStampV4(
+export async function writePersistentMetadataStampV5(
   provenance: StructuralProvenance,
   installScripts: boolean,
-  resetScriptsEnabledCapability: boolean,
-  pendingDependencyBuilds?: string[],
+  scriptsEnabledInstallVerified: boolean,
 ) {
-  const existing = await readPersistentMetadataStamp()
-  const existingMatches =
-    existing && componentNames.every((name) => existing.provenance[name] === provenance[name])
   const stamp: PersistentMetadataStamp = {
     lastInvocationInstallScripts: installScripts,
-    pendingDependencyBuilds: (
-      pendingDependencyBuilds ??
-      (existingMatches ? existing.pendingDependencyBuilds : undefined) ??
-      []
-    ).toSorted(),
     provenance,
-    scriptsEnabledInstallSucceeded:
-      installScripts ||
-      (!resetScriptsEnabledCapability &&
-        Boolean(existingMatches && existing.scriptsEnabledInstallSucceeded)),
-    version: 4,
+    scriptsEnabledInstallVerified,
+    version: 5,
   }
   const stampPath = persistentMetadataStampPath()
   const directory = path.dirname(stampPath)
