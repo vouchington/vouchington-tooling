@@ -134,6 +134,11 @@ describe('scc-complexity', () => {
     await expect(checkSccComplexity(outside)).resolves.toEqual({
       errors: [`::error::${outside.repoRoot} is not inside a git repository`],
     })
+    await expect(
+      checkSccComplexity({ ...outside, repoRoot: 'outside%\r\n::warning::injected' }),
+    ).resolves.toEqual({
+      errors: ['::error::outside%25%0D%0A::warning::injected is not inside a git repository'],
+    })
   })
 
   it('runs the default scc process wrapper and reads its output file', async () => {
@@ -388,7 +393,7 @@ describe('scc-complexity', () => {
       ),
     ).resolves.toEqual({
       errors: [
-        '::error::scc-complexity failed: baseline entry tooling:src/app.mts is out of scope',
+        '::error::scc-complexity failed: scope tooling received result outside its paths: src/app.mts',
       ],
     })
   })

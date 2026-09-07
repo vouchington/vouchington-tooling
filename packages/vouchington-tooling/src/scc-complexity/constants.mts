@@ -1,0 +1,1 @@
+export const SCC_COMPLEXITY_LIMIT = 50
