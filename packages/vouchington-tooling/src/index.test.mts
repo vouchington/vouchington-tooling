@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { GitHubBodyLengthValidation } from './index.mts'
 import {
   EphemeralListenerAttemptsExhaustedError,
   MissingSqlAstParserError,
@@ -38,6 +39,8 @@ import {
   HeadOutOfDateError,
   runGh,
   runGit,
+  GITHUB_BODY_MAX_CHARACTERS,
+  validateGitHubBodyLength,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -84,5 +87,13 @@ describe('package exports', () => {
     expect(typeof getDiffAgainstBase).toBe('function')
     expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
     expect(new HeadOutOfDateError('x', 'origin').name).toBe('HeadOutOfDateError')
+    const bodyLength: GitHubBodyLengthValidation = validateGitHubBodyLength('😀')
+    expect(GITHUB_BODY_MAX_CHARACTERS).toBe(65_536)
+    expect(bodyLength).toEqual({
+      ok: true,
+      characterCount: 1,
+      utf8ByteCount: 4,
+      maxCharacterCount: GITHUB_BODY_MAX_CHARACTERS,
+    })
   })
 })
