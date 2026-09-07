@@ -1,6 +1,17 @@
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+const writeFailure = vi.hoisted(() => ({ enabled: false }))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    writeFile: (...args: Parameters<typeof actual.writeFile>) =>
+      writeFailure.enabled ? Promise.reject(new Error('disk full')) : actual.writeFile(...args),
+  }
+})
 
 import {
   installCalls,
@@ -50,6 +61,26 @@ describe('pending build lifecycle safety', () => {
       }
     },
   )
+
+  it('fails closed before rebuilding when duplicate-ledger deduplication cannot be written', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = '., ., backend'
+      writeFailure.enabled = true
+      await expect(runInstaller(fixture)).rejects.toThrow(
+        'persistent install completed without a clear pending build ledger',
+      )
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
+      ).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      writeFailure.enabled = false
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
 
   it.each(['dependency', '., ., backend'])(
     'rejects distinct pending IDs left after a successful generic rebuild: %s',

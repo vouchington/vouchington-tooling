@@ -1,7 +1,18 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const writeFailure = vi.hoisted(() => ({ enabled: false }))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    writeFile: (...args: Parameters<typeof actual.writeFile>) =>
+      writeFailure.enabled ? Promise.reject(new Error('disk full')) : actual.writeFile(...args),
+  }
+})
 
 import {
   buildLedgersAllowNativeRepair,
@@ -18,6 +29,7 @@ const pnpm11131DuplicateLedger = join(
 )
 
 afterEach(async () => {
+  writeFailure.enabled = false
   process.chdir(previousCwd)
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
 })
@@ -91,5 +103,20 @@ describe('pending builds', () => {
 
     await expect(deduplicatePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
     await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [dependency, 2]\n')
+  })
+
+  it('fails closed when it cannot rewrite duplicate pending IDs', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-deduplication-write-failure-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, await readFile(pnpm11131DuplicateLedger, 'utf8'))
+    writeFailure.enabled = true
+
+    await expect(deduplicatePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await expect(readFile(modules, 'utf8')).resolves.toContain(
+      "pendingBuilds: ['.', '.', 'backend']",
+    )
   })
 })
