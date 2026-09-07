@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { parse, stringify } from 'yaml'
 
+import { classifyPendingBuildIds } from './pending-build-classification.mts'
+
 export type PendingBuildState =
   | { kind: 'clear' }
   | { ids: string[]; kind: 'pending' }
@@ -60,6 +62,27 @@ export async function deduplicatePendingBuilds(): Promise<PendingBuildState> {
   } catch {
     return { kind: 'unknown' }
   }
+  return pendingBuilds()
+}
+
+export async function pruneStalePendingBuilds(): Promise<PendingBuildState> {
+  const ledgers = await buildLedgers()
+  if (ledgers === undefined || ledgers.pendingBuilds.kind !== 'pending')
+    return ledgers?.pendingBuilds ?? { kind: 'unknown' }
+  const classification = await classifyPendingBuildIds(ledgers.pendingBuilds.ids)
+  if (classification === undefined) return { kind: 'unknown' }
+  if (classification.stale.length === 0) return ledgers.pendingBuilds
+  try {
+    await writeFile(
+      modulesPath(),
+      stringify({ ...ledgers.record, pendingBuilds: classification.current }),
+    )
+  } catch {
+    return { kind: 'unknown' }
+  }
+  console.warn(
+    `pnpm-install: pruned stale pending build IDs absent from lockfile and package tree: ${classification.stale.join(', ')}`,
+  )
   return pendingBuilds()
 }
 

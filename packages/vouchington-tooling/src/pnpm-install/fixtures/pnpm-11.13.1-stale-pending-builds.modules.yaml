@@ -1,0 +1,4 @@
+packageManager: pnpm@11.13.1
+pendingBuilds:
+  - no-mistakes@0.35.0
+  - no-mistakes@0.55.0

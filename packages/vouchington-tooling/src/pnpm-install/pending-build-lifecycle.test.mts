@@ -62,6 +62,39 @@ describe('pending build lifecycle safety', () => {
     },
   )
 
+  it('rebuilds a current workspace ID after pruning a stale pending ID', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = 'backend, no-mistakes@0.35.0'
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'rebuild --pending --recursive',
+      ])
+      expect(result.stderr).toContain(
+        'pnpm-install: pruned stale pending build IDs absent from lockfile and package tree: no-mistakes@0.35.0',
+      )
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('clears a stale-only ledger without another pnpm rebuild', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = 'no-mistakes@0.35.0'
+      const result = await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+      ])
+      expect(result.stderr).toContain(
+        'pnpm-install: pruned stale pending build IDs absent from lockfile and package tree: no-mistakes@0.35.0',
+      )
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   it('fails closed before rebuilding when duplicate-ledger deduplication cannot be written', async () => {
     const fixture = await makeFixture()
     try {

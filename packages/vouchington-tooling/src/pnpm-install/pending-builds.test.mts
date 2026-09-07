@@ -18,6 +18,7 @@ import {
   buildLedgersAllowNativeRepair,
   deduplicatePendingBuilds,
   pendingBuilds,
+  pruneStalePendingBuilds,
 } from './pending-builds.mts'
 
 const roots: string[] = []
@@ -27,6 +28,38 @@ const pnpm11131DuplicateLedger = join(
   'fixtures',
   'pnpm-11.13.1-duplicate-pending-builds.modules.yaml',
 )
+const pnpm11131StaleLedger = join(
+  import.meta.dirname,
+  'fixtures',
+  'pnpm-11.13.1-stale-pending-builds.modules.yaml',
+)
+
+async function writeCurrentGraph(root: string) {
+  await Promise.all([
+    writeFile(
+      join(root, 'pnpm-lock.yaml'),
+      'lockfileVersion: 9\nimporters:\n  .: {}\n  backend: {}\npackages:\n  no-mistakes@0.55.0: {}\n',
+    ),
+    mkdir(
+      join(root, 'node_modules', '.pnpm', 'no-mistakes@0.55.0', 'node_modules', 'no-mistakes'),
+      {
+        recursive: true,
+      },
+    ),
+  ])
+  await writeFile(
+    join(
+      root,
+      'node_modules',
+      '.pnpm',
+      'no-mistakes@0.55.0',
+      'node_modules',
+      'no-mistakes',
+      'package.json',
+    ),
+    '{"name":"no-mistakes","version":"0.55.0"}\n',
+  )
+}
 
 afterEach(async () => {
   writeFailure.enabled = false
@@ -118,5 +151,84 @@ describe('pending builds', () => {
     await expect(readFile(modules, 'utf8')).resolves.toContain(
       "pendingBuilds: ['.', '.', 'backend']",
     )
+  })
+
+  it('prunes only the stale pnpm 11.13.1 no-mistakes ledger ID and diagnoses it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-stale-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    await writeCurrentGraph(root)
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, await readFile(pnpm11131StaleLedger, 'utf8'))
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({
+      ids: ['no-mistakes@0.55.0'],
+      kind: 'pending',
+    })
+    await expect(readFile(modules, 'utf8')).resolves.not.toContain('no-mistakes@0.35.0')
+    expect(warning).toHaveBeenCalledWith(
+      'pnpm-install: pruned stale pending build IDs absent from lockfile and package tree: no-mistakes@0.35.0',
+    )
+  })
+
+  it('preserves current workspace IDs while pruning only stale IDs', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-mixed-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    await writeCurrentGraph(root)
+    process.chdir(root)
+    await writeFile(
+      join(root, 'node_modules', '.modules.yaml'),
+      'pendingBuilds: [backend, no-mistakes@0.35.0]\n',
+    )
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ ids: ['backend'], kind: 'pending' })
+  })
+
+  it('fails closed without rewriting when graph classification is uncertain', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-classification-unknown-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, 'pendingBuilds: [no-mistakes@0.35.0]\n')
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [no-mistakes@0.35.0]\n')
+  })
+
+  it('fails closed without rewriting when the package tree cannot be classified', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-package-tree-unknown-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules', 'broken-package'), { recursive: true })
+    await writeFile(
+      join(root, 'pnpm-lock.yaml'),
+      'lockfileVersion: 9\nimporters: {}\npackages: {}\n',
+    )
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await Promise.all([
+      writeFile(modules, 'pendingBuilds: [no-mistakes@0.35.0]\n'),
+      writeFile(join(root, 'node_modules', 'broken-package', 'package.json'), '{}\n'),
+    ])
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [no-mistakes@0.35.0]\n')
+  })
+
+  it('fails closed when it cannot rewrite stale pending IDs', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-stale-write-failure-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    await writeCurrentGraph(root)
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, 'pendingBuilds: [no-mistakes@0.35.0]\n')
+    writeFailure.enabled = true
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [no-mistakes@0.35.0]\n')
   })
 })

@@ -72,10 +72,9 @@ For persistent `pnpm-install`, v5 metadata tracks structural inputs separately f
 `--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
 uses one script-suppressed verification install followed by `pnpm rebuild --pending --recursive`.
-When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
-rerunning first-party workspace hooks.
-If that generic rebuild leaves only pnpm's root importer marker, one root-only pending rebuild runs
-the root lifecycle hook; every other residual ID remains a hard failure. An isolated native-binary
+Before that generic rebuild, it removes pending IDs proved absent from both the current lockfile graph
+and installed package tree, while preserving current package and workspace IDs. Every unresolved or
+unreadable pending ID remains a hard failure. An isolated native-binary
 mismatch uses one strict forced install only when structural provenance
 matches, workspace links are valid, and pnpm records empty `ignoredBuilds` and `pendingBuilds` ledgers;
 otherwise it retains the script-free then strict reconciliation. Native and workspace-link health
