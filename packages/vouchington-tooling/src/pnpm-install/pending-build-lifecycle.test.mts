@@ -30,6 +30,67 @@ describe('pending build lifecycle safety', () => {
     }
   })
 
+  it('runs the root lifecycle when pnpm leaves only its root importer marker', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+      fixture.env.PNPM_REBUILD_PENDING_BUILDS = '.'
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'rebuild --pending --recursive',
+        'rebuild --pending --workspace-root',
+      ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
+      ).resolves.toContain('pendingBuilds: []')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it.each(['dependency', '., dependency'])(
+    'rejects non-root-only markers left after a successful generic rebuild: %s',
+    async (residual) => {
+      const fixture = await makeFixture()
+      try {
+        fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+        fixture.env.PNPM_REBUILD_PENDING_BUILDS = residual
+        await expect(runInstaller(fixture)).rejects.toThrow(
+          'persistent install completed without a clear pending build ledger',
+        )
+        await expect(installCalls(fixture)).resolves.toEqual([
+          'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+          'rebuild --pending --recursive',
+        ])
+      } finally {
+        await rm(fixture.root, { force: true, recursive: true })
+      }
+    },
+  )
+
+  it('rejects a root-only rebuild that does not clear the ledger', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+      fixture.env.PNPM_REBUILD_PENDING_BUILDS = '.'
+      fixture.env.PNPM_WORKSPACE_ROOT_REBUILD_PENDING_BUILDS = 'dependency'
+      await expect(runInstaller(fixture)).rejects.toThrow(
+        'persistent install completed without a clear pending build ledger',
+      )
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'rebuild --pending --recursive',
+        'rebuild --pending --workspace-root',
+      ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
+      ).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   it.each(['pendingBuilds: [dependency]\n', 'pendingBuilds: nope\n'])(
     'reconciles a matching verified stamp when its live ledger is not clear',
     async (modules) => {
