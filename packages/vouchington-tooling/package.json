@@ -33,6 +33,11 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./agent-harness-identity": {
+      "types": "./dist/agent-harness-identity/index.d.mts",
+      "import": "./dist/agent-harness-identity/index.mjs",
+      "default": "./dist/agent-harness-identity/index.mjs"
+    },
     "./skill-discovery": {
       "types": "./dist/skill-discovery/index.d.mts",
       "import": "./dist/skill-discovery/index.mjs",

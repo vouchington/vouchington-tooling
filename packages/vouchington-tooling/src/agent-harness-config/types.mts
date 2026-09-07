@@ -1,6 +1,8 @@
-export const HARNESS_IDS = ['claude', 'codex', 'grok', 'cursor'] as const
+import { HARNESS_IDS } from '../agent-harness-identity/index.mts'
+import type { HarnessId } from '../agent-harness-identity/index.mts'
 
-export type HarnessId = (typeof HARNESS_IDS)[number]
+export { HARNESS_IDS }
+export type { HarnessId }
 
 export type ApplyTarget =
   | { readonly kind: 'global' }

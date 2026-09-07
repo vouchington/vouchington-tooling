@@ -41,6 +41,8 @@ import {
   runGit,
   GITHUB_BODY_MAX_CHARACTERS,
   validateGitHubBodyLength,
+  inspectHarnessEnvironment,
+  selectHarnessSession,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -69,6 +71,11 @@ describe('package exports', () => {
     expect(CHECKPOINT_MARKER).toBe('pr-checkpoint:v1')
     expect(typeof classifyFrictionObservation).toBe('function')
     expect(dumpHarnessPolicy().cursor.approvalMode).toBe('auto-review')
+    expect(
+      selectHarnessSession(inspectHarnessEnvironment({ CODEX_THREAD_ID: 'root-session' }), [
+        'codex',
+      ]),
+    ).toEqual({ harness: 'codex', sessionId: 'root-session' })
     expect(typeof validateNugetUpdate).toBe('function')
     expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
     expect(typeof runPostReview).toBe('function')

@@ -9,6 +9,13 @@ export type {
 } from './skill-discovery/index.mts'
 
 export {
+  HARNESS_IDS,
+  inspectHarnessEnvironment,
+  selectHarnessSession,
+} from './agent-harness-identity/index.mts'
+export type { HarnessEnvironment, HarnessSessionIdentity } from './agent-harness-identity/index.mts'
+
+export {
   codexChildren,
   codexIdentity,
   computeTranscriptFacts,
@@ -124,7 +131,6 @@ export {
   dumpHarnessPolicy,
   planHarnessConfig,
   DEFAULT_EXTRA_WRITABLE_ROOTS,
-  HARNESS_IDS,
 } from './agent-harness-config/index.mts'
 export type {
   ApplyTarget,
