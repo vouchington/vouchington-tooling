@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { parse } from 'yaml'
+import { parse, stringify } from 'yaml'
 
 export type PendingBuildState =
   | { kind: 'clear' }
@@ -9,14 +9,18 @@ export type PendingBuildState =
   | { kind: 'unknown' }
 
 type BuildLedgers =
-  | { ignoredBuilds: string[] | undefined; pendingBuilds: PendingBuildState }
+  | {
+      ignoredBuilds: string[] | undefined
+      pendingBuilds: PendingBuildState
+      record: Record<string, unknown>
+    }
   | undefined
+
+const modulesPath = () => path.join(process.cwd(), 'node_modules', '.modules.yaml')
 
 async function buildLedgers(): Promise<BuildLedgers> {
   try {
-    const value: unknown = parse(
-      await readFile(path.join(process.cwd(), 'node_modules', '.modules.yaml'), 'utf8'),
-    )
+    const value: unknown = parse(await readFile(modulesPath(), 'utf8'))
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
     // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- validate the parsed YAML object before reading its fields
     const record = value as Record<string, unknown>
@@ -33,6 +37,7 @@ async function buildLedgers(): Promise<BuildLedgers> {
       ignoredBuilds: ignored,
       pendingBuilds:
         pending.length === 0 ? { kind: 'clear' } : { ids: pending.toSorted(), kind: 'pending' },
+      record,
     }
   } catch {
     return undefined
@@ -41,6 +46,21 @@ async function buildLedgers(): Promise<BuildLedgers> {
 
 export async function pendingBuilds(): Promise<PendingBuildState> {
   return (await buildLedgers())?.pendingBuilds ?? { kind: 'unknown' }
+}
+
+export async function deduplicatePendingBuilds(): Promise<PendingBuildState> {
+  const ledgers = await buildLedgers()
+  if (ledgers === undefined || ledgers.pendingBuilds.kind !== 'pending')
+    return ledgers?.pendingBuilds ?? { kind: 'unknown' }
+  // `buildLedgers` has already verified every pending entry is a string.
+  const unique = [...new Set(ledgers.record.pendingBuilds as string[])]
+  if (unique.length === ledgers.pendingBuilds.ids.length) return ledgers.pendingBuilds
+  try {
+    await writeFile(modulesPath(), stringify({ ...ledgers.record, pendingBuilds: unique }))
+  } catch {
+    return { kind: 'unknown' }
+  }
+  return pendingBuilds()
 }
 
 export async function buildLedgersAllowNativeRepair() {
