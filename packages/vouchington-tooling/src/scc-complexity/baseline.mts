@@ -4,7 +4,8 @@ import type {
   SccComplexityScope,
   SccComplexityValue,
 } from './types.mts'
-import { canonicalRepoPath, isInScope } from './paths.mts'
+import { assertWorkflowCommandData, canonicalRepoPath, isInScope } from './paths.mts'
+import { SCC_COMPLEXITY_LIMIT } from './constants.mts'
 
 export const SCC_COMPLEXITY_BASELINE_VERSION = 1 as const
 
@@ -51,7 +52,8 @@ export function validateSccComplexityBaseline(
       if (allFiles.has(entry.file)) throw new Error(`baseline entry ${key} is out of scope`)
       throw new Error(`baseline entry ${key} is stale`)
     }
-    if (value.complexity <= (scope.limit ?? 50)) throw new Error(`baseline entry ${key} is stale`)
+    if (value.complexity <= (scope.limit ?? SCC_COMPLEXITY_LIMIT))
+      throw new Error(`baseline entry ${key} is stale`)
   }
 }
 
@@ -92,6 +94,8 @@ function parseEntry(value: unknown, index: number): SccComplexityBaselineEntry {
     throw new Error(`baseline entry ${index} has an invalid scope`)
   if (typeof value.file !== 'string' || value.file.length === 0)
     throw new Error(`baseline entry ${index} has an invalid file`)
+  assertWorkflowCommandData(value.scope, `baseline entry ${index}`)
+  assertWorkflowCommandData(value.file, `baseline entry ${index}`)
   if (
     typeof value.complexity !== 'number' ||
     !Number.isSafeInteger(value.complexity) ||

@@ -388,7 +388,7 @@ describe('scc-complexity', () => {
       ),
     ).resolves.toEqual({
       errors: [
-        '::error::scc-complexity failed: baseline entry tooling:src/app.mts is out of scope',
+        '::error::scc-complexity failed: scope tooling received result outside its paths: src/app.mts',
       ],
     })
   })
