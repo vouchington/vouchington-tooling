@@ -215,7 +215,13 @@ import {
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
-import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
+import {
+  createPullRequest,
+  getDiffAgainstBase,
+  runGh,
+  runGit,
+  validateGitHubBodyLength,
+} from 'vouchington-tooling/gh-cli'
 import {
   shellScriptViolations,
   workflowYamlViolations,
@@ -230,6 +236,10 @@ scalars before scanning, so a hazard hidden by YAML's own quote-stripping is sti
 throws on a `run:` value that is a YAML alias or a multiline PLAIN scalar, shapes it cannot yet
 scan safely. Both functions scan already-in-scope source text — deciding which files count as a
 shell script or a workflow/action YAML file is left to the caller.
+
+`validateGitHubBodyLength` measures an issue or pull-request body against GitHub's 65,536 Unicode
+code-point limit without altering it. Its result includes the UTF-8 byte count for diagnostics; that
+byte count is not a validation limit.
 
 `agent-harness-config` merges classifier-auto and sandbox keys into Claude, Codex, Grok, and Cursor
 config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
