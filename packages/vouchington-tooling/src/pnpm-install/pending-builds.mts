@@ -81,14 +81,13 @@ async function rewritePendingBuilds(
   originalLength: number,
   ids: string[],
 ): Promise<PendingBuildState> {
-  if (ids.length === originalLength)
-    return ids.length === 0 ? { kind: 'clear' } : { ids: ids.toSorted(), kind: 'pending' }
+  if (ids.length === originalLength) return { ids: ids.toSorted(), kind: 'pending' }
   const temporary = `${modulesPath()}.${randomUUID()}.tmp`
   try {
     await writeFile(temporary, stringify({ ...record, pendingBuilds: ids }), { flag: 'wx' })
     await rename(temporary, modulesPath())
   } catch {
-    await rm(temporary, { force: true }).catch(() => {})
+    await rm(temporary, { force: true })
     return { kind: 'unknown' }
   }
   return pendingBuilds()

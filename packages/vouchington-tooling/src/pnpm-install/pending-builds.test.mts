@@ -45,9 +45,11 @@ describe('pending builds', () => {
     roots.push(root)
     process.chdir(root)
     expect(await pendingBuilds()).toEqual({ kind: 'unknown' })
+    expect(await pruneStalePendingBuilds()).toEqual({ kind: 'unknown' })
     await mkdir(join(root, 'node_modules'))
     await writeFile(join(root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
     expect(await pendingBuilds()).toEqual({ kind: 'clear' })
+    expect(await pruneStalePendingBuilds()).toEqual({ kind: 'clear' })
     await writeFile(join(root, 'node_modules', '.modules.yaml'), 'pendingBuilds: [two, one]\n')
     expect(await pendingBuilds()).toEqual({ ids: ['one', 'two'], kind: 'pending' })
     for (const contents of [
@@ -178,6 +180,8 @@ describe('pending builds', () => {
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, 'pendingBuilds: [no-mistakes@0.55.0]\n')
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
     await writeFile(modules, 'virtualStoreDir: .pnpm\npendingBuilds: [no-mistakes@0.55.0]\n')
     await writeFile(join(root, 'pnpm-lock.yaml'), 'packages: nope\n')
 
