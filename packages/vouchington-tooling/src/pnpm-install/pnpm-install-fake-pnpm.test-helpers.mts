@@ -29,10 +29,10 @@ if [ "\${PNPM_FAIL_RELEASE_AGE_CALL:-0}" = "$calls" ]; then
   exit 1
 fi
 if [ -n "\${PNPM_SLEEP_SECONDS:-}" ]; then sleep "$PNPM_SLEEP_SECONDS"; fi
-if [ "\${PNPM_INVALID_PENDING_BUILDS:-0}" = 1 ]; then
+if [ "\${1:-}" != rebuild ] && [ "\${PNPM_INVALID_PENDING_BUILDS:-0}" = 1 ]; then
   mkdir -p "$PNPM_NODE_MODULES"
   printf 'pendingBuilds: invalid\n' > "$PNPM_NODE_MODULES/.modules.yaml"
-elif [ -n "\${PNPM_PENDING_BUILDS:-}" ]; then
+elif [ "\${1:-}" != rebuild ] && [ -n "\${PNPM_PENDING_BUILDS:-}" ]; then
   mkdir -p "$PNPM_NODE_MODULES"
   printf 'pendingBuilds: [%s]\\n' "$PNPM_PENDING_BUILDS" > "$PNPM_NODE_MODULES/.modules.yaml"
 elif [ ! -f "$PNPM_NODE_MODULES/.modules.yaml" ]; then
@@ -49,6 +49,8 @@ case " $* " in
     fi
     if [ "\${PNPM_REBUILD_INVALID_LEDGER:-0}" = 1 ]; then
       printf 'pendingBuilds: invalid\n' > "$PNPM_NODE_MODULES/.modules.yaml"
+    elif [ "\${PNPM_REBUILD_REQUIRES_DEDUPED:-0}" = 1 ] && sed -n 's/.*\\[\\(.*\\)\\].*/\\1/p' "$PNPM_NODE_MODULES/.modules.yaml" | tr ',' '\\n' | sed 's/^ *//; s/ *$//' | sort | uniq -d | grep -q .; then
+      cp "$PNPM_NODE_MODULES/.modules.yaml" "$PNPM_NODE_MODULES/.modules.yaml.rebuild-left-pending"
     elif [ -n "\${PNPM_REBUILD_PENDING_BUILDS:-}" ]; then
       printf 'pendingBuilds: [%s]\n' "$PNPM_REBUILD_PENDING_BUILDS" > "$PNPM_NODE_MODULES/.modules.yaml"
     else

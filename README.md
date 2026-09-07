@@ -222,7 +222,9 @@ parseable empty `pendingBuilds` ledger. A v4, malformed, or missing stamp on a p
 matching stamp with pending or unreadable build state, and an unverified scripts-enabled tree all
 use two script-free forced reconciliation passes. If a scripts-enabled install or
 reconciliation leaves a parseable nonempty ledger, it completes pnpm's own generic
-`pnpm rebuild --pending --recursive` finalization, then rechecks native and workspace-link health
+`pnpm rebuild --pending --recursive` finalization. Before that rebuild, it safely deduplicates
+identical pending IDs without dropping distinct dependencies or workspace importers. This covers
+pnpm 11.13.1's duplicate-importer ledger behavior, then rechecks native and workspace-link health
 and requires an empty ledger. Unreadable or unresolved ledger state fails without refreshing the
 stamp for scripts-enabled runs. Scripts-disabled installs can finish with unreadable state, but
 write an unverified stamp so the next scripts-enabled invocation reconciles. They retain

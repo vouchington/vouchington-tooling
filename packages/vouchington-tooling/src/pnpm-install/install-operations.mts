@@ -2,7 +2,11 @@ import { scheduler } from 'node:timers/promises'
 
 import { runPnpm } from './exec.mts'
 import { nativeBinariesMatchRuntime, repairedNativeBinariesMatchRuntime } from './native-health.mts'
-import { buildLedgersAllowNativeRepair, pendingBuilds } from './pending-builds.mts'
+import {
+  buildLedgersAllowNativeRepair,
+  deduplicatePendingBuilds,
+  pendingBuilds,
+} from './pending-builds.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
 import {
@@ -78,16 +82,11 @@ export async function finalizePendingBuilds(
   if (options.installScripts && before.kind === 'unknown')
     fail(`${phase} completed without a clear pending build ledger`)
   if (options.installScripts && before.kind === 'pending') {
+    const deduplicated = await deduplicatePendingBuilds()
+    if (deduplicated.kind !== 'pending')
+      fail(`${phase} completed without a clear pending build ledger`)
     await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
-    let after = await pendingBuilds()
-    if (after.kind === 'pending' && after.ids.length === 1 && after.ids[0] === '.') {
-      await install(
-        ['rebuild', '--pending', '--workspace-root'],
-        options,
-        'pending workspace root rebuild',
-      )
-      after = await pendingBuilds()
-    }
+    const after = await pendingBuilds()
     if (after.kind !== 'clear') fail(`${phase} completed without a clear pending build ledger`)
   }
   await verifyInstallHealth(runCapture, phase)
