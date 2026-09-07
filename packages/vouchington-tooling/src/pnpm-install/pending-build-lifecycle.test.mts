@@ -103,6 +103,24 @@ describe('pending build lifecycle safety', () => {
     },
   )
 
+  it('prunes a stale package ID left after the generic rebuild', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+      fixture.env.PNPM_REBUILD_PENDING_BUILDS = 'no-mistakes@0.55.0'
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'rebuild --pending --recursive',
+      ])
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
+      ).resolves.toContain('pendingBuilds: []')
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects an uncleared ledger after deduplicating duplicate IDs', async () => {
     const fixture = await makeFixture()
     try {

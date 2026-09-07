@@ -6,6 +6,7 @@ import {
   buildLedgersAllowNativeRepair,
   deduplicatePendingBuilds,
   pendingBuilds,
+  pruneStalePendingBuilds,
 } from './pending-builds.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
@@ -93,7 +94,8 @@ export async function finalizePendingBuilds(
     if (deduplicated.kind !== 'pending') failPendingBuildLedger(phase, deduplicated)
     await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
     const after = await pendingBuilds()
-    if (after.kind !== 'clear') failPendingBuildLedger(phase, after)
+    const finalState = after.kind === 'pending' ? await pruneStalePendingBuilds() : after
+    if (finalState.kind !== 'clear') failPendingBuildLedger(phase, finalState)
   }
   await verifyInstallHealth(runCapture, phase)
   return options.installScripts ? { kind: 'clear' as const } : before
