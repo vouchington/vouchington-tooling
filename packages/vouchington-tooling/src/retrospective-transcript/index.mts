@@ -2,6 +2,10 @@ import { existsSync, globSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
+import {
+  inspectHarnessEnvironment,
+  selectHarnessSession,
+} from '../agent-harness-identity/index.mts'
 import { codexChildren, codexIdentity, computeCodex } from './codex.mts'
 import { segmentCodex } from './codex-segment.mts'
 import { computeClaude } from './claude.mts'
@@ -47,9 +51,8 @@ export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolu
   const env = options.env ?? process.env
   const sessionId =
     options.sessionId ??
-    ['CODEX_THREAD_ID', 'CLAUDE_CODE_SESSION_ID', 'CURSOR_SESSION_ID', 'GROK_SESSION_ID']
-      .map((key) => env[key])
-      .find(Boolean)
+    selectHarnessSession(inspectHarnessEnvironment(env), ['codex', 'claude', 'cursor', 'grok'])
+      ?.sessionId
   if (!sessionId)
     return {
       error:

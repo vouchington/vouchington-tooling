@@ -153,6 +153,10 @@ import {
   dumpHarnessPolicy,
 } from 'vouchington-tooling/agent-harness-config'
 import {
+  inspectHarnessEnvironment,
+  selectHarnessSession,
+} from 'vouchington-tooling/agent-harness-identity'
+import {
   readVitestReportAttempts,
   writeVitestBlobManifest,
 } from 'vouchington-tooling/vitest-blob-manifest'
@@ -245,6 +249,10 @@ classifier stays available in plan mode; its defined sandbox profile still requi
 `--sandbox workspace-write` at launch. Cursor uses global `approvalMode = "auto-review"`;
 `unrestricted` disables the sandbox. Repo checks surface user-level trust or mode prerequisites
 instead of claiming that repo files alone activate them.
+
+`agent-harness-identity` inspects the four harness environment signals without choosing a winner.
+Callers supply their own precedence to `selectHarnessSession`, keeping product-specific identity
+policy out of this package.
 
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,
