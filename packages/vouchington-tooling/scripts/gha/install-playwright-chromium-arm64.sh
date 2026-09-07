@@ -25,16 +25,47 @@ browser_revision() {
   node -e "const fs=require('node:fs'); const file=process.argv[1]; const name=process.argv[2]; const browser=JSON.parse(fs.readFileSync(file,'utf8')).browsers.find(b => b.name === name); if (!browser) { process.stderr.write('unknown browser '+name); process.exit(1) } process.stdout.write(String(browser.revision))" "$browsers_json" "$1"
 }
 
+browser_executable() {
+  local name="$1" dir="$2" exe
+  case "$name" in
+    chromium) exe="$dir/chrome-linux-arm64/chrome" ;;
+    chromium-headless-shell) exe="$dir/chrome-headless-shell-linux-arm64/chrome-headless-shell" ;;
+    *)
+      echo "::error::browser_executable: unknown browser name '$name'" >&2
+      return 2
+      ;;
+  esac
+  if [ -x "$exe" ]; then
+    printf '%s\n' "$exe"
+    return
+  fi
+
+  # Playwright releases before 1.63 used these archive layouts.
+  case "$name" in
+    chromium) exe="$dir/chrome-linux/chrome" ;;
+    chromium-headless-shell) exe="$dir/chrome-linux/headless_shell" ;;
+  esac
+  if [ -x "$exe" ]; then
+    printf '%s\n' "$exe"
+    return
+  fi
+  return 1
+}
+
 install_browser() {
   local name="$1" archive="$2"
   local rev
   rev=$(browser_revision "$name")
   local dir="${browsers_path}/${name//-/_}-${rev}"
   local marker="${dir}/INSTALLATION_COMPLETE"
+  local exe
 
   if [ -f "$marker" ]; then
-    echo "Already installed: ${name}-${rev} (cache hit)"
-    return
+    if exe=$(browser_executable "$name" "$dir"); then
+      echo "Already installed: ${name}-${rev} (cache hit)"
+      return
+    fi
+    echo "Reinstalling ${name}-${rev}: cache marker exists but executable is missing"
   fi
 
   echo "Installing ${name} v${rev} via curl + system unzip"
@@ -47,17 +78,8 @@ install_browser() {
   unzip -q "$tmp" -d "$dir"
   rm -f "$tmp"
 
-  local exe
-  case "$name" in
-    chromium) exe="$dir/chrome-linux/chrome" ;;
-    chromium-headless-shell) exe="$dir/chrome-linux/headless_shell" ;;
-    *)
-      echo "::error::install_browser: unknown browser name '$name'"
-      exit 1
-      ;;
-  esac
-  if [ ! -x "$exe" ]; then
-    echo "::error::Expected ${name} binary missing or not executable after extract: $exe"
+  if ! exe=$(browser_executable "$name" "$dir"); then
+    echo "::error::Expected ${name} binary missing or not executable after extract: $dir"
     exit 1
   fi
 
