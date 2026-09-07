@@ -352,7 +352,7 @@ describe('pnpm install lifecycle', () => {
       ])
       await expect(
         readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
-      ).resolves.toBe('pendingBuilds: []\n')
+      ).resolves.toBe('virtualStoreDir: .pnpm\npendingBuilds: []\n')
       expect(result.stderr).toContain('pending-build-ledger-unverified')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
