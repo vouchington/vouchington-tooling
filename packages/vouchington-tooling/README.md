@@ -215,13 +215,8 @@ import {
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
-import {
-  createPullRequest,
-  getDiffAgainstBase,
-  runGh,
-  runGit,
-  validateGitHubBodyLength,
-} from 'vouchington-tooling/gh-cli'
+import { GITHUB_BODY_MAX_CHARACTERS, validateGitHubBodyLength } from 'vouchington-tooling'
+import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
 import {
   shellScriptViolations,
   workflowYamlViolations,
