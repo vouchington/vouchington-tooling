@@ -41,6 +41,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs_on) }}
     timeout-minutes: 75
     permissions:
+      checks: write
       contents: read
       pull-requests: read
     concurrency:
@@ -50,6 +51,7 @@ jobs:
     outputs:
       agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
+      check_run_id: ${{ steps.agent.outputs.check_run_id }}
     steps:
       - name: Validate immutable tooling ref
         shell: bash
@@ -128,6 +130,7 @@ jobs:
         uses: ./.vouchington-tooling/.github/actions/opencode-code-review
         with:
           pr_number: ${{ inputs.pr_number }}
+          head_sha: ${{ steps.pr-refs.outputs.head_sha || github.sha }}
           provider_name: ${{ inputs.provider }}
           model: ${{ inputs.model }}
           timeout_seconds: ${{ steps.timeout.outputs.seconds }}
@@ -143,6 +146,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
+      checks: write
       contents: read
       pull-requests: write
     steps:
@@ -173,5 +177,6 @@ jobs:
         with:
           pr_number: ${{ inputs.pr_number }}
           artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
+          check_run_id: ${{ needs.review.outputs.check_run_id }}
           provider_name: ${{ inputs.provider }}
           token_source: github-token

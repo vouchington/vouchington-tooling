@@ -28,6 +28,10 @@ inputs:
     description: Exact pull request base SHA required when the review is posted
     required: false
     default: ''
+  check_run_id:
+    description: Check run ID to finalize with the poster's outcome. Empty skips finalization.
+    required: false
+    default: ''
 outputs:
   poster_outcome:
     description: Aggregate download, validation, and posting outcome
@@ -35,6 +39,9 @@ outputs:
   posted:
     description: Whether a review was posted
     value: ${{ steps.poster-result.outputs.posted }}
+  comment_count:
+    description: Number of inline comments in the posted review, or 0 when nothing was posted
+    value: ${{ steps.poster-result.outputs.comment_count }}
 
 runs:
   using: composite
@@ -109,6 +116,7 @@ runs:
         CODE_REVIEW_TOKEN_SOURCE: ${{ inputs.token_source }}
         EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
         EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
+        PROVIDER_NAME: ${{ inputs.provider_name }}
       run: |
         set -euo pipefail
         node --experimental-strip-types \
@@ -121,20 +129,53 @@ runs:
       env:
         POST_OUTCOME: ${{ steps.post.outcome }}
         POSTED: ${{ steps.post.outputs.posted }}
+        COMMENT_COUNT: ${{ steps.post.outputs.comment_count }}
         PROVIDER_NAME: ${{ inputs.provider_name }}
       run: |
         set -euo pipefail
         poster_outcome=failure
         posted=false
+        comment_count="${COMMENT_COUNT:-0}"
         if [ "$POST_OUTCOME" = "success" ] && [ "$POSTED" = "true" ]; then
           poster_outcome=success
           posted=true
         else
+          comment_count=0
           echo "::warning::$PROVIDER_NAME review poster did not complete; no review was posted."
           echo "⚠️ $PROVIDER_NAME review poster did not complete; no review was posted." >> "$GITHUB_STEP_SUMMARY"
         fi
         echo "poster_outcome=$poster_outcome" >> "$GITHUB_OUTPUT"
         echo "posted=$posted" >> "$GITHUB_OUTPUT"
+        echo "comment_count=$comment_count" >> "$GITHUB_OUTPUT"
+
+    - name: Finalize check run
+      id: finalize-check
+      if: always()
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token || github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        CHECK_RUN_ID: ${{ inputs.check_run_id }}
+        PROVIDER_NAME: ${{ inputs.provider_name }}
+        POSTER_OUTCOME: ${{ steps.poster-result.outputs.poster_outcome }}
+        COMMENT_COUNT: ${{ steps.poster-result.outputs.comment_count }}
+      run: |
+        set -euo pipefail
+        if [ "$POSTER_OUTCOME" = "success" ]; then
+          CONCLUSION=success
+          NOUN=findings
+          [ "$COMMENT_COUNT" = "1" ] && NOUN=finding
+          TITLE="Code Review complete — ${COMMENT_COUNT} ${NOUN}"
+          SUMMARY="${PROVIDER_NAME} posted a review with ${COMMENT_COUNT} ${NOUN}."
+        else
+          CONCLUSION=neutral
+          TITLE="Code Review failed — could not post the review"
+          SUMMARY="${PROVIDER_NAME} produced a review, but it could not be posted to the pull request. Check the workflow run for details."
+        fi
+        export CONCLUSION TITLE SUMMARY
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/gha-check-run/cli.mts" complete
 
     - name: Clean local review payload
       if: always()

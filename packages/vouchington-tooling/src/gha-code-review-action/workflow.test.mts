@@ -53,11 +53,13 @@ describe('code-review reusable workflow', () => {
     expect(Object.keys(workflow.jobs ?? {})).toEqual(['review', 'poster'])
     expect(workflow.jobs?.review?.permissions).toEqual({
       actions: 'read',
+      checks: 'write',
       contents: 'read',
       'pull-requests': 'read',
     })
     expect(workflow.jobs?.poster?.permissions).toEqual({
       actions: 'read',
+      checks: 'write',
       contents: 'read',
       'pull-requests': 'write',
       'id-token': 'write',

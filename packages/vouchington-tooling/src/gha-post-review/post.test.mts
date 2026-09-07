@@ -122,7 +122,7 @@ describe('runPostReview', () => {
       }),
     })
 
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
+    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true, commentCount: 1 })
     expect(posts).toHaveLength(1)
     expect(posts[0]).toEqual({
       event: 'COMMENT',
@@ -205,7 +205,7 @@ describe('runPostReview', () => {
         },
       ],
     })
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
+    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true, commentCount: 2 })
     expect(posts).toHaveLength(1)
     expect(
       posts[0]?.comments.map((entry) => entry.line).sort((left, right) => left - right),
@@ -226,10 +226,19 @@ describe('runPostReview', () => {
         throw new Error('github down')
       },
     })
-    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true })
+    expect(runPostReview(PAYLOAD_PATH, io)).toEqual({ posted: true, commentCount: 1 })
     expect(posts[0]?.comments).toEqual([
       makeComment({ path: 'src/outside.mts', line: 400, body: 'no remap' }),
     ])
+  })
+
+  it('prefixes the posted body with provider attribution when a provider name is given', () => {
+    const { io, posts } = makeIo({
+      file: JSON.stringify({ body: 'Verdict.', comments: [] }),
+    })
+    expect(runPostReview(PAYLOAD_PATH, io, 'Claude')).toEqual({ posted: true, commentCount: 0 })
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.body).toBe('**Claude review**\n\nVerdict.')
   })
 
   it('rejects comments that are missing start_side or a usable body', () => {

@@ -153,11 +153,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       actions: read
+      checks: write
       contents: read
       pull-requests: read
     outputs:
       agent_outcome: ${{ steps.agent.outputs.agent_outcome }}
       payload_artifact_id: ${{ steps.agent.outputs.payload_artifact_id }}
+      check_run_id: ${{ steps.agent.outputs.check_run_id }}
     steps:
       - name: Validate immutable tooling ref
         shell: bash
@@ -226,6 +228,7 @@ jobs:
         uses: ./.vouchington-tooling/.github/actions/code-review
         with:
           pr_number: ${{ inputs.pr_number }}
+          head_sha: ${{ inputs.expected_head_sha || github.sha }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}
           trusted_prompt_ref: ${{ inputs.trusted_prompt_ref || github.sha }}
           prompt_path: ${{ inputs.prompt_path || '.agents/skills/agent-workflow/code-review-prompt.md' }}
@@ -256,6 +259,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
+      checks: write
       contents: read
       pull-requests: write
       id-token: write
@@ -288,6 +292,7 @@ jobs:
         with:
           pr_number: ${{ inputs.pr_number }}
           artifact_id: ${{ needs.review.outputs.payload_artifact_id }}
+          check_run_id: ${{ needs.review.outputs.check_run_id }}
           provider_name: ${{ inputs.provider_name || 'Claude' }}
           token_source: ${{ inputs.token_source || 'claude-app' }}
           expected_head_sha: ${{ inputs.expected_head_sha }}

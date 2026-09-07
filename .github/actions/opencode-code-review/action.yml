@@ -7,10 +7,16 @@ outputs:
   payload_artifact_id:
     description: Uploaded review payload artifact ID, empty when no payload was produced
     value: ${{ steps.upload-payload.outputs.artifact-id }}
+  check_run_id:
+    description: Check run ID created for this review, empty when the Checks API call did not complete
+    value: ${{ steps.create-check.outputs.check_run_id }}
 
 inputs:
   pr_number:
     description: Pull request number to review
+    required: true
+  head_sha:
+    description: Full commit SHA the review check run is reported against
     required: true
   provider_name:
     description: Provider name to show in workflow steps
@@ -126,17 +132,16 @@ runs:
 
     - name: Resolve trusted Node version
       id: trusted-node-version
-      if: always() && steps.review-prompt.outputs.available == 'true'
+      if: always()
       continue-on-error: true
       shell: bash
       run: bash "$GITHUB_ACTION_PATH/../code-review/resolve-node-version.sh"
 
     - name: Setup trusted Node for payload handoff
       id: setup-node
-      if: >-
-        always() &&
-        steps.review-prompt.outputs.available == 'true' &&
-        steps.trusted-node-version.outcome == 'success'
+      # Runs even when the review prompt is unavailable: the check-run step below still
+      # needs a working Node to report a conclusion for that case.
+      if: always() && steps.trusted-node-version.outcome == 'success'
       continue-on-error: true
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
@@ -274,6 +279,46 @@ runs:
           echo "::warning::$PROVIDER_NAME Code Review did not complete; no review payload was uploaded."
           echo "⚠️ $PROVIDER_NAME Code Review did not complete; no review payload was uploaded." >> "$GITHUB_STEP_SUMMARY"
         fi
+
+    - name: Create check run
+      id: create-check
+      if: always()
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        HEAD_SHA: ${{ inputs.head_sha }}
+        PROVIDER_NAME: ${{ inputs.provider_name }}
+        AGENT_OUTCOME: ${{ steps.agent-result.outputs.agent_outcome }}
+        PAYLOAD_STAGED: ${{ steps.stage-payload.outputs.staged }}
+      run: |
+        set -euo pipefail
+        CHECK_NAME="${PROVIDER_NAME} Code Review"
+        if [ "$AGENT_OUTCOME" = "skipped" ]; then
+          STATUS=completed
+          CONCLUSION=neutral
+          TITLE="Code Review skipped — no provider configured"
+          SUMMARY="${PROVIDER_NAME} Code Review was skipped: no model or provider API key was configured for this run."
+        elif [ "$AGENT_OUTCOME" = "success" ] && [ "$PAYLOAD_STAGED" != "true" ]; then
+          STATUS=completed
+          CONCLUSION=success
+          TITLE="Code Review complete — no findings"
+          SUMMARY="${PROVIDER_NAME} reviewed this pull request and found nothing to flag."
+        elif [ "$AGENT_OUTCOME" = "success" ] && [ "$PAYLOAD_STAGED" = "true" ]; then
+          STATUS=in_progress
+          CONCLUSION=""
+          TITLE="Code Review — posting findings…"
+          SUMMARY="${PROVIDER_NAME} found findings to report; posting them to the pull request now."
+        else
+          STATUS=completed
+          CONCLUSION=neutral
+          TITLE="Code Review failed — the review agent did not complete successfully"
+          SUMMARY="${PROVIDER_NAME} Code Review did not complete successfully. Check the workflow run for details."
+        fi
+        export CHECK_NAME STATUS CONCLUSION TITLE SUMMARY
+        node --experimental-strip-types \
+          "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/src/gha-check-run/cli.mts" create
 
     - name: Clean review payload files
       if: always()

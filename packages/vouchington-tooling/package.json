@@ -208,6 +208,11 @@
       "import": "./dist/gha-claude-post-review/index.mjs",
       "default": "./dist/gha-claude-post-review/index.mjs"
     },
+    "./gha-check-run": {
+      "types": "./dist/gha-check-run/index.d.mts",
+      "import": "./dist/gha-check-run/index.mjs",
+      "default": "./dist/gha-check-run/index.mjs"
+    },
     "./http-link-pagination": {
       "types": "./dist/http-link-pagination/index.d.mts",
       "import": "./dist/http-link-pagination/index.mjs",

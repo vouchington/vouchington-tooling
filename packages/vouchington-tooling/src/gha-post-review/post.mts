@@ -34,7 +34,20 @@ export type PostReviewIo = {
   postReview(payload: SanitizedReview): PostResult
 }
 
-export function runPostReview(payloadPath: string, io: PostReviewIo): { posted: boolean } {
+export type PostReviewResult = {
+  posted: boolean
+  commentCount: number
+}
+
+/**
+ * Posts a validated review, optionally prefixing the body with a provider attribution line.
+ * The attribution is cosmetic (final posted text only); it never affects staged payload bytes.
+ */
+export function runPostReview(
+  payloadPath: string,
+  io: PostReviewIo,
+  providerName?: string,
+): PostReviewResult {
   try {
     const selectedHeadSha = io.getHeadSha()
     let review = parseReviewPayload(io.readFile(payloadPath), selectedHeadSha)
@@ -47,8 +60,12 @@ export function runPostReview(payloadPath: string, io: PostReviewIo): { posted: 
     if (io.getHeadSha() !== selectedHeadSha) {
       throw new ReviewPayloadError('PR head changed while preparing the selected review.')
     }
-    const first = io.postReview(review)
-    if (first.ok) return { posted: true }
+    const commentCount = review.comments.length
+    const attributedReview = providerName
+      ? { ...review, body: `**${providerName} review**\n\n${review.body}` }
+      : review
+    const first = io.postReview(attributedReview)
+    if (first.ok) return { posted: true, commentCount }
     throw new ReviewPayloadError(`GitHub review POST failed (HTTP ${first.status}).`)
   } finally {
     io.removeFile(payloadPath)
