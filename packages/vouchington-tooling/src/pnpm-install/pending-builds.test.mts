@@ -90,6 +90,17 @@ describe('pending builds', () => {
     }
   })
 
+  it('returns unknown or clear without classifying a missing or clear ledger', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-prune-early-return-'))
+    roots.push(root)
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await mkdir(join(root, 'node_modules'))
+    await writeFile(join(root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'clear' })
+  })
+
   it('allows isolated native repair only with clear pending and ignored ledgers', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-ledgers-'))
     roots.push(root)
@@ -187,6 +198,96 @@ describe('pending builds', () => {
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ ids: ['backend'], kind: 'pending' })
   })
 
+  it('ignores malformed nested manifests that are not installed package roots', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-nested-manifest-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    await writeCurrentGraph(root)
+    await mkdir(
+      join(
+        root,
+        'node_modules',
+        '.pnpm',
+        'no-mistakes@0.55.0',
+        'node_modules',
+        'no-mistakes',
+        'dist',
+      ),
+      { recursive: true },
+    )
+    await Promise.all([
+      writeFile(
+        join(
+          root,
+          'node_modules',
+          '.pnpm',
+          'no-mistakes@0.55.0',
+          'node_modules',
+          'no-mistakes',
+          'dist',
+          'package.json',
+        ),
+        '{}\n',
+      ),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: [no-mistakes@0.35.0, no-mistakes@0.55.0]\n',
+      ),
+    ])
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({
+      ids: ['no-mistakes@0.55.0'],
+      kind: 'pending',
+    })
+  })
+
+  it('preserves peer-qualified scoped IDs represented by package and snapshot graph entries', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-peer-qualified-'))
+    roots.push(root)
+    await mkdir(
+      join(
+        root,
+        'node_modules',
+        '.pnpm',
+        '@scope+native@1.0.0_peer@2.0.0',
+        'node_modules',
+        '@scope',
+        'native',
+      ),
+      { recursive: true },
+    )
+    await Promise.all([
+      writeFile(
+        join(root, 'pnpm-lock.yaml'),
+        'lockfileVersion: 9\nimporters: {}\npackages:\n  "@scope/native@1.0.0": {}\nsnapshots:\n  "@scope/native@1.0.0(peer@2.0.0)": {}\n',
+      ),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: ["@scope/native@1.0.0(peer@2.0.0)"]\n',
+      ),
+      writeFile(
+        join(
+          root,
+          'node_modules',
+          '.pnpm',
+          '@scope+native@1.0.0_peer@2.0.0',
+          'node_modules',
+          '@scope',
+          'native',
+          'package.json',
+        ),
+        '{"name":"@scope/native","version":"1.0.0"}\n',
+      ),
+    ])
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({
+      ids: ['@scope/native@1.0.0(peer@2.0.0)'],
+      kind: 'pending',
+    })
+  })
+
   it('fails closed without rewriting when graph classification is uncertain', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-classification-unknown-'))
     roots.push(root)
@@ -197,6 +298,57 @@ describe('pending builds', () => {
 
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
     await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [no-mistakes@0.35.0]\n')
+  })
+
+  it.each([
+    'lockfileVersion: 9\nimporters: {}\n',
+    'lockfileVersion: 9\nimporters: {}\npackages: {}\nsnapshots: nope\n',
+    '[]\n',
+  ])('fails closed for malformed lockfile graph structures: %j', async (lockfile) => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-lockfile-unknown-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    await Promise.all([
+      writeFile(join(root, 'pnpm-lock.yaml'), lockfile),
+      writeFile(join(root, 'node_modules', '.modules.yaml'), 'pendingBuilds: [stale]\n'),
+    ])
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+  })
+
+  it('scans only direct installed package roots in pnpm virtual and scoped trees', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-package-roots-'))
+    roots.push(root)
+    const virtual = join(root, 'node_modules', '.pnpm', 'virtual@1.0.0', 'node_modules', 'virtual')
+    const scoped = join(root, 'node_modules', '@scope', 'installed')
+    await Promise.all([
+      mkdir(join(root, 'node_modules', '.pnpm', 'node_modules'), { recursive: true }),
+      mkdir(virtual, { recursive: true }),
+      mkdir(join(root, 'node_modules', '.pnpm', 'virtual@1.0.0', 'node_modules', '.bin'), {
+        recursive: true,
+      }),
+      mkdir(scoped, { recursive: true }),
+      mkdir(join(root, 'node_modules', '.cache'), { recursive: true }),
+    ])
+    await Promise.all([
+      writeFile(
+        join(root, 'pnpm-lock.yaml'),
+        'lockfileVersion: 9\nimporters: {}\npackages:\n  virtual@1.0.0: {}\n  "@scope/installed@1.0.0": {}\n',
+      ),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: [virtual@1.0.0, "@scope/installed@1.0.0"]\n',
+      ),
+      writeFile(join(virtual, 'package.json'), '{"name":"virtual","version":"1.0.0"}\n'),
+      writeFile(join(scoped, 'package.json'), '{"name":"@scope/installed","version":"1.0.0"}\n'),
+    ])
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({
+      ids: ['@scope/installed@1.0.0', 'virtual@1.0.0'],
+      kind: 'pending',
+    })
   })
 
   it('fails closed without rewriting when the package tree cannot be classified', async () => {

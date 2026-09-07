@@ -3,7 +3,11 @@ import path from 'node:path'
 
 import { parse } from 'yaml'
 
-type Lockfile = { importers?: Record<string, unknown>; packages?: Record<string, unknown> }
+type Lockfile = {
+  importers?: Record<string, unknown>
+  packages?: Record<string, unknown>
+  snapshots?: Record<string, unknown>
+}
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -15,32 +19,55 @@ async function lockfileIds(root: string) {
   const lockfile = record(parse(await readFile(path.join(root, 'pnpm-lock.yaml'), 'utf8'))) as
     | Lockfile
     | undefined
-  const packages = lockfile === undefined ? undefined : record(lockfile.packages)
-  const importers = lockfile === undefined ? undefined : record(lockfile.importers)
+  if (lockfile === undefined) return undefined
+  const packages = record(lockfile.packages)
+  const importers = record(lockfile.importers)
   if (packages === undefined || importers === undefined) return undefined
-  return new Set([...Object.keys(packages), ...Object.keys(importers)])
+  const snapshots = lockfile.snapshots === undefined ? {} : record(lockfile.snapshots)
+  if (snapshots === undefined) return undefined
+  return new Set([...Object.keys(packages), ...Object.keys(importers), ...Object.keys(snapshots)])
+}
+
+async function packageRootId(directory: string, ids: Set<string>) {
+  const manifest = record(JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8')))
+  if (typeof manifest?.name !== 'string' || typeof manifest.version !== 'string')
+    throw new Error('installed package manifest is malformed')
+  ids.add(`${manifest.name}@${manifest.version}`)
 }
 
 async function installedPackageIds(directory: string, ids: Set<string>) {
   const entries = await readdir(directory, { withFileTypes: true })
   for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === '.bin') continue
     const child = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      await installedPackageIds(child, ids)
-      continue
-    }
-    if (entry.name !== 'package.json' || !entry.isFile()) continue
-    const manifest = record(JSON.parse(await readFile(child, 'utf8')))
-    if (typeof manifest?.name !== 'string' || typeof manifest.version !== 'string')
-      throw new Error('installed package manifest is malformed')
-    ids.add(`${manifest.name}@${manifest.version}`)
+    if (entry.name.startsWith('@')) await installedPackageIds(child, ids)
+    else await packageRootId(child, ids)
   }
 }
 
 async function packageTreeIds(root: string) {
   const ids = new Set<string>()
-  await installedPackageIds(path.join(root, 'node_modules'), ids)
+  const nodeModules = path.join(root, 'node_modules')
+  const entries = await readdir(nodeModules, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const child = path.join(nodeModules, entry.name)
+    if (entry.name === '.pnpm') {
+      for (const store of await readdir(child, { withFileTypes: true })) {
+        if (store.isDirectory() && store.name !== 'node_modules')
+          await installedPackageIds(path.join(child, store.name, 'node_modules'), ids)
+      }
+    } else if (!entry.name.startsWith('.')) {
+      if (entry.name.startsWith('@')) await installedPackageIds(child, ids)
+      else await packageRootId(child, ids)
+    }
+  }
   return ids
+}
+
+function packageBaseId(id: string) {
+  const peerSuffix = id.indexOf('(')
+  return peerSuffix === -1 ? id : id.slice(0, peerSuffix)
 }
 
 /**
@@ -54,8 +81,8 @@ export async function classifyPendingBuildIds(ids: string[]) {
     if (lockfile === undefined) return undefined
     const current = ids.filter(
       (id) =>
-        packageTree.has(id) ||
-        [...lockfile].some((lockfileId) => lockfileId === id || lockfileId.startsWith(`${id}(`)),
+        packageTree.has(packageBaseId(id)) ||
+        [...lockfile].some((lockfileId) => packageBaseId(lockfileId) === packageBaseId(id)),
     )
     return { current, stale: ids.filter((id) => !current.includes(id)) }
   } catch {

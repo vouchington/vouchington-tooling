@@ -28,12 +28,15 @@ async function addMismatchedNative(
     'addon.node',
   )
   await mkdir(join(addon, '..'), { recursive: true })
-  await writeFile(
-    addon,
-    process.platform === 'darwin'
-      ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
-      : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
-  )
+  await Promise.all([
+    writeFile(
+      addon,
+      process.platform === 'darwin'
+        ? Buffer.from([0x7f, 0x45, 0x4c, 0x46])
+        : Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+    ),
+    writeFile(join(addon, '..', 'package.json'), '{"name":"native","version":"1.0.0"}\n'),
+  ])
   if (repair) await configureNativeRepair(fixture, addon)
   else fixture.env.PNPM_NATIVE_ADDON = addon
   return addon
@@ -59,7 +62,7 @@ describe('native health repair lifecycle', () => {
     '[]\n',
     'ignoredBuilds: nope\n',
     'ignoredBuilds: [native]\n',
-    'ignoredBuilds: []\npendingBuilds: [native]\n',
+    'ignoredBuilds: []\npendingBuilds: [native@1.0.0]\n',
   ])('keeps the two-pass repair when ignored-build state is unsafe', async (modules) => {
     const fixture = await makeFixture()
     try {
@@ -104,7 +107,7 @@ describe('native health repair lifecycle', () => {
       await runInstaller(fixture, { installScripts: false })
       await writeFile(
         join(fixture.root, 'node_modules', '.modules.yaml'),
-        'ignoredBuilds: []\npendingBuilds: [native]\n',
+        'ignoredBuilds: []\npendingBuilds: [native@1.0.0]\n',
       )
       await addMismatchedNative(fixture, true)
       await resetInstallCalls(fixture)
@@ -127,7 +130,7 @@ describe('native health repair lifecycle', () => {
         'ignoredBuilds: []\npendingBuilds: [native]\n',
       )
       await addMismatchedNative(fixture, true)
-      fixture.env.PNPM_PENDING_BUILDS = 'native'
+      fixture.env.PNPM_PENDING_BUILDS = 'native@1.0.0'
       fixture.env.PNPM_REPAIR_NATIVE = '0'
       fixture.env.PNPM_REPAIR_NATIVE_ON_REBUILD = '1'
       await resetInstallCalls(fixture)

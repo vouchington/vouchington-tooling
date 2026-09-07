@@ -38,7 +38,7 @@ export async function makeFixture() {
     ),
     writeFile(
       join(root, 'pnpm-lock.yaml'),
-      'lockfileVersion: 9\nimporters:\n  .: {}\n  dependency: {}\n  backend: {}\npackages: {}\n',
+      'lockfileVersion: 9\nimporters:\n  .: {}\n  dependency: {}\n  backend: {}\npackages:\n  native@1.0.0: {}\n',
     ),
     writeJson(join(consumer, 'package.json'), {
       name: '@fixture/consumer',
