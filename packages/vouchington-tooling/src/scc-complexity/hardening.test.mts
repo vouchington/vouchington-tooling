@@ -78,7 +78,7 @@ describe('scc-complexity hardening', () => {
         }),
       ),
     ).toThrow('baseline entry 0 contains a workflow command control character')
-    for (const includePath of ['C:\\outside', '\\outside']) {
+    for (const includePath of ['C:\\outside', 'C:outside', 'D:outside', '\\outside']) {
       await expect(
         checkSccComplexity(ctx, { scopes: [{ includePaths: [includePath], name: 'tooling' }] }),
       ).resolves.toEqual({
@@ -97,6 +97,40 @@ describe('scc-complexity hardening', () => {
     ).resolves.toEqual({
       errors: [
         '::error::scc-complexity failed: scope tooling includes a path outside the repository',
+      ],
+    })
+    await symlink(join(outside, 'missing-target'), join(ctx.repoRoot, 'src', 'dangling'))
+    await expect(
+      checkSccComplexity(ctx, {
+        scopes: [{ includePaths: ['src/dangling/deep'], name: 'tooling' }],
+      }),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: scope tooling includes a path outside the repository',
+      ],
+    })
+  })
+
+  it('rejects tracked baseline entries outside their named scope', async () => {
+    const ctx = await makeFixture(['dev/tool.mts', 'src/app.mts'])
+    const baseline = parseSccComplexityBaseline(
+      JSON.stringify({
+        entries: [{ complexity: 12, file: 'src/app.mts', scope: 'tooling' }],
+        version: SCC_COMPLEXITY_BASELINE_VERSION,
+      }),
+    )
+    await expect(
+      checkSccComplexity(
+        ctx,
+        { baseline, scopes: [{ includePaths: ['dev'], name: 'tooling' }] },
+        () =>
+          Promise.resolve(
+            JSON.stringify([{ Files: [{ Complexity: 12, Location: 'dev/tool.mts' }] }]),
+          ),
+      ),
+    ).resolves.toEqual({
+      errors: [
+        '::error::scc-complexity failed: baseline entry tooling:src/app.mts is out of scope',
       ],
     })
   })
