@@ -71,14 +71,13 @@ vouchington stage-review-payload optional|required <source> <destination>
 For persistent `pnpm-install`, v5 metadata tracks structural inputs separately from the
 `--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
-uses one script-suppressed verification install followed by `pnpm rebuild --pending --recursive`.
-When only newly pending dependency package IDs remain, it instead rebuilds those exact IDs without
-rerunning first-party workspace hooks.
-If that generic rebuild leaves only pnpm's root importer marker, one root-only pending rebuild runs
-the root lifecycle hook; every other residual ID remains a hard failure. An isolated native-binary
+uses two script-suppressed verification installs followed by `pnpm rebuild --pending --recursive`.
+Before rebuilding, duplicate pending IDs are collapsed. After rebuilding, IDs proven absent from
+the current workspace lockfile are removed; live dependency and workspace-importer IDs are
+retained. Any residual ID after the generic rebuild remains a reported hard failure. An isolated native-binary
 mismatch uses one strict forced install only when structural provenance
 matches, workspace links are valid, and pnpm records empty `ignoredBuilds` and `pendingBuilds` ledgers;
-otherwise it retains the script-free then strict reconciliation. Native and workspace-link health
+otherwise it retains the two script-free reconciliation passes. Native and workspace-link health
 are verified before its metadata stamp is refreshed.
 The command emits a structured non-secret provenance diagnostic identifying changed structural
 categories, the last script policy, script capability, and native-binary health.
