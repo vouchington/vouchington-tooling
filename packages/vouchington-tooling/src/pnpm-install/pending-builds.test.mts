@@ -3,14 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const writeFailure = vi.hoisted(() => ({ enabled: false }))
+const filesystemFailures = vi.hoisted(() => ({ access: false, write: false }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    access: (...args: Parameters<typeof actual.access>) =>
+      filesystemFailures.access
+        ? Promise.reject(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
+        : actual.access(...args),
     writeFile: (...args: Parameters<typeof actual.writeFile>) =>
-      writeFailure.enabled ? Promise.reject(new Error('disk full')) : actual.writeFile(...args),
+      filesystemFailures.write ? Promise.reject(new Error('disk full')) : actual.writeFile(...args),
   }
 })
 
@@ -62,7 +66,8 @@ async function writeCurrentGraph(root: string) {
 }
 
 afterEach(async () => {
-  writeFailure.enabled = false
+  filesystemFailures.access = false
+  filesystemFailures.write = false
   process.chdir(previousCwd)
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
 })
@@ -156,7 +161,7 @@ describe('pending builds', () => {
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
     await writeFile(modules, await readFile(pnpm11131DuplicateLedger, 'utf8'))
-    writeFailure.enabled = true
+    filesystemFailures.write = true
 
     await expect(deduplicatePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
     await expect(readFile(modules, 'utf8')).resolves.toContain(
@@ -375,6 +380,58 @@ describe('pending builds', () => {
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'clear' })
   })
 
+  it('fails closed for a temp-shaped installed package directory with a malformed manifest', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-pnpm-temporary-package-manifest-'))
+    roots.push(root)
+    await writeCurrentGraph(root)
+    const temporaryPackage = join(
+      root,
+      'node_modules',
+      '.pnpm',
+      'no-mistakes@0.55.0',
+      'node_modules',
+      'no-mistakes_tmp_123_0',
+    )
+    await Promise.all([
+      mkdir(temporaryPackage, { recursive: true }),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: [no-mistakes@0.35.0]\n',
+      ),
+    ])
+    await writeFile(join(temporaryPackage, 'package.json'), '{}\n')
+    process.chdir(root)
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+  })
+
+  it('fails closed when the temporary package manifest cannot be checked', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-pnpm-temporary-package-access-'))
+    roots.push(root)
+    await writeCurrentGraph(root)
+    await Promise.all([
+      mkdir(
+        join(
+          root,
+          'node_modules',
+          '.pnpm',
+          'no-mistakes@0.55.0',
+          'node_modules',
+          'no-mistakes_tmp_123_0',
+        ),
+        { recursive: true },
+      ),
+      writeFile(
+        join(root, 'node_modules', '.modules.yaml'),
+        'pendingBuilds: [no-mistakes@0.35.0]\n',
+      ),
+    ])
+    process.chdir(root)
+    filesystemFailures.access = true
+
+    await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+  })
+
   it('fails closed without rewriting when the package tree cannot be classified', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-package-tree-unknown-'))
     roots.push(root)
@@ -402,7 +459,7 @@ describe('pending builds', () => {
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
     await writeFile(modules, 'pendingBuilds: [no-mistakes@0.35.0]\n')
-    writeFailure.enabled = true
+    filesystemFailures.write = true
 
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
     await expect(readFile(modules, 'utf8')).resolves.toBe('pendingBuilds: [no-mistakes@0.35.0]\n')

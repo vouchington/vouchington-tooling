@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { access, readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
 import { parse } from 'yaml'
@@ -37,16 +37,24 @@ async function packageRootId(directory: string, ids: Set<string>) {
   ids.add(`${manifest.name}@${manifest.version}`)
 }
 
+async function isTemporaryPackageDirectoryWithoutManifest(directory: string) {
+  if (!pnpmTemporaryPackageDirectory.test(path.basename(directory))) return false
+  try {
+    await access(path.join(directory, 'package.json'))
+    return false
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
+      return true
+    throw error
+  }
+}
+
 async function installedPackageIds(directory: string, ids: Set<string>) {
   const entries = await readdir(directory, { withFileTypes: true })
   for (const entry of entries) {
-    if (
-      !entry.isDirectory() ||
-      entry.name === '.bin' ||
-      pnpmTemporaryPackageDirectory.test(entry.name)
-    )
-      continue
+    if (!entry.isDirectory() || entry.name === '.bin') continue
     const child = path.join(directory, entry.name)
+    if (await isTemporaryPackageDirectoryWithoutManifest(child)) continue
     if (entry.name.startsWith('@')) await installedPackageIds(child, ids)
     else await packageRootId(child, ids)
   }
