@@ -104,6 +104,45 @@ describe('code-review action', () => {
     )
   })
 
+  it('materializes PR context with the job token and points Claude at it instead of gh/git/Bash/WebFetch', () => {
+    const materialize = stepByName.get('Materialize PR review context')
+    const build = stepByName.get('Build review prompt')
+    const review = stepByName.get('Run Code Review')
+    expect(materialize?.env?.GH_TOKEN).toBe('${{ github.token }}')
+    expect(materialize?.env?.PR_NUMBER).toBe('${{ inputs.pr_number }}')
+    expect(materialize?.if).toBe("steps.review-prompt.outputs.available == 'true'")
+    expect(materialize?.['continue-on-error']).toBe(true)
+    expect(materialize?.run).toContain('scripts/gha/materialize-pr-context.sh')
+    expect(review?.if).toContain("steps.materialize.outcome == 'success'")
+    expect(build?.run).toContain('.review-context/pr.json')
+    expect(build?.run).toContain('.review-context/files.json')
+    expect(build?.run).toContain('.review-context/pr.diff')
+    expect(build?.run).toContain('.review-context/pr-comments.json')
+    expect(build?.run).toContain('.review-context/pr-review-comments.json')
+    expect(build?.run).toContain('.review-context/pr-reviews.json')
+    expect(build?.run).toContain('.review-context/issues/<N>.json')
+    expect(build?.run).toContain('normal file-Read tool')
+    expect(build?.run).toContain('no working gh, git, or Bash access')
+    expect(stepByName.get('Clear leftover review payload')?.run).toContain(
+      'rm -rf "${GITHUB_WORKSPACE}/.review-context"',
+    )
+    expect(stepByName.get('Clean review payload files')?.run).toContain(
+      '"${GITHUB_WORKSPACE}/.review-context"',
+    )
+  })
+
+  it('places the materialize step between clearing the leftover payload and installing Claude Code', () => {
+    const names = steps.map((step) => step.name)
+    const clearIndex = names.indexOf('Clear leftover review payload')
+    const materializeIndex = names.indexOf('Materialize PR review context')
+    const homeIndex = names.indexOf('Isolate Claude Code install home')
+    const reviewIndex = names.indexOf('Run Code Review')
+    expect(clearIndex).toBeGreaterThanOrEqual(0)
+    expect(materializeIndex).toBe(clearIndex + 1)
+    expect(materializeIndex).toBeLessThan(homeIndex)
+    expect(homeIndex).toBeLessThan(reviewIndex)
+  })
+
   it('stages the payload through the same-ref CLI', () => {
     const stage = stepByName.get('Stage review payload artifact')
     expect(stage?.run).toContain('VOUCHINGTON_TOOLING_ROOT')
