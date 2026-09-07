@@ -29,7 +29,10 @@ if [ "\${PNPM_FAIL_RELEASE_AGE_CALL:-0}" = "$calls" ]; then
   exit 1
 fi
 if [ -n "\${PNPM_SLEEP_SECONDS:-}" ]; then sleep "$PNPM_SLEEP_SECONDS"; fi
-if [ -n "\${PNPM_PENDING_BUILDS:-}" ]; then
+if [ "\${PNPM_INVALID_PENDING_BUILDS:-0}" = 1 ]; then
+  mkdir -p "$PNPM_NODE_MODULES"
+  printf 'pendingBuilds: invalid\n' > "$PNPM_NODE_MODULES/.modules.yaml"
+elif [ -n "\${PNPM_PENDING_BUILDS:-}" ]; then
   mkdir -p "$PNPM_NODE_MODULES"
   printf 'pendingBuilds: [%s]\\n' "$PNPM_PENDING_BUILDS" > "$PNPM_NODE_MODULES/.modules.yaml"
 elif [ ! -f "$PNPM_NODE_MODULES/.modules.yaml" ]; then

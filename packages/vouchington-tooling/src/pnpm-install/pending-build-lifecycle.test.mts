@@ -126,4 +126,19 @@ describe('pending build lifecycle safety', () => {
       await rm(fixture.root, { force: true, recursive: true })
     }
   })
+
+  it('fails before stamp when an enabled ordinary install leaves an unreadable ledger', async () => {
+    const fixture = await makeFixture()
+    try {
+      fixture.env.PNPM_INVALID_PENDING_BUILDS = '1'
+      await expect(runInstaller(fixture)).rejects.toThrow(
+        'persistent install completed without a clear pending build ledger',
+      )
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
+      ).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
 })
