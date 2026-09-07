@@ -3,40 +3,35 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-
 import type { SharedContext } from '../shared-context/index.mts'
-
+import {
+  baselineEntryByScopeAndFile,
+  baselineKey,
+  validateSccComplexityBaseline,
+} from './baseline.mts'
+import { parseSccComplexityValues } from './parser.mts'
+import type {
+  SccComplexityBaseline,
+  SccComplexityOptions,
+  SccComplexityScope,
+  SccComplexityValue,
+  SccComplexityViolation,
+} from './types.mts'
 const execFileAsync = promisify(execFile)
-
+export { parseSccComplexityBaseline, SCC_COMPLEXITY_BASELINE_VERSION } from './baseline.mts'
+export type {
+  SccComplexityBaseline,
+  SccComplexityBaselineEntry,
+  SccComplexityOptions,
+  SccComplexityScope,
+  SccComplexityViolation,
+} from './types.mts'
 export const SCC_COMPLEXITY_LIMIT = 50
 const DEFAULT_INCLUDE_EXT = 'js,mts,jsx,ts,tsx'
 const DEFAULT_EXCLUDE_DIR = '.git,fixtures,__tests__,test-helpers'
 const DEFAULT_NOT_MATCH = String.raw`\.(test|spec)\.`
 const DEFAULT_TMPDIR_PREFIX = 'scc-complexity-'
-
-export interface SccComplexityOptions {
-  limit?: number
-  includeExt?: string
-  excludeDir?: string
-  notMatch?: string
-  tmpdirPrefix?: string
-  command?: string
-}
-
-interface SccFile {
-  Location?: unknown
-  Complexity?: unknown
-}
-
-interface SccLanguage {
-  Files?: unknown
-}
-
-export interface SccComplexityViolation {
-  file: string
-  complexity: number
-}
-
+type RunScc = (outputPath: string, scope?: SccComplexityScope) => Promise<string>
 export function buildSccArgs(options: SccComplexityOptions = {}): string[] {
   return [
     '--format',
@@ -57,20 +52,17 @@ export function buildSccArgs(options: SccComplexityOptions = {}): string[] {
 export async function checkSccComplexity(
   ctx: SharedContext,
   options: SccComplexityOptions = {},
-  runScc?: (outputPath: string) => Promise<string>,
+  runScc?: RunScc,
 ): Promise<{ errors: string[] }> {
-  if (!ctx.isInsideGitRepo) {
+  if (!ctx.isInsideGitRepo)
     return { errors: [`::error::${ctx.repoRoot} is not inside a git repository`] }
-  }
-
   const dir = await mkdtemp(join(tmpdir(), options.tmpdirPrefix ?? DEFAULT_TMPDIR_PREFIX))
-  const outputPath = join(dir, 'scc.json')
-  const limit = options.limit ?? SCC_COMPLEXITY_LIMIT
   try {
-    const resolve = runScc ?? ((path: string) => runSccJson(ctx.repoRoot, path, options))
-    const json = await resolve(outputPath)
-    const violations = parseSccComplexityViolations(json, ctx.trackedFileSet, limit)
-    return { errors: violations.map((violation) => formatViolation(violation, limit)) }
+    const scopes = scopesFor(options)
+    const results = await runScopes(ctx, options, scopes, dir, runScc)
+    if (options.baseline)
+      validateSccComplexityBaseline(options.baseline, scopes, ctx.trackedFileSet, results)
+    return { errors: formatViolations(results, scopes, options.baseline) }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { errors: [`::error::scc-complexity failed: ${message}`] }
@@ -84,49 +76,98 @@ export function parseSccComplexityViolations(
   trackedFileSet: ReadonlySet<string>,
   limit = SCC_COMPLEXITY_LIMIT,
 ): SccComplexityViolation[] {
-  const parsed = JSON.parse(json) as unknown
-  if (!Array.isArray(parsed)) throw new Error('scc JSON output must be an array')
+  return parseSccComplexityValues(json, trackedFileSet)
+    .filter((value) => value.complexity > limit)
+    .toSorted(compare)
+}
 
-  const violations: SccComplexityViolation[] = []
-  for (const language of parsed as SccLanguage[]) {
-    if (!Array.isArray(language.Files)) continue
-    for (const file of language.Files as SccFile[]) {
-      if (typeof file.Location !== 'string') continue
-      if (!trackedFileSet.has(file.Location)) continue
-      if (typeof file.Complexity !== 'number') continue
-      if (file.Complexity <= limit) continue
-      violations.push({ file: file.Location, complexity: file.Complexity })
-    }
+function scopesFor(options: SccComplexityOptions): readonly SccComplexityScope[] {
+  if (!options.scopes) {
+    if (options.baseline) throw new Error('baseline requires named scopes')
+    return [{ includePaths: [], name: '', ...options }]
   }
+  if (options.scopes.length === 0) throw new Error('scopes must not be empty')
+  const names = new Set<string>()
+  for (const scope of options.scopes) {
+    if (!scope.name || names.has(scope.name))
+      throw new Error(`scope name ${scope.name || '(empty)'} is invalid`)
+    if (scope.includePaths.length === 0 || scope.includePaths.some((path) => !path))
+      throw new Error(`scope ${scope.name} must include at least one path`)
+    names.add(scope.name)
+  }
+  return options.scopes
+}
 
-  return violations.toSorted((a, b) => b.complexity - a.complexity || a.file.localeCompare(b.file))
+async function runScopes(
+  ctx: SharedContext,
+  options: SccComplexityOptions,
+  scopes: readonly SccComplexityScope[],
+  dir: string,
+  runScc?: RunScc,
+): Promise<Map<string, SccComplexityValue[]>> {
+  const results = new Map<string, SccComplexityValue[]>()
+  for (const scope of scopes) {
+    const outputPath = join(dir, `${scope.name || 'default'}.json`)
+    const resolve =
+      runScc ??
+      ((path: string, current?: SccComplexityScope) =>
+        runSccJson(ctx.repoRoot, path, options, current))
+    results.set(
+      scope.name,
+      parseSccComplexityValues(await resolve(outputPath, scope), ctx.trackedFileSet),
+    )
+  }
+  return results
+}
+
+function formatViolations(
+  results: ReadonlyMap<string, readonly SccComplexityValue[]>,
+  scopes: readonly SccComplexityScope[],
+  baseline?: SccComplexityBaseline,
+): string[] {
+  const entries = baselineEntryByScopeAndFile(baseline)
+  return scopes.flatMap((scope) =>
+    (results.get(scope.name) ?? []).flatMap((value) => {
+      const limit = scope.limit ?? SCC_COMPLEXITY_LIMIT
+      if (value.complexity <= limit) return []
+      const entry = entries.get(baselineKey({ file: value.file, scope: scope.name }))
+      if (entry && value.complexity <= entry.complexity) return []
+      const prefix = scope.name ? `[${scope.name}] ` : ''
+      const detail = entry
+        ? `scc complexity ${value.complexity} exceeds baseline ceiling ${entry.complexity}`
+        : `scc complexity ${value.complexity} exceeds ${limit}; simplify or split this file`
+      return [`::error file=${value.file}::${prefix}${value.file}: ${detail}`]
+    }),
+  )
 }
 
 async function runSccJson(
   repoRoot: string,
   outputPath: string,
   options: SccComplexityOptions,
+  scope?: SccComplexityScope,
 ): Promise<string> {
   try {
     await execFileAsync(
       options.command ?? 'scc',
-      [...buildSccArgs(options), '--output', outputPath],
-      {
-        cwd: repoRoot,
-        maxBuffer: 1024 * 1024,
-      },
+      [
+        ...buildSccArgs({ ...options, ...scope }),
+        ...(scope?.includePaths ?? []),
+        '--output',
+        outputPath,
+      ],
+      { cwd: repoRoot, maxBuffer: 1024 * 1024 },
     )
   } catch (error) {
-    if (isNodeSystemError(error) && error.code === 'ENOENT') {
+    if (isNodeSystemError(error) && error.code === 'ENOENT')
       throw new Error('scc executable not found; install with mise install', { cause: error })
-    }
     throw error
   }
   return readFile(outputPath, 'utf8')
 }
 
-function formatViolation({ file, complexity }: SccComplexityViolation, limit: number): string {
-  return `::error file=${file}::${file}: scc complexity ${complexity} exceeds ${limit}; simplify or split this file`
+function compare(a: SccComplexityViolation, b: SccComplexityViolation): number {
+  return b.complexity - a.complexity || a.file.localeCompare(b.file)
 }
 
 function isNodeSystemError(error: unknown): error is NodeJS.ErrnoException {
