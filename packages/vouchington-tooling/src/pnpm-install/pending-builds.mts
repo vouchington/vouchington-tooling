@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { parse, stringify } from 'yaml'
@@ -72,9 +73,12 @@ async function rewritePendingBuilds(
 ): Promise<PendingBuildState> {
   if (ids.length === originalLength)
     return ids.length === 0 ? { kind: 'clear' } : { ids: ids.toSorted(), kind: 'pending' }
+  const temporary = `${modulesPath()}.${randomUUID()}.tmp`
   try {
-    await writeFile(modulesPath(), stringify({ ...record, pendingBuilds: ids }))
+    await writeFile(temporary, stringify({ ...record, pendingBuilds: ids }), { flag: 'wx' })
+    await rename(temporary, modulesPath())
   } catch {
+    await rm(temporary, { force: true }).catch(() => {})
     return { kind: 'unknown' }
   }
   return pendingBuilds()

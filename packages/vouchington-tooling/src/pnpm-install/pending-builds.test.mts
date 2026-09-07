@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const writeFailure = vi.hoisted(() => ({ enabled: false }))
+const renameFailure = vi.hoisted(() => ({ enabled: false }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    rename: (...args: Parameters<typeof actual.rename>) =>
+      renameFailure.enabled ? Promise.reject(new Error('rename failed')) : actual.rename(...args),
     writeFile: (...args: Parameters<typeof actual.writeFile>) =>
       writeFailure.enabled ? Promise.reject(new Error('disk full')) : actual.writeFile(...args),
   }
@@ -31,6 +34,7 @@ const pnpm11131DuplicateLedger = join(
 
 afterEach(async () => {
   writeFailure.enabled = false
+  renameFailure.enabled = false
   process.chdir(previousCwd)
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
 })
@@ -119,6 +123,20 @@ describe('pending builds', () => {
     await expect(readFile(modules, 'utf8')).resolves.toContain(
       "pendingBuilds: ['.', '.', 'backend']",
     )
+  })
+
+  it('preserves the live ledger when atomic replacement fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'pending-build-rename-failure-'))
+    roots.push(root)
+    await mkdir(join(root, 'node_modules'))
+    process.chdir(root)
+    const modules = join(root, 'node_modules', '.modules.yaml')
+    const original = await readFile(pnpm11131DuplicateLedger, 'utf8')
+    await writeFile(modules, original)
+    renameFailure.enabled = true
+
+    await expect(deduplicatePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
+    await expect(readFile(modules, 'utf8')).resolves.toBe(original)
   })
 
   it('prunes only pending IDs absent from the current workspace lockfile', async () => {
