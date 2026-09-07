@@ -4,18 +4,14 @@ export type ProvenanceStatus =
   | {
       kind: 'matching'
       lastInvocationInstallScripts: boolean
-      pendingDependencyBuilds: string[]
-      scriptsEnabledInstallSucceeded: boolean
+      scriptsEnabledInstallVerified: boolean
     }
   | { kind: 'unsafe' }
 
-export type PersistentInstallTransition =
-  | { action: 'ordinary' | 'reconcile' | 'upgrade-scripts'; reason: string }
-  | {
-      action: 'upgrade-dependencies'
-      pendingDependencyBuilds: [string, ...string[]]
-      reason: string
-    }
+export type PersistentInstallTransition = {
+  action: 'ordinary' | 'reconcile'
+  reason: string
+}
 
 // The matching rows are deliberately explicit: a script-disabled invocation can never erase
 // evidence that this structural tree has already completed a scripts-enabled install.
@@ -24,16 +20,8 @@ export function persistentInstallTransition(
   installScripts: boolean,
 ): PersistentInstallTransition {
   if (provenance.kind === 'matching') {
-    if (installScripts && !provenance.scriptsEnabledInstallSucceeded)
-      return { action: 'upgrade-scripts', reason: 'pending-scripts-rebuild' }
-    const [firstPendingDependencyBuild, ...remainingPendingDependencyBuilds] =
-      provenance.pendingDependencyBuilds
-    if (installScripts && firstPendingDependencyBuild !== undefined)
-      return {
-        action: 'upgrade-dependencies',
-        pendingDependencyBuilds: [firstPendingDependencyBuild, ...remainingPendingDependencyBuilds],
-        reason: 'pending-dependency-rebuild',
-      }
+    if (installScripts && !provenance.scriptsEnabledInstallVerified)
+      return { action: 'reconcile', reason: 'scripts-enabled-install-unverified' }
     return { action: 'ordinary', reason: 'matching-structural-provenance' }
   }
   if (provenance.kind === 'absent') return { action: 'ordinary', reason: 'missing-stamp' }
@@ -54,12 +42,10 @@ export function persistentProvenanceDiagnostic(
     changedComponents: provenance.kind === 'changed' ? provenance.components : [],
     event: 'pnpm-install-persistent-provenance',
     installScripts,
-    scriptsEnabledInstallSucceeded:
-      provenance.kind === 'matching' ? provenance.scriptsEnabledInstallSucceeded : false,
+    scriptsEnabledInstallVerified:
+      provenance.kind === 'matching' ? provenance.scriptsEnabledInstallVerified : false,
     lastInvocationInstallScripts:
       provenance.kind === 'matching' ? provenance.lastInvocationInstallScripts : null,
-    pendingDependencyBuildCount:
-      provenance.kind === 'matching' ? provenance.pendingDependencyBuilds.length : 0,
     nativeBinariesMatchRuntime,
     reason: transition.reason,
     state: provenance.kind,

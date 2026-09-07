@@ -114,7 +114,7 @@ describe('pnpm install regression boundaries', () => {
     await writeJson(join(root, 'package.json'), { name: 'fixture', private: true })
     await writeFile(
       join(bin, 'pnpm'),
-      '#!/usr/bin/env bash\nif [ "${1:-}" = m ]; then printf \'%s\\n\' "$PNPM_WORKSPACES_JSON"; fi\n',
+      '#!/usr/bin/env bash\nif [ "${1:-}" = m ]; then printf \'%s\\n\' "$PNPM_WORKSPACES_JSON"; elif [ "${1:-}" != --version ]; then mkdir -p node_modules; printf \'pendingBuilds: []\\n\' > node_modules/.modules.yaml; fi\n',
     )
     await execFileAsync('chmod', ['+x', join(bin, 'pnpm')])
     try {

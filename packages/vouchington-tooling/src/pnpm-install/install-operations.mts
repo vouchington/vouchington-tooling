@@ -2,7 +2,7 @@ import { scheduler } from 'node:timers/promises'
 
 import { runPnpm } from './exec.mts'
 import { nativeBinariesMatchRuntime, repairedNativeBinariesMatchRuntime } from './native-health.mts'
-import { buildLedgersAllowNativeRepair } from './pending-builds.mts'
+import { buildLedgersAllowNativeRepair, pendingBuilds } from './pending-builds.mts'
 import { INSTALL_TERMINATION_FAILED } from './process.mts'
 import { formatReleaseAgeFailure, isReleaseAgeViolation } from './release-age.mts'
 import {
@@ -38,21 +38,17 @@ export async function install(args: string[], options: InstallOptions, label: st
   )
 }
 
-export async function reconcileOrFail(
-  options: InstallOptions,
-  runCapture: (args: string[]) => Promise<CommandResult>,
-) {
+export async function reconcileOrFail(options: InstallOptions) {
   await install(
     [...forcedInstallArgs, '--ignore-scripts', '--ignore-pnpmfile'],
     options,
     'script-free reconciliation',
   )
   await install(
-    withScriptPolicy(forcedInstallArgs, options.installScripts),
+    [...forcedInstallArgs, '--ignore-scripts'],
     options,
-    'strict persistent reconciliation',
+    'second script-free persistent reconciliation',
   )
-  await verifyInstallHealth(runCapture, 'persistent reconciliation')
 }
 
 async function verifyInstallHealth(
@@ -71,6 +67,23 @@ async function verifyInstallHealth(
     logWorkspaceLinkMismatches(remaining)
     fail(`${phase} completed with invalid workspace links`)
   }
+}
+
+export async function finalizePendingBuilds(
+  options: InstallOptions,
+  runCapture: (args: string[]) => Promise<CommandResult>,
+  phase: string,
+) {
+  const before = await pendingBuilds()
+  if (options.installScripts && before.kind === 'unknown')
+    fail(`${phase} completed without a clear pending build ledger`)
+  if (options.installScripts && before.kind === 'pending') {
+    await install(['rebuild', '--pending', '--recursive'], options, 'pending scripts rebuild')
+    const after = await pendingBuilds()
+    if (after.kind !== 'clear') fail(`${phase} completed without a clear pending build ledger`)
+  }
+  await verifyInstallHealth(runCapture, phase)
+  return options.installScripts ? { kind: 'clear' as const } : before
 }
 
 export async function repairIsolatedNativeMismatch(

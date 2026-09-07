@@ -9,69 +9,119 @@ import {
   runInstaller,
 } from './pnpm-install-fixture.test-helpers.mts'
 
+const forced =
+  'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false'
+const secondScriptFree = `${forced} --ignore-scripts`
+
 describe('pending build lifecycle safety', () => {
-  it.each(['unknown', 'workspace'] as const)(
-    'uses the full pending rebuild when a disabled install has %s pending state',
-    async (scenario) => {
+  it('uses pnpm generic pending rebuild when an enabled ordinary install leaves dependency debt', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture)
+      await resetInstallCalls(fixture)
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'rebuild --pending --recursive',
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it.each(['pendingBuilds: [dependency]\n', 'pendingBuilds: nope\n'])(
+    'reconciles a matching verified stamp when its live ledger is not clear',
+    async (modules) => {
       const fixture = await makeFixture()
       try {
         await runInstaller(fixture)
-        if (scenario === 'workspace') {
-          await writeFile(
-            join(fixture.root, 'node_modules', '.modules.yaml'),
-            'pendingBuilds: []\n',
-          )
-          fixture.env.PNPM_PENDING_BUILDS = 'workspace-hook'
-        } else await rm(join(fixture.root, 'node_modules', '.modules.yaml'), { force: true })
+        await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), modules)
         await resetInstallCalls(fixture)
-        await runInstaller(fixture, { installScripts: false })
-        fixture.env.PNPM_PENDING_BUILDS = ''
-        await runInstaller(fixture)
+        const result = await runInstaller(fixture)
         await expect(installCalls(fixture)).resolves.toEqual([
-          'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-          'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-          'rebuild --pending --recursive',
+          `${forced} --ignore-scripts --ignore-pnpmfile`,
+          secondScriptFree,
         ])
+        expect(result.stderr).toContain('pending-build-ledger-unverified')
+        expect(
+          JSON.parse(
+            await readFile(
+              join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'),
+              'utf8',
+            ),
+          ),
+        ).toMatchObject({
+          scriptsEnabledInstallVerified: true,
+          version: 5,
+        })
       } finally {
         await rm(fixture.root, { force: true, recursive: true })
       }
     },
   )
 
-  it('fails closed for tampered dependency IDs without passing them to pnpm', async () => {
+  it('does not retain verification after a script-disabled install leaves pending debt', async () => {
     const fixture = await makeFixture()
     try {
       await runInstaller(fixture)
-      const stampPath = join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json')
-      const stamp = JSON.parse(await readFile(stampPath, 'utf8')) as Record<string, unknown>
-      stamp.pendingDependencyBuilds = ['--dir']
-      await writeFile(stampPath, `${JSON.stringify(stamp)}\n`)
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
+      await runInstaller(fixture, { installScripts: false })
+      const stamp = JSON.parse(
+        await readFile(
+          join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'),
+          'utf8',
+        ),
+      ) as Record<string, unknown>
+      expect(stamp.scriptsEnabledInstallVerified).toBe(false)
+      fixture.env.PNPM_PENDING_BUILDS = ''
       await resetInstallCalls(fixture)
-      const result = await runInstaller(fixture)
+      await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'rebuild --pending --recursive',
+        `${forced} --ignore-scripts --ignore-pnpmfile`,
+        secondScriptFree,
       ])
-      expect(result.stderr).toContain('invalid-pending-dependency-builds')
-      expect(result.stderr).not.toContain('--dir')
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
   })
 
-  it('does not stamp success when a selective rebuild cannot update pnpm pending state', async () => {
+  it('allows an unreadable script-disabled ledger but requires enabled reconciliation next', async () => {
     const fixture = await makeFixture()
     try {
-      await writeFile(join(fixture.root, 'pnpm-lock.yaml'), 'packages:\n  dependency@1: {}\n')
-      await runInstaller(fixture)
-      await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'pendingBuilds: []\n')
-      fixture.env.PNPM_PENDING_BUILDS = '"dependency@1"'
       await runInstaller(fixture, { installScripts: false })
-      fixture.env.PNPM_PENDING_BUILDS = ''
+      await rm(join(fixture.root, 'node_modules', '.modules.yaml'))
+      await runInstaller(fixture, { installScripts: false })
+      expect(
+        JSON.parse(
+          await readFile(
+            join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'),
+            'utf8',
+          ),
+        ),
+      ).toMatchObject({ scriptsEnabledInstallVerified: false })
+      await resetInstallCalls(fixture)
+      await runInstaller(fixture)
+      await expect(installCalls(fixture)).resolves.toEqual([
+        `${forced} --ignore-scripts --ignore-pnpmfile`,
+        secondScriptFree,
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('does not stamp scripts-enabled success when pnpm leaves its pending ledger malformed', async () => {
+    const fixture = await makeFixture()
+    try {
       fixture.env.PNPM_REBUILD_INVALID_LEDGER = '1'
+      fixture.env.PNPM_PENDING_BUILDS = 'dependency'
       await expect(runInstaller(fixture)).rejects.toThrow(
-        'dependency rebuild completed but pending build ledger could not be updated safely',
+        'persistent install completed without a clear pending build ledger',
       )
+      await expect(
+        readFile(join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
+      ).rejects.toMatchObject({ code: 'ENOENT' })
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }

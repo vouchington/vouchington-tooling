@@ -12,6 +12,7 @@ import {
 
 const forced =
   'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false'
+const secondScriptFree = `${forced} --ignore-scripts`
 
 async function addMismatchedNative(
   fixture: Awaited<ReturnType<typeof makeFixture>>,
@@ -63,14 +64,15 @@ describe('native health repair lifecycle', () => {
     const fixture = await makeFixture()
     try {
       await runInstaller(fixture)
-      if (modules !== undefined)
-        await writeFile(join(fixture.root, 'node_modules', '.modules.yaml'), modules)
+      const modulesPath = join(fixture.root, 'node_modules', '.modules.yaml')
+      if (modules === undefined) await rm(modulesPath)
+      else await writeFile(modulesPath, modules)
       await addMismatchedNative(fixture, true)
       await resetInstallCalls(fixture)
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
         `${forced} --ignore-scripts --ignore-pnpmfile`,
-        forced,
+        secondScriptFree,
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -89,7 +91,7 @@ describe('native health repair lifecycle', () => {
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
         `${forced} --ignore-scripts --ignore-pnpmfile`,
-        forced,
+        secondScriptFree,
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -110,6 +112,30 @@ describe('native health repair lifecycle', () => {
       await expect(installCalls(fixture)).resolves.toEqual([
         `${forced} --ignore-scripts --ignore-pnpmfile`,
         `${forced} --ignore-scripts`,
+      ])
+    } finally {
+      await rm(fixture.root, { force: true, recursive: true })
+    }
+  })
+
+  it('finalizes a pending native repair before checking native health', async () => {
+    const fixture = await makeFixture()
+    try {
+      await runInstaller(fixture, { installScripts: false })
+      await writeFile(
+        join(fixture.root, 'node_modules', '.modules.yaml'),
+        'ignoredBuilds: []\npendingBuilds: [native]\n',
+      )
+      await addMismatchedNative(fixture, true)
+      fixture.env.PNPM_PENDING_BUILDS = 'native'
+      fixture.env.PNPM_REPAIR_NATIVE = '0'
+      fixture.env.PNPM_REPAIR_NATIVE_ON_REBUILD = '1'
+      await resetInstallCalls(fixture)
+      await expect(runInstaller(fixture)).resolves.toBeDefined()
+      await expect(installCalls(fixture)).resolves.toEqual([
+        `${forced} --ignore-scripts --ignore-pnpmfile`,
+        `${forced} --ignore-scripts`,
+        'rebuild --pending --recursive',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -153,7 +179,7 @@ describe('native health repair lifecycle', () => {
       await expect(readFile(stamp, 'utf8')).resolves.toBe(before)
       await expect(installCalls(fixture)).resolves.toEqual([
         `${forced} --ignore-scripts --ignore-pnpmfile`,
-        forced,
+        secondScriptFree,
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
