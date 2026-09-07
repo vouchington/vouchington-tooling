@@ -134,6 +134,11 @@ describe('scc-complexity', () => {
     await expect(checkSccComplexity(outside)).resolves.toEqual({
       errors: [`::error::${outside.repoRoot} is not inside a git repository`],
     })
+    await expect(
+      checkSccComplexity({ ...outside, repoRoot: 'outside%\r\n::warning::injected' }),
+    ).resolves.toEqual({
+      errors: ['::error::outside%25%0D%0A::warning::injected is not inside a git repository'],
+    })
   })
 
   it('runs the default scc process wrapper and reads its output file', async () => {

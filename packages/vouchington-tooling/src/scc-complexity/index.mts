@@ -60,7 +60,11 @@ export async function checkSccComplexity(
   runScc?: RunScc,
 ): Promise<{ errors: string[] }> {
   if (!ctx.isInsideGitRepo)
-    return { errors: [`::error::${ctx.repoRoot} is not inside a git repository`] }
+    return {
+      errors: [
+        `::error::${escapeWorkflowCommandMessage(ctx.repoRoot)} is not inside a git repository`,
+      ],
+    }
   const dir = await mkdtemp(join(tmpdir(), options.tmpdirPrefix ?? DEFAULT_TMPDIR_PREFIX))
   try {
     const scopes = await normalizeScopes(scopesFor(options), ctx.repoRoot, options.limit)
