@@ -1,8 +1,13 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { compareAstGrepCompanions } from './companion-parity.mts'
+import type {
+  AstGrepCompanionContext,
+  AstGrepCompanionDifference,
+  AstGrepCompanionParityOptions,
+} from './index.mts'
 
 function withRules(files: Record<string, string>, run: (rules: string) => void): void {
   const root = mkdtempSync(join(tmpdir(), 'ast-grep-companions-'))
@@ -14,13 +19,28 @@ function withRules(files: Record<string, string>, run: (rules: string) => void):
       mkdirSync(dirname(target), { recursive: true })
       writeFileSync(target, contents)
     }
-    run(rules)
+    run(realpathSync(rules))
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
 }
 
 describe('AST-grep companion parity', () => {
+  it('exports the complete public companion parity type contract from the subpath', () => {
+    expectTypeOf<AstGrepCompanionParityOptions>().toMatchTypeOf<{ rules: string }>()
+    expectTypeOf<AstGrepCompanionContext>().toMatchTypeOf<{
+      file: string
+      role: 'base' | 'companion'
+    }>()
+    expectTypeOf<AstGrepCompanionDifference>().toMatchTypeOf<{
+      base: unknown
+      baseFile: string
+      companion: unknown
+      companionFile: string
+      path: string
+    }>()
+  })
+
   it('compares recursively paired YAML documents without considering object key order', () => {
     withRules(
       {
@@ -149,6 +169,16 @@ describe('AST-grep companion parity', () => {
     })
   })
 
+  it('fails closed on YAML aliases before comparison can traverse or report a cyclic graph', () => {
+    const cyclic = 'rule: &rule { self: *rule }\n'
+    withRules({ 'rule.yml': cyclic, 'rule-tsx.yml': cyclic }, (rules) =>
+      expect(() => compareAstGrepCompanions({ rules })).toThrow('rule.yml: invalid YAML'),
+    )
+    withRules({ 'rule.yml': 'rule: { pattern: one }\n', 'rule-tsx.yml': cyclic }, (rules) =>
+      expect(() => compareAstGrepCompanions({ rules })).toThrow('rule-tsx.yml: invalid YAML'),
+    )
+  })
+
   it('rejects invalid suffixes and root links', () => {
     withRules({ 'rule.yml': 'id: rule\n', 'rule-tsx.yml': 'id: rule\n' }, (rules) => {
       expect(() => compareAstGrepCompanions({ rules, companionSuffix: '' })).toThrow(
@@ -160,5 +190,42 @@ describe('AST-grep companion parity', () => {
         'rules: symbolic links are not allowed',
       )
     })
+  })
+
+  it('rejects supplied rule paths with symlink or reparse-point ancestors', () => {
+    withRules({}, (rules) => {
+      const root = dirname(rules)
+      const physicalAncestor = join(root, 'physical')
+      const physicalRules = join(physicalAncestor, 'rules')
+      mkdirSync(physicalRules, { recursive: true })
+      writeFileSync(join(physicalRules, 'rule.yml'), 'id: rule\n')
+      writeFileSync(join(physicalRules, 'rule-tsx.yml'), 'id: rule\n')
+      const redirectedAncestor = join(root, 'redirected')
+      symlinkSync(
+        physicalAncestor,
+        redirectedAncestor,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      )
+
+      expect(() => compareAstGrepCompanions({ rules: join(redirectedAncestor, 'rules') })).toThrow(
+        'rules: symbolic links are not allowed',
+      )
+    })
+  })
+
+  it('uses explicit code-unit ordering for discovered rule paths', () => {
+    withRules(
+      {
+        'ä.yml': 'message: base\n',
+        'ä-tsx.yml': 'message: companion\n',
+        'z.yml': 'message: base\n',
+        'z-tsx.yml': 'message: companion\n',
+      },
+      (rules) =>
+        expect(compareAstGrepCompanions({ rules }).map(({ baseFile }) => baseFile)).toEqual([
+          'z.yml',
+          'ä.yml',
+        ]),
+    )
   })
 })

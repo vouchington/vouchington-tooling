@@ -1,5 +1,5 @@
 import * as fs from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { parse as yamlLoad } from 'yaml'
 
 export interface AstGrepCompanionDifference {
@@ -21,10 +21,27 @@ export interface AstGrepCompanionContext {
 
 const YAML_EXTENSION = /\.ya?ml$/u
 
+function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
+}
+
+function assertPhysicalPath(path: string): void {
+  let ancestor = path
+  while (true) {
+    if (fs.lstatSync(ancestor).isSymbolicLink())
+      throw new Error('rules: symbolic links are not allowed')
+    const parent = dirname(ancestor)
+    if (parent === ancestor) return
+    ancestor = parent
+  }
+}
+
 function yamlFiles(directory: string, relative = ''): string[] {
   const entries = fs
     .readdirSync(directory, { withFileTypes: true })
-    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .toSorted((a, b) => compareCodeUnits(a.name, b.name))
   const files: string[] = []
   for (const entry of entries) {
     const file = relative ? `${relative}/${entry.name}` : entry.name
@@ -36,7 +53,7 @@ function yamlFiles(directory: string, relative = ''): string[] {
 }
 function loadDocument(rules: string, file: string): unknown {
   try {
-    return yamlLoad(fs.readFileSync(join(rules, file), 'utf8'))
+    return yamlLoad(fs.readFileSync(join(rules, file), 'utf8'), { maxAliasCount: 0 })
   } catch (error) {
     throw new Error(`${file}: invalid YAML: ${String(error)}`)
   }
@@ -65,7 +82,9 @@ function compare(
     return
   }
   if (isRecord(base) && isRecord(companion)) {
-    for (const key of [...new Set([...Object.keys(base), ...Object.keys(companion)])].toSorted())
+    for (const key of [...new Set([...Object.keys(base), ...Object.keys(companion)])].toSorted(
+      compareCodeUnits,
+    ))
       compare(base[key], companion[key], pointer(path, key), difference)
     return
   }
@@ -83,7 +102,7 @@ export function compareAstGrepCompanions(
   const suffix = options.companionSuffix ?? '-tsx'
   assertSuffix(suffix)
   const rules = resolve(options.rules)
-  if (fs.lstatSync(rules).isSymbolicLink()) throw new Error('rules: symbolic links are not allowed')
+  assertPhysicalPath(rules)
   const files = yamlFiles(rules)
   const basesByStem = new Map<string, string[]>()
   const companions: Array<{ file: string; baseStem: string }> = []
@@ -99,14 +118,16 @@ export function compareAstGrepCompanions(
   for (const [baseStem, companionFiles] of companionsByStem)
     if (companionFiles.length > 1)
       throw new Error(
-        `${baseStem}: duplicate companion rules: ${companionFiles.toSorted().join(', ')}`,
+        `${baseStem}: duplicate companion rules: ${companionFiles.toSorted(compareCodeUnits).join(', ')}`,
       )
   const differences: AstGrepCompanionDifference[] = []
   for (const { file: companionFile, baseStem } of companions) {
     const bases = basesByStem.get(baseStem) ?? []
     if (!bases.length) throw new Error(`${companionFile}: missing base companion`)
     if (bases.length > 1)
-      throw new Error(`${companionFile}: duplicate base companions: ${bases.toSorted().join(', ')}`)
+      throw new Error(
+        `${companionFile}: duplicate base companions: ${bases.toSorted(compareCodeUnits).join(', ')}`,
+      )
     const baseFile = bases[0]!
     const normalize = options.normalize ?? ((document: unknown) => document)
     const base = normalize(loadDocument(rules, baseFile), { file: baseFile, role: 'base' })
