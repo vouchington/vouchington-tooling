@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { compareAstGrepCompanions } from './companion-parity.mts'
+import { compareAstGrepCompanions, compareCodeUnits } from './companion-parity.mts'
 import type {
   AstGrepCompanionContext,
   AstGrepCompanionDifference,
@@ -227,5 +227,42 @@ describe('AST-grep companion parity', () => {
           'ä.yml',
         ]),
     )
+  })
+
+  it('orders equal and distinct code units deterministically', () => {
+    expect(compareCodeUnits('same', 'same')).toBe(0)
+    expect(compareCodeUnits('z', 'ä')).toBe(-1)
+    expect(compareCodeUnits('ä', 'z')).toBe(1)
+  })
+
+  it('fails closed on differing tagged non-JSON YAML values before they enter diagnostics', () => {
+    for (const [base, companion] of [
+      ['!!set { base: null }', '!!set { companion: null }'],
+      ['!!omap [ { base: one } ]', '!!omap [ { companion: two } ]'],
+      ['!!timestamp 2026-01-01T00:00:00Z', '!!timestamp 2027-01-01T00:00:00Z'],
+    ])
+      withRules(
+        { 'rule.yml': `value: ${base}\n`, 'rule-tsx.yml': `value: ${companion}\n` },
+        (rules) =>
+          expect(() => compareAstGrepCompanions({ rules })).toThrow(
+            'rule.yml: invalid YAML: Error: unsupported non-JSON YAML value',
+          ),
+      )
+  })
+
+  it('rejects cyclic values returned by a normalizer before producing diagnostics', () => {
+    withRules({ 'rule.yml': '{}\n', 'rule-tsx.yml': '{}\n' }, (rules) => {
+      const record: Record<string, unknown> = {}
+      record.self = record
+      expect(() => compareAstGrepCompanions({ rules, normalize: () => record })).toThrow(
+        'unsupported cyclic YAML value',
+      )
+
+      const array: unknown[] = []
+      array.push(array)
+      expect(() => compareAstGrepCompanions({ rules, normalize: () => array })).toThrow(
+        'unsupported cyclic YAML value',
+      )
+    })
   })
 })

@@ -21,7 +21,7 @@ export interface AstGrepCompanionContext {
 
 const YAML_EXTENSION = /\.ya?ml$/u
 
-function compareCodeUnits(left: string, right: string): number {
+export function compareCodeUnits(left: string, right: string): number {
   if (left < right) return -1
   if (left > right) return 1
   return 0
@@ -53,7 +53,9 @@ function yamlFiles(directory: string, relative = ''): string[] {
 }
 function loadDocument(rules: string, file: string): unknown {
   try {
-    return yamlLoad(fs.readFileSync(join(rules, file), 'utf8'), { maxAliasCount: 0 })
+    const document = yamlLoad(fs.readFileSync(join(rules, file), 'utf8'), { maxAliasCount: 0 })
+    assertJsonValue(document)
+    return document
   } catch (error) {
     throw new Error(`${file}: invalid YAML: ${String(error)}`)
   }
@@ -66,7 +68,28 @@ function pointer(path: string, key: string | number): string {
   return `${path}/${segment}`
 }
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === null || prototype === Object.prototype
+}
+function assertJsonValue(value: unknown, ancestors = new WeakSet<object>()): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return
+  if (typeof value === 'number' && Number.isFinite(value)) return
+  if (Array.isArray(value)) {
+    if (ancestors.has(value)) throw new Error('unsupported cyclic YAML value')
+    ancestors.add(value)
+    for (const item of value) assertJsonValue(item, ancestors)
+    ancestors.delete(value)
+    return
+  }
+  if (isRecord(value)) {
+    if (ancestors.has(value)) throw new Error('unsupported cyclic YAML value')
+    ancestors.add(value)
+    for (const item of Object.values(value)) assertJsonValue(item, ancestors)
+    ancestors.delete(value)
+    return
+  }
+  throw new Error('unsupported non-JSON YAML value')
 }
 function compare(
   base: unknown,
@@ -135,6 +158,8 @@ export function compareAstGrepCompanions(
       file: companionFile,
       role: 'companion',
     })
+    assertJsonValue(base)
+    assertJsonValue(companion)
     compare(base, companion, '', (path, baseValue, companionValue) => {
       differences.push({
         baseFile,
