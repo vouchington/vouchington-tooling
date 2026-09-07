@@ -186,6 +186,13 @@ import {
 import { buildOpenApiDocument, writeOpenApi } from 'vouchington-tooling/openapi-document'
 import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
 import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
+import {
+  extractLooseMarkdownTableRows,
+  extractMarkdownTables,
+  markdownSectionBetweenHeadings,
+  parseGfmMarkdown,
+  parseMarkdownTables,
+} from 'vouchington-tooling/markdown'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
@@ -247,6 +254,13 @@ shell script or a workflow/action YAML file is left to the caller.
 `validateGitHubBodyLength` measures an issue or pull-request body against GitHub's 65,536 Unicode
 code-point limit without altering it. Its result includes the UTF-8 byte count for diagnostics; that
 byte count is not a validation limit.
+
+`vouchington-tooling/markdown` parses GFM into standard mdast/unist nodes, provides pre-order
+walking and typed searches, normalizes node text, and extracts positioned tables or heading-bounded
+source sections. `parseMarkdownTables` preserves its compact `{ cells, line }[][]` compatibility
+shape, including short table delimiters. `extractLooseMarkdownTableRows` is intentionally literal
+recovery for malformed pipe rows; callers supply table positions to exclude and retain ownership of
+their policy interpretation.
 
 `agent-harness-config` merges classifier-auto and sandbox keys into Claude, Codex, Grok, and Cursor
 config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
