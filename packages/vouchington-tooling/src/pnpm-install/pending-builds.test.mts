@@ -65,9 +65,12 @@ describe('pending builds', () => {
   it('deduplicates IDs without dropping unique pending work', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-dedupe-'))
     roots.push(root)
-    await mkdir(join(root, 'node_modules'))
     process.chdir(root)
+    await expect(dedupePendingBuilds()).resolves.toBe(false)
+    await mkdir(join(root, 'node_modules'))
     const modules = join(root, 'node_modules', '.modules.yaml')
+    await writeFile(modules, '[]\n')
+    await expect(dedupePendingBuilds()).resolves.toBe(false)
     await writeFile(
       modules,
       'custom: retained\npendingBuilds: [., ., backend, dependency, backend]\n',
