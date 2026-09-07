@@ -178,6 +178,11 @@
       "import": "./dist/csv/index.mjs",
       "default": "./dist/csv/index.mjs"
     },
+    "./markdown": {
+      "types": "./dist/markdown/index.d.mts",
+      "import": "./dist/markdown/index.mjs",
+      "default": "./dist/markdown/index.mjs"
+    },
     "./http-body": {
       "types": "./dist/http-body/index.d.mts",
       "import": "./dist/http-body/index.mjs",
@@ -294,10 +299,14 @@
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
+    "@types/mdast": "4.0.4",
+    "@types/unist": "3.0.3",
     "csv-parse": "7.0.2",
     "csv-stringify": "6.8.3",
     "dockerfile-ast": "0.7.1",
     "picomatch": "4.0.7",
+    "remark": "15.0.1",
+    "remark-gfm": "4.0.1",
     "smol-toml": "1.8.0",
     "yaml": "2.9.0"
   },
