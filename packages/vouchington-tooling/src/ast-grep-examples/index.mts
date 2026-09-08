@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import picomatch from 'picomatch'
 import { parse as yamlLoad, stringify as yamlDump } from 'yaml'
-
-interface AstGrepExample {
-  code: string
-  isValid: boolean
-  file: string
-}
+export { compareAstGrepCompanions } from './companion-parity.mts'
+export type {
+  AstGrepCompanionContext,
+  AstGrepCompanionDifference,
+  AstGrepCompanionParityOptions,
+} from './companion-parity.mts'
+type AstGrepExample = { code: string; isValid: boolean; file: string }
 interface Rule {
   id: string
   examples?: AstGrepExample[]

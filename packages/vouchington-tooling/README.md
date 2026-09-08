@@ -93,6 +93,11 @@ ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-i
 nonignored-working-tree mirrors with an explicit config; `--directory` selects the repository root.
 `ast-grep-examples` runs native `ast-grep test`, then validates each scoped rule's `files:` and
 `ignores:` examples with project `languageGlobs` replay from its root `--config`.
+`compareAstGrepCompanions` compares recursive `<name>.yml`/`.yaml` and `<name>-tsx` companion
+rules across every YAML field, returns stable JSON-pointer differences, and rejects unsafe or
+ambiguous rule paths. The supplied rule path and every ancestor must be physical directories; YAML
+aliases and non-JSON tagged values are rejected before comparison. Callers own any explicit
+normalization for language-specific differences.
 `ast-grep-pack` prints JSON `{ rules, config }` for the shipped unconditional rule pack. Point a
 consumer `sgconfig.yml` `ruleDirs` at `rules` and keep product-specific YAML locally.
 `gha-workspace-policy` checks tracked workflow and composite-action files in the current repository;
