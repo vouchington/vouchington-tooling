@@ -247,6 +247,39 @@ describe('prefix coverage transport', () => {
     expect(signed).not.toContain(keys('web', 3).lcov)
   })
 
+  it('resolves the highest attempt when multiple complete coverage pairs exist for a suite', async () => {
+    const keys = (suite: string, attempt: number) => transportObjectKeysV2(identity, suite, attempt)
+    const objects = [
+      { key: keys('web', 1).lcov, byteLength: 1 },
+      { key: keys('web', 1).manifest, byteLength: 2 },
+      { key: keys('web', 2).lcov, byteLength: 3 },
+      { key: keys('web', 2).manifest, byteLength: 4 },
+    ]
+    const source = await mintPrefixUploadControl(identity, {
+      signPost: async (keyPrefix) => ({
+        url: 'https://storage.example.test/upload',
+        fields: {},
+        keyPrefix,
+        maxObjectBytes: 32,
+      }),
+    })
+    const signed: string[] = []
+    const result = await discoverDownloadControl(
+      source,
+      { list: async () => ({ objects }) },
+      {
+        signGet: async (key) => {
+          signed.push(key)
+          return `https://storage.example.test/${key}`
+        },
+      },
+    )
+    expect(result.coverage.web?.lcov.attempt).toBe(2)
+    expect(result.coverage.web?.manifest.attempt).toBe(2)
+    expect(signed).not.toContain(keys('web', 1).lcov)
+    expect(signed).not.toContain(keys('web', 1).manifest)
+  })
+
   it.each([
     [
       'foreign key',
