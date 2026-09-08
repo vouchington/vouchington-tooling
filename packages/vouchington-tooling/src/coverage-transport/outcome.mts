@@ -67,8 +67,9 @@ export function isBlobPrimaryState(value: string | undefined): value is BlobPrim
 
 /**
  * Sibling to `assertCoverageTransportOutcome` for the Vitest blob. `true`/`false` are the S3
- * upload step's `blob` output; `skipped` means that step never ran. GitHub fallback is always
- * attempted when enabled — workflows must not gate it on `blob != 'true'`.
+ * upload step's `blob` output; `skipped` means that step never ran. Workflows gate the GitHub
+ * fallback on `blob != 'true'`, so a persisted S3 primary with no GitHub artifact attempt is the
+ * expected steady state, not a degraded one.
  */
 export function assertCoverageTransportBlobOutcome(
   suite: string,
@@ -79,11 +80,6 @@ export function assertCoverageTransportBlobOutcome(
 ): boolean {
   const artifactSucceeded = artifactAttempt1 === 'success' || artifactAttempt2 === 'success'
   if (primaryPersisted === 'true') {
-    if (!artifactSucceeded) {
-      emit(
-        `::warning::Vitest blob persisted only to S3 for suite=${suite}; GitHub artifact fallback is degraded.`,
-      )
-    }
     return true
   }
   if (artifactSucceeded) {
@@ -103,9 +99,9 @@ export function assertCoverageTransportBlobOutcome(
 export type AppendOutput = (path: string, data: string) => void
 
 /**
- * Writes `blob=true|false` to `$GITHUB_OUTPUT` for outcome reporting. GitHub-fallback blob upload
- * must always be attempted when enabled; do not gate it on this signal. The upload subcommand's
- * exit code tracks the coverage pair, not the blob. A no-op outside CI (`githubOutputPath` unset).
+ * Writes `blob=true|false` to `$GITHUB_OUTPUT` for outcome reporting. Workflows gate the
+ * GitHub-fallback blob upload on this signal (`blob != 'true'`). The upload subcommand's exit
+ * code tracks the coverage pair, not the blob. A no-op outside CI (`githubOutputPath` unset).
  */
 export function writeUploadOutcomeOutput(
   outcome: { readonly blob: boolean },
