@@ -146,6 +146,20 @@ runs:
             echo
             cat "$trusted_inline_prompt"
           fi
+          echo
+          printf '%s\n' \
+            'This sandboxed run has no working gh, git, or Bash access, and WebFetch/WebSearch are not granted. Do not attempt any of them.' \
+            'Read pull request context instead from these files under .review-context/ (relative to your working directory, the repository root) using your normal file-Read tool:' \
+            '' \
+            '- .review-context/pr.json: PR title, body, url, author, baseRefName, headRefName, headRefOid' \
+            '- .review-context/files.json: changed files with per-file status and patch' \
+            '- .review-context/pr.diff: the full unified diff (a placeholder notes when GitHub caps the diff response at 300 files; use files.json instead)' \
+            '- .review-context/pr-comments.json: issue-style PR conversation comments' \
+            '- .review-context/pr-review-comments.json: inline PR review comments' \
+            '- .review-context/pr-reviews.json: submitted PR reviews' \
+            '- .review-context/issues/<N>.json and .review-context/issues/<N>-comments.json: linked issues or PRs referenced from the PR body or comments (when <N> is itself a PR, also .review-context/issues/<N>-review-comments.json and .review-context/issues/<N>-reviews.json)' \
+            '' \
+            'Anchor every inline finding to a real file:line from files.json or pr.diff.'
           if [ -n "$EXTRA_PROMPT" ]; then
             printf '\n%s\n' "$EXTRA_PROMPT"
           fi
@@ -169,6 +183,19 @@ runs:
       run: |
         set -euo pipefail
         rm -f "${GITHUB_WORKSPACE}/code-review-payload.json"
+        rm -rf "${GITHUB_WORKSPACE}/.review-context"
+
+    - name: Materialize PR review context
+      id: materialize
+      if: steps.review-prompt.outputs.available == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/materialize-pr-context.sh"
 
     - name: Isolate Claude Code install home
       if: steps.review-prompt.outputs.available == 'true'
@@ -209,6 +236,7 @@ runs:
       if: >-
         always() &&
         steps.review-prompt.outputs.available == 'true' &&
+        steps.materialize.outcome == 'success' &&
         steps.trusted-node-version.outcome == 'success' &&
         steps.setup-node.outcome == 'success'
       id: claude-review
@@ -365,6 +393,7 @@ runs:
         # lifecycle across runs, so no cleanup is needed here.
         rm -rf \
           "${GITHUB_WORKSPACE}/code-review-payload.json" \
+          "${GITHUB_WORKSPACE}/.review-context" \
           "${RUNNER_TEMP}/code-review-payload" \
           "${RUNNER_TEMP}/code-review-prompt.md" \
           "${RUNNER_TEMP}/vouchington-tooling-runtime"
