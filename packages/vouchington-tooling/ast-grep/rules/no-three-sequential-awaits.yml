@@ -34,6 +34,10 @@ ignores:
 rule:
   all:
     - not:
+        any:
+          - matches: async-disposable-acquisition
+          - matches: async-disposable-commit
+    - not:
         follows:
           stopBy: neighbor
           any:
@@ -73,6 +77,10 @@ rule:
                     pattern: $W = await Promise.all($$$)
                 - not:
                     pattern: $W = await Promise.allSettled($$$)
+          not:
+            any:
+              - matches: async-disposable-acquisition
+              - matches: async-disposable-commit
     - any:
         - all:
             - pattern:
@@ -150,8 +158,16 @@ rule:
                       pattern: $Y = await Promise.all($$$)
                   - not:
                       pattern: $Y = await Promise.allSettled($$$)
+          - not:
+              any:
+                - matches: async-disposable-acquisition
+                - matches: async-disposable-commit
           - precedes:
               stopBy: neighbor
+              not:
+                any:
+                  - matches: async-disposable-acquisition
+                  - matches: async-disposable-commit
               any:
                 - all:
                     - pattern:
@@ -202,6 +218,69 @@ constraints:
   P:
     not:
       regex: '^Promise\.all(Settled)?\b'
+utils:
+  async-disposable-acquisition:
+    all:
+      - pattern:
+          context: |
+            async function run() {
+              await using $RESOURCE = await $ACQUIRE
+            }
+          selector: expression_statement
+      - precedes:
+          # Pair only with the nearest lifecycle endpoint to the right.
+          # Overlapping-resource policy belongs to a separate lifecycle rule.
+          stopBy:
+            any:
+              - pattern:
+                  context: |
+                    async function run() {
+                      await using $_ = await $_
+                    }
+                  selector: expression_statement
+              - pattern:
+                  context: |
+                    async function run() {
+                      await $_.commit($$$)
+                    }
+                  selector: expression_statement
+          pattern:
+            context: |
+              async function run() {
+                await $RESOURCE.commit($$$)
+              }
+            selector: expression_statement
+  async-disposable-commit:
+    all:
+      - pattern:
+          context: |
+            async function run() {
+              await $RESOURCE.commit($$$)
+            }
+          selector: expression_statement
+      - follows:
+          # Pair only with the nearest lifecycle endpoint to the left.
+          # Overlapping-resource policy belongs to a separate lifecycle rule.
+          stopBy:
+            any:
+              - pattern:
+                  context: |
+                    async function run() {
+                      await using $_ = await $_
+                    }
+                  selector: expression_statement
+              - pattern:
+                  context: |
+                    async function run() {
+                      await $_.commit($$$)
+                    }
+                  selector: expression_statement
+          pattern:
+            context: |
+              async function run() {
+                await using $RESOURCE = await $ACQUIRE
+              }
+            selector: expression_statement
 examples:
   - code: |
       async function run() {
@@ -239,4 +318,94 @@ examples:
         await Promise.all([one(), two(), three()])
       }
     isValid: true
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+      }
+    isValid: true
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginBoundedTransaction({ timeoutMs: 1000 })
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await transaction.commit()
+      }
+    isValid: true
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await applyThirdChange(transaction)
+        await transaction.commit()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await unrelatedFirst()
+        await unrelatedSecond()
+        await unrelatedThird()
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await other.commit()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+        await afterFirst()
+        await afterSecond()
+        await afterThird()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using outer = await acquire()
+        {
+          await using inner = await acquire()
+          await innerFirst(inner)
+          await innerSecond(inner)
+          await innerThird(inner)
+          await inner.commit()
+        }
+        await outer.commit()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await transaction.rollback()
+      }
+    isValid: false
+    file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await using resource = await acquire()
+        await useFirst(resource)
+        await useSecond(resource)
+        await resource.dispose()
+      }
+    isValid: false
     file: 'backend/services/example.mts'
