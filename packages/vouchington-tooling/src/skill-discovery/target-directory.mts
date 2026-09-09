@@ -46,6 +46,7 @@ async function runDirectoryLinkWorker(
   target: TargetDirectory,
   name: string,
 ): Promise<string> {
+  const relativeSource = relative(target.path, source)
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
@@ -53,7 +54,7 @@ async function runDirectoryLinkWorker(
         '--input-type=module',
         '--eval',
         LINK_WORKER,
-        source,
+        relativeSource,
         name,
         String(target.dev),
         String(target.ino),

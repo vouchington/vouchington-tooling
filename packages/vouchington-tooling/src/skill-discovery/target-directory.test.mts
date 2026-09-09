@@ -1,6 +1,6 @@
-import { lstat, mkdtemp, mkdir, realpath, rename, rm, symlink } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readlink, realpath, rename, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -70,6 +70,24 @@ describe('target directory', () => {
     await expect(
       linkDirectoryEntry('source', target, 'skill', undefined, async () => 'existing'),
     ).resolves.toBe(false)
+  })
+
+  it('links a real entry with a symlink target relative to the target directory', async () => {
+    const root = await fixture()
+    const source = join(root, 'source-skill')
+    await mkdir(source)
+    const targetPath = join(root, 'nested', 'target')
+    await mkdir(targetPath, { recursive: true })
+    const target = await resolveTargetDirectory(targetPath)
+    const linkPath = join(targetPath, 'skill')
+
+    await expect(linkDirectoryEntry(source, target, 'skill')).resolves.toBe(true)
+
+    const rawTarget = await readlink(linkPath)
+    expect(isAbsolute(rawTarget)).toBe(false)
+    await expect(realpath(linkPath)).resolves.toBe(await realpath(source))
+
+    await expect(linkDirectoryEntry(source, target, 'skill')).resolves.toBe(false)
   })
 })
 

@@ -1,14 +1,4 @@
-import {
-  lstat,
-  mkdtemp,
-  mkdir,
-  readlink,
-  realpath,
-  rename,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -71,7 +61,7 @@ describe('skill discovery', () => {
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot, targetRoot }),
     ).resolves.toMatchObject({ created: true })
-    await expect(readlink(join(targetRoot, 'agent-workflow'))).resolves.toBe(
+    await expect(realpath(join(targetRoot, 'agent-workflow'))).resolves.toBe(
       await realpath(join(sourceRoot, 'agent-workflow')),
     )
   })
@@ -143,7 +133,7 @@ describe('skill discovery', () => {
     )
     await linkSkill({ name: 'backend-vitest-test-authoring', sourceRoot, targetRoot })
     for (const [name] of skills) {
-      await expect(readlink(join(targetRoot, name))).resolves.toBe(
+      await expect(realpath(join(targetRoot, name))).resolves.toBe(
         await realpath(join(sourceRoot, name)),
       )
     }

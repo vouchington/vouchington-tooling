@@ -10,7 +10,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -36,7 +36,7 @@ describe('logical skill source roots', () => {
     await expect(
       linkSkill({ name: 'agent-workflow', sourceRoot: root, targetRoot }),
     ).resolves.toMatchObject({ created: true })
-    await expect(readlink(join(targetRoot, 'agent-workflow'))).resolves.toBe(
+    await expect(realpath(join(targetRoot, 'agent-workflow'))).resolves.toBe(
       await realpath(join(root, 'agent-workflow')),
     )
     await expect(linkSkill({ name: 'missing', sourceRoot: root, targetRoot })).rejects.toThrow(
@@ -110,7 +110,7 @@ describe('logical skill source roots', () => {
       created: true,
     })
     for (const name of ['agent-workflow', 'first', 'second', 'shared']) {
-      await expect(readlink(join(targetRoot, name))).resolves.toBe(join(root, name))
+      await expect(realpath(join(targetRoot, name))).resolves.toBe(join(root, name))
     }
   })
 
@@ -133,7 +133,7 @@ describe('logical skill source roots', () => {
     )
     expect(results.filter((result) => result.created)).toHaveLength(1)
     expect(await readlink(join(targetRoot, 'agent-workflow'))).toBe(
-      join(sourceRoot, 'agent-workflow'),
+      relative(targetRoot, join(sourceRoot, 'agent-workflow')),
     )
 
     await unlink(sourceRoot)
