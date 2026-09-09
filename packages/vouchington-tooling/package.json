@@ -330,10 +330,6 @@
     "@types/picomatch": "^4.0.3",
     "agent-blackboard": "^0.5.0"
   },
-  "optionalDependencies": {
-    "@libpg-query/parser": "^18.0.0",
-    "@typescript/typescript6": "^6.0.2"
-  },
   "peerDependencies": {
     "typescript": ">=5"
   },
@@ -341,6 +337,10 @@
     "typescript": {
       "optional": true
     }
+  },
+  "optionalDependencies": {
+    "@libpg-query/parser": "^18.0.0",
+    "@typescript/typescript6": "^6.0.2"
   },
   "engines": {
     "node": ">=24.0.0"
