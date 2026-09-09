@@ -1,5 +1,5 @@
 id: no-object-assign-new-error
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Use http-errors/http-assert or an explicit typed error helper instead of Object.assign(new Error(...))'
 files:

@@ -1,11 +1,12 @@
 id: no-three-sequential-awaits
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Avoid 3 sequential await statements; abstract dependent work or parallelize independent work with Promise.all().'
 files:
   - '**/*.ts'
   - '**/*.mts'
   - '**/*.cts'
+  - '**/*.tsx'
 ignores:
   - '**/*.test.ts'
   - '**/*.test.mts'
@@ -18,19 +19,23 @@ ignores:
   - '**/*.mock.test.cts'
   - '**/*.stories.ts'
   - '**/*.stories.mts'
-  - 'backend/test-helpers/**'
-  - 'test-helpers/**'
-  - 'test-infra/**'
-  - 'web/test-helpers/**'
+  - backend/test-helpers/**
+  - test-helpers/**
+  - test-infra/**
+  - web/test-helpers/**
   - '**/test-helpers/**'
-  - 'playwright/**'
-  - 'playwright/setup/**'
-  - 'integration-tests/**'
-  - 'seed/**'
+  - playwright/**
+  - playwright/setup/**
+  - integration-tests/**
+  - seed/**
   - '**/seeds/**'
-  - 'backend/scripts/seeds/**'
-  - 'backend/scripts/seed/**'
-  - 'backend/scripts/explain-analyze/**'
+  - backend/scripts/seeds/**
+  - backend/scripts/seed/**
+  - backend/scripts/explain-analyze/**
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/*.mock.test.tsx'
+  - '**/*.stories.tsx'
 rule:
   all:
     - not:
@@ -46,6 +51,10 @@ rule:
                     context: await $P
                     selector: expression_statement
                 - not:
+                    pattern: await params
+                - not:
+                    pattern: await searchParams
+                - not:
                     has:
                       pattern: Promise.all($$)
                 - not:
@@ -54,17 +63,29 @@ rule:
             - all:
                 - pattern: const $W = await $P
                 - not:
+                    pattern: const $W = await params
+                - not:
+                    pattern: const $W = await searchParams
+                - not:
                     pattern: const $W = await Promise.all($$$)
                 - not:
                     pattern: const $W = await Promise.allSettled($$$)
             - all:
                 - pattern: let $W = await $P
                 - not:
+                    pattern: let $W = await params
+                - not:
+                    pattern: let $W = await searchParams
+                - not:
                     pattern: let $W = await Promise.all($$$)
                 - not:
                     pattern: let $W = await Promise.allSettled($$$)
             - all:
                 - pattern: var $W = await $P
+                - not:
+                    pattern: var $W = await params
+                - not:
+                    pattern: var $W = await searchParams
                 - not:
                     pattern: var $W = await Promise.all($$$)
                 - not:
@@ -73,6 +94,10 @@ rule:
                 - pattern:
                     context: $W = await $P
                     selector: expression_statement
+                - not:
+                    pattern: $W = await params
+                - not:
+                    pattern: $W = await searchParams
                 - not:
                     pattern: $W = await Promise.all($$$)
                 - not:
@@ -87,6 +112,10 @@ rule:
                 context: await $A
                 selector: expression_statement
             - not:
+                pattern: await params
+            - not:
+                pattern: await searchParams
+            - not:
                 has:
                   pattern: Promise.all($$)
             - not:
@@ -95,17 +124,29 @@ rule:
         - all:
             - pattern: const $X = await $A
             - not:
+                pattern: const $X = await params
+            - not:
+                pattern: const $X = await searchParams
+            - not:
                 pattern: const $X = await Promise.all($$$)
             - not:
                 pattern: const $X = await Promise.allSettled($$$)
         - all:
             - pattern: let $X = await $A
             - not:
+                pattern: let $X = await params
+            - not:
+                pattern: let $X = await searchParams
+            - not:
                 pattern: let $X = await Promise.all($$$)
             - not:
                 pattern: let $X = await Promise.allSettled($$$)
         - all:
             - pattern: var $X = await $A
+            - not:
+                pattern: var $X = await params
+            - not:
+                pattern: var $X = await searchParams
             - not:
                 pattern: var $X = await Promise.all($$$)
             - not:
@@ -114,6 +155,10 @@ rule:
             - pattern:
                 context: $X = await $A
                 selector: expression_statement
+            - not:
+                pattern: $X = await params
+            - not:
+                pattern: $X = await searchParams
             - not:
                 pattern: $X = await Promise.all($$$)
             - not:
@@ -127,6 +172,10 @@ rule:
                       context: await $B
                       selector: expression_statement
                   - not:
+                      pattern: await params
+                  - not:
+                      pattern: await searchParams
+                  - not:
                       has:
                         pattern: Promise.all($$)
                   - not:
@@ -135,17 +184,29 @@ rule:
               - all:
                   - pattern: const $Y = await $B
                   - not:
+                      pattern: const $Y = await params
+                  - not:
+                      pattern: const $Y = await searchParams
+                  - not:
                       pattern: const $Y = await Promise.all($$$)
                   - not:
                       pattern: const $Y = await Promise.allSettled($$$)
               - all:
                   - pattern: let $Y = await $B
                   - not:
+                      pattern: let $Y = await params
+                  - not:
+                      pattern: let $Y = await searchParams
+                  - not:
                       pattern: let $Y = await Promise.all($$$)
                   - not:
                       pattern: let $Y = await Promise.allSettled($$$)
               - all:
                   - pattern: var $Y = await $B
+                  - not:
+                      pattern: var $Y = await params
+                  - not:
+                      pattern: var $Y = await searchParams
                   - not:
                       pattern: var $Y = await Promise.all($$$)
                   - not:
@@ -154,6 +215,10 @@ rule:
                   - pattern:
                       context: $Y = await $B
                       selector: expression_statement
+                  - not:
+                      pattern: $Y = await params
+                  - not:
+                      pattern: $Y = await searchParams
                   - not:
                       pattern: $Y = await Promise.all($$$)
                   - not:
@@ -174,6 +239,10 @@ rule:
                         context: await $C
                         selector: expression_statement
                     - not:
+                        pattern: await params
+                    - not:
+                        pattern: await searchParams
+                    - not:
                         has:
                           pattern: Promise.all($$)
                     - not:
@@ -182,17 +251,29 @@ rule:
                 - all:
                     - pattern: const $Z = await $C
                     - not:
+                        pattern: const $Z = await params
+                    - not:
+                        pattern: const $Z = await searchParams
+                    - not:
                         pattern: const $Z = await Promise.all($$$)
                     - not:
                         pattern: const $Z = await Promise.allSettled($$$)
                 - all:
                     - pattern: let $Z = await $C
                     - not:
+                        pattern: let $Z = await params
+                    - not:
+                        pattern: let $Z = await searchParams
+                    - not:
                         pattern: let $Z = await Promise.all($$$)
                     - not:
                         pattern: let $Z = await Promise.allSettled($$$)
                 - all:
                     - pattern: var $Z = await $C
+                    - not:
+                        pattern: var $Z = await params
+                    - not:
+                        pattern: var $Z = await searchParams
                     - not:
                         pattern: var $Z = await Promise.all($$$)
                     - not:
@@ -201,6 +282,10 @@ rule:
                     - pattern:
                         context: $Z = await $C
                         selector: expression_statement
+                    - not:
+                        pattern: $Z = await params
+                    - not:
+                        pattern: $Z = await searchParams
                     - not:
                         pattern: $Z = await Promise.all($$$)
                     - not:
@@ -409,3 +494,126 @@ examples:
       }
     isValid: false
     file: 'backend/services/example.mts'
+  - code: |
+      async function run() {
+        await one()
+        await two()
+        await three()
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        const { id } = await params
+        const topic = await getTopic(id)
+        const aliases = await getAliases(id)
+        return <div>{topic.name}{aliases.length}</div>
+      }
+    isValid: true
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await Promise.all([one(), two(), three()])
+        return <div />
+      }
+    isValid: true
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+        return <div />
+      }
+    isValid: true
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginBoundedTransaction({ timeoutMs: 1000 })
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await transaction.commit()
+        return <div />
+      }
+    isValid: true
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await applyThirdChange(transaction)
+        await transaction.commit()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await unrelatedFirst()
+        await unrelatedSecond()
+        await unrelatedThird()
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await other.commit()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyChange(transaction)
+        await transaction.commit()
+        await afterFirst()
+        await afterSecond()
+        await afterThird()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using outer = await acquire()
+        {
+          await using inner = await acquire()
+          await innerFirst(inner)
+          await innerSecond(inner)
+          await innerThird(inner)
+          await inner.commit()
+        }
+        await outer.commit()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using transaction = await beginTransaction()
+        await applyFirstChange(transaction)
+        await applySecondChange(transaction)
+        await transaction.rollback()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx
+  - code: |
+      async function run() {
+        await using resource = await acquire()
+        await useFirst(resource)
+        await useSecond(resource)
+        await resource.dispose()
+        return <div />
+      }
+    isValid: false
+    file: web/app/example.tsx

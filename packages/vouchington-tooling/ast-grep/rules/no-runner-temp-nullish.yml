@@ -1,5 +1,5 @@
 id: no-runner-temp-nullish
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Use logical OR for RUNNER_TEMP temp roots so an empty string falls back safely.'
 files:

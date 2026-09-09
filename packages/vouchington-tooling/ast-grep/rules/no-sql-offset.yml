@@ -1,5 +1,5 @@
 id: no-sql-offset
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Do not use SQL OFFSET in backend sql templates; use cursor pagination, LIMIT + 1, COUNT, EXISTS, or ROW_NUMBER() instead'
 files:

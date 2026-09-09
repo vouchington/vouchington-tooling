@@ -1,5 +1,5 @@
 id: backend-no-test-file-imports
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Do not import backend test files from backend Vitest files; move shared helpers to test-helpers or a support module.'
 files:

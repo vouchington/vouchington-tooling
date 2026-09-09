@@ -1,5 +1,5 @@
 id: playwright-no-bare-meta-press
-language: TypeScript
+language: Tsx
 severity: error
 message: "use 'ControlOrMeta+' instead of 'Meta+' in Playwright .press() calls; bare Meta+ fails on Linux CI"
 files:

@@ -19,20 +19,26 @@ describe('ast-grep pack', () => {
     const pack = astGrepPackPaths()
     expect(pack.rules).toMatch(/ast-grep\/rules$/)
     expect(pack.config).toMatch(/ast-grep\/sgconfig\.yml$/)
-    expect(readFileSync(pack.config, 'utf8')).toContain('languageGlobs')
+    expect(yamlLoad(readFileSync(pack.config, 'utf8'))).toMatchObject({
+      languageGlobs: {
+        Tsx: ['**/*.ts', '**/*.mts', '**/*.cts', '**/*.tsx'],
+      },
+    })
   })
 
-  it('ships product-identifier-free unconditional rules with examples', () => {
+  it('ships product-identifier-free unconditional Tsx rules with examples', () => {
     const { rules } = astGrepPackPaths()
     const files = readdirSync(rules)
       .filter((file) => file.endsWith('.yml'))
       .toSorted()
     expect(files.length).toBeGreaterThan(20)
+    expect(files.filter((file) => file.endsWith('-tsx.yml'))).toEqual([])
     for (const file of files) {
       const text = readFileSync(join(rules, file), 'utf8')
       expect(text, file).not.toMatch(PRODUCT)
-      const rule = yamlLoad(text) as { id?: string; examples?: unknown[] }
+      const rule = yamlLoad(text) as { id?: string; language?: string; examples?: unknown[] }
       expect(rule.id, file).toBe(file.replace(/\.yml$/u, ''))
+      expect(rule.language, file).toBe('Tsx')
       expect(rule.examples?.length, file).toBeGreaterThan(0)
     }
   })
