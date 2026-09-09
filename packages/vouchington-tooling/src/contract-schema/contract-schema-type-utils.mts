@@ -22,13 +22,13 @@ export function namedObjectDefinition(type: ts.Type, checker: ts.TypeChecker): s
  * happen to reuse the same rest-variable name.
  */
 function isDeclaredTypeSymbol(symbol: ts.Symbol): boolean {
-  return (
+  return Boolean(
     symbol.declarations?.some(
       (declaration) =>
         ts.isInterfaceDeclaration(declaration) ||
         ts.isClassDeclaration(declaration) ||
         ts.isEnumDeclaration(declaration),
-    ) ?? false
+    ),
   )
 }
 
@@ -95,7 +95,7 @@ export function jsonPromiseType(type: ts.Type, checker: ts.TypeChecker): ts.Type
 export function jsonSerializedType(type: ts.Type, checker: ts.TypeChecker): ts.Type | undefined {
   const toJSON = checker.getPropertyOfType(type, 'toJSON')
   if (!toJSON) return undefined
-  const declaration = toJSON.valueDeclaration ?? toJSON.declarations?.[0]
+  const declaration = toJSON.valueDeclaration
   /* v8 ignore next */
   if (!declaration) return undefined
   const toJSONType = checker.getTypeOfSymbolAtLocation(toJSON, declaration)
@@ -104,9 +104,8 @@ export function jsonSerializedType(type: ts.Type, checker: ts.TypeChecker): ts.T
   return signature ? checker.getReturnTypeOfSignature(signature) : undefined
 }
 
-export function unsupportedType(type: ts.Type, checker: ts.TypeChecker, reason?: string): Error {
-  const rendered = checker.typeToString(type)
-  return new Error(`Unsupported response contract type "${rendered}"${reason ? `: ${reason}` : ''}`)
+export function unsupportedType(type: ts.Type, checker: ts.TypeChecker, reason: string): Error {
+  return new Error(`Unsupported response contract type "${checker.typeToString(type)}": ${reason}`)
 }
 
 export function compareSymbols(left: ts.Symbol, right: ts.Symbol): number {

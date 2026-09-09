@@ -106,7 +106,7 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     }
   }
   /* v8 ignore next */
-  if (!(type.flags & ts.TypeFlags.Object)) throw unsupportedType(type, checker)
+  if (!(type.flags & ts.TypeFlags.Object)) throw unsupportedType(type, checker, 'unsupported type')
   const serializedType = jsonSerializedType(type, checker)
   if (serializedType) return schemaForType(serializedType, context)
   const promisedType = jsonPromiseType(type, checker)
@@ -182,15 +182,15 @@ function schemaForNamedType(
   build: () => ContractSchemaNode,
 ): ContractSchemaNode {
   const existingType = context.definitionTypes.get(name)
+  /* v8 ignore start -- distinct checker types sharing a definition name */
   if (existingType && existingType !== type) {
-    /* v8 ignore start */
     const flags = ts.TypeFormatFlags.NoTruncation
     const existingIdentity = context.checker.typeToString(existingType, undefined, flags)
     const incomingIdentity = context.checker.typeToString(type, undefined, flags)
     if (existingIdentity === incomingIdentity) return { type: 'ref', name }
     throw new Error(`Response contract schema definition name collision: "${name}"`)
-    /* v8 ignore stop */
   }
+  /* v8 ignore stop */
   if (context.definitions.has(name) || context.activeTypes.has(type)) return { type: 'ref', name }
   context.definitionTypes.set(name, type)
   context.activeTypes.set(type, name)

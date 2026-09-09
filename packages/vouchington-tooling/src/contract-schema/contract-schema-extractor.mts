@@ -16,10 +16,9 @@ export function extractResponseContracts(
   const contracts: Record<string, ExtractedResponseContract> = {}
 
   for (const property of checker.getPropertiesOfType(registryType).toSorted(compareSymbols)) {
-    const declaration = property.valueDeclaration ?? property.declarations?.[0]
-    /* v8 ignore start */
+    const declaration = property.valueDeclaration
+    /* v8 ignore next */
     if (!declaration) throw new Error(`Contract "${property.name}" has no declaration`)
-    /* v8 ignore stop */
     const propertyType = checker.getTypeOfSymbolAtLocation(property, declaration)
     contracts[property.name] = extractContractSchema(
       propertyType,

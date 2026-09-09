@@ -16,7 +16,7 @@ export function objectSchema(
 ): ContractSchemaNode {
   const properties: Record<string, { required: boolean; schema: ContractSchemaNode }> = {}
   for (const property of context.checker.getPropertiesOfType(type).toSorted(compareSymbols)) {
-    const declaration = property.valueDeclaration ?? property.declarations?.[0]
+    const declaration = property.valueDeclaration
     /* v8 ignore start */
     const propertyType = declaration
       ? context.checker.getTypeOfSymbolAtLocation(property, declaration)
@@ -29,11 +29,7 @@ export function objectSchema(
         schema: schemaForType(propertyType, context),
       }
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Property "${property.name}": ${error.message}`, { cause: error })
-      }
-      /* v8 ignore next -- schemaForType throws Error */
-      throw error
+      throw new Error(`Property "${property.name}": ${(error as Error).message}`, { cause: error })
     }
   }
   const stringIndex = context.checker.getIndexInfoOfType(type, ts.IndexKind.String)
@@ -63,8 +59,7 @@ export function tupleSchema(
   schemaForType: SchemaForType,
 ): ContractSchemaNode {
   const items = context.checker.getTypeArguments(type as ts.TypeReference)
-  const flags =
-    ((type as ts.TypeReference).target as ts.TupleType).elementFlags ?? /* v8 ignore next */ []
+  const flags = ((type as ts.TypeReference).target as ts.TupleType).elementFlags
   const restIndex = flags.findIndex((flag) => Boolean(flag & ts.ElementFlags.Variable))
   const fixedItems = restIndex === -1 ? items : items.slice(0, restIndex)
   return {

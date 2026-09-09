@@ -52,8 +52,7 @@ export function collectObjectShape(
   addAdditional: (schema: ContractSchemaNode) => void,
 ): void {
   if (node.type === 'ref') {
-    const definition = definitions[node.name]
-    if (definition) collectObjectShape(definition, definitions, properties, addAdditional)
+    collectObjectShape(definitions[node.name]!, definitions, properties, addAdditional)
     return
   }
   if (node.type === 'intersection') {

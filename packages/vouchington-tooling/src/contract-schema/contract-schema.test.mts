@@ -99,7 +99,9 @@ const sources = {
       nested: Box<Array<{ z: string }>>
       amount: Box<number>
       yes: Box<boolean>
+      wrapped: Box<Named>
     }
+    type Named = { x: string }
   `,
   'named-interface': `
     interface Named { x: string }
@@ -145,6 +147,13 @@ const sources = {
   'typeof-object': `
     const sample = { x: 'a' }
     interface ApiResponseContracts { result: typeof sample }
+  `,
+  'same-anonymous-generic': `
+    type Box<T> = { value: T }
+    interface ApiResponseContracts {
+      a: Box<{ z: string }>
+      b: Box<{ z: string }>
+    }
   `,
 } as const
 
@@ -331,6 +340,7 @@ describe('response contract schemas', () => {
     expect(extracted.empty!.schema.root).toEqual({ type: 'ref', name: 'Box<null>' })
     expect(extracted.amount!.schema.root).toEqual({ type: 'ref', name: 'Box<number>' })
     expect(extracted.yes!.schema.root).toEqual({ type: 'ref', name: 'Box<boolean>' })
+    expect(extracted.wrapped!.schema.root).toEqual({ type: 'ref', name: 'Box<Named>' })
     expect(extracted.nested!.schema.root).toMatchObject({ type: 'ref' })
     expect(contracts('named-interface').result!.schema.root).toEqual({
       type: 'ref',
@@ -406,5 +416,7 @@ describe('response contract schemas', () => {
     expect(Object.keys(twoNamed.definitions).toSorted()).toEqual(['Alpha', 'Beta'])
     expect(contracts('named-union').result!.schema.root).toEqual({ type: 'ref', name: 'Status' })
     expect(contracts('typeof-object').result!.schema.root).toMatchObject({ type: 'object' })
+    const sameAnonymous = contracts('same-anonymous-generic')
+    expect(sameAnonymous.a!.schema.root).toEqual(sameAnonymous.b!.schema.root)
   })
 })
