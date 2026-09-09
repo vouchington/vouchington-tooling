@@ -18,9 +18,12 @@ on:
         type: string
         default: ''
       tooling_ref:
-        description: Immutable full SHA of vouchington/vouchington-tooling for nested actions
-        required: true
+        description: >-
+          Optional immutable full SHA of vouchington/vouchington-tooling for nested actions.
+          Defaults to the tooling commit pinned by the caller's uses: line.
+        required: false
         type: string
+        default: ''
       trusted_prompt_ref:
         description: Set explicitly to expected_base_sha whenever selected SHAs are provided
         required: false
@@ -164,7 +167,7 @@ jobs:
       - name: Validate immutable tooling ref
         shell: bash
         env:
-          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
+          TOOLING_REF: ${{ inputs.tooling_ref || job.workflow_sha }}
         run: |
           set -euo pipefail
           [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
@@ -219,7 +222,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vouchington/vouchington-tooling
-          ref: ${{ inputs.tooling_ref || github.sha }}
+          ref: ${{ inputs.tooling_ref || job.workflow_sha }}
           path: .vouchington-tooling
           fetch-depth: 1
 
@@ -270,7 +273,7 @@ jobs:
       - name: Validate immutable tooling ref
         shell: bash
         env:
-          TOOLING_REF: ${{ inputs.tooling_ref || github.sha }}
+          TOOLING_REF: ${{ inputs.tooling_ref || job.workflow_sha }}
         run: |
           set -euo pipefail
           [[ "$TOOLING_REF" =~ ^[0-9a-f]{40}$ ]] || {
@@ -282,7 +285,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vouchington/vouchington-tooling
-          ref: ${{ inputs.tooling_ref || github.sha }}
+          ref: ${{ inputs.tooling_ref || job.workflow_sha }}
           path: .vouchington-tooling
           fetch-depth: 1
 

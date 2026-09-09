@@ -58,7 +58,7 @@ describe('opencode-code-review reusable workflow', () => {
       provider: { required: true, type: 'string' },
       model: { required: true, type: 'string' },
       pr_number: { required: true, type: 'string' },
-      tooling_ref: { required: true, type: 'string' },
+      tooling_ref: { required: false, type: 'string', default: '' },
       runs_on: { required: false, type: 'string', default: '["ubuntu-latest"]' },
       timeout_minutes: { required: false, type: 'string', default: '60' },
     })
@@ -104,18 +104,23 @@ describe('opencode-code-review reusable workflow', () => {
     expect(agentStep?.uses).toBe('./.vouchington-tooling/.github/actions/opencode-code-review')
   })
 
-  it('validates tooling_ref as a full lowercase SHA before any arithmetic or checkout, in both jobs', () => {
+  it('validates tooling_ref as a full lowercase SHA before any arithmetic or checkout, in both jobs, falling back to the job-scoped tooling workflow SHA', () => {
     for (const jobId of ['review', 'post'] as const) {
       const job = workflow.jobs?.[jobId]
       const guard = job?.steps?.[0]
       expect(guard?.name).toBe('Validate immutable tooling ref')
       expect(guard?.shell).toBe('bash')
-      expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref }}')
+      expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref || job.workflow_sha }}')
       expect(guard?.run).toContain('^[0-9a-f]{40}$')
       expect(guard?.run).toContain('tooling_ref must be a full lowercase commit SHA')
     }
+    // job.workflow_sha resolves to this repository's own pinned commit regardless of caller;
+    // github.workflow_sha would resolve to the top-level caller's commit instead — see #99.
+    expect(text).not.toContain('github.workflow_sha')
     expect(text.match(/repository: vouchington\/vouchington-tooling/g)).toHaveLength(2)
-    expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \}\}/g)).toHaveLength(2)
+    expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \|\| job\.workflow_sha \}\}/g)).toHaveLength(
+      2,
+    )
   })
 
   it('clamps timeout_minutes to a 1-3600 second range without ever failing the job', () => {
