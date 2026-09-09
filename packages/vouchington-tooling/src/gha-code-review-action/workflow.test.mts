@@ -112,18 +112,26 @@ describe('code-review reusable workflow', () => {
     )
   })
 
-  it('loads nested composites from an explicit tooling SHA, never the caller workflow SHA', () => {
+  it('loads nested composites from an explicit tooling SHA, falling back to the job-scoped tooling workflow SHA, never the caller workflow SHA', () => {
     expect(workflow.on?.workflow_call?.inputs?.tooling_ref).toMatchObject({
-      required: true,
+      required: false,
       type: 'string',
+      default: '',
     })
     expect(workflow.on?.workflow_dispatch?.inputs?.tooling_ref).toMatchObject({
       required: false,
       type: 'string',
       default: '',
     })
+    // github.workflow_sha/github.sha are scoped to the top-level caller workflow in a
+    // workflow_call chain, not to this reusable workflow's own pinned commit — see #99.
+    // job.workflow_sha is scoped to whichever workflow file defines the current job, which
+    // resolves to this repository's own commit regardless of who calls in.
     expect(text).not.toContain('github.workflow_sha')
-    expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \|\| github\.sha \}\}/g)).toHaveLength(2)
+    expect(text).not.toContain('inputs.tooling_ref || github.sha')
+    expect(text.match(/ref: \$\{\{ inputs\.tooling_ref \|\| job\.workflow_sha \}\}/g)).toHaveLength(
+      2,
+    )
     const toolingRefJobs = [workflow.jobs?.review, workflow.jobs?.poster]
     const toolingRefGuards = toolingRefJobs.map((job) =>
       job?.steps?.find((step) => step.name === 'Validate immutable tooling ref'),
@@ -132,7 +140,7 @@ describe('code-review reusable workflow', () => {
     for (const [index, guard] of toolingRefGuards.entries()) {
       expect(toolingRefJobs[index]?.steps?.indexOf(guard!)).toBe(0)
       expect(guard?.shell).toBe('bash')
-      expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref || github.sha }}')
+      expect(guard?.env?.TOOLING_REF).toBe('${{ inputs.tooling_ref || job.workflow_sha }}')
       expect(guard?.run).toContain('tooling_ref must be a full lowercase commit SHA')
       expect(guard?.run).toContain('^[0-9a-f]{40}$')
     }
