@@ -325,6 +325,33 @@ export type {
   RequestContract,
   ResponseContract,
 } from './openapi-document/index.mts'
+export {
+  buildVirtualProgramMatrix,
+  extractContractSchema,
+  extractResponseContracts,
+  validateResponseContract,
+  virtualProgramBuildCountForTest,
+} from './contract-schema/index.mts'
+export type {
+  ContractValidationIssue,
+  ExtractContractSchemaOptions,
+  ExtractedResponseContract,
+  VirtualProgramMatrix,
+} from './contract-schema/index.mts'
+export {
+  buildFixtureSchemaLock,
+  responseSchemaFor,
+  validateFixtureContracts,
+  writeGeneratedFiles,
+} from './api-fixtures/index.mts'
+export type {
+  FixtureSchemaLock,
+  FixtureSchemaLockCase,
+  FixtureSchemaLockSource,
+  FixtureValidationCase,
+  FixtureValidationContract,
+  ValidateFixtureContractsOptions,
+} from './api-fixtures/index.mts'
 export { decide, deriveRetryAttempt } from './transient-retry/index.mts'
 export type {
   DecisionResult,

@@ -168,6 +168,16 @@
       "import": "./dist/openapi-document/index.mjs",
       "default": "./dist/openapi-document/index.mjs"
     },
+    "./contract-schema": {
+      "types": "./dist/contract-schema/index.d.mts",
+      "import": "./dist/contract-schema/index.mjs",
+      "default": "./dist/contract-schema/index.mjs"
+    },
+    "./api-fixtures": {
+      "types": "./dist/api-fixtures/index.d.mts",
+      "import": "./dist/api-fixtures/index.mjs",
+      "default": "./dist/api-fixtures/index.mjs"
+    },
     "./transient-retry": {
       "types": "./dist/transient-retry/index.d.mts",
       "import": "./dist/transient-retry/index.mjs",
@@ -321,7 +331,16 @@
     "agent-blackboard": "^0.5.0"
   },
   "optionalDependencies": {
-    "@libpg-query/parser": "^18.0.0"
+    "@libpg-query/parser": "^18.0.0",
+    "@typescript/typescript6": "^6.0.2"
+  },
+  "peerDependencies": {
+    "typescript": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=24.0.0"

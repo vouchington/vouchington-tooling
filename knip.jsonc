@@ -6,7 +6,9 @@
   "workspaces": {
     "packages/vouchington-tooling": {
       // Loaded from the consumer package boundary only when the opt-in integration runs.
-      "ignoreDependencies": ["agent-blackboard"],
+      // typescript: optional peer for classic-API-compatible installs; runtime import uses
+      // optionalDependency @typescript/typescript6 under typescript@7 workspaces.
+      "ignoreDependencies": ["agent-blackboard", "typescript"],
       "entry": [
         "src/index.mts!",
         "src/cli/index.mts!",
@@ -24,6 +26,8 @@
         "src/process-line-buffer/index.mts!",
         "src/pg-schema-snapshot/index.mts!",
         "src/openapi-document/index.mts!",
+        "src/contract-schema/index.mts!",
+        "src/api-fixtures/index.mts!",
         "src/coverage-transport/index.mts!",
         "src/pnpm-deploy/index.mts!",
         "src/dockerfile-parse/index.mts!",
