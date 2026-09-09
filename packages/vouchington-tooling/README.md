@@ -93,6 +93,9 @@ ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-i
 nonignored-working-tree mirrors with an explicit config; `--directory` selects the repository root.
 `ast-grep-examples` runs native `ast-grep test`, then validates each scoped rule's `files:` and
 `ignores:` examples with project `languageGlobs` replay from its root `--config`.
+The shipped pack maps `**/*.ts`, `**/*.mts`, `**/*.cts`, and `**/*.tsx` to `Tsx` so one rule
+covers script and JSX surfaces. Consumers must use the same `languageGlobs` and `language: Tsx`;
+do not add `-tsx` companion YAML. Angle-bracket type assertions (`<T>value`) are not valid TSX.
 `compareAstGrepCompanions` compares recursive `<name>.yml`/`.yaml` and `<name>-tsx` companion
 rules across every YAML field, returns stable JSON-pointer differences, and rejects unsafe or
 ambiguous rule paths. The supplied rule path and every ancestor must be physical directories; YAML

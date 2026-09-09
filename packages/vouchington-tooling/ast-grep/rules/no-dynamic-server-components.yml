@@ -2,17 +2,17 @@
 # It cannot verify the import source — it matches by function name.
 # If you have other functions named `dynamic` or `nextDynamic`, add a suppression comment.
 id: no-dynamic-server-components
-language: TypeScript
+language: Tsx
 severity: error
 message: "dynamic()/nextDynamic() may wrap a server component — ensure the target has 'use client'"
-# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
-# only scans `.ts` files; see no-dynamic-server-components-tsx.yml for the
-# companion rule that covers `.tsx` files.
 files:
-  - 'web/**/*.ts'
+  - web/**/*.ts
+  - web/**/*.tsx
 ignores:
   - '**/*.test.ts'
   - '**/*.spec.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
 rule:
   any:
     - pattern: '$FN(() => import($PATH))'
@@ -69,3 +69,39 @@ examples:
   - code: "const Comp = lazy(() => import('./my-component'))"
     isValid: true
     file: 'web/app/page.ts'
+  - code: const Comp = dynamic(() => import('./my-component'))
+    isValid: false
+    file: web/app/page.tsx
+  - code: const Comp = dynamic(() => import(`./my-component`))
+    isValid: false
+    file: web/app/page.tsx
+  - code: const Comp = dynamic(() => import('../components/comp'))
+    isValid: false
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./add-tag-form').then(m => ({ default: m.AddTagForm })))"
+    isValid: false
+    file: web/app/page.tsx
+  - code: const Comp = nextDynamic(() => import('./my-component'))
+    isValid: false
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./c'), { loading: () => null })"
+    isValid: false
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./c'), { not_ssr: false })"
+    isValid: false
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./c'), { ssr: falsey })"
+    isValid: false
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./c'), { ssr: false })"
+    isValid: true
+    file: web/app/page.tsx
+  - code: 'const Comp = dynamic(() => import("./c"), { "ssr": false })'
+    isValid: true
+    file: web/app/page.tsx
+  - code: "const Comp = dynamic(() => import('./c'), { 'ssr': false })"
+    isValid: true
+    file: web/app/page.tsx
+  - code: const Comp = lazy(() => import('./my-component'))
+    isValid: true
+    file: web/app/page.tsx

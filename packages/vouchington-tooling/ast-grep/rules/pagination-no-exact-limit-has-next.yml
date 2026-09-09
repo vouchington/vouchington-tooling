@@ -1,5 +1,5 @@
 id: pagination-no-exact-limit-has-next
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Do not infer another page from an exact page-size boundary; fetch limit + 1 and test rows.length > limit.'
 files:

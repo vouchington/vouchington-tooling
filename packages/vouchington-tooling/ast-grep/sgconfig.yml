@@ -1,9 +1,8 @@
 ruleDirs:
   - rules
 languageGlobs:
-  TypeScript:
+  Tsx:
     - '**/*.ts'
     - '**/*.mts'
     - '**/*.cts'
-  Tsx:
     - '**/*.tsx'

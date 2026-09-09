@@ -1,5 +1,5 @@
 id: no-dynamic-import-in-vitest-config
-language: TypeScript
+language: Tsx
 severity: error
 message: >-
   vitest config files must use static imports — dynamic import() prevents

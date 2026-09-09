@@ -1,5 +1,5 @@
 id: storybook-no-webpack-final
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Storybook must use viteFinal, not webpackFinal; this project uses @storybook/nextjs-vite'
 files:

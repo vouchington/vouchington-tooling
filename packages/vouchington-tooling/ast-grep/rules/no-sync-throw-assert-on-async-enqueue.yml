@@ -1,5 +1,5 @@
 id: no-sync-throw-assert-on-async-enqueue
-language: TypeScript
+language: Tsx
 severity: error
 message: 'Best-effort syntactic heuristic (not type-aware): this wraps a synchronous throw-assertion around a call that looks like a Promise-returning enqueue call. expect(() => fn()).not.toThrow() and .toThrow() only observe a synchronous throw and never see an async rejection, so this gives false confidence in the async contract. Await the call and assert on its resolved value instead, e.g. expect(await enqueueFoo()).toBeUndefined() or await expect(enqueueFoo()).resolves.toBeDefined().'
 files:

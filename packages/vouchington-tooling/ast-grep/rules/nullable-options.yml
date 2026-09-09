@@ -1,5 +1,5 @@
 id: nullable-options
-language: TypeScript
+language: Tsx
 severity: error
 message: >-
   This helper option member is declared optional-nullable (`T | null` with `?`), so a bare `??`/`||`

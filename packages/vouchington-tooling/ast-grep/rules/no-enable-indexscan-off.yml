@@ -1,8 +1,5 @@
-# NOTE: ast-grep maps `.tsx` to language `Tsx`, not `TypeScript`. This rule
-# only scans `.ts/.mts/.cts` files; see no-enable-indexscan-off-tsx.yml for
-# the companion rule that covers `.tsx` files.
 id: no-enable-indexscan-off
-language: TypeScript
+language: Tsx
 severity: error
 message: >-
   Do not use `enable_indexscan = off` — it disables index scans repo-wide within the transaction
@@ -39,3 +36,19 @@ examples:
       const note = 'see applyFilteredVectorScan'
     isValid: true
     file: 'backend/src/vector-scan.mts'
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan = off`
+    isValid: false
+    file: web/lib/__tests__/example.tsx
+  - code: |-
+      import sql from 'sql-template-strings'
+      export const query = sql`SET LOCAL enable_indexscan TO off`
+    isValid: false
+    file: web/lib/__tests__/example.tsx
+  - code: |-
+      export function Example() {
+        return <div>hnsw.iterative_scan = strict_order</div>
+      }
+    isValid: true
+    file: web/components/example.tsx
