@@ -22,9 +22,12 @@ branching, review, and release policy.
    checks with a concrete reason.
 6. Review the diff for accidental files, secrets, generated output, broken documentation links,
    and assumptions that belong in local instructions instead.
+7. When feedback arrives on an open change, give every surfaced item a disposition and drive it to
+   closure before hand-off; do not leave items unaddressed or silently absorb or defer them.
 
 For portable implementation and review checks, read [implementation](references/implementation.md),
-[review](references/review.md), and [evidence sweep](references/evidence-sweep.md). The older
+[review](references/review.md), [review response](references/review-response.md), and
+[evidence sweep](references/evidence-sweep.md). The older
 [implementation and review](references/implementation-and-review.md) remains a compact overview.
 Local instructions remain authoritative for commands, commits, review systems, and release policy.
 
