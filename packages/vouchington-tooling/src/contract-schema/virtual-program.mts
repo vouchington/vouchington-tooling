@@ -39,7 +39,7 @@ export function buildVirtualProgramMatrix<const Id extends string>(
     target: ts.ScriptTarget.ESNext,
   }
   const host = ts.createCompilerHost(options, true)
-  const originalGetSourceFile = host.getSourceFile
+  const originalGetSourceFile = host.getSourceFile.bind(host)
   host.getSourceFile = (requested, languageVersion, onError, shouldCreateNewSourceFile) => {
     const virtualSource = sourcesByFileName.get(requested)
     if (virtualSource !== undefined) {
@@ -47,8 +47,7 @@ export function buildVirtualProgramMatrix<const Id extends string>(
     }
     const cached = virtualCompilerSourceFiles.get(requested)
     if (cached) return cached
-    const sourceFile = originalGetSourceFile.call(
-      host,
+    const sourceFile = originalGetSourceFile(
       requested,
       languageVersion,
       onError,

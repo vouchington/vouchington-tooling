@@ -165,8 +165,7 @@ function distinctSchemaShapes(shapes: unknown[]): unknown[] {
 
 function hasToJSON(value: unknown): value is { toJSON(): unknown } {
   if (value == null || typeof value !== 'object') return false
-  const candidate = value as { toJSON?: unknown }
-  return typeof candidate.toJSON === 'function'
+  return typeof (value as { toJSON?: unknown }).toJSON === 'function'
 }
 
 function isIdKeyedMap(entries: [string, unknown][]): boolean {

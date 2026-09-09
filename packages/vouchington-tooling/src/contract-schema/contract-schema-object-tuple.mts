@@ -45,10 +45,11 @@ function typeOfSyntheticProperty(
   property: ts.Symbol,
   checker: ts.TypeChecker,
 ): ts.Type | undefined {
-  const internalChecker = checker as ts.TypeChecker & {
-    getTypeOfSymbol?: (symbol: ts.Symbol) => ts.Type
-  }
-  return internalChecker.getTypeOfSymbol?.(property)
+  return (
+    checker as ts.TypeChecker & {
+      getTypeOfSymbol?: (symbol: ts.Symbol) => ts.Type
+    }
+  ).getTypeOfSymbol?.(property)
 }
 
 export function tupleSchema(
@@ -56,9 +57,8 @@ export function tupleSchema(
   context: ExtractionContext,
   schemaForType: SchemaForType,
 ): ContractSchemaNode {
-  const reference = type as ts.TypeReference
-  const items = context.checker.getTypeArguments(reference)
-  const flags = (reference.target as ts.TupleType).elementFlags ?? []
+  const items = context.checker.getTypeArguments(type as ts.TypeReference)
+  const flags = ((type as ts.TypeReference).target as ts.TupleType).elementFlags ?? []
   const restIndex = flags.findIndex((flag) => Boolean(flag & ts.ElementFlags.Variable))
   const fixedItems = restIndex === -1 ? items : items.slice(0, restIndex)
   return {
