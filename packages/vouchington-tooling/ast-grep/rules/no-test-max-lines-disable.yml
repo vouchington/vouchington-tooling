@@ -7,18 +7,18 @@ language: Tsx
 severity: error
 message: 'Test files must not disable max-lines or all lint rules; split the test or extract reusable helpers instead.'
 files:
-  - "**/*.test.ts"
-  - "**/*.test.mts"
-  - "**/*.test.cts"
-  - "**/*.spec.ts"
-  - "**/*.spec.mts"
-  - "**/*.spec.cts"
-  - "**/__tests__/**/*.ts"
-  - "**/__tests__/**/*.mts"
-  - "**/__tests__/**/*.cts"
-  - "**/*.test.tsx"
-  - "**/*.spec.tsx"
-  - "**/__tests__/**/*.tsx"
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+  - '**/__tests__/**/*.ts'
+  - '**/__tests__/**/*.mts'
+  - '**/__tests__/**/*.cts'
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/__tests__/**/*.tsx'
 rule:
   kind: comment
   any:

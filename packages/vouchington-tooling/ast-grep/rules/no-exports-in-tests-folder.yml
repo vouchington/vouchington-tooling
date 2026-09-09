@@ -7,10 +7,10 @@ language: Tsx
 severity: error
 message: 'Do not export from files under __tests__; move shared test support to a test-helpers directory.'
 files:
-  - "**/__tests__/**/*.ts"
-  - "**/__tests__/**/*.mts"
-  - "**/__tests__/**/*.cts"
-  - "**/__tests__/**/*.tsx"
+  - '**/__tests__/**/*.ts'
+  - '**/__tests__/**/*.mts'
+  - '**/__tests__/**/*.cts'
+  - '**/__tests__/**/*.tsx'
 rule:
   all:
     - kind: export_statement

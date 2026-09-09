@@ -3,39 +3,39 @@ language: Tsx
 severity: error
 message: 'Avoid 3 sequential await statements; abstract dependent work or parallelize independent work with Promise.all().'
 files:
-  - "**/*.ts"
-  - "**/*.mts"
-  - "**/*.cts"
-  - "**/*.tsx"
+  - '**/*.ts'
+  - '**/*.mts'
+  - '**/*.cts'
+  - '**/*.tsx'
 ignores:
-  - "**/*.test.ts"
-  - "**/*.test.mts"
-  - "**/*.test.cts"
-  - "**/*.spec.ts"
-  - "**/*.spec.mts"
-  - "**/*.spec.cts"
-  - "**/*.mock.test.ts"
-  - "**/*.mock.test.mts"
-  - "**/*.mock.test.cts"
-  - "**/*.stories.ts"
-  - "**/*.stories.mts"
+  - '**/*.test.ts'
+  - '**/*.test.mts'
+  - '**/*.test.cts'
+  - '**/*.spec.ts'
+  - '**/*.spec.mts'
+  - '**/*.spec.cts'
+  - '**/*.mock.test.ts'
+  - '**/*.mock.test.mts'
+  - '**/*.mock.test.cts'
+  - '**/*.stories.ts'
+  - '**/*.stories.mts'
   - backend/test-helpers/**
   - test-helpers/**
   - test-infra/**
   - web/test-helpers/**
-  - "**/test-helpers/**"
+  - '**/test-helpers/**'
   - playwright/**
   - playwright/setup/**
   - integration-tests/**
   - seed/**
-  - "**/seeds/**"
+  - '**/seeds/**'
   - backend/scripts/seeds/**
   - backend/scripts/seed/**
   - backend/scripts/explain-analyze/**
-  - "**/*.test.tsx"
-  - "**/*.spec.tsx"
-  - "**/*.mock.test.tsx"
-  - "**/*.stories.tsx"
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/*.mock.test.tsx'
+  - '**/*.stories.tsx'
 rule:
   all:
     - not:
