@@ -115,6 +115,7 @@ async function assertTargetAncestorsUnchanged(ancestors: TargetDirectory[]): Pro
 
 const LINK_WORKER = String.raw`
 import { lstat, readlink, symlink } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 const [source, name, dev, ino] = process.argv.slice(1)
 const directory = await lstat('.', { bigint: true })
@@ -122,7 +123,7 @@ if (!directory.isDirectory() || directory.isSymbolicLink() || directory.dev !== 
   throw new Error('Target root changed during skill linking')
 async function assertExistingMatchesSource() {
   const destination = await lstat(name)
-  if (!destination.isSymbolicLink() || (await readlink(name)) !== source)
+  if (!destination.isSymbolicLink() || resolve(await readlink(name)) !== resolve(source))
     throw new Error('Destination already exists: ' + name)
 }
 

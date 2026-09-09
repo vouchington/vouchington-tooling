@@ -89,6 +89,19 @@ describe('target directory', () => {
 
     await expect(linkDirectoryEntry(source, target, 'skill')).resolves.toBe(false)
   })
+
+  it('treats a pre-existing absolute symlink to the same source as already linked', async () => {
+    const root = await fixture()
+    const source = join(root, 'source-skill')
+    await mkdir(source)
+    const targetPath = join(root, 'target')
+    await mkdir(targetPath)
+    const target = await resolveTargetDirectory(targetPath)
+    const linkPath = join(targetPath, 'skill')
+    await symlink(source, linkPath, 'dir')
+
+    await expect(linkDirectoryEntry(source, target, 'skill')).resolves.toBe(false)
+  })
 })
 
 async function fixture(): Promise<string> {
