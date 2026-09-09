@@ -90,6 +90,9 @@ importers:
       smol-toml:
         specifier: 1.8.0
         version: 1.8.0
+      typescript:
+        specifier: '>=5'
+        version: 7.0.2
       yaml:
         specifier: 2.9.0
         version: 2.9.0
@@ -107,6 +110,9 @@ importers:
       '@libpg-query/parser':
         specifier: ^18.0.0
         version: 18.0.0
+      '@typescript/typescript6':
+        specifier: ^6.0.2
+        version: 6.0.2
 
 packages:
 
@@ -1038,6 +1044,10 @@ packages:
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
+
+  '@typescript/typescript6@6.0.2':
+    resolution: {integrity: sha512-mbCddXd+jm7hfx7w2YU64/Av4/NqqeG3GoRZgxPcgoTxYjhrcfJRw9ULch71SS4G+Q3bOXFhRvPqjguN0Hyp5w==}
+    hasBin: true
 
   '@vitest/coverage-v8@4.1.11':
     resolution: {integrity: sha512-8MVGEFnJIcdGjcbfKmeq8z0pZHH0JlVtoVZH9Q/qwUp6wyFnEJUBMrw9DCaj+ra3vShGmhavjalMIhPNxZAUcw==}
@@ -2224,6 +2234,11 @@ packages:
     resolution: {integrity: sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==}
     engines: {node: '>= 18'}
 
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -2973,6 +2988,11 @@ snapshots:
     optional: true
 
   '@typescript/typescript-win32-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript6@6.0.2':
+    dependencies:
+      '@typescript/old': typescript@6.0.3
     optional: true
 
   '@vitest/coverage-v8@4.1.11(vitest@4.1.11)':
@@ -4457,6 +4477,9 @@ snapshots:
       content-type: 2.1.0
       media-typer: 1.1.1
       mime-types: 3.0.2
+
+  typescript@6.0.3:
+    optional: true
 
   typescript@7.0.2:
     optionalDependencies:

@@ -6,6 +6,9 @@ Libraries and the `vouchington` CLI.
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
+# optional, only if you import vouchington-tooling/contract-schema
+# (classic compiler API; typescript@7's package root is version-only)
+npm install @typescript/typescript6
 # optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
 npm install agent-blackboard@^0.5.0
 ```
@@ -192,6 +195,15 @@ import {
   renderSchemaMarkdown,
 } from 'vouchington-tooling/pg-schema-snapshot'
 import { buildOpenApiDocument, writeOpenApi } from 'vouchington-tooling/openapi-document'
+import {
+  extractResponseContracts,
+  validateResponseContract,
+} from 'vouchington-tooling/contract-schema'
+import {
+  buildFixtureSchemaLock,
+  validateFixtureContracts,
+  writeGeneratedFiles,
+} from 'vouchington-tooling/api-fixtures'
 import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
 import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import {
