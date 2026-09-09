@@ -24,6 +24,18 @@ guaranteed to reproduce this cascade correctly. A mid-stack PR's base ref being 
 not the default branch, is the sign to slow down and confirm the merge path in use actually
 understands stacks before treating it as routine.
 
+Treat the forge's own view of a stack — its layers, their order, and each one's base — as the only
+reliable source for that structure, and re-read it immediately before acting rather than trusting a
+stacking tool's local record. Local metadata about a stack can go stale after a rebase, an
+out-of-band relink, or a manual recovery in ways nothing in the working tree reveals, so re-derive
+the current topology from the forge before rebasing, merging, or reporting on a stack, not once at
+the start of a session and not from memory of how it looked earlier.
+
+A stack is only as recoverable as its own foundation. If the bottom-most layer's base is not the
+default branch, the whole stack is built on unmerged work, and nothing above it can fully drain
+until that foundation either merges or the stack is re-rooted onto the default branch — confirm the
+root before treating any stack as one that can simply be worked down layer by layer.
+
 Drain a stack from the bottom, one layer at a time, merging each bottom-most layer as soon as it
 becomes ready rather than waiting for every layer above it to be ready first. A stack should stay as
 short as it can be: every layer that remains unmerged keeps accumulating rebase surface, CI cost,
@@ -44,6 +56,12 @@ merging — but the bottom-most layer is otherwise ready to merge, stop before y
 stack's current state layer by layer, and ask whether to merge that ready bottom layer before
 continuing. Do not leave a ready bottom layer sitting under a blocked or stalled upper layer without
 saying so.
+
+A stall belongs to the layer it happened on, not to the stack as a whole: keep readying every other
+layer whose progress does not depend on the blocked one, and pause the drain entirely only once
+nothing further can be readied without it. The same scoping applies to ownership — shepherd only the
+layers actually assigned to you, and treat any other layer in the same stack as something to report
+on, not to act on.
 
 Do not invent a default branch, a stacking tool or its command catalog, an exact merge-selector
 syntax, or a merge-authorization policy. A consumer wrapper or local instruction file owns those
