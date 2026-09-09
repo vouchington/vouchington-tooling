@@ -125,5 +125,9 @@ describe('fixture schema lock', () => {
         source,
       }).backendResponseContracts['GET:/unused'],
     ).toEqual({ hash: 'def', fixtureIds: [] })
+    expect(responseSchemaFor('undef', undefined, undefined, new Set()).hash).toMatch(
+      /^[0-9a-f]{64}$/,
+    )
+    expect(responseSchemaFor('null', undefined, null, new Set()).hash).toMatch(/^[0-9a-f]{64}$/)
   })
 })

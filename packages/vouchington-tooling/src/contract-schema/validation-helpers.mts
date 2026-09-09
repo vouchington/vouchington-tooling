@@ -31,9 +31,8 @@ export function addUnexpectedIssue(context: ValidationContext, path: string): vo
 }
 
 export function propertyPath(path: string, property: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(property)
-    ? `${path}.${property}`
-    : `${path}[${JSON.stringify(property)}]`
+  if (/^[A-Za-z_$][\w$]*$/.test(property)) return `${path}.${property}`
+  return `${path}[${JSON.stringify(property)}]`
 }
 
 function describeValue(value: unknown): string {

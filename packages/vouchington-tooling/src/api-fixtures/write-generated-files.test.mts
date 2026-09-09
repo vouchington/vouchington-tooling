@@ -69,4 +69,42 @@ describe('writeGeneratedFiles', () => {
     })
     expect(await readFile(file, 'utf8')).toBe('{}\n')
   })
+
+  it('ignores non-json obsolete entries and fails closed on unexpected IO errors', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'write-generated-files-io-'))
+    const responses = join(root, 'responses')
+    await mkdir(responses, { recursive: true })
+    await mkdir(join(responses, 'nested'))
+    await writeFile(join(responses, 'notes.txt'), 'skip\n')
+    const keep = join(responses, 'keep.json')
+    await writeFile(keep, '{"ok":true}\n')
+
+    await expect(
+      writeGeneratedFiles({
+        files: new Map([[keep, '{"ok":true}\n']]),
+        check: true,
+        obsoleteDirectory: responses,
+        staleError: (paths) => new Error(paths.join(',')),
+      }),
+    ).resolves.toBeUndefined()
+
+    const fileAsDir = join(root, 'not-a-dir.json')
+    await writeFile(fileAsDir, '{}\n')
+    await expect(
+      writeGeneratedFiles({
+        files: new Map([[keep, '{"ok":true}\n']]),
+        check: true,
+        obsoleteDirectory: fileAsDir,
+        staleError: (paths) => new Error(paths.join(',')),
+      }),
+    ).rejects.toMatchObject({ code: 'ENOTDIR' })
+
+    await expect(
+      writeGeneratedFiles({
+        files: new Map([[responses, '{"ok":true}\n']]),
+        check: true,
+        staleError: (paths) => new Error(paths.join(',')),
+      }),
+    ).rejects.toMatchObject({ code: 'EISDIR' })
+  })
 })

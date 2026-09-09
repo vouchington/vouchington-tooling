@@ -93,7 +93,58 @@ const sources = {
     interface ApiResponseContracts {
       topic: Box<'topic'>
       notice: Box<'notification'>
+      flag: Box<true>
+      count: Box<1>
+      empty: Box<null>
+      nested: Box<Array<{ z: string }>>
+      amount: Box<number>
+      yes: Box<boolean>
     }
+  `,
+  'named-interface': `
+    interface Named { x: string }
+    interface ApiResponseContracts { result: Named }
+  `,
+  'rest-binding': `
+    function mapRows(rows: Array<{ a: string; b: number; c: boolean }>) {
+      return rows.map(({ a, ...row }) => row)
+    }
+    interface ApiResponseContracts { result: ReturnType<typeof mapRows> }
+  `,
+  'non-literal-unique': `
+    type Unique = boolean
+    type BoundedArray<T, TMin extends number, TMax extends number, TUnique extends boolean> = T[]
+    interface ApiResponseContracts { result: BoundedArray<string, 1, 2, Unique> }
+  `,
+  'missing-array-args': `
+    type BoundedArray<T> = T[]
+    interface ApiResponseContracts { result: BoundedArray<string> }
+  `,
+  'property-error': `
+    interface ApiResponseContracts { result: { bad: () => string } }
+  `,
+  'plain-string': `interface ApiResponseContracts { result: string }`,
+  'optional-boolean': `interface ApiResponseContracts { result: { flag?: boolean } }`,
+  'simple-tuple': `interface ApiResponseContracts { result: [string, number] }`,
+  'promise-like': `
+    interface ApiResponseContracts { result: { rows: PromiseLike<string> } }
+  `,
+  'two-named': `
+    type Alpha = { a: string }
+    type Beta = { b: number }
+    interface ApiResponseContracts { result: { alpha: Alpha; beta: Beta } }
+  `,
+  'bare-array-alias': `
+    type BoundedArray = string[]
+    interface ApiResponseContracts { result: BoundedArray }
+  `,
+  'named-union': `
+    type Status = 'on' | 'off'
+    interface ApiResponseContracts { result: Status }
+  `,
+  'typeof-object': `
+    const sample = { x: 'a' }
+    interface ApiResponseContracts { result: typeof sample }
   `,
 } as const
 
@@ -246,6 +297,26 @@ describe('response contract schemas', () => {
       sourceId: 'non-literal-bounds' as const,
       expectedError: 'bounds must be numeric literals',
     },
+    {
+      name: 'non-literal-unique',
+      sourceId: 'non-literal-unique' as const,
+      expectedError: 'uniqueness must be literal',
+    },
+    {
+      name: 'missing-array-args',
+      sourceId: 'missing-array-args' as const,
+      expectedError: 'requires four type arguments',
+    },
+    {
+      name: 'property-error',
+      sourceId: 'property-error' as const,
+      expectedError: 'Property "bad"',
+    },
+    {
+      name: 'bare-array-alias',
+      sourceId: 'bare-array-alias' as const,
+      expectedError: 'requires four type arguments',
+    },
   ])('rejects $name response types', ({ sourceId, expectedError }) => {
     expect(() => contracts(sourceId)).toThrow(expectedError)
   })
@@ -255,6 +326,21 @@ describe('response contract schemas', () => {
     const extracted = contracts('generic-literal')
     expect(extracted.topic!.schema.root).toEqual({ type: 'ref', name: 'Box<topic>' })
     expect(extracted.notice!.schema.root).toEqual({ type: 'ref', name: 'Box<notification>' })
+    expect(extracted.flag!.schema.root).toEqual({ type: 'ref', name: 'Box<true>' })
+    expect(extracted.count!.schema.root).toEqual({ type: 'ref', name: 'Box<1>' })
+    expect(extracted.empty!.schema.root).toEqual({ type: 'ref', name: 'Box<null>' })
+    expect(extracted.amount!.schema.root).toEqual({ type: 'ref', name: 'Box<number>' })
+    expect(extracted.yes!.schema.root).toEqual({ type: 'ref', name: 'Box<boolean>' })
+    expect(extracted.nested!.schema.root).toMatchObject({ type: 'ref' })
+    expect(contracts('named-interface').result!.schema.root).toEqual({
+      type: 'ref',
+      name: 'Named',
+    })
+    const rest = contracts('rest-binding').result!.schema.root
+    expect(rest).toMatchObject({ type: 'array' })
+    if (rest.type !== 'array') throw new Error('Expected an array schema')
+    expect(rest.items).toMatchObject({ type: 'object' })
+    expect(rest.items).not.toEqual({ type: 'ref', name: 'row' })
   })
 
   it('models Date as its JSON string representation', () => {
@@ -306,5 +392,19 @@ describe('response contract schemas', () => {
     expect(validateResponseContract(contract.schema, { id: 'one', optional: {} })).toEqual([
       expect.objectContaining({ path: '$.optional.enabled', kind: 'missing-required' }),
     ])
+  })
+
+  it('covers plain strings, optional booleans, fixed tuples, and PromiseLike', () => {
+    expect(contracts('plain-string').result!.schema.root).toEqual({ type: 'string' })
+    const optionalBoolean = contracts('optional-boolean').result!.schema.root
+    expect(optionalBoolean).toMatchObject({ type: 'object' })
+    const tuple = contracts('simple-tuple').result!.schema.root
+    expect(tuple).toMatchObject({ type: 'tuple', optionalItems: 0 })
+    expect(tuple).not.toHaveProperty('rest')
+    expect(contracts('promise-like').result!.schema.root).toMatchObject({ type: 'object' })
+    const twoNamed = contracts('two-named').result!.schema
+    expect(Object.keys(twoNamed.definitions).toSorted()).toEqual(['Alpha', 'Beta'])
+    expect(contracts('named-union').result!.schema.root).toEqual({ type: 'ref', name: 'Status' })
+    expect(contracts('typeof-object').result!.schema.root).toMatchObject({ type: 'object' })
   })
 })

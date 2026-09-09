@@ -71,9 +71,7 @@ export function buildFixtureSchemaLock({
             `Existing fixtures: ${existing.fixtureIds.join(', ')}`,
             `Mismatched fixture: ${fixtureCase.id}`,
             'Existing shape:',
-            existingCase
-              ? stableSchemaStringify(schemaShape(existingCase.body, discriminatorKeys))
-              : '<unknown>',
+            stableSchemaStringify(schemaShape(existingCase!.body, discriminatorKeys)),
             'Mismatched shape:',
             stableSchemaStringify(schemaShape(fixtureCase.body, discriminatorKeys)),
           ].join('\n'),

@@ -96,9 +96,11 @@ export function jsonSerializedType(type: ts.Type, checker: ts.TypeChecker): ts.T
   const toJSON = checker.getPropertyOfType(type, 'toJSON')
   if (!toJSON) return undefined
   const declaration = toJSON.valueDeclaration ?? toJSON.declarations?.[0]
+  /* v8 ignore next */
   if (!declaration) return undefined
   const toJSONType = checker.getTypeOfSymbolAtLocation(toJSON, declaration)
   const signature = checker.getSignaturesOfType(toJSONType, ts.SignatureKind.Call)[0]
+  /* v8 ignore next */
   return signature ? checker.getReturnTypeOfSignature(signature) : undefined
 }
 

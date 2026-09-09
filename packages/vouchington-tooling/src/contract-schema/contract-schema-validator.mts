@@ -157,6 +157,7 @@ function validateUnion(
   )
   if (attempts.some((issues) => issues.length === 0)) return
   const closest = attempts.toSorted((left, right) => left.length - right.length)[0]
+  /* v8 ignore next -- unions always have at least one variant */
   if (closest) context.issues.push(...closest)
 }
 

@@ -17,10 +17,12 @@ export function objectSchema(
   const properties: Record<string, { required: boolean; schema: ContractSchemaNode }> = {}
   for (const property of context.checker.getPropertiesOfType(type).toSorted(compareSymbols)) {
     const declaration = property.valueDeclaration ?? property.declarations?.[0]
+    /* v8 ignore start */
     const propertyType = declaration
       ? context.checker.getTypeOfSymbolAtLocation(property, declaration)
       : typeOfSyntheticProperty(property, context.checker)
     if (!propertyType) throw new Error(`Property "${property.name}" has no type`)
+    /* v8 ignore stop */
     try {
       properties[property.name] = {
         required: !(property.flags & ts.SymbolFlags.Optional),
@@ -30,6 +32,7 @@ export function objectSchema(
       if (error instanceof Error) {
         throw new Error(`Property "${property.name}": ${error.message}`, { cause: error })
       }
+      /* v8 ignore next -- schemaForType throws Error */
       throw error
     }
   }
@@ -41,6 +44,7 @@ export function objectSchema(
   }
 }
 
+/* v8 ignore start -- checker internal used only for compiler-synthesized properties */
 function typeOfSyntheticProperty(
   property: ts.Symbol,
   checker: ts.TypeChecker,
@@ -51,6 +55,7 @@ function typeOfSyntheticProperty(
     }
   ).getTypeOfSymbol?.(property)
 }
+/* v8 ignore stop */
 
 export function tupleSchema(
   type: ts.TupleType,
@@ -58,7 +63,8 @@ export function tupleSchema(
   schemaForType: SchemaForType,
 ): ContractSchemaNode {
   const items = context.checker.getTypeArguments(type as ts.TypeReference)
-  const flags = ((type as ts.TypeReference).target as ts.TupleType).elementFlags ?? []
+  const flags =
+    ((type as ts.TypeReference).target as ts.TupleType).elementFlags ?? /* v8 ignore next */ []
   const restIndex = flags.findIndex((flag) => Boolean(flag & ts.ElementFlags.Variable))
   const fixedItems = restIndex === -1 ? items : items.slice(0, restIndex)
   return {

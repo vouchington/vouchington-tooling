@@ -53,6 +53,7 @@ export function buildVirtualProgramMatrix<const Id extends string>(
       onError,
       shouldCreateNewSourceFile,
     )
+    /* v8 ignore next -- host lookup of a missing lib file */
     if (sourceFile) virtualCompilerSourceFiles.set(requested, sourceFile)
     return sourceFile
   }
@@ -74,6 +75,7 @@ export function buildVirtualProgramMatrix<const Id extends string>(
       const fileName = fileNameById.get(id)
       if (!fileName) throw new Error(`Unknown virtual source ID "${id}"`)
       const sourceFile = program.getSourceFile(fileName)
+      /* v8 ignore next -- createProgram always materializes matrix source files */
       if (!sourceFile) throw new Error(`Unable to load ${fileName}`)
       const diagnostics = [
         ...program.getSyntacticDiagnostics(sourceFile),

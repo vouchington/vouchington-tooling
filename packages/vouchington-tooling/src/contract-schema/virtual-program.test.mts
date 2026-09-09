@@ -32,6 +32,13 @@ describe('virtual TypeScript program matrix', () => {
     expect(() => matrix.sourceFile('invalid')).toThrow('virtual/invalid.ts')
   })
 
+  it('rejects unknown virtual source IDs', () => {
+    const matrix = buildVirtualProgramMatrix(ownerExecution('unknown-source-id'), {
+      alpha: 'export interface Alpha {}',
+    })
+    expect(() => matrix.sourceFile('beta' as 'alpha')).toThrow('Unknown virtual source ID')
+  })
+
   it('rejects matrix IDs that cannot form stable virtual filenames', () => {
     expect(() =>
       buildVirtualProgramMatrix(ownerExecution('invalid-source-id'), {

@@ -212,4 +212,53 @@ describe('validateResponseContract', () => {
       expect.arrayContaining([expect.objectContaining({ path: '$', kind: 'type' })]),
     )
   })
+
+  it('rejects non-array values for array schemas and reports union mismatches', () => {
+    const schema: ContractSchema = {
+      root: {
+        type: 'object',
+        properties: {
+          ids: { required: true, schema: { type: 'array', items: { type: 'string' } } },
+        },
+        additionalProperties: false,
+      },
+      definitions: {},
+    }
+    expect(validateResponseContract(schema, { ids: 'nope' })).toEqual([
+      expect.objectContaining({
+        path: '$.ids',
+        kind: 'type',
+        message: expect.stringContaining('array'),
+      }),
+    ])
+    expect(validateResponseContract(schema, { ids: ['ok'], 'x-id': true })).toEqual([
+      expect.objectContaining({ path: '$["x-id"]', kind: 'unexpected' }),
+    ])
+    expect(validateResponseContract({ root: { type: 'null' }, definitions: {} }, [])).toEqual([
+      expect.objectContaining({
+        path: '$',
+        kind: 'type',
+        message: expect.stringContaining('null'),
+      }),
+    ])
+    expect(
+      validateResponseContract(
+        {
+          root: {
+            type: 'intersection',
+            variants: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: { id: { required: true, schema: { type: 'string' } } },
+                additionalProperties: false,
+              },
+            ],
+          },
+          definitions: {},
+        },
+        { id: '1' },
+      ),
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ path: '$', kind: 'type' })]))
+  })
 })
