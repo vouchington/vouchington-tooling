@@ -32,7 +32,7 @@
     "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^5.0.0",
     "dependency-cruiser": "^18.2.0",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "eslint-plugin-no-mistakes": "^0.55.0",
     "github-actionlint": "^1.7.12",
     "knip": "^6.34.0",
