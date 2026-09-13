@@ -42,6 +42,29 @@ describe('domain skill plugins', () => {
     }
   })
 
+  it('routes non-blocking bot feedback through durable follow-up issues', async () => {
+    const [response, manifest] = await Promise.all([
+      readSkill('vouchington-workflow', 'agent-workflow/references/review-response.md'),
+      readRecordJson('packages/vouchington-tooling/skill-manifest.json'),
+    ])
+    const normalized = response.replaceAll(/\s+/g, ' ')
+    const agentWorkflow = (manifest.skills as Array<Record<string, unknown>>).find(
+      (skill) => skill.name === 'agent-workflow',
+    )
+
+    expect(normalized).toMatch(/automated reviewer[^.]*valid[^.]*non-blocking/i)
+    expect(normalized).toMatch(/do not[^.]*code[^.]*push/i)
+    expect(normalized).toMatch(/invalid[^.]*reason[^.]*no code change[^.]*no follow-up/i)
+    expect(normalized).toMatch(/blocking[^.]*fixed[^.]*pushed[^.]*confirmed/i)
+    expect(normalized).toMatch(/human feedback[^.]*already-planned push[^.]*cheap/i)
+    expect(normalized).toMatch(/search[^.]*existing[^.]*follow-up/i)
+    expect(normalized).toContain('`follow-up`')
+    expect(normalized).toMatch(/non-closing[^.]*originating pull request/i)
+    expect(normalized).toMatch(/re-fetch[^.]*verify[^.]*replying[^.]*only then resolve/i)
+    expect(normalized).toMatch(/reply[^.]*unauthorized[^.]*fail closed[^.]*unresolved/i)
+    expect(agentWorkflow).toMatchObject({ prerequisites: ['github-issue'] })
+  })
+
   it('keeps reusable practices in canonical resources without product policy', async () => {
     const resources = await Promise.all([
       readSkill('vouchington-workflow', 'agent-workflow/references/implementation.md'),

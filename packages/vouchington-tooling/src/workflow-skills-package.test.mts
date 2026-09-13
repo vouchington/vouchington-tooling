@@ -61,6 +61,7 @@ describe('workflow skills package contract', () => {
       const prerequisites = new Map(
         manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
       )
+      expect(prerequisites.get('agent-workflow')).toEqual(['github-issue'])
       expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
       expect(prerequisites.get('dependabot')).toEqual(['github-actions-checklist'])
       expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])

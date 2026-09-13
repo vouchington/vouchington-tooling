@@ -5,7 +5,8 @@
       "name": "agent-workflow",
       "plugin": "vouchington-workflow",
       "pluginVersion": "0.7.0",
-      "path": "agent-workflow/SKILL.md"
+      "path": "agent-workflow/SKILL.md",
+      "prerequisites": ["github-issue"]
     },
     {
       "name": "backend-vitest-test-authoring",
