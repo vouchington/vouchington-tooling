@@ -147,6 +147,13 @@ Host-lock environment:
 | `HOST_LOCK_PROCESS_GROUP_DRAIN_SECONDS` | `30`                  | Time to wait for the command process group  |
 | `HOST_LOCK_ACTIVE`                      | unset                 | Set while a lock is held; nested locks fail |
 
+## Sourceable Bash libraries
+
+`scripts/worktree/git-worktrees.sh` is included in the published package. Source it to parse
+`git worktree list --porcelain` with `git_worktree_*` helpers. Its
+`git_worktree_canonical_path_hash <path>` helper resolves the physical path and prints a stable
+`d` plus the first 12 lowercase hexadecimal characters of its SHA-256 digest.
+
 ## Library
 
 ```ts
