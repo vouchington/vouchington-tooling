@@ -41,6 +41,12 @@ describe('git-worktrees.sh', () => {
     ).rejects.toMatchObject({ code: 1 })
   })
 
+  it('propagates Git worktree discovery failures', async () => {
+    await expect(
+      source('git_worktree_list_porcelain "$1"', ['/definitely/not/a/repository']),
+    ).rejects.toMatchObject({ code: 128 })
+  })
+
   it('parses live and prunable paths from git porcelain output', async () => {
     const root = await mkdtemp(join(tmpdir(), 'worktree-library-'))
     const live = join(root, 'live')

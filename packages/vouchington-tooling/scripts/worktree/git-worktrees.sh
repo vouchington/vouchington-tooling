@@ -5,9 +5,9 @@ git_worktree_list_porcelain() {
   local repo_root=${1:-}
 
   if [ -n "$repo_root" ]; then
-    (git -C "$repo_root" worktree list --porcelain 2>/dev/null || true)
+    (git -C "$repo_root" worktree list --porcelain 2>/dev/null)
   else
-    (git worktree list --porcelain 2>/dev/null || true)
+    (git worktree list --porcelain 2>/dev/null)
   fi
 }
 
