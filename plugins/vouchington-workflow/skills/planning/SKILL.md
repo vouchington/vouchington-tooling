@@ -17,7 +17,9 @@ Use before implementation work that needs a durable plan. Repository-local `AGEN
 4. Specify implementation steps, file-level intent, validation, rollout, and any follow-up that is
    truly outside the accepted scope. Distinguish existing paths from new paths.
 5. Validate and save the plan using the repository's required issue or document workflow before
-   implementation when local policy requires one.
+   implementation when local policy requires one. When creating a plan issue from a source issue
+   that already has a milestone, apply that same existing milestone through
+   [github-issue](../github-issue/SKILL.md).
 
 For cross-cutting changes, read [impact discovery](references/impact-discovery.md) before selecting
 tests or concluding that a surface has no dependents.

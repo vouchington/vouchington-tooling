@@ -379,14 +379,16 @@ describe('vouchington-workflow plugin', () => {
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
-    const [issue, organize, taxonomy, revisit, distill] = await Promise.all([
+    const [issue, organize, taxonomy, revisit, distill, planning] = await Promise.all([
       readSkill('github-issue'),
       readSkill('organize-github-issues'),
       readSkill('review-github-issue-taxonomy'),
       readSkill('revisit-followups'),
       readSkill('retrospective-distill'),
+      readSkill('planning'),
     ])
     const normalizedIssue = issue.replaceAll(/\s+/g, ' ')
+    const normalizedPlanning = planning.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(/before every write.*canonical identity.*still match/i)
     expect(normalizedIssue).toMatch(
@@ -410,6 +412,9 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/close only when.*acceptance evidence.*resolved/i)
     expect(normalizedIssue).toMatch(/matching existing labels.*without separate approval/i)
     expect(normalizedIssue).toMatch(/selected existing milestone.*without separate approval/i)
+    expect(normalizedIssue).toMatch(
+      /plan issue from a source issue that already has a milestone.*same existing milestone/i,
+    )
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
@@ -420,7 +425,11 @@ describe('vouchington-workflow plugin', () => {
     expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')
-    for (const skill of [issue, organize, taxonomy, revisit, distill]) {
+    expect(normalizedPlanning).toMatch(
+      /plan issue from a source issue that already has a milestone.*same existing milestone/i,
+    )
+    expect(planning).toContain('[github-issue](../github-issue/SKILL.md)')
+    for (const skill of [issue, organize, taxonomy, revisit, distill, planning]) {
       expect(skill).not.toMatch(/filaments|voucha|jonathanong|vouchington\//i)
     }
   })
