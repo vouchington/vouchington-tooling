@@ -49,11 +49,13 @@ repository.
 3. Write a self-contained issue with the problem, desired outcome, ownership boundaries, concrete
    areas, validation, and external context. A discovered blocker does not widen implementation scope.
 4. Fetch the complete live taxonomy. Apply matching existing labels and a selected existing milestone
-   without separate approval. Omit a missing optional milestone; a missing required milestone blocks
-   the issue, and milestone creation is a separately authorized taxonomy operation. For a
-   missing label, use [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain
-   explicit approval for its exact repository, name, description, and color before creating it.
-   Omit a declined optional label; a missing required label blocks the issue.
+   without separate approval. When creating a plan issue from a source issue that already has a
+   milestone, select that same existing milestone. Omit a missing optional milestone; a missing
+   required milestone blocks the issue, and milestone creation is a separately authorized taxonomy
+   operation. For a missing label, use
+   [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain explicit approval
+   for its exact repository, name, description, and color before creating it. Omit a declined
+   optional label; a missing required label blocks the issue.
 5. Refetch the created or updated issue and verify its metadata. Report a partial failure without
    retrying creation. Preserve history and report the action, URL, labels, and milestone.
 6. Link a pull request with a closing reference only when it fully resolves the issue. Keep
