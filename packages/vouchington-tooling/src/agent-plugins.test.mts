@@ -332,7 +332,22 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/`pull_request`[\s\S]*private repositories?/i)
     expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
     expect(skill).toMatch(/30 minutes/i)
-    expect(skill).toMatch(/GitHub-hosted runners?[\s\S]*public repositories?/i)
+    expect(normalized).toMatch(/Prefer GitHub-hosted runners for public and private repositories/i)
+    expect(normalized).toMatch(/Choose the smallest hosted runner the job fits/i)
+    expect(normalized).toMatch(
+      /full VM or native-architecture runner only for work the smaller runner cannot do/i,
+    )
+    expect(normalized).toMatch(
+      /self-hosted or disposable runners names its approved labels in repository-local policy/i,
+    )
+    expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
+    expect(normalized).toMatch(
+      /every long-running, network-bound, or waiting step its own `timeout-minutes`/i,
+    )
+    expect(normalized).toMatch(/bound every network call/i)
+    expect(normalized).toMatch(
+      /Do not add workspace-cleanup steps for them, and check out with `persist-credentials: false` unless a later step must push with that token\./i,
+    )
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )
