@@ -332,7 +332,9 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/`pull_request`[\s\S]*private repositories?/i)
     expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
     expect(skill).toMatch(/30 minutes/i)
-    expect(skill).toMatch(/GitHub-hosted runners?[\s\S]*public repositories?/i)
+    expect(normalized).toMatch(/Prefer GitHub-hosted runners for public and private repositories/i)
+    expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
+    expect(normalized).toMatch(/Do not add workspace-cleanup steps.*`persist-credentials: false`/i)
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )

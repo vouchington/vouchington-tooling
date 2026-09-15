@@ -41,8 +41,16 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   a deadline of no more than 30 minutes and support cancellation, rollback, or an explicit terminal
   retained/recovery state. An event callback may report completion; it must not hide a longer-running
   operation in another service.
-- Use GitHub-hosted runners only for public repositories. Private repositories use the consumer's
-  approved self-hosted or disposable runner labels.
+- Prefer GitHub-hosted runners for public and private repositories. Choose the smallest hosted runner
+  the job fits, such as `ubuntu-slim` for a short job that needs no Docker daemon, and use a full VM
+  or native-architecture runner only for work the smaller runner cannot do. A consumer that still
+  requires self-hosted or disposable runners names its approved labels in repository-local policy.
+- Keep each job's `timeout-minutes` below any hard platform limit of its runner, so GitHub's own
+  cancellation and `always()`/`cancelled()` cleanup steps run before the runner is killed. Give every
+  long-running, network-bound, or waiting step its own `timeout-minutes` inside the job budget, and
+  bound every network call, such as `curl --connect-timeout … --max-time …`.
+- Ephemeral hosted runners start from a clean workspace. Do not add workspace-cleanup steps for them,
+  and check out with `persist-credentials: false` unless a later step must push with that token.
 - Persistent workspaces must check out the full tree. Do not configure sparse checkout; enforce that
   prohibition with a YAML-aware check over intended tracked workflow and action files, with fixtures
   for accepted and rejected shapes.
