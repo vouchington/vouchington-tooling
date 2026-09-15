@@ -334,7 +334,9 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/30 minutes/i)
     expect(normalized).toMatch(/Prefer GitHub-hosted runners for public and private repositories/i)
     expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
-    expect(normalized).toMatch(/Do not add workspace-cleanup steps.*`persist-credentials: false`/i)
+    expect(normalized).toMatch(
+      /Do not add workspace-cleanup steps for them, and check out with `persist-credentials: false` unless a later step must push with that token\./i,
+    )
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )
