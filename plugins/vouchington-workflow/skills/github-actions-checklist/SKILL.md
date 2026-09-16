@@ -45,8 +45,10 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   the job fits, such as `ubuntu-slim` for a short job that needs no Docker daemon, and use a full VM
   or native-architecture runner only for work the smaller runner cannot do. A consumer that still
   requires self-hosted or disposable runners names its approved labels in repository-local policy.
-- Keep each job's `timeout-minutes` below any hard platform limit of its runner, so GitHub's own
-  cancellation and `always()`/`cancelled()` cleanup steps run before the runner is killed. Give every
+- Keep each job's `timeout-minutes` below any hard platform limit of its runner — for example, no
+  more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise —
+  so the job's own cancellation fires first and `always()`/`cancelled()` cleanup steps still run,
+  instead of the runner being killed outright once the platform limit is reached. Give every
   long-running, network-bound, or waiting step its own `timeout-minutes` inside the job budget, and
   bound every network call, such as `curl --connect-timeout … --max-time …`.
 - Ephemeral hosted runners start from a clean workspace. Do not add workspace-cleanup steps for them,

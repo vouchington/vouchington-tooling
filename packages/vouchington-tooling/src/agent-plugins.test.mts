@@ -342,6 +342,12 @@ describe('vouchington-workflow plugin', () => {
     )
     expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
     expect(normalized).toMatch(
+      /no more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise/i,
+    )
+    expect(normalized).toMatch(
+      /the job's own cancellation fires first and `always\(\)`\/`cancelled\(\)` cleanup steps still run/i,
+    )
+    expect(normalized).toMatch(
       /every long-running, network-bound, or waiting step its own `timeout-minutes`/i,
     )
     expect(normalized).toMatch(/bound every network call/i)
