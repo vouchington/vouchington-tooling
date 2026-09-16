@@ -362,7 +362,14 @@ describe('vouchington-workflow plugin', () => {
       /package-manager stores \(pnpm\/npm, Go modules, a Rust `target\/` directory, Gradle\)/i,
     )
     expect(normalized).toMatch(
+      /`apt-get install` steps that used to be a no-op because the package was already present/i,
+    )
+    expect(normalized).toMatch(/Docker image pulls that used to hit a warm local image store/i)
+    expect(normalized).toMatch(
       /"persists between runs so caching is not needed" describes the old runner and becomes false the moment `runs-on` changes/i,
+    )
+    expect(normalized).toMatch(
+      /replace that assumption with a keyed `actions\/cache` step instead/i,
     )
     expect(normalized).toMatch(
       /Re-derive `timeout-minutes` from a real passing run on the new runner rather than carrying over a budget calibrated on a warm host/i,
