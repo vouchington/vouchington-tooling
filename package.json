@@ -35,7 +35,7 @@
     "eslint": "^10.10.0",
     "eslint-plugin-no-mistakes": "^0.59.0",
     "github-actionlint": "^1.7.12",
-    "knip": "^6.35.0",
+    "knip": "^6.35.1",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
     "oxlint-tsgolint": "^7.0.2001",
