@@ -41,8 +41,29 @@ Apply this portable baseline unless a stricter repository-local rule overrides i
   a deadline of no more than 30 minutes and support cancellation, rollback, or an explicit terminal
   retained/recovery state. An event callback may report completion; it must not hide a longer-running
   operation in another service.
-- Use GitHub-hosted runners only for public repositories. Private repositories use the consumer's
-  approved self-hosted or disposable runner labels.
+- Prefer GitHub-hosted runners for public and private repositories. Choose the smallest hosted runner
+  the job fits, such as `ubuntu-slim` for a short job that needs no Docker daemon, and use a full VM
+  or native-architecture runner only for work the smaller runner cannot do. A consumer that still
+  requires self-hosted or disposable runners names its approved labels in repository-local policy.
+- Keep each job's `timeout-minutes` below any hard platform limit of its runner — for example, no
+  more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise —
+  so the job's own cancellation fires first and `always()`/`cancelled()` cleanup steps still run,
+  instead of the runner being killed outright once the platform limit is reached. Give every
+  long-running, network-bound, or waiting step its own `timeout-minutes` inside the job budget, and
+  bound every network call, such as `curl --connect-timeout … --max-time …`.
+- Ephemeral hosted runners start from a clean workspace. Do not add workspace-cleanup steps for them,
+  and check out with `persist-credentials: false` unless a later step must push with that token.
+- Moving a job from a self-hosted or other persistent runner to a GitHub-hosted one drops every
+  piece of runner-local state the job's steps assumed was already there, not just the workspace.
+  Audit for state that used to persist for free: browser installs (a Playwright, Cypress, or
+  Puppeteer cache), package-manager stores (pnpm/npm, Go modules, a Rust `target/` directory,
+  Gradle), `apt-get install` steps that used to be a no-op because the package was already present,
+  and Docker image pulls that used to hit a warm local image store. A step or action comment
+  claiming a tool "persists between runs so caching is not needed" describes the old runner and
+  becomes false the moment `runs-on` changes; replace that assumption with a keyed `actions/cache`
+  step instead. Re-derive `timeout-minutes` from a real passing run on the new runner rather than
+  carrying over a budget calibrated on a warm host — the same job can look intermittently flaky
+  purely because every step now starts cold.
 - Persistent workspaces must check out the full tree. Do not configure sparse checkout; enforce that
   prohibition with a YAML-aware check over intended tracked workflow and action files, with fixtures
   for accepted and rejected shapes.

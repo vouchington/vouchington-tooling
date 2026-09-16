@@ -332,7 +332,48 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(/`pull_request`[\s\S]*private repositories?/i)
     expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
     expect(skill).toMatch(/30 minutes/i)
-    expect(skill).toMatch(/GitHub-hosted runners?[\s\S]*public repositories?/i)
+    expect(normalized).toMatch(/Prefer GitHub-hosted runners for public and private repositories/i)
+    expect(normalized).toMatch(/Choose the smallest hosted runner the job fits/i)
+    expect(normalized).toMatch(
+      /full VM or native-architecture runner only for work the smaller runner cannot do/i,
+    )
+    expect(normalized).toMatch(
+      /self-hosted or disposable runners names its approved labels in repository-local policy/i,
+    )
+    expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
+    expect(normalized).toMatch(
+      /no more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise/i,
+    )
+    expect(normalized).toMatch(
+      /the job's own cancellation fires first and `always\(\)`\/`cancelled\(\)` cleanup steps still run/i,
+    )
+    expect(normalized).toMatch(
+      /every long-running, network-bound, or waiting step its own `timeout-minutes`/i,
+    )
+    expect(normalized).toMatch(/bound every network call/i)
+    expect(normalized).toMatch(
+      /Do not add workspace-cleanup steps for them, and check out with `persist-credentials: false` unless a later step must push with that token\./i,
+    )
+    expect(normalized).toMatch(
+      /Moving a job from a self-hosted or other persistent runner to a GitHub-hosted one drops every piece of runner-local state/i,
+    )
+    expect(normalized).toMatch(/browser installs \(a Playwright, Cypress, or Puppeteer cache\)/i)
+    expect(normalized).toMatch(
+      /package-manager stores \(pnpm\/npm, Go modules, a Rust `target\/` directory, Gradle\)/i,
+    )
+    expect(normalized).toMatch(
+      /`apt-get install` steps that used to be a no-op because the package was already present/i,
+    )
+    expect(normalized).toMatch(/Docker image pulls that used to hit a warm local image store/i)
+    expect(normalized).toMatch(
+      /"persists between runs so caching is not needed" describes the old runner and becomes false the moment `runs-on` changes/i,
+    )
+    expect(normalized).toMatch(
+      /replace that assumption with a keyed `actions\/cache` step instead/i,
+    )
+    expect(normalized).toMatch(
+      /Re-derive `timeout-minutes` from a real passing run on the new runner rather than carrying over a budget calibrated on a warm host/i,
+    )
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )
