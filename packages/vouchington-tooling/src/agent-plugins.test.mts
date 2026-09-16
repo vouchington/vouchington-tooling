@@ -354,6 +354,19 @@ describe('vouchington-workflow plugin', () => {
     expect(normalized).toMatch(
       /Do not add workspace-cleanup steps for them, and check out with `persist-credentials: false` unless a later step must push with that token\./i,
     )
+    expect(normalized).toMatch(
+      /Moving a job from a self-hosted or other persistent runner to a GitHub-hosted one drops every piece of runner-local state/i,
+    )
+    expect(normalized).toMatch(/browser installs \(a Playwright, Cypress, or Puppeteer cache\)/i)
+    expect(normalized).toMatch(
+      /package-manager stores \(pnpm\/npm, Go modules, a Rust `target\/` directory, Gradle\)/i,
+    )
+    expect(normalized).toMatch(
+      /"persists between runs so caching is not needed" describes the old runner and becomes false the moment `runs-on` changes/i,
+    )
+    expect(normalized).toMatch(
+      /Re-derive `timeout-minutes` from a real passing run on the new runner rather than carrying over a budget calibrated on a warm host/i,
+    )
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )
