@@ -298,6 +298,11 @@
       "import": "./dist/gh-cli/index.mjs",
       "default": "./dist/gh-cli/index.mjs"
     },
+    "./github-projects": {
+      "types": "./dist/github-projects/index.d.mts",
+      "import": "./dist/github-projects/index.mjs",
+      "default": "./dist/github-projects/index.mjs"
+    },
     "./gh-api-shell-quoting": {
       "types": "./dist/gh-api-shell-quoting/index.d.mts",
       "import": "./dist/gh-api-shell-quoting/index.mjs",
