@@ -15,10 +15,11 @@ local `AGENTS.md`, `CLAUDE.md`, and live taxonomy guidance before acting.
 2. Classify from the permitted metadata and discussion evidence, not implementation guesses. Keep
    automation, ownership, and provenance labels unless local policy explicitly permits changes.
 3. Apply only existing labels, milestones, and projects without requesting separate label approval;
-   an issue belongs to at most one project, and not every issue needs one. Never set a project item's
-   status to a value that closes the issue unless the caller separately authorizes closing it. Do not
-   create taxonomy, close work, rewrite bodies, or alter titles unless the caller separately
-   authorizes that scope.
+   an issue belongs to at most one project, and not every issue needs one. Before adding a project,
+   check the issue's current membership and skip the add, reporting the conflict, instead of creating
+   a second one. Never set a project item's status to a value that closes the issue unless the caller
+   separately authorizes closing it. Do not create taxonomy, close work, rewrite bodies, or alter
+   titles unless the caller separately authorizes that scope.
 4. In review mode, report the exact proposed metadata changes without mutating. In apply mode, make
    only necessary, idempotent updates.
 5. Refetch every touched item and verify the requested metadata, including project membership,

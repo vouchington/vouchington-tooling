@@ -21,9 +21,10 @@ or deleting taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN` plus t
 API capability — project-write to create, rename, or close a project. Treat insufficient permission
 or capability, missing or inaccessible data, identity changes, and mismatches as a hard deny that
 approval cannot override. Narrowly within that rule: adding an item to an existing project uses the
-same permission set as applying existing metadata, plus project-read API capability; missing project
-scope or capability is a hard deny of the project step alone — skip it, report the gap, and never
-work around it, while the issue and its other metadata still proceed.
+same permission set as applying existing metadata, plus project-write API capability — adding an
+item mutates project membership even though it needs no separate approval; missing project scope or
+capability is a hard deny of the project step alone — skip it, report the gap, and never work around
+it, while the issue and its other metadata still proceed.
 
 When an external creation target is denied, never write there. Search for and create or reuse a
 tracking issue in the current repository, or a consumer-selected tracker. Immediately before that
@@ -55,7 +56,9 @@ repository.
 4. Fetch the complete live taxonomy, including open projects. Apply matching existing labels and a
    selected existing milestone without separate approval. Select an existing open project for
    cross-repo initiative work and a milestone for single-repo initiative work; an issue belongs to at
-   most one project and not every issue needs one. Adding an item to an existing, described project
+   most one project and not every issue needs one. Before adding an item, check the issue's current
+   project membership; if it already belongs to a different project, skip the add and report the
+   conflict instead of creating a second membership. Adding an item to an existing, described project
    needs no separate approval, the same as applying a milestone — but creating, renaming, or closing a
    project is a separately authorized taxonomy operation, like milestone creation. A missing project
    scope or permission skips the project step; report the gap and never work around it. Never set a

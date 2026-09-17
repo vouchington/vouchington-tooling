@@ -432,6 +432,7 @@ describe('vouchington-workflow plugin', () => {
     const normalizedIssue = issue.replaceAll(/\s+/g, ' ')
     const normalizedPlanning = planning.replaceAll(/\s+/g, ' ')
     const normalizedTaxonomy = taxonomy.replaceAll(/\s+/g, ' ')
+    const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(/before every write.*canonical identity.*still match/i)
     expect(normalizedIssue).toMatch(
@@ -468,14 +469,15 @@ describe('vouchington-workflow plugin', () => {
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
     )
     expect(normalizedIssue).toMatch(
-      /creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
+      /plus project-write API capability.*before adding an item, check the issue's current project membership.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
     )
     expect(normalizedIssue).toMatch(
-      /status to a value that closes the issue unless closing it is separately authorized/i,
+      /status to a value that closes the issue unless closing it is separately authorized.*re-read the project rather than assuming only that item/i,
     )
-    expect(normalizedIssue).toMatch(/re-read the project rather than assuming only that item/i)
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
-    expect(organize).toMatch(/existing labels, milestones, and projects[\s\S]*at most one project/i)
+    expect(normalizedOrganize).toMatch(
+      /existing labels, milestones, and projects.*at most one project.*before adding a project, check the issue's current membership/i,
+    )
     expect(organize).toMatch(/status to a value that closes the issue/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
