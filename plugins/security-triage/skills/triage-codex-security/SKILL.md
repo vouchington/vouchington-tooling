@@ -7,7 +7,7 @@ description: Triage Codex Security findings for one repository into evidence-bac
 
 Use this skill only for one repository per run. It produces finding results and the
 [`codex-security-triage/v1`](references/handoff-v1.md) handoff; it does not create
-repository issues, apply labels or milestones, or shepherd pull requests.
+repository issues, apply labels, milestones, or project membership, or shepherd pull requests.
 
 ## Establish the evidence boundary
 
