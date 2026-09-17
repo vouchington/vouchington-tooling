@@ -472,7 +472,7 @@ describe('vouchington-workflow plugin', () => {
       /plus project-write API capability.*before adding an item, check the issue's current project membership.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
     )
     expect(normalizedIssue).toMatch(
-      /status to a value that closes the issue unless closing it is separately authorized.*re-read the project rather than assuming only that item/i,
+      /status to a value that closes the issue unless closing it is separately authorized.*Auto-close issue project workflow.*re-read the project rather than assuming only that item/i,
     )
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
     expect(normalizedOrganize).toMatch(

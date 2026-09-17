@@ -62,8 +62,9 @@ repository.
    needs no separate approval, the same as applying a milestone — but creating, renaming, or closing a
    project is a separately authorized taxonomy operation, like milestone creation. A missing project
    scope or permission skips the project step; report the gap and never work around it. Never set a
-   project item's status to a value that closes the issue unless closing it is separately authorized;
-   some project automation closes the issue as a side effect of a status change. When creating a plan
+   project item's status to a value that closes the issue unless closing it is separately authorized:
+   GitHub's built-in Auto-close issue project workflow closes the issue when its status changes to
+   Done. When creating a plan
    issue from a source issue that already has a milestone or project, apply that same existing
    milestone or project. Omit a missing optional milestone; a missing required milestone blocks the
    issue, and milestone creation is a separately authorized taxonomy operation. For a missing label,
