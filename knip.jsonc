@@ -45,6 +45,7 @@
         "src/swift-source-offset/index.mts!",
         "src/swift-resolved-pin-delta/index.mts!",
         "src/gh-cli/index.mts!",
+        "src/github-projects/index.mts!",
         "src/markdown/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
