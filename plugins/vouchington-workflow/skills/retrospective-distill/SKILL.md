@@ -25,6 +25,6 @@ or retention system. Public issue bodies contain only the minimum bounded facts 
 needed to establish the problem, proposed work, relevant areas, and validation. Never embed
 unredacted logs, command output, environment details, provider payloads, or transcript content.
 
-This skill supplies no journal API, issue repository, labels, milestones, archival command, or
-approval model. Consumer wrappers cannot weaken this export boundary; they provide only those local
-details.
+This skill supplies no journal API, issue repository, labels, milestones, projects, archival
+command, or approval model. Consumer wrappers cannot weaken this export boundary; they provide
+only those local details.

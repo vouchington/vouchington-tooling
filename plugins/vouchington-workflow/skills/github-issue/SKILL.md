@@ -16,10 +16,15 @@ owner-prefix or visibility assumptions. Immediately before every write, refetch 
 require its canonical identity to still match and the repository not to be archived. Issue operations
 also require issues to be enabled and `viewerPermission` of `TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`;
 issue creation additionally requires `viewerCanCreateIssues`. Applying existing metadata to a pull
-request uses the same permission set but does not require issues to be enabled. Creating, changing, or
-deleting taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN` plus the operation-specific API
-capability. Treat insufficient permission or capability, missing or inaccessible data, identity
-changes, and mismatches as a hard deny that approval cannot override.
+request uses the same permission set but does not require issues to be enabled. Creating, changing,
+or deleting taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN` plus the operation-specific
+API capability — project-write to create, rename, or close a project. Treat insufficient permission
+or capability, missing or inaccessible data, identity changes, and mismatches as a hard deny that
+approval cannot override. Narrowly within that rule: adding an item to an existing project uses the
+same permission set as applying existing metadata, plus project-write API capability — adding an
+item mutates project membership even though it needs no separate approval; missing project scope or
+capability is a hard deny of the project step alone — skip it, report the gap, and never work around
+it, while the issue and its other metadata still proceed.
 
 When an external creation target is denied, never write there. Search for and create or reuse a
 tracking issue in the current repository, or a consumer-selected tracker. Immediately before that
@@ -48,16 +53,32 @@ repository.
    resolved; otherwise leave state unchanged and report the gap.
 3. Write a self-contained issue with the problem, desired outcome, ownership boundaries, concrete
    areas, validation, and external context. A discovered blocker does not widen implementation scope.
-4. Fetch the complete live taxonomy. Apply matching existing labels and a selected existing milestone
-   without separate approval. When creating a plan issue from a source issue that already has a
-   milestone, select that same existing milestone. Omit a missing optional milestone; a missing
-   required milestone blocks the issue, and milestone creation is a separately authorized taxonomy
-   operation. For a missing label, use
+4. Fetch the complete live taxonomy, including open projects. Apply matching existing labels and a
+   selected existing milestone without separate approval. Select an existing open project for
+   cross-repo initiative work and a milestone for single-repo initiative work; an issue belongs to at
+   most one project and not every issue needs one. Before adding an item, check its project
+   membership and that of any item the project's own automation could pull in alongside it, such as
+   a parent issue's sub-issues; skip the add and report the conflict if any of them already belongs
+   to a different project, instead of creating a second membership. Adding an item to an existing,
+   described project needs no separate approval, the same as applying a milestone — but creating,
+   renaming, or closing a project is a separately authorized taxonomy operation, like milestone
+   creation. A missing project scope or permission skips the project step; report the gap and never
+   work around it. Never set a project item's status to a value that closes the issue unless closing
+   it is separately authorized: GitHub's built-in Auto-close issue project workflow closes the issue
+   when its status changes to Done. When creating a plan issue from a source issue that already has a
+   milestone, apply that same existing milestone. When the source issue already has a project,
+   refetch its current memberships and apply the same project only if exactly one accessible, open
+   membership exists; otherwise skip the project step and report the conflict rather than guess. Omit
+   a missing optional milestone; a missing required milestone blocks the issue, and milestone creation
+   is a separately authorized taxonomy operation. For a missing label, use
    [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain explicit approval
    for its exact repository, name, description, and color before creating it. Omit a declined
    optional label; a missing required label blocks the issue.
-5. Refetch the created or updated issue and verify its metadata. Report a partial failure without
-   retrying creation. Preserve history and report the action, URL, labels, and milestone.
+5. Refetch the created or updated issue and verify its metadata, including project membership. When
+   an item was added to a project, re-read the project rather than assuming only that item changed —
+   automation such as auto-adding a parent issue's sub-issues can pull in additional items, including
+   into a second project. Report a partial failure without retrying creation. Preserve history and
+   report the action, URL, labels, milestone, and project.
 6. Link a pull request with a closing reference only when it fully resolves the issue. Keep
    cross-repository references fully qualified; PR creation authority remains separate.
 7. Use native sub-issues only for real hierarchy, blocked-by relationships only for genuine known

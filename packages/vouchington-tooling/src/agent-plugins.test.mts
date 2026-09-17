@@ -83,6 +83,7 @@ describe('security-triage plugin', () => {
     expect(skill).toMatch(/stop and wait for an affirmative response\s+approving/i)
     expect(skill).toContain('exact finding IDs and actions')
     expect(skill).toContain('native authenticated browser')
+    expect(skill).toContain('milestones, or projects, or shepherd')
     expect(skill).not.toMatch(/playwright/i)
     expect(skill).not.toMatch(/create (a |an )?github issue/i)
     expect(skill).not.toMatch(/\bgh\s+(issue|api).*\b(create|edit|issues)\b/i)
@@ -430,6 +431,8 @@ describe('vouchington-workflow plugin', () => {
     ])
     const normalizedIssue = issue.replaceAll(/\s+/g, ' ')
     const normalizedPlanning = planning.replaceAll(/\s+/g, ' ')
+    const normalizedTaxonomy = taxonomy.replaceAll(/\s+/g, ' ')
+    const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(/before every write.*canonical identity.*still match/i)
     expect(normalizedIssue).toMatch(
@@ -454,20 +457,40 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/matching existing labels.*without separate approval/i)
     expect(normalizedIssue).toMatch(/selected existing milestone.*without separate approval/i)
     expect(normalizedIssue).toMatch(
-      /plan issue from a source issue that already has a milestone.*same existing milestone/i,
+      /already has a milestone, apply that same existing milestone.*already has a project.*exactly one accessible, open membership exists.*skip the project step and report the conflict/i,
     )
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
+    expect(normalizedIssue).toMatch(/cross-repo initiative work.*single-repo initiative work/i)
+    expect(normalizedIssue).toMatch(/belongs to at most one project/i)
+    expect(normalizedIssue).toMatch(
+      /hard deny of the project step alone.*issue and its other metadata still proceed/i,
+    )
+    expect(normalizedIssue).toMatch(
+      /plus project-write API capability.*before adding an item, check its project membership and that of any item the project's own automation could pull in.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
+    )
+    expect(normalizedIssue).toMatch(
+      /status to a value that closes the issue unless closing it is separately authorized.*Auto-close issue project workflow.*re-read the project rather than assuming only that item/i,
+    )
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
+    expect(normalizedOrganize).toMatch(
+      /existing labels, milestones, and projects.*at most one project.*before adding a project, check the issue's membership and that of any item the project's own automation could pull in/i,
+    )
+    expect(normalizedOrganize).toMatch(/status to a value that closes the issue/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
+    expect(normalizedTaxonomy).toMatch(
+      /duplicated across repositories is a candidate project.*confined to one repository is a candidate milestone/i,
+    )
+    expect(taxonomy).toMatch(/auto-adding a parent issue's sub-issues/i)
     expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(distill).toMatch(/labels, milestones, projects/i)
     expect(normalizedPlanning).toMatch(
-      /plan issue from a source issue that already has a milestone.*same existing milestone/i,
+      /plan issue from a source issue that already has a milestone or project.*same existing milestone or project/i,
     )
     expect(planning).toContain('[github-issue](../github-issue/SKILL.md)')
     for (const skill of [issue, organize, taxonomy, revisit, distill, planning]) {
