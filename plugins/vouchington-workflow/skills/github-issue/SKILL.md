@@ -56,21 +56,22 @@ repository.
 4. Fetch the complete live taxonomy, including open projects. Apply matching existing labels and a
    selected existing milestone without separate approval. Select an existing open project for
    cross-repo initiative work and a milestone for single-repo initiative work; an issue belongs to at
-   most one project and not every issue needs one. Before adding an item, check the issue's current
-   project membership; if it already belongs to a different project, skip the add and report the
-   conflict instead of creating a second membership. Adding an item to an existing, described project
-   needs no separate approval, the same as applying a milestone — but creating, renaming, or closing a
-   project is a separately authorized taxonomy operation, like milestone creation. A missing project
-   scope or permission skips the project step; report the gap and never work around it. Never set a
-   project item's status to a value that closes the issue unless closing it is separately authorized:
-   GitHub's built-in Auto-close issue project workflow closes the issue when its status changes to
-   Done. When creating a plan
-   issue from a source issue that already has a milestone or project, apply that same existing
-   milestone or project. Omit a missing optional milestone; a missing required milestone blocks the
-   issue, and milestone creation is a separately authorized taxonomy operation. For a missing label,
-   use [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain explicit
-   approval for its exact repository, name, description, and color before creating it. Omit a
-   declined optional label; a missing required label blocks the issue.
+   most one project and not every issue needs one. Before adding an item, check its project
+   membership and that of any item the project's own automation could pull in alongside it, such as
+   a parent issue's sub-issues; skip the add and report the conflict if any of them already belongs
+   to a different project, instead of creating a second membership. Adding an item to an existing,
+   described project needs no separate approval, the same as applying a milestone — but creating,
+   renaming, or closing a project is a separately authorized taxonomy operation, like milestone
+   creation. A missing project scope or permission skips the project step; report the gap and never
+   work around it. Never set a project item's status to a value that closes the issue unless closing
+   it is separately authorized: GitHub's built-in Auto-close issue project workflow closes the issue
+   when its status changes to Done. When creating a plan issue from a source issue that already has a
+   milestone or project, apply that same existing milestone or project. Omit a missing optional
+   milestone; a missing required milestone blocks the issue, and milestone creation is a separately
+   authorized taxonomy operation. For a missing label, use
+   [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain explicit approval
+   for its exact repository, name, description, and color before creating it. Omit a declined
+   optional label; a missing required label blocks the issue.
 5. Refetch the created or updated issue and verify its metadata, including project membership. When
    an item was added to a project, re-read the project rather than assuming only that item changed —
    automation such as auto-adding a parent issue's sub-issues can pull in additional items, including

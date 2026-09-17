@@ -469,16 +469,16 @@ describe('vouchington-workflow plugin', () => {
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
     )
     expect(normalizedIssue).toMatch(
-      /plus project-write API capability.*before adding an item, check the issue's current project membership.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
+      /plus project-write API capability.*before adding an item, check its project membership and that of any item the project's own automation could pull in.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
     )
     expect(normalizedIssue).toMatch(
       /status to a value that closes the issue unless closing it is separately authorized.*Auto-close issue project workflow.*re-read the project rather than assuming only that item/i,
     )
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
     expect(normalizedOrganize).toMatch(
-      /existing labels, milestones, and projects.*at most one project.*before adding a project, check the issue's current membership/i,
+      /existing labels, milestones, and projects.*at most one project.*before adding a project, check the issue's membership and that of any item the project's own automation could pull in/i,
     )
-    expect(organize).toMatch(/status to a value that closes the issue/i)
+    expect(normalizedOrganize).toMatch(/status to a value that closes the issue/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
     expect(normalizedTaxonomy).toMatch(
