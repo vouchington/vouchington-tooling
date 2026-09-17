@@ -8,18 +8,6 @@ inputs:
   artifact_id:
     description: Same-run review payload artifact ID
     required: true
-  provider_name:
-    description: Provider name to show in workflow diagnostics
-    required: false
-    default: Claude
-  token_source:
-    description: Review POST credential. claude-app mints an App token via OIDC; github-token uses GITHUB_TOKEN.
-    required: false
-    default: claude-app
-  github_token:
-    description: Explicit GitHub token for github-token posting; falls back to github.token when unset
-    required: false
-    default: ''
   expected_head_sha:
     description: Exact pull request head SHA that may receive the review
     required: false
@@ -61,7 +49,7 @@ runs:
       with:
         artifact-ids: ${{ inputs.artifact_id }}
         path: ${{ runner.temp }}/code-review-payload-download
-        github-token: ${{ inputs.github_token || github.token }}
+        github-token: ${{ github.token }}
         repository: ${{ github.repository }}
         run-id: ${{ github.run_id }}
 
@@ -110,13 +98,12 @@ runs:
       continue-on-error: true
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.github_token || github.token }}
+        GH_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ inputs.pr_number }}
         CODE_REVIEW_PAYLOAD_PATH: ${{ runner.temp }}/code-review-payload-ready/code-review-payload.json
-        CODE_REVIEW_TOKEN_SOURCE: ${{ inputs.token_source }}
         EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
         EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
-        PROVIDER_NAME: ${{ inputs.provider_name }}
+        PROVIDER_NAME: Claude
       run: |
         set -euo pipefail
         node --experimental-strip-types \
@@ -130,7 +117,7 @@ runs:
         POST_OUTCOME: ${{ steps.post.outcome }}
         POSTED: ${{ steps.post.outputs.posted }}
         COMMENT_COUNT: ${{ steps.post.outputs.comment_count }}
-        PROVIDER_NAME: ${{ inputs.provider_name }}
+        PROVIDER_NAME: Claude
       run: |
         set -euo pipefail
         poster_outcome=failure
@@ -154,10 +141,10 @@ runs:
       continue-on-error: true
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.github_token || github.token }}
+        GH_TOKEN: ${{ github.token }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         CHECK_RUN_ID: ${{ inputs.check_run_id }}
-        PROVIDER_NAME: ${{ inputs.provider_name }}
+        PROVIDER_NAME: Claude
         POSTER_OUTCOME: ${{ steps.poster-result.outputs.poster_outcome }}
         COMMENT_COUNT: ${{ steps.poster-result.outputs.comment_count }}
       run: |

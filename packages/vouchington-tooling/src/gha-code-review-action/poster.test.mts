@@ -30,7 +30,7 @@ describe('code-review-poster action', () => {
     expect(download?.with).toEqual({
       'artifact-ids': '${{ inputs.artifact_id }}',
       path: '${{ runner.temp }}/code-review-payload-download',
-      'github-token': '${{ inputs.github_token || github.token }}',
+      'github-token': '${{ github.token }}',
       repository: '${{ github.repository }}',
       'run-id': '${{ github.run_id }}',
     })
@@ -38,16 +38,25 @@ describe('code-review-poster action', () => {
       'gha-review-payload/cli.mts',
     )
     expect(stepByName.get('Post batched review')?.run).toContain('gha-post-review/cli.mts')
-    expect(stepByName.get('Post batched review')?.env?.CODE_REVIEW_TOKEN_SOURCE).toBe(
-      '${{ inputs.token_source }}',
+    expect(stepByName.get('Post batched review')?.env).not.toHaveProperty(
+      'CODE_REVIEW_TOKEN_SOURCE',
     )
     expect(stepByName.get('Post batched review')?.env).toMatchObject({
       EXPECTED_HEAD_SHA: '${{ inputs.expected_head_sha }}',
       EXPECTED_BASE_SHA: '${{ inputs.expected_base_sha }}',
+      PROVIDER_NAME: 'Claude',
     })
     expect(action.inputs?.expected_head_sha).toMatchObject({ default: '' })
     expect(action.inputs?.expected_base_sha).toMatchObject({ default: '' })
-    expect(action.inputs?.token_source).toMatchObject({ default: 'claude-app' })
+    expect(action.inputs).not.toHaveProperty('token_source')
+    expect(action.inputs).not.toHaveProperty('github_token')
+    expect(action.inputs).not.toHaveProperty('provider_name')
+  })
+
+  it('hardcodes Claude as the provider name in the finalized check run', () => {
+    const finalize = stepByName.get('Finalize check run')
+    expect(finalize?.env?.PROVIDER_NAME).toBe('Claude')
+    expect(finalize?.run).toContain('${PROVIDER_NAME} posted a review')
   })
 
   it('reuses the code-review Node resolver', () => {

@@ -57,7 +57,7 @@ describe('install-github-release', () => {
     expect(runHelper(['--unknown']).status).toBe(2)
   })
 
-  it('accepts installer flags used by lychee, gitleaks, and opencode', () => {
+  it('accepts installer flags used by lychee and gitleaks', () => {
     expect(runHelper(['--repo']).status).toBe(2)
     const skipped = runHelper(
       [
@@ -85,13 +85,13 @@ describe('install-github-release', () => {
   it('validates an explicit SHA-256 digest before downloading', () => {
     const required = [
       '--repo',
-      'anomalyco/opencode',
+      'lycheeverse/lychee',
       '--version',
-      '1.18.21',
+      '0.24.2',
       '--asset',
-      'opencode-linux-x64.tar.gz',
+      'lychee-x86_64-unknown-linux-gnu.tar.gz',
       '--bin',
-      'opencode',
+      'lychee',
     ]
     const invalid = runHelper([...required, '--expected-sha256', 'not-a-digest'])
     expect(invalid.status).toBe(2)

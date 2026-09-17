@@ -37,6 +37,24 @@ describe('code-review action', () => {
     expect(actionText).toContain('--disallowedTools Bash')
   })
 
+  it('hardcodes the Claude provider name and drops third-party provider inputs', () => {
+    expect(action.inputs).not.toHaveProperty('provider_name')
+    expect(action.inputs).not.toHaveProperty('anthropic_base_url')
+    expect(action.inputs).not.toHaveProperty('anthropic_default_opus_model')
+    expect(action.inputs).not.toHaveProperty('anthropic_default_sonnet_model')
+    expect(action.inputs).not.toHaveProperty('anthropic_default_haiku_model')
+    expect(action.inputs).not.toHaveProperty('provider_api_token')
+    expect(actionText).not.toContain('ANTHROPIC_AUTH_TOKEN')
+    expect(actionText).not.toContain('ANTHROPIC_BASE_URL')
+    expect(actionText).not.toContain('anthropic_api_key')
+    const review = stepByName.get('Run Code Review')
+    expect(review?.with).not.toHaveProperty('anthropic_api_key')
+    expect(stepByName.get('Record agent outcome')?.env?.PROVIDER_NAME).toBe('Claude')
+    const createCheck = stepByName.get('Create check run')
+    expect(createCheck?.env?.PROVIDER_NAME).toBe('Claude')
+    expect(createCheck?.run).toContain('CHECK_NAME="${PROVIDER_NAME} Code Review"')
+  })
+
   it('rejects extra_prompt unless the calling repository is private', () => {
     const build = stepByName.get('Build review prompt')
     expect(build?.env?.EXTRA_PROMPT).toBe('${{ inputs.extra_prompt }}')
