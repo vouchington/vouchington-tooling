@@ -147,26 +147,36 @@ describe('code-review reusable workflow', () => {
     expect(text).toContain('repository: vouchington/vouchington-tooling')
   })
 
-  it('passes the anthropic_* environment overrides through to the composite action', () => {
-    const callInputs = workflow.on?.workflow_call?.inputs as Record<
-      string,
-      { type?: string; default?: string }
-    >
+  it('does not expose third-party provider inputs; auth is claude_code_oauth_token only', () => {
+    const callInputs = Object.keys(workflow.on?.workflow_call?.inputs ?? {})
     for (const key of [
       'anthropic_base_url',
       'anthropic_default_opus_model',
       'anthropic_default_sonnet_model',
       'anthropic_default_haiku_model',
+      'provider_name',
+      'token_source',
     ]) {
-      expect(callInputs[key]).toMatchObject({ type: 'string', default: '' })
+      expect(callInputs).not.toContain(key)
     }
+    const callSecrets = Object.keys(workflow.on?.workflow_call?.secrets ?? {})
+    expect(callSecrets).not.toContain('provider_api_token')
+    expect(callSecrets).toContain('claude_code_oauth_token')
     const runReview = workflow.jobs?.review?.steps?.find((step) => step.name === 'Run Code Review')
+    expect(runReview?.with).not.toHaveProperty('anthropic_base_url')
+    expect(runReview?.with).not.toHaveProperty('anthropic_default_opus_model')
+    expect(runReview?.with).not.toHaveProperty('anthropic_default_sonnet_model')
+    expect(runReview?.with).not.toHaveProperty('anthropic_default_haiku_model')
+    expect(runReview?.with).not.toHaveProperty('provider_name')
+    expect(runReview?.with).not.toHaveProperty('provider_api_token')
     expect(runReview?.with).toMatchObject({
-      anthropic_base_url: '${{ inputs.anthropic_base_url }}',
-      anthropic_default_opus_model: '${{ inputs.anthropic_default_opus_model }}',
-      anthropic_default_sonnet_model: '${{ inputs.anthropic_default_sonnet_model }}',
-      anthropic_default_haiku_model: '${{ inputs.anthropic_default_haiku_model }}',
+      claude_code_oauth_token: '${{ secrets.claude_code_oauth_token }}',
     })
+    const runPoster = workflow.jobs?.poster?.steps?.find(
+      (step) => step.uses?.includes('code-review-poster') === true,
+    )
+    expect(runPoster?.with).not.toHaveProperty('provider_name')
+    expect(runPoster?.with).not.toHaveProperty('token_source')
   })
 
   it('accepts string required_review on workflow_call so dispatch leaves do not fail graph build', () => {

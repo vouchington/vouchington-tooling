@@ -18,10 +18,6 @@ inputs:
   head_sha:
     description: Full commit SHA the review check run is reported against
     required: true
-  provider_name:
-    description: Provider name to show in workflow steps
-    required: false
-    default: Claude
   model:
     description: Claude-compatible model to use (haiku, sonnet, or opus)
     required: false
@@ -42,24 +38,8 @@ inputs:
     description: Extra prompt text. Rejected unless the calling repository is private.
     required: false
     default: ''
-  anthropic_base_url:
-    description: Anthropic-compatible API base URL
-    required: false
-    default: ''
   anthropic_model:
     description: Default Claude Code model environment override
-    required: false
-    default: ''
-  anthropic_default_opus_model:
-    description: Default opus model environment override
-    required: false
-    default: ''
-  anthropic_default_sonnet_model:
-    description: Default sonnet model environment override
-    required: false
-    default: ''
-  anthropic_default_haiku_model:
-    description: Default haiku model environment override
     required: false
     default: ''
   claude_code_subagent_model:
@@ -72,10 +52,6 @@ inputs:
     default: ''
   claude_code_oauth_token:
     description: Claude Code OAuth token
-    required: false
-    default: ''
-  provider_api_token:
-    description: Anthropic-compatible provider API token
     required: false
     default: ''
   trusted_prompt_ref:
@@ -244,17 +220,11 @@ runs:
       uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1.0.217
       env:
         HOME: ${{ steps.claude-home.outputs.home }}
-        ANTHROPIC_AUTH_TOKEN: ${{ inputs.provider_api_token }}
-        ANTHROPIC_BASE_URL: ${{ inputs.anthropic_base_url }}
         ANTHROPIC_MODEL: ${{ inputs.anthropic_model }}
-        ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ inputs.anthropic_default_opus_model }}
-        ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ inputs.anthropic_default_sonnet_model }}
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ inputs.anthropic_default_haiku_model }}
         CLAUDE_CODE_SUBAGENT_MODEL: ${{ inputs.claude_code_subagent_model }}
         CLAUDE_CODE_EFFORT_LEVEL: ${{ inputs.claude_code_effort_level }}
       with:
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
-        anthropic_api_key: ${{ inputs.provider_api_token }}
         include_fix_links: false
         display_report: true
         use_sticky_comment: false
@@ -316,7 +286,7 @@ runs:
         PAYLOAD_STAGED: ${{ steps.stage-payload.outputs.staged }}
         UPLOAD_OUTCOME: ${{ steps.upload-payload.outcome }}
         ARTIFACT_ID: ${{ steps.upload-payload.outputs.artifact-id }}
-        PROVIDER_NAME: ${{ inputs.provider_name }}
+        PROVIDER_NAME: Claude
       run: |
         set -euo pipefail
         outcome=failure
@@ -345,7 +315,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         HEAD_SHA: ${{ inputs.head_sha }}
-        PROVIDER_NAME: ${{ inputs.provider_name }}
+        PROVIDER_NAME: Claude
         PROMPT_AVAILABLE: ${{ steps.review-prompt.outputs.available }}
         AGENT_OUTCOME: ${{ steps.agent-result.outputs.agent_outcome }}
         PAYLOAD_STAGED: ${{ steps.stage-payload.outputs.staged }}
