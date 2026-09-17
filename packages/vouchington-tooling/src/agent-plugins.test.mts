@@ -83,7 +83,7 @@ describe('security-triage plugin', () => {
     expect(skill).toMatch(/stop and wait for an affirmative response\s+approving/i)
     expect(skill).toContain('exact finding IDs and actions')
     expect(skill).toContain('native authenticated browser')
-    expect(skill).toContain('project membership')
+    expect(skill).toContain('milestones, or projects, or shepherd')
     expect(skill).not.toMatch(/playwright/i)
     expect(skill).not.toMatch(/create (a |an )?github issue/i)
     expect(skill).not.toMatch(/\bgh\s+(issue|api).*\b(create|edit|issues)\b/i)
@@ -463,21 +463,26 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
     expect(normalizedIssue).toMatch(/cross-repo initiative work.*single-repo initiative work/i)
+    expect(normalizedIssue).toMatch(/belongs to at most one project/i)
     expect(normalizedIssue).toMatch(
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
     )
     expect(normalizedIssue).toMatch(
-      /creating, renaming, or closing a project is a separately authorized taxonomy operation.*status to a value that closes the issue unless closing it is separately authorized.*re-read the project rather than assuming only that item/i,
+      /creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
     )
+    expect(normalizedIssue).toMatch(
+      /status to a value that closes the issue unless closing it is separately authorized/i,
+    )
+    expect(normalizedIssue).toMatch(/re-read the project rather than assuming only that item/i)
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
-    expect(organize).toMatch(
-      /existing labels, milestones, and projects[\s\S]*at most one project[\s\S]*status to a value that closes the issue/i,
-    )
+    expect(organize).toMatch(/existing labels, milestones, and projects[\s\S]*at most one project/i)
+    expect(organize).toMatch(/status to a value that closes the issue/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
     expect(normalizedTaxonomy).toMatch(
-      /duplicated across repositories is a candidate project.*confined to one repository is a candidate milestone.*auto-adding a parent issue's sub-issues/i,
+      /duplicated across repositories is a candidate project.*confined to one repository is a candidate milestone/i,
     )
+    expect(taxonomy).toMatch(/auto-adding a parent issue's sub-issues/i)
     expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')

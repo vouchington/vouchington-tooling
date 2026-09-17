@@ -16,14 +16,14 @@ owner-prefix or visibility assumptions. Immediately before every write, refetch 
 require its canonical identity to still match and the repository not to be archived. Issue operations
 also require issues to be enabled and `viewerPermission` of `TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`;
 issue creation additionally requires `viewerCanCreateIssues`. Applying existing metadata to a pull
-request uses the same permission set but does not require issues to be enabled. Adding an item to an
-existing project uses that same permission set plus project-read API capability; a missing project
+request uses the same permission set but does not require issues to be enabled. Creating, changing,
+or deleting taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN` plus the operation-specific
+API capability — project-write to create, rename, or close a project. Treat insufficient permission
+or capability, missing or inaccessible data, identity changes, and mismatches as a hard deny that
+approval cannot override. Narrowly within that rule: adding an item to an existing project uses the
+same permission set as applying existing metadata, plus project-read API capability; missing project
 scope or capability is a hard deny of the project step alone — skip it, report the gap, and never
-work around it, while the issue and its other metadata still proceed. Creating, changing, or deleting
-taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN` plus the operation-specific API
-capability — project-write to create, rename, or close a project. Treat insufficient permission or
-capability, missing or inaccessible data, identity changes, and mismatches as a hard deny that
-approval cannot override.
+work around it, while the issue and its other metadata still proceed.
 
 When an external creation target is denied, never write there. Search for and create or reuse a
 tracking issue in the current repository, or a consumer-selected tracker. Immediately before that
