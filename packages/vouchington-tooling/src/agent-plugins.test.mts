@@ -457,7 +457,7 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/matching existing labels.*without separate approval/i)
     expect(normalizedIssue).toMatch(/selected existing milestone.*without separate approval/i)
     expect(normalizedIssue).toMatch(
-      /plan issue from a source issue that already has a milestone or project.*same existing milestone or project/i,
+      /already has a milestone, apply that same existing milestone.*already has a project.*exactly one accessible, open membership exists.*skip the project step and report the conflict/i,
     )
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)

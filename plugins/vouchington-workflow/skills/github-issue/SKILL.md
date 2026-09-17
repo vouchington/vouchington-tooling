@@ -66,9 +66,11 @@ repository.
    work around it. Never set a project item's status to a value that closes the issue unless closing
    it is separately authorized: GitHub's built-in Auto-close issue project workflow closes the issue
    when its status changes to Done. When creating a plan issue from a source issue that already has a
-   milestone or project, apply that same existing milestone or project. Omit a missing optional
-   milestone; a missing required milestone blocks the issue, and milestone creation is a separately
-   authorized taxonomy operation. For a missing label, use
+   milestone, apply that same existing milestone. When the source issue already has a project,
+   refetch its current memberships and apply the same project only if exactly one accessible, open
+   membership exists; otherwise skip the project step and report the conflict rather than guess. Omit
+   a missing optional milestone; a missing required milestone blocks the issue, and milestone creation
+   is a separately authorized taxonomy operation. For a missing label, use
    [review-github-issue-taxonomy](../review-github-issue-taxonomy/SKILL.md): obtain explicit approval
    for its exact repository, name, description, and color before creating it. Omit a declined
    optional label; a missing required label blocks the issue.
