@@ -435,7 +435,7 @@ describe('vouchington-workflow plugin', () => {
     const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(
-      /(?:^|[.!?]\s)Immediately before every write, refetch the exact target and require its canonical identity to still match and the repository not to be archived\. Issue operations also require issues to be enabled and `viewerPermission` of `TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`; issue creation additionally requires `viewerCanCreateIssues`\./i,
+      /(?:^|[.!?]\s)Immediately before every write, refetch the exact target and require its canonical identity to still match and the repository not to be archived\. Issue operations also require issues to be enabled and `viewerPermission` of `TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`; issue creation additionally requires `viewerCanCreateIssues`\. Applying existing metadata to a pull request uses the same permission set but does not require issues to be enabled\./i,
     )
     expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
     expect(normalizedIssue).toMatch(/issue creation additionally requires `viewerCanCreateIssues`/i)
@@ -463,7 +463,7 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
     expect(normalizedIssue).toMatch(
-      /(?:^|[.!?]\s)Select an existing open project for strategic, initiative-level tracking and a milestone for repo-local release or sequencing tracking — the choice turns on the initiative's nature, not how many repositories it touches, so a single-repo strategic initiative can carry a project, and an initiative that needs both a cross-cutting strategic view and repo-local sequencing may carry both; an issue belongs to at most one project and not every issue needs one\./i,
+      /(?:^|[.!?]\s)Select an existing open project for strategic, initiative-level tracking and a milestone for repo-local release or sequencing tracking — the choice turns on the initiative's nature, not how many repositories it touches, so a single-repo strategic initiative can carry a project, and an initiative that needs both a cross-cutting strategic view and repo-local sequencing may carry both; an issue belongs to at most one project and not every issue needs one\. Before adding an item, check its project membership/i,
     )
     expect(normalizedIssue).toMatch(
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
