@@ -463,7 +463,7 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
     expect(normalizedIssue).toMatch(
-      /strategic, initiative-level tracking.*repo-local.*sequencing.*single-repo strategic initiative can carry a project.*needs both.*cross-cutting.*repo-local sequencing may carry both.*belongs to at most one project/i,
+      /strategic, initiative-level tracking.*repo-local.*sequencing.*single-repo strategic initiative can carry a project.*needs both.*cross-cutting strategic view.*repo-local sequencing may carry both.*belongs to at most one project/i,
     )
     expect(normalizedIssue).toMatch(
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
