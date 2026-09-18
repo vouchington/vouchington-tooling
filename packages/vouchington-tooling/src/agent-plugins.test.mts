@@ -435,7 +435,7 @@ describe('vouchington-workflow plugin', () => {
     const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(
-      /before every write.*canonical identity.*still match.*repository not to be archived.*issue operations also require issues to be enabled/i,
+      /before every write.*canonical identity to still match.*repository not to be archived.*issue operations also require issues to be enabled/i,
     )
     expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
     expect(normalizedIssue).toMatch(/issue creation additionally requires `viewerCanCreateIssues`/i)
