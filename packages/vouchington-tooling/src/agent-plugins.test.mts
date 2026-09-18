@@ -434,9 +434,8 @@ describe('vouchington-workflow plugin', () => {
     const normalizedTaxonomy = taxonomy.replaceAll(/\s+/g, ' ')
     const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
-    expect(normalizedIssue).toMatch(/before every write.*canonical identity.*still match/i)
     expect(normalizedIssue).toMatch(
-      /repository not to be archived.*issue operations.*issues.*enabled/i,
+      /before every write.*canonical identity.*still match.*repository not to be archived.*issue operations.*issues.*enabled/i,
     )
     expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
     expect(normalizedIssue).toMatch(/issue creation additionally requires `viewerCanCreateIssues`/i)
@@ -463,8 +462,9 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
-    expect(normalizedIssue).toMatch(/strategic, initiative-level tracking.*repo-local.*sequencing/i)
-    expect(normalizedIssue).toMatch(/belongs to at most one project/i)
+    expect(normalizedIssue).toMatch(
+      /strategic, initiative-level tracking.*repo-local.*sequencing.*single-repo strategic initiative can carry a project.*needs both.*cross-cutting.*repo-local sequencing may carry both.*belongs to at most one project/i,
+    )
     expect(normalizedIssue).toMatch(
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
     )
