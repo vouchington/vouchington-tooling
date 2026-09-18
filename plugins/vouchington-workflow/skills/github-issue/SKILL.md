@@ -55,7 +55,10 @@ repository.
    areas, validation, and external context. A discovered blocker does not widen implementation scope.
 4. Fetch the complete live taxonomy, including open projects. Apply matching existing labels and a
    selected existing milestone without separate approval. Select an existing open project for
-   cross-repo initiative work and a milestone for single-repo initiative work; an issue belongs to at
+   strategic, initiative-level tracking and a milestone for repo-local release or sequencing
+   tracking — the choice turns on the initiative's nature, not how many repositories it touches, so a
+   single-repo strategic initiative can carry a project, and an initiative that needs both a
+   cross-cutting strategic view and repo-local sequencing may carry both; an issue belongs to at
    most one project and not every issue needs one. Before adding an item, check its project
    membership and that of any item the project's own automation could pull in alongside it, such as
    a parent issue's sub-issues; skip the add and report the conflict if any of them already belongs
