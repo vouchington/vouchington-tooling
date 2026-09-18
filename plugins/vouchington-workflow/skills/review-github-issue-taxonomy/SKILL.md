@@ -14,8 +14,9 @@ local configuration edits or live taxonomy mutation; read local `AGENTS.md` and 
    deletion, or rule change.
 3. Audit aliases, ambiguity, unused labels, missing descriptions, color consistency, milestone
    overlap, delivery gaps, and path-label coverage. Audit projects too: a milestone theme duplicated
-   across repositories is a candidate project, and a project confined to one repository is a
-   candidate milestone. Flag a project with no description, an empty or stale project, a closed
+   across repositories is a candidate project, and a project holding only routine, non-initiative
+   work — regardless of how many repositories it touches — is a candidate milestone; repository count
+   alone is not a miscategorization signal. Flag a project with no description, an empty or stale project, a closed
    project with open items, an issue that belongs to more than one project, and a project's own
    automation for auto-adding a parent issue's sub-issues left enabled where the at-most-one-project
    rule applies — it can silently duplicate membership.

@@ -463,7 +463,7 @@ describe('vouchington-workflow plugin', () => {
     expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
     expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
-    expect(normalizedIssue).toMatch(/cross-repo initiative work.*single-repo initiative work/i)
+    expect(normalizedIssue).toMatch(/strategic, initiative-level tracking.*repo-local.*sequencing/i)
     expect(normalizedIssue).toMatch(/belongs to at most one project/i)
     expect(normalizedIssue).toMatch(
       /hard deny of the project step alone.*issue and its other metadata still proceed/i,
@@ -482,7 +482,7 @@ describe('vouchington-workflow plugin', () => {
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
     expect(normalizedTaxonomy).toMatch(
-      /duplicated across repositories is a candidate project.*confined to one repository is a candidate milestone/i,
+      /duplicated across repositories is a candidate project.*holding only routine, non-initiative.*work.*regardless of how many repositories it touches.*is a candidate milestone.*repository count.*alone is not a miscategorization signal/i,
     )
     expect(taxonomy).toMatch(/auto-adding a parent issue's sub-issues/i)
     expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
