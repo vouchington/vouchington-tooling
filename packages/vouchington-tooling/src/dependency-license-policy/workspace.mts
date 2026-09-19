@@ -17,10 +17,7 @@ function parseYamlObject(source: string, path: string): Record<string, unknown> 
   try {
     parsed = parseYaml(source)
   } catch (error) {
-    throw new Error(
-      `failed to parse ${path}: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    )
+    throw new Error(`failed to parse ${path}: ${String(error)}`, { cause: error })
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error(`expected ${path} to contain a YAML object`)

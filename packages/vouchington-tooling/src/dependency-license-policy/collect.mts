@@ -16,6 +16,12 @@ export interface CollectPnpmLicenseReportOptions {
   readonly readFile?: (path: string, encoding: 'utf8') => string
 }
 
+const DEFAULT_OPTIONS = {
+  execute: spawnSync as PnpmExecutor,
+  prepareWorkspace: preparePnpmLicenseAuditWorkspace,
+  readFile: readFileSync,
+}
+
 function commandFailureOutput(result: { stderr: string; stdout: string }): string {
   return result.stderr.trim() || result.stdout.trim()
 }
@@ -34,9 +40,7 @@ export function collectPnpmLicenseReport(
   repoRoot: string,
   options: CollectPnpmLicenseReportOptions = {},
 ): PnpmLicenseReport {
-  const execute: PnpmExecutor = options.execute ?? spawnSync
-  const readFile = options.readFile ?? readFileSync
-  const prepareWorkspace = options.prepareWorkspace ?? preparePnpmLicenseAuditWorkspace
+  const { execute, prepareWorkspace, readFile } = { ...DEFAULT_OPTIONS, ...options }
   const lockfilePath = join(repoRoot, 'pnpm-lock.yaml')
   const workspacePath = join(repoRoot, 'pnpm-workspace.yaml')
   const auditWorkspace = prepareWorkspace(
@@ -61,12 +65,9 @@ export function collectPnpmLicenseReport(
     try {
       return parsePnpmLicenseReport(JSON.parse(result.stdout) as unknown)
     } catch (error) {
-      throw new Error(
-        `pnpm licenses list --json produced unparseable output: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        { cause: error },
-      )
+      throw new Error(`pnpm licenses list --json produced unparseable output: ${String(error)}`, {
+        cause: error,
+      })
     }
   } finally {
     auditWorkspace.cleanup()

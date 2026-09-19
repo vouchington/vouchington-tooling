@@ -36,10 +36,7 @@ export function parseSpdxExpression(expression: string): SpdxNode {
   try {
     return convertParsedNode(parseSpdx(expression))
   } catch (error) {
-    throw new Error(
-      `Invalid SPDX license expression: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    )
+    throw new Error(`Invalid SPDX license expression: ${String(error)}`, { cause: error })
   }
 }
 
