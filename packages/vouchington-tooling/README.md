@@ -238,6 +238,10 @@ import { runCiLocal } from 'vouchington-tooling/ci-local'
 import { rateLimitDelay } from 'vouchington-tooling/gha-rate-limit'
 import { parseCheckpoint } from 'vouchington-tooling/gha-pr-checkpoint'
 import { checkWorkspaceGatesPolicy } from 'vouchington-tooling/workspace-gates'
+import {
+  collectPnpmLicenseReport,
+  evaluatePnpmLicenseReport,
+} from 'vouchington-tooling/dependency-license-policy'
 import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-policy'
 import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
 import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
@@ -305,6 +309,17 @@ policy out of this package.
 `checkWorkspaceGatesPolicy` rejects tracked test assertions that hard-code the exact version of a
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,
 or derive a configuration or documentation package spec from that manifest instead.
+
+`dependency-license-policy` keeps legal policy in the consumer. `collectPnpmLicenseReport` creates
+an isolated, script-free temporary workspace and store, expands pnpm's supported architectures to
+every `os`, `cpu`, and `libc` selector represented in the lockfile, and validates the JSON report.
+Pass explicit denied SPDX IDs and prefixes, exact aliases, and justified allowlist scopes to
+`evaluatePnpmLicenseReport`. Unknown, malformed, and custom SPDX references fail closed. Allowlist
+scopes are either intentionally global or an exact package-name set; the library returns structured
+violations and does not format CI-provider diagnostics.
+When present, the repository `.npmrc` is copied into the owner-private temporary directory so pnpm
+can authenticate to the same registries; normal cleanup removes the copy, and the caller remains
+responsible for terminating the process normally rather than abandoning temporary audit state.
 
 `session-friction` is an opt-in capture and reporting library. Callers supply the session id,
 absolute log directory, host-independent observation, and journal loader; it does not inspect host

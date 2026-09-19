@@ -504,6 +504,21 @@ export type {
 } from './gha-pr-checkpoint/index.mts'
 export { checkWorkspaceGatesPolicy } from './workspace-gates/index.mts'
 export type { WorkspaceGatesOptions } from './workspace-gates/index.mts'
+export {
+  collectPnpmLicenseReport,
+  evaluatePackageLicenseExpression,
+  evaluatePnpmLicenseReport,
+  parsePnpmLicenseReport,
+} from './dependency-license-policy/index.mts'
+export type {
+  CollectPnpmLicenseReportOptions,
+  DependencyLicenseAllowlistEntry,
+  DependencyLicenseEvaluation,
+  DependencyLicensePolicy,
+  DependencyLicenseViolation,
+  PnpmLicenseReport,
+  PnpmLicenseReportEntry,
+} from './dependency-license-policy/index.mts'
 export { validateNugetUpdate } from './nuget-central-version/index.mts'
 export { normalizeSwiftSource } from './swift-semantic-equal/index.mts'
 export {
