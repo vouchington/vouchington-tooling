@@ -43,6 +43,7 @@ import {
   validateGitHubBodyLength,
   inspectHarnessEnvironment,
   selectHarnessSession,
+  evaluatePnpmLicenseReport,
 } from './index.mts'
 
 describe('package exports', () => {
@@ -92,6 +93,7 @@ describe('package exports', () => {
     expect(buildGhPrCreateArgs({ title: 't', bodyFile: 'body.md', head: 'x' })).toContain('--head')
     expect(typeof createPullRequest).toBe('function')
     expect(typeof getDiffAgainstBase).toBe('function')
+    expect(typeof evaluatePnpmLicenseReport).toBe('function')
     expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
     expect(new HeadOutOfDateError('x', 'origin').name).toBe('HeadOutOfDateError')
     const bodyLength: GitHubBodyLengthValidation = validateGitHubBodyLength('😀')

@@ -38,6 +38,7 @@
         "src/gha-post-review/index.mts!",
         "src/gha-check-run/index.mts!",
         "src/workspace-gates/index.mts!",
+        "src/dependency-license-policy/index.mts!",
         "src/nuget-central-version/index.mts!",
         "src/nuget-central-version/cli.mts!",
         "src/swift-semantic-equal/index.mts!",

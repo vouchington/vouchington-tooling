@@ -268,6 +268,11 @@
       "import": "./dist/workspace-gates/index.mjs",
       "default": "./dist/workspace-gates/index.mjs"
     },
+    "./dependency-license-policy": {
+      "types": "./dist/dependency-license-policy/index.d.mts",
+      "import": "./dist/dependency-license-policy/index.mjs",
+      "default": "./dist/dependency-license-policy/index.mjs"
+    },
     "./nuget-central-version": {
       "types": "./dist/nuget-central-version/index.d.mts",
       "import": "./dist/nuget-central-version/index.mjs",
@@ -328,11 +333,13 @@
     "remark": "15.0.1",
     "remark-gfm": "4.0.1",
     "smol-toml": "1.8.0",
+    "spdx-expression-parse": "5.0.0",
     "yaml": "2.9.0"
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",
     "@types/picomatch": "^4.0.3",
+    "@types/spdx-expression-parse": "4.0.0",
     "agent-blackboard": "^0.5.0"
   },
   "peerDependencies": {
