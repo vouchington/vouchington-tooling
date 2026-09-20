@@ -14,14 +14,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { parseGithubOutput } from './github-output.test-helpers.mts'
 
 const temporaryDirectories: string[] = []
-const defaultUuid = '12345678-abcd-4def-8123-123456789abc'
+const defaultRandomHex = '12345678abcd4def8123123456789abc'
 
 type RunOptions = {
   args?: string[]
   githubOutput?: string
   payload?: string | Buffer
-  uuidScript?: string
-  uuids?: string[]
+  randomSourceScript?: string
+  randomHexValues?: string[]
 }
 
 function runHelper(options: RunOptions = {}) {
@@ -29,28 +29,35 @@ function runHelper(options: RunOptions = {}) {
   temporaryDirectories.push(temporaryDirectory)
   const fakeBinDirectory = join(temporaryDirectory, 'bin')
   const githubOutput = options.githubOutput ?? join(temporaryDirectory, 'github-output')
+  const odPath = join(fakeBinDirectory, 'od')
   const uuidgenPath = join(fakeBinDirectory, 'uuidgen')
 
   mkdirSync(fakeBinDirectory)
 
   writeFileSync(
-    uuidgenPath,
-    options.uuidScript ??
+    odPath,
+    options.randomSourceScript ??
       `#!/bin/sh
-counter_file="$FAKE_UUID_COUNTER"
+if [ "$*" != "-An -v -N16 -tx1 /dev/urandom" ]; then
+  echo "unexpected od arguments: $*" >&2
+  exit 64
+fi
+counter_file="$FAKE_RANDOM_COUNTER"
 count=0
 if [ -f "$counter_file" ]; then read -r count < "$counter_file"; fi
 count=$((count + 1))
 printf '%s\n' "$count" > "$counter_file"
-printf '%s\n' "$FAKE_UUID_VALUES" | sed -n "\${count}p"
+printf '%s\n' "$FAKE_RANDOM_VALUES" | sed -n "\${count}p"
 `,
   )
+  writeFileSync(uuidgenPath, '#!/bin/sh\necho "uuidgen must not be called" >&2\nexit 97\n')
+  chmodSync(odPath, 0o755)
   chmodSync(uuidgenPath, 0o755)
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    FAKE_UUID_COUNTER: join(temporaryDirectory, 'uuid-count'),
-    FAKE_UUID_VALUES: (options.uuids ?? [defaultUuid]).join('\n'),
+    FAKE_RANDOM_COUNTER: join(temporaryDirectory, 'random-count'),
+    FAKE_RANDOM_VALUES: (options.randomHexValues ?? [defaultRandomHex]).join('\n'),
     GITHUB_OUTPUT: githubOutput,
     PATH: fakeBinDirectory + delimiter + (process.env['PATH'] ?? ''),
     RUNNER_TEMP: temporaryDirectory,
@@ -74,8 +81,8 @@ printf '%s\n' "$FAKE_UUID_VALUES" | sed -n "\${count}p"
     ...result,
     githubOutput,
     output: result.status === 0 ? readFileSync(githubOutput) : undefined,
-    uuidCalls: existsSync(env.FAKE_UUID_COUNTER!)
-      ? readFileSync(env.FAKE_UUID_COUNTER!, 'utf8').trim()
+    randomSourceCalls: existsSync(env.FAKE_RANDOM_COUNTER!)
+      ? readFileSync(env.FAKE_RANDOM_COUNTER!, 'utf8').trim()
       : '0',
   }
 }
@@ -104,22 +111,25 @@ describe('write-github-multiline-output', () => {
   })
 
   it('retries when a generated delimiter occurs in the payload', () => {
-    const firstUuid = '11111111-aaaa-4bbb-8ccc-111111111111'
-    const secondUuid = '22222222-dddd-4eee-8fff-222222222222'
-    const payload = `prefixCODEX_FIX_REQUEST_11111111_AAAA_4BBB_8CCC_111111111111suffix`
+    const firstRandomHex = '11111111aaaa4bbb8ccc111111111111'
+    const secondRandomHex = '22222222dddd4eee8fff222222222222'
+    const payload = `prefixCODEX_FIX_REQUEST_${firstRandomHex.toUpperCase()}suffix`
 
-    const result = runHelper({ payload, uuids: [firstUuid, secondUuid] })
+    const result = runHelper({
+      payload,
+      randomHexValues: [firstRandomHex, secondRandomHex],
+    })
 
     expect(result.status).toBe(0)
-    expect(result.uuidCalls).toBe('2')
+    expect(result.randomSourceCalls).toBe('2')
     expect(result.output!.toString()).toContain(
-      'codex_fix_request<<CODEX_FIX_REQUEST_22222222_DDDD_4EEE_8FFF_222222222222\n',
+      `codex_fix_request<<CODEX_FIX_REQUEST_${secondRandomHex.toUpperCase()}\n`,
     )
     expect(parseGithubOutput(result.output!.toString())).toEqual({ codex_fix_request: payload })
   })
 
   it('preserves empty and line-oriented payload variants', () => {
-    const marker = `CODEX_FIX_REQUEST_${defaultUuid.toUpperCase().replaceAll('-', '_')}`
+    const marker = `CODEX_FIX_REQUEST_${defaultRandomHex.toUpperCase()}`
 
     expect(runHelper().output!.toString()).toBe(`codex_fix_request<<${marker}\n${marker}\n`)
     expect(runHelper({ payload: 'one line' }).output!.toString()).toBe(
@@ -133,7 +143,7 @@ describe('write-github-multiline-output', () => {
   it('preserves percent signs, CRLF bytes, and leading -n text', () => {
     const payload = Buffer.from('-n literal\r\n100% complete\r\n')
     const result = runHelper({ args: ['mixed-name'], payload })
-    const marker = `MIXED_NAME_${defaultUuid.toUpperCase().replaceAll('-', '_')}`
+    const marker = `MIXED_NAME_${defaultRandomHex.toUpperCase()}`
 
     expect(result.status).toBe(0)
     expect(result.output).toEqual(
@@ -160,25 +170,31 @@ describe('write-github-multiline-output', () => {
     expect(missingOutput.stderr).toContain('GITHUB_OUTPUT must be set')
   })
 
-  it('fails clearly when UUID generation fails', () => {
-    const commandFailure = runHelper({ uuidScript: '#!/bin/sh\nexit 42\n' })
-    const emptyUuid = runHelper({ uuidScript: '#!/bin/sh\nexit 0\n' })
+  it('fails clearly when random suffix generation fails', () => {
+    const commandFailure = runHelper({ randomSourceScript: '#!/bin/sh\nexit 42\n' })
+    const invalidValues = ['', 'not-hex', 'abcd'].map((value) =>
+      runHelper({ randomHexValues: [value] }),
+    )
 
     expect(commandFailure.status).toBe(1)
-    expect(commandFailure.stderr).toContain('uuidgen failed')
-    expect(emptyUuid.status).toBe(1)
-    expect(emptyUuid.stderr).toContain('uuidgen returned an empty')
+    expect(commandFailure.stderr).toContain('random suffix generation failed')
+    for (const result of invalidValues) {
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain(
+        'random suffix generator returned an invalid GitHub output delimiter suffix',
+      )
+    }
   })
 
   it('fails after ten delimiter collisions', () => {
-    const normalizedUuid = defaultUuid.toUpperCase().replaceAll('-', '_')
+    const normalizedRandomHex = defaultRandomHex.toUpperCase()
     const result = runHelper({
-      payload: `CODEX_FIX_REQUEST_${normalizedUuid}`,
-      uuids: Array.from({ length: 10 }, () => defaultUuid),
+      payload: `CODEX_FIX_REQUEST_${normalizedRandomHex}`,
+      randomHexValues: Array.from({ length: 10 }, () => defaultRandomHex),
     })
 
     expect(result.status).toBe(1)
-    expect(result.uuidCalls).toBe('10')
+    expect(result.randomSourceCalls).toBe('10')
     expect(result.stderr).toContain('after 10 attempts')
   })
 })
