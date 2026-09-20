@@ -26,17 +26,17 @@ delimiter_prefix=$(printf '%s' "$output_name" | tr '[:lower:]-' '[:upper:]_')
 delimiter=''
 attempt=1
 while [[ $attempt -le 10 ]]; do
-  if ! uuid=$(uuidgen); then
-    echo 'uuidgen failed while creating a GitHub output delimiter' >&2
+  if ! random_suffix=$(LC_ALL=C od -An -v -N16 -tx1 /dev/urandom | LC_ALL=C tr -d '[:space:]'); then
+    echo 'random suffix generation failed while creating a GitHub output delimiter' >&2
     exit 1
   fi
-  if [[ -z "$uuid" ]]; then
-    echo 'uuidgen returned an empty GitHub output delimiter suffix' >&2
+  if [[ ! "$random_suffix" =~ ^[[:xdigit:]]{32}$ ]]; then
+    echo 'random suffix generator returned an invalid GitHub output delimiter suffix' >&2
     exit 1
   fi
 
-  normalized_uuid=$(printf '%s' "$uuid" | tr '[:lower:]-' '[:upper:]_')
-  delimiter="${delimiter_prefix}_${normalized_uuid}"
+  normalized_suffix=$(printf '%s' "$random_suffix" | tr '[:lower:]-' '[:upper:]_')
+  delimiter="${delimiter_prefix}_${normalized_suffix}"
   if ! grep -Fq -- "$delimiter" "$payload_file"; then
     break
   fi
