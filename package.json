@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/node": "^26.5.1",
     "@vitest/coverage-v8": "^5.0.0",
-    "dependency-cruiser": "^18.2.0",
+    "dependency-cruiser": "^18.3.0",
     "eslint": "^10.10.0",
     "eslint-plugin-no-mistakes": "^0.61.11",
     "github-actionlint": "^1.7.12",
