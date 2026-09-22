@@ -21,8 +21,8 @@ importers:
         specifier: ^10.10.0
         version: 10.10.0(jiti@2.7.0)(supports-color@7.2.0)
       eslint-plugin-no-mistakes:
-        specifier: ^0.61.11
-        version: 0.61.11(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))
+        specifier: ^0.62.1
+        version: 0.62.1(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -1336,8 +1336,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-no-mistakes@0.61.11:
-    resolution: {integrity: sha512-Zi6gL9kf/poIqQ9G2s0lh9xdSZCYzvTU3zg+9Gi50MnWq8tn7t6/SeZheOx5sUrV9sojDzzo4ra0rgTLAodWvQ==}
+  eslint-plugin-no-mistakes@0.62.1:
+    resolution: {integrity: sha512-3wwkBZzpkEkKfqUAvgMhxyYqDdFYrgWPu3W4+pg1igpOV7tfikyA2S8F0ENfGQ9RtesX3soCOZ+WGujodUojeg==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     peerDependencies:
       eslint: '>=9'
@@ -3305,7 +3305,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-no-mistakes@0.61.11(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0)):
+  eslint-plugin-no-mistakes@0.62.1(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0)):
     dependencies:
       eslint: 10.10.0(jiti@2.7.0)(supports-color@7.2.0)
 
