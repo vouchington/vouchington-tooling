@@ -30,6 +30,10 @@ Use the upstream `agent-blackboard` skill for the MCP operation contract and
 `vouchington-workflow:blackboard` for journaling policy. Create or ensure an explicit root session
 before recording work, preserve exact parent/child session identities, and append contemporaneous
 notes for failed checks, denied permissions, scope changes, repeated fixes, and reusable tool gaps.
+For Agent Blackboard, maintain sorted, deduplicated lowercase `owner/name` values in
+`session.data.repositories`. Tag every new `entry.data.repositories` with only the repositories
+relevant to that entry. Patch the session union before appending; if the patch fails, do not append.
+Each agent writes only its own session. Start a new session for work after archival.
 
 The hosted connection requires `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`. If either is
 missing or rejected, stop and report the blocker. Never search for, print, or mint credentials, and

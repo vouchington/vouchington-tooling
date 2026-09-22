@@ -57,7 +57,7 @@ vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington retrospective-facts --pr 49 --repo vouchington/vouchington-infra --raw
 vouchington agent-blackboard probe
-vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md
+vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md --repository vouchington/vouchington-tooling
 vouchington agent-blackboard journal entries --session-id <uuid>
 vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --checksum <sha256> --counts <counts.json>
 vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
@@ -126,6 +126,9 @@ as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
 need `agent-blackboard@^0.5.0`. Snapshot cleanup accepts only package-generated temporary paths.
+`appendJournal` requires a `repositories: string[]` argument. The CLI accepts one or more
+`--repository owner/name` flags; it records the entry's exact repositories and updates the session's
+cumulative repository list before appending.
 Programmatic callers launched from a different workspace directory pass their own module URL as
 `dependencies: { resolveFrom: import.meta.url }`; the CLI defaults to the current package context.
 It captures a target under a private tombstone, validates partition names, permissions, JSONL,

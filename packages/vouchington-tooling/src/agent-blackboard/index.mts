@@ -15,7 +15,11 @@ export type BlackboardConnection = {
 }
 export type BlackboardClientModule = {
   Sessions: new (connection: BlackboardConnection) => {
-    ensure(input: unknown): Promise<{ status: 'created' | 'exists' }>
+    ensure(input: unknown): Promise<{
+      status: 'created' | 'exists'
+      session: { data: Record<string, unknown>; archivedAt?: string | null }
+    }>
+    patch(input: unknown): Promise<unknown>
     list(input: unknown): Promise<unknown>
     get(id: string): Promise<unknown>
   }
@@ -52,6 +56,7 @@ export async function appendJournal(input: {
   sessionId: string
   agent: string
   version: string
+  repositories: string[]
   markdownFile: string
   parentSessionId?: string | null
   timestamp?: string
@@ -60,6 +65,7 @@ export async function appendJournal(input: {
 }): Promise<string> {
   assertSessionId(input.sessionId)
   if (input.parentSessionId != null) assertSessionId(input.parentSessionId, 'parent session id')
+  const repositories = normalizeRepositories(input.repositories, true)
   const timestamp = input.timestamp === undefined ? new Date() : new Date(input.timestamp)
   if (Number.isNaN(timestamp.valueOf()))
     throw new Error('journal timestamp is not a valid date-time')
@@ -72,17 +78,41 @@ export async function appendJournal(input: {
   if (!markdown) throw new Error(`note file is empty: ${input.markdownFile}`)
   const connection = resolveBlackboardConnection(input.env)
   const { Sessions, Entries } = await loadClient(input.dependencies)
-  await new Sessions(connection).ensure({
+  const sessions = new Sessions(connection)
+  const ensured = await sessions.ensure({
     id: input.sessionId,
     parentSessionId: input.parentSessionId ?? null,
     agent: input.agent,
     version: input.version,
   })
+  if (ensured.session.archivedAt != null)
+    throw new Error(`session is archived; create a new session: ${input.sessionId}`)
+  const current = ensured.session.data.repositories
+  const cumulative = normalizeRepositories(current, false)
+  const merged = [...new Set([...cumulative, ...repositories])].sort()
+  if (JSON.stringify(current) !== JSON.stringify(merged))
+    await sessions.patch({ sessionId: input.sessionId, data: { repositories: merged } })
   const entry = await new Entries(connection).append({
     sessionId: input.sessionId,
-    data: { type: 'journal', markdown, timestamp: timestamp.toISOString() },
+    data: { type: 'journal', markdown, timestamp: timestamp.toISOString(), repositories },
   })
   return `Journaled to agent-blackboard session ${input.sessionId} (entry created at ${entry.createdAt}).`
+}
+
+function normalizeRepositories(value: unknown, required: boolean): string[] {
+  if (value === undefined && !required) return []
+  if (!Array.isArray(value) || (required && value.length === 0))
+    throw new Error('repositories must be a non-empty array of owner/name strings')
+  const repositories: string[] = []
+  for (const candidate of value as unknown[]) {
+    if (typeof candidate !== 'string')
+      throw new Error('repositories must be a non-empty array of owner/name strings')
+    const repository = candidate.trim().toLowerCase()
+    if (!/^[a-z0-9-]+\/[a-z0-9._-]+$/.test(repository))
+      throw new Error(`invalid repository: ${candidate}`)
+    repositories.push(repository)
+  }
+  return [...new Set(repositories)].sort()
 }
 
 export async function readJournal(

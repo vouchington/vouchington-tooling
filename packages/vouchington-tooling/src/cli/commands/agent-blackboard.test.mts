@@ -44,6 +44,19 @@ describe('agent-blackboard CLI', () => {
       runAgentBlackboardCommand(['journal', 'append', '--session-id', 'bad']),
     ).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--agent is required')
+    await expect(
+      runAgentBlackboardCommand([
+        'journal',
+        'append',
+        '--session-id',
+        'one',
+        '--agent',
+        'codex',
+        '--file',
+        'entry.md',
+      ]),
+    ).resolves.toBe(2)
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--repository is required')
   })
 
   it('rejects unknown and duplicate flags while allowing values that begin with dashes', async () => {
@@ -162,6 +175,10 @@ describe('agent-blackboard CLI', () => {
         'parent',
         '--timestamp',
         '2026-01-01T00:00:00.000Z',
+        '--repository',
+        'vouchington/vouchington',
+        '--repository',
+        'jonathanong/agent-blackboard',
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenCalledWith({
@@ -169,6 +186,7 @@ describe('agent-blackboard CLI', () => {
       agent: 'codex',
       version: '1.0.0',
       markdownFile: 'entry.md',
+      repositories: ['vouchington/vouchington', 'jonathanong/agent-blackboard'],
       parentSessionId: 'parent',
       timestamp: '2026-01-01T00:00:00.000Z',
     })
@@ -183,6 +201,8 @@ describe('agent-blackboard CLI', () => {
         'codex',
         '--file',
         'entry.md',
+        '--repository',
+        'vouchington/vouchington',
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenLastCalledWith({
@@ -190,6 +210,7 @@ describe('agent-blackboard CLI', () => {
       agent: 'codex',
       version: 'unknown',
       markdownFile: 'entry.md',
+      repositories: ['vouchington/vouchington'],
     })
   })
 

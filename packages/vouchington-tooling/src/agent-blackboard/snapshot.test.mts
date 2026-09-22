@@ -147,6 +147,21 @@ describe('snapshot partitions', () => {
     await expect(readdir(result.directory)).rejects.toThrow()
   })
 
+  it('preserves repository membership selection in partition manifests', async () => {
+    const records = sourceRecords()
+    const manifestRecord = records.at(-1) as { manifest: { selection: Record<string, unknown> } }
+    manifestRecord.manifest.selection.dataArrayContains = {
+      repositories: 'vouchington/vouchington',
+    }
+    const path = await snapshot(records)
+    const result = await partitionSnapshot({ path })
+    paths.add(result.directory)
+    expect(result.partitions).toHaveLength(1)
+    expect(result.partitions[0]?.manifest.selection.dataArrayContains).toEqual({
+      repositories: 'vouchington/vouchington',
+    })
+  })
+
   it('rejects arbitrary, hardlinked, symlinked, malformed, unverified, and oversized sources', async () => {
     const outside = join(await mkdtemp(join(tmpdir(), 'snapshot-outside-')), 'snapshot.jsonl')
     paths.add(outside)

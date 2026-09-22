@@ -68,7 +68,9 @@ async function runSnapshot(args: string[]): Promise<number> {
 
 async function runJournal(args: string[]): Promise<number> {
   const [action, ...flags] = args
-  const values = flagsToValues(flags)
+  const { repositories, remaining } =
+    action === 'append' ? extractRepositories(flags) : { repositories: [], remaining: flags }
+  const values = flagsToValues(remaining)
   if (action === 'entries') {
     assertAllowed(values, ['session-id'])
     const sessionId = required(values, 'session-id')
@@ -92,11 +94,30 @@ async function runJournal(args: string[]): Promise<number> {
       'timestamp',
     ])
     process.stdout.write(
-      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...('timestamp' in values ? { timestamp: values.timestamp } : {}) })}\n`,
+      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', repositories: requiredRepositories(repositories), markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...('timestamp' in values ? { timestamp: values.timestamp } : {}) })}\n`,
     )
     return 0
   }
   throw new Error('usage: agent-blackboard journal append|entries')
+}
+
+function extractRepositories(flags: string[]): { repositories: string[]; remaining: string[] } {
+  const repositories: string[] = []
+  const remaining: string[] = []
+  for (let index = 0; index < flags.length; index += 2) {
+    const flag = flags[index]
+    const value = flags[index + 1]
+    if (!flag?.startsWith('--') || value === undefined)
+      throw new Error(`invalid option: ${flag ?? ''}`)
+    if (flag === '--repository') repositories.push(value)
+    else remaining.push(flag, value)
+  }
+  return { repositories, remaining }
+}
+
+function requiredRepositories(repositories: string[]): string[] {
+  if (repositories.length === 0) throw new Error('--repository is required')
+  return repositories
 }
 
 function flagsToValues(flags: string[]): Record<string, string> {

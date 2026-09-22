@@ -31,7 +31,13 @@ describe('agent blackboard', () => {
     await writeFile(file, Buffer.from([0xc3, 0x28]))
     try {
       await expect(
-        appendJournal({ sessionId: 'session:1', agent: 'codex', version: '1', markdownFile: file }),
+        appendJournal({
+          sessionId: 'session:1',
+          agent: 'codex',
+          version: '1',
+          repositories: ['vouchington/vouchington-tooling'],
+          markdownFile: file,
+        }),
       ).rejects.toThrow('not valid UTF-8')
     } finally {
       await rm(directory, { recursive: true, force: true })
