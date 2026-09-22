@@ -153,6 +153,10 @@ describe('agent-blackboard CLI', () => {
       runAgentBlackboardCommand(['journal', 'entries', undefined as never]),
     ).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('invalid option: ')
+    for (const flags of [['session'], ['--repository'], [undefined as never]]) {
+      await expect(runAgentBlackboardCommand(['journal', 'append', ...flags])).resolves.toBe(2)
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('invalid option:')
+    }
   })
 
   it('runs the probe and journal append commands through their service boundaries', async () => {
