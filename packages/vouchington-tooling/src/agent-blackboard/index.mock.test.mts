@@ -160,16 +160,20 @@ describe('agent blackboard client', () => {
   })
 
   it('rejects malformed repository attribution before provider calls', async () => {
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        repositories: ['not-a-repository'],
-        markdownFile: 'missing',
-        env,
-      }),
-    ).rejects.toThrow('invalid repository')
+    for (const repositories of [[], [42] as unknown as string[], ['not-a-repository']]) {
+      await expect(
+        appendJournal({
+          sessionId,
+          agent: 'codex',
+          version: '1',
+          repositories,
+          markdownFile: 'missing',
+          env,
+        }),
+      ).rejects.toThrow(
+        repositories[0] === 'not-a-repository' ? 'invalid repository' : 'repositories must be',
+      )
+    }
     expect(client.ensure).not.toHaveBeenCalled()
   })
 

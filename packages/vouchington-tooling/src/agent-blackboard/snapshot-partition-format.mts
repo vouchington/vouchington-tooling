@@ -44,8 +44,9 @@ function isSelection(value: unknown): boolean {
   if (
     value.dataArrayContains !== undefined &&
     (!isObject(value.dataArrayContains) ||
-      Object.values(value.dataArrayContains).some(
-        (member) => typeof member !== 'string' || member.length === 0,
+      Object.keys(value.dataArrayContains).length === 0 ||
+      Object.entries(value.dataArrayContains).some(
+        ([key, member]) => key.length === 0 || typeof member !== 'string' || member.length === 0,
       ))
   )
     return false

@@ -162,6 +162,15 @@ describe('snapshot partitions', () => {
     })
   })
 
+  it('rejects malformed repository membership selections in snapshot manifests', async () => {
+    for (const dataArrayContains of [{}, { '': 'owner/repo' }, { repositories: '' }]) {
+      const records = sourceRecords()
+      const manifestRecord = records.at(-1) as { manifest: { selection: Record<string, unknown> } }
+      manifestRecord.manifest.selection.dataArrayContains = dataArrayContains
+      await expect(partitionSnapshot({ path: await snapshot(records) })).rejects.toThrow('manifest')
+    }
+  })
+
   it('rejects arbitrary, hardlinked, symlinked, malformed, unverified, and oversized sources', async () => {
     const outside = join(await mkdtemp(join(tmpdir(), 'snapshot-outside-')), 'snapshot.jsonl')
     paths.add(outside)
