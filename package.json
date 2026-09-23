@@ -33,7 +33,7 @@
     "@vitest/coverage-v8": "^5.0.1",
     "dependency-cruiser": "^18.3.1",
     "eslint": "^10.10.0",
-    "eslint-plugin-no-mistakes": "^0.61.11",
+    "eslint-plugin-no-mistakes": "^0.62.1",
     "github-actionlint": "^1.7.12",
     "knip": "^6.35.1",
     "oxfmt": "^0.67.0",
