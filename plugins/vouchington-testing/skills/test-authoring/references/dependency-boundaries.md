@@ -27,7 +27,8 @@ status, or owned field instead. A sequence-bound fake answers by call order — 
 responses, or a queue of canned replies consumed in turn — when the code under test does not own
 that order, so a dependency that adds a request, paginates differently, or reorders its calls hands
 the wrong reply to the wrong call; route the fake by request meaning, such as method and pathname,
-and assert the owned result rather than the exact URL, query string, or call count.
+and assert the owned result rather than dependency-incidental URL, query-string, or call-count
+details.
 
 When a dependency upgrade breaks a test, first ask whether the test pinned dependency behavior. If
 it did, fix the test by deleting or rewriting it rather than re-pinning the new upstream value, and
