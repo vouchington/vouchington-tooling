@@ -9,9 +9,11 @@ repository regresses, so every upgrade arrives as a red build that no change her
 Apply the [tautological tests](tautological-tests.md) falsifiability check with ownership added: for
 every assertion, name a defect in this repository's code that would make it fail. If only a
 dependency release could fail it, delete it. If it covers owned logic but also pins incidental
-dependency detail, rewrite it to assert the owned outcome. Configuration the repository chooses —
-which rules it enables, its thresholds and scopes, and the arguments it passes to a dependency — is
-owned, so test it, but through the dependency's public API rather than its internals.
+dependency detail, rewrite it to assert the owned outcome. What the repository chooses or promises
+is owned even when a dependency carries it out — the rules it enables, its thresholds and scopes,
+the arguments, endpoints, and parameters it passes, how it handles a dependency's exit codes and
+errors, and any call count or order its own logic requires — so test it, but through the
+dependency's public API rather than its internals.
 
 Watch for these shapes. A version-drift guard deep-imports a package's private files or calls its
 internal functions so the suite notices when upstream behavior changes; it couples the suite to a
