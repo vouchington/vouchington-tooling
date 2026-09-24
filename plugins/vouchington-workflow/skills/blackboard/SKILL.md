@@ -14,6 +14,9 @@ subagent-identity rules.
    evidence, and any tracking reference.
 2. Preserve the provider's required session and parent-session identity. Never invent, guess,
    print, search for, or persist credentials outside its documented mechanism.
+   When the provider supports structured repository metadata, keep a cumulative list of canonical
+   repositories on each agent's own session and tag each entry with only its relevant repositories.
+   Update session metadata before appending, and stop if that update fails.
 3. If the journal service cannot authenticate or persist a mandatory entry, stop and report the
    blocker rather than silently substituting a local file or memory.
 4. Read journal entries oldest-first when preparing a retrospective or clustering follow-ups; use

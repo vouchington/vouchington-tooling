@@ -3,6 +3,7 @@ export type SnapshotSelection = {
   version?: string
   parentSessionId?: string | null
   data?: Record<string, unknown>
+  dataArrayContains?: Record<string, string>
   inactiveForHours?: number
 }
 

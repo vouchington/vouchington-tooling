@@ -14,6 +14,8 @@ Read the local `AGENTS.md`, `CLAUDE.md`, and journal guidance first.
    sources. Do not estimate unknown facts from memory or transcripts.
 3. Summarize the outcome, plan-versus-actual differences, validation evidence, recurring friction,
    and actionable process improvements. Keep one-off noise separate from repeatable root causes.
+   Preserve the repository attribution of the source entries in the retrospective record when the
+   journal supports it; a retrospective spanning repositories names every represented repository.
 4. Save through the repository's required durable mechanism and report the record identifier plus
    any follow-up decisions.
 

@@ -41,6 +41,15 @@ function isSelection(value: unknown): boolean {
   )
     return false
   if (value.data !== undefined && !isObject(value.data)) return false
+  if (
+    value.dataArrayContains !== undefined &&
+    (!isObject(value.dataArrayContains) ||
+      Object.keys(value.dataArrayContains).length === 0 ||
+      Object.entries(value.dataArrayContains).some(
+        ([key, member]) => key.length === 0 || typeof member !== 'string' || member.length === 0,
+      ))
+  )
+    return false
   return (
     value.inactiveForHours === undefined ||
     (typeof value.inactiveForHours === 'number' &&
