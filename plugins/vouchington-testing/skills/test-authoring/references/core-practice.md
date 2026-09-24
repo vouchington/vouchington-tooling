@@ -2,7 +2,9 @@
 
 Choose the lowest realistic boundary that can observe the contract. Mock external systems and
 uncontrolled infrastructure; exercise internal module composition where practical. Test behavior,
-failure paths, authorization, and security-relevant validation rather than private calls.
+failure paths, authorization, and security-relevant validation rather than private calls, and
+assert what this repository owns rather than what its [dependencies](dependency-boundaries.md)
+produce.
 
 Start with a failing test when the behavior is testable. Finish only when the production path, its
 public contract, documentation, and generated artifacts move together. Do not leave placeholders or

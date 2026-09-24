@@ -18,3 +18,6 @@ rules before choosing a runner-specific approach.
 
 Read [tautological tests](references/tautological-tests.md) before finishing any test whose
 assertion is not obviously falsifiable by a defect in the code under test.
+
+Read [dependency boundaries](references/dependency-boundaries.md) before asserting on anything a
+dependency produces, and whenever a dependency upgrade breaks a test.
