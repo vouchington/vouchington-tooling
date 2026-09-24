@@ -21,7 +21,7 @@ import {
 } from './pnpm-install-fixture.test-helpers.mts'
 
 const forced =
-  'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false'
+  'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false'
 const secondScriptFree = `${forced} --ignore-scripts`
 
 describe('pending build lifecycle safety', () => {
@@ -33,7 +33,7 @@ describe('pending build lifecycle safety', () => {
       fixture.env.PNPM_PENDING_BUILDS = 'dependency'
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
         'rebuild --pending --recursive',
       ])
     } finally {
@@ -50,7 +50,7 @@ describe('pending build lifecycle safety', () => {
         fixture.env.PNPM_REBUILD_REQUIRES_DEDUPED = '1'
         await runInstaller(fixture)
         await expect(installCalls(fixture)).resolves.toEqual([
-          'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+          'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
           'rebuild --pending --recursive',
         ])
         await expect(
@@ -71,7 +71,7 @@ describe('pending build lifecycle safety', () => {
         'persistent install completed without a clear pending build ledger',
       )
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
       await expect(
         readFile(join(fixture.root, 'node_modules', '.pnpm-install-metadata-health.json'), 'utf8'),
@@ -94,7 +94,7 @@ describe('pending build lifecycle safety', () => {
           `persistent install completed without a clear pending build ledger; remaining IDs: ${JSON.stringify(expectedIds)}`,
         )
         await expect(installCalls(fixture)).resolves.toEqual([
-          'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+          'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
           'rebuild --pending --recursive',
         ])
       } finally {
@@ -110,7 +110,7 @@ describe('pending build lifecycle safety', () => {
       fixture.env.PNPM_REBUILD_PENDING_BUILDS = 'no-mistakes@0.55.0'
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
         'rebuild --pending --recursive',
       ])
       await expect(
@@ -131,7 +131,7 @@ describe('pending build lifecycle safety', () => {
         'persistent install completed without a clear pending build ledger',
       )
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
         'rebuild --pending --recursive',
       ])
       await expect(

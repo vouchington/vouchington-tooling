@@ -2,6 +2,10 @@
 
 pnpm workspace. Node >= 24. Two published packages live under `packages/`.
 
+pnpm 12 is required but never pinned: no `packageManager` or `devEngines.packageManager` field,
+no Corepack, and every `pnpm/action-setup` step takes only `version: 12` after `actions/setup-node`.
+`packages/vouchington-tooling/src/pnpm-setup-policy.test.mts` enforces this.
+
 ## Commands
 
 ```bash
