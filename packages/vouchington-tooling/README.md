@@ -10,7 +10,7 @@ npm install @libpg-query/parser
 # (classic compiler API; typescript@7's package root is version-only)
 npm install @typescript/typescript6
 # optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
-npm install agent-blackboard@^0.5.0
+npm install agent-blackboard@^0.6.0
 ```
 
 ## CLI
@@ -125,7 +125,7 @@ GitHub reports a merged PR whose `baseRefName` is `main`; a merged PR into anoth
 as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
-need `agent-blackboard@^0.5.0`. Snapshot cleanup accepts only package-generated temporary paths.
+need `agent-blackboard@^0.6.0`. Snapshot cleanup accepts only package-generated temporary paths.
 `appendJournal` requires a `repositories: string[]` argument. The CLI accepts one or more
 `--repository owner/name` flags; it records the entry's exact repositories and updates the session's
 cumulative repository list before appending.
