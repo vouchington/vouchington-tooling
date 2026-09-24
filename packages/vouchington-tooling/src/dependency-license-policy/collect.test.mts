@@ -7,7 +7,7 @@ import { parse as parseYaml } from 'yaml'
 
 import { collectPnpmLicenseReport } from './collect.mts'
 import type { PnpmExecutor } from './types.mts'
-import { preparePnpmLicenseAuditWorkspace, renderPnpmLicenseAuditWorkspace } from './workspace.mts'
+import { preparePnpmLicenseAuditWorkspace, renderPnpmLicenseAuditFiles } from './workspace.mts'
 
 type PnpmResult = {
   error?: Error
@@ -19,12 +19,7 @@ type PnpmResult = {
 function fakeExecutor(result: PnpmResult, fetchResult: PnpmResult = { status: 0 }): PnpmExecutor {
   const steps = [
     {
-      args: [
-        '--config.store-dir=/audit/.pnpm-store',
-        '--config.force=true',
-        'fetch',
-        '--ignore-scripts',
-      ],
+      args: ['--config.store-dir=/audit/.pnpm-store', 'fetch', '--ignore-scripts'],
       result: fetchResult,
     },
     {
@@ -59,14 +54,37 @@ function collectTestReport(execute: PnpmExecutor, cleanup: () => void = () => un
   })
 }
 
+const AUDIT_PATHS = { lockfile: 'pnpm-lock.yaml', workspace: 'pnpm-workspace.yaml' }
+
+const ENGINES_GRAPH = [
+  'packages:',
+  '  engines-only@1.0.0:',
+  '    engines: {node: ^20.9.0}',
+  '  sharp-win32@1.0.0:',
+  '    resolution: {integrity: sha512-fixture}',
+  "    engines: {node: '>=20.9.0'}",
+  '    os: [win32]',
+  '',
+].join('\n')
+
+const GRAPH_WITHOUT_ENGINES = {
+  packages: {
+    'engines-only@1.0.0': {},
+    'sharp-win32@1.0.0': { os: ['win32'], resolution: { integrity: 'sha512-fixture' } },
+  },
+}
+
+function renderAuditWorkspace(lockfile: string, workspace: string) {
+  return parseYaml(renderPnpmLicenseAuditFiles(lockfile, workspace, AUDIT_PATHS).workspace) as {
+    supportedArchitectures: Record<string, string[]>
+  }
+}
+
 describe('pnpm license collection', () => {
   it('derives every lockfile platform without retaining workspace packages', () => {
-    const workspace = parseYaml(
-      renderPnpmLicenseAuditWorkspace(
-        `packages:\n  example@1.0.0:\n    os: [win32]\n    cpu: arm64\n    libc: [musl]\n`,
-        'packages: [app]\nengineStrict: true\n',
-        { lockfile: 'pnpm-lock.yaml', workspace: 'pnpm-workspace.yaml' },
-      ),
+    const workspace = renderAuditWorkspace(
+      `packages:\n  example@1.0.0:\n    os: [win32]\n    cpu: arm64\n    libc: [musl]\n`,
+      'packages: [app]\nengineStrict: true\n',
     )
     expect(workspace).toEqual({
       engineStrict: true,
@@ -79,40 +97,37 @@ describe('pnpm license collection', () => {
     })
   })
 
+  it('drops engines from every lockfile package so fetch keeps Node-incompatible optionals', () => {
+    const { lockfile } = renderPnpmLicenseAuditFiles(ENGINES_GRAPH, 'packages: []\n', AUDIT_PATHS)
+    expect(parseYaml(lockfile)).toEqual(GRAPH_WITHOUT_ENGINES)
+  })
+
   it('rejects malformed platform selectors', () => {
     expect(() =>
-      renderPnpmLicenseAuditWorkspace(
+      renderPnpmLicenseAuditFiles(
         `packages:\n  example@1.0.0:\n    os: 42\n`,
         'packages: []\n',
-        {
-          lockfile: 'pnpm-lock.yaml',
-          workspace: 'pnpm-workspace.yaml',
-        },
+        AUDIT_PATHS,
       ),
     ).toThrow('pnpm-lock.yaml packages.*.os to be a string or an array of strings')
   })
 
   it.each([
     ['[', 'failed to parse pnpm-lock.yaml'],
+    ['', 'expected pnpm-lock.yaml to contain a YAML object'],
     ['- not-an-object\n', 'expected pnpm-lock.yaml to contain a YAML object'],
     ['importers: {}\n', 'expected pnpm-lock.yaml to contain a packages object'],
   ])('rejects malformed lockfile YAML %j', (lockfile, message) => {
-    expect(() =>
-      renderPnpmLicenseAuditWorkspace(lockfile, 'packages: []\n', {
-        lockfile: 'pnpm-lock.yaml',
-        workspace: 'pnpm-workspace.yaml',
-      }),
-    ).toThrow(message)
+    expect(() => renderPnpmLicenseAuditFiles(lockfile, 'packages: []\n', AUDIT_PATHS)).toThrow(
+      message,
+    )
   })
 
   it('ignores lockfile snapshots without platform selectors', () => {
-    const workspace = parseYaml(
-      renderPnpmLicenseAuditWorkspace(
-        'packages:\n  scalar: 1\n  ordinary:\n    resolution: {integrity: fixture}\n',
-        'packages: []\n',
-        { lockfile: 'pnpm-lock.yaml', workspace: 'pnpm-workspace.yaml' },
-      ),
-    ) as { supportedArchitectures: Record<string, string[]> }
+    const workspace = renderAuditWorkspace(
+      'packages:\n  scalar: 1\n  ordinary:\n    resolution: {integrity: fixture}\n',
+      'packages: []\n',
+    )
     expect(workspace.supportedArchitectures).toEqual({
       cpu: ['current'],
       libc: ['current'],
@@ -124,15 +139,16 @@ describe('pnpm license collection', () => {
     const repoRoot = mkdtempSync(join(tmpdir(), 'dependency-license-test-'))
     try {
       writeFileSync(join(repoRoot, 'package.json'), '{}\n')
-      writeFileSync(join(repoRoot, 'pnpm-lock.yaml'), 'packages: {}\n')
-      const workspace = preparePnpmLicenseAuditWorkspace(
-        repoRoot,
-        'packages: {}\n',
-        'packages: []\n',
-      )
+      const workspace = preparePnpmLicenseAuditWorkspace(repoRoot, ENGINES_GRAPH, 'packages: []\n')
       try {
-        expect(existsSync(join(workspace.cwd, 'package.json'))).toBe(true)
+        expect(readFileSync(join(workspace.cwd, 'package.json'), 'utf8')).toBe('{}\n')
         expect(existsSync(join(workspace.cwd, '.npmrc'))).toBe(false)
+        expect(parseYaml(readFileSync(join(workspace.cwd, 'pnpm-lock.yaml'), 'utf8'))).toEqual(
+          GRAPH_WITHOUT_ENGINES,
+        )
+        expect(
+          parseYaml(readFileSync(join(workspace.cwd, 'pnpm-workspace.yaml'), 'utf8')),
+        ).toMatchObject({ packages: [], supportedArchitectures: { os: ['current', 'win32'] } })
       } finally {
         workspace.cleanup()
       }
@@ -145,7 +161,6 @@ describe('pnpm license collection', () => {
     const repoRoot = mkdtempSync(join(tmpdir(), 'dependency-license-test-'))
     try {
       writeFileSync(join(repoRoot, 'package.json'), '{}\n')
-      writeFileSync(join(repoRoot, 'pnpm-lock.yaml'), 'packages: {}\n')
       writeFileSync(join(repoRoot, '.npmrc'), 'registry=https://registry.example.test\n')
       const workspace = preparePnpmLicenseAuditWorkspace(
         repoRoot,
@@ -196,7 +211,7 @@ describe('pnpm license collection', () => {
     expect(cleanupCount).toBe(3)
   })
 
-  it('parses a well-formed report using an isolated forced fetch', () => {
+  it('parses a well-formed report using an isolated fetch', () => {
     expect(
       collectTestReport(
         fakeExecutor({

@@ -328,7 +328,10 @@ or derive a configuration or documentation package spec from that manifest inste
 
 `dependency-license-policy` keeps legal policy in the consumer. `collectPnpmLicenseReport` creates
 an isolated, script-free temporary workspace and store, expands pnpm's supported architectures to
-every `os`, `cpu`, and `libc` selector represented in the lockfile, and validates the JSON report.
+every `os`, `cpu`, and `libc` selector represented in the lockfile, drops every `engines` constraint
+from the audit copy of the lockfile, and validates the JSON report. Dropping `engines` keeps
+`pnpm fetch` from skipping optional packages that exclude the running Node.js; pnpm 12's `fetch`
+ignores `force`, so their licenses would otherwise report as Unknown.
 Pass explicit denied SPDX IDs and prefixes, exact aliases, and justified allowlist scopes to
 `evaluatePnpmLicenseReport`. Unknown, malformed, and custom SPDX references fail closed. Allowlist
 scopes are either intentionally global or an exact package-name set; the library returns structured
