@@ -13,7 +13,6 @@ export async function loadYaml(
   repoRoot: string,
   relPath: string,
   errors: string[],
-  parse: (source: string) => unknown = load,
 ): Promise<AnyObj | null> {
   let content: string
   try {
@@ -25,7 +24,7 @@ export async function loadYaml(
     return null
   }
   try {
-    const parsed = parse(content)
+    const parsed = load(content)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
     return parsed as AnyObj
   } catch {

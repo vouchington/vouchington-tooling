@@ -5,7 +5,6 @@ import {
   packageNameFromPnpmLockKey,
   pnpmLockPackageKeyMatchesSelector,
 } from '../pnpm-install/index.mts'
-import { parsePnpmLockfileGraph } from '../pnpm-lockfile.mts'
 import type { SharedContext } from '../shared-context/index.mts'
 import type { ResolvedWorkspaceGatesOptions } from './options.mts'
 import { loadYaml, type AnyObj } from './yaml-loader.mts'
@@ -64,7 +63,7 @@ async function collectLockfilePackageKeys(
 ): Promise<string[]> {
   if (!ctx.trackedFileSet.has(lockfilePath)) return []
 
-  const lockfile = await loadYaml(ctx.repoRoot, lockfilePath, errors, parsePnpmLockfileGraph)
+  const lockfile = await loadYaml(ctx.repoRoot, lockfilePath, errors)
   const packages = lockfile?.['packages']
   if (typeof packages !== 'object' || packages === null || Array.isArray(packages)) return []
 

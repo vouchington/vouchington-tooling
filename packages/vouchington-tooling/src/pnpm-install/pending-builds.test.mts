@@ -23,7 +23,6 @@ import {
   pendingBuilds,
   pruneStalePendingBuilds,
 } from './pending-builds.mts'
-import { twoDocumentLockfile } from '../pnpm-lockfile.test-helpers.mts'
 
 const roots: string[] = []
 const previousCwd = process.cwd()
@@ -173,30 +172,6 @@ describe('pending builds', () => {
     warn.mockRestore()
     await expect(readFile(modules, 'utf8')).resolves.toContain('custom: retained')
     await expect(readFile(modules, 'utf8')).resolves.not.toContain('no-mistakes@0.55.0')
-  })
-
-  it('prunes against the graph document of a pnpm 12 lockfile', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'pending-build-pruning-two-documents-'))
-    roots.push(root)
-    const modulesDir = join(root, 'node_modules')
-    await mkdir(join(modulesDir, '.pnpm'), { recursive: true })
-    process.chdir(root)
-    const modules = join(modulesDir, '.modules.yaml')
-    await writeFile(
-      modules,
-      'virtualStoreDir: .pnpm\npendingBuilds: [pnpm@12.6.0, current@1.0.0, .]\n',
-    )
-    const graph = 'importers:\n  .: {}\npackages:\n  current@1.0.0: {}\n'
-    await writeFile(join(root, 'pnpm-lock.yaml'), twoDocumentLockfile(graph))
-    await writeFile(join(modulesDir, '.pnpm', 'lock.yaml'), graph)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    await expect(pruneStalePendingBuilds()).resolves.toEqual({
-      ids: ['.', 'current@1.0.0'],
-      kind: 'pending',
-    })
-    expect(warn).toHaveBeenCalledWith('pending-build-ledger-pruned-stale IDs: ["pnpm@12.6.0"]')
-    warn.mockRestore()
   })
 
   it('does not prune when the current lockfile cannot prove an ID is stale', async () => {

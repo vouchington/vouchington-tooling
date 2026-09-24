@@ -7,8 +7,6 @@ import { parse as parseYaml } from 'yaml'
 
 import { collectPnpmLicenseReport } from './collect.mts'
 import type { PnpmExecutor } from './types.mts'
-import { parsePnpmLockfileGraph } from '../pnpm-lockfile.mts'
-import { PNPM_ENV_DOCUMENT, twoDocumentLockfile } from '../pnpm-lockfile.test-helpers.mts'
 import { preparePnpmLicenseAuditWorkspace, renderPnpmLicenseAuditFiles } from './workspace.mts'
 
 type PnpmResult = {
@@ -99,31 +97,9 @@ describe('pnpm license collection', () => {
     })
   })
 
-  it('derives platforms from the graph document of a pnpm 12 lockfile', () => {
-    const workspace = renderAuditWorkspace(
-      twoDocumentLockfile(`packages:\n  example@1.0.0:\n    os: [win32]\n    cpu: arm64\n`),
-      'packages: [app]\n',
-    )
-    expect(workspace.supportedArchitectures).toEqual({
-      cpu: ['current', 'arm64'],
-      libc: ['current'],
-      os: ['current', 'win32'],
-    })
-  })
-
   it('drops engines from every lockfile package so fetch keeps Node-incompatible optionals', () => {
     const { lockfile } = renderPnpmLicenseAuditFiles(ENGINES_GRAPH, 'packages: []\n', AUDIT_PATHS)
-    expect(parsePnpmLockfileGraph(lockfile)).toEqual(GRAPH_WITHOUT_ENGINES)
-  })
-
-  it('drops engines from the graph and keeps the pnpm 12 env document byte-for-byte', () => {
-    const { lockfile } = renderPnpmLicenseAuditFiles(
-      twoDocumentLockfile(ENGINES_GRAPH),
-      'packages: []\n',
-      AUDIT_PATHS,
-    )
-    expect(lockfile.startsWith(`${PNPM_ENV_DOCUMENT}---\n`)).toBe(true)
-    expect(parsePnpmLockfileGraph(lockfile)).toEqual(GRAPH_WITHOUT_ENGINES)
+    expect(parseYaml(lockfile)).toEqual(GRAPH_WITHOUT_ENGINES)
   })
 
   it('rejects malformed platform selectors', () => {
@@ -167,9 +143,9 @@ describe('pnpm license collection', () => {
       try {
         expect(readFileSync(join(workspace.cwd, 'package.json'), 'utf8')).toBe('{}\n')
         expect(existsSync(join(workspace.cwd, '.npmrc'))).toBe(false)
-        expect(
-          parsePnpmLockfileGraph(readFileSync(join(workspace.cwd, 'pnpm-lock.yaml'), 'utf8')),
-        ).toEqual(GRAPH_WITHOUT_ENGINES)
+        expect(parseYaml(readFileSync(join(workspace.cwd, 'pnpm-lock.yaml'), 'utf8'))).toEqual(
+          GRAPH_WITHOUT_ENGINES,
+        )
         expect(
           parseYaml(readFileSync(join(workspace.cwd, 'pnpm-workspace.yaml'), 'utf8')),
         ).toMatchObject({ packages: [], supportedArchitectures: { os: ['current', 'win32'] } })

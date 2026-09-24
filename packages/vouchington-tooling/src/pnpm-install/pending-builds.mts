@@ -4,8 +4,6 @@ import path from 'node:path'
 
 import { parse, stringify } from 'yaml'
 
-import { parsePnpmLockfileGraph } from '../pnpm-lockfile.mts'
-
 export type PendingBuildState =
   | { kind: 'clear' }
   | { ids: string[]; kind: 'pending' }
@@ -57,7 +55,7 @@ export async function pendingBuilds(): Promise<PendingBuildState> {
 
 async function lockfileBuildIds(lockfilePath: string) {
   try {
-    const lockfile = parsePnpmLockfileGraph(await readFile(lockfilePath, 'utf8'))
+    const lockfile: unknown = parse(await readFile(lockfilePath, 'utf8'))
     if (!isRecord(lockfile) || !isRecord(lockfile.importers) || !isRecord(lockfile.packages))
       return undefined
     return new Set([...Object.keys(lockfile.importers), ...Object.keys(lockfile.packages)])

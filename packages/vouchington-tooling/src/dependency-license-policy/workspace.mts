@@ -2,9 +2,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { isMap, parse as parseYaml, stringify as stringifyYaml } from 'yaml'
-
-import { parsePnpmLockfileGraphDocument } from '../pnpm-lockfile.mts'
+import { isMap, parseDocument, stringify as stringifyYaml } from 'yaml'
 
 type PlatformKey = 'cpu' | 'libc' | 'os'
 const PLATFORM_KEYS: readonly PlatformKey[] = ['os', 'cpu', 'libc']
@@ -20,12 +18,11 @@ export interface PnpmLicenseAuditFiles {
   readonly workspace: string
 }
 
-function parseYamlSource<T>(parse: () => T, path: string): T {
-  try {
-    return parse()
-  } catch (error) {
-    throw new Error(`failed to parse ${path}: ${String(error)}`, { cause: error })
-  }
+function parseYamlDocument(source: string, path: string) {
+  const document = parseDocument(source)
+  const [error] = document.errors
+  if (error) throw new Error(`failed to parse ${path}: ${String(error)}`, { cause: error })
+  return document
 }
 
 function assertYamlObject(value: unknown, path: string): Record<string, unknown> {
@@ -71,28 +68,22 @@ function collectSupportedArchitectures(
  * Renders the audit copies of `pnpm-lock.yaml` and `pnpm-workspace.yaml` so `pnpm fetch` downloads
  * every package in the lockfile, including optional ones that don't match the host.
  *
- * The workspace supports every `os`, `cpu`, and `libc` in the lockfile's graph. The lockfile drops
- * every `engines` constraint from the graph because pnpm 12's `fetch` ignores `force` and skips an
- * optional package whose `engines` exclude the running Node.js. That leaves the package's license
- * Unknown. The pnpm 12 env document stays byte-for-byte, since pnpm checks the `packageManager`
- * pin against it.
+ * The workspace supports every `os`, `cpu`, and `libc` in the lockfile. The lockfile drops every
+ * `engines` constraint because pnpm 12's `fetch` ignores `force` and skips an optional package whose
+ * `engines` exclude the running Node.js, which would leave that package's license Unknown.
  */
 export function renderPnpmLicenseAuditFiles(
   lockfileSource: string,
   workspaceSource: string,
   paths: { lockfile: string; workspace: string },
 ): PnpmLicenseAuditFiles {
-  const graph = parseYamlSource(
-    () => parsePnpmLockfileGraphDocument(lockfileSource),
-    paths.lockfile,
-  )
-  if (!graph) throw new Error(`expected ${paths.lockfile} to contain a YAML object`)
-  const lockfile = assertYamlObject(graph.document.toJS(), paths.lockfile)
+  const lockfileDocument = parseYamlDocument(lockfileSource, paths.lockfile)
+  const lockfile = assertYamlObject(lockfileDocument.toJS(), paths.lockfile)
   const workspace = assertYamlObject(
-    parseYamlSource(() => parseYaml(workspaceSource) as unknown, paths.workspace),
+    parseYamlDocument(workspaceSource, paths.workspace).toJS(),
     paths.workspace,
   )
-  const packageNodes = graph.document.get('packages')
+  const packageNodes = lockfileDocument.get('packages')
   if (!isMap(packageNodes)) {
     throw new Error(`expected ${paths.lockfile} to contain a packages object`)
   }
@@ -103,7 +94,7 @@ export function renderPnpmLicenseAuditFiles(
   )
   for (const { value } of packageNodes.items) if (isMap(value)) value.delete('engines')
   return {
-    lockfile: lockfileSource.slice(0, graph.start) + graph.document.toString({ lineWidth: 0 }),
+    lockfile: lockfileDocument.toString({ lineWidth: 0 }),
     workspace: stringifyYaml({ ...workspace, packages: [], supportedArchitectures }),
   }
 }
