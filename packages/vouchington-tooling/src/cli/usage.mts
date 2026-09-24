@@ -83,7 +83,7 @@ gha-workspace-policy [--root <directory>] [--workflow-directory <directory>] [--
 gha-output <name>
 gha-needs-results [label]
 download-with-diagnostics <url> <destination> [-- curl-args...]
-download-optional-run-artifacts (--name <name> | --pattern <pattern>) --dir <directory>
+download-optional-run-artifacts (--name <name>... | --pattern <pattern>) --dir <directory>
 host-pressure-diagnostics
 allocate-browser-safe-ports [count] [--policy path] [--forbidden-ports path]
 diagnose-port-collision [--ports "2200 2216"] [--output-dir PATH]

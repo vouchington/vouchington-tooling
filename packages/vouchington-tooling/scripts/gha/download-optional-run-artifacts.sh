@@ -2,18 +2,34 @@
 set -euo pipefail
 
 usage() {
-  echo 'usage: download-optional-run-artifacts.sh (--name <name> | --pattern <pattern>) --dir <directory>' >&2
+  echo 'usage: download-optional-run-artifacts.sh (--name <name>... | --pattern <pattern>) --dir <directory>' >&2
   exit 2
+}
+
+contains() {
+  local needle="$1" item
+  shift
+  for item in "$@"; do
+    [ "$item" != "$needle" ] || return 0
+  done
+  return 1
 }
 
 selector=''
 selector_type=''
+names=()
 destination=''
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --name|--pattern)
+    --name)
+      { [ "$selector_type" != pattern ] && [ "$#" -ge 2 ] && [ -n "$2" ]; } || usage
+      selector_type=name
+      if [ "${#names[@]}" -eq 0 ] || ! contains "$2" "${names[@]}"; then names+=("$2"); fi
+      shift 2
+      ;;
+    --pattern)
       [ -z "$selector_type" ] && [ "$#" -ge 2 ] || usage
-      selector_type="${1#--}"
+      selector_type=pattern
       selector="$2"
       shift 2
       ;;
@@ -26,7 +42,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-[ -n "$selector_type" ] && [ -n "$selector" ] && [ -n "$destination" ] || usage
+[ -n "$selector_type" ] && [ -n "$destination" ] || usage
+[ "$selector_type" != pattern ] || [ -n "$selector" ] || usage
 [ -n "${GITHUB_OUTPUT:-}" ] || { echo 'GITHUB_OUTPUT must be set' >&2; exit 2; }
 [ -n "${GITHUB_REPOSITORY:-}" ] || { echo 'GITHUB_REPOSITORY must be set' >&2; exit 2; }
 [ -n "${GITHUB_RUN_ID:-}" ] || { echo 'GITHUB_RUN_ID must be set' >&2; exit 2; }
@@ -47,28 +64,11 @@ esac
 
 validate_artifact_name() {
   case "$1" in
-    ''|.|..|*/*|*\\*)
+    ''|.|..|*/*|*\\*|*$'\n'*|*$'\r'*)
       echo '[optional-run-artifacts] invalid artifact name' >&2
       return 2
       ;;
   esac
-}
-
-download_exact() {
-  artifact="$1"
-  directory="$2"
-  validate_artifact_name "$artifact" || return $?
-  artifacts=$(list_artifact_names) || return $?
-  found=0
-  while IFS= read -r candidate; do
-    if [ "$candidate" = "$artifact" ]; then
-      found=1
-      break
-    fi
-  done < <(printf '%s\n' "$artifacts")
-  [ "$found" -eq 1 ] || return 3
-  echo "[optional-run-artifacts] attempt selector=$selector_type" >&2
-  GH_HOST="$github_host" gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$artifact" --dir "$directory"
 }
 
 list_artifact_names_once() {
@@ -126,8 +126,47 @@ download_pattern() {
   done
 }
 
+warn_absent() {
+  local requested="$1" count=$(($# - 1)) list='' name
+  shift
+  for name in "${@:1:3}"; do
+    list="${list:+$list, }$name"
+  done
+  [ "$count" -le 3 ] || list="$list and $((count - 3)) more"
+  echo "::warning::Optional same-run artifacts absent: $count of $requested requested (${list//\%/%25})" >&2
+}
+
+download_names() {
+  local name status listed_names
+  listed=()
+  present=()
+  absent=()
+  for name in "${names[@]}"; do
+    validate_artifact_name "$name" || return $?
+  done
+  listed_names=$(list_artifact_names) || return $?
+  while IFS= read -r name; do
+    listed+=("$name")
+  done <<< "$listed_names"
+  for name in "${names[@]}"; do
+    if contains "$name" "${listed[@]}"; then present+=("$name"); else absent+=("$name"); fi
+  done
+  echo "[optional-run-artifacts] selection selector=name requested=${#names[@]} present=${#present[@]} absent=${#absent[@]}" >&2
+  [ "${#absent[@]}" -eq 0 ] || warn_absent "${#names[@]}" "${absent[@]}"
+  [ "${#present[@]}" -gt 0 ] || return 3
+  for name in "${present[@]}"; do
+    echo "[optional-run-artifacts] attempt selector=name artifact=$name" >&2
+    if GH_HOST="$github_host" gh run download "$GITHUB_RUN_ID" --repo "$repository" --name "$name" --dir "$destination/$name"; then :; else
+      status=$?
+      echo "[optional-run-artifacts] download failed artifact=$name exit=$status" >&2
+      [ "$status" -ne 3 ] || status=1
+      return "$status"
+    fi
+  done
+}
+
 if [ "$selector_type" = name ]; then
-  if download_exact "$selector" "$destination"; then status=0; else status=$?; fi
+  if download_names; then status=0; else status=$?; fi
 else
   if download_pattern; then status=0; else status=$?; fi
 fi
@@ -139,7 +178,7 @@ else
     130|143) exit "$status" ;;
     3)
       echo 'availability=unavailable' >> "$GITHUB_OUTPUT"
-      echo "::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=$selector_type exit=$status)" >&2
+      [ "$selector_type" = name ] || echo "::warning::Optional same-run artifact unavailable; continuing with validated fallback (selector=$selector_type exit=$status)" >&2
       echo "[optional-run-artifacts] result=unavailable selector=$selector_type exit=$status" >&2
       ;;
     *)
