@@ -17,6 +17,7 @@ import {
   writeTracked,
 } from './test-helpers.mts'
 import type { SharedContext } from '../shared-context/index.mts'
+import { twoDocumentLockfile } from '../pnpm-lockfile.test-helpers.mts'
 
 describe('workspace-gates first-party graph', () => {
   const testDirs: string[] = []
@@ -102,6 +103,14 @@ describe('workspace-gates first-party graph', () => {
         peerDependencies: { 'acme-lib': '1.0.0', '@acme/core': '1.0.0' },
       }),
       'pnpm-lock.yaml': buildPnpmLock(),
+    })
+    const { errors } = await checkWorkspaceGatesPolicy(stubCtx(dir, files), defaultOptions())
+    expect(errors).toEqual([])
+  })
+
+  it('reads first-party packages from the graph document of a pnpm 12 lockfile', async () => {
+    const { dir, files } = await makeCompliantFixture(testDirs, {
+      extraFiles: { 'pnpm-lock.yaml': twoDocumentLockfile(buildPnpmLock()) },
     })
     const { errors } = await checkWorkspaceGatesPolicy(stubCtx(dir, files), defaultOptions())
     expect(errors).toEqual([])

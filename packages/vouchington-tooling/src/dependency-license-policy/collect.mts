@@ -50,11 +50,10 @@ export function collectPnpmLicenseReport(
   )
   try {
     const storeConfig = `--config.store-dir=${join(auditWorkspace.cwd, '.pnpm-store')}`
-    const fetchResult = execute(
-      'pnpm',
-      [storeConfig, '--config.force=true', 'fetch', '--ignore-scripts'],
-      { cwd: auditWorkspace.cwd, encoding: 'utf8' },
-    )
+    const fetchResult = execute('pnpm', [storeConfig, 'fetch', '--ignore-scripts'], {
+      cwd: auditWorkspace.cwd,
+      encoding: 'utf8',
+    })
     assertCommandSucceeded('pnpm fetch', fetchResult)
 
     const result = execute('pnpm', [storeConfig, 'licenses', 'list', '--json'], {
