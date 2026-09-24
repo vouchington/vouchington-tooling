@@ -19,7 +19,7 @@ type Manifest = {
 
 const pnpmSetup = /^pnpm\/action-setup@/
 const nodeSetup = /^actions\/setup-node@/
-const bareMajor = /^\d+$/
+const latestOfMajor = /^latest-\d+$/
 const manualActivation = [
   /\bcorepack\b/i,
   /\bpnpm@\d/,
@@ -81,10 +81,10 @@ describe('pnpm setup policy', () => {
     expect(setups.length).toBeGreaterThan(0)
   })
 
-  it('passes pnpm/action-setup nothing but a bare pnpm major', () => {
+  it('passes pnpm/action-setup nothing but the latest-<major> dist-tag', () => {
     for (const { source, step } of setups) {
       expect(Object.keys(step.with ?? {}), source).toEqual(['version'])
-      expect(String(step.with?.version), source).toMatch(bareMajor)
+      expect(String(step.with?.version), source).toMatch(latestOfMajor)
     }
   })
 
