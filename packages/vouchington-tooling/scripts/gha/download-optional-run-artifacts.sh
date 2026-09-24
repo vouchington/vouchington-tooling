@@ -126,14 +126,14 @@ download_pattern() {
   done
 }
 
-warn_absent() {
+notice_absent() {
   local requested="$1" count=$(($# - 1)) list='' name
   shift
   for name in "${@:1:3}"; do
     list="${list:+$list, }$name"
   done
   [ "$count" -le 3 ] || list="$list and $((count - 3)) more"
-  echo "::warning::Optional same-run artifacts absent: $count of $requested requested (${list//\%/%25})" >&2
+  echo "::notice::Optional same-run artifacts absent: $count of $requested requested (${list//\%/%25})" >&2
 }
 
 download_names() {
@@ -152,7 +152,7 @@ download_names() {
     if contains "$name" "${listed[@]}"; then present+=("$name"); else absent+=("$name"); fi
   done
   echo "[optional-run-artifacts] selection selector=name requested=${#names[@]} present=${#present[@]} absent=${#absent[@]}" >&2
-  [ "${#absent[@]}" -eq 0 ] || warn_absent "${#names[@]}" "${absent[@]}"
+  [ "${#absent[@]}" -eq 0 ] || notice_absent "${#names[@]}" "${absent[@]}"
   [ "${#present[@]}" -gt 0 ] || return 3
   for name in "${present[@]}"; do
     echo "[optional-run-artifacts] attempt selector=name artifact=$name" >&2

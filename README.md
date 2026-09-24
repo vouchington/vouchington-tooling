@@ -250,9 +250,10 @@ Name mode takes one or more `--name <artifact>` flags (mutually exclusive with `
 the run's artifacts once, and extracts every requested name that is present into `<dir>/<name>`.
 Names are matched literally, in request order, with repeats downloaded once; empty names, `.`, `..`,
 and names containing `/`, `\`, or a line break are rejected before anything is listed. Requested
-names absent from the run are skipped with a single bounded `::warning::` (the absent count, the
-first three names, then `and N more`) and never one line per name. `availability=available` means at
-least one requested artifact was downloaded; `availability=unavailable` (exit 0) means none was
+names absent from the run are expected (callers pass a superset such as retry-attempt variants) and
+are skipped with a single bounded `::notice::` (the absent count, the first three names, then
+`and N more`) and never one line per name. `availability=available` means at least one requested
+artifact was downloaded; `availability=unavailable` (exit 0) means none was
 present. A present artifact whose download fails is a hard failure: the helper stops at the first
 one, prints `download failed artifact=<name> exit=<n>`, exits non-zero (a downloader exit of 3 is
 reported as 1 so it cannot be mistaken for absence), and writes no `availability` output.

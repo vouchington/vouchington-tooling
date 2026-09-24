@@ -59,6 +59,10 @@ function warnings(result: Result) {
   return result.stderr.split('\n').filter((line) => line.includes('::warning::'))
 }
 
+function notices(result: Result) {
+  return result.stderr.split('\n').filter((line) => line.includes('::notice::'))
+}
+
 function downloaded(result: Result, name: string) {
   return readFileSync(join(result.temporaryDirectory, 'out', name, 'artifact-name'), 'utf8')
 }
@@ -88,7 +92,7 @@ describe('download-optional-run-artifacts --name', () => {
     expect(result.output).toBe('availability=available\n')
   })
 
-  it('downloads the present names and warns once about the absent ones', () => {
+  it('downloads the present names and notices once about the absent ones', () => {
     const result = runNames({
       names: ['present-a', 'missing-a', 'present-b', 'missing-b', 'missing-c'],
       listing: ['present-b', 'present-a'],
@@ -96,13 +100,14 @@ describe('download-optional-run-artifacts --name', () => {
 
     expect(result.status).toBe(0)
     expect(calls(result)).toEqual(['api', 'download present-a', 'download present-b'])
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 3 of 5 requested (missing-a, missing-b, missing-c)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 3 of 5 requested (missing-a, missing-b, missing-c)',
     ])
+    expect(warnings(result)).toEqual([])
     expect(result.output).toBe('availability=available\n')
   })
 
-  it('bounds the absent warning to a count and the first few names', () => {
+  it('bounds the absent notice to a count and the first few names', () => {
     const absent = Array.from(
       { length: 40 },
       (_, index) => `missing-${String(index + 1).padStart(2, '0')}`,
@@ -110,21 +115,23 @@ describe('download-optional-run-artifacts --name', () => {
     const result = runNames({ names: ['present', ...absent], listing: ['present'] })
 
     expect(result.status).toBe(0)
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 40 of 41 requested (missing-01, missing-02, missing-03 and 37 more)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 40 of 41 requested (missing-01, missing-02, missing-03 and 37 more)',
     ])
+    expect(warnings(result)).toEqual([])
     expect(result.stderr.match(/missing-\d+/g)).toHaveLength(3)
     expect(result.output).toBe('availability=available\n')
   })
 
-  it('reports availability=unavailable with one warning when every name is absent', () => {
+  it('reports availability=unavailable with one notice when every name is absent', () => {
     const result = runNames({ names: ['missing-a', 'missing-b'], listing: ['other'] })
 
     expect(result.status).toBe(0)
     expect(calls(result)).toEqual(['api'])
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 2 of 2 requested (missing-a, missing-b)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 2 of 2 requested (missing-a, missing-b)',
     ])
+    expect(warnings(result)).toEqual([])
     expect(result.stderr).toContain(
       '[optional-run-artifacts] result=unavailable selector=name exit=3',
     )
@@ -135,7 +142,8 @@ describe('download-optional-run-artifacts --name', () => {
     const result = runNames({ names: ['missing'], listing: [] })
 
     expect(result.status).toBe(0)
-    expect(warnings(result)).toHaveLength(1)
+    expect(notices(result)).toHaveLength(1)
+    expect(warnings(result)).toEqual([])
     expect(result.output).toBe('availability=unavailable\n')
   })
 
@@ -164,7 +172,8 @@ describe('download-optional-run-artifacts --name', () => {
     })
 
     expect(result.status).toBe(1)
-    expect(warnings(result)).toHaveLength(1)
+    expect(notices(result)).toHaveLength(1)
+    expect(warnings(result)).toEqual([])
     expect(result.stderr).toContain('[optional-run-artifacts] download failed artifact=a exit=1')
     expect(result.output).toBe('')
   })
@@ -207,9 +216,10 @@ exit 99
 
     expect(result.status).toBe(0)
     expect(calls(result)).toEqual(['api', 'download a', 'download b'])
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 1 of 3 requested (missing)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 1 of 3 requested (missing)',
     ])
+    expect(warnings(result)).toEqual([])
   })
 
   it('accepts --dir before, between, and after --name flags', () => {
@@ -264,18 +274,20 @@ exit 99
 
     expect(result.status).toBe(0)
     expect(calls(result)).toEqual(['api'])
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 5 of 5 requested (*, a*, a?c and 2 more)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 5 of 5 requested (*, a*, a?c and 2 more)',
     ])
+    expect(warnings(result)).toEqual([])
     expect(result.output).toBe('availability=unavailable\n')
   })
 
   it('escapes percent signs so an absent name cannot forge a workflow-command escape', () => {
     const result = runNames({ names: ['50%0A'], listing: [] })
 
-    expect(warnings(result)).toEqual([
-      '::warning::Optional same-run artifacts absent: 1 of 1 requested (50%250A)',
+    expect(notices(result)).toEqual([
+      '::notice::Optional same-run artifacts absent: 1 of 1 requested (50%250A)',
     ])
+    expect(warnings(result)).toEqual([])
   })
 
   it.each(['.', '..', 'nested/name', 'back\\slash', 'line\nbreak', 'carriage\rreturn'])(
