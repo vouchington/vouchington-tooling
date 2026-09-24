@@ -34,6 +34,7 @@ vouchington gha-output name
 vouchington gha-needs-results
 vouchington download-with-diagnostics <url> <destination>
 vouchington download-optional-run-artifacts --pattern 'coverage-*' --dir ./coverage-fallback
+vouchington download-optional-run-artifacts --name coverage-tooling --name coverage-web --dir ./coverage-fallback
 vouchington host-pressure-diagnostics
 vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-ports ./ports.json
 vouchington diagnose-port-collision --ports "2200 2216"
@@ -90,6 +91,17 @@ non-expired artifacts across the run, keeps the first result for each name (matc
 download`), and extracts each selected name into its own directory. Ordinary absence is reported as
 `availability=unavailable`. Artifact listing retries up to three times with bounded backoff;
 exhausted transport errors, invalid names, and cancellation remain hard failures.
+
+Name mode takes one or more `--name <artifact>` flags (mutually exclusive with `--pattern`), lists
+the run's artifacts once, and extracts every requested name that is present into `<dir>/<name>`.
+Names are matched literally, in request order, with repeats downloaded once; empty names, `.`, `..`,
+and names containing `/`, `\`, or a line break are rejected before anything is listed. Requested
+names absent from the run are skipped with a single bounded `::warning::` (the absent count, the
+first three names, then `and N more`) and never one line per name. `availability=available` means at
+least one requested artifact was downloaded; `availability=unavailable` (exit 0) means none was
+present. A present artifact whose download fails is a hard failure: the helper stops at the first
+one, prints `download failed artifact=<name> exit=<n>`, exits non-zero (a downloader exit of 3 is
+reported as 1 so it cannot be mistaken for absence), and writes no `availability` output.
 
 `require-up-to-date` fetches the requested remote branch and fails unless its fetched tip is an
 ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-index and current
