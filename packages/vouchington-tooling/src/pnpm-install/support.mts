@@ -24,7 +24,7 @@ type DeclaredDependency = { name: string; spec: string }
 
 const commonInstallArgs = [
   '--prefer-offline',
-  '--prod=false',
+  '--no-prod',
   '--config.disallow-workspace-cycles=false',
 ]
 export const baseInstallArgs = ['install', '--frozen-lockfile', ...commonInstallArgs]

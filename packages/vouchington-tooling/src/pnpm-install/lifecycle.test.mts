@@ -18,7 +18,7 @@ describe('pnpm install lifecycle', () => {
       const cold = await runInstaller(fixture)
       expect(cold.stderr).toContain('persistent dependency tree is absent; installing cold')
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
       await expect(readFile(join(fixture.root, stamp), 'utf8')).resolves.toEqual(
         expect.stringContaining('"version":5'),
@@ -27,7 +27,7 @@ describe('pnpm install lifecycle', () => {
       const result = await runInstaller(fixture)
       expect(result.stderr.match(/"event":"pnpm-install-persistent-provenance"/g)).toHaveLength(1)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -65,7 +65,7 @@ describe('pnpm install lifecycle', () => {
       expect(repaired.stderr).toContain('"nativeBinariesMatchRuntime":false')
       expect(repaired.stderr).toContain('"reason":"native-health-mismatch"')
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -79,9 +79,9 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_REPAIR_LINK = '1'
       await expect(runInstaller(fixture)).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -93,7 +93,7 @@ describe('pnpm install lifecycle', () => {
     try {
       await expect(runInstaller(fixture, { installScripts: false })).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -120,9 +120,9 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_REPAIR_LINK = '1'
       await expect(runInstaller(fixture)).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -165,10 +165,10 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_REPAIR_LINK = '1'
       await expect(runInstaller(fixture, { installScripts: false })).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -186,8 +186,8 @@ describe('pnpm install lifecycle', () => {
       )
       await expect(runInstaller(fixture)).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
       await resetInstallCalls(fixture)
       fixture.env.PNPM_VERSION = '11.1.0'
@@ -261,7 +261,7 @@ describe('pnpm install lifecycle', () => {
         runInstaller(fixture, { lifecycle: 'ephemeral', selectors: '@fixture/consumer...' }),
       ).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --filter @fixture/consumer... --fail-if-no-match',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --filter @fixture/consumer... --fail-if-no-match',
       ])
       await resetInstallCalls(fixture)
       await expect(
@@ -281,7 +281,7 @@ describe('pnpm install lifecycle', () => {
     try {
       await expect(runInstaller(fixture, { lifecycle: 'ephemeral-full' })).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -311,8 +311,8 @@ describe('pnpm install lifecycle', () => {
       await runInstaller(fixture, { installScripts: false })
       await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -326,8 +326,8 @@ describe('pnpm install lifecycle', () => {
       await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
@@ -346,9 +346,9 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_PENDING_BUILDS = ''
       const result = await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
       await expect(
         readFile(join(fixture.root, 'node_modules', '.modules.yaml'), 'utf8'),
@@ -368,8 +368,8 @@ describe('pnpm install lifecycle', () => {
       fixture.env.PNPM_REPAIR_LINK = '1'
       const result = await runInstaller(fixture, { installScripts: true })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts --ignore-pnpmfile',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
       expect(result.stderr).toContain('"action":"reconcile"')
       expect(result.stderr).toContain('"reason":"scripts-enabled-install-unverified"')
@@ -419,12 +419,12 @@ describe('pnpm install lifecycle', () => {
       await resetInstallCalls(fixture)
       await runInstaller(fixture, { installScripts: false })
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false --ignore-scripts',
+        'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
       await resetInstallCalls(fixture)
       const result = await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
       expect(result.stderr).toContain('"action":"ordinary"')
     } finally {
@@ -471,7 +471,7 @@ describe('pnpm install lifecycle', () => {
       await resetInstallCalls(fixture)
       const result = await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
-        'install --frozen-lockfile --prefer-offline --prod=false --config.disallow-workspace-cycles=false',
+        'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',
       ])
       expect(result.stderr).toContain('"action":"ordinary"')
     } finally {

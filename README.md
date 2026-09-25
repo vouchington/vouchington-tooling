@@ -217,6 +217,10 @@ vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
 
+`pnpm-install` runs the `pnpm` on `PATH` and never reads the consumer's `packageManager` field, so
+consumers need no pnpm pin. It works with pnpm 11 and 12. The metadata fingerprint includes
+`pnpm --version` and every workspace manifest, so changing either triggers one reconciling install.
+
 For persistent `pnpm-install`, v5 metadata tracks structural inputs separately from the
 `--install-scripts` policy and records `scriptsEnabledInstallVerified` only after pnpm reports a
 parseable empty `pendingBuilds` ledger. A v4, malformed, or missing stamp on a populated tree, a
@@ -346,7 +350,11 @@ The plugin currently ships `postgres-cursor-call-contract`, `banned-member-read`
 
 ## Development
 
-Requires Node 24+ and pnpm 11+.
+Requires Node 24+ and pnpm 12. The repository does not pin pnpm: no manifest declares
+`packageManager`, and local work uses whichever pnpm 12 is installed. CI asks `pnpm/action-setup` for
+`latest-12` after `actions/setup-node`, so it runs the newest pnpm 12 release that is at least one day
+old. New 12.x releases reach CI without a PR; moving to pnpm 13 needs one.
+`pnpm-setup-policy.test.mts` enforces that shape.
 
 ```bash
 pnpm install

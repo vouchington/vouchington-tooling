@@ -11,7 +11,7 @@ import {
 } from './pnpm-install-fixture.test-helpers.mts'
 
 const forced =
-  'install --frozen-lockfile --force --prefer-offline --prod=false --config.disallow-workspace-cycles=false'
+  'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false'
 const secondScriptFree = `${forced} --ignore-scripts`
 
 async function addMismatchedNative(

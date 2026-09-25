@@ -116,9 +116,14 @@ describe('pnpm install with a real registry fixture', () => {
           join(root, 'pnpm-workspace.yaml'),
           `allowBuilds:\n  '@fixture/postinstall@${tarballUrl}': true\npackages:\n  - '.'\n`,
         )
-        await execFileAsync('pnpm', ['install', '--lockfile-only', '--store-dir', storeDirectory], {
-          cwd: root,
-        })
+        // pnpm 12 indexes the tarball it downloads while resolving --lockfile-only, and a later
+        // install from the same store reuses it. Resolve against a throwaway store so the
+        // installer's store starts cold and the counts below measure only the installer's fetches.
+        await execFileAsync(
+          'pnpm',
+          ['install', '--lockfile-only', '--store-dir', join(root, 'resolution-store')],
+          { cwd: root },
+        )
         tarballFetches = 0
 
         await runInstaller(root, false, postinstallLog, storeDirectory)
