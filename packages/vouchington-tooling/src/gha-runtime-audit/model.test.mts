@@ -58,6 +58,60 @@ describe('gha-runtime-audit model', () => {
     expect(() => parseSample({ ...makeJob(1, 'test', 10), html_url: '' }, run)).toThrow(
       'must be a string',
     )
+    expect(parseSample({ ...makeJob(1, 'test', 10), steps: [] }, run)?.sample.steps).toEqual([])
+    const parsed = parseSample(
+      {
+        ...makeJob(1, 'test', 10),
+        steps: [
+          { name: 'skipped', started_at: null, completed_at: null },
+          {
+            name: 'half',
+            started_at: '2026-01-01T00:00:00.000Z',
+            completed_at: null,
+          },
+          {
+            name: 'Run actions/checkout@v4',
+            started_at: '2026-01-01T00:00:00.000Z',
+            completed_at: '2026-01-01T00:01:00.000Z',
+          },
+        ],
+      },
+      run,
+    )
+    expect(parsed?.sample.steps).toEqual([{ name: 'Run actions/checkout@v4', durationSeconds: 60 }])
+    expect(() => parseSample({ ...makeJob(1, 'test', 10), steps: 'nope' }, run)).toThrow(
+      'steps must be an array',
+    )
+    expect(() => parseSample({ ...makeJob(1, 'test', 10), steps: [null] }, run)).toThrow(
+      'must be an object',
+    )
+    expect(() => parseSample({ ...makeJob(1, 'test', 10), steps: [{ name: '' }] }, run)).toThrow(
+      'non-empty string',
+    )
+    expect(() =>
+      parseSample(
+        {
+          ...makeJob(1, 'test', 10),
+          steps: [{ name: 'bad', started_at: 'nope', completed_at: '2026-01-01T00:00:00.000Z' }],
+        },
+        run,
+      ),
+    ).toThrow('ISO timestamp')
+    expect(() =>
+      parseSample(
+        {
+          ...makeJob(1, 'test', 10),
+          steps: [
+            {
+              name: 'backwards',
+              started_at: '2026-01-02T00:00:00.000Z',
+              completed_at: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+        },
+        run,
+      ),
+    ).toThrow('invalid execution interval')
   })
 
   it('parses a successful workflow and run', () => {

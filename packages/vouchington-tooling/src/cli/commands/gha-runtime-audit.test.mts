@@ -70,6 +70,110 @@ describe('runGhaRuntimeAudit', () => {
     expect(await runGhaRuntimeAudit(parsed, execute, { GITHUB_REPOSITORY: 'owner/repo' })).toBe(0)
   })
 
+  it('passes median floor and ceiling into the audit', async () => {
+    const parsed = parseCli([
+      'node',
+      'vouchington',
+      'gha-runtime-audit',
+      '--repository',
+      'owner/repo',
+      '--pr-workflow',
+      'CI',
+      '--median-threshold-floor',
+      '200',
+      '--median-threshold-ceiling',
+      '300',
+    ])
+    if (parsed.kind !== 'gha-runtime-audit') throw new Error('expected gha-runtime-audit')
+    expect(parsed.medianFloorSeconds).toBe(200)
+    expect(parsed.medianThresholdSeconds).toBe(300)
+    const sharded: GhApiExecutor = async (request) => {
+      if (request.endpoint.includes('/jobs')) {
+        return {
+          jobs: [
+            {
+              id: 11,
+              name: 'backend (1)',
+              started_at: '2026-01-01T00:00:00.000Z',
+              completed_at: '2026-01-01T00:02:00.000Z',
+              conclusion: 'success',
+              html_url: 'https://github.test/jobs/11',
+            },
+            {
+              id: 12,
+              name: 'backend (2)',
+              started_at: '2026-01-01T00:00:00.000Z',
+              completed_at: '2026-01-01T00:03:00.000Z',
+              conclusion: 'success',
+              html_url: 'https://github.test/jobs/12',
+            },
+          ],
+        }
+      }
+      return execute(request)
+    }
+    expect(await runGhaRuntimeAudit(parsed, sharded)).toBe(0)
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('family-median-below-floor')
+  })
+
+  it('rejects invalid median thresholds', () => {
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-runtime-audit',
+        '--pr-workflow',
+        'CI',
+        '--median-threshold-floor',
+      ]),
+    ).toEqual({ kind: 'error', message: '--median-threshold-floor requires a value' })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-runtime-audit',
+        '--pr-workflow',
+        'CI',
+        '--median-threshold-floor',
+        '0',
+      ]),
+    ).toEqual({ kind: 'error', message: '--median-threshold-floor requires a positive integer' })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-runtime-audit',
+        '--pr-workflow',
+        'CI',
+        '--median-threshold-ceiling',
+        '9007199254740993',
+      ]),
+    ).toEqual({
+      kind: 'error',
+      message: '--median-threshold-ceiling requires a positive integer',
+    })
+    expect(
+      parseCli([
+        'node',
+        'vouchington',
+        'gha-runtime-audit',
+        '--pr-workflow',
+        'CI',
+        '--median-threshold-floor',
+        '360',
+      ]),
+    ).toEqual({
+      kind: 'error',
+      message: '--median-threshold-floor must be below the median ceiling',
+    })
+    expect(
+      parseCli(['node', 'vouchington', 'gha-runtime-audit', '--median-threshold-floor', '120']),
+    ).toEqual({
+      kind: 'error',
+      message: 'gha-runtime-audit requires --pr-workflow or --push-workflow',
+    })
+  })
+
   it('requires a repository', async () => {
     const parsed = parseCli(['node', 'vouchington', 'gha-runtime-audit', '--pr-workflow', 'CI'])
     if (parsed.kind !== 'gha-runtime-audit') throw new Error('expected gha-runtime-audit')
