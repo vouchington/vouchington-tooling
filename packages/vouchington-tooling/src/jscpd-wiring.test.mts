@@ -34,12 +34,12 @@ describe('jscpd wiring', () => {
     expect(read('.github/workflows/ci.yml')).toContain('pnpm run lint\n')
   })
 
-  it('keeps the vouchington clone-size baseline', () => {
+  it('keeps minLines at 200 and similarity at 0.85', () => {
     expect(config).toEqual({
       format: ['typescript', 'tsx', 'javascript', 'sql', 'bash', 'css'],
       crossFormats: 'typescript,tsx',
       failOnEmpty: true,
-      similarity: 0.9,
+      similarity: 0.85,
       minLines: 200,
       exitCode: 1,
       ignore: ['**/fixtures/**'],
