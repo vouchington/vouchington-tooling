@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runCli } from './index.mts'
+import { parseGhaArtifactsCleanup } from './parse-gha-artifacts-cleanup.mts'
+import { parseGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
+import { parseHttpOrigin, parseRunnerPortPolicy } from './parse-options.mts'
 import { parseCli, parseCommandHelp } from './parse.mts'
 import { commandNames, commandUsage } from './usage.mts'
 
@@ -48,6 +51,16 @@ describe('subcommand help', () => {
       kind: 'command-help',
       command: 'post-review',
     })
+  })
+
+  it('keeps parser-level help reachable when the dispatcher does not intercept it', () => {
+    for (const flag of ['--help', '-h']) {
+      expect(parseGhaRuntimeAudit([flag])).toEqual({ kind: 'help' })
+      expect(parseGhaArtifactsCleanup([flag])).toEqual({ kind: 'help' })
+      expect(parseGhaArtifactsCleanup(['run', flag])).toEqual({ kind: 'help' })
+      expect(parseHttpOrigin([flag])).toEqual({ kind: 'help' })
+      expect(parseRunnerPortPolicy([flag])).toEqual({ kind: 'help' })
+    }
   })
 
   it('leaves help after -- for the child command', () => {
