@@ -85,7 +85,7 @@ gha-needs-results [label]
 download-with-diagnostics <url> <destination> [-- curl-args...]
 download-optional-run-artifacts (--name <name>... | --pattern <pattern>) --dir <directory>
 host-pressure-diagnostics
-allocate-browser-safe-ports [count] [--policy path] [--forbidden-ports path]
+allocate-browser-safe-ports <count> [--policy path] [--forbidden-ports path]
 diagnose-port-collision [--ports "2200 2216"] [--output-dir PATH]
 prepare-trivy-db
 gha-artifacts-cleanup run --run-id <id> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
