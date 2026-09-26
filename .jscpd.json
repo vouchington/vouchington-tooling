@@ -2,7 +2,7 @@
   "format": ["typescript", "tsx", "javascript", "sql", "bash", "css"],
   "crossFormats": "typescript,tsx",
   "failOnEmpty": true,
-  "similarity": 0.9,
+  "similarity": 0.85,
   "minLines": 200,
   "exitCode": 1,
   "ignore": ["**/fixtures/**"]
