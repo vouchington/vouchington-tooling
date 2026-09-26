@@ -1,6 +1,7 @@
 import { createOutputConsumer } from './output.mts'
 import { tailText } from './tail.mts'
 import { TailQueue } from './tail-queue.mts'
+import { terminateAttempt, type AttemptControl } from './termination.mts'
 import { createWatchdogLifecycle, registerWatchdogSetup } from './watchdog.mts'
 import type {
   BrowserSessionDeps,
@@ -35,14 +36,20 @@ export function runAttempt(
       semanticProgress = false
     let failure: unknown,
       hasFailure = false,
-      childExited = false,
       closeExit: BrowserSessionExit | undefined,
       draining = false,
       drainDone = false,
-      reason: BrowserSessionResult['reason'] = 'exit',
-      complete = false,
-      terminating = false
-    let killTimer: unknown, stallTimer: unknown
+      complete = false
+    let stallTimer: unknown
+    const control: AttemptControl = {
+      childExited: false,
+      deps,
+      graceMs: options.graceMs,
+      killTimer: undefined,
+      process,
+      reason: 'exit',
+      terminating: false,
+    }
     const watchdog = createWatchdogLifecycle()
     const listeners: Array<() => void> = []
     const captureFailure = (error: unknown) =>
@@ -51,44 +58,24 @@ export function runAttempt(
       if (complete) return
       complete = true
       deps.clearTimeout(deadlineTimer)
-      if (killTimer) deps.clearTimeout(killTimer)
+      if (control.killTimer) deps.clearTimeout(control.killTimer)
       deps.clearTimeout(stallTimer)
       watchdog.complete(captureFailure)
       for (const remove of listeners) remove()
       const result = {
         attempts: 0,
-        deadlineExceeded: reason === 'deadline',
+        deadlineExceeded: control.reason === 'deadline',
         diagnosticTail: tailText(tail.toBuffer(), maxTail),
         exit,
-        reason,
+        reason: control.reason,
         semanticProgress,
         startupProgress,
       }
       if (hasFailure) reject(failure)
       else resolve(result)
     }
-    const signal = (value: NodeJS.Signals) => {
-      try {
-        deps.killProcessGroup(process.processGroupId, value)
-      } catch {}
-      try {
-        process.kill(value)
-      } catch {}
-    }
     const terminate = (nextReason: BrowserSessionResult['reason']) => {
-      if (nextReason === 'deadline' && childExited && reason === 'exit') return
-      if (nextReason === 'parent-signal' || nextReason === 'deadline') {
-        if (reason === 'exit' || reason === 'startup-stall' || reason === 'semantic-stall')
-          reason = nextReason
-        else if (reason !== nextReason) return
-      } else if (reason !== 'exit') return
-      else if (nextReason !== 'exit') reason = nextReason
-      if (terminating) return
-      terminating = true
-      killTimer = deps.setTimeout(() => {
-        if (deps.isProcessGroupAlive(process.processGroupId)) signal('SIGKILL')
-      }, options.graceMs)
-      signal('SIGTERM')
+      terminateAttempt(control, nextReason)
     }
     const fail = (error: unknown) => {
       if (hasFailure || complete) return
@@ -117,11 +104,12 @@ export function runAttempt(
       const event = options.onLine(value)
       if (event === 'startup' && !startupProgress) {
         startupProgress = true
-        if (!childExited) armStall(options.semanticStallMs, 'semantic-stall')
+        if (!control.childExited) armStall(options.semanticStallMs, 'semantic-stall')
       }
       if (event === 'semantic') {
         semanticProgress = true
-        if (startupProgress && !childExited) armStall(options.semanticStallMs, 'semantic-stall')
+        if (startupProgress && !control.childExited)
+          armStall(options.semanticStallMs, 'semantic-stall')
       }
     }
     const streams = [process.stdout, process.stderr].map((stream, index) =>
@@ -154,11 +142,11 @@ export function runAttempt(
     }
     process.on('error', () => terminate('exit'))
     process.on('exit', () => {
-      if (reason === 'exit' && deps.now() >= deadline) reason = 'deadline'
-      childExited = true
+      if (control.reason === 'exit' && deps.now() >= deadline) control.reason = 'deadline'
+      control.childExited = true
       deps.clearTimeout(stallTimer)
       if (!deps.isProcessGroupAlive(process.processGroupId)) return
-      terminate(reason)
+      terminate(control.reason)
       drain()
     })
     process.on('close', (code, value) => {
@@ -169,15 +157,15 @@ export function runAttempt(
           fail(error)
         }
       if (
-        !childExited &&
+        !control.childExited &&
         deps.now() >= deadline &&
-        reason !== 'parent-signal' &&
-        reason !== 'deadline'
+        control.reason !== 'parent-signal' &&
+        control.reason !== 'deadline'
       )
-        reason = 'deadline'
+        control.reason = 'deadline'
       closeExit = { code, signal: value }
       if (!deps.isProcessGroupAlive(process.processGroupId)) return finish(closeExit)
-      terminate(reason)
+      terminate(control.reason)
       drain()
       if (drainDone || hasFailure) finish(closeExit)
     })
@@ -188,7 +176,7 @@ export function runAttempt(
         now: () => deps.now(),
         process,
         terminate: () => {
-          if (!childExited) terminate('provider-watchdog')
+          if (!control.childExited) terminate('provider-watchdog')
         },
       })
       registerWatchdogSetup(setup, watchdog, fail)
