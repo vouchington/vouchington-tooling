@@ -82,8 +82,9 @@ Apply this baseline unless a stricter local rule overrides it.
 ## Pinning
 
 - Pin every repository-backed external `uses:` reference — anything other than a local `./...`
-  action — to a full lowercase 40-character Git SHA and its immediate machine-maintainable version
-  comment, such as `# v4.2.0`, so Dependabot can update both.
+  action or a `$/` self-repository reference — to a full lowercase 40-character Git SHA and its
+  immediate machine-maintainable version comment, such as `# v4.2.0`, so Dependabot can update both.
+- A `$/` reference is the same repository at the running commit. It must not include an `@ref`.
 - Pin `docker://...` actions to an immutable `@sha256:` image digest. Keep GitHub Actions dependency
   updates enabled.
 - Workflow tests and fixtures must not assert an action dependency's exact SHA or version. Assert
