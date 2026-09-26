@@ -5,6 +5,7 @@ import type {
   ContractSchema,
   ContractSchemaNode,
 } from '../openapi-document/contract-schema-types.mts'
+import { boundedArraySchema, type ExtractionContext } from './contract-schema-bounded-array.mts'
 import { objectSchema, tupleSchema } from './contract-schema-object-tuple.mts'
 import type { ExtractContractSchemaOptions, ExtractedResponseContract } from './types.mts'
 import {
@@ -16,13 +17,7 @@ import {
   unsupportedType,
 } from './contract-schema-type-utils.mts'
 
-export type ExtractionContext = {
-  checker: ts.TypeChecker
-  definitions: Map<string, ContractSchemaNode>
-  definitionTypes: Map<string, ts.Type>
-  activeTypes: Map<ts.Type, string>
-  options: ExtractContractSchemaOptions
-}
+export type { ExtractionContext }
 
 export function extractContractSchema(
   type: ts.Type,
@@ -112,7 +107,7 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
   const promisedType = jsonPromiseType(type, checker)
   if (promisedType) return schemaForType(promisedType, context)
   if (checker.isTupleType(type)) return tupleSchema(type as ts.TupleType, context, schemaForType)
-  const constrainedArray = boundedArraySchema(type, context)
+  const constrainedArray = boundedArraySchema(type, context, schemaForType)
   if (constrainedArray) return constrainedArray
   if (checker.isArrayType(type) || checker.isArrayLikeType(type)) {
     const typeArguments = checker.getTypeArguments(type as ts.TypeReference)
@@ -134,45 +129,6 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     )
   }
   return objectSchema(type, context, schemaForType)
-}
-
-function boundedArraySchema(
-  type: ts.Type,
-  context: ExtractionContext,
-): Extract<ContractSchemaNode, { type: 'array' }> | undefined {
-  const alias = context.options.boundedArrayAlias
-  if (!alias || type.aliasSymbol?.name !== alias) return undefined
-  const [itemType, minItemsType, maxItemsType, uniqueItemsType] = type.aliasTypeArguments ?? []
-  if (!itemType || !minItemsType || !maxItemsType || !uniqueItemsType) {
-    throw unsupportedType(type, context.checker, `${alias} requires four type arguments`)
-  }
-  const minItems = numberLiteralValue(minItemsType, type, context.checker, alias)
-  const maxItems = numberLiteralValue(maxItemsType, type, context.checker, alias)
-  if (minItems < 0 || maxItems < minItems) {
-    throw unsupportedType(type, context.checker, `${alias} has invalid item bounds`)
-  }
-  if (!(uniqueItemsType.flags & ts.TypeFlags.BooleanLiteral)) {
-    throw unsupportedType(type, context.checker, `${alias} uniqueness must be literal`)
-  }
-  return {
-    type: 'array',
-    items: schemaForType(itemType, context),
-    minItems,
-    maxItems,
-    uniqueItems: (uniqueItemsType as ts.Type & { intrinsicName: string }).intrinsicName === 'true',
-  }
-}
-
-function numberLiteralValue(
-  type: ts.Type,
-  owner: ts.Type,
-  checker: ts.TypeChecker,
-  alias: string,
-): number {
-  if (!(type.flags & ts.TypeFlags.NumberLiteral)) {
-    throw unsupportedType(owner, checker, `${alias} bounds must be numeric literals`)
-  }
-  return (type as ts.NumberLiteralType).value
 }
 
 function schemaForNamedType(
