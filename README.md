@@ -364,6 +364,9 @@ pnpm run build
 pnpm test
 ```
 
+`pnpm run lint` includes the [jscpd clone-size gate](docs/jscpd.md). The threshold matches the
+Vouchington product repository: any clone of 200 lines or more fails, at 90% similarity.
+
 Run the local CLI after a build:
 
 ```bash
