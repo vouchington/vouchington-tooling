@@ -17,5 +17,5 @@ output first; they own commit format, required trailers, file-size limits, and v
 5. Re-read the staged diff and commit message before committing. Do not amend another author's
    work or rewrite history unless local policy and explicit authorization allow it.
 
-This skill does not prescribe branch names, file-size budgets, commit conventions, PR templates,
-or push commands. Supply those through repository-local instructions or a consumer wrapper.
+Local instructions or the consumer wrapper own: branch names, file-size budgets, commit
+conventions, pull-request templates, and push commands.

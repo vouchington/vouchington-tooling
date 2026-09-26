@@ -1,37 +1,38 @@
 # Dependency boundaries
 
-Test the code this repository owns. A dependency's behavior — its algorithms, error messages, output
-formats, internal file layout, exit codes, the URLs and query strings it builds, its pagination and
-retry strategy, and the order or number of calls it makes — belongs to that dependency's own tests.
-An assertion that pins any of it fails when the dependency ships a release rather than when this
-repository regresses, so every upgrade arrives as a red build that no change here caused.
+Test the code this repository owns. The dependency's own tests own its algorithms, error messages,
+output formats, internal file layout, exit codes, the URLs and query strings it builds, its
+pagination and retry strategy, and the order or number of calls it makes. An assertion that pins
+any of that fails on a dependency release, not on a regression here.
 
-Apply the [tautological tests](tautological-tests.md) falsifiability check with ownership added: for
-every assertion, name a defect in this repository's code that would make it fail. If only a
-dependency release could fail it, delete it. If it covers owned logic but also pins incidental
-dependency detail, rewrite it to assert the owned outcome. What the repository chooses or promises
-is owned even when a dependency carries it out — the rules it enables, its thresholds and scopes,
-the arguments, endpoints, and parameters it passes, how it handles a dependency's exit codes and
-errors, and any call count or order its own logic requires — so test it, but through the
-dependency's public API rather than its internals.
+Apply the [tautological tests](tautological-tests.md) check with ownership added. Name a defect in
+this repository that would fail the assertion.
 
-Watch for these shapes. A version-drift guard deep-imports a package's private files or calls its
-internal functions so the suite notices when upstream behavior changes; it couples the suite to a
-layout the package never promised, so delete it, and when documentation relies on dependency
-behavior, link to the dependency's own documentation instead of restating and pinning it. A
-dependency re-test runs a dependency with fabricated input and asserts what it returns; a wrapper
-that only forwards configuration needs one test proving the configuration arrives, not a second copy
-of the dependency's suite. An upstream-output pin asserts exact dependency-owned messages, markdown,
-JSON envelopes, or renderer markup when the owned contract is narrower; assert the rule identifier,
-status, or owned field instead. A sequence-bound fake answers by call order — chained one-shot mock
-responses, or a queue of canned replies consumed in turn — when the code under test does not own
-that order, so a dependency that adds a request, paginates differently, or reorders its calls hands
-the wrong reply to the wrong call; route the fake by request meaning, such as method and pathname,
-and assert the owned result rather than dependency-incidental URL, query-string, or call-count
-details.
+- If only a dependency release could fail it, delete it.
+- If it covers owned logic and also pins incidental dependency detail, rewrite it to the owned
+  outcome.
 
-When a dependency upgrade breaks a test, first ask whether the test pinned dependency behavior. If
-it did, fix the test by deleting or rewriting it rather than re-pinning the new upstream value, and
-do not add a guard that fails on the next release. If the failure traces to owned code or owned
-configuration — the dependency now rejects arguments this repository passes, or returns a result
-this repository's logic mishandles — it is a real regression, so fix the owned code instead.
+Owned even when a dependency carries it out: enabled rules, thresholds, scopes, arguments,
+endpoints, parameters, handling of the dependency's exit codes and errors, and any call count or
+order this repository's logic requires. Test those through the dependency's public API.
+
+Shapes:
+
+- Version-drift guard: a deep import of private files, or a call to internal functions, so the
+  suite notices an upstream change. Delete it. When docs rely on dependency behavior, link to the
+  dependency's docs.
+- Dependency re-test: fabricated input asserted against what the dependency returns. A wrapper that
+  only forwards configuration needs one test that the configuration arrives.
+- Upstream-output pin: an exact dependency-owned message, markdown blob, JSON envelope, or renderer
+  markup when the owned contract is narrower. Assert the rule identifier, status, or owned field.
+- Sequence-bound fake: one-shot responses, or a queue consumed in call order, when this repository
+  does not own that order. An added request, a pagination change, or a reorder then hands the wrong
+  reply to the wrong call. Route the fake by request meaning, such as method and pathname. Assert
+  the owned result, not an incidental URL, query string, or call count.
+
+When a dependency upgrade breaks a test:
+
+- If the test pinned dependency behavior, delete or rewrite it. Do not re-pin the new value. Do not
+  add a guard that fails on the next release.
+- If owned code or configuration failed — the dependency rejects arguments this repository passes,
+  or returns a result this repository mishandles — fix the owned code.

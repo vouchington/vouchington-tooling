@@ -6,97 +6,104 @@ description: Use when editing GitHub Actions workflows or composite actions to k
 # GitHub Actions checklist
 
 Use before editing a workflow or composite action. Repository-local instructions own runners,
-approved action pinning, concurrency naming, secrets, permissions, and workflow-only PR rules.
+approved action pins, concurrency names, secrets, permissions, and workflow-only pull-request rules.
+Apply this baseline unless a stricter local rule overrides it.
 
-Apply this portable baseline unless a stricter repository-local rule overrides it:
+## Triggers and required checks
 
-- Use `pull_request` for pull-request workflows in private repositories. Reserve
-  `pull_request_target` for base-owned orchestration in public repositories or narrowly scoped
-  Dependabot/Renovate automation. A privileged workflow must never check out or execute untrusted
-  pull-request content.
-- Load [github-actions-authoring](../github-actions-authoring/SKILL.md) when changing orchestration.
-  Do not poll remote workflow, deployment, lease, service, or health state.
-- Required checks must be actual workflow jobs that execute or aggregate the work they report.
-  Workflow code must not create or publish check runs or commit statuses merely to synthesize a
-  required context, copy another workflow's conclusion, or bypass the event graph. A purpose-built
-  external CI or analysis integration may report its own result; do not use its API as a relay for
-  work owned by GitHub Actions.
-- On `main`, or the consumer's configured default branch, split test jobs by domain such as web and
-  backend instead of hiding unrelated suites in one monolithic test job. Keep domain job names stable
-  when they are required checks, and use a real bounded fan-in job only when the merge contract needs
-  one combined result.
-- Serialize test runs for the same pull request or default branch with a stable concurrency group. For
-  pull requests, use `cancel-in-progress: true` so a superseded head replaces the active run. On
-  `main`, or the consumer's configured default branch, use `cancel-in-progress: false` so the active
-  run finishes before the newest pending revision starts. GitHub may replace an older pending main
-  run with the newest pending revision; preserving every intermediate queued revision is not required.
-  When one workflow handles both events, make `cancel-in-progress` conditional on the pull-request
-  event while keeping the PR number or branch ref in the concurrency group.
-- Give every concrete job a timeout of no more than 30 minutes. A caller job that invokes a reusable
-  workflow through top-level `jobs.<job_id>.uses` cannot accept `timeout-minutes`; enforce the bound
-  on every concrete job inside the called workflow. If the underlying operation cannot terminate
-  inside that bound, decompose it into event-driven phases; lowering or moving the timeout alone does
-  not fix the design. Preserve a required job or check name with a bounded fan-in job when splitting
-  work would otherwise change the repository's merge contract. Each underlying phase must also have
-  a deadline of no more than 30 minutes and support cancellation, rollback, or an explicit terminal
-  retained/recovery state. An event callback may report completion; it must not hide a longer-running
-  operation in another service.
-- Prefer GitHub-hosted runners for public and private repositories. Choose the smallest hosted runner
-  the job fits, such as `ubuntu-slim` for a short job that needs no Docker daemon, and use a full VM
-  or native-architecture runner only for work the smaller runner cannot do. A consumer that still
+- Use `pull_request` for pull-request workflows in private repositories.
+- Reserve `pull_request_target` for base-owned orchestration in a public repository, or for a
+  narrowly scoped Dependabot or Renovate workflow.
+- A privileged workflow must not check out or execute untrusted pull-request content.
+- When changing orchestration, load
+  [github-actions-authoring](../github-actions-authoring/SKILL.md). Do not poll remote workflow,
+  deployment, lease, service, or health state.
+- Required checks must be actual workflow jobs that run or aggregate the work they report.
+- Workflow code must not create or publish check runs or commit statuses to synthesize a required
+  context, copy another workflow's conclusion, or bypass the event graph.
+- An external CI or analysis integration may report its own result. Do not relay GitHub Actions
+  work through its API.
+
+## Tests, concurrency, and timeouts
+
+- On `main`, or the consumer's configured default branch, split test jobs by domain, such as web
+  and backend. Keep required-check job names stable. Add a bounded fan-in job only when the merge
+  contract needs one combined result.
+- Serialize test runs for the same pull request or default branch with one stable concurrency group.
+- For pull requests, set `cancel-in-progress: true`. On `main`, or the consumer's configured default
+  branch, set `cancel-in-progress: false` so the active run finishes before the newest pending
+  revision starts. GitHub may replace an older pending main run with the newest pending revision;
+  preserving every intermediate queued revision is not required.
+- When one workflow handles both events, make `cancel-in-progress` conditional on the pull-request
+  event. Keep the pull-request number or branch ref in the group.
+- Give every concrete job `timeout-minutes` of at most 30 minutes. A top-level `jobs.<job_id>.uses`
+  caller cannot accept `timeout-minutes`; set it on every concrete job in the called workflow.
+- If the operation cannot finish inside that bound, split it into event-driven phases. Lowering or
+  moving the timeout does not fix the design. Preserve a required job or check name with a bounded
+  fan-in job when the split would otherwise change the merge contract.
+- Each underlying phase also has a deadline of no more than 30 minutes and supports cancellation,
+  rollback, or an explicit terminal retained or recovery state. A callback may report completion. It
+  must not hide a longer-running operation in another service.
+- Keep each job's `timeout-minutes` below any hard platform limit of its runner so the job's own
+  cancellation fires first and `always()`/`cancelled()` cleanup steps still run. Example: no more
+  than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise.
+- Give every long-running, network-bound, or waiting step its own `timeout-minutes` inside the job
+  budget. Bound every network call, such as `curl --connect-timeout … --max-time …`.
+
+## Runners and persistent workspaces
+
+- Prefer GitHub-hosted runners for public and private repositories. Choose the smallest hosted
+  runner the job fits, such as `ubuntu-slim` for a short job that needs no Docker daemon. Use a full
+  VM or native-architecture runner only for work the smaller runner cannot do. A consumer that still
   requires self-hosted or disposable runners names its approved labels in repository-local policy.
-- Keep each job's `timeout-minutes` below any hard platform limit of its runner — for example, no
-  more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise —
-  so the job's own cancellation fires first and `always()`/`cancelled()` cleanup steps still run,
-  instead of the runner being killed outright once the platform limit is reached. Give every
-  long-running, network-bound, or waiting step its own `timeout-minutes` inside the job budget, and
-  bound every network call, such as `curl --connect-timeout … --max-time …`.
-- Ephemeral hosted runners start from a clean workspace. Do not add workspace-cleanup steps for them,
-  and check out with `persist-credentials: false` unless a later step must push with that token.
+- Ephemeral hosted runners start from a clean workspace. Do not add workspace-cleanup steps for
+  them, and check out with `persist-credentials: false` unless a later step must push with that
+  token.
 - Moving a job from a self-hosted or other persistent runner to a GitHub-hosted one drops every
-  piece of runner-local state the job's steps assumed was already there, not just the workspace.
-  Audit for state that used to persist for free: browser installs (a Playwright, Cypress, or
-  Puppeteer cache), package-manager stores (pnpm/npm, Go modules, a Rust `target/` directory,
-  Gradle), `apt-get install` steps that used to be a no-op because the package was already present,
-  and Docker image pulls that used to hit a warm local image store. A step or action comment
-  claiming a tool "persists between runs so caching is not needed" describes the old runner and
-  becomes false the moment `runs-on` changes; replace that assumption with a keyed `actions/cache`
-  step instead. Re-derive `timeout-minutes` from a real passing run on the new runner rather than
-  carrying over a budget calibrated on a warm host — the same job can look intermittently flaky
-  purely because every step now starts cold.
-- Persistent workspaces must check out the full tree. Do not configure sparse checkout; enforce that
-  prohibition with a YAML-aware check over intended tracked workflow and action files, with fixtures
-  for accepted and rejected shapes.
-- Fix workspace ownership at the producer. A container with a writable workspace bind mount must use
-  a non-root identity whose ownership and write access are compatible with the runner workspace. Do not
-  add an unconditional, pre-checkout, workspace-wide permission or ownership traversal to recover
-  persistent runners. Migrate an already contaminated workspace once while the runner is drained.
-  Normal runtime repair may cover bounded known generated paths. A necessary workspace-wide fallback
-  must stay failure-gated, same-filesystem, directory-only, and batched, and record path count and timing
-  evidence.
-- Pin every repository-backed external `uses:` reference—anything other than a local `./...`
-  action—to a full lowercase 40-character Git SHA followed immediately by its machine-maintainable
-  version comment, such as `# v4.2.0`, so Dependabot can update both. Pin `docker://...` actions to an
-  immutable `@sha256:` image digest instead of a Git SHA. Keep GitHub Actions dependency updates
-  enabled.
+  piece of runner-local state the job assumed was already there. Audit browser installs (a
+  Playwright, Cypress, or Puppeteer cache), package-manager stores (pnpm/npm, Go modules, a Rust
+  `target/` directory, Gradle), `apt-get install` steps that used to be a no-op because the package
+  was already present, and Docker image pulls that used to hit a warm local image store. A comment
+  that a tool "persists between runs so caching is not needed" describes the old runner and becomes
+  false the moment `runs-on` changes; replace that assumption with a keyed `actions/cache` step
+  instead. Re-derive `timeout-minutes` from a real passing run on the new runner rather than
+  carrying over a budget calibrated on a warm host.
+- A persistent workspace checks out the full tree. Do not configure sparse checkout. Enforce that
+  with a YAML-aware check over intended tracked workflow and action files, with accepted and
+  rejected fixtures.
+- Fix workspace ownership at the producer. A writable workspace bind mount uses a non-root identity
+  whose ownership and write access match the runner workspace.
+- Do not add an unconditional pre-checkout workspace-wide permission or ownership traversal.
+- Migrate a contaminated workspace once, while the runner is drained.
+- Routine repair may cover bounded known generated paths. A workspace-wide fallback must be
+  failure-gated, same-filesystem, directory-only, and batched,
+  and must record path count and timing.
+
+## Pinning
+
+- Pin every repository-backed external `uses:` reference — anything other than a local `./...`
+  action — to a full lowercase 40-character Git SHA and its immediate machine-maintainable version
+  comment, such as `# v4.2.0`, so Dependabot can update both.
+- Pin `docker://...` actions to an immutable `@sha256:` image digest. Keep GitHub Actions dependency
+  updates enabled.
 - Workflow tests and fixtures must not assert an action dependency's exact SHA or version. Assert
-  the action identity and Git SHA shape, or derive the dependency ref from the workflow under test,
-  so dependency-update pull requests can change pins without synchronized fixture edits. This does
-  not prohibit asserting an exact source revision in `with.ref` when exact-head checkout is a
-  workflow security invariant.
+  the action identity and Git SHA shape, or read the ref from the workflow under test.
+- This does not prohibit asserting an exact source revision in `with.ref` when exact-head checkout
+  is a workflow security invariant.
+
+## Edit
 
 1. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the workflow,
-   plus relevant CI documentation and callers. Apply the closest instruction only when rules
-   conflict. Identify trusted and untrusted inputs and every credential boundary.
+   plus CI docs and callers. On conflict, apply the closest instruction. Name trusted inputs,
+   untrusted inputs, and every credential boundary.
 2. Give each job the least permissions it needs. Keep untrusted pull-request content out of shell
    interpolation, privileged tokens, and write-capable steps.
-3. Apply the portable check, test-topology, concurrency, pinning, runner, trigger, and timeout
-   baseline plus any stricter consumer policy. Keep checkout refs, artifact boundaries, caches, and
-   concurrency behavior explicit.
-4. Validate changed YAML with the local workflow checker and run the affected workflow tests or
-   scripts. Update local CI documentation when behavior or operator expectations change.
-5. Review the final diff for privilege escalation, accidental secret exposure, unsafe quoting,
-   unsupported runner assumptions, and unreachable workflow paths.
+3. Apply this baseline and any stricter consumer policy. Keep checkout refs, artifact boundaries,
+   caches, and concurrency explicit.
+4. Validate changed YAML with the local workflow checker and run the affected tests or scripts.
+   Update local CI docs when behavior or operator expectations change.
+5. Review the diff for privilege escalation, secret exposure, unsafe quoting, unsupported runner
+   assumptions, and unreachable paths.
 
-This skill intentionally has no default runner labels, action SHAs, workflow directories,
-concurrency scheme, or release policy. A consumer wrapper supplies those values.
+Consumer wrapper owns: runner labels, action SHAs, workflow directories, concurrency scheme, and
+release policy.

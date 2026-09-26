@@ -22,5 +22,5 @@ issue policy, and review-record conventions first.
    duplicate repository or label authorization. Then clean up temporary collection artifacts and
    report skipped, covered, and created items.
 
-Do not assume a review journal format, default lookback, hosting provider, repository, issue
-taxonomy, or confirmation mechanism. Consumer wrappers own those integrations.
+Consumer wrapper owns: review journal format, default lookback, hosting provider, repository,
+issue taxonomy, and confirmation mechanism.

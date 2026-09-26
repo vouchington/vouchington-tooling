@@ -5,14 +5,14 @@ description: Add maintainable Storybook stories and browser-mode component cover
 
 # Storybook authoring
 
-Create stories that show meaningful supported states with realistic args and fixtures. Keep story
-data local and deterministic, expose important visual or interaction variants, and add browser-mode
-coverage where it catches behavior unavailable to unit tests. Do not use stories as a substitute for
-end-to-end setup or production data handling.
+Apply [test-authoring](../test-authoring/SKILL.md).
 
-Consumer wrappers own Storybook configuration, exclusions, visual baselines, and commands.
+- Show a meaningful supported state with realistic args and fixtures.
+- Keep story data local and deterministic.
+- Expose an important visual or interaction variant.
+- Add browser-mode coverage where it catches behavior a unit test cannot see.
+- Do not use a story as end-to-end setup or as production data handling.
+- Read [component coverage](references/component-coverage.md) for direct stories and browser
+  isolation.
 
-Read [component coverage](references/component-coverage.md) for direct stories and browser isolation.
-
-Read [tautological tests](../test-authoring/references/tautological-tests.md) before finishing any
-interaction assertion that is not obviously falsifiable by a defect in the component under test.
+Consumer wrapper owns: Storybook configuration, exclusions, visual baselines, and commands.

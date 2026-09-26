@@ -10,9 +10,11 @@ documentation, rule inventory, and fixture conventions before selecting an imple
 
 1. State the invariant and search for an existing analyzer, rule, or guard that owns it. Prefer the
    narrowest established owner over a parallel scanner.
-2. For workflow or action policy, parse YAML instead of text matching and inspect only intended tracked
-   configuration files. A persistent-workspace guard must reject sparse-checkout inputs and unsafe
-   writable workspace mounts while allowing unrelated YAML keys and ordinary read-only mounts.
+2. For workflow or action policy, parse YAML instead of text matching. Inspect only intended
+   tracked configuration files. A persistent-workspace guard enforces
+   [github-actions-checklist](../github-actions-checklist/SKILL.md): reject sparse-checkout inputs
+   and unsafe writable workspace mounts, and allow unrelated YAML keys and ordinary read-only
+   mounts.
 3. Add meaningful accepted and rejected fixtures before the rule. Cover path routing, parser
    boundaries, equivalent YAML forms, and every allowed exception.
 4. Keep discovery limited to tracked, intended files. Make suppressions and allowlists narrow,

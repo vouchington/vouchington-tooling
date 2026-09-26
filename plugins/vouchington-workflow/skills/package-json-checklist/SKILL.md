@@ -13,7 +13,8 @@ dependency age/version policy, registry, release process, and package layout.
 1. Identify the owning package and every consumer of the changed script, dependency, export, or
    binary. Prefer existing workspace utilities before adding a dependency.
 2. Use the repository's package manager for dependency changes. Update the lockfile when it records
-   the affected metadata; avoid lockfile churn for metadata-only edits it does not record. Keep peer,
+   the affected metadata; avoid lockfile churn for metadata-only edits it does not record. Keep
+   peer,
    optional, development, and runtime dependencies in their intended sections.
 3. For a published package, verify exports, types, files, binaries, and build output match the
    package's supported import and installation paths.
@@ -22,6 +23,5 @@ dependency age/version policy, registry, release process, and package layout.
    authorization.
 5. Review the lockfile and generated metadata for unrelated churn before committing.
 
-This skill supplies no version range, workspace topology, registry, package-manager command, or
-release convention. Put those repository-specific choices in local instructions or a consumer
-wrapper.
+Local instructions or the consumer wrapper own: version range, workspace topology, registry,
+package-manager command, and release convention.

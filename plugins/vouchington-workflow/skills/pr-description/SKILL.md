@@ -19,5 +19,6 @@ Include enough context for a reviewer with no prior conversation:
 - A compact diagram only when it materially clarifies a multi-component flow or lifecycle.
 
 Use the repository's approved PR tooling and preserve sections managed by its review automation.
-Do not invent required headings, a source issue rule, merge policy, repository command, or hosted
-review system. Consumer wrappers own those mechanics.
+
+Consumer wrapper owns: required headings, source-issue rule, merge policy, repository command, and
+hosted review system.

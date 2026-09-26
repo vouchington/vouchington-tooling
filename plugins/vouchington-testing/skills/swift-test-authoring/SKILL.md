@@ -5,14 +5,15 @@ description: Add Swift and SwiftUI tests with deterministic state, networking, a
 
 # Swift test authoring
 
-Test public behavior with deterministic inputs and injected dependencies. For SwiftUI, inspect or
-interact through the project's supported test approach; for networking, use a protocol-level test
-double and keep request/response synchronization explicit. Avoid sleeps and global state, and keep
-fixtures small enough to make failures readable.
+Apply [test-authoring](../test-authoring/SKILL.md).
 
-Consumer wrappers own test targets, coverage thresholds, view-inspection libraries, and fixture APIs.
+- Test public behavior with deterministic inputs and injected dependencies.
+- For SwiftUI, inspect or interact through the project's supported test approach.
+- For networking, use a protocol-level test double. Keep request and response synchronization
+  explicit.
+- Avoid sleeps and global state. Keep fixtures small enough that a failure is readable.
+- Read [network test doubles](references/network-test-doubles.md) for cancellation and shared-state
+  safety.
 
-Read [network test doubles](references/network-test-doubles.md) for cancellation and shared-state safety.
-
-Read [tautological tests](../test-authoring/references/tautological-tests.md) before finishing any
-assertion that is not obviously falsifiable by a defect in the code under test.
+Consumer wrapper owns: test targets, coverage thresholds, view-inspection libraries, and fixture
+APIs.

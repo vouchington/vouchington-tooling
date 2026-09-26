@@ -5,11 +5,15 @@ description: Diagnose and improve PostgreSQL performance in Node.js applications
 
 # PostgreSQL and Node.js performance
 
-Measure query plans and workload shape before changing code. Select only required columns, bound
-result sets, paginate or stream large reads, batch writes within explicit transaction limits, and
-keep connection-pool usage bounded. Validate query changes with representative cardinality and
-watch latency, memory, lock time, and connection pressure together.
+Measure the query plan and the workload shape before changing code.
 
-Consumer wrappers own schema ownership, operational thresholds, pooling configuration, and rollout.
+- Select only the required columns.
+- Bound each result set. Paginate or stream a large read.
+- Batch writes inside an explicit transaction limit.
+- Keep connection-pool usage bounded.
+- Validate a query change at representative cardinality. Watch latency, memory, lock time, and
+  connection pressure together.
+- Read [performance patterns](references/performance-patterns.md) before changing a high-volume
+  path.
 
-Read [performance patterns](references/performance-patterns.md) before changing high-volume paths.
+Consumer wrapper owns: schema ownership, operational thresholds, pooling configuration, and rollout.

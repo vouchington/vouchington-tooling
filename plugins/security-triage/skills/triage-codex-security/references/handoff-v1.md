@@ -44,13 +44,13 @@ The producer returns one record per source finding. `selectedRemote`, `canonical
 }
 ```
 
-`issueCandidate` is optional and applies only to `grouped_issue`; its `groupKey`, `title`, and
-`summary` are stable consumer inputs. Omit `closeReason`, `providerPullRequest`, and nonapplicable
-`severity` members. `grouped_issue` is only a candidate: this contract never authorizes issue
-creation or repository taxonomy changes.
-
-Consumers must recompute their binding from the checkout and must reject a record unless its
-`canonicalRepository`, `defaultBranch`, and `evidenceSha` exactly match. A remote name can differ
-between checkouts, but the consumer's selected remote must normalize to the same canonical
-repository; otherwise it must reject the record. The hosted selector has already been required to
-prove that same canonical identity before a provider write.
+- `issueCandidate` is optional and applies only to `grouped_issue`. Its `groupKey`, `title`, and
+  `summary` are stable consumer inputs.
+- Omit `closeReason`, `providerPullRequest`, and severity members that do not apply.
+- `grouped_issue` is only a candidate. This contract does not authorize issue creation or taxonomy
+  changes.
+- A consumer recomputes its binding from the checkout. Reject a record unless `canonicalRepository`,
+  `defaultBranch`, and `evidenceSha` match exactly.
+- A remote name may differ between checkouts. The consumer's selected remote must still normalize to
+  the same canonical repository. Otherwise it must reject the record.
+- The hosted selector must already have proved that same canonical identity before a provider write.
