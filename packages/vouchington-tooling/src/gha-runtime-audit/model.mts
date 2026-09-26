@@ -22,6 +22,11 @@ export interface RunRecord {
   pullRequestBaseBranches: string[]
 }
 
+interface RuntimeStepSample {
+  name: string
+  durationSeconds: number
+}
+
 export interface RuntimeSample {
   runId: number
   runUrl: string
@@ -30,11 +35,13 @@ export interface RuntimeSample {
   startedAt: string
   completedAt: string
   durationSeconds: number
+  steps?: RuntimeStepSample[]
 }
 
 export type RuntimeViolationReason =
   | 'sample-at-or-above-hard-ceiling'
   | 'five-sample-median-above-threshold'
+  | 'family-median-below-floor'
 
 export interface RuntimeJobResult {
   key: string
@@ -45,6 +52,9 @@ export interface RuntimeJobResult {
   maximumSeconds: number
   reasons: RuntimeViolationReason[]
   samples: RuntimeSample[]
+  shardCount?: number
+  setupShare?: number | null
+  suggestedShardCount?: number
 }
 
 export interface RuntimeAuditResult {
@@ -53,6 +63,7 @@ export interface RuntimeAuditResult {
     sampleLimit: number
     recentCompletedRunHorizon: number
     medianThresholdSeconds: number
+    medianFloorSeconds: number | null
     hardCeilingSeconds: number
     branch: string
   }
@@ -157,6 +168,33 @@ export function parseSample(
       startedAt,
       completedAt,
       durationSeconds,
+      ...jobSteps(job['steps'], run.id),
     },
   }
+}
+
+function jobSteps(
+  value: unknown,
+  runId: number,
+): { steps: RuntimeStepSample[] } | Record<string, never> {
+  if (value === undefined) return {}
+  const steps = parseArray(value, `job in run ${runId} steps must be an array`)
+  const parsed: RuntimeStepSample[] = []
+  for (const [index, entry] of steps.entries()) {
+    const step = readStep(entry, runId, index)
+    if (step) parsed.push(step)
+  }
+  return { steps: parsed }
+}
+
+function readStep(value: unknown, runId: number, index: number): RuntimeStepSample | undefined {
+  const detail = `job in run ${runId} steps[${index}]`
+  const step = parseObject(value, `${detail} must be an object`)
+  const name = parseString(step['name'], `${detail}.name must be a non-empty string`)
+  if (step['started_at'] == null || step['completed_at'] == null) return undefined
+  const startedAt = parseTimestamp(step['started_at'], `${detail}.started_at`)
+  const completedAt = parseTimestamp(step['completed_at'], `${detail}.completed_at`)
+  const durationSeconds = (Date.parse(completedAt) - Date.parse(startedAt)) / 1000
+  if (durationSeconds < 0) malformed(`${detail} has an invalid execution interval`)
+  return { name, durationSeconds }
 }

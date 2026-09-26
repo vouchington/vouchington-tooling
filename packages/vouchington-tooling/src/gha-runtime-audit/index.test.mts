@@ -111,7 +111,7 @@ describe('gha-runtime-audit', () => {
     expect(requests.map((request) => request.jq)).toEqual([
       '{workflows: [.workflows[] | {id, name, state}]}',
       '{workflow_runs: [.workflow_runs[] | {id, name, event, conclusion, created_at, html_url, head_branch, pull_requests: [(.pull_requests // [])[] | {base: {ref: .base.ref}}]}]}',
-      '{jobs: [.jobs[] | {id, name, started_at, completed_at, conclusion, html_url}]}',
+      '{jobs: [.jobs[] | {id, name, started_at, completed_at, conclusion, html_url, steps: [(.steps // [])[] | {name, started_at, completed_at}]}]}',
     ])
   })
 

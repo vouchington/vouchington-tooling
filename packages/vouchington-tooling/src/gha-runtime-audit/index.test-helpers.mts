@@ -8,6 +8,11 @@ export type FixtureJob = {
   completed_at: string
   conclusion: 'success' | 'failure'
   html_url: string
+  steps?: Array<{
+    name: string
+    started_at: string | null
+    completed_at: string | null
+  }>
 }
 
 export const exampleAuditOptions: Omit<RuntimeAuditOptions, 'repository'> = {

@@ -14,6 +14,7 @@ export type RuntimeAuditOptions = {
   sampleLimit?: number
   recentCompletedRunHorizon?: number
   medianThresholdSeconds?: number
+  medianFloorSeconds?: number
   hardCeilingSeconds?: number
 }
 
@@ -24,6 +25,7 @@ export type ResolvedRuntimeAuditOptions = {
   sampleLimit: number
   recentCompletedRunHorizon: number
   medianThresholdSeconds: number
+  medianFloorSeconds: number | null
   hardCeilingSeconds: number
 }
 
@@ -47,14 +49,30 @@ export function resolveRuntimeAuditOptions(
   if (options.workflows.length === 0) {
     throw new Error('At least one workflow filter is required')
   }
+  const medianThresholdSeconds = options.medianThresholdSeconds ?? 360
+  const medianFloorSeconds = options.medianFloorSeconds ?? null
+  assertPositiveInteger(medianThresholdSeconds, 'median ceiling')
+  if (medianFloorSeconds !== null) {
+    assertPositiveInteger(medianFloorSeconds, 'median floor')
+    if (medianFloorSeconds >= medianThresholdSeconds) {
+      throw new Error('median floor must be below the median ceiling')
+    }
+  }
   return {
     repository: options.repository,
     workflows: options.workflows,
     branch: options.branch ?? 'main',
     sampleLimit: options.sampleLimit ?? 5,
     recentCompletedRunHorizon: options.recentCompletedRunHorizon ?? 10,
-    medianThresholdSeconds: options.medianThresholdSeconds ?? 360,
+    medianThresholdSeconds,
+    medianFloorSeconds,
     hardCeilingSeconds: options.hardCeilingSeconds ?? 600,
+  }
+}
+
+function assertPositiveInteger(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label} must be a positive integer`)
   }
 }
 

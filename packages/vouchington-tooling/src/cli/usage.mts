@@ -71,6 +71,8 @@ agent-harness-config check|apply [--global] [--repo PATH]... [--harness claude|c
 gha-runtime-audit
   [--repository owner/name]   Default GITHUB_REPOSITORY
   [--branch main]
+  [--median-threshold-floor <seconds>]    Off unless set. Must be below the ceiling
+  [--median-threshold-ceiling <seconds>]  Default 360. Flags a five-sample median above this
   --pr-workflow <name|/regex/>     Repeatable
   --push-workflow <name|/regex/>   Repeatable
 

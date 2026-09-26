@@ -7,10 +7,12 @@ import {
   type GhApiExecutor,
   type RunRecord,
   type RuntimeAuditResult,
+  type RuntimeJobResult,
   type RuntimeSample,
   type WorkflowRecord,
 } from './model.mts'
-import { buildRuntimeResults, type RuntimeSamplesByJob } from './results.mts'
+import { buildFamilyResults } from './family.mts'
+import { buildRuntimeResults, violationOrder, type RuntimeSamplesByJob } from './results.mts'
 import {
   isRunInScope,
   isSelectedWorkflow,
@@ -93,7 +95,7 @@ async function collectRunSamples(
     const response = parseObject(
       await execute({
         endpoint: `/repos/${options.repository}/actions/runs/${run.id}/jobs?filter=latest&per_page=100&page=${page}`,
-        jq: '{jobs: [.jobs[] | {id, name, started_at, completed_at, conclusion, html_url}]}',
+        jq: '{jobs: [.jobs[] | {id, name, started_at, completed_at, conclusion, html_url, steps: [(.steps // [])[] | {name, started_at, completed_at}]}]}',
       }),
       `jobs response for run ${run.id} must be an object`,
     )
@@ -128,16 +130,29 @@ export async function auditCiJobRuntime(
       await collectRunSamples(execute, resolved, run, samplesByKey)
     }
   }
-  const results = buildRuntimeResults(samplesByKey, resolved)
   return {
     scope: {
       repository: resolved.repository,
       sampleLimit: resolved.sampleLimit,
       recentCompletedRunHorizon: resolved.recentCompletedRunHorizon,
       medianThresholdSeconds: resolved.medianThresholdSeconds,
+      medianFloorSeconds: resolved.medianFloorSeconds,
       hardCeilingSeconds: resolved.hardCeilingSeconds,
       branch: resolved.branch,
     },
-    ...results,
+    ...combineResults(samplesByKey, resolved),
   }
+}
+
+function combineResults(
+  samplesByKey: ReadonlyMap<string, RuntimeSamplesByJob>,
+  resolved: ResolvedRuntimeAuditOptions,
+): { jobs: RuntimeJobResult[]; violations: RuntimeJobResult[] } {
+  const perJob = buildRuntimeResults(samplesByKey, resolved)
+  const jobs = [...perJob.jobs, ...buildFamilyResults(samplesByKey, resolved)].sort((left, right) =>
+    left.key.localeCompare(right.key),
+  )
+  const violations = jobs.filter((job) => job.reasons.length > 0)
+  violations.sort(violationOrder)
+  return { jobs, violations }
 }

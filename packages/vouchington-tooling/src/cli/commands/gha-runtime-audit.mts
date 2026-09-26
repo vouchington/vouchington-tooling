@@ -28,6 +28,12 @@ export async function runGhaRuntimeAudit(
     repository,
     workflows: parsed.workflows,
     ...(parsed.branch === undefined ? {} : { branch: parsed.branch }),
+    ...(parsed.medianFloorSeconds === undefined
+      ? {}
+      : { medianFloorSeconds: parsed.medianFloorSeconds }),
+    ...(parsed.medianThresholdSeconds === undefined
+      ? {}
+      : { medianThresholdSeconds: parsed.medianThresholdSeconds }),
   })
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   return 0
