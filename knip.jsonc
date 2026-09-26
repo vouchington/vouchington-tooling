@@ -3,6 +3,8 @@
   // eslint: peer of eslint-plugin-vouchington; imported only from plugin tests.
   // pr-shepherd: agent CLI, not imported from source.
   "ignoreDependencies": ["eslint", "pr-shepherd"],
+  // mise installs the pinned scc binary. It is not an npm package.
+  "ignoreBinaries": ["mise"],
   "workspaces": {
     "packages/vouchington-tooling": {
       // Loaded from the consumer package boundary only when the opt-in integration runs.
@@ -32,6 +34,7 @@
         "src/pnpm-deploy/index.mts!",
         "src/dockerfile-parse/index.mts!",
         "src/scc-complexity/index.mts!",
+        "src/scc-complexity/repo-cli.mts!",
         "src/ci-local/index.mts!",
         "src/gha-rate-limit/index.mts!",
         "src/gha-pr-checkpoint/index.mts!",

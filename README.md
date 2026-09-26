@@ -364,8 +364,11 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm run lint` includes the [jscpd clone-size gate](docs/jscpd.md). The threshold matches the
-Vouchington product repository: any clone of 200 lines or more fails, at 90% similarity.
+`pnpm run lint` includes the [jscpd clone-size gate](docs/jscpd.md) and the
+[scc complexity ceiling](docs/scc-complexity.md). Both match the Vouchington product repository:
+any clone of 200 lines or more fails at 90% similarity, and `scc` 3.7.0 fails a counted file
+whose complexity is over 50. Files already over that ceiling are pinned in
+`scc-complexity-baseline.json`.
 
 Run the local CLI after a build:
 

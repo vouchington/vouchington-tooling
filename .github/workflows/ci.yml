@@ -29,6 +29,11 @@ jobs:
         with:
           version: latest-12
       - run: pnpm install --frozen-lockfile
+      - name: Install scc
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          cache: false
+        timeout-minutes: 3
       - run: pnpm run lint
       - run: pnpm run typecheck
       - run: pnpm run build
