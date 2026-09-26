@@ -229,58 +229,11 @@ describe('allocate-browser-safe-ports.py', () => {
     ])
   })
 
-  it('does not throw when /proc/<pid>/environ is unreadable', async () => {
-    const { stdout } = await execFile('python3', [
-      '-B',
-      '-c',
-      [
-        'import importlib.util, os',
-        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
-        'allocator = importlib.util.module_from_spec(spec)',
-        'spec.loader.exec_module(allocator)',
-        'allocator.Path.is_file = lambda self: True',
-        'original = allocator.Path.read_bytes',
-        'def boom(self):',
-        "  if self.name in ('environ', 'cmdline'):",
-        "    raise PermissionError(13, 'Permission denied', str(self))",
-        '  return original(self)',
-        'allocator.Path.read_bytes = boom',
-        'pid = os.getpid()',
-        'print(type(allocator.process_environ(pid)).__name__)',
-        'try:',
-        '  allocator.process_command_line(pid)',
-        "  print('ok')",
-        'except Exception as error:',
-        '  print(type(error).__name__)',
-      ].join('\n'),
-    ])
-    expect(stdout.trim().split('\n')).toEqual(['dict', 'ok'])
-  })
-
-  it('waits for a released port to become bindable before --release returns', async () => {
-    const { stdout } = await execFile('python3', [
-      '-B',
-      '-c',
-      [
-        'import importlib.util',
-        `spec = importlib.util.spec_from_file_location('allocator', ${pythonScriptPath})`,
-        'allocator = importlib.util.module_from_spec(spec)',
-        'spec.loader.exec_module(allocator)',
-        'calls = []',
-        'class Probe:',
-        '  def __init__(self, *args, **kwargs): pass',
-        '  def setsockopt(self, *args): pass',
-        '  def bind(self, address):',
-        '    calls.append(address)',
-        '    if len(calls) < 3:',
-        '      raise OSError()',
-        '  def close(self): pass',
-        'allocator.socket.socket = Probe',
-        'allocator.HOLD_POLL_SECONDS = 0',
-        'allocator.wait_until_port_bindable(12345)',
-        'print(len(calls))',
-      ].join('\n'),
-    ])
-    expect(stdout.trim()).toBe('3')
+  it('does not advertise hold, release, stop, or check modes', async () => {
+    const { stdout } = await execFile('python3', [scriptPath, '--help'])
+    expect(stdout).not.toContain('--hold')
+    expect(stdout).not.toContain('--release')
+    expect(stdout).not.toContain('--stop')
+    expect(stdout).not.toContain('--check')
   })
 })
