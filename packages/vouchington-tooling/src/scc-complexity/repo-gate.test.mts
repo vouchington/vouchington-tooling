@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -32,7 +32,7 @@ describe('repository scc complexity gate', () => {
     await Promise.all(dirs.splice(0).map((dir) => rm(dir, { force: true, recursive: true })))
   })
 
-  async function gitRepo(files: readonly string[], baseline: unknown) {
+  async function gitRepo(files: readonly string[]) {
     const root = await mkdtemp(join(tmpdir(), 'repo-scc-'))
     dirs.push(root)
     await execFileAsync('git', ['init'], { cwd: root })
@@ -40,7 +40,6 @@ describe('repository scc complexity gate', () => {
       await mkdir(dirname(join(root, file)), { recursive: true })
       await writeFile(join(root, file), 'export const value = true\n')
     }
-    await writeFile(join(root, 'scc-complexity-baseline.json'), JSON.stringify(baseline))
     await execFileAsync('git', ['add', '.'], { cwd: root })
     return root
   }
@@ -51,24 +50,14 @@ describe('repository scc complexity gate', () => {
     expect(REPO_SCC_SCOPE).toEqual({ includePaths: ['.'], name: 'source' })
   })
 
-  it('accepts the checked-in ceilings and rejects a rise above one', async () => {
-    const baseline = JSON.parse(read('scc-complexity-baseline.json')) as {
-      entries: { complexity: number; file: string; scope: string }[]
-      version: number
-    }
-    const atCeiling = report(
-      baseline.entries.map((entry) => ({ complexity: entry.complexity, file: entry.file })),
-    )
-    await expect(runRepoSccComplexity(undefined, { runScc: async () => atCeiling })).resolves.toBe(
-      0,
-    )
+  it('accepts complexity 50 and rejects 51', async () => {
+    const file = 'packages/vouchington-tooling/src/scc-complexity/repo-gate.mts'
+    await expect(
+      runRepoSccComplexity(undefined, {
+        runScc: async () => report([{ complexity: 50, file }]),
+      }),
+    ).resolves.toBe(0)
 
-    const raised = report(
-      baseline.entries.map((entry, index) => ({
-        complexity: entry.complexity + (index === 0 ? 1 : 0),
-        file: entry.file,
-      })),
-    )
     const written: string[] = []
     const stderr = {
       write: (chunk: string) => {
@@ -77,14 +66,18 @@ describe('repository scc complexity gate', () => {
       },
     }
     await expect(
-      runRepoSccComplexity(moduleRoot, { command: 'scc', runScc: async () => raised, stderr }),
+      runRepoSccComplexity(moduleRoot, {
+        command: 'scc',
+        runScc: async () => report([{ complexity: 51, file }]),
+        stderr,
+      }),
     ).resolves.toBe(1)
-    expect(written.join('')).toContain(baseline.entries[0]?.file)
-    expect(written.join('')).toContain('baseline ceiling')
+    expect(written.join('')).toContain(file)
+    expect(written.join('')).toContain('exceeds 50')
   })
 
-  it('fails a file over 50 that is not in the baseline', async () => {
-    const root = await gitRepo(['src/new.mts'], { entries: [], version: 1 })
+  it('fails a file over 50', async () => {
+    const root = await gitRepo(['src/new.mts'])
     const stderr: string[] = []
     await expect(
       runRepoSccComplexity(root, {
@@ -98,7 +91,6 @@ describe('repository scc complexity gate', () => {
   it('fails when the checkout is not a git repository', async () => {
     const root = await mkdtemp(join(tmpdir(), 'repo-scc-nogit-'))
     dirs.push(root)
-    await writeFile(join(root, 'scc-complexity-baseline.json'), '{"version":1,"entries":[]}')
     const stderr: string[] = []
     await expect(
       runRepoSccComplexity(root, {
@@ -110,7 +102,7 @@ describe('repository scc complexity gate', () => {
   })
 
   it('writes a failure to stderr when no stream is injected', async () => {
-    const root = await gitRepo(['src/new.mts'], { entries: [], version: 1 })
+    const root = await gitRepo(['src/new.mts'])
     const written: string[] = []
     const write = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
       written.push(String(chunk))
@@ -130,10 +122,6 @@ describe('repository scc complexity gate', () => {
 })
 
 describe('repository scc complexity wiring', () => {
-  const baseline = JSON.parse(read('scc-complexity-baseline.json')) as {
-    entries: { complexity: number; file: string; scope: string }[]
-    version: number
-  }
   const doc = read('docs/scc-complexity.md')
   const packageJson = JSON.parse(read('package.json')) as { scripts: Record<string, string> }
 
@@ -146,7 +134,8 @@ describe('repository scc complexity wiring', () => {
     expect(packageJson.scripts.lint).toContain('pnpm run scc-complexity')
     expect(doc).toContain('3.7.0')
     expect(doc).toContain('50')
-    expect(doc).toContain('scc-complexity-baseline.json')
+    expect(doc).toContain('There is no baseline.')
+    expect(existsSync(resolve(moduleRoot, 'scc-complexity-baseline.json'))).toBe(false)
 
     const ci = read('.github/workflows/ci.yml')
     const testJob = ci.slice(ci.indexOf('\n  test:\n'), ci.indexOf('\n  test-macos:\n'))
@@ -163,20 +152,5 @@ describe('repository scc complexity wiring', () => {
     expect(mise?.with).toEqual({ cache: false })
     expect(mise?.['timeout-minutes']).toBe(3)
     expect(testJob.indexOf('jdx/mise-action@')).toBeLessThan(testJob.indexOf('pnpm run lint'))
-  })
-
-  it('records only source files still over the ceiling, in path order', () => {
-    expect(baseline.version).toBe(1)
-    expect(baseline.entries.length).toBeGreaterThan(0)
-    const files = baseline.entries.map((entry) => entry.file)
-    expect(files).toEqual([...files].toSorted())
-    for (const entry of baseline.entries) {
-      expect(entry.scope).toBe('source')
-      expect(entry.complexity).toBeGreaterThan(50)
-      expect(entry.file).not.toMatch(/\.(test|spec)\./)
-      expect(entry.file.split('/')).not.toContain('fixtures')
-      expect(entry.file.split('/')).not.toContain('test-helpers')
-      expect(read(entry.file).length).toBeGreaterThan(0)
-    }
   })
 })

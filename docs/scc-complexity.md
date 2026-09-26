@@ -8,10 +8,6 @@ The scan is `scc --format json --by-file` for `js`, `mts`, `jsx`, `ts`, and `tsx
 `.git`, `fixtures`, `__tests__`, and `test-helpers` directories, and it skips paths matching
 `\.(test|spec)\.`. Only tracked files can fail the gate.
 
-Files at or under 50 need no entry. Files still over 50 are listed in
-[`scc-complexity-baseline.json`](../scc-complexity-baseline.json) with the complexity they have
-now. A listed file may fall, and it fails if it rises above its ceiling. When a listed file
-reaches 50 or below, delete its entry in the same change. A file that is not listed fails above
-50 with `simplify or split this file`.
+Every counted file fails above 50 with `simplify or split this file`. There is no baseline.
 
 CI installs the pinned `scc` with `jdx/mise-action` before lint. The job cache stays off.
