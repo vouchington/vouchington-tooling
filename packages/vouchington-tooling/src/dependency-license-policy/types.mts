@@ -6,11 +6,18 @@ export interface PnpmLicenseReportEntry {
 /** Shape emitted by `pnpm licenses list --json`. */
 export type PnpmLicenseReport = Record<string, PnpmLicenseReportEntry[]>
 
+export interface PnpmCommandResult {
+  readonly error?: Error
+  readonly status: number | null
+  readonly stderr: string
+  readonly stdout: string
+}
+
 export type PnpmExecutor = (
   command: string,
-  args: string[],
-  options: { cwd: string; encoding: 'utf8' },
-) => { error?: Error; status: number | null; stderr: string; stdout: string }
+  args: readonly string[],
+  options: { readonly cwd: string; readonly encoding: 'utf8'; readonly signal: AbortSignal },
+) => PnpmCommandResult | Promise<PnpmCommandResult>
 
 export interface DependencyLicenseAllowlistEntry {
   /** Exact SPDX atom allowed by this entry. */

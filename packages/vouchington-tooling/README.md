@@ -326,19 +326,24 @@ policy out of this package.
 dependency declared by a non-fixture package manifest. Assert dependency membership or placement,
 or derive a configuration or documentation package spec from that manifest instead.
 
-`dependency-license-policy` keeps legal policy in the consumer. `collectPnpmLicenseReport` creates
-an isolated, script-free temporary workspace and store, expands pnpm's supported architectures to
-every `os`, `cpu`, and `libc` selector represented in the lockfile, drops every `engines` constraint
-from the audit copy of the lockfile, and validates the JSON report. Dropping `engines` keeps
-`pnpm fetch` from skipping optional packages that exclude the running Node.js; pnpm 12's `fetch`
-ignores `force`, so their licenses would otherwise report as Unknown.
+`dependency-license-policy` keeps legal policy in the consumer. `collectPnpmLicenseReport` returns
+a promise. It creates an isolated, script-free temporary workspace, expands pnpm's supported
+architectures to every `os`, `cpu`, and `libc` selector represented in the lockfile, drops every
+`engines` constraint from the audit copy of the lockfile, and validates the JSON report. Dropping
+`engines` keeps `pnpm fetch` from skipping optional packages that exclude the running Node.js;
+pnpm 12's `fetch` ignores `force`, so their licenses would otherwise report as Unknown.
+Packages are fetched into a dedicated owner-only store under the pnpm cache
+(`dependency-license-audit-store`) so a later audit reuses content-addressed packages instead of
+downloading every platform again, without writing those packages into the developer store.
 Pass explicit denied SPDX IDs and prefixes, exact aliases, and justified allowlist scopes to
 `evaluatePnpmLicenseReport`. Unknown, malformed, and custom SPDX references fail closed. Allowlist
 scopes are either intentionally global or an exact package-name set; the library returns structured
 violations and does not format CI-provider diagnostics.
-When present, the repository `.npmrc` is copied into the owner-private temporary directory so pnpm
-can authenticate to the same registries; normal cleanup removes the copy, and the caller remains
-responsible for terminating the process normally rather than abandoning temporary audit state.
+When present, the repository `.npmrc` is copied into the owner-private temporary workspace so pnpm
+can authenticate to the same registries. The workspace is removed when the audit finishes, when the
+process receives SIGINT, SIGTERM, or SIGHUP, and on the next audit if the previous process died
+first, including SIGKILL. Each workspace records its owner's PID so a later audit can delete
+directories whose owner is gone.
 
 `session-friction` is an opt-in capture and reporting library. Callers supply the session id,
 absolute log directory, host-independent observation, and journal loader; it does not inspect host

@@ -1,8 +1,16 @@
-import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { isMap, parseDocument, stringify as stringifyYaml } from 'yaml'
+
+import {
+  LICENSE_AUDIT_DIRECTORY_PREFIX,
+  reclaimStaleLicenseAuditDirectories,
+  removeAuditDirectory,
+  writeAuditPid,
+  type LicenseAuditWorkspaceOptions,
+} from './audit-directory.mts'
 
 type PlatformKey = 'cpu' | 'libc' | 'os'
 const PLATFORM_KEYS: readonly PlatformKey[] = ['os', 'cpu', 'libc']
@@ -99,13 +107,21 @@ export function renderPnpmLicenseAuditFiles(
   }
 }
 
+export function licenseAuditParentDirectory(directory?: string): string {
+  return directory ?? tmpdir()
+}
+
 export function preparePnpmLicenseAuditWorkspace(
   repoRoot: string,
   lockfileSource: string,
   workspaceSource: string,
+  options: LicenseAuditWorkspaceOptions = {},
 ): PnpmLicenseAuditWorkspace {
-  const auditRoot = mkdtempSync(join(tmpdir(), 'dependency-license-audit-'))
+  const directory = licenseAuditParentDirectory(options.directory)
+  reclaimStaleLicenseAuditDirectories(directory, options)
+  const auditRoot = mkdtempSync(join(directory, LICENSE_AUDIT_DIRECTORY_PREFIX))
   try {
+    writeAuditPid(auditRoot, options.pid)
     copyFileSync(join(repoRoot, 'package.json'), join(auditRoot, 'package.json'))
     const npmrc = join(repoRoot, '.npmrc')
     if (existsSync(npmrc)) copyFileSync(npmrc, join(auditRoot, '.npmrc'))
@@ -116,11 +132,11 @@ export function preparePnpmLicenseAuditWorkspace(
     writeFileSync(join(auditRoot, 'pnpm-lock.yaml'), files.lockfile, 'utf8')
     writeFileSync(join(auditRoot, 'pnpm-workspace.yaml'), files.workspace, 'utf8')
   } catch (error) {
-    rmSync(auditRoot, { force: true, recursive: true })
+    removeAuditDirectory(auditRoot)
     throw error
   }
   return {
     cwd: auditRoot,
-    cleanup: () => rmSync(auditRoot, { force: true, recursive: true }),
+    cleanup: () => removeAuditDirectory(auditRoot),
   }
 }
