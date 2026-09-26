@@ -28,7 +28,7 @@ import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
-import { printUsage } from './usage.mts'
+import { commandUsage, printUsage } from './usage.mts'
 
 const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
   'gha-output': { command: 'bash', path: 'scripts/gha/write-github-multiline-output.sh' },
@@ -80,6 +80,9 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
   switch (parsed.kind) {
     case 'help':
       printUsage()
+      return 0
+    case 'command-help':
+      process.stdout.write(commandUsage(parsed.command))
       return 0
     case 'version':
       process.stdout.write(`${readInstalledVersion()}\n`)

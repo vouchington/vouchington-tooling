@@ -35,6 +35,34 @@ describe('retrospective-facts CLI', () => {
     expect(String(stderr.mock.calls.at(-1)?.[0])).toBe('git metadata unavailable\n')
   })
 
+  it('prints one fact block per --pr and writes nothing when a later PR fails', async () => {
+    vi.mocked(runRetrospectiveFacts)
+      .mockResolvedValueOnce('=== Retrospective Facts ===\nPR: 541')
+      .mockResolvedValueOnce('=== Retrospective Facts ===\nPR: 542\n')
+    await expect(
+      runRetrospectiveFactsCommand(['--pr', '541', '--pr', '542', '--repo', 'owner/repo', '--raw']),
+    ).resolves.toBe(0)
+    expect(runRetrospectiveFacts).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ pr: '541', repo: 'owner/repo', raw: true }),
+    )
+    expect(runRetrospectiveFacts).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ pr: '542', repo: 'owner/repo', raw: true }),
+    )
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toBe(
+      '=== Retrospective Facts ===\nPR: 541\n\n=== Retrospective Facts ===\nPR: 542\n',
+    )
+    stdout.mockClear()
+    vi.mocked(runRetrospectiveFacts).mockReset()
+    vi.mocked(runRetrospectiveFacts)
+      .mockResolvedValueOnce('first\n')
+      .mockRejectedValueOnce(new Error('git failed'))
+    await expect(runRetrospectiveFactsCommand(['--pr', '1', '--pr', 'nope'])).resolves.toBe(2)
+    expect(stdout).not.toHaveBeenCalled()
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toBe('git failed\n')
+  })
+
   it('reports parser and service errors without writing facts', async () => {
     await expect(runRetrospectiveFactsCommand(['--unknown'])).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Unknown option')
