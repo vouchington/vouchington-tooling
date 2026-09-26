@@ -3,6 +3,7 @@ import {
   type ParsedGhaArtifactsCleanup,
 } from './parse-gha-artifacts-cleanup.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
+import { parseForwardedCommand } from './parse-forwarded-commands.mts'
 import { commandNames } from './usage.mts'
 import {
   parseAstGrepExamples,
@@ -105,24 +106,12 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   const [command, ...rest] = args
   const help = parseCommandHelp(command, rest)
   if (help) return help
+  const forwarded = parseForwardedCommand(command, rest)
+  if (forwarded) return forwarded
   if (command === 'runner-port-policy') return parseRunnerPortPolicy(rest)
-  if (command === 'with-host-lock') return { kind: 'with-host-lock', args: rest }
-  if (command === 'agent-harness-config') return { kind: 'agent-harness-config', args: rest }
   if (command === 'gha-runtime-audit') return parseGhaRuntimeAudit(rest)
-  if (command === 'pnpm-install') return { kind: 'pnpm-install', args: rest }
-  if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args: rest }
-  if (command === 'vitest-report-attempt') return { kind: 'vitest-report-attempt', args: rest }
-  if (command === 'prepare-vitest-reports') return { kind: 'prepare-vitest-reports', args: rest }
-  if (command === 'nuget-central-version') return { kind: 'nuget-central-version', args: rest }
-  if (command === 'swift-semantic-equal') return { kind: 'swift-semantic-equal', args: rest }
-  if (command === 'post-review') return { kind: 'post-review', args: rest }
-  if (command === 'stage-review-payload') return { kind: 'stage-review-payload', args: rest }
   if (command === 'http-origin') return parseHttpOrigin(rest)
-  if (command === 'retrospective-transcript')
-    return { kind: 'retrospective-transcript', args: rest }
   if (command === 'link-skill') return parseLinkSkill(rest)
-  if (command === 'retrospective-facts') return { kind: 'retrospective-facts', args: rest }
-  if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args: rest }
   if (command === 'require-up-to-date') return parseRequireUpToDate(rest)
   if (command === 'gitleaks-directory-scan') return parseGitleaksDirectoryScan(rest)
   if (command === 'ast-grep-examples') return parseAstGrepExamples(rest)

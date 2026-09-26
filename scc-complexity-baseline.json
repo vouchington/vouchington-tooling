@@ -8,26 +8,6 @@
     },
     {
       "scope": "source",
-      "file": "packages/vouchington-tooling/src/browser-session-runner/attempt.mts",
-      "complexity": 68
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/cli/parse-options.mts",
-      "complexity": 65
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/cli/parse.mts",
-      "complexity": 66
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/gh-api-shell-quoting/scan.mts",
-      "complexity": 68
-    },
-    {
-      "scope": "source",
       "file": "packages/vouchington-tooling/src/gha-workspace-policy/docker-workspace-user.mts",
       "complexity": 118
     },
@@ -35,31 +15,6 @@
       "scope": "source",
       "file": "packages/vouchington-tooling/src/retrospective-transcript/codex.mts",
       "complexity": 95
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/session-friction/log.mts",
-      "complexity": 62
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/session-friction/normalize.mts",
-      "complexity": 76
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/sql-scanner/index.mts",
-      "complexity": 63
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/sql-scanner/literals.mts",
-      "complexity": 64
-    },
-    {
-      "scope": "source",
-      "file": "packages/vouchington-tooling/src/workspace-gates/manifest-version-parser.mts",
-      "complexity": 62
     }
   ]
 }
