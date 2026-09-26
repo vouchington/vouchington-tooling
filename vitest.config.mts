@@ -31,6 +31,7 @@ export default defineConfig({
         'packages/*/src/workspace-gates/index.mts',
         'packages/*/src/gh-cli/index.mts',
         'packages/*/src/**/*-types.mts',
+        'packages/*/src/scc-complexity/repo-cli.mts',
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],
       thresholds: {
