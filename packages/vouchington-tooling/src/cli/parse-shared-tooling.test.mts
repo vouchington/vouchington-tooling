@@ -4,7 +4,8 @@ import { parseCli } from './parse.mts'
 describe('shared tooling command parsing', () => {
   it('parses shared tooling commands and their option boundaries', () => {
     expect(parseCli(['node', 'vouchington', 'require-up-to-date', '--help'])).toEqual({
-      kind: 'help',
+      kind: 'command-help',
+      command: 'require-up-to-date',
     })
     expect(parseCli(['node', 'vouchington', 'require-up-to-date', '--remote', 'origin'])).toEqual({
       kind: 'error',
@@ -84,7 +85,10 @@ describe('shared tooling command parsing', () => {
       message: 'unknown ast-grep-examples option: --unknown',
     })
     expect(parseCli(['node', 'vouchington', 'ast-grep-pack'])).toEqual({ kind: 'ast-grep-pack' })
-    expect(parseCli(['node', 'vouchington', 'ast-grep-pack', '--help'])).toEqual({ kind: 'help' })
+    expect(parseCli(['node', 'vouchington', 'ast-grep-pack', '--help'])).toEqual({
+      kind: 'command-help',
+      command: 'ast-grep-pack',
+    })
     expect(parseCli(['node', 'vouchington', 'ast-grep-pack', '--rules'])).toEqual({
       kind: 'error',
       message: 'unknown ast-grep-pack option: --rules',

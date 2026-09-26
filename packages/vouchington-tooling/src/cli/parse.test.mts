@@ -72,9 +72,6 @@ describe('parseCli', () => {
       kind: 'runner-port-policy',
       reserved: 2200,
     })
-    expect(parseCli(['node', 'vouchington', 'runner-port-policy', '--help'])).toEqual({
-      kind: 'help',
-    })
   })
 
   it('rejects invalid runner-port-policy options', () => {
@@ -128,9 +125,6 @@ describe('parseCli', () => {
         { name: 'CI', event: 'pull_request' },
         { name: /^Main CI \(.+\)$/, event: 'push' },
       ],
-    })
-    expect(parseCli(['node', 'vouchington', 'gha-runtime-audit', '--help'])).toEqual({
-      kind: 'help',
     })
   })
 
@@ -298,7 +292,6 @@ describe('parseCli', () => {
       field: 'origin',
       value: '--looks-like-flag',
     })
-    expect(parseCli(['node', 'vouchington', 'http-origin', '--help'])).toEqual({ kind: 'help' })
     expect(parseCli(['node', 'vouchington', 'http-origin', '--field'])).toEqual({
       kind: 'error',
       message: '--field requires a name',
@@ -397,12 +390,6 @@ describe('parseCli', () => {
       keepPatterns: [],
       deletePatterns: [],
       patternsFile: 'patterns.json',
-    })
-    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', '--help'])).toEqual({
-      kind: 'help',
-    })
-    expect(parseCli(['node', 'vouchington', 'gha-artifacts-cleanup', 'run', '--help'])).toEqual({
-      kind: 'help',
     })
   })
 

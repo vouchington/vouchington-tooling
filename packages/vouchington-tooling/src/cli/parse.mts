@@ -3,6 +3,7 @@ import {
   type ParsedGhaArtifactsCleanup,
 } from './parse-gha-artifacts-cleanup.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
+import { commandNames } from './usage.mts'
 import {
   parseAstGrepExamples,
   parseAstGrepPack,
@@ -16,6 +17,7 @@ import {
 
 export type ParsedCli =
   | { kind: 'help' }
+  | { kind: 'command-help'; command: string }
   | { kind: 'version' }
   | { kind: 'error'; message: string }
   | { kind: 'runner-port-policy'; file?: string; reserved?: number }
@@ -101,6 +103,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (args[0] === '--version' || args[0] === '-v') return { kind: 'version' }
 
   const [command, ...rest] = args
+  const help = parseCommandHelp(command, rest)
+  if (help) return help
   if (command === 'runner-port-policy') return parseRunnerPortPolicy(rest)
   if (command === 'with-host-lock') return { kind: 'with-host-lock', args: rest }
   if (command === 'agent-harness-config') return { kind: 'agent-harness-config', args: rest }
@@ -129,4 +133,20 @@ export function parseCli(argv: readonly string[]): ParsedCli {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
   }
   return { kind: 'error', message: `unknown command: ${command}` }
+}
+
+export function parseCommandHelp(
+  command: string | undefined,
+  rest: readonly string[],
+): { kind: 'command-help'; command: string } | undefined {
+  if (command === undefined || !commandNames().includes(command) || !helpBeforeSeparator(rest)) {
+    return undefined
+  }
+  return { kind: 'command-help', command }
+}
+
+function helpBeforeSeparator(args: readonly string[]): boolean {
+  const separator = args.indexOf('--')
+  const options = separator === -1 ? args : args.slice(0, separator)
+  return options.includes('--help') || options.includes('-h')
 }
