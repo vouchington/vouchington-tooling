@@ -1,13 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildSharedContext } from '../shared-context/index.mts'
-import {
-  checkSccComplexity,
-  parseSccComplexityBaseline,
-  type SccComplexityScope,
-} from './index.mts'
+import { checkSccComplexity, type SccComplexityScope } from './index.mts'
 
 export const REPO_SCC_SCOPE = {
   includePaths: ['.'],
@@ -28,13 +23,9 @@ export async function runRepoSccComplexity(
   root = repoRootFromModule(),
   options: RepoSccOptions = {},
 ): Promise<number> {
-  const baseline = parseSccComplexityBaseline(
-    readFileSync(resolve(root, 'scc-complexity-baseline.json'), 'utf8'),
-  )
   const result = await checkSccComplexity(
     await buildSharedContext(root),
     {
-      baseline,
       scopes: [{ includePaths: [...REPO_SCC_SCOPE.includePaths], name: REPO_SCC_SCOPE.name }],
       ...commandOption(options.command),
     },
