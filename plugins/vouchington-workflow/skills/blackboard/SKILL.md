@@ -12,15 +12,15 @@ subagent-identity rules.
 1. Append a concise note when a check fails, permission is denied, scope changes, a repeated fix is
    needed, or a tool result reveals a reusable gap. Include the finding, affected paths, concrete
    evidence, and any tracking reference.
-2. Preserve the provider's required session and parent-session identity. Never invent, guess,
-   print, search for, or persist credentials outside its documented mechanism.
-   When the provider supports structured repository metadata, keep a cumulative list of canonical
-   repositories on each agent's own session and tag each entry with only its relevant repositories.
-   Update session metadata before appending, and stop if that update fails.
+2. Preserve the provider's required session and parent-session identity.
+   - Do not invent, guess, print, search for, or persist a credential outside its documented
+     mechanism.
+   - When the provider supports repository metadata, keep the cumulative canonical repository list
+     on that agent's own session. Tag each entry with only the repositories relevant to it.
+   - Update session metadata before appending. Stop if that update fails.
 3. If the journal service cannot authenticate or persist a mandatory entry, stop and report the
    blocker rather than silently substituting a local file or memory.
 4. Read journal entries oldest-first when preparing a retrospective or clustering follow-ups; use
    direct evidence rather than reconstructing events from memory.
 
-This skill does not require a particular service, command, note grammar, archival policy, or issue
-destination. A consumer wrapper supplies those integrations.
+Consumer wrapper owns: service, command, note grammar, archival policy, and issue destination.

@@ -31,5 +31,5 @@ For portable implementation and review checks, read [implementation](references/
 [implementation and review](references/implementation-and-review.md) remains a compact overview.
 Local instructions remain authoritative for commands, commits, review systems, and release policy.
 
-Do not invent a default branch, runner class, documentation root, review system, merge policy, or
-command catalog. A consumer wrapper or local instruction file owns those choices.
+Consumer wrapper or local instructions own: default branch, runner class, documentation root,
+review system, merge policy, and command catalog.

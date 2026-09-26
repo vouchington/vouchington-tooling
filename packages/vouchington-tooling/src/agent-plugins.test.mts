@@ -136,7 +136,7 @@ describe('vouchington-workflow plugin', () => {
 
   it('is listed in both marketplaces with portable skills and installation instructions', async () => {
     const skillNames = (await readdir(join(workflowPlugin, 'skills'), { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
       .map((entry) => entry.name)
       .sort()
     expect(skillNames).toEqual([
@@ -411,10 +411,10 @@ describe('vouchington-workflow plugin', () => {
     expect(checklist).toMatch(
       /failure-gated[\s\S]*same-filesystem[\s\S]*directory-only[\s\S]*batched/i,
     )
-    expect(authoring).toMatch(/YAML-aware[\s\S]*tracked workflow and action files/i)
-    expect(authoring).toMatch(/non-root identity[\s\S]*whole workspace[\s\S]*before checkout/i)
+    expect(authoring).toMatch(/persistent-workspace rules in[\s\S]*github-actions-checklist/i)
+    expect(checklist).toMatch(/YAML-aware[\s\S]*tracked workflow and action files/i)
     expect(logs).toMatch(/producer[\s\S]*sparse state or unsafe ownership/i)
-    expect(logs).toMatch(/path-count and timing evidence/i)
+    expect(checklist).toMatch(/path count and timing/i)
     expect(analysis).toMatch(/parse YAML[\s\S]*tracked\s+configuration files/i)
     expect(analysis).toMatch(/sparse-checkout inputs[\s\S]*writable workspace mounts/i)
     expect(analysis).toMatch(/accepted and rejected fixtures/i)
@@ -435,56 +435,55 @@ describe('vouchington-workflow plugin', () => {
     const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
 
     expect(normalizedIssue).toMatch(
-      /(?:^|[.!?]\s)Immediately before every write, refetch the exact target and require its canonical identity to still match and the repository not to be archived\. Issue operations also require issues to be enabled and `viewerPermission` of `TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`; issue creation additionally requires `viewerCanCreateIssues`\. Applying existing metadata to a pull request uses the same permission set but does not require issues to be enabled\./i,
+      /Immediately before every write, refetch the exact target\. Its canonical identity must still match, and the repository must not be archived\./i,
     )
     expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
-    expect(normalizedIssue).toMatch(/issue creation additionally requires `viewerCanCreateIssues`/i)
     expect(normalizedIssue).toMatch(
-      /taxonomy definitions requires `WRITE`, `MAINTAIN`, or `ADMIN`/i,
+      /viewerCanCreateIssues.*does not require issues to be enabled.*taxonomy definitions requires `WRITE`/i,
     )
-    expect(normalizedIssue).toMatch(/insufficient permission.*hard deny.*approval cannot override/i)
-    expect(normalizedIssue).toMatch(/external creation target is denied.*tracking issue/i)
+    expect(normalizedIssue).toMatch(/is a hard deny\. Approval cannot override it/i)
+    expect(normalizedIssue).toMatch(/denied external creation target[\s\S]*tracking issue/i)
     expect(normalizedIssue).toMatch(/copy-ready report/i)
-    expect(normalizedIssue).toMatch(/authorization to file the external issue.*tracking fallback/i)
-    expect(normalizedIssue).toMatch(/refetch the destination repository.*issue-operation gate/i)
+    expect(normalizedIssue).toMatch(/tracking fallback unless the caller opts/i)
+    expect(normalizedIssue).toMatch(/refetch the destination and apply the issue-operation gate/i)
     expect(normalizedIssue).toMatch(
-      /less-restricted destination.*remove private repository identity/i,
+      /less-restricted destination, remove private repository identity/i,
     )
     expect(normalizedIssue).toMatch(/If no tracker passes, return the draft without mutation/i)
-    expect(normalizedIssue).toMatch(/before editing.*refetch the issue and its current discussion/i)
-    expect(normalizedIssue).toMatch(/close only when.*acceptance evidence.*resolved/i)
-    expect(normalizedIssue).toMatch(/matching existing labels.*without separate approval/i)
-    expect(normalizedIssue).toMatch(/selected existing milestone.*without separate approval/i)
+    expect(normalizedIssue).toMatch(/Before editing[\s\S]*refetch the issue and its discussion/i)
+    expect(normalizedIssue).toMatch(/acceptance evidence show the work is resolved/i)
+    expect(normalizedIssue).toMatch(/matching existing labels and a selected existing milestone/i)
+    expect(normalizedIssue).toMatch(/with no separate approval/i)
     expect(normalizedIssue).toMatch(
-      /already has a milestone, apply that same existing milestone.*already has a project.*exactly one accessible, open membership exists.*skip the project step and report the conflict/i,
+      /already has a milestone, apply that same milestone.*already has a project.*exactly one accessible open membership exists.*skip the project and report the conflict/i,
     )
     expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
-    expect(normalizedIssue).toMatch(/PR creation authority remains separate/i)
-    expect(normalizedIssue).toMatch(/native sub-issues only for real hierarchy/i)
+    expect(normalizedIssue).toMatch(/Pull-request creation authority stays separate/i)
+    expect(normalizedIssue).toMatch(/native sub-issues only for a real hierarchy/i)
     expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
     expect(normalizedIssue).toMatch(
-      /(?:^|[.!?]\s)Select an existing open project for strategic, initiative-level tracking and a milestone for repo-local release or sequencing tracking — the choice turns on the initiative's nature, not how many repositories it touches, so a single-repo strategic initiative can carry a project, and an initiative that needs both a cross-cutting strategic view and repo-local sequencing may carry both; an issue belongs to at most one project and not every issue needs one\. Before adding an item, check its project membership/i,
+      /existing open project for strategic, initiative-level tracking.*milestone for repo-local release or sequencing.*not by how many repositories it touches.*single-repo strategic initiative can have a project.*can have both.*at most one project, and not every issue needs one/i,
     )
     expect(normalizedIssue).toMatch(
-      /hard deny of the project step alone.*issue and its other metadata still proceed/i,
+      /denies the project step only.*issue and its other metadata still proceed/i,
     )
     expect(normalizedIssue).toMatch(
-      /plus project-write API capability.*before adding an item, check its project membership and that of any item the project's own automation could pull in.*creating, renaming, or closing a project is a separately authorized taxonomy operation/i,
+      /plus project-write.*project's automation could pull in.*Creating, renaming, or closing a project is a separate taxonomy operation/i,
     )
     expect(normalizedIssue).toMatch(
-      /status to a value that closes the issue unless closing it is separately authorized.*Auto-close issue project workflow.*re-read the project rather than assuming only that item/i,
+      /project status that closes the issue unless closing is separately authorized.*Auto-close issue workflow.*re-read the project/i,
     )
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
     expect(normalizedOrganize).toMatch(
-      /existing labels, milestones, and projects.*at most one project.*before adding a project, check the issue's membership and that of any item the project's own automation could pull in/i,
+      /existing labels, milestones, and projects.*\[github-issue\].*single-project membership/i,
     )
-    expect(normalizedOrganize).toMatch(/status to a value that closes the issue/i)
+    expect(normalizedOrganize).toMatch(/status that closes the issue/i)
     expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
     expect(normalizedTaxonomy).toMatch(
-      /duplicated across repositories is a candidate project.*holding only routine, non-initiative.*work.*regardless of how many repositories it touches.*is a candidate milestone.*repository count.*alone is not a miscategorization signal/i,
+      /duplicated across repositories is a candidate project.*only routine, non-initiative work is a candidate milestone.*Repository count is not the signal/i,
     )
-    expect(taxonomy).toMatch(/auto-adding a parent issue's sub-issues/i)
+    expect(taxonomy).toMatch(/auto-add of a parent issue's sub-issues/i)
     expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
     expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')

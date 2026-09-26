@@ -5,53 +5,55 @@ description: Author or redesign GitHub Actions workflows around event-driven orc
 
 # GitHub Actions authoring
 
-Never poll in CI. A workflow must react to a state transition, not repeatedly ask whether remote
-state has changed. Read [github-actions-checklist](../github-actions-checklist/SKILL.md) first, then
-every applicable `AGENTS.md` and `CLAUDE.md`. Repository-local policy and the consumer wrapper own
-runner labels, permissions, action pins, concurrency, secrets, and required-check names.
+Never poll in CI. A workflow reacts to a state transition. Read
+[github-actions-checklist](../github-actions-checklist/SKILL.md) first, then every applicable
+`AGENTS.md` and `CLAUDE.md`. Repository-local policy and the consumer wrapper own runner labels,
+permissions, action pins, concurrency, secrets, and required-check names.
 
 ## Design the event graph
 
-1. Name the producer, the durable transition it emits, and the consumer that owns the next action.
-2. Use `needs` for jobs in one workflow and `workflow_call` for a reusable workflow whose caller
-   must await its result. When a consumer must run after failure or skip, give it an explicit status
-   condition and inspect `needs.<job>.result`; the implicit success condition skips it otherwise.
-3. Use `workflow_run` when a completed workflow is the trusted event boundary. Validate the exact
-   source workflow, repository, branch or pull-request head, conclusion, and artifacts before acting.
-   The receiving workflow must already exist on the default branch, and GitHub starts at most three
-   chained `workflow_run` levels; plan rollout explicitly and collapse deeper chains into one DAG.
-4. Use `repository_dispatch` for a cross-repository transition or authenticated external callback.
-   Authenticate the sender, pass immutable correlation data, validate it against the source, and make
-   duplicate delivery safe. Its receiving workflow must also already exist on the default branch,
-   so introduce and verify the receiver before enabling senders.
-5. Prefer provider-native completion events, callbacks, queues, or state-machine transitions for
-   deployments and services. A scheduled reconciliation workflow may repair missed events, but it
-   must inspect a snapshot once and exit; it must not wait for convergence.
+- Name the producer, the durable transition it emits, and the consumer that owns the next action.
+- Use `needs` for jobs in one workflow. Use `workflow_call` when the caller must await a reusable
+  workflow. When a consumer must run after failure or skip, give it an explicit status condition and
+  read `needs.<job>.result`. The implicit success condition skips it otherwise.
+- Use `workflow_run` when a completed workflow is the trusted event boundary. Validate the source
+  workflow, repository, branch or pull-request head, conclusion, and artifacts before acting.
+- The `workflow_run` receiver must already exist on the default branch. GitHub chains at most three
+  `workflow_run` levels. Plan that rollout, and collapse a deeper chain into one DAG.
+- Use `repository_dispatch` for a cross-repository transition or an authenticated external callback.
+  Authenticate the sender, pass immutable correlation data, validate it against the source, and make
+  duplicate delivery safe. The receiver must already exist on the default branch before senders are
+  enabled.
+- Prefer a provider-native completion event, callback, queue, or state-machine transition for a
+  deployment or service.
+- A scheduled reconciliation workflow may repair a missed event. It inspects one snapshot and exits.
+  It does not wait for convergence.
 
 ## Persistent workspaces
 
-Check out the full tree and prevent sparse-checkout configuration with a YAML-aware policy over
-tracked workflow and action files. Correct the producer of unsafe workspace state: writable workspace
-bind mounts use a non-root identity whose ownership and write access are compatible with the runner.
-Do not make each job traverse the whole workspace before checkout to repair permissions. Drain and
-migrate an already contaminated runner once. At runtime, repair may cover bounded known generated
-paths; a workspace-wide fallback must stay failure-gated, same-filesystem, directory-only, and batched,
-with path-count and timing evidence in its diagnostics.
+Apply the persistent-workspace rules in
+[github-actions-checklist](../github-actions-checklist/SKILL.md).
 
 ## Reject polling designs
 
-Do not add a sleep-and-read loop, repeated run/check/deployment/lease/service queries, a CLI waiter,
-or recursive redispatch whose purpose is to observe remote state eventually changing. Timeouts cap
-cost but do not make polling event-driven. If the producer cannot emit a usable event, add a bridge
-at the producer or provider boundary and let that bridge dispatch the correlated completion event.
-
-Bounded retries are allowed only for the same failed operation when failure is transient and the
-operation is idempotent. Local process readiness checks are allowed when the process runs inside the
-job and cannot emit a workflow event. Neither exception permits repeated observation of remote state.
+- Do not add a sleep-and-read loop, a repeated query of a run, check, deployment, lease, or
+  service, a CLI waiter, or a recursive redispatch whose purpose is to watch remote state change.
+- A timeout caps cost. It does not make polling event-driven.
+- If the producer cannot emit a usable event, add the bridge at the producer or provider boundary
+  and let that bridge dispatch the correlated completion event.
+- Bounded retries are allowed only for the same failed operation, and only when the failure is
+  transient and the operation is idempotent.
+- A local process readiness check is allowed when that process runs inside the job and cannot emit
+  a workflow event.
+- Neither exception allows repeated observation of remote state.
 
 ## Validate the result
 
-Test accepted, rejected, duplicate, stale, and out-of-order events. Preserve required-check names
-and prove that every terminal producer outcome causes one terminal consumer outcome. Run the local
-workflow checker and affected tests, then inspect the completed event graph for credentials crossing
-untrusted boundaries, missing correlation fields, and any remaining polling path.
+- Test accepted, rejected, duplicate, stale, and out-of-order events.
+- Preserve required-check names. Prove that every terminal producer outcome causes one terminal
+  consumer outcome.
+- Run the local workflow checker and affected tests. Inspect the event graph for credentials
+  crossing an untrusted boundary, a missing correlation field, and any remaining polling path.
+
+Consumer wrapper owns: runner labels, permissions, action pins, concurrency, secrets, and
+required-check names.

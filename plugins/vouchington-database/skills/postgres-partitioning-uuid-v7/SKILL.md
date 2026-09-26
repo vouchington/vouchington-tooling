@@ -5,12 +5,15 @@ description: Design PostgreSQL partitions and indexes that use time-ordered UUID
 
 # PostgreSQL partitioning with UUIDv7
 
-Partition only after confirming lifecycle, retention, and query predicates benefit from it. Treat a
-UUIDv7 as time ordered but not as a replacement for explicit business timestamps where semantics
-matter. Align partition keys, primary keys, indexes, constraints, and query predicates so partition
-pruning is observable. Plan creation, retention, migration, and verification as one deployable
-lifecycle, including rollback and independent-reader compatibility.
+Partition only after lifecycle, retention, and query predicates show that it helps.
 
-Consumer wrappers own partition intervals, migration tooling, retention policy, and deploy sequencing.
+- Treat a UUIDv7 as time ordered. Where the meaning matters, keep an explicit business timestamp.
+- Align the partition key, primary key, indexes, constraints, and query predicates so partition
+  pruning is observable.
+- Plan creation, retention, migration, and verification as one deployable lifecycle. Include
+  rollback and independent-reader compatibility.
+- Read [partition lifecycle](references/partition-lifecycle.md) before a schema or retention
+  migration.
 
-Read [partition lifecycle](references/partition-lifecycle.md) before a schema or retention migration.
+Consumer wrapper owns: partition intervals, migration tooling, retention policy, and deploy
+sequencing.
