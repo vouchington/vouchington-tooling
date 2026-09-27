@@ -16,9 +16,15 @@ export function codexChildren(
   const base = ownerPath.replace(/\/$/, '')
   for (const record of parseLines(lines)) {
     const payload = asRecord(record.payload)
-    if (record.type !== 'event_msg' || payload?.type !== 'sub_agent_activity') continue
-    const threadId = payload.agent_thread_id
-    const agentPath = payload.agent_path
+    if (record.type !== 'event_msg') continue
+    const activity =
+      payload?.type === 'sub_agent_activity'
+        ? payload
+        : payload?.type === 'item_completed' && asRecord(payload.item)?.type === 'SubAgentActivity'
+          ? asRecord(payload.item)
+          : undefined
+    const threadId = activity?.agent_thread_id
+    const agentPath = activity?.agent_path
     if (typeof threadId !== 'string' || typeof agentPath !== 'string') continue
     const normalized = agentPath.replace(/\/$/, '')
     if (normalized.startsWith(`${base}/`) && !normalized.slice(base.length + 1).includes('/'))

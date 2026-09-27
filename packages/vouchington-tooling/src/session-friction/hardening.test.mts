@@ -120,7 +120,11 @@ it('ignores persisted events with ill-formed audit fields', async () => {
       detail: '\ud800',
     })}\n`,
   )
-  expect(readFrictionLog('invalid-unicode', options)).toEqual({ status: 'empty' })
+  expect(readFrictionLog('invalid-unicode', options)).toEqual({
+    status: 'empty',
+    truncated: true,
+    droppedCount: 1,
+  })
 })
 
 it('rejects a multiply-linked session log without modifying its target', async () => {
@@ -274,7 +278,7 @@ it('does not recognize IPv6 loopback embedded in remote-looking tokens', () => {
       command: 'node server',
       structuredStderr: 'connect ECONNREFUSED ::1:3000',
     }),
-  ).toMatchObject({ kind: 'sandbox-failure' })
+  ).toMatchObject({ kind: 'ambiguous-failure' })
 })
 
 it('does not recognize an IPv4-looking tail inside a remote IPv6 address', () => {
@@ -302,7 +306,7 @@ it('does not recognize loopback-looking URL userinfo as the remote host', () => 
       command: 'curl local',
       structuredStderr: 'connect ECONNREFUSED https://user:password@localhost:443',
     }),
-  ).toMatchObject({ kind: 'sandbox-failure' })
+  ).toMatchObject({ kind: 'ambiguous-failure' })
 })
 
 it('rejects primitive observations and ill-formed audit text', () => {

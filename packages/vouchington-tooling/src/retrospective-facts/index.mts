@@ -1,14 +1,33 @@
 import { shell } from './exec.mts'
 import { foreignFacts } from './foreign.mts'
 import { localFacts } from './local.mts'
+import { completeCommandFacts, type RetrospectiveFactsReport } from './coverage.mts'
 import type { RetrospectiveFactsOptions } from './shared.mts'
 
 export type { CommandExecutor, CommandResult, RetrospectiveFactsOptions } from './shared.mts'
+export type { RetrospectiveFactsReport } from './coverage.mts'
 
 export async function runRetrospectiveFacts(options: RetrospectiveFactsOptions): Promise<string> {
+  return (await runRetrospectiveFactsReport(options)).markdown
+}
+
+export async function runRetrospectiveFactsReport(
+  options: RetrospectiveFactsOptions,
+): Promise<RetrospectiveFactsReport> {
   validate(options)
   const execute = options.execute ?? shell
-  return options.repo ? foreignFacts(options, execute) : localFacts(options, execute)
+  let complete = true
+  let successful = 0
+  const collect: typeof execute = async (command, args) => {
+    const result = await execute(command, args)
+    if (result.ok) successful++
+    if (!completeCommandFacts(command, args, result)) complete = false
+    return result
+  }
+  const markdown = await (options.repo
+    ? foreignFacts(options, collect)
+    : localFacts(options, collect))
+  return { markdown, coverage: complete ? 'complete' : successful ? 'partial' : 'unavailable' }
 }
 
 function validate(options: RetrospectiveFactsOptions): void {

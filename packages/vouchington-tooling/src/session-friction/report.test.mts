@@ -190,9 +190,16 @@ describe('buildSessionFrictionReport', () => {
         ],
       }),
     })
-    expect(report).toEqual({
-      markdown: expect.stringContaining('Status: failures observed'),
+    expect(report).toMatchObject({
+      coverage: {
+        journalStatus: 'partial',
+        frictionStatus: 'events',
+        truncated: false,
+        droppedCount: 0,
+      },
+      markdown: expect.stringContaining('Status: unavailable (journal scan incomplete)'),
     })
+    expect(report.markdown).toContain('build cache failure')
     expect(report.markdown).toContain('## Sandbox & Permission Audit')
     expect(report.markdown.indexOf('sandbox-escalation')).toBeLessThan(
       report.markdown.indexOf('sandbox-failure'),
@@ -224,7 +231,8 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: { journalStatus: 'complete', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (no friction log for session missing)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -236,7 +244,8 @@ describe('buildSessionFrictionReport', () => {
           throw new Error('fetch failed')
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -272,7 +281,9 @@ describe('buildSessionFrictionReport', () => {
         entries: [{}, hostile, { data: { type: 'journal', markdown: conforming } }],
       }),
     })
-    expect(report.markdown).toContain('Status: failures observed')
+    expect(report.coverage.journalStatus).toBe('partial')
+    expect(report.markdown).toContain('journal scan incomplete')
+    expect(report.markdown).toContain(conforming)
     expect(report.diagnostic).toBeUndefined()
   })
 
@@ -361,7 +372,8 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: { journalStatus: 'complete', frictionStatus: 'unreadable', truncated: true },
       markdown:
         '## CI Failures\nStatus: unavailable (friction log unreadable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -374,7 +386,8 @@ describe('buildSessionFrictionReport', () => {
           throw new Error('journal unavailable')
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'unreadable', truncated: true },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -426,7 +439,13 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: {
+        journalStatus: 'complete',
+        frictionStatus: 'empty',
+        truncated: false,
+        droppedCount: 0,
+      },
       markdown:
         '## CI Failures\nStatus: none observed\n\n' +
         '## Sandbox & Permission Audit\nStatus: none observed',
@@ -448,7 +467,8 @@ describe('buildSessionFrictionReport', () => {
           throw unprintable
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',

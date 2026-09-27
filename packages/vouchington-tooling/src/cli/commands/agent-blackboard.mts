@@ -1,8 +1,12 @@
 import {
   appendJournal,
+  flushFeedbackOutbox,
   formatJournalEntries,
   probeBlackboard,
   readJournal,
+  type FeedbackMode,
+  type WorkOutcome,
+  type FeedbackCoverage,
 } from '../../agent-blackboard/index.mts'
 import { cleanupSnapshotPartitions, partitionSnapshot } from '../../agent-blackboard/snapshot.mts'
 import type {
@@ -26,7 +30,7 @@ export async function runAgentBlackboardCommand(args: string[]): Promise<number>
     if (command === 'journal') return await runJournal(rest)
     if (command === 'snapshot') return await runSnapshot(rest)
     throw new Error(
-      'usage: agent-blackboard probe | journal append|entries | snapshot partition|cleanup',
+      'usage: agent-blackboard probe | journal append|entries|flush | snapshot partition|cleanup',
     )
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
@@ -71,6 +75,12 @@ async function runJournal(args: string[]): Promise<number> {
   const { repositories, remaining } =
     action === 'append' ? extractRepositories(flags) : { repositories: [], remaining: flags }
   const values = flagsToValues(remaining)
+  if (action === 'flush') {
+    assertAllowed(values, ['outbox-directory'])
+    const result = await flushFeedbackOutbox({ directory: required(values, 'outbox-directory') })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    return 0
+  }
   if (action === 'entries') {
     assertAllowed(values, ['session-id'])
     const sessionId = required(values, 'session-id')
@@ -92,13 +102,36 @@ async function runJournal(args: string[]): Promise<number> {
       'file',
       'parent-session-id',
       'timestamp',
+      'mode',
+      'source-event-id',
+      'work-outcome',
+      'coverage-status',
+      'coverage-source',
+      'dropped-count',
+      'outbox-directory',
     ])
-    process.stdout.write(
-      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', repositories: requiredRepositories(repositories), markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...('timestamp' in values ? { timestamp: values.timestamp } : {}) })}\n`,
-    )
+    const result = await appendJournal({
+      mode: required(values, 'mode') as FeedbackMode,
+      sourceEventId: required(values, 'source-event-id'),
+      workOutcome: required(values, 'work-outcome') as WorkOutcome,
+      feedbackCoverage: {
+        status: required(values, 'coverage-status') as FeedbackCoverage['status'],
+        sources: values['coverage-source']?.split(',') ?? [],
+        droppedCount: Number(values['dropped-count'] ?? '0'),
+      },
+      ...(values['outbox-directory'] ? { outboxDirectory: values['outbox-directory'] } : {}),
+      sessionId: required(values, 'session-id'),
+      agent: required(values, 'agent'),
+      version: values.version ?? 'unknown',
+      repositories: requiredRepositories(repositories),
+      markdownFile: required(values, 'file'),
+      ...('timestamp' in values ? { timestamp: values.timestamp } : {}),
+      parentSessionId: values['parent-session-id'] ?? null,
+    })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
     return 0
   }
-  throw new Error('usage: agent-blackboard journal append|entries')
+  throw new Error('usage: agent-blackboard journal append|entries|flush')
 }
 
 function extractRepositories(flags: string[]): { repositories: string[]; remaining: string[] } {

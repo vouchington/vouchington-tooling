@@ -2,20 +2,29 @@ import type { FrictionEvent, FrictionEventKind } from './types.mts'
 import { markdownAuditText } from './text.mts'
 
 const SANDBOX_SECTION_HEADER = '## Sandbox & Permission Audit'
-const KIND_ORDER: FrictionEventKind[] = ['sandbox-escalation', 'sandbox-failure']
+const KIND_ORDER: FrictionEventKind[] = [
+  'sandbox-escalation',
+  'sandbox-failure',
+  'ambiguous-failure',
+]
 
 export function buildSandboxSection(events: FrictionEvent[]): string {
+  const observations = events.flatMap((event) =>
+    event.failure
+      ? [event, { ...event, kind: event.failure.kind, detail: event.failure.detail }]
+      : [event],
+  )
   const groups = KIND_ORDER.map((kind) => {
-    const selected = events.filter((event) => event.kind === kind)
+    const selected = observations.filter((event) => event.kind === kind)
     return selected.length
       ? [
           `- ${kind} (${selected.length})`,
           ...selected.map(
             (event) =>
-              `  - ${markdownAuditText(event.commandPrefix)} — ${markdownAuditText(event.detail)} — ${markdownAuditText(event.timestamp)}`,
+              `  - ${markdownAuditText(event.commandPrefix)} — ${markdownAuditText(event.detail)} — ${markdownAuditText(event.timestamp)}${event.kind === 'sandbox-escalation' ? ` — outcome: ${event.outcome ?? 'unknown'}` : ''}`,
           ),
         ].join('\n')
       : undefined
   }).filter((group): group is string => group !== undefined)
-  return `${SANDBOX_SECTION_HEADER}\nEvents observed: ${events.length}\n\n${groups.join('\n')}`
+  return `${SANDBOX_SECTION_HEADER}\nEvents observed: ${observations.length}\n\n${groups.join('\n')}`
 }

@@ -1,10 +1,11 @@
+import { readCoverageLedger, writeCoverageLedger } from './coverage-ledger.mts'
 import { closeSync, constants, fchmodSync, fstatSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { classifyFrictionObservation } from './classify.mts'
 import { ensurePrivateDirectory } from './directory.mts'
 import { withFileLock } from './lock.mts'
 import {
-  atEventLimit,
+  validEventCount,
   LOG_MAX_BYTES,
   openLogFile,
   readLogContent,
@@ -66,8 +67,23 @@ export function recordFriction(
       if (fstatSync(descriptor).size > LOG_MAX_BYTES)
         throw new Error('session-friction log is too large')
       if (!classified) return
+      const coverage = readCoverageLedger(path)
+      const logBytes = fstatSync(descriptor).size
+      if (coverage && coverage.logBytes === logBytes && coverage.retainedEvents >= maxEvents) {
+        writeCoverageLedger(path, { ...coverage, droppedCount: coverage.droppedCount + 1 })
+        return
+      }
       const content = readLogContent(descriptor)
-      if (atEventLimit(content, maxEvents)) return
+      const retainedEvents = validEventCount(content, FRICTION_LOG_MAX_EVENTS)
+      if (retainedEvents >= maxEvents) {
+        writeCoverageLedger(path, {
+          schemaVersion: 1,
+          logBytes,
+          retainedEvents,
+          droppedCount: (coverage?.droppedCount ?? 0) + 1,
+        })
+        return
+      }
       const event = {
         ...classified,
         commandPrefix: normalizeAuditText(classified.commandPrefix),
@@ -78,9 +94,22 @@ export function recordFriction(
       if (!validEvent(event)) return
       const prefix = content && !content.endsWith('\n') ? '\n' : ''
       const addition = `${prefix}${JSON.stringify(event)}\n`
-      if (fstatSync(descriptor).size + Buffer.byteLength(addition) > LOG_MAX_BYTES)
-        throw new Error('session-friction log is too large')
+      if (logBytes + Buffer.byteLength(addition) > LOG_MAX_BYTES) {
+        writeCoverageLedger(path, {
+          schemaVersion: 1,
+          logBytes,
+          retainedEvents,
+          droppedCount: (coverage?.droppedCount ?? 0) + 1,
+        })
+        return
+      }
       writeAll(descriptor, addition)
+      if (coverage)
+        writeCoverageLedger(path, {
+          ...coverage,
+          logBytes: fstatSync(descriptor).size,
+          retainedEvents: retainedEvents + 1,
+        })
     } finally {
       closeSync(descriptor)
     }
@@ -102,15 +131,34 @@ export function readFrictionLog(
       const descriptor = openLogFile(path, constants.O_RDONLY)
       try {
         const events: FrictionEvent[] = []
+        const ledger = readCoverageLedger(path)
+        let droppedCount = ledger?.droppedCount ?? 0
+        let retainedEvents = 0
         for (const line of readLogContent(descriptor).split('\n')) {
           if (!line.trim()) continue
           try {
             const value: unknown = JSON.parse(line)
-            if (validEvent(value)) events.push(value)
-          } catch {}
-          if (events.length >= maxEvents) break
+            if (validEvent(value)) {
+              retainedEvents++
+              if (events.length < maxEvents) events.push(value)
+              else droppedCount++
+            } else droppedCount++
+          } catch {
+            droppedCount++
+          }
         }
-        return events.length ? { status: 'events', events } : { status: 'empty' }
+        if (
+          ledger &&
+          (ledger.logBytes !== fstatSync(descriptor).size ||
+            ledger.retainedEvents !== Math.min(retainedEvents, FRICTION_LOG_MAX_EVENTS))
+        )
+          throw new Error('session-friction coverage ledger does not match retained log')
+        if (!Number.isSafeInteger(droppedCount))
+          throw new Error('session-friction dropped count overflow; capture incomplete')
+        const coverage = droppedCount ? { truncated: true as const, droppedCount } : {}
+        return events.length
+          ? { status: 'events', events, ...coverage }
+          : { status: 'empty', ...coverage }
       } finally {
         closeSync(descriptor)
       }

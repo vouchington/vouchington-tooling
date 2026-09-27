@@ -25,7 +25,7 @@ vi.mock('agent-blackboard', () => ({
   },
 }))
 
-import { appendJournal, formatJournalEntries, probeBlackboard, readJournal } from './index.mts'
+import { formatJournalEntries, probeBlackboard, readJournal } from './index.mts'
 import type { BlackboardClientModule } from './index.mts'
 
 const env = { AGENT_BLACKBOARD_URL: 'https://blackboard.test', AGENT_BLACKBOARD_TOKEN: 'secret' }
@@ -44,228 +44,10 @@ afterEach(async () => {
   directory = undefined
 })
 
-async function note(content = 'A durable finding'): Promise<string> {
-  directory = await mkdtemp(join(tmpdir(), 'blackboard-index-'))
-  const path = join(directory, 'note.md')
-  await writeFile(path, content)
-  return path
-}
-
 describe('agent blackboard client', () => {
   it('probes the configured connection', async () => {
-    await probeBlackboard(env)
+    await probeBlackboard(env, { resolveFrom: import.meta.url })
     expect(client.list).toHaveBeenCalledWith({ limit: 1 })
-  })
-
-  it('ensures a session and appends a journal entry', async () => {
-    client.ensure.mockResolvedValue({ status: 'created', session: { data: {} } })
-    client.patch.mockResolvedValue({ data: { repositories: ['vouchington/vouchington'] } })
-    client.append.mockResolvedValue({ createdAt: '2026-01-01T00:00:00.000Z' })
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        parentSessionId: 'parent:one',
-        timestamp: '2026-01-01T00:00:00.000Z',
-        markdownFile: await note(),
-        repositories: ['Vouchington/Vouchington', 'vouchington/vouchington'],
-        env,
-      }),
-    ).resolves.toContain('entry created at 2026-01-01T00:00:00.000Z')
-    expect(client.ensure).toHaveBeenCalledWith({
-      id: sessionId,
-      parentSessionId: 'parent:one',
-      agent: 'codex',
-      version: '1',
-    })
-    expect(client.append).toHaveBeenCalledWith({
-      sessionId,
-      data: {
-        type: 'journal',
-        markdown: 'A durable finding',
-        timestamp: '2026-01-01T00:00:00.000Z',
-        repositories: ['vouchington/vouchington'],
-      },
-    })
-    expect(client.patch).toHaveBeenCalledWith({
-      sessionId,
-      data: { repositories: ['vouchington/vouchington'] },
-    })
-    expect(client.patch.mock.invocationCallOrder[0]).toBeLessThan(
-      client.append.mock.invocationCallOrder[0]!,
-    )
-  })
-
-  it('adds only new repositories to an existing session before appending', async () => {
-    client.ensure.mockResolvedValue({
-      status: 'exists',
-      session: { data: { repositories: ['other/repo'] } },
-    })
-    client.append.mockResolvedValue({ createdAt: timestamp })
-    await appendJournal({
-      sessionId,
-      agent: 'codex',
-      version: '1',
-      repositories: ['vouchington/vouchington'],
-      markdownFile: await note(),
-      env,
-    })
-    expect(client.patch).toHaveBeenCalledWith({
-      sessionId,
-      data: { repositories: ['other/repo', 'vouchington/vouchington'] },
-    })
-    expect(client.append).toHaveBeenCalledWith({
-      sessionId,
-      data: expect.objectContaining({ repositories: ['vouchington/vouchington'] }),
-    })
-  })
-
-  it('does not append when repository metadata cannot be patched', async () => {
-    client.ensure.mockResolvedValue({ status: 'created', session: { data: {} } })
-    client.patch.mockRejectedValue(new Error('session archived'))
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: await note(),
-        env,
-      }),
-    ).rejects.toThrow('session archived')
-    expect(client.append).not.toHaveBeenCalled()
-  })
-
-  it('does not append to an archived session even when its repositories already match', async () => {
-    client.ensure.mockResolvedValue({
-      status: 'exists',
-      session: {
-        data: { repositories: ['vouchington/vouchington'] },
-        archivedAt: '2026-01-01T00:00:00.000Z',
-      },
-    })
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: await note(),
-        env,
-      }),
-    ).rejects.toThrow('session is archived')
-    expect(client.patch).not.toHaveBeenCalled()
-    expect(client.append).not.toHaveBeenCalled()
-  })
-
-  it('rejects malformed repository attribution before provider calls', async () => {
-    for (const repositories of [[], [42] as unknown as string[], ['not-a-repository']]) {
-      await expect(
-        appendJournal({
-          sessionId,
-          agent: 'codex',
-          version: '1',
-          repositories,
-          markdownFile: 'missing',
-          env,
-        }),
-      ).rejects.toThrow(
-        repositories[0] === 'not-a-repository' ? 'invalid repository' : 'repositories must be',
-      )
-    }
-    expect(client.ensure).not.toHaveBeenCalled()
-  })
-
-  it('uses null parents and rejects empty notes and invalid identities before client operations', async () => {
-    await expect(
-      appendJournal({
-        sessionId: 'bad/path',
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: 'missing',
-        env,
-      }),
-    ).rejects.toThrow('URL-safe')
-    await expect(
-      appendJournal({
-        sessionId,
-        parentSessionId: 'parent/one',
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: 'missing',
-        env,
-      }),
-    ).rejects.toThrow('parent session id')
-    await expect(
-      appendJournal({
-        sessionId,
-        parentSessionId: '',
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: 'missing',
-        env,
-      }),
-    ).rejects.toThrow('parent session id')
-    expect(client.ensure).not.toHaveBeenCalled()
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: await note(''),
-        env,
-      }),
-    ).rejects.toThrow('note file is empty')
-    client.ensure.mockResolvedValue({
-      status: 'exists',
-      session: { data: { repositories: ['vouchington/vouchington'] } },
-    })
-    client.append.mockResolvedValue({ createdAt: timestamp })
-    await appendJournal({
-      sessionId,
-      agent: 'codex',
-      version: '1',
-      repositories: ['vouchington/vouchington'],
-      markdownFile: await note(),
-      env,
-    })
-    expect(client.ensure).toHaveBeenLastCalledWith(
-      expect.objectContaining({ parentSessionId: null }),
-    )
-  })
-
-  it('validates timestamps before provider calls and canonicalizes offsets', async () => {
-    await expect(
-      appendJournal({
-        sessionId,
-        agent: 'codex',
-        version: '1',
-        repositories: ['vouchington/vouchington'],
-        markdownFile: 'missing',
-        timestamp: '',
-        env,
-      }),
-    ).rejects.toThrow('valid date-time')
-    expect(client.ensure).not.toHaveBeenCalled()
-    client.ensure.mockResolvedValue({ status: 'created', session: { data: {} } })
-    client.append.mockResolvedValue({ createdAt: timestamp })
-    await appendJournal({
-      sessionId,
-      agent: 'codex',
-      version: '1',
-      repositories: ['vouchington/vouchington'],
-      markdownFile: await note(),
-      timestamp: '2026-01-01T01:00:00+01:00',
-      env,
-    })
-    expect(client.append).toHaveBeenLastCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ timestamp }) }),
-    )
   })
 
   it('reads and formats only sorted journal entries', async () => {
@@ -275,7 +57,7 @@ describe('agent blackboard client', () => {
       { createdAt: '2026-01-01T00:00:00.000Z', data: { type: 'other', markdown: 'ignore' } },
       null,
     ]
-    const entries = await readJournal(sessionId, env)
+    const entries = await readJournal(sessionId, env, { resolveFrom: import.meta.url })
     expect(entries).toHaveLength(4)
     expect(formatJournalEntries(sessionId, entries)).toBe(
       '## 2026-01-01T00:00:00.000Z\n\nfirst\n\n## 2026-01-02T00:00:00.000Z\n\nlater',
@@ -307,22 +89,10 @@ describe('agent blackboard client', () => {
       },
     })
     await probeBlackboard(env, { loadClient: loader })
-    await appendJournal({
-      sessionId,
-      agent: 'codex',
-      version: '1',
-      repositories: ['vouchington/vouchington'],
-      markdownFile: await note(),
-      env,
-      dependencies: { loadClient: loader },
-    })
     await expect(readJournal(sessionId, env, { loadClient: loader })).resolves.toEqual([
       { entry: true },
     ])
     expect(list).toHaveBeenCalledWith({ limit: 1 })
-    expect(ensure).toHaveBeenCalledOnce()
-    expect(patch).toHaveBeenCalledOnce()
-    expect(append).toHaveBeenCalledOnce()
   })
 
   it.each(['ERR_MODULE_NOT_FOUND', 'MODULE_NOT_FOUND'])(

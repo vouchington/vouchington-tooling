@@ -206,9 +206,7 @@ describe('vouchington-workflow plugin', () => {
       expect(skill).not.toContain('CLAUDE.md')
       expect(skill.replaceAll(/(?:AGENTS|CLAUDE)\.md/giu, '')).not.toMatch(/\b(?:claude|codex)\b/i)
       expect(skill).not.toMatch(/\.github\/workflows\/RUNNERS|filaments|voucha/i)
-      expect(skill).not.toMatch(
-        /pr-shepherd|auto harness|agent hook|coverage (?:tooling|baseline)/i,
-      )
+      expect(skill).not.toMatch(/auto harness|agent hook|coverage (?:tooling|baseline)/i)
       expect(skill).toMatch(/consumer\s+wrapper/i)
     }
     expect(skills[0]).toContain('every applicable')

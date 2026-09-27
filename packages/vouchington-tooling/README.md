@@ -66,7 +66,7 @@ vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington retrospective-facts --pr 49 --repo vouchington/vouchington-infra --raw
 vouchington agent-blackboard probe
-vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md --repository vouchington/vouchington-tooling
+vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md --repository owner/repo --mode autonomous --source-event-id event:1 --work-outcome in-progress --coverage-status partial --timestamp 2026-01-01T00:00:00.000Z
 vouchington agent-blackboard journal entries --session-id <uuid>
 vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --checksum <sha256> --counts <counts.json>
 vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
@@ -147,7 +147,10 @@ as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
 need `agent-blackboard@^0.6.0`. Snapshot cleanup accepts only package-generated temporary paths.
-`appendJournal` requires a `repositories: string[]` argument. The CLI accepts one or more
+`appendJournal` and the journal CLI now require explicit mode, stable source-event identity, work
+outcome, feedback coverage, and exact repositories. This is a breaking pre-1.0 API change; adopt the
+shared contract before upgrading consumers. `appendJournal` reads a bounded UTF-8 note and delegates
+to `writeFeedback`, returning delivered or pending state rather than a success-shaped message. The CLI accepts one or more
 `--repository owner/name` flags; it records the entry's exact repositories and updates the session's
 cumulative repository list before appending.
 Programmatic callers launched from a different workspace directory pass their own module URL as
@@ -405,13 +408,19 @@ absolute log directory, host-independent observation, and journal loader; it doe
 environment variables, install hooks, or connect to a journal service by itself. Invoking
 `recordFriction` touches the session log even when no event is classified, preserving the
 difference between an observed clean session and missing evidence. Report markdown keeps backend
-diagnostics separate from its paste-safe output. Capture stores at most 500 events per session,
+diagnostics separate from its paste-safe output. Capture stores at most 500 events per session and counts rejected captures in a fixed-size atomic
+sidecar under the same session lock for either the event or byte limit, with visible `truncated`/`droppedCount` metadata. Saturated
+capture reads only the bounded counter; reports also preserve historical overflow markers.
+Interrupted or inconsistent counter updates make coverage unavailable. Malformed records also make the scan partial. It
 truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
 when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
 Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
 Report liveness inherits the caller-supplied journal loader, which must bound its own I/O and yields.
 Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
-and rendered audit fields at 120 escaped characters. The supplied log directory must be dedicated
+and rendered audit fields at 120 escaped characters. Permission requests record requested outcomes; explicit result observations may record approved
+or denied outcomes. A decision and simultaneous tool failure are both retained and counted in
+the report. Escalation detail without a decision remains unknown. Localhost connection
+refusal is an ambiguous failure and does not establish a sandbox cause. The supplied log directory must be dedicated
 to session-friction; existing directories must already be owner-only, while newly created
 directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
 buffer that can detect growth one byte beyond the documented 2 MB cap.
@@ -506,3 +515,66 @@ links declared prerequisites. Without a manifest, it links the conventional
 outside either root, and existing non-matching destinations.
 `targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
 rejected.
+
+## Validated feedback and delivery
+
+Import `createFeedbackEnvelope`, `validateFeedbackEnvelope`, `writeFeedback`, `verifyFreshFeedback`,
+`composeRetrospective`, `feedbackOutboxStatus`, and `flushFeedbackOutbox` from the existing
+`vouchington-tooling/agent-blackboard` subpath. Consumers must run Node 24 or newer and install `agent-blackboard@^0.6.0` explicitly alongside
+`vouchington-tooling`; the provider is not installed by this package. Missing provider installation
+returns `client-unavailable`; missing or invalid connection configuration returns
+`configuration-invalid`, separately from transport outages and authentication rejection.
+The upstream `agent-blackboard` client still owns the
+service protocol; this integration adds no provider schema or service. Supply consumer module
+context through `dependencies.resolveFrom` or inject the client loader at the transport boundary.
+
+The version-one envelope retains canonical `markdown` and storage `type: journal | retrospective`.
+It requires exact canonical repositories, stable URL-safe `sourceEventId`, ISO timestamp, explicit
+`workOutcome`, and `feedbackCoverage` with status, sources, and dropped count. Optional category is
+context only. Retrospectives retain valid date and integer/string issue/PR references. Markdown is
+capped at 12 KB and the envelope at 16 KB. Known credentials are redacted; authors remain responsible
+for minimizing summaries and excluding raw logs, transcripts, environment dumps, and undisclosed
+secrets. A bound violation fails visibly without clipping findings.
+
+`writeFeedback({identity, envelope, mode, ...})` accepts an exact caller-owned session identity and
+never manufactures native agent identities. Interactive mode requires an absolute private outbox
+directory. The writer persists before transport with atomic rename, file/directory fsync, a stable
+record path, and owner-only permissions. The outbox holds at most 128 records and 2 MB. Saturation,
+corruption, or persistence failure blocks capture and preserves unsent records. Delivered records
+are removed only after matching readback. Pending state includes count and a safe diagnostic;
+interactive CLI exit zero means durable retention, and callers must inspect the printed status to
+know whether delivery was acknowledged. Autonomous errors and unpersisted writes fail nonzero.
+Identity, content, and archived-session conflicts fail in either mode while preserving the unsent
+record; they are not reported as transient pending delivery. Replay retains permanently conflicted
+records and continues to deliver unrelated pending records; transient failures stop that replay.
+Verified delivery retains its receipt when local cleanup fails, returning
+`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is safe to replay with exact dedup.
+Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
+records after connectivity returns.
+
+Autonomous mode prohibits the filesystem outbox. `verifyFreshFeedback` requires a fresh source-event
+write plus readback of its own append receipt and rejects visible duplicate source records. This
+is fresh online reporting evidence, not a distributed execution lease: eventually consistent
+provider reads cannot establish source uniqueness. Trusted controllers
+supply a unique new authorization-probe source ID, preserve their authoritative run/session
+lineage, and atomically claim and revalidate the attempt before execution. Terminal writes keep work outcome separate from coverage and returned delivery state.
+The delivered result includes a verified receipt with session ID, source-event ID and creation time.
+Controllers require this online result together with atomically established attempt ownership
+before execution.
+
+Delivery is at least once. Replays pre-read matching source identity/content, accept equivalent
+persistent duplicates, and reject conflicting reuse. Equality ignores object property order while
+preserving array order. Each online operation has a 20-second deadline (`timeoutMs` can shorten it);
+readback scans at most 10,000 records or 2 MB. The SDK does not expose cancellation for in-flight
+requests, so a timed-out write can commit later. That never grants admission or a delivery receipt;
+replay the identical envelope and source ID to verify its actual persistence.
+
+`composeRetrospective` invokes the existing fact/transcript collectors with raw output disabled and
+generates required sections and markers. Tool and architectural assessments preserve observation,
+evidence, disposition and tracking reference. None-observed and unassessed states need a scoped
+reason. Complete coverage is rejected when required sources are unavailable or capture is partial.
+Typed collector reports expose availability independently of rendered text. Composition rejects
+aggregate dropped counts below observed friction drops and retains larger caller aggregates without
+double counting. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
+for consumers to preserve or reject conflicting explicit overrides; trusted mode stays external.
+Human top-five summaries do not authorize dropping additional durable findings.

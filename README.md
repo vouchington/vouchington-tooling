@@ -338,7 +338,7 @@ resolves: callers must discard accumulated results if the command later exits no
 `session-friction` remains dormant until a caller explicitly supplies a session id, absolute log
 directory, hook observation, and journal loader. Host payload parsing, hook installation, session
 discovery, and journal transport stay with the consuming repository. Capture stores at most 500
-events per session, truncates event detail to 1,000 characters, and consumes up to 500 entries
+events per session, counts rejected captures in a bounded atomic sidecar, truncates event detail to 1,000 characters, and consumes up to 500 entries
 from the journal loader when building a report, stopping earlier when its aggregate 1 MB
 inspected-byte budget is reached. Log reads are capped at 2 MB, journal Markdown at
 10,000 bytes per entry, and newly created evidence directories and files are owner-only. Recording
@@ -388,3 +388,9 @@ Run the local CLI after a build:
 ```bash
 node packages/vouchington-tooling/dist/cli/index.mjs --help
 ```
+
+Validated journal and retrospective feedback uses the existing `agent-blackboard` subpath. Explicit
+interactive mode persists sanitized pending records in a bounded private outbox; autonomous mode
+requires fresh online admission and acknowledged terminal readback. Work outcome, evidence coverage,
+and delivery remain separate. See the [feedback contract](packages/vouchington-tooling/README.md#validated-feedback-and-delivery)
+for current APIs, privacy bounds, stable event replay, and the breaking journal writer adoption.

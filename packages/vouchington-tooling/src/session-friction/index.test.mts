@@ -36,22 +36,6 @@ afterEach(async () => {
 })
 
 describe('classifyFrictionObservation', () => {
-  it('prioritizes escalation over a simultaneous failure', () => {
-    expect(
-      classifyFrictionObservation({
-        type: 'tool-result',
-        command: 'rtk git push',
-        commandWrappers: ['rtk'],
-        escalationDetail: 'sandbox override',
-        structuredStderr: 'EPERM',
-      }),
-    ).toEqual({
-      kind: 'sandbox-escalation',
-      commandPrefix: 'rtk git push',
-      detail: 'sandbox override',
-    })
-  })
-
   it('classifies permission requests and structured stderr only', () => {
     expect(
       classifyFrictionObservation({ type: 'permission-request', command: 'pnpm test' }),
@@ -59,6 +43,7 @@ describe('classifyFrictionObservation', () => {
       kind: 'sandbox-escalation',
       commandPrefix: 'pnpm test',
       detail: 'permission-request',
+      outcome: 'requested',
     })
     expect(
       classifyFrictionObservation({
@@ -67,9 +52,9 @@ describe('classifyFrictionObservation', () => {
         structuredStderr: 'ECONNREFUSED 127.0.0.1',
       }),
     ).toEqual({
-      kind: 'sandbox-failure',
+      kind: 'ambiguous-failure',
       commandPrefix: 'node test',
-      detail: 'stderr matched localhost connection failure',
+      detail: 'localhost connection refused; sandbox cause unverified',
     })
     expect(
       classifyFrictionObservation({
@@ -77,7 +62,7 @@ describe('classifyFrictionObservation', () => {
         command: 'node test',
         structuredStderr: 'ECONNREFUSED 127.0.0.2',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -98,14 +83,14 @@ describe('classifyFrictionObservation', () => {
         command: 'node test',
         structuredStderr: 'connect ECONNREFUSED [::1]:5432',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'node test',
         structuredStderr: 'connect ECONNREFUSED 0:0:0:0:0:0:0:1%lo0:3000',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -192,6 +177,7 @@ describe('friction log', () => {
           timestamp: '2026-01-01T00:00:00.000Z',
           commandPrefix: 'git push',
           detail: 'override',
+          outcome: 'unknown',
         },
       ],
     })
@@ -200,20 +186,27 @@ describe('friction log', () => {
   it('requires an absolute directory and applies the event cap', async () => {
     expect(() => readFrictionLog('s', { directory: 'relative' })).toThrow(/absolute/)
     const directoryPath = await directory()
-    for (let index = 0; index < FRICTION_LOG_MAX_EVENTS + 2; index++)
-      recordFriction(
-        'capped',
-        { type: 'permission-request', command: 'git push' },
-        { directory: directoryPath, maxEvents: 1_000, timestamp: String(index) },
-      )
-    const path = join(directoryPath, (await readdir(directoryPath))[0]!)
+    const observation = { type: 'permission-request' as const, command: 'git push' }
+    const options = { directory: directoryPath, maxEvents: 1_000, timestamp: '0' }
+    recordFriction('capped', observation, options)
+    const path = join(
+      directoryPath,
+      (await readdir(directoryPath)).find((name) => name.endsWith('.jsonl'))!,
+    )
+    await writeFile(path, (await readFile(path, 'utf8')).repeat(FRICTION_LOG_MAX_EVENTS))
+    recordFriction('capped', observation, options)
+    recordFriction('capped', observation, options)
     const raw = await readFile(path, 'utf8')
-    await writeFile(path, raw.repeat(2))
     const result = readFrictionLog('capped', { directory: directoryPath })
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events).toHaveLength(FRICTION_LOG_MAX_EVENTS)
     expect(isAbsolute(directoryPath)).toBe(true)
-    expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1_000)
+    expect(result).toMatchObject({ truncated: true, droppedCount: 2 })
+    expect(raw.trim().split('\n')).toHaveLength(500)
+    await writeFile(path, raw.repeat(2))
+    expect(() => readFrictionLog('capped', { directory: directoryPath })).toThrow(
+      /ledger does not match/,
+    )
   })
 
   it('ignores malformed lines while retaining valid events', async () => {
@@ -427,7 +420,11 @@ describe('friction log', () => {
     await writeFile(path, 'x'.repeat(2_000_000))
     expect(() =>
       recordFriction('oversized-log', { type: 'permission-request', command: 'git push' }, options),
-    ).toThrow(/too large/)
+    ).not.toThrow()
+    expect(readFrictionLog('oversized-log', options)).toMatchObject({
+      truncated: true,
+      droppedCount: 2,
+    })
     expect((await stat(path)).size).toBe(2_000_000)
     await writeFile(path, 'x'.repeat(2_000_001))
     expect(() => readFrictionLog('oversized-log', options)).toThrow(/too large/)
