@@ -6,6 +6,11 @@ import {
   requiredWorkflowPermissions,
   type Workflow,
 } from './permissions.mts'
+import { inheritanceAwarePermissionMismatches } from './permission-inheritance.mts'
+
+export type CallerCalleePermissionPolicy = {
+  comparison: 'exact' | 'inheritance-aware'
+}
 
 function formatPermissions(value: ReturnType<typeof parsePermissions>): string {
   if (value === null) return 'none'
@@ -16,6 +21,7 @@ function formatPermissions(value: ReturnType<typeof parsePermissions>): string {
 export function callerCalleePermissionMismatches(
   topology: WorkflowTopology,
   documents: Readonly<Record<string, Workflow>>,
+  policy: CallerCalleePermissionPolicy = { comparison: 'exact' },
 ): string[] {
   const mismatches: string[] = []
   const jobsById = new Map(topology.jobs.map((job) => [job.id, job]))
@@ -33,13 +39,26 @@ export function callerCalleePermissionMismatches(
     const caller = documents[callerPath]
     if (!caller) throw new Error(`missing workflow document: ${callerPath}`)
     const job = caller.jobs?.[callerJob.key]
-    if (!job) continue
+    if (policy.comparison === 'exact' && !job) continue
     const calleePath = callee.path
     const calleeWorkflow = documents[calleePath]
     if (!calleeWorkflow) throw new Error(`missing workflow document: ${calleePath}`)
 
+    if (policy.comparison === 'inheritance-aware') {
+      mismatches.push(
+        ...inheritanceAwarePermissionMismatches({
+          callerPath,
+          callerJobKey: callerJob.key,
+          callerWorkflow: caller,
+          calleePath,
+          calleeWorkflow,
+        }),
+      )
+      continue
+    }
+
     const calleePerms = requiredWorkflowPermissions(calleeWorkflow)
-    const jobPerms = parsePermissions(job.permissions)
+    const jobPerms = parsePermissions(job?.permissions)
     if (jobPerms == null) {
       mismatches.push(
         `  ${callerPath} job "${callerJob.key}" → ${calleePath}: missing explicit job-level permissions`,

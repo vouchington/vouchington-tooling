@@ -37,7 +37,24 @@ const guardCoversConsumer = conditionEntails('always()', 'failure()')
 
 The permission comparison expects documents for every local caller and callable callee in the
 topology. The consumer reads workflow files and decides which inventory entries are provisioned;
-these functions never fetch secret values. Readiness checks rely on the parser's
+these functions never fetch secret values. The two-argument permission comparison requires exact
+caller/callee grants for compatibility. Consumers that intentionally let a reusable workflow job
+inherit the caller's token can opt into the fail-closed inheritance policy:
+
+```ts
+callerCalleePermissionMismatches(topology, documents, {
+  comparison: 'inheritance-aware',
+})
+```
+
+This mode requires an explicit caller permission map, rejects malformed declarations and
+`write-all`, and permits extra caller grants only when the callee omits top-level permissions and
+at least one callee job omits its own permissions. Explicit grants from every callee job still form
+required minima that must fit within the caller grants, including jobs guarded by `if`. The strict
+scope model follows GitHub's
+[workflow permission syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
+
+Readiness checks rely on the parser's
 `secretReferences` at workflow, job, and step scope. A missing required secret is considered ready
 only when a preceding guarded `run` step binds it to an env var, checks that var for emptiness,
 and exits with status 1. Optional `workflow_call` secrets are exempt.
