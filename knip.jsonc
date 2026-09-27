@@ -13,6 +13,8 @@
       "ignoreDependencies": ["agent-blackboard", "typescript", "vitest"],
       "entry": [
         "src/index.mts!",
+        "src/agent-blackboard/index.mts!",
+        "src/session-friction/index.mts!",
         "src/cli/index.mts!",
         "src/sql-ast/index.mts!",
         "src/sql-scanner/index.mts!",

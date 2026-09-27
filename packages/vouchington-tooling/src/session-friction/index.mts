@@ -14,6 +14,7 @@ export type {
   JournalLoader,
   PermissionRequestObservation,
   SessionFrictionReport,
+  SessionFrictionCoverage,
   SessionFrictionReportOptions,
   ToolResultObservation,
 } from './types.mts'

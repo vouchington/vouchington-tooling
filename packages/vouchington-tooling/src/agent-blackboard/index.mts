@@ -1,48 +1,23 @@
+import { createFeedbackEnvelope, normalizeRepositories } from './feedback-codec.mts'
+import { writeFeedback } from './feedback-delivery.mts'
+import type {
+  FeedbackCoverage,
+  FeedbackDeliveryOptions,
+  FeedbackDeliveryResult,
+  FeedbackIdentity,
+  WorkOutcome,
+} from './feedback-types.mts'
+import {
+  loadClient,
+  resolveBlackboardConnection,
+  type BlackboardClientDependencies,
+} from './client.mts'
 import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { assertSessionId } from './session-id.mts'
 
 export { cleanupSnapshotPartitions, partitionSnapshot } from './snapshot.mts'
 export { assertSessionId } from './session-id.mts'
 export type * from './snapshot-types.mts'
-
-export type BlackboardConnection = {
-  baseUrl: string
-  token: string
-  readRetry: Record<string, never>
-}
-export type BlackboardClientModule = {
-  Sessions: new (connection: BlackboardConnection) => {
-    ensure(input: unknown): Promise<{
-      status: 'created' | 'exists'
-      session: { data: Record<string, unknown>; archivedAt?: string | null }
-    }>
-    patch(input: unknown): Promise<unknown>
-    list(input: unknown): Promise<unknown>
-    get(id: string): Promise<unknown>
-  }
-  Entries: new (connection: BlackboardConnection) => {
-    append(input: unknown): Promise<{ createdAt: string }>
-    get(input: unknown): AsyncIterable<unknown>
-  }
-}
-type BlackboardClientLoader = () => Promise<BlackboardClientModule>
-export type BlackboardClientDependencies = {
-  loadClient?: BlackboardClientLoader
-  resolveFrom?: string | URL
-}
-
-export function resolveBlackboardConnection(
-  env: NodeJS.ProcessEnv = process.env,
-): BlackboardConnection {
-  const baseUrl = env.AGENT_BLACKBOARD_URL
-  const token = env.AGENT_BLACKBOARD_TOKEN
-  if (!baseUrl) throw new Error('AGENT_BLACKBOARD_URL is not set')
-  if (!token) throw new Error('AGENT_BLACKBOARD_TOKEN is not set')
-  return { baseUrl, token, readRetry: {} }
-}
 
 export async function probeBlackboard(
   env?: NodeJS.ProcessEnv,
@@ -52,67 +27,55 @@ export async function probeBlackboard(
   await new Sessions(resolveBlackboardConnection(env)).list({ limit: 1 })
 }
 
-export async function appendJournal(input: {
-  sessionId: string
-  agent: string
-  version: string
-  repositories: string[]
-  markdownFile: string
-  parentSessionId?: string | null
-  timestamp?: string
-  env?: NodeJS.ProcessEnv
-  dependencies?: BlackboardClientDependencies
-}): Promise<string> {
+export async function appendJournal(
+  input: Omit<FeedbackDeliveryOptions, 'identity' | 'envelope'> &
+    FeedbackIdentity & {
+      repositories: string[]
+      markdownFile: string
+      sourceEventId: string
+      workOutcome: WorkOutcome
+      feedbackCoverage: FeedbackCoverage
+      timestamp?: string
+      category?: string
+    },
+): Promise<FeedbackDeliveryResult> {
   assertSessionId(input.sessionId)
   if (input.parentSessionId != null) assertSessionId(input.parentSessionId, 'parent session id')
-  const repositories = normalizeRepositories(input.repositories, true)
+  const repositories = normalizeRepositories(input.repositories)
   const timestamp = input.timestamp === undefined ? new Date() : new Date(input.timestamp)
   if (Number.isNaN(timestamp.valueOf()))
     throw new Error('journal timestamp is not a valid date-time')
   let markdown: string
   try {
     markdown = new TextDecoder('utf-8', { fatal: true }).decode(await readFile(input.markdownFile))
-  } catch (error) {
-    throw new Error(`note file is not valid UTF-8: ${input.markdownFile}`, { cause: error })
+  } catch {
+    throw new Error('note file is not valid UTF-8 or cannot be read')
   }
-  if (!markdown) throw new Error(`note file is empty: ${input.markdownFile}`)
-  const connection = resolveBlackboardConnection(input.env)
-  const { Sessions, Entries } = await loadClient(input.dependencies)
-  const sessions = new Sessions(connection)
-  const ensured = await sessions.ensure({
-    id: input.sessionId,
-    parentSessionId: input.parentSessionId ?? null,
-    agent: input.agent,
-    version: input.version,
+  if (!markdown) throw new Error('note file is empty')
+  return writeFeedback({
+    identity: {
+      sessionId: input.sessionId,
+      parentSessionId: input.parentSessionId,
+      agent: input.agent,
+      version: input.version,
+    },
+    envelope: createFeedbackEnvelope({
+      schemaVersion: 1,
+      type: 'journal',
+      sourceEventId: input.sourceEventId,
+      timestamp: timestamp.toISOString(),
+      repositories,
+      markdown,
+      workOutcome: input.workOutcome,
+      feedbackCoverage: input.feedbackCoverage,
+      ...(input.category === undefined ? {} : { category: input.category }),
+    }),
+    mode: input.mode,
+    ...(input.outboxDirectory === undefined ? {} : { outboxDirectory: input.outboxDirectory }),
+    ...(input.env === undefined ? {} : { env: input.env }),
+    ...(input.dependencies === undefined ? {} : { dependencies: input.dependencies }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
   })
-  if (ensured.session.archivedAt != null)
-    throw new Error(`session is archived; create a new session: ${input.sessionId}`)
-  const current = ensured.session.data.repositories
-  const cumulative = normalizeRepositories(current, false)
-  const merged = [...new Set([...cumulative, ...repositories])].sort()
-  if (JSON.stringify(current) !== JSON.stringify(merged))
-    await sessions.patch({ sessionId: input.sessionId, data: { repositories: merged } })
-  const entry = await new Entries(connection).append({
-    sessionId: input.sessionId,
-    data: { type: 'journal', markdown, timestamp: timestamp.toISOString(), repositories },
-  })
-  return `Journaled to agent-blackboard session ${input.sessionId} (entry created at ${entry.createdAt}).`
-}
-
-function normalizeRepositories(value: unknown, required: boolean): string[] {
-  if (value === undefined && !required) return []
-  if (!Array.isArray(value) || (required && value.length === 0))
-    throw new Error('repositories must be a non-empty array of owner/name strings')
-  const repositories: string[] = []
-  for (const candidate of value as unknown[]) {
-    if (typeof candidate !== 'string')
-      throw new Error('repositories must be a non-empty array of owner/name strings')
-    const repository = candidate.trim().toLowerCase()
-    if (!/^[a-z0-9-]+\/[a-z0-9._-]+$/.test(repository))
-      throw new Error(`invalid repository: ${candidate}`)
-    repositories.push(repository)
-  }
-  return [...new Set(repositories)].sort()
 }
 
 export async function readJournal(
@@ -156,32 +119,20 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
     .join('\n\n')
 }
 
-async function loadClient(
-  dependencies: BlackboardClientDependencies = {},
-): Promise<BlackboardClientModule> {
-  const loader = dependencies.loadClient ?? (() => defaultClientLoader(dependencies.resolveFrom))
-  try {
-    return await loader()
-  } catch (error) {
-    if (isMissingModuleError(error))
-      throw new Error(
-        'agent-blackboard is not installed; install it alongside vouchington-tooling to use this integration',
-        { cause: error },
-      )
-    throw error
-  }
-}
-
-async function defaultClientLoader(resolveFrom?: string | URL): Promise<BlackboardClientModule> {
-  const consumerRequire = createRequire(resolveFrom ?? resolve(process.cwd(), 'package.json'))
-  const specifier = pathToFileURL(consumerRequire.resolve('agent-blackboard')).href
-  return (await import(specifier)) as BlackboardClientModule
-}
-
-function isMissingModuleError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'MODULE_NOT_FOUND')
-  )
-}
+export { resolveBlackboardConnection } from './client.mts'
+export type {
+  BlackboardConnection,
+  BlackboardClientModule,
+  BlackboardClientDependencies,
+} from './client.mts'
+export type * from './feedback-types.mts'
+export { createFeedbackEnvelope, validateFeedbackEnvelope } from './feedback-codec.mts'
+export {
+  writeFeedback,
+  autonomousGate,
+  flushFeedbackOutbox,
+  FeedbackDeliveryError,
+} from './feedback-delivery.mts'
+export { feedbackOutboxStatus } from './feedback-outbox.mts'
+export { composeRetrospective } from './feedback-compose.mts'
+export type { RetrospectiveCompositionInput, FeedbackAssessment } from './feedback-compose.mts'

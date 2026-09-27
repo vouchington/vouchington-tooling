@@ -66,7 +66,10 @@ function errorMessage(error: unknown): string {
 }
 
 function sandboxMarkdown(friction: FrictionLogReadResult): string {
-  if (friction.status === 'events') return buildSandboxSection(friction.events)
+  if (friction.status === 'events')
+    return `${friction.truncated ? `## Capture Coverage\nStatus: partial\nDropped records: ${friction.droppedCount ?? 0}\n\n` : ''}${buildSandboxSection(friction.events)}`
+  if (friction.status === 'empty' && friction.truncated)
+    return `## Sandbox & Permission Audit\nStatus: unavailable (partial capture; dropped ${friction.droppedCount ?? 0} records)`
   const status = friction.status === 'empty' ? 'none observed' : 'unavailable (no friction log)'
   return `## Sandbox & Permission Audit\nStatus: ${status}`
 }
@@ -80,14 +83,26 @@ function reportFromLog(
 ): SessionFrictionReport {
   try {
     const friction = readFrictionLog(sessionId, logOptions)
+    const coverage = {
+      journalStatus:
+        journal.status === 'unreachable'
+          ? ('unavailable' as const)
+          : journal.truncated
+            ? ('partial' as const)
+            : ('complete' as const),
+      frictionStatus: friction.status,
+      truncated: friction.status !== 'absent' && friction.truncated === true,
+      ...(friction.status === 'absent' ? {} : { droppedCount: friction.droppedCount ?? 0 }),
+    }
     if (journal.status === 'ok' && journal.truncated)
       return {
+        coverage,
         markdown:
           '## CI Failures\nStatus: unavailable (journal scan incomplete)\n\n' +
           sandboxMarkdown(friction),
       }
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
-    return { markdown: `${markdown}\n\n${sandboxMarkdown(friction)}` }
+    return { coverage, markdown: `${markdown}\n\n${sandboxMarkdown(friction)}` }
   } catch (error) {
     const ciMarkdown =
       journal.status === 'ok' && journal.truncated
@@ -96,6 +111,16 @@ function reportFromLog(
           ? '## CI Failures\nStatus: unavailable (friction log unreadable)'
           : buildCiFailuresSection(sessionId, journal, 'empty')
     return {
+      coverage: {
+        journalStatus:
+          journal.status === 'unreachable'
+            ? 'unavailable'
+            : journal.truncated
+              ? 'partial'
+              : 'complete',
+        frictionStatus: 'unreadable',
+        truncated: true,
+      },
       markdown: `${ciMarkdown}\n\n## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)`,
       diagnostic: errorMessage(error),
     }

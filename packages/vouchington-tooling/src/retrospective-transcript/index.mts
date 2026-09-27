@@ -25,6 +25,17 @@ export { formatTranscriptFacts, formatUnavailable } from './format.mts'
 export type { ResolveOptions } from './resolve-transcript-file.mts'
 export { resolveTranscriptFile } from './resolve-transcript-file.mts'
 const MALFORMED_INTERIOR = 'malformed interior transcript record'
+type CapturedSegment = CodexSegment & { partial: boolean }
+function partialCapture(lines: string[]): boolean {
+  return parseLines(lines).length !== lines.filter((line) => line.trim()).length
+}
+export type RetrospectiveTranscriptReport = {
+  markdown: string
+  coverage: 'complete' | 'partial' | 'unavailable'
+}
+function unavailable(reason: string): RetrospectiveTranscriptReport {
+  return { markdown: formatUnavailable(reason), coverage: 'unavailable' }
+}
 function schema(lines: string[]): 'claude' | 'codex' | undefined {
   const records = parseLines(lines)
   const kinds = new Set(
@@ -77,8 +88,8 @@ async function codexSubagents(
   sessionsDir: string,
   ownerPath: string,
   visited = new Set<string>(),
-): Promise<CodexSegment[] | undefined> {
-  const result: CodexSegment[] = []
+): Promise<CapturedSegment[] | undefined> {
+  const result: CapturedSegment[] = []
   for (const edge of codexChildren(lines, ownerPath)) {
     if (visited.has(edge.threadId)) continue
     visited.add(edge.threadId)
@@ -94,7 +105,7 @@ async function codexSubagents(
       return undefined
     const segment = segmentCodex(child)
     if (!segment) return undefined
-    result.push(segment)
+    result.push({ ...segment, partial: partialCapture(child) })
     const nested = await codexSubagents(segment.lines, sessionsDir, edge.agentPath, visited)
     if (!nested) return undefined
     result.push(...nested)
@@ -102,30 +113,36 @@ async function codexSubagents(
   return result
 }
 export async function runRetrospectiveTranscript(options: ResolveOptions): Promise<string> {
+  return (await runRetrospectiveTranscriptReport(options)).markdown
+}
+export async function runRetrospectiveTranscriptReport(
+  options: ResolveOptions,
+): Promise<RetrospectiveTranscriptReport> {
   const resolved = resolveTranscriptFile(options)
-  if ('error' in resolved) return formatUnavailable(resolved.error)
+  if ('error' in resolved) return unavailable(resolved.error)
   const lines = await readLines(resolved.path)
-  if (!lines) return formatUnavailable('could not read transcript')
+  if (!lines) return unavailable('could not read transcript')
   const detected = schema(lines)
-  if (!detected) return formatUnavailable('unsupported or mixed transcript schema')
-  if (hasMalformedInteriorRecord(lines)) return formatUnavailable(MALFORMED_INTERIOR)
+  if (!detected) return unavailable('unsupported or mixed transcript schema')
+  if (hasMalformedInteriorRecord(lines)) return unavailable(MALFORMED_INTERIOR)
   if (detected === 'claude') {
     const directory = join(dirname(resolved.path), basename(resolved.path, '.jsonl'), 'subagents')
     const subagents = await Promise.all(globFrom(directory, '*.jsonl').sort().map(readLines))
-    return formatTranscriptFacts(
-      resolved.sessionId,
-      computeTranscriptFacts(
-        lines,
-        subagents.filter(
-          (value): value is string[] =>
-            value !== undefined && schema(value) === 'claude' && !hasMalformedInteriorRecord(value),
-        ),
-      ),
+    const valid = subagents.filter(
+      (value): value is string[] =>
+        value !== undefined && schema(value) === 'claude' && !hasMalformedInteriorRecord(value),
     )
+    return {
+      markdown: formatTranscriptFacts(resolved.sessionId, computeTranscriptFacts(lines, valid)),
+      coverage:
+        valid.length === subagents.length && !partialCapture(lines) && !valid.some(partialCapture)
+          ? 'complete'
+          : 'partial',
+    }
   }
   const identity = codexIdentity(lines)
   const root = segmentCodex(lines)
-  if (!root) return formatUnavailable('could not segment Codex transcript')
+  if (!root) return unavailable('could not segment Codex transcript')
   const codexHome = (options.env ?? process.env).CODEX_HOME
   const subagents = await codexSubagents(
     root.lines,
@@ -137,9 +154,15 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
       [identity.threadId ?? resolved.sessionId].filter((threadId) => SESSION_ID.test(threadId)),
     ),
   )
-  if (!subagents) return formatUnavailable('could not resolve a referenced Codex child transcript')
-  return formatTranscriptFacts(
-    resolved.sessionId,
-    computeCodex(root.lines, subagents, root.baseline),
-  )
+  if (!subagents) return unavailable('could not resolve a referenced Codex child transcript')
+  return {
+    markdown: formatTranscriptFacts(
+      resolved.sessionId,
+      computeCodex(root.lines, subagents, root.baseline),
+    ),
+    coverage:
+      partialCapture(lines) || subagents.some((segment) => segment.partial)
+        ? 'partial'
+        : 'complete',
+  }
 }

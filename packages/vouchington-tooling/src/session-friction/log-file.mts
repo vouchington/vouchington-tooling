@@ -10,10 +10,15 @@ export function validEvent(value: unknown): value is FrictionEvent {
   // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a record view after the runtime object check
   const record = value as Record<string, unknown>
   return (
-    (record.kind === 'sandbox-escalation' || record.kind === 'sandbox-failure') &&
+    (record.kind === 'sandbox-escalation' ||
+      record.kind === 'sandbox-failure' ||
+      record.kind === 'ambiguous-failure') &&
     isSafeAuditText(record.timestamp) &&
     isSafeAuditText(record.commandPrefix) &&
-    isSafeAuditText(record.detail)
+    isSafeAuditText(record.detail) &&
+    (record.outcome === undefined ||
+      (typeof record.outcome === 'string' &&
+        ['requested', 'approved', 'denied', 'unknown'].includes(record.outcome)))
   )
 }
 
@@ -41,10 +46,10 @@ export function openLogFile(path: string, flags: number): number {
     throw error
   }
 }
-export function readLogContent(descriptor: number): string {
-  if (fstatSync(descriptor).size > LOG_MAX_BYTES)
+export function readLogContent(descriptor: number, maximumBytes = LOG_MAX_BYTES): string {
+  if (fstatSync(descriptor).size > maximumBytes)
     throw new Error('session-friction log is too large')
-  const buffer = Buffer.alloc(LOG_MAX_BYTES + 1)
+  const buffer = Buffer.alloc(maximumBytes + 1)
   let length = 0
   while (length < buffer.length) {
     const bytes = readSync(descriptor, buffer, length, buffer.length - length, length)
@@ -52,7 +57,7 @@ export function readLogContent(descriptor: number): string {
     length += bytes
   }
   /* v8 ignore next -- detects external growth after the descriptor size check. */
-  if (length > LOG_MAX_BYTES) throw new Error('session-friction log is too large')
+  if (length > maximumBytes) throw new Error('session-friction log is too large')
   return decodeUtf8(buffer.subarray(0, length))
 }
 

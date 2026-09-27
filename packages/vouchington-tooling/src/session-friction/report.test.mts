@@ -190,7 +190,7 @@ describe('buildSessionFrictionReport', () => {
         ],
       }),
     })
-    expect(report).toEqual({
+    expect(report).toMatchObject({
       markdown: expect.stringContaining('Status: failures observed'),
     })
     expect(report.markdown).toContain('## Sandbox & Permission Audit')
@@ -224,7 +224,7 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: unavailable (no friction log for session missing)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -236,7 +236,7 @@ describe('buildSessionFrictionReport', () => {
           throw new Error('fetch failed')
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -361,7 +361,7 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: unavailable (friction log unreadable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -374,7 +374,7 @@ describe('buildSessionFrictionReport', () => {
           throw new Error('journal unavailable')
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -426,7 +426,7 @@ describe('buildSessionFrictionReport', () => {
         directory,
         journalLoader: async () => ({ status: 'not-found' }),
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: none observed\n\n' +
         '## Sandbox & Permission Audit\nStatus: none observed',
@@ -448,7 +448,7 @@ describe('buildSessionFrictionReport', () => {
           throw unprintable
         },
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',

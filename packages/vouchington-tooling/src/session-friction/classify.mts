@@ -52,7 +52,12 @@ export function classifyFrictionObservation(
   const commandPrefix = normalizeCommandPrefix(command, observation.commandWrappers)
   if (commandPrefix === '' || !isWellFormedUnicode(commandPrefix)) return null
   if (observation.type === 'permission-request') {
-    return { kind: 'sandbox-escalation', commandPrefix, detail: 'permission-request' }
+    return {
+      kind: 'sandbox-escalation',
+      commandPrefix,
+      detail: 'permission-request',
+      outcome: 'requested',
+    }
   }
   if (observation.type !== 'tool-result') return null
   if (
@@ -64,11 +69,17 @@ export function classifyFrictionObservation(
     boundedText(observation.escalationDetail ?? '', DETAIL_MAX_LENGTH),
   )
   if (!isWellFormedUnicode(escalationDetail)) return null
-  if (escalationDetail) {
+  if (
+    observation.permissionOutcome !== undefined &&
+    !['approved', 'denied'].includes(observation.permissionOutcome)
+  )
+    return null
+  if (escalationDetail || observation.permissionOutcome) {
     return {
       kind: 'sandbox-escalation',
       commandPrefix,
-      detail: escalationDetail,
+      detail: escalationDetail || `permission-${observation.permissionOutcome}`,
+      outcome: observation.permissionOutcome ?? 'unknown',
     }
   }
   const rawStderr = observation.structuredStderr
@@ -87,9 +98,9 @@ export function classifyFrictionObservation(
     })
   ) {
     return {
-      kind: 'sandbox-failure',
+      kind: 'ambiguous-failure',
       commandPrefix,
-      detail: 'stderr matched localhost connection failure',
+      detail: 'localhost connection refused; sandbox cause unverified',
     }
   }
   return null

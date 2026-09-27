@@ -32,6 +32,11 @@ describe('agent blackboard', () => {
     try {
       await expect(
         appendJournal({
+          mode: 'autonomous',
+          sourceEventId: 'utf8-test',
+          workOutcome: 'unknown',
+          feedbackCoverage: { status: 'not-assessed', sources: [], droppedCount: 0 },
+          parentSessionId: null,
           sessionId: 'session:1',
           agent: 'codex',
           version: '1',
@@ -43,4 +48,32 @@ describe('agent blackboard', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
+})
+
+it('rejects empty notes, unsafe parents and invalid timestamps before resolving transport', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'blackboard-current-journal-'))
+  const path = join(directory, 'empty.md')
+  await writeFile(path, '')
+  const input = {
+    sessionId: 'native:owner',
+    parentSessionId: null,
+    agent: 'codex',
+    version: '1',
+    mode: 'autonomous' as const,
+    sourceEventId: 'journal:validation',
+    workOutcome: 'unknown' as const,
+    feedbackCoverage: { status: 'not-assessed' as const, sources: [], droppedCount: 0 },
+    repositories: ['owner/repo'],
+    markdownFile: path,
+    env: {},
+  }
+  try {
+    await expect(appendJournal(input)).rejects.toThrow(/empty/)
+    await expect(appendJournal({ ...input, parentSessionId: 'bad/parent' })).rejects.toThrow(
+      /parent session id/,
+    )
+    await expect(appendJournal({ ...input, timestamp: '' })).rejects.toThrow(/valid date-time/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

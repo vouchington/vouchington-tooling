@@ -3,6 +3,9 @@ import {
   formatJournalEntries,
   probeBlackboard,
   readJournal,
+  type FeedbackMode,
+  type WorkOutcome,
+  type FeedbackCoverage,
 } from '../../agent-blackboard/index.mts'
 import { cleanupSnapshotPartitions, partitionSnapshot } from '../../agent-blackboard/snapshot.mts'
 import type {
@@ -92,10 +95,33 @@ async function runJournal(args: string[]): Promise<number> {
       'file',
       'parent-session-id',
       'timestamp',
+      'mode',
+      'source-event-id',
+      'work-outcome',
+      'coverage-status',
+      'coverage-source',
+      'dropped-count',
+      'outbox-directory',
     ])
-    process.stdout.write(
-      `${await appendJournal({ sessionId: required(values, 'session-id'), agent: required(values, 'agent'), version: values.version ?? 'unknown', repositories: requiredRepositories(repositories), markdownFile: required(values, 'file'), ...(values['parent-session-id'] ? { parentSessionId: values['parent-session-id'] } : {}), ...('timestamp' in values ? { timestamp: values.timestamp } : {}) })}\n`,
-    )
+    const result = await appendJournal({
+      mode: required(values, 'mode') as FeedbackMode,
+      sourceEventId: required(values, 'source-event-id'),
+      workOutcome: required(values, 'work-outcome') as WorkOutcome,
+      feedbackCoverage: {
+        status: required(values, 'coverage-status') as FeedbackCoverage['status'],
+        sources: values['coverage-source']?.split(',') ?? [],
+        droppedCount: Number(values['dropped-count'] ?? '0'),
+      },
+      ...(values['outbox-directory'] ? { outboxDirectory: values['outbox-directory'] } : {}),
+      sessionId: required(values, 'session-id'),
+      agent: required(values, 'agent'),
+      version: values.version ?? 'unknown',
+      repositories: requiredRepositories(repositories),
+      markdownFile: required(values, 'file'),
+      ...('timestamp' in values ? { timestamp: values.timestamp } : {}),
+      parentSessionId: values['parent-session-id'] ?? null,
+    })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
     return 0
   }
   throw new Error('usage: agent-blackboard journal append|entries')

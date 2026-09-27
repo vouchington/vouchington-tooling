@@ -41,9 +41,13 @@ For Agent Blackboard, maintain sorted, deduplicated lowercase `owner/name` value
 relevant to that entry. Patch the session union before appending; if the patch fails, do not append.
 Each agent writes only its own session. Start a new session for work after archival.
 
-The hosted connection requires `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`. If either is
-missing or rejected, stop and report the blocker. Never search for, print, or mint credentials, and
-never substitute a local journal file.
+The hosted connection requires `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`. Never search
+for, print, or mint credentials. Select the trusted runner mode explicitly: interactive work may
+continue after the shared writer persists sanitized feedback in its bounded private outbox, with
+visible pending count and replay action. Failed persistence or identity/content conflicts block
+capture. Autonomous work requires fresh online append/readback before admission and acknowledged
+terminal reporting; missing or rejected credentials block it. Never substitute an ad hoc local
+journal file or use an outbox to authorize autonomous work.
 
 ## Extracted modules
 

@@ -49,6 +49,7 @@ describe('classifyFrictionObservation', () => {
       kind: 'sandbox-escalation',
       commandPrefix: 'rtk git push',
       detail: 'sandbox override',
+      outcome: 'unknown',
     })
   })
 
@@ -59,6 +60,7 @@ describe('classifyFrictionObservation', () => {
       kind: 'sandbox-escalation',
       commandPrefix: 'pnpm test',
       detail: 'permission-request',
+      outcome: 'requested',
     })
     expect(
       classifyFrictionObservation({
@@ -67,9 +69,9 @@ describe('classifyFrictionObservation', () => {
         structuredStderr: 'ECONNREFUSED 127.0.0.1',
       }),
     ).toEqual({
-      kind: 'sandbox-failure',
+      kind: 'ambiguous-failure',
       commandPrefix: 'node test',
-      detail: 'stderr matched localhost connection failure',
+      detail: 'localhost connection refused; sandbox cause unverified',
     })
     expect(
       classifyFrictionObservation({
@@ -77,7 +79,7 @@ describe('classifyFrictionObservation', () => {
         command: 'node test',
         structuredStderr: 'ECONNREFUSED 127.0.0.2',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -98,14 +100,14 @@ describe('classifyFrictionObservation', () => {
         command: 'node test',
         structuredStderr: 'connect ECONNREFUSED [::1]:5432',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
         command: 'node test',
         structuredStderr: 'connect ECONNREFUSED 0:0:0:0:0:0:0:1%lo0:3000',
       }),
-    ).toMatchObject({ kind: 'sandbox-failure' })
+    ).toMatchObject({ kind: 'ambiguous-failure' })
     expect(
       classifyFrictionObservation({
         type: 'tool-result',
@@ -192,6 +194,7 @@ describe('friction log', () => {
           timestamp: '2026-01-01T00:00:00.000Z',
           commandPrefix: 'git push',
           detail: 'override',
+          outcome: 'unknown',
         },
       ],
     })
@@ -213,7 +216,7 @@ describe('friction log', () => {
     expect(result.status).toBe('events')
     if (result.status === 'events') expect(result.events).toHaveLength(FRICTION_LOG_MAX_EVENTS)
     expect(isAbsolute(directoryPath)).toBe(true)
-    expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1_000)
+    expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1_004)
   })
 
   it('ignores malformed lines while retaining valid events', async () => {

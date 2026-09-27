@@ -388,3 +388,9 @@ Run the local CLI after a build:
 ```bash
 node packages/vouchington-tooling/dist/cli/index.mjs --help
 ```
+
+Validated journal and retrospective feedback uses the existing `agent-blackboard` subpath. Explicit
+interactive mode persists sanitized pending records in a bounded private outbox; autonomous mode
+requires fresh online admission and acknowledged terminal readback. Work outcome, evidence coverage,
+and delivery remain separate. See the [feedback contract](packages/vouchington-tooling/README.md#validated-feedback-and-delivery)
+for current APIs, privacy bounds, stable event replay, and the breaking journal writer adoption.

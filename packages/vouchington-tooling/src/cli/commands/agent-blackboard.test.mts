@@ -43,11 +43,19 @@ describe('agent-blackboard CLI', () => {
     await expect(
       runAgentBlackboardCommand(['journal', 'append', '--session-id', 'bad']),
     ).resolves.toBe(2)
-    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--agent is required')
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('--mode is required')
     await expect(
       runAgentBlackboardCommand([
         'journal',
         'append',
+        '--mode',
+        'autonomous',
+        '--source-event-id',
+        'cli:note',
+        '--work-outcome',
+        'unknown',
+        '--coverage-status',
+        'not-assessed',
         '--session-id',
         'one',
         '--agent',
@@ -160,13 +168,31 @@ describe('agent-blackboard CLI', () => {
   })
 
   it('runs the probe and journal append commands through their service boundaries', async () => {
-    vi.mocked(appendJournal).mockResolvedValue('journaled')
+    vi.mocked(appendJournal).mockResolvedValue({
+      status: 'delivered',
+      sourceEventId: 'cli:note',
+      pendingCount: 0,
+      receipt: {
+        sessionId: 'session',
+        sourceEventId: 'cli:note',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        verified: true,
+      },
+    })
     await expect(runAgentBlackboardCommand(['probe'])).resolves.toBe(0)
     expect(probeBlackboard).toHaveBeenCalledOnce()
     await expect(
       runAgentBlackboardCommand([
         'journal',
         'append',
+        '--mode',
+        'autonomous',
+        '--source-event-id',
+        'cli:note',
+        '--work-outcome',
+        'unknown',
+        '--coverage-status',
+        'not-assessed',
         '--session-id',
         'session',
         '--agent',
@@ -186,6 +212,10 @@ describe('agent-blackboard CLI', () => {
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenCalledWith({
+      mode: 'autonomous',
+      sourceEventId: 'cli:note',
+      workOutcome: 'unknown',
+      feedbackCoverage: { status: 'not-assessed', sources: [], droppedCount: 0 },
       sessionId: 'session',
       agent: 'codex',
       version: '1.0.0',
@@ -194,11 +224,22 @@ describe('agent-blackboard CLI', () => {
       parentSessionId: 'parent',
       timestamp: '2026-01-01T00:00:00.000Z',
     })
-    expect(String(stdout.mock.calls.at(-1)?.[0])).toBe('journaled\n')
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
+      status: 'delivered',
+      sourceEventId: 'cli:note',
+    })
     await expect(
       runAgentBlackboardCommand([
         'journal',
         'append',
+        '--mode',
+        'autonomous',
+        '--source-event-id',
+        'cli:note',
+        '--work-outcome',
+        'unknown',
+        '--coverage-status',
+        'not-assessed',
         '--session-id',
         'session',
         '--agent',
@@ -210,6 +251,11 @@ describe('agent-blackboard CLI', () => {
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenLastCalledWith({
+      mode: 'autonomous',
+      sourceEventId: 'cli:note',
+      workOutcome: 'unknown',
+      feedbackCoverage: { status: 'not-assessed', sources: [], droppedCount: 0 },
+      parentSessionId: null,
       sessionId: 'session',
       agent: 'codex',
       version: 'unknown',
@@ -275,4 +321,50 @@ describe('agent-blackboard CLI', () => {
     })
     expect(String(stdout.mock.calls.at(-1)?.[0])).toBe('{"cleaned":true}\n')
   })
+})
+
+it('reports interactive durable pending without failing primary work', async () => {
+  vi.mocked(appendJournal).mockResolvedValue({
+    status: 'pending',
+    sourceEventId: 'cli:pending',
+    pendingCount: 2,
+    diagnostic: 'configuration-invalid',
+  })
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  try {
+    await expect(
+      runAgentBlackboardCommand([
+        'journal',
+        'append',
+        '--mode',
+        'interactive',
+        '--source-event-id',
+        'cli:pending',
+        '--work-outcome',
+        'unknown',
+        '--coverage-status',
+        'not-assessed',
+        '--session-id',
+        'native:owner',
+        '--agent',
+        'codex',
+        '--file',
+        'entry.md',
+        '--repository',
+        'owner/repo',
+        '--outbox-directory',
+        '/private/tmp/outbox',
+        '--coverage-source',
+        'tool-result',
+        '--dropped-count',
+        '2',
+      ]),
+    ).resolves.toBe(0)
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
+      status: 'pending',
+      pendingCount: 2,
+    })
+  } finally {
+    stdout.mockRestore()
+  }
 })

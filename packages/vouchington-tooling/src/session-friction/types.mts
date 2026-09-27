@@ -1,16 +1,18 @@
-export type FrictionEventKind = 'sandbox-escalation' | 'sandbox-failure'
+export type FrictionEventKind = 'sandbox-escalation' | 'sandbox-failure' | 'ambiguous-failure'
 
 export type FrictionEvent = {
   kind: FrictionEventKind
   timestamp: string
   commandPrefix: string
   detail: string
+  outcome?: 'requested' | 'approved' | 'denied' | 'unknown'
 }
 
 export type ToolResultObservation = {
   type: 'tool-result'
   command: string
   commandWrappers?: string[]
+  permissionOutcome?: 'approved' | 'denied'
   escalationDetail?: string
   structuredStderr?: string
 }
@@ -25,8 +27,8 @@ export type FrictionObservation = ToolResultObservation | PermissionRequestObser
 
 export type FrictionLogReadResult =
   | { status: 'absent' }
-  | { status: 'empty' }
-  | { status: 'events'; events: FrictionEvent[] }
+  | { status: 'empty'; truncated?: boolean; droppedCount?: number }
+  | { status: 'events'; events: FrictionEvent[]; truncated?: boolean; droppedCount?: number }
 
 export type FrictionLogOptions = {
   directory: string
@@ -46,7 +48,14 @@ export type JournalLoadResult =
 
 export type JournalLoader = (sessionId: string) => JournalLoadResult | Promise<JournalLoadResult>
 
+export type SessionFrictionCoverage = {
+  journalStatus: 'complete' | 'partial' | 'unavailable'
+  frictionStatus: 'absent' | 'empty' | 'events' | 'unreadable'
+  truncated: boolean
+  droppedCount?: number
+}
 export type SessionFrictionReport = {
+  coverage: SessionFrictionCoverage
   markdown: string
   diagnostic?: string
 }

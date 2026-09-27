@@ -67,7 +67,13 @@ export function recordFriction(
         throw new Error('session-friction log is too large')
       if (!classified) return
       const content = readLogContent(descriptor)
-      if (atEventLimit(content, maxEvents)) return
+      if (atEventLimit(content, maxEvents)) {
+        const addition = `${content && !content.endsWith('\n') ? '\n' : ''}{"type":"coverage-drop"}\n`
+        if (fstatSync(descriptor).size + Buffer.byteLength(addition) > LOG_MAX_BYTES)
+          throw new Error('session-friction coverage log is too large; capture incomplete')
+        writeAll(descriptor, addition)
+        return
+      }
       const event = {
         ...classified,
         commandPrefix: normalizeAuditText(classified.commandPrefix),
@@ -102,15 +108,23 @@ export function readFrictionLog(
       const descriptor = openLogFile(path, constants.O_RDONLY)
       try {
         const events: FrictionEvent[] = []
+        let droppedCount = 0
         for (const line of readLogContent(descriptor).split('\n')) {
           if (!line.trim()) continue
           try {
             const value: unknown = JSON.parse(line)
-            if (validEvent(value)) events.push(value)
-          } catch {}
-          if (events.length >= maxEvents) break
+            if (validEvent(value)) {
+              if (events.length < maxEvents) events.push(value)
+              else droppedCount++
+            } else droppedCount++
+          } catch {
+            droppedCount++
+          }
         }
-        return events.length ? { status: 'events', events } : { status: 'empty' }
+        const coverage = droppedCount ? { truncated: true, droppedCount } : {}
+        return events.length
+          ? { status: 'events', events, ...coverage }
+          : { status: 'empty', ...coverage }
       } finally {
         closeSync(descriptor)
       }
