@@ -278,12 +278,29 @@ import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-tr
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 import { GITHUB_BODY_MAX_CHARACTERS, validateGitHubBodyLength } from 'vouchington-tooling'
-import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
+import { createPullRequest, processDiffCommand, runGh, runGit } from 'vouchington-tooling/gh-cli'
 import {
   shellScriptViolations,
   workflowYamlViolations,
 } from 'vouchington-tooling/gh-api-shell-quoting'
 ```
+
+`processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
+a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps
+at most one file block (which can itself be large), preserves preambles and line content, and drains
+a bounded stderr tail for typed command failures. Blocks are provisional until the returned promise
+resolves: callers must discard accumulated results if the command later exits nonzero or is signaled.
+
+```ts
+let changedFileCount = 0
+await processDiffCommand({ executable: 'git', args: ['diff', 'origin/main...HEAD'] }, async () => {
+  changedFileCount += 1
+})
+// Use changedFileCount only after processDiffCommand resolves.
+```
+
+This breaking minor removes `getDiffAgainstBase`; migrate callers to `processDiffCommand` and pass
+the command they need to run.
 
 `checkSccComplexity` keeps its single repository-wide scan when `scopes` is omitted. Consumers
 that need separately ratcheted areas may provide named scopes with positional `includePaths`; SCC

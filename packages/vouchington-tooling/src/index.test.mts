@@ -34,7 +34,8 @@ import {
   requireUpToDate,
   buildGhPrCreateArgs,
   createPullRequest,
-  getDiffAgainstBase,
+  DiffCommandError,
+  processDiffCommand,
   HeadNotPushedError,
   HeadOutOfDateError,
   runGh,
@@ -92,7 +93,10 @@ describe('package exports', () => {
     expect(typeof runGit).toBe('function')
     expect(buildGhPrCreateArgs({ title: 't', bodyFile: 'body.md', head: 'x' })).toContain('--head')
     expect(typeof createPullRequest).toBe('function')
-    expect(typeof getDiffAgainstBase).toBe('function')
+    expect(new DiffCommandError({ executable: 'git', args: [] }, { stderr: '' }).name).toBe(
+      'DiffCommandError',
+    )
+    expect(typeof processDiffCommand).toBe('function')
     expect(typeof evaluatePnpmLicenseReport).toBe('function')
     expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
     expect(new HeadOutOfDateError('x', 'origin').name).toBe('HeadOutOfDateError')
