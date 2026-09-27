@@ -134,7 +134,7 @@ describe('retrospective facts', () => {
         stdout: JSON.stringify({
           ...pr,
           changedFiles: 150,
-          files: [{ path: 'CLAUDE.md' }],
+          files: [{ path: 'AGENTS.md' }],
           commits: Array.from({ length: 100 }, () => ({})),
         }),
       },
