@@ -545,7 +545,8 @@ export type {
 } from './vitest-diagnostics/index.mts'
 export { createCommandRunner, runGh, runGit } from './gh-cli/index.mts'
 export type { ExecFileText, RunTextCommand } from './gh-cli/index.mts'
-export { getDiffAgainstBase } from './gh-cli/index.mts'
+export { DiffCommandError, processDiffCommand } from './gh-cli/index.mts'
+export type { DiffBlockCallback, DiffCommand } from './gh-cli/index.mts'
 export { GITHUB_BODY_MAX_CHARACTERS, validateGitHubBodyLength } from './gh-cli/index.mts'
 export type { GitHubBodyLengthValidation } from './gh-cli/index.mts'
 export {

@@ -6,7 +6,7 @@ description: Create an evidence-backed implementation plan for a repository chan
 # Planning
 
 Use before implementation work that needs a durable plan. Repository-local `AGENTS.md`,
-`CLAUDE.md`, issue templates, and planning conventions override this portable foundation.
+`AGENTS.md`, issue templates, and planning conventions override this portable foundation.
 
 1. State the desired outcome and compare no change, reuse, and alternative approaches. Choose the
    smallest durable option; ask before treating an unresolved product choice as settled.

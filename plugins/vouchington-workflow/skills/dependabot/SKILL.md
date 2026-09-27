@@ -5,7 +5,7 @@ description: Configure or audit Dependabot coverage, cooldowns, package-family g
 
 # Dependabot policy
 
-Read every applicable `AGENTS.md` and `CLAUDE.md`, then the repository's dependency, CI, release,
+Read every applicable `AGENTS.md`, then the repository's dependency, CI, release,
 and branch-protection docs. The consumer wrapper owns the accepted cooldown, package roots,
 first-party publishers, manual-update exceptions, runner policy, required checks, and secret source.
 

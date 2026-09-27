@@ -6,7 +6,7 @@ description: Organize existing GitHub issues and pull requests with the reposito
 # Organize GitHub issues
 
 Use for issue hygiene, priority normalization, milestone assignment, and project membership. Read
-local `AGENTS.md`, `CLAUDE.md`, and live taxonomy guidance before acting.
+local `AGENTS.md`, and live taxonomy guidance before acting.
 
 1. Confirm repository identity. Fetch live labels, milestone descriptions, open project
    descriptions, and the in-scope issue or pull-request evidence. Before a mutation, apply the

@@ -30,6 +30,7 @@
         "src/openapi-document/index.mts!",
         "src/contract-schema/index.mts!",
         "src/api-fixtures/index.mts!",
+        "src/config-inventory/index.mts!",
         "src/coverage-transport/index.mts!",
         "src/pnpm-deploy/index.mts!",
         "src/dockerfile-parse/index.mts!",
