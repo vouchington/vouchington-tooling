@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -17,6 +17,29 @@ const moduleRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..
 
 function read(file: string) {
   return readFileSync(resolve(moduleRoot, file), 'utf8')
+}
+
+type WorkflowStep = {
+  readonly run?: string
+  readonly uses?: string
+  readonly with?: { readonly cache?: boolean }
+  readonly 'timeout-minutes'?: number
+}
+
+function lintJobs() {
+  return readdirSync(resolve(moduleRoot, '.github/workflows'))
+    .filter((file) => /\.ya?ml$/u.test(file))
+    .flatMap((file) => {
+      const source = read(`.github/workflows/${file}`)
+      const workflow = parseYaml(source) as {
+        jobs: Record<string, { readonly steps?: readonly WorkflowStep[] }>
+      }
+      return Object.entries(workflow.jobs).flatMap(([job, { steps }]) =>
+        steps?.some((step) => /\bpnpm run lint\b/u.test(step.run ?? ''))
+          ? [{ file, job, source, steps }]
+          : [],
+      )
+    })
 }
 
 function report(files: readonly { complexity: number; file: string }[]) {
@@ -125,7 +148,7 @@ describe('repository scc complexity wiring', () => {
   const doc = read('docs/scc-complexity.md')
   const packageJson = JSON.parse(read('package.json')) as { scripts: Record<string, string> }
 
-  it('pins scc 3.7.0 and runs that pin from lint after CI installs it', () => {
+  it('pins scc 3.7.0 and runs that pin from lint after CI and Release install it', () => {
     const tools = parseToml(read('.mise.toml')) as { tools: Record<string, string> }
     expect(tools.tools['github:boyter/scc']).toBe('3.7.0')
     expect(packageJson.scripts['scc-complexity']).toBe(
@@ -135,22 +158,21 @@ describe('repository scc complexity wiring', () => {
     expect(doc).toContain('3.7.0')
     expect(doc).toContain('50')
     expect(doc).toContain('There is no baseline.')
+    expect(doc).toContain('CI and Release install the pinned `scc`')
     expect(existsSync(resolve(moduleRoot, 'scc-complexity-baseline.json'))).toBe(false)
 
-    const ci = read('.github/workflows/ci.yml')
-    const testJob = ci.slice(ci.indexOf('\n  test:\n'), ci.indexOf('\n  test-macos:\n'))
-    const workflow = parseYaml(ci) as {
-      jobs: {
-        test: {
-          steps: { 'timeout-minutes'?: number; uses?: string; with?: { cache?: boolean } }[]
-        }
-      }
+    const jobs = lintJobs()
+    expect(jobs.length).toBeGreaterThan(0)
+    for (const { file, job, source, steps } of jobs) {
+      const lint = steps!.findIndex((step) => /\bpnpm run lint\b/u.test(step.run ?? ''))
+      const mise = steps!.findIndex((step) => step.uses?.startsWith('jdx/mise-action@'))
+      expect(mise, `${file}#${job}`).toBeGreaterThanOrEqual(0)
+      expect(mise, `${file}#${job}`).toBeLessThan(lint)
+      const step = steps![mise]!
+      expect(step.uses, `${file}#${job}`).toMatch(/^jdx\/mise-action@[0-9a-f]{40}$/)
+      expect(source, `${file}#${job}`).toMatch(/jdx\/mise-action@[0-9a-f]{40} # v\d+\.\d+\.\d+/)
+      expect(step.with, `${file}#${job}`).toEqual({ cache: false })
+      expect(step['timeout-minutes'], `${file}#${job}`).toBe(3)
     }
-    const mise = workflow.jobs.test.steps.find((step) => step.uses?.startsWith('jdx/mise-action@'))
-    expect(mise?.uses).toMatch(/^jdx\/mise-action@[0-9a-f]{40}$/)
-    expect(testJob).toMatch(/jdx\/mise-action@[0-9a-f]{40} # v\d+\.\d+\.\d+/)
-    expect(mise?.with).toEqual({ cache: false })
-    expect(mise?.['timeout-minutes']).toBe(3)
-    expect(testJob.indexOf('jdx/mise-action@')).toBeLessThan(testJob.indexOf('pnpm run lint'))
   })
 })

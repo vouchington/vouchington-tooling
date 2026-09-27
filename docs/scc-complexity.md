@@ -10,4 +10,4 @@ The scan is `scc --format json --by-file` for `js`, `mts`, `jsx`, `ts`, and `tsx
 
 Every counted file fails above 50 with `simplify or split this file`. There is no baseline.
 
-CI installs the pinned `scc` with `jdx/mise-action` before lint. The job cache stays off.
+CI and Release install the pinned `scc` with `jdx/mise-action` before lint. The job cache stays off.
