@@ -6,7 +6,7 @@ description: Bootstrap an npm package and give a human the exact commands to pub
 # npm publishing bootstrap
 
 Prepare the local package. Leave public registry writes and trusted-publisher mutations to the
-human. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the
+human. Read every applicable `AGENTS.md` from the repository root through the
 package. Repository-local policy and the consumer wrapper own the package path and name, npm scope,
 GitHub repository, release workflow, build commands, and whether a laptop may publish.
 
