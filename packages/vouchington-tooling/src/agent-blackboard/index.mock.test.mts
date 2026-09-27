@@ -46,7 +46,7 @@ afterEach(async () => {
 
 describe('agent blackboard client', () => {
   it('probes the configured connection', async () => {
-    await probeBlackboard(env)
+    await probeBlackboard(env, { resolveFrom: import.meta.url })
     expect(client.list).toHaveBeenCalledWith({ limit: 1 })
   })
 
@@ -57,7 +57,7 @@ describe('agent blackboard client', () => {
       { createdAt: '2026-01-01T00:00:00.000Z', data: { type: 'other', markdown: 'ignore' } },
       null,
     ]
-    const entries = await readJournal(sessionId, env)
+    const entries = await readJournal(sessionId, env, { resolveFrom: import.meta.url })
     expect(entries).toHaveLength(4)
     expect(formatJournalEntries(sessionId, entries)).toBe(
       '## 2026-01-01T00:00:00.000Z\n\nfirst\n\n## 2026-01-02T00:00:00.000Z\n\nlater',

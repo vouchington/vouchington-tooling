@@ -1,5 +1,6 @@
+import { fileURLToPath } from 'node:url'
 import { createServer, type Server } from 'node:http'
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -15,8 +16,11 @@ import {
 } from './index.mts'
 const servers: Server[] = []
 const directories: string[] = []
+const originalCwd = process.cwd()
+const dependencies = { resolveFrom: import.meta.url }
 afterEach(async () => {
   vi.unstubAllEnvs()
+  process.chdir(originalCwd)
   await Promise.all(
     servers
       .splice(0)
@@ -131,6 +135,7 @@ it('requires real append/readback and accepts reordered keys and equivalent conc
     envelope: envelope(),
     mode: 'autonomous',
     env: service.env,
+    dependencies,
   })
   expect(result).toMatchObject({
     status: 'delivered',
@@ -138,14 +143,20 @@ it('requires real append/readback and accepts reordered keys and equivalent conc
   })
   expect(service.session?.data).toEqual({ repositories: ['owner/repo'] })
   await expect(
-    writeFeedback({ identity, envelope: envelope(), mode: 'autonomous', env: service.env }),
+    writeFeedback({
+      identity,
+      envelope: envelope(),
+      mode: 'autonomous',
+      env: service.env,
+      dependencies,
+    }),
   ).resolves.toMatchObject({ status: 'delivered' })
   expect(service.appends).toBe(1)
   await expect(
-    autonomousGate({ identity, envelope: envelope(), env: service.env }),
+    autonomousGate({ identity, envelope: envelope(), env: service.env, dependencies }),
   ).rejects.toMatchObject({ diagnostic: 'event-conflict' })
   await expect(
-    autonomousGate({ identity, envelope: envelope('fresh:gate'), env: service.env }),
+    autonomousGate({ identity, envelope: envelope('fresh:gate'), env: service.env, dependencies }),
   ).resolves.toMatchObject({ status: 'delivered', receipt: { sourceEventId: 'fresh:gate' } })
   expect(service.appends).toBe(2)
 })
@@ -158,10 +169,13 @@ it('replays a durable interactive record after a committed append lost its respo
     mode: 'interactive',
     outboxDirectory: path,
     env: service.env,
+    dependencies,
   })
   expect(result).toMatchObject({ status: 'pending', pendingCount: 1 })
   expect(service.appends).toBe(1)
-  await expect(flushFeedbackOutbox({ directory: path, env: service.env })).resolves.toEqual({
+  await expect(
+    flushFeedbackOutbox({ directory: path, env: service.env, dependencies }),
+  ).resolves.toEqual({
     status: 'empty',
     pendingCount: 0,
     deliveredCount: 1,
@@ -172,11 +186,23 @@ it('replays a durable interactive record after a committed append lost its respo
 it('blocks unconfirmed, unauthorized and metadata-rejected writes without exposing provider errors', async () => {
   const hidden = await provider({ hideEntries: true })
   await expect(
-    writeFeedback({ identity, envelope: envelope(), mode: 'autonomous', env: hidden.env }),
+    writeFeedback({
+      identity,
+      envelope: envelope(),
+      mode: 'autonomous',
+      env: hidden.env,
+      dependencies,
+    }),
   ).rejects.toMatchObject({ diagnostic: 'readback-unconfirmed' })
   const rejected = await provider({ rejectPatch: true })
   await expect(
-    writeFeedback({ identity, envelope: envelope(), mode: 'autonomous', env: rejected.env }),
+    writeFeedback({
+      identity,
+      envelope: envelope(),
+      mode: 'autonomous',
+      env: rejected.env,
+      dependencies,
+    }),
   ).rejects.toMatchObject({ diagnostic: 'authentication-rejected' })
   expect(rejected.appends).toBe(0)
   const unauthorized = await provider({ unauthorized: true })
@@ -186,19 +212,27 @@ it('blocks unconfirmed, unauthorized and metadata-rejected writes without exposi
     mode: 'interactive',
     outboxDirectory: await directory(),
     env: unauthorized.env,
+    dependencies,
   })
   expect(result).toMatchObject({ status: 'pending', diagnostic: 'authentication-rejected' })
   expect(JSON.stringify(result)).not.toContain('private provider')
 })
 it('rejects a source identity collision without appending conflicting content', async () => {
   const service = await provider()
-  await writeFeedback({ identity, envelope: envelope(), mode: 'autonomous', env: service.env })
+  await writeFeedback({
+    identity,
+    envelope: envelope(),
+    mode: 'autonomous',
+    env: service.env,
+    dependencies,
+  })
   await expect(
     writeFeedback({
       identity,
       envelope: { ...envelope(), markdown: 'Different finding' },
       mode: 'autonomous',
       env: service.env,
+      dependencies,
     }),
   ).rejects.toMatchObject({ diagnostic: 'event-conflict' })
   expect(service.appends).toBe(1)
@@ -265,6 +299,7 @@ it('reads a note through the current public journal writer contract', async () =
     feedbackCoverage: { status: 'partial', sources: ['note'], droppedCount: 0 },
     mode: 'autonomous',
     env: service.env,
+    dependencies,
     timestamp: '2026-01-01T01:00:00+01:00',
   })
   expect(result).toMatchObject({ status: 'delivered', sourceEventId: 'journal:file' })
@@ -285,11 +320,14 @@ it('classifies actual SDK identity mismatches as hard conflicts while retaining 
       mode: 'interactive',
       outboxDirectory: path,
       env: service.env,
+      dependencies,
     }),
   ).rejects.toMatchObject({ status: 'blocked', diagnostic: 'identity-conflict' })
   expect(service.appends).toBe(0)
   expect(feedbackOutboxStatus(path)).toEqual({ status: 'pending', pendingCount: 1 })
-  await expect(flushFeedbackOutbox({ directory: path, env: service.env })).resolves.toMatchObject({
+  await expect(
+    flushFeedbackOutbox({ directory: path, env: service.env, dependencies }),
+  ).resolves.toMatchObject({
     status: 'pending',
     pendingCount: 1,
     deliveredCount: 0,
@@ -301,6 +339,14 @@ it('delivers journal defaults and replays through the consumer context with defa
   const service = await provider()
   vi.stubEnv('AGENT_BLACKBOARD_URL', service.env.AGENT_BLACKBOARD_URL)
   vi.stubEnv('AGENT_BLACKBOARD_TOKEN', service.env.AGENT_BLACKBOARD_TOKEN)
+  const consumer = await directory()
+  await mkdir(join(consumer, 'node_modules'))
+  await symlink(
+    fileURLToPath(new URL('../../node_modules/agent-blackboard', import.meta.url)),
+    join(consumer, 'node_modules', 'agent-blackboard'),
+    'dir',
+  )
+  process.chdir(consumer)
   const path = await directory()
   const note = join(await directory(), 'note.md')
   const { writeFile } = await import('node:fs/promises')
@@ -318,7 +364,6 @@ it('delivers journal defaults and replays through the consumer context with defa
       outboxDirectory: path,
       category: 'tooling',
       timeoutMs: 20_000,
-      dependencies: { resolveFrom: import.meta.url },
     }),
   ).resolves.toMatchObject({ status: 'delivered', pendingCount: 0 })
   expect(service.entries[0]?.data).toMatchObject({
@@ -334,9 +379,7 @@ it('delivers journal defaults and replays through the consumer context with defa
     env: {},
   })
   expect(failed.status).toBe('pending')
-  await expect(
-    flushFeedbackOutbox({ directory: path, dependencies: { resolveFrom: import.meta.url } }),
-  ).resolves.toMatchObject({
+  await expect(flushFeedbackOutbox({ directory: path })).resolves.toMatchObject({
     status: 'empty',
     deliveredCount: 1,
     pendingCount: 0,
