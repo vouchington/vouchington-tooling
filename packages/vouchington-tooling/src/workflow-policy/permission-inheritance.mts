@@ -1,71 +1,14 @@
 import type { Workflow } from './permissions.mts'
-
-const LEVEL_RANK = { none: 0, read: 1, write: 2 } as const
-type PermissionLevel = keyof typeof LEVEL_RANK
-type PermissionMap = Record<string, PermissionLevel>
-type BoundedPermissionDeclaration = PermissionMap | 'read-all'
-
-const LEVELS_BY_SCOPE = {
-  actions: ['none', 'read', 'write'],
-  'artifact-metadata': ['none', 'read', 'write'],
-  attestations: ['none', 'read', 'write'],
-  checks: ['none', 'read', 'write'],
-  'code-quality': ['none', 'read', 'write'],
-  contents: ['none', 'read', 'write'],
-  deployments: ['none', 'read', 'write'],
-  discussions: ['none', 'read', 'write'],
-  'id-token': ['none', 'write'],
-  issues: ['none', 'read', 'write'],
-  models: ['none', 'read'],
-  packages: ['none', 'read', 'write'],
-  pages: ['none', 'read', 'write'],
-  'pull-requests': ['none', 'read', 'write'],
-  'repository-projects': ['none', 'read', 'write'],
-  'security-events': ['none', 'read', 'write'],
-  statuses: ['none', 'read', 'write'],
-  'vulnerability-alerts': ['none', 'read'],
-} as const satisfies Record<string, readonly PermissionLevel[]>
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value == null || typeof value !== 'object' || Array.isArray(value)) return false
-  const prototype = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
-}
-
-function isValidPermissionMap(value: unknown): value is PermissionMap {
-  if (!isPlainRecord(value)) return false
-  return Object.entries(value).every(([scope, level]) => {
-    const allowed = Object.hasOwn(LEVELS_BY_SCOPE, scope)
-      ? (LEVELS_BY_SCOPE[scope as keyof typeof LEVELS_BY_SCOPE] as readonly PermissionLevel[])
-      : undefined
-    return typeof level === 'string' && allowed?.includes(level as PermissionLevel) === true
-  })
-}
-
-function isValidDeclaration(value: unknown): value is BoundedPermissionDeclaration {
-  return value === 'read-all' || isValidPermissionMap(value)
-}
-
-function permissionMap(value: BoundedPermissionDeclaration): Map<string, PermissionLevel> {
-  if (value === 'read-all') {
-    return new Map(
-      Object.entries(LEVELS_BY_SCOPE)
-        .filter(([, levels]) => (levels as readonly PermissionLevel[]).includes('read'))
-        .map(([scope]) => [scope, 'read'] as const),
-    )
-  }
-  return new Map(Object.entries(value).filter(([, level]) => level !== 'none'))
-}
-
-function mergePermissionMaps(
-  target: Map<string, PermissionLevel>,
-  source: Map<string, PermissionLevel>,
-): void {
-  for (const [scope, level] of source) {
-    const current = target.get(scope) ?? 'none'
-    if (LEVEL_RANK[level] > LEVEL_RANK[current]) target.set(scope, level)
-  }
-}
+import {
+  isPlainRecord,
+  isValidDeclaration,
+  isValidPermissionMap,
+  mergePermissionMaps,
+  permissionMap,
+  PERMISSION_LEVEL_RANK,
+  type BoundedPermissionDeclaration,
+  type PermissionLevel,
+} from './permission-declarations.mts'
 
 function sortedEntries(value: Map<string, PermissionLevel>): [string, PermissionLevel][] {
   return [...value].toSorted(([left], [right]) => left.localeCompare(right))
@@ -151,7 +94,7 @@ export function inheritanceAwarePermissionMismatches(args: {
 
   const calleeFitsCaller = [...calleeMap].every(([scope, level]) => {
     const callerLevel = callerMap.get(scope) ?? 'none'
-    return LEVEL_RANK[callerLevel] >= LEVEL_RANK[level]
+    return PERMISSION_LEVEL_RANK[callerLevel] >= PERMISSION_LEVEL_RANK[level]
   })
   const hasCallerInheritance =
     !topLevelPresent && calleeJobs.some(([, job]) => !Object.hasOwn(job, 'permissions'))
