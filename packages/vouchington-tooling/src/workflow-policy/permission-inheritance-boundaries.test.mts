@@ -249,6 +249,38 @@ describe('inheritance-aware reusable workflow permission comparison', () => {
     ])
   })
 
+  it('retains the strongest explicit requirement across top-level and ordered job grants', () => {
+    expect(
+      compare({
+        callerPermissions: { contents: 'write' },
+        calleePermissions: { contents: 'write' },
+        calleePermissionsPresent: true,
+        calleeJobs: {
+          equal: { permissions: { contents: 'write' } },
+          weaker: { permissions: { contents: 'read' } },
+        },
+      }),
+    ).toEqual([])
+
+    for (const calleeJobs of [
+      {
+        stronger: { permissions: { contents: 'write' } },
+        weaker: { permissions: { contents: 'read' } },
+      },
+      {
+        weaker: { permissions: { contents: 'read' } },
+        stronger: { permissions: { contents: 'write' } },
+      },
+    ]) {
+      expect(
+        compare({
+          callerPermissions: { contents: 'write' },
+          calleeJobs,
+        }),
+      ).toEqual([])
+    }
+  })
+
   it('normalizes none grants and accepts valid empty explicit declarations', () => {
     expect(
       compare({
