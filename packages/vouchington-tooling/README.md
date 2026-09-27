@@ -2,6 +2,9 @@
 
 Libraries and the `vouchington` CLI.
 
+[`config-inventory`](../../docs/config-inventory.md) collects environment, dynamic-configuration,
+and package-manager evidence using caller-owned file roles and policies.
+
 ```bash
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
