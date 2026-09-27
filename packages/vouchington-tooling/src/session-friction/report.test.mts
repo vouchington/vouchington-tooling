@@ -192,13 +192,14 @@ describe('buildSessionFrictionReport', () => {
     })
     expect(report).toMatchObject({
       coverage: {
-        journalStatus: 'complete',
+        journalStatus: 'partial',
         frictionStatus: 'events',
         truncated: false,
         droppedCount: 0,
       },
-      markdown: expect.stringContaining('Status: failures observed'),
+      markdown: expect.stringContaining('Status: unavailable (journal scan incomplete)'),
     })
+    expect(report.markdown).toContain('build cache failure')
     expect(report.markdown).toContain('## Sandbox & Permission Audit')
     expect(report.markdown.indexOf('sandbox-escalation')).toBeLessThan(
       report.markdown.indexOf('sandbox-failure'),
@@ -280,7 +281,9 @@ describe('buildSessionFrictionReport', () => {
         entries: [{}, hostile, { data: { type: 'journal', markdown: conforming } }],
       }),
     })
-    expect(report.markdown).toContain('Status: failures observed')
+    expect(report.coverage.journalStatus).toBe('partial')
+    expect(report.markdown).toContain('journal scan incomplete')
+    expect(report.markdown).toContain(conforming)
     expect(report.diagnostic).toBeUndefined()
   })
 

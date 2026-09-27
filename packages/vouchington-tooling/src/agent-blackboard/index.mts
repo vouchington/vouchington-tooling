@@ -129,7 +129,7 @@ export type * from './feedback-types.mts'
 export { createFeedbackEnvelope, validateFeedbackEnvelope } from './feedback-codec.mts'
 export {
   writeFeedback,
-  autonomousGate,
+  verifyFreshFeedback,
   flushFeedbackOutbox,
   FeedbackDeliveryError,
 } from './feedback-delivery.mts'

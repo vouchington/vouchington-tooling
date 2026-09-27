@@ -15,12 +15,14 @@ const JOURNAL_ENTRY_MAX_COUNT = 500
 const JOURNAL_MARKDOWN_MAX_BYTES = 10_000
 const JOURNAL_TOTAL_MAX_BYTES = 1_000_000
 
-function journalData(entry: JournalEntry): { type: unknown; markdown: unknown } | undefined {
+function journalData(
+  entry: JournalEntry,
+): { type: unknown; markdown: unknown } | undefined | 'unreadable' {
   try {
     const data = (entry as JournalEntry | null)?.data
     return data ? { type: data.type, markdown: data.markdown } : undefined
   } catch {
-    return undefined
+    return 'unreadable'
   }
 }
 
@@ -34,8 +36,11 @@ async function collectEntries(
   let truncated = false
   for await (const entry of entries) {
     consumed++
-    const data = journalData(entry)
+    const scanned = journalData(entry)
+    if (scanned === 'unreadable') truncated = true
+    const data = scanned === 'unreadable' ? undefined : scanned
     const markdown = data?.markdown
+    if (data?.type === 'journal' && typeof markdown !== 'string') truncated = true
     if (data?.type === 'journal' && typeof markdown === 'string') {
       const bytes = Buffer.byteLength(markdown)
       inspectedBytes += bytes
@@ -74,6 +79,12 @@ function sandboxMarkdown(friction: FrictionLogReadResult): string {
   return `## Sandbox & Permission Audit\nStatus: ${status}`
 }
 
+function incompleteCiSection(markdownBlocks: string[]): string {
+  return ['## CI Failures\nStatus: unavailable (journal scan incomplete)', ...markdownBlocks].join(
+    '\n\n',
+  )
+}
+
 function reportFromLog(
   sessionId: string,
   logOptions: FrictionLogOptions,
@@ -97,16 +108,14 @@ function reportFromLog(
     if (journal.status === 'ok' && journal.truncated)
       return {
         coverage,
-        markdown:
-          '## CI Failures\nStatus: unavailable (journal scan incomplete)\n\n' +
-          sandboxMarkdown(friction),
+        markdown: incompleteCiSection(journal.markdownBlocks) + '\n\n' + sandboxMarkdown(friction),
       }
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
     return { coverage, markdown: `${markdown}\n\n${sandboxMarkdown(friction)}` }
   } catch (error) {
     const ciMarkdown =
       journal.status === 'ok' && journal.truncated
-        ? '## CI Failures\nStatus: unavailable (journal scan incomplete)'
+        ? incompleteCiSection(journal.markdownBlocks)
         : journal.status === 'ok' && journal.markdownBlocks.length === 0
           ? '## CI Failures\nStatus: unavailable (friction log unreadable)'
           : buildCiFailuresSection(sessionId, journal, 'empty')

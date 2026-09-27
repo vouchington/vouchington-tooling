@@ -492,7 +492,7 @@ rejected.
 
 ## Validated feedback and delivery
 
-Import `createFeedbackEnvelope`, `validateFeedbackEnvelope`, `writeFeedback`, `autonomousGate`,
+Import `createFeedbackEnvelope`, `validateFeedbackEnvelope`, `writeFeedback`, `verifyFreshFeedback`,
 `composeRetrospective`, `feedbackOutboxStatus`, and `flushFeedbackOutbox` from the existing
 `vouchington-tooling/agent-blackboard` subpath. Consumers must run Node 24 or newer and install `agent-blackboard@^0.6.0` explicitly alongside
 `vouchington-tooling`; the provider is not installed by this package. Missing provider installation
@@ -521,13 +521,20 @@ know whether delivery was acknowledged. Autonomous errors and unpersisted writes
 Identity, content, and archived-session conflicts fail in either mode while preserving the unsent
 record; they are not reported as transient pending delivery. Replay retains permanently conflicted
 records and continues to deliver unrelated pending records; transient failures stop that replay.
+Verified delivery retains its receipt when local cleanup fails, returning
+`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is safe to replay with exact dedup.
+Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
+records after connectivity returns.
 
-Autonomous mode prohibits the filesystem outbox. `autonomousGate` requires a fresh source-event
-write plus readback; reusing an earlier admission source ID blocks admission. Trusted controllers
-supply a new explicit authorization-attempt source ID and preserve their authoritative run/session
-lineage. Terminal writes keep work outcome separate from coverage and returned delivery state.
+Autonomous mode prohibits the filesystem outbox. `verifyFreshFeedback` requires a fresh source-event
+write plus readback of its own append receipt and rejects visible duplicate source records. This
+is fresh online reporting evidence, not a distributed execution lease: eventually consistent
+provider reads cannot establish source uniqueness. Trusted controllers
+supply a unique new authorization-probe source ID, preserve their authoritative run/session
+lineage, and atomically claim and revalidate the attempt before execution. Terminal writes keep work outcome separate from coverage and returned delivery state.
 The delivered result includes a verified receipt with session ID, source-event ID and creation time.
-Only that online result authorizes the controller's next step.
+Controllers require this online result together with atomically established attempt ownership
+before execution.
 
 Delivery is at least once. Replays pre-read matching source identity/content, accept equivalent
 persistent duplicates, and reject conflicting reuse. Equality ignores object property order while

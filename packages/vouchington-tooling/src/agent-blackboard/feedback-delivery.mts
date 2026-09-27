@@ -35,11 +35,11 @@ export async function writeFeedback(
   persistFeedbackOutbox(input.outboxDirectory, { identity: input.identity, envelope })
   try {
     const receipt = await deliverFeedbackOnline({ ...input, envelope })
-    const pendingCount = removeFeedbackOutbox(input.outboxDirectory, {
+    const cleanup = removeFeedbackOutbox(input.outboxDirectory, {
       identity: input.identity,
       envelope,
     })
-    return { status: 'delivered', sourceEventId: envelope.sourceEventId, pendingCount, receipt }
+    return { status: 'delivered', sourceEventId: envelope.sourceEventId, ...cleanup, receipt }
   } catch (error) {
     const diagnostic = feedbackDiagnostic(error)
     if (['identity-conflict', 'event-conflict', 'archived-session'].includes(diagnostic))
@@ -52,7 +52,7 @@ export async function writeFeedback(
     }
   }
 }
-export async function autonomousGate(
+export async function verifyFreshFeedback(
   input: FeedbackOnlineOptions,
 ): Promise<Extract<FeedbackDeliveryResult, { status: 'delivered' }>> {
   const envelope = prepareEnvelope(input)
@@ -68,9 +68,11 @@ export async function flushFeedbackOutbox(input: {
   pendingCount: number
   deliveredCount: number
   diagnostic?: FeedbackDiagnostic
+  cleanupDiagnostic?: 'outbox-cleanup-failed'
 }> {
   let deliveredCount = 0
   let diagnostic: FeedbackDiagnostic | undefined
+  let cleanupDiagnostic: 'outbox-cleanup-failed' | undefined
   for (const record of listFeedbackOutbox(input.directory)) {
     try {
       await deliverFeedbackOnline({
@@ -78,7 +80,8 @@ export async function flushFeedbackOutbox(input: {
         ...(input.env === undefined ? {} : { env: input.env }),
         ...(input.dependencies === undefined ? {} : { dependencies: input.dependencies }),
       })
-      removeFeedbackOutbox(input.directory, record)
+      const cleanup = removeFeedbackOutbox(input.directory, record)
+      cleanupDiagnostic ??= cleanup.cleanupDiagnostic
       deliveredCount++
     } catch (error) {
       const current = feedbackDiagnostic(error)
@@ -91,6 +94,7 @@ export async function flushFeedbackOutbox(input: {
   return {
     ...feedbackOutboxStatus(input.directory),
     deliveredCount,
+    ...(cleanupDiagnostic === undefined ? {} : { cleanupDiagnostic }),
     ...(diagnostic === undefined ? {} : { diagnostic }),
   }
 }

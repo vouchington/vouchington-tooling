@@ -145,16 +145,30 @@ export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxR
     return current.length + 1
   })
 }
-export function removeFeedbackOutbox(directory: string, record: FeedbackOutboxRecord): number {
+export function removeFeedbackOutbox(
+  directory: string,
+  record: FeedbackOutboxRecord,
+): {
+  pendingCount: number
+  cleanupDiagnostic?: 'outbox-cleanup-failed'
+} {
   const path = outboxDirectory(directory, true)
   return withFileLock(join(path, '.records'), () => {
     const current = records(path)
     const existing = current.find((item) => item.path === join(path, filename(record)))
-    if (!existing) return current.length
+    if (!existing) return { pendingCount: current.length }
     if (canonicalFeedback(existing.record) !== canonicalFeedback(record))
       throw new Error('feedback outbox changed during delivery')
-    unlinkSync(existing.path)
-    syncDirectory(path)
-    return current.length - 1
+    try {
+      unlinkSync(existing.path)
+    } catch {
+      return { pendingCount: current.length, cleanupDiagnostic: 'outbox-cleanup-failed' }
+    }
+    try {
+      syncDirectory(path)
+    } catch {
+      return { pendingCount: current.length - 1, cleanupDiagnostic: 'outbox-cleanup-failed' }
+    }
+    return { pendingCount: current.length - 1 }
   })
 }

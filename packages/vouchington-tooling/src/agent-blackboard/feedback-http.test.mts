@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import {
   appendJournal,
-  autonomousGate,
+  verifyFreshFeedback,
   createFeedbackEnvelope,
   feedbackOutboxStatus,
   flushFeedbackOutbox,
@@ -153,11 +153,16 @@ it('requires real append/readback and accepts reordered keys and equivalent conc
   ).resolves.toMatchObject({ status: 'delivered' })
   expect(service.appends).toBe(1)
   await expect(
-    autonomousGate({ identity, envelope: envelope(), env: service.env, dependencies }),
+    verifyFreshFeedback({ identity, envelope: envelope(), env: service.env, dependencies }),
   ).rejects.toMatchObject({ diagnostic: 'event-conflict' })
   await expect(
-    autonomousGate({ identity, envelope: envelope('fresh:gate'), env: service.env, dependencies }),
-  ).resolves.toMatchObject({ status: 'delivered', receipt: { sourceEventId: 'fresh:gate' } })
+    verifyFreshFeedback({
+      identity,
+      envelope: envelope('fresh:gate'),
+      env: service.env,
+      dependencies,
+    }),
+  ).rejects.toMatchObject({ diagnostic: 'event-conflict' })
   expect(service.appends).toBe(2)
 })
 it('replays a durable interactive record after a committed append lost its response', async () => {
@@ -267,15 +272,15 @@ it('times out an autonomous gate and never authorizes a late operation', async (
         async get() {}
       },
       Entries: class {
-        async append() {
-          return { createdAt: 't' }
+        async append(input: unknown) {
+          return { createdAt: 't', data: (input as { data: unknown }).data }
         }
         async *get() {}
       },
     }),
   }
   await expect(
-    autonomousGate({
+    verifyFreshFeedback({
       identity,
       envelope: envelope('gate:timeout'),
       env: { AGENT_BLACKBOARD_URL: 'https://example.test', AGENT_BLACKBOARD_TOKEN: 'private' },
@@ -416,4 +421,50 @@ it('replays healthy records behind a permanent conflicting record while preservi
       (entry) => JSON.stringify(entry.data) === JSON.stringify(records[1]!.envelope),
     ),
   ).toBe(true)
+})
+
+it('rejects a conflicting event before changing repository attribution', async () => {
+  const service = await provider()
+  await writeFeedback({
+    identity,
+    envelope: envelope(),
+    mode: 'autonomous',
+    env: service.env,
+    dependencies,
+  })
+  const original = JSON.stringify(service.session)
+  await expect(
+    writeFeedback({
+      identity,
+      envelope: {
+        ...envelope(),
+        repositories: ['other/repo', 'owner/repo'],
+        markdown: 'conflicting',
+      },
+      mode: 'autonomous',
+      env: service.env,
+      dependencies,
+    }),
+  ).rejects.toMatchObject({ diagnostic: 'event-conflict' })
+  expect(JSON.stringify(service.session)).toBe(original)
+  expect(service.appends).toBe(1)
+})
+
+it('verifies fresh own append/readback through the actual HTTP client', async () => {
+  const service = await provider({ reorder: true })
+  await expect(
+    verifyFreshFeedback({
+      identity,
+      envelope: envelope('unique:probe'),
+      env: service.env,
+      dependencies,
+    }),
+  ).resolves.toMatchObject({
+    status: 'delivered',
+    receipt: {
+      sourceEventId: 'unique:probe',
+      createdAt: '2026-01-01T00:00:01.000Z',
+      verified: true,
+    },
+  })
 })

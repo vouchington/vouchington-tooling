@@ -173,3 +173,43 @@ it('retains escalation and a simultaneous failure', () => {
     failure: { kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' },
   })
 })
+
+it('makes malformed tagged journal records visibly partial', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'friction-malformed-journal-'))
+  try {
+    recordFriction('owner', { type: 'tool-result', command: 'echo clean' }, { directory })
+    for (const markdown of [undefined, null, 42, {}, []]) {
+      const report = await buildSessionFrictionReport('owner', {
+        directory,
+        journalLoader: () => ({ status: 'ok', entries: [{ data: { type: 'journal', markdown } }] }),
+      })
+      expect(report.coverage.journalStatus).toBe('partial')
+      expect(report.markdown).toContain('Status: unavailable (journal scan incomplete)')
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('marks unreadable journal access partial without rendering its raw exception', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'friction-journal-getter-'))
+  try {
+    const report = await buildSessionFrictionReport('owner', {
+      directory,
+      journalLoader: () => ({
+        status: 'ok',
+        entries: [
+          {
+            get data(): never {
+              throw new Error('private backend exception')
+            },
+          },
+        ],
+      }),
+    })
+    expect(report.coverage.journalStatus).toBe('partial')
+    expect(report.markdown).not.toContain('private backend exception')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})

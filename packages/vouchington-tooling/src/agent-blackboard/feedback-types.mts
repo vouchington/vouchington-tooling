@@ -52,7 +52,13 @@ export type FeedbackDiagnostic =
   | 'archived-session'
   | 'delivery-timeout'
 export type FeedbackDeliveryResult =
-  | { status: 'delivered'; sourceEventId: string; pendingCount: number; receipt: FeedbackReceipt }
+  | {
+      status: 'delivered'
+      sourceEventId: string
+      pendingCount: number
+      receipt: FeedbackReceipt
+      cleanupDiagnostic?: 'outbox-cleanup-failed'
+    }
   | {
       status: 'pending'
       sourceEventId: string

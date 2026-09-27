@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import {
-  autonomousGate,
+  verifyFreshFeedback,
   feedbackOutboxStatus,
   createFeedbackEnvelope,
   flushFeedbackOutbox,
@@ -65,7 +65,7 @@ function provider(
       Entries: class {
         async append(input: unknown) {
           stored.push({ createdAt: timestamp, data: (input as { data: unknown }).data })
-          return { createdAt: timestamp }
+          return { createdAt: timestamp, data: (input as { data: unknown }).data }
         }
         async *get() {
           yield* stored.length ? (options.after ?? stored) : (options.before ?? [])
@@ -86,10 +86,10 @@ it('distinguishes invalid configuration and unavailable client dependencies from
     { AGENT_BLACKBOARD_URL: 'https://provider.test' },
   ])
     await expect(
-      autonomousGate({ identity, envelope: envelope(), env: invalid }),
+      verifyFreshFeedback({ identity, envelope: envelope(), env: invalid }),
     ).rejects.toMatchObject({ diagnostic: 'configuration-invalid' })
   await expect(
-    autonomousGate({
+    verifyFreshFeedback({
       identity,
       envelope: envelope(),
       env,
@@ -101,7 +101,7 @@ it('distinguishes invalid configuration and unavailable client dependencies from
     }),
   ).rejects.toMatchObject({ diagnostic: 'client-unavailable' })
   await expect(
-    autonomousGate({
+    verifyFreshFeedback({
       identity,
       envelope: envelope(),
       env,
@@ -109,7 +109,7 @@ it('distinguishes invalid configuration and unavailable client dependencies from
     }),
   ).rejects.toMatchObject({ diagnostic: 'identity-conflict' })
   await expect(
-    autonomousGate({
+    verifyFreshFeedback({
       identity,
       envelope: envelope(),
       env,
@@ -127,11 +127,11 @@ it('blocks hostile matching records and bounded incomplete readback without auth
     const dependencies = provider({ before })
     if (before.length === 3)
       await expect(
-        autonomousGate({ identity, envelope: envelope(), env, dependencies }),
+        verifyFreshFeedback({ identity, envelope: envelope(), env, dependencies }),
       ).resolves.toMatchObject({ status: 'delivered' })
     else
       await expect(
-        autonomousGate({ identity, envelope: envelope(), env, dependencies }),
+        verifyFreshFeedback({ identity, envelope: envelope(), env, dependencies }),
       ).rejects.toMatchObject({
         diagnostic:
           before.length === 1 && (before[0] as { data?: unknown }).data
@@ -140,7 +140,12 @@ it('blocks hostile matching records and bounded incomplete readback without auth
       })
   }
   await expect(
-    autonomousGate({ identity, envelope: envelope(), env, dependencies: provider({ after: [] }) }),
+    verifyFreshFeedback({
+      identity,
+      envelope: envelope(),
+      env,
+      dependencies: provider({ after: [] }),
+    }),
   ).rejects.toMatchObject({ diagnostic: 'readback-unconfirmed' })
 })
 it('rejects invalid explicit identity, timeout and mode boundaries before launching work', async () => {
@@ -170,7 +175,7 @@ it('rejects invalid explicit identity, timeout and mode boundaries before launch
     writeFeedback({ identity, envelope: envelope(), mode: 'interactive', env }),
   ).rejects.toThrow(/requires/)
   await expect(
-    autonomousGate({ identity, envelope: envelope(), env, timeoutMs: 0 }),
+    verifyFreshFeedback({ identity, envelope: envelope(), env, timeoutMs: 0 }),
   ).rejects.toThrow(/timeoutMs/)
   await expect(
     writeFeedback({
@@ -237,7 +242,7 @@ it('keeps ensure failures classified as outages when fetched metadata does not e
     { id: 'another-session', agent: 'claude' },
   ])
     await expect(
-      autonomousGate({
+      verifyFreshFeedback({
         identity,
         envelope: envelope(),
         env,

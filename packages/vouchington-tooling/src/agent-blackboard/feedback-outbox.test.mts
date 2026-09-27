@@ -92,8 +92,8 @@ it('preserves idempotent pending records and prevents wrong-content delivery rem
     }),
   ).toThrow(/changed/)
   expect(feedbackOutboxStatus(path).pendingCount).toBe(1)
-  expect(removeFeedbackOutbox(path, record)).toBe(0)
-  expect(removeFeedbackOutbox(path, record)).toBe(0)
+  expect(removeFeedbackOutbox(path, record)).toEqual({ pendingCount: 0 })
+  expect(removeFeedbackOutbox(path, record)).toEqual({ pendingCount: 0 })
   expect(feedbackOutboxStatus(join(path, 'not-created'))).toEqual({
     status: 'empty',
     pendingCount: 0,

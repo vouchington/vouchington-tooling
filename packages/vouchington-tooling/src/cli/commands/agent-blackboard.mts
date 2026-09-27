@@ -1,5 +1,6 @@
 import {
   appendJournal,
+  flushFeedbackOutbox,
   formatJournalEntries,
   probeBlackboard,
   readJournal,
@@ -29,7 +30,7 @@ export async function runAgentBlackboardCommand(args: string[]): Promise<number>
     if (command === 'journal') return await runJournal(rest)
     if (command === 'snapshot') return await runSnapshot(rest)
     throw new Error(
-      'usage: agent-blackboard probe | journal append|entries | snapshot partition|cleanup',
+      'usage: agent-blackboard probe | journal append|entries|flush | snapshot partition|cleanup',
     )
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
@@ -74,6 +75,12 @@ async function runJournal(args: string[]): Promise<number> {
   const { repositories, remaining } =
     action === 'append' ? extractRepositories(flags) : { repositories: [], remaining: flags }
   const values = flagsToValues(remaining)
+  if (action === 'flush') {
+    assertAllowed(values, ['outbox-directory'])
+    const result = await flushFeedbackOutbox({ directory: required(values, 'outbox-directory') })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    return 0
+  }
   if (action === 'entries') {
     assertAllowed(values, ['session-id'])
     const sessionId = required(values, 'session-id')
@@ -124,7 +131,7 @@ async function runJournal(args: string[]): Promise<number> {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     return 0
   }
-  throw new Error('usage: agent-blackboard journal append|entries')
+  throw new Error('usage: agent-blackboard journal append|entries|flush')
 }
 
 function extractRepositories(flags: string[]): { repositories: string[]; remaining: string[] } {

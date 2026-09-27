@@ -17,7 +17,7 @@ export type BlackboardClientModule = {
     get(id: string): Promise<unknown>
   }
   Entries: new (connection: BlackboardConnection) => {
-    append(input: unknown): Promise<{ createdAt: string }>
+    append(input: unknown): Promise<{ createdAt: string; data: unknown }>
     get(input: unknown): AsyncIterable<unknown>
   }
 }

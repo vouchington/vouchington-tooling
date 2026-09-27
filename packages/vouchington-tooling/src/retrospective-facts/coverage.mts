@@ -10,6 +10,8 @@ export function completeCommandFacts(
   args: string[],
   result: CommandResult,
 ): boolean {
+  if (command === 'git' && args[0] === 'merge-base' && args[1] === '--is-ancestor')
+    return result.ok || result.exitCode === 1
   if (!result.ok) return false
   if (command !== 'gh') {
     if (args[0] === 'branch') return Boolean(result.stdout.trim())

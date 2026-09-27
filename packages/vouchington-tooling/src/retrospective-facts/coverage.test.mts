@@ -80,3 +80,32 @@ it('keeps local collection failures and invalid counted facts partial', async ()
   })
   expect(result.coverage).toBe('partial')
 })
+
+it('treats negative ancestry predicates as complete and unexpected failures as partial', async () => {
+  for (const exitCode of [1, 2]) {
+    const report = await runRetrospectiveFactsReport({
+      noPr: true,
+      execute: async (_command, args) => ({
+        ok: args[0] !== 'merge-base',
+        stdout: args[0] === 'branch' ? 'topic' : args[0] === 'rev-list' ? '0' : '',
+        stderr: '',
+        exitCode: args[0] === 'merge-base' ? exitCode : 0,
+      }),
+    })
+    expect(report.coverage).toBe(exitCode === 1 ? 'complete' : 'partial')
+    expect(report.markdown).toContain(
+      exitCode === 1 ? 'no (origin/main lacks topic)' : 'unavailable',
+    )
+  }
+  expect(
+    completeCommandFacts('gh', ['merge-base', '--is-ancestor'], {
+      ok: false,
+      stdout: '',
+      stderr: '',
+      exitCode: 1,
+    }),
+  ).toBe(false)
+  expect(
+    completeCommandFacts('git', ['merge-base'], { ok: false, stdout: '', stderr: '', exitCode: 1 }),
+  ).toBe(false)
+})

@@ -38,10 +38,12 @@ async function ensureSession(
 async function findEvent(
   entries: AsyncIterable<unknown>,
   envelope: FeedbackEnvelope,
+  expectedCreatedAt?: string,
 ): Promise<{ createdAt: string } | undefined> {
   let count = 0
   let inspectedBytes = 0
   let found: { createdAt: string } | undefined
+  let matching = 0
   for await (const entry of entries) {
     inspectedBytes += Buffer.byteLength(JSON.stringify(entry))
     if (++count > 10_000 || inspectedBytes > 2_000_000)
@@ -62,7 +64,10 @@ async function findEvent(
       typeof entry.createdAt !== 'string'
     )
       throw new FeedbackDeliveryError('event-conflict')
-    found = { createdAt: entry.createdAt }
+    if (++matching > 1 && expectedCreatedAt !== undefined)
+      throw new FeedbackDeliveryError('event-conflict')
+    if (expectedCreatedAt === undefined || entry.createdAt === expectedCreatedAt)
+      found = { createdAt: entry.createdAt }
   }
   return found
 }
@@ -101,6 +106,11 @@ export async function deliverFeedbackOnline(
       const entries = new Entries(connection)
       const ensured = await ensureSession(sessions, input.identity)
       if (ensured.session.archivedAt != null) throw new FeedbackDeliveryError('archived-session')
+      const existing = await findEvent(
+        entries.get({ sessionId: input.identity.sessionId, format: 'jsonl' }),
+        input.envelope,
+      )
+      if (existing && fresh) throw new FeedbackDeliveryError('event-conflict')
       const merged = [
         ...new Set([
           ...normalizeRepositories(ensured.session.data.repositories, false),
@@ -112,11 +122,6 @@ export async function deliverFeedbackOnline(
           sessionId: input.identity.sessionId,
           data: { repositories: merged },
         })
-      const existing = await findEvent(
-        entries.get({ sessionId: input.identity.sessionId, format: 'jsonl' }),
-        input.envelope,
-      )
-      if (existing && fresh) throw new FeedbackDeliveryError('event-conflict')
       if (existing)
         return {
           sessionId: input.identity.sessionId,
@@ -124,10 +129,22 @@ export async function deliverFeedbackOnline(
           createdAt: existing.createdAt,
           verified: true,
         }
-      await entries.append({ sessionId: input.identity.sessionId, data: input.envelope })
+      const appended = await entries.append({
+        sessionId: input.identity.sessionId,
+        data: input.envelope,
+      })
+      if (
+        fresh &&
+        (!isObject(appended) ||
+          typeof appended.createdAt !== 'string' ||
+          !isObject(appended.data) ||
+          canonicalFeedback(appended.data) !== canonicalFeedback(input.envelope))
+      )
+        throw new FeedbackDeliveryError('readback-unconfirmed')
       const confirmed = await findEvent(
         entries.get({ sessionId: input.identity.sessionId, format: 'jsonl' }),
         input.envelope,
+        fresh ? appended.createdAt : undefined,
       )
       if (!confirmed) throw new FeedbackDeliveryError('readback-unconfirmed')
       return {

@@ -5,6 +5,7 @@ vi.mock('../../agent-blackboard/index.mts', async (importOriginal) => {
   return {
     ...actual,
     appendJournal: vi.fn(),
+    flushFeedbackOutbox: vi.fn(),
     probeBlackboard: vi.fn(),
   }
 })
@@ -18,7 +19,11 @@ vi.mock('../../agent-blackboard/snapshot.mts', async (importOriginal) => {
 })
 
 import { runAgentBlackboardCommand, setJournalReaderForTest } from './agent-blackboard.mts'
-import { appendJournal, probeBlackboard } from '../../agent-blackboard/index.mts'
+import {
+  appendJournal,
+  flushFeedbackOutbox,
+  probeBlackboard,
+} from '../../agent-blackboard/index.mts'
 import { cleanupSnapshotPartitions, partitionSnapshot } from '../../agent-blackboard/snapshot.mts'
 
 describe('agent-blackboard CLI', () => {
@@ -28,10 +33,31 @@ describe('agent-blackboard CLI', () => {
     stderr.mockClear()
     stdout.mockClear()
     vi.mocked(appendJournal).mockReset()
+    vi.mocked(flushFeedbackOutbox).mockReset()
     vi.mocked(probeBlackboard).mockReset()
     vi.mocked(cleanupSnapshotPartitions).mockReset()
     vi.mocked(partitionSnapshot).mockReset()
     setJournalReaderForTest()
+  })
+
+  it('exposes replay without regenerating pending event content', async () => {
+    vi.mocked(flushFeedbackOutbox).mockResolvedValue({
+      status: 'empty',
+      pendingCount: 0,
+      deliveredCount: 1,
+    })
+    expect(
+      await runAgentBlackboardCommand([
+        'journal',
+        'flush',
+        '--outbox-directory',
+        '/private/outbox',
+      ]),
+    ).toBe(0)
+    expect(flushFeedbackOutbox).toHaveBeenCalledWith({ directory: '/private/outbox' })
+    expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('"deliveredCount":1')
+    expect(await runAgentBlackboardCommand(['journal', 'flush'])).toBe(2)
+    expect(await runAgentBlackboardCommand(['journal', 'flush', '--mode', 'autonomous'])).toBe(2)
   })
 
   it('rejects malformed commands before loading the optional integration dependency', async () => {
