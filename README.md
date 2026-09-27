@@ -315,8 +315,14 @@ import { isSwiftCodeOffset } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
-import { createPullRequest, getDiffAgainstBase, runGh, runGit } from 'vouchington-tooling/gh-cli'
+import { createPullRequest, processDiffCommand, runGh, runGit } from 'vouchington-tooling/gh-cli'
 ```
+
+`processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
+a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps
+at most one file block (which can itself be large), preserves preambles and line content, and drains
+a bounded stderr tail for typed command failures. Blocks are provisional until the returned promise
+resolves: callers must discard accumulated results if the command later exits nonzero or is signaled.
 
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
 `dockerfile-parse` uses `dockerfile-ast`.
