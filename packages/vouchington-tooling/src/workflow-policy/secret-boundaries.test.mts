@@ -55,6 +55,7 @@ describe('secret readiness boundaries', () => {
     expect(stripShellComments("echo '# literal' # trailing\n# entire line")).toBe(
       "echo '# literal' \n",
     )
+    expect(stripShellComments('echo artifact#tag # trailing')).toBe('echo artifact#tag ')
   })
 
   it('parses nested operators and quotes conservatively', () => {
@@ -63,6 +64,7 @@ describe('secret readiness boundaries', () => {
       '(vars.B || vars.C)',
       '"a && b"',
     ])
+    expect(splitTopLevel('&& vars.A &&', '&&')).toEqual(['vars.A'])
     expect(hasTopLevelMixedOperators('vars.A && (vars.B || vars.C)')).toBe(false)
     expect(hasTopLevelMixedOperators('vars.A && vars.B || vars.C')).toBe(true)
     expect(conditionEntails("vars.A == 'a && b'", "vars.A == 'a && b' && vars.C")).toBe(true)
@@ -77,5 +79,28 @@ describe('secret readiness boundaries', () => {
     input.workflows[0]!.secretReferences = [key]
     input.jobs = []
     expect(unprovisionedSecretsWithoutReadinessStep(input, inventory)).toEqual([])
+  })
+
+  it('does not mistake an unrelated env binding or a missing run for a readiness guard', () => {
+    const input = topology(false)
+    input.jobs[0]!.steps[0]!.env = {
+      CHECK: '${{ secrets.DEPLOY_KEY }}',
+      OTHER: 'plain text',
+    }
+    expect(unprovisionedSecretsWithoutReadinessStep(input, inventory)).toEqual([])
+    delete input.jobs[0]!.steps[0]!.run
+    expect(unprovisionedSecretsWithoutReadinessStep(input, inventory)).toHaveLength(1)
+  })
+
+  it('uses unresolved job workflow ids as paths and ignores unreferenced inventory entries', () => {
+    const input = topology(false)
+    input.jobs[0]!.workflowId = 'external/workflow.yml'
+    input.jobs[0]!.steps[0]!.run = 'echo no guard'
+    expect(
+      unprovisionedSecretsWithoutReadinessStep(input, {
+        ...inventory,
+        UNUSED_KEY: { provisioned: false },
+      }),
+    ).toEqual([expect.stringMatching(/^external\/workflow\.yml: "DEPLOY_KEY" is unprovisioned/)])
   })
 })

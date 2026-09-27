@@ -52,6 +52,20 @@ describe('compiler host filesystem decisions', () => {
     expect(compilerHostProbesAreFresh(tracked.snapshot())).toBe(false)
   })
 
+  it('keeps a stable repeated read as one probe and replays the first observation', () => {
+    let value = 'same'
+    const tracked = trackCompilerHost({
+      fileExists: () => true,
+      readFile: (_path: string) => value,
+    })
+    expect(tracked.host.readFile('virtual.mts')).toBe('same')
+    expect(tracked.host.readFile('virtual.mts')).toBe('same')
+    expect(tracked.snapshot().probes).toHaveLength(1)
+    expect(tracked.snapshot().stableDuringCapture).toBe(true)
+    value = 'changed'
+    expect(compilerHostProbesAreFresh(tracked.snapshot())).toBe(false)
+  })
+
   it('detects disk mutation during capture and metadata changes after capture', () => {
     const root = mkdtempSync(join(tmpdir(), 'compiler-host-race-'))
     try {

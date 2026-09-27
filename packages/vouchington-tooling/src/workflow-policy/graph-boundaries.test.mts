@@ -145,4 +145,29 @@ describe('topology policy failures', () => {
     }
     expect(evaluateGraphPolicy(expanded, expandedIndex, policy)).toEqual([])
   })
+
+  it('uses opaque missing job ids for inventory and reports empty step selectors', () => {
+    const { topology, index, policy } = fixture()
+    topology.workflows[0]!.jobIds = ['unresolved-job']
+    policy.jobInventory = { ...policy.jobInventory, 'pipelines/build.yml': ['unresolved-job'] }
+    policy.forbiddenJobs = ['absent-job']
+    policy.stepOrders = [
+      { jobId: consumer, steps: [{ id: 'prepare' }] },
+      { jobId: producer, steps: [{}] },
+    ]
+    expect(evaluateGraphPolicy(topology, index, policy)).toEqual([
+      `required ordered step missing: ${producer}: <step>`,
+    ])
+  })
+
+  it('matches step actions by uses and reports a missing action', () => {
+    const { topology, index, policy } = fixture()
+    topology.jobs[1]!.steps[0]!.uses = 'local/action'
+    policy.stepOrders = [{ jobId: consumer, steps: [{ uses: 'local/action' }] }]
+    expect(evaluateGraphPolicy(topology, index, policy)).toEqual([])
+    policy.stepOrders = [{ jobId: consumer, steps: [{ uses: 'local/absent' }] }]
+    expect(evaluateGraphPolicy(topology, index, policy)).toEqual([
+      `required ordered step missing: ${consumer}: local/absent`,
+    ])
+  })
 })

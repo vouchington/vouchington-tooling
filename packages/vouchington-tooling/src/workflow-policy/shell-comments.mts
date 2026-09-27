@@ -16,8 +16,7 @@ export function stripShellComments(run: string): string {
         else if (char === '"' && !inSingleQuote) inDoubleQuote = !inDoubleQuote
         else if (char === '#' && !inSingleQuote && !inDoubleQuote) {
           const previousChar = line[index - 1]
-          if (index === 0 || (previousChar !== undefined && /\s/.test(previousChar)))
-            return line.slice(0, index)
+          if (index === 0 || /\s/.test(previousChar!)) return line.slice(0, index)
         }
       }
       return line

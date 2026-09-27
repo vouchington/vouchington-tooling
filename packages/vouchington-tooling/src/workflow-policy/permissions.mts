@@ -49,6 +49,10 @@ function expandReadAllPermissions(): Map<string, string> {
   return new Map(READ_ALL_PERMISSIONS.map((permission) => [permission, 'read']))
 }
 
+export function permissionsToMap(permissions: Map<string, string> | 'read-all'): Map<string, string>
+export function permissionsToMap(
+  permissions: Map<string, string> | 'read-all' | null,
+): Map<string, string> | null
 export function permissionsToMap(
   permissions: Map<string, string> | 'read-all' | null,
 ): Map<string, string> | null {

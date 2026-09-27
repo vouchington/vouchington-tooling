@@ -56,7 +56,7 @@ export function callerCalleePermissionMismatches(
       continue
     }
 
-    const callerMap = permissionsToMap(jobPerms) ?? new Map<string, string>()
+    const callerMap = permissionsToMap(jobPerms)
     const calleeMap = permissionsToMap(calleePerms) ?? new Map<string, string>()
     const callerEntries = [...callerMap].toSorted(([left], [right]) => left.localeCompare(right))
     const calleeEntries = [...calleeMap].toSorted(([left], [right]) => left.localeCompare(right))

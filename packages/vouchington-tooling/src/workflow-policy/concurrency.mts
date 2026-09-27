@@ -100,7 +100,7 @@ function collisionDiagnostics(
     if (!group) continue
     const normalizedGroup = group.toLocaleLowerCase('en-US')
     const workflowPartition = /\$\{\{\s*github\.workflow\s*\}\}/.test(group)
-      ? (ownerWorkflowPaths.get(owner.id) ?? owner.id)
+      ? ownerWorkflowPaths.get(owner.id)!
       : ''
     const key = `${normalizedGroup}\0${workflowPartition}`
     const entry = groups.get(key) ?? { group: normalizedGroup, ids: [] }

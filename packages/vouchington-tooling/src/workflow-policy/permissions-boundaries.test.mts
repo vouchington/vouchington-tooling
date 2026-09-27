@@ -69,6 +69,17 @@ describe('reusable workflow permission comparison', () => {
     expect(
       requiredWorkflowPermissions({ permissions: { contents: 'read' }, jobs: { a: {} } }),
     ).toEqual(new Map([['contents', 'read']]))
+    expect(
+      requiredWorkflowPermissions({
+        permissions: { contents: 'read', issues: 'unknown' },
+        jobs: { a: { permissions: { contents: 'unknown', issues: 'read', checks: 'unknown' } } },
+      }),
+    ).toEqual(
+      new Map([
+        ['contents', 'read'],
+        ['issues', 'read'],
+      ]),
+    )
   })
 
   it('requires top-level permissions except in pure workflow_call documents', () => {
@@ -77,6 +88,7 @@ describe('reusable workflow permission comparison', () => {
         [caller]: { on: 'push' },
         [callee]: { on: { workflow_call: null } },
         'workflows/mixed.yml': { on: { workflow_call: null, push: null } },
+        'workflows/explicit.yml': { on: 'push', permissions: { contents: 'read' } },
       }),
     ).toEqual([caller, 'workflows/mixed.yml'])
   })
@@ -144,5 +156,23 @@ describe('reusable workflow permission comparison', () => {
   it('ignores remote and non-callable edges', () => {
     expect(callerCalleePermissionMismatches(topology(false), {})).toEqual([])
     expect(callerCalleePermissionMismatches(topology(true, false), {})).toEqual([])
+  })
+
+  it('handles missing call targets and caller workflow ids using supplied paths', () => {
+    const noTarget = topology()
+    delete noTarget.edges[0]!.to
+    expect(callerCalleePermissionMismatches(noTarget, documents())).toEqual([])
+
+    const unresolvedCaller = topology()
+    unresolvedCaller.jobs[0]!.workflowId = caller
+    expect(callerCalleePermissionMismatches(unresolvedCaller, documents())).toEqual([
+      `  ${caller} job "invoke" → ${callee}: missing explicit job-level permissions`,
+    ])
+  })
+
+  it('compares explicit caller permissions with a callee that requests none', () => {
+    expect(callerCalleePermissionMismatches(topology(), documents({ contents: 'read' }))).toEqual([
+      `  ${caller} job "invoke" → ${callee}: caller grants {"contents":"read"}, callee requires {}`,
+    ])
   })
 })

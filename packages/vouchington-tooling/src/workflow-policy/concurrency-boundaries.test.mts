@@ -69,6 +69,10 @@ describe('consumer supplied concurrency intent', () => {
       'unsupported:github.alpha',
       'unsupported:github.zeta',
     ])
+    expect(extractConcurrencyScopes('github.unknown | github.ref')).toEqual([
+      'ref',
+      'unsupported:github.unknown',
+    ])
   })
 
   it('requires intent for each owner and a reason for each unlocked workflow', () => {
@@ -165,5 +169,36 @@ describe('consumer supplied concurrency intent', () => {
     expect(evaluateLockPolicy(sameWorkflow, {}, { first: retained, second: retained })).toContain(
       `concurrency group collision: ${jobGroup}: first, second`,
     )
+
+    const partialTopology: WorkflowTopology = {
+      workflows: [],
+      jobs: [
+        {
+          id: 'external-one',
+          workflowId: 'automation/external-one.yml',
+          key: 'one',
+          steps: [],
+          concurrency: { effective: { group: jobGroup, cancelInProgress: false } },
+        },
+        {
+          id: 'external-two',
+          workflowId: 'automation/external-two.yml',
+          key: 'two',
+          steps: [],
+          concurrency: { effective: { group: jobGroup, cancelInProgress: false } },
+        },
+      ],
+      edges: [],
+    }
+    expect(
+      evaluateLockPolicy(
+        partialTopology,
+        {},
+        {
+          'external-one': retained,
+          'external-two': retained,
+        },
+      ),
+    ).not.toContain(`concurrency group collision: ${jobGroup}: external-one, external-two`)
   })
 })
