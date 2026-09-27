@@ -125,7 +125,7 @@ describe('vouchington-workflow plugin', () => {
 
     for (const manifest of [codex, claude, agent]) {
       expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.8.0')
+      expect(manifest.version).toBe('0.9.0')
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -238,7 +238,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.8.0',
+        pluginVersion: '0.9.0',
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -300,7 +300,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'dependabot',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.8.0',
+        pluginVersion: '0.9.0',
         prerequisites: ['github-actions-checklist'],
       }),
     )

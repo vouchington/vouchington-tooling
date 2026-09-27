@@ -88,14 +88,22 @@ describe('workflow skills package contract', () => {
       const prerequisites = new Map(
         manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
       )
-      expect(prerequisites.get('agent-workflow')).toEqual(['github-issue'])
+      expect(prerequisites.get('agent-workflow')).toEqual([
+        'github-issue',
+        'pr-description',
+        'review-ci-logs',
+      ])
       expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
       expect(prerequisites.get('dependabot')).toEqual(['github-actions-checklist'])
       expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
       expect(prerequisites.get('vitest-test-authoring')).toEqual(['test-authoring'])
       expect(prerequisites.get('github-issue')).toEqual([])
       for (const [name, required, closure = required] of [
-        ['agent-workflow', ['github-issue']],
+        [
+          'agent-workflow',
+          ['github-issue', 'pr-description', 'review-ci-logs'],
+          ['github-issue', 'pr-description', 'review-ci-logs', 'github-actions-checklist'],
+        ],
         [
           'backend-vitest-test-authoring',
           ['vitest-test-authoring'],
@@ -112,7 +120,7 @@ describe('workflow skills package contract', () => {
         ['retrospective-distill', ['github-issue']],
         ['review-github-issue-taxonomy', ['github-issue']],
         ['revisit-followups', ['github-issue']],
-        ['review-ci-logs', ['github-actions-checklist']],
+        ['review-ci-logs', ['github-actions-checklist', 'pr-description']],
         ['static-analysis-checklist', ['github-actions-checklist']],
       ] as const) {
         expect(prerequisites.get(name)).toEqual(required)
@@ -126,6 +134,17 @@ describe('workflow skills package contract', () => {
           )
         }
       }
+      expect(
+        readFileSync(join(output, 'review-ci-logs/pr-description/references/examples.md'), 'utf8'),
+      ).toBe(
+        readFileSync(
+          resolve(
+            packageRoot,
+            '../../plugins/vouchington-workflow/skills/pr-description/references/examples.md',
+          ),
+          'utf8',
+        ),
+      )
       for (const skill of manifest.skills) {
         const pluginManifest = JSON.parse(
           readFileSync(resolve(packageRoot, '../../plugins', skill.plugin, 'plugin.json'), 'utf8'),

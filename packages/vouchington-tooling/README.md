@@ -338,6 +338,32 @@ shape, including short table delimiters. `extractLooseMarkdownTableRows` is inte
 recovery for malformed pipe rows; callers supply table positions to exclude and retain ownership of
 their policy interpretation.
 
+`parseMarkdownSections` returns visible root H2 sections, their exact original `content`,
+`startOffset`/`endOffset` source ranges, heading line, and `hasVisibleContent`. Heading text is
+normalized by collapsing whitespace and removing Markdown formatting/comments and collapsed text; matching remains
+case-sensitive. Source offsets are JavaScript string offsets, so `source.slice(startOffset,
+endOffset)` preserves Unicode and CRLF exactly. Sections end at the next visible root H2 or EOF;
+fenced examples, quoted headings, and headings inside `<details>` do not create boundaries.
+
+```ts
+import { parseMarkdownSections, validateMarkdownSections } from 'vouchington-tooling/markdown'
+
+const document = parseMarkdownSections(body)
+const diagnostics = validateMarkdownSections(document, {
+  requiredHeadings: ['Summary', 'Impact'],
+})
+const relatedIssues = document.sections.find((section) => section.heading === 'Related issues')
+```
+
+The caller owns required headings. Validation returns diagnostics with `code`, `message`, and
+optional `heading`/`line`, for `missing-heading`, `duplicate-heading`, `empty-section`, or
+`malformed-details`. Nonempty visible paragraphs, lists, and populated table bodies satisfy the
+content check; comments, fenced/indented code, images, disclosure labels, and collapsed-only content
+do not. The parser tracks balanced nested details/summary tags in GFM HTML nodes, accepting optional
+summaries and quoted attributes; it is not a general HTML validator or sanitizer. It never rewrites
+the input or infers semantic relevance, cost, schema conformance, or failure causes. The existing
+`markdownSectionBetweenHeadings` API retains its original boundary behavior.
+
 `agent-harness-config` merges classifier-auto and sandbox keys into Claude, Codex, Grok, and Cursor
 config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
 home-directory configs; `--repo` updates a checkout. It does not copy allowlists, hooks, or plugins.
