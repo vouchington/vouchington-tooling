@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gunzipSync } from 'node:zlib'
 
 import { describe, expect, it } from 'vitest'
+
+import { linkSkill } from './skill-discovery/index.mts'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginRoots = ['vouchington-workflow', 'vouchington-testing', 'vouchington-database'].map(
@@ -23,8 +25,8 @@ type SkillManifest = {
 }
 
 describe('workflow skills package contract', () => {
-  it('ships exactly the canonical skills at stable paths without tracked copies', () => {
-    const output = mkdtempSync(resolve(tmpdir(), 'vouchington-skills-pack-'))
+  it('ships canonical resources and links required skills without tracked copies', async () => {
+    const output = realpathSync(mkdtempSync(resolve(tmpdir(), 'vouchington-skills-pack-')))
     try {
       const canonical = pluginRoots
         .flatMap((root) => skillPaths(root))
@@ -46,6 +48,31 @@ describe('workflow skills package contract', () => {
         .sort()
       expect(packaged).toHaveLength(29)
       expect(packaged).toEqual(canonical)
+      const resources = pluginRoots
+        .flatMap((root) => skillPaths(root, root, false))
+        .map((path) => `package/skills/${path}`)
+        .sort()
+      expect(
+        tarPaths(gunzipSync(readFileSync(tarball)))
+          .filter(
+            (path) =>
+              path.startsWith('package/skills/') &&
+              !path.endsWith('/') &&
+              path !== 'package/skills/manifest.json',
+          )
+          .sort(),
+      ).toEqual(resources)
+      const unpacked = join(output, 'unpacked')
+      mkdirSync(unpacked)
+      execFileSync('tar', ['-xzf', tarball, '-C', unpacked])
+      const packedSkills = join(unpacked, 'package/skills')
+      for (const root of pluginRoots) {
+        for (const path of skillPaths(root, root, false)) {
+          expect(readFileSync(join(packedSkills, path), 'utf8')).toBe(
+            readFileSync(join(root, path), 'utf8'),
+          )
+        }
+      }
       const manifest = JSON.parse(
         readFileSync(join(packageRoot, 'skill-manifest.json'), 'utf8'),
       ) as SkillManifest
@@ -67,6 +94,38 @@ describe('workflow skills package contract', () => {
       expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
       expect(prerequisites.get('vitest-test-authoring')).toEqual(['test-authoring'])
       expect(prerequisites.get('github-issue')).toEqual([])
+      for (const [name, required, closure = required] of [
+        ['agent-workflow', ['github-issue']],
+        [
+          'backend-vitest-test-authoring',
+          ['vitest-test-authoring'],
+          ['vitest-test-authoring', 'test-authoring'],
+        ],
+        ['dependabot', ['github-actions-checklist']],
+        ['github-actions-authoring', ['github-actions-checklist']],
+        ['dotnet-test-authoring', ['test-authoring']],
+        ['playwright-authoring', ['test-authoring']],
+        ['storybook-authoring', ['test-authoring']],
+        ['swift-test-authoring', ['test-authoring']],
+        ['planning', ['github-issue']],
+        ['organize-github-issues', ['github-issue']],
+        ['retrospective-distill', ['github-issue']],
+        ['review-github-issue-taxonomy', ['github-issue']],
+        ['revisit-followups', ['github-issue']],
+        ['review-ci-logs', ['github-actions-checklist']],
+        ['static-analysis-checklist', ['github-actions-checklist']],
+      ] as const) {
+        expect(prerequisites.get(name)).toEqual(required)
+        const targetRoot = join(output, name)
+        mkdirSync(targetRoot)
+        await linkSkill({ name, sourceRoot: packedSkills, targetRoot })
+        expect(readdirSync(targetRoot).sort()).toEqual([name, ...closure].sort())
+        for (const linked of [name, ...closure]) {
+          expect(realpathSync(join(targetRoot, linked))).toBe(
+            realpathSync(join(packedSkills, linked)),
+          )
+        }
+      }
       for (const skill of manifest.skills) {
         const pluginManifest = JSON.parse(
           readFileSync(resolve(packageRoot, '../../plugins', skill.plugin, 'plugin.json'), 'utf8'),
@@ -85,11 +144,13 @@ describe('workflow skills package contract', () => {
   })
 })
 
-function skillPaths(root: string, path = root): string[] {
+function skillPaths(root: string, path = root, entrypointsOnly = true): string[] {
   return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
     const child = join(path, entry.name)
-    if (entry.isDirectory()) return skillPaths(root, child)
-    return entry.name === 'SKILL.md' ? [relative(root, child).replaceAll('\\', '/')] : []
+    if (entry.isDirectory()) return skillPaths(root, child, entrypointsOnly)
+    return !entrypointsOnly || entry.name === 'SKILL.md'
+      ? [relative(root, child).replaceAll('\\', '/')]
+      : []
   })
 }
 

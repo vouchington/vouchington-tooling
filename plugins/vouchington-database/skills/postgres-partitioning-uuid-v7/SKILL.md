@@ -1,9 +1,13 @@
 ---
 name: postgres-partitioning-uuid-v7
-description: Design PostgreSQL partitions and indexes that use time-ordered UUIDv7 identifiers efficiently.
+description: Design PostgreSQL partitions and pruning around UUIDv7.
 ---
 
 # PostgreSQL partitioning with UUIDv7
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/postgres-partitioning-uuid-v7/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Partition only after lifecycle, retention, and query predicates show that it helps.
 

@@ -1,9 +1,13 @@
 ---
 name: github-issue
-description: Search, create, update, link, or assess GitHub issues using the repository's live issue policy and taxonomy.
+description: Search, write, and classify GitHub issues within live authorization.
 ---
 
 # GitHub issues
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/github-issue/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use for durable follow-ups and pull-request linkage. Read local `AGENTS.md`, issue
 templates, and repository-routing policy before any remote mutation.

@@ -12,3 +12,5 @@
 - For every acceptance criterion, keep evidence from a focused test, a review, or an explicitly
   justified manual check. Evidence counts only when it is falsifiable. Confirm the assertion is not
   [tautological](tautological-tests.md) before treating it as coverage.
+- For instruction and documentation contracts, test real paths, links, rendered markers, or
+  executable behavior. Do not freeze prose wording unless a real consumer parses that exact text.

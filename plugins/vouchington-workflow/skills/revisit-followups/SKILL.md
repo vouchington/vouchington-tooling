@@ -1,9 +1,13 @@
 ---
 name: revisit-followups
-description: Review recently completed work and repository instructions for genuinely deferred follow-ups, then propose verified issue candidates.
+description: Find verified deferred work in completed changes and instructions.
 ---
 
 # Revisit follow-ups
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/revisit-followups/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use to turn explicit deferred work into a curated backlog. Read local `AGENTS.md`,
 issue policy, and review-record conventions first.

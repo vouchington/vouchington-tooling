@@ -1,9 +1,13 @@
 ---
 name: stacked-prs
-description: Recognize a native GitHub stacked pull request and drain it from the bottom-most ready layer up, rather than waiting for the whole stack to be ready first.
+description: Drain native GitHub stacks from the bottom ready layer.
 ---
 
 # Stacked pull requests
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/stacked-prs/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use when a change is a chain of native GitHub stacked pull requests. Read local `AGENTS.md` and
 `AGENTS.md` first. They own whether this repository stacks, which tool creates, rebases, and merges

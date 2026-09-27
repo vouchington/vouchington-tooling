@@ -462,6 +462,14 @@ Codex plugins. The package build materializes plugin source trees without hand-c
 and writes sorted schema-v1 provenance to `skills/manifest.json`.
 Each manifest entry may declare its ordered `prerequisites`; ordinary Markdown links remain
 cross-references and never cause additional skills to be linked.
+Prerequisites ensure installation closure; they do not require eagerly reading every installed
+skill. Follow the invoked skill's conditional instructions for the current task.
+
+Canonical entrypoints direct agents to applicable local instructions and adapters before using
+portable policy. Local `AGENTS.md` may name an adapter alias; an already-read canonical skill or
+adapter is not loaded again. `linkSkill` still links files only: it does not load instructions,
+resolve local aliases, or execute a workflow. Validate observed agent loading separately from
+installation and packaged-resource checks.
 
 Use `readSkillManifest(skillsRoot)` to discover installed skills or
 `linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The

@@ -1,9 +1,13 @@
 ---
 name: retrospective-distill
-description: Distill completed session records into a small set of verified, actionable follow-up issues.
+description: Turn completed session records into verified follow-up candidates.
 ---
 
 # Retrospective distillation
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/retrospective-distill/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use when completed retrospectives or journals should become durable follow-up work. Read local
 `AGENTS.md`, issue policy, and journal retention rules before any mutation.

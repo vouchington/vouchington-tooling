@@ -1,9 +1,13 @@
 ---
 name: static-analysis-checklist
-description: Use when adding, changing, replacing, or removing static-analysis rules, configurations, fixtures, suppressions, allowlists, or repository guards.
+description: Place, author, and validate static-analysis invariants.
 ---
 
 # Static analysis checklist
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/static-analysis-checklist/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use when changing a static-analysis invariant. Read local `AGENTS.md`, analyzer
 documentation, rule inventory, and fixture conventions before selecting an implementation.

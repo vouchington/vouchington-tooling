@@ -1,9 +1,13 @@
 ---
 name: organize-github-issues
-description: Organize existing GitHub issues and pull requests with the repository's live taxonomy without inventing new taxonomy.
+description: Apply existing issue and PR taxonomy within the requested scope.
 ---
 
 # Organize GitHub issues
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/organize-github-issues/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use for issue hygiene, priority normalization, milestone assignment, and project membership. Read
 local `AGENTS.md`, and live taxonomy guidance before acting.

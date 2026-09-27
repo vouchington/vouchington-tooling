@@ -1,9 +1,13 @@
 ---
 name: test-authoring
-description: Write focused, maintainable tests and test fixtures for application or library behavior.
+description: Choose meaningful tests, fixtures, and observable boundaries.
 ---
 
 # Test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use the repository's test conventions and the matching runner skill.
 

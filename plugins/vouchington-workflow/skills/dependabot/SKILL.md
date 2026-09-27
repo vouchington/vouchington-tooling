@@ -1,9 +1,13 @@
 ---
 name: dependabot
-description: Configure or audit Dependabot coverage, cooldowns, package-family grouping, trusted CI, and conservative auto-merge policy for a repository.
+description: Configure Dependabot coverage, grouping, cooldowns, and trusted automation.
 ---
 
 # Dependabot policy
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/dependabot/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Read every applicable `AGENTS.md`, then the repository's dependency, CI, release,
 and branch-protection docs. The consumer wrapper owns the accepted cooldown, package roots,

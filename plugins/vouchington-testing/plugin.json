@@ -1,8 +1,10 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vouchington-testing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable testing guidance for common runners and application stacks.",
-  "author": { "name": "Vouchington" },
+  "author": {
+    "name": "Vouchington"
+  },
   "skills": "./skills/"
 }

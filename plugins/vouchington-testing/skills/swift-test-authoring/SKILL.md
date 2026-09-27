@@ -1,9 +1,13 @@
 ---
 name: swift-test-authoring
-description: Add Swift and SwiftUI tests with deterministic state, networking, and view inspection.
+description: Test Swift and SwiftUI state, networking, and view behavior.
 ---
 
 # Swift test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/swift-test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [test-authoring](../test-authoring/SKILL.md).
 

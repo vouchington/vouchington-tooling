@@ -1,9 +1,13 @@
 ---
 name: github-actions-authoring
-description: Author or redesign GitHub Actions workflows around event-driven orchestration, with remote-state polling prohibited.
+description: Design event-driven GitHub Actions without remote-state polling.
 ---
 
 # GitHub Actions authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/github-actions-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Never poll in CI. A workflow reacts to a state transition. Read
 [github-actions-checklist](../github-actions-checklist/SKILL.md) first, then every applicable

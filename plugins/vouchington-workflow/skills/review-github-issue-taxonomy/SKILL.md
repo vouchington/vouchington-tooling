@@ -1,9 +1,13 @@
 ---
 name: review-github-issue-taxonomy
-description: Audit GitHub labels, milestones, projects, and path-label automation and return actionable taxonomy recommendations.
+description: Audit labels, milestones, projects, and path-label ownership.
 ---
 
 # Review GitHub issue taxonomy
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/review-github-issue-taxonomy/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use when the taxonomy itself needs review. Stay read-only unless the caller explicitly authorizes
 local configuration edits or a live taxonomy mutation. Read local `AGENTS.md` first.

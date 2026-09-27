@@ -1,9 +1,13 @@
 ---
 name: postgres-node-performance-tuning
-description: Diagnose and improve PostgreSQL performance in Node.js applications with large data volumes.
+description: Measure and improve PostgreSQL queries in Node.js services.
 ---
 
 # PostgreSQL and Node.js performance
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/postgres-node-performance-tuning/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Measure the query plan and the workload shape before changing code.
 
