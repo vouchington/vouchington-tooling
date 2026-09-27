@@ -1,6 +1,6 @@
 ---
 name: stacked-prs
-description: Drain native GitHub stacks from the bottom ready layer.
+description: Drain native GitHub stacks from the bottom ready layer; a ready lower layer does not freeze later work.
 ---
 
 # Stacked pull requests
@@ -36,6 +36,20 @@ a stack, and who may authorize a merge.
 - A stall blocks only layers that depend on it. Ready the others. Pause the whole drain only when
   nothing further can be readied without the blocked layer.
 - Act only on layers assigned to you. Report the other layers; do not change them.
+- One worker per native stack implements that stack and runs its shepherd poll. The parent does
+  not poll. It reconciles stacks, starts a worker, and carries merge questions to the human.
+- Start shepherding when the first owned pull request exists.
+- A lower layer is in decent shape when it is committed, its local checks have passed, its pull
+  request is open with an updated body, and shepherding has started. Decent shape does not mean
+  green CI, ready for review, or merged.
+- Start the next dependent layer once the lower layer is in decent shape. Do not wait for merge,
+  a ready-delay, or green CI.
+- A ready, mergeable, or queued lower layer blocks only an operation that would rewrite that
+  layer. Keep readying every other owned layer.
+- Independent stacks run at the same time, one worker each. Dependent unmerged work is another
+  layer of the same stack, not a second stack whose base is an unmerged head.
+- At most one poll process per stack. The parent does not run a second poll for the same stack.
+- This skill does not grant a merge. Merge authorization stays with the consumer.
 
 Consumer wrapper owns: default branch, stacking tool and commands, merge-selector syntax, and
 merge authorization.
