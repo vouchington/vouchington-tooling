@@ -1,9 +1,13 @@
 ---
 name: vitest-test-authoring
-description: Apply Vitest-specific patterns when adding or changing Vitest tests, mocks, or fixtures.
+description: Author deterministic Vitest assertions, mocks, and factories.
 ---
 
 # Vitest test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/vitest-test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [test-authoring](../test-authoring/SKILL.md) first.
 

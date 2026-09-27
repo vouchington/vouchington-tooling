@@ -1,9 +1,13 @@
 ---
 name: git-commit-checklist
-description: Use before staging and committing changes to verify scope, validation, commit metadata, and local repository policy.
+description: Verify scope, checks, and local policy before committing.
 ---
 
 # Git commit checklist
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/git-commit-checklist/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use before every commit. Read local `AGENTS.md`, contribution guidance, and hook
 output first; they own commit format, required trailers, file-size limits, and validation commands.
@@ -19,3 +23,7 @@ output first; they own commit format, required trailers, file-size limits, and v
 
 Local instructions or the consumer wrapper own: branch names, file-size budgets, commit
 conventions, pull-request templates, and push commands.
+
+When an authorized rebase push may race another writer, capture the remote tip before fetching and
+push with an exact expected-tip lease. A lease against a freshly fetched tracking ref can overwrite
+the concurrent change it was meant to protect.

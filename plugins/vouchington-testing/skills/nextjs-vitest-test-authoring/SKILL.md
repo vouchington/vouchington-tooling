@@ -1,9 +1,13 @@
 ---
 name: nextjs-vitest-test-authoring
-description: Apply Vitest patterns for Next.js components, routes, and server-side modules.
+description: Test Next.js components, routes, and server boundaries with Vitest.
 ---
 
 # Next.js Vitest test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/nextjs-vitest-test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [vitest-test-authoring](../vitest-test-authoring/SKILL.md) first.
 

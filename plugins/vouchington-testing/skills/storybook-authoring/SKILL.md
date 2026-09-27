@@ -1,9 +1,13 @@
 ---
 name: storybook-authoring
-description: Add maintainable Storybook stories and browser-mode component coverage.
+description: Author component stories and browser coverage for real states.
 ---
 
 # Storybook authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/storybook-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [test-authoring](../test-authoring/SKILL.md).
 

@@ -1,9 +1,13 @@
 ---
 name: npm-publishing
-description: Bootstrap an npm package and give a human the exact commands to publish it publicly and configure GitHub trusted publishing.
+description: Prepare npm bootstrap and trusted publishing commands for a human.
 ---
 
 # npm publishing bootstrap
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/npm-publishing/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Prepare the local package. Leave public registry writes and trusted-publisher mutations to the
 human. Read every applicable `AGENTS.md` from the repository root through the

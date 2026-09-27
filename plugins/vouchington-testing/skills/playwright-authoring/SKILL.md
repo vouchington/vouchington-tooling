@@ -1,9 +1,13 @@
 ---
 name: playwright-authoring
-description: Author reliable Playwright browser tests, fixtures, selectors, and user flows.
+description: Author reliable Playwright flows, fixtures, and assertions.
 ---
 
 # Playwright authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/playwright-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [test-authoring](../test-authoring/SKILL.md).
 

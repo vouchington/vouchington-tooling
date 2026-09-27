@@ -24,6 +24,14 @@ in repository-local instruction files or thin wrapper skills. The portable issue
 collaborator authority before creation, routes denied external work to a verified consumer tracker,
 uses existing labels without extra approval, and requires explicit approval before creating labels.
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
+
+Domain skill entrypoints read applicable `AGENTS.md` and a repository-local adapter when present.
+The default adapter is `.agents/skills/<canonical-name>/SKILL.md`; local instructions may name an
+alias, such as `nextjs-vitest-test-authoring` → `web-vitest-test-authoring`. A previously read
+adapter or canonical skill is not loaded again. This is agent guidance, not runtime concatenation
+or a new loader API; linked files and plugin installation alone do not prove an adapter was read.
+Workflow references load by phase. Plans are proportional and saved once outside Git, including
+in an existing issue or PR description; the skills do not require a separate Plan issue or template.
 The `github-actions-authoring` skill requires event-driven orchestration and prohibits remote-state
 polling in CI; it loads `github-actions-checklist` as a prerequisite. The checklist also defines the
 portable trigger, 30-minute timeout, runner, action-pinning, dependency-update testing, real required

@@ -1,9 +1,13 @@
 ---
 name: github-actions-checklist
-description: Use when editing GitHub Actions workflows or composite actions to keep security, runner, permissions, concurrency, and validation aligned with local policy.
+description: Check Actions triggers, permissions, runners, pins, and deadlines.
 ---
 
 # GitHub Actions checklist
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/github-actions-checklist/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use before editing a workflow or composite action. Repository-local instructions own runners,
 approved action pins, concurrency names, secrets, permissions, and workflow-only pull-request rules.

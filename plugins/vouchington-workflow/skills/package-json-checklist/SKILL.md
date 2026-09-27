@@ -1,9 +1,13 @@
 ---
 name: package-json-checklist
-description: Use when changing JavaScript package metadata, dependencies, scripts, workspaces, or published entrypoints.
+description: Check package metadata, dependencies, entrypoints, and lockfiles.
 ---
 
 # Package metadata checklist
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/package-json-checklist/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use before changing `package.json`, a lockfile, workspace metadata, or a package entrypoint. Read
 every applicable `AGENTS.md` from the repository root through the owning package,

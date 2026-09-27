@@ -1,9 +1,13 @@
 ---
 name: pr-description
-description: Draft or review a self-contained pull-request description with summary, root cause, validation, rollout, and issue context.
+description: Write a self-contained PR description backed by the final diff.
 ---
 
 # Pull-request description
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/pr-description/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use before opening or updating a pull request, or when reviewing PR hand-off quality. Read local
 `AGENTS.md`, pull-request template, and issue-linking policy first.

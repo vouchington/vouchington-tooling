@@ -1,8 +1,11 @@
 {
   "name": "vouchington-database",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable PostgreSQL schema and performance guidance.",
-  "author": { "name": "Vouchington", "url": "https://github.com/vouchington" },
+  "author": {
+    "name": "Vouchington",
+    "url": "https://github.com/vouchington"
+  },
   "homepage": "https://github.com/vouchington/vouchington-tooling",
   "repository": "https://github.com/vouchington/vouchington-tooling",
   "license": "MIT",

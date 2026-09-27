@@ -1,9 +1,13 @@
 ---
 name: dotnet-test-authoring
-description: Add maintainable .NET tests with appropriate unit, app, and integration boundaries.
+description: Author .NET unit, application, and integration tests.
 ---
 
 # .NET test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/dotnet-test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [test-authoring](../test-authoring/SKILL.md).
 

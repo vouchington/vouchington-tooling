@@ -1,9 +1,13 @@
 ---
 name: backend-vitest-test-authoring
-description: Apply backend Vitest patterns for service, provider, persistence, and queue boundaries.
+description: Test backend persistence, providers, services, and queues with Vitest.
 ---
 
 # Backend Vitest test authoring
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/backend-vitest-test-authoring/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Apply [vitest-test-authoring](../vitest-test-authoring/SKILL.md) first.
 

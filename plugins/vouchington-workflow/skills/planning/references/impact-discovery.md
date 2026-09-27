@@ -5,5 +5,7 @@ tests. Use the repository's graph or search tools where available; otherwise rec
 used and the uncertainty that remains. Select focused tests from real dependents, then include
 broader validation when a shared contract, package boundary, or generated artifact changes.
 
+Check source-issue paths against current source before relying on them; issue text is a snapshot.
+
 Do not treat a tool's incomplete graph as proof that no dependent exists. Escalate uncertain
 high-risk boundaries for independent review or a broader test selection.

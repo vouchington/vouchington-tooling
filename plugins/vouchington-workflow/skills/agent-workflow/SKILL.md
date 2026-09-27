@@ -1,35 +1,25 @@
 ---
 name: agent-workflow
-description: 'Shared workflow guidance for repository implementation: inspect local instructions, keep changes bounded, validate, and prepare reviewable commits.'
+description: Implement and review repository changes within local policy.
 ---
 
 # Agent workflow
 
-Use this skill before implementation work. It supplies portable defaults; the repository's
-`AGENTS.md`, contribution guide, and CI configuration define the actual commands,
-branching, review, and release policy.
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/agent-workflow/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
-1. Inspect the current checkout and its status without discarding local work. Follow the consumer
-   repository's instructions for branch and worktree topology; do not create either implicitly.
-2. Read every applicable `AGENTS.md` from the repository root through each changed
-   file, then relevant documentation and tests. Apply the closest instruction only when rules
-   conflict, and treat all applicable local instructions as higher priority than this skill.
-3. Confirm the accepted task's boundary. Reuse existing ownership and utilities; ask before
-   widening scope or making an irreversible external change.
-4. Write a focused test first when behavior can be tested. Keep source, tests, docs, and generated
-   artifacts within the repository's stated size and formatting rules.
-5. Run the focused checks, then the local commands required for the changed surface. Report skipped
-   checks with a concrete reason.
-6. Review the diff for accidental files, secrets, generated output, broken documentation links,
-   and assumptions that belong in local instructions instead.
-7. When feedback arrives on an open change, give every surfaced item a disposition and drive it to
-   closure before hand-off; do not leave items unaddressed or silently absorb or defer them.
+Use before implementation. Inspect checkout status without discarding work; follow local branch,
+worktree, contribution, and CI policy. Read every applicable `AGENTS.md` from the repository root
+through changed files, plus relevant documentation and tests. Local instructions govern this skill.
 
-For portable implementation and review checks, read [implementation](references/implementation.md),
-[review](references/review.md), [review response](references/review-response.md), and
-[evidence sweep](references/evidence-sweep.md). The older
-[implementation and review](references/implementation-and-review.md) remains a compact overview.
-Local instructions remain authoritative for commands, commits, review systems, and release policy.
+- During implementation, use [implementation](references/implementation.md).
+- Before handoff, use [evidence sweep](references/evidence-sweep.md).
+- For review, use [review](references/review.md).
+- For surfaced feedback, use [review response](references/review-response.md).
+
+Load only the references required by the current phase. Keep scope changes explicit; a discovered
+blocker or follow-up does not authorize widening the task.
 
 Consumer wrapper or local instructions own: default branch, runner class, documentation root,
 review system, merge policy, and command catalog.

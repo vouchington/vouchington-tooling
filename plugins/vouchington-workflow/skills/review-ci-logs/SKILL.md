@@ -1,9 +1,13 @@
 ---
 name: review-ci-logs
-description: Audit CI failures or noisy logs, identify the root cause, and recommend diagnostics-preserving fixes.
+description: Diagnose CI failures and noise without weakening diagnostics.
 ---
 
 # Review CI logs
+
+Read applicable `AGENTS.md` and their declared adapter alias, otherwise
+`.agents/skills/review-ci-logs/SKILL.md` from the repository root if present.
+Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 Use when investigating a CI failure, repeated workflow noise, or misleading diagnostics. Read local
 `AGENTS.md`, workflow guidance, and CI documentation before inspecting runs.
