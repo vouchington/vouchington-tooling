@@ -95,9 +95,10 @@ export function collectEnvVarReferencesFromFile(
   referenceMatchers: EnvVarReferenceMatcher[],
   buckets: readonly import('./types.mts').SourceBucket[],
 ): void {
+  if (buckets.length === 0) return
+  const names = namesAlreadySeen(source, referenceMatchers)
   for (const bucket of buckets) {
-    for (const name of namesAlreadySeen(source, referenceMatchers))
-      addEnvVar(envVars, name, file, bucket)
+    for (const name of names) addEnvVar(envVars, name, file, bucket)
   }
 }
 
