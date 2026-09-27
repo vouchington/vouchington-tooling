@@ -37,7 +37,7 @@ Add detail only where the change warrants it:
 
 Put long comparisons, inventories, diagrams, calculations, and failure evidence in collapsed
 `<details>` sections. Keep the short conclusions and material risks outside them. Keep the
-repository's top-level section headings outside disclosure containers. Put opening/closing tags
+consumer's required visible core headings outside disclosure containers. Put opening/closing tags
 on separate lines, with a blank line after `</summary>` and before `</details>` so Markdown renders.
 Read [description examples](references/examples.md) when choosing a comparison, diagram, or failure
 record.
