@@ -14,6 +14,10 @@ Apply this baseline unless a stricter local rule overrides it.
 - Use `pull_request` for pull-request workflows in private repositories.
 - Reserve `pull_request_target` for base-owned orchestration in a public repository, or for a
   narrowly scoped Dependabot or Renovate workflow.
+- A pull-request CI workflow must not subscribe to `ready_for_review` or `converted_to_draft`
+  unless a job changes what it does on that transition. Those activity types start another run for
+  the same head, and `cancel-in-progress: true` replaces checks that already passed. Dependabot
+  auto-merge may keep `ready_for_review`: it enables merge and does not rerun tests.
 - A privileged workflow must not check out or execute untrusted pull-request content.
 - When changing orchestration, load
   [github-actions-authoring](../github-actions-authoring/SKILL.md). Do not poll remote workflow,
