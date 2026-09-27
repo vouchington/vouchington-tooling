@@ -65,23 +65,33 @@ function assessment(title: string, value: FeedbackAssessment): string {
   return `## ${title}\nStatus: ${value.status.replaceAll('-', ' ')}${value.reason ? ` (${value.reason})` : ''}\n${lines.join('\n')}`
 }
 function unavailable(marker: string, input: Unassessed): string {
+  if (input.status !== 'unavailable' && input.status !== 'not-assessed')
+    throw new Error('unassessed status must be unavailable or not-assessed')
   if (!input.reason.trim() || Buffer.byteLength(input.reason) > 240)
     throw new Error('unavailable reason must be bounded and explicit')
   return `${marker}\nStatus: ${input.status.replaceAll('-', ' ')} (${input.reason})`
 }
 export async function composeRetrospective(input: RetrospectiveCompositionInput): Promise<string> {
-  const [facts, transcript, friction] = await Promise.all([
+  const unavailableFacts =
     'status' in input.facts
-      ? Promise.resolve({
+      ? {
           markdown: unavailable('=== Retrospective Facts ===', input.facts),
           coverage: input.facts.status,
-        })
-      : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
+        }
+      : undefined
+  const unavailableTranscript =
     'status' in input.transcript
-      ? Promise.resolve({
+      ? {
           markdown: unavailable('=== Transcript Facts ===', input.transcript),
           coverage: input.transcript.status,
-        })
+        }
+      : undefined
+  const [facts, transcript, friction] = await Promise.all([
+    'status' in input.facts
+      ? Promise.resolve(unavailableFacts!)
+      : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
+    'status' in input.transcript
+      ? Promise.resolve(unavailableTranscript!)
       : runRetrospectiveTranscriptReport(input.transcript),
     input.friction
       ? buildSessionFrictionReport(input.sessionId, input.friction)

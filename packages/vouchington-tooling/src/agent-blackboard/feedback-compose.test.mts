@@ -169,3 +169,27 @@ it('rejects aggregate drop counts below observed friction drops without double c
     await rm(directory, { recursive: true, force: true })
   }
 })
+it('rejects invalid unassessed statuses before invoking either collector', async () => {
+  let calls = 0
+  const execute = async () => {
+    calls++
+    return { ok: false, stdout: '', stderr: '' }
+  }
+  for (const status of ['complete', 'partial', '', ['unavailable'], {}, 1, null]) {
+    const invalid = { status, reason: 'no evidence selected' }
+    await expect(
+      composeRetrospective({
+        ...input(),
+        facts: invalid as RetrospectiveCompositionInput['facts'],
+      }),
+    ).rejects.toThrow(/unassessed status/)
+    await expect(
+      composeRetrospective({
+        ...input(),
+        facts: { repo: 'owner/repo', pr: '1', execute },
+        transcript: invalid as RetrospectiveCompositionInput['transcript'],
+      }),
+    ).rejects.toThrow(/unassessed status/)
+  }
+  expect(calls).toBe(0)
+})
