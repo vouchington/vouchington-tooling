@@ -6,7 +6,7 @@ description: Distill completed session records into a small set of verified, act
 # Retrospective distillation
 
 Use when completed retrospectives or journals should become durable follow-up work. Read local
-`AGENTS.md`, `CLAUDE.md`, issue policy, and journal retention rules before any mutation.
+`AGENTS.md`, issue policy, and journal retention rules before any mutation.
 
 1. Enumerate only completed, eligible session records. For repository-scoped work, filter sessions
    by repository membership and use only entries attributed to that repository. Leave untagged

@@ -94,7 +94,7 @@ Apply this baseline unless a stricter local rule overrides it.
 
 ## Edit
 
-1. Read every applicable `AGENTS.md` and `CLAUDE.md` from the repository root through the workflow,
+1. Read every applicable `AGENTS.md` from the repository root through the workflow,
    plus CI docs and callers. On conflict, apply the closest instruction. Name trusted inputs,
    untrusted inputs, and every credential boundary.
 2. Give each job the least permissions it needs. Keep untrusted pull-request content out of shell

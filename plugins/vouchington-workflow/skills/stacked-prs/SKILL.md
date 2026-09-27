@@ -6,7 +6,7 @@ description: Recognize a native GitHub stacked pull request and drain it from th
 # Stacked pull requests
 
 Use when a change is a chain of native GitHub stacked pull requests. Read local `AGENTS.md` and
-`CLAUDE.md` first. They own whether this repository stacks, which tool creates, rebases, and merges
+`AGENTS.md` first. They own whether this repository stacks, which tool creates, rebases, and merges
 a stack, and who may authorize a merge.
 
 - Each pull request except the bottom one targets the pull request below it. The bottom pull
