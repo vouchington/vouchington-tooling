@@ -1,3 +1,4 @@
+import { feedbackDeadline } from './feedback-deadline.mts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -243,4 +244,13 @@ it('keeps ensure failures classified as outages when fetched metadata does not e
         dependencies: provider({ error: new Error('private outage'), existing }),
       }),
     ).rejects.toMatchObject({ diagnostic: 'blackboard-unavailable' })
+})
+
+it('propagates a synchronous operation failure before allocating its deadline timer', async () => {
+  const failure = new Error('operation could not start')
+  await expect(
+    feedbackDeadline(() => {
+      throw failure
+    }),
+  ).rejects.toBe(failure)
 })

@@ -296,3 +296,49 @@ it('classifies actual SDK identity mismatches as hard conflicts while retaining 
     diagnostic: 'identity-conflict',
   })
 })
+
+it('delivers journal defaults and replays through the consumer context with default credentials', async () => {
+  const service = await provider()
+  vi.stubEnv('AGENT_BLACKBOARD_URL', service.env.AGENT_BLACKBOARD_URL)
+  vi.stubEnv('AGENT_BLACKBOARD_TOKEN', service.env.AGENT_BLACKBOARD_TOKEN)
+  const path = await directory()
+  const note = join(await directory(), 'note.md')
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(note, 'Finding with optional journal metadata')
+  await expect(
+    appendJournal({
+      ...identity,
+      parentSessionId: 'native:parent',
+      markdownFile: note,
+      repositories: ['owner/repo'],
+      sourceEventId: 'journal:defaults',
+      workOutcome: 'in-progress',
+      feedbackCoverage: { status: 'partial', sources: ['note'], droppedCount: 0 },
+      mode: 'interactive',
+      outboxDirectory: path,
+      category: 'tooling',
+      timeoutMs: 20_000,
+      dependencies: { resolveFrom: import.meta.url },
+    }),
+  ).resolves.toMatchObject({ status: 'delivered', pendingCount: 0 })
+  expect(service.entries[0]?.data).toMatchObject({
+    category: 'tooling',
+    sourceEventId: 'journal:defaults',
+  })
+  expect(service.session).toMatchObject({ parentSessionId: 'native:parent' })
+  const failed = await writeFeedback({
+    identity: { ...identity, parentSessionId: 'native:parent' },
+    envelope: envelope('replay:defaults'),
+    mode: 'interactive',
+    outboxDirectory: path,
+    env: {},
+  })
+  expect(failed.status).toBe('pending')
+  await expect(
+    flushFeedbackOutbox({ directory: path, dependencies: { resolveFrom: import.meta.url } }),
+  ).resolves.toMatchObject({
+    status: 'empty',
+    deliveredCount: 1,
+    pendingCount: 0,
+  })
+})

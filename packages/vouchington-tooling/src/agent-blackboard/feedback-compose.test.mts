@@ -193,3 +193,17 @@ it('rejects invalid unassessed statuses before invoking either collector', async
   }
   expect(calls).toBe(0)
 })
+
+it('preserves untracked findings without inventing a tracking reference', async () => {
+  const current = input()
+  current.tools.findings = [
+    {
+      observation: 'Recovered tool failure',
+      evidence: 'Observed successful retry',
+      disposition: 'resolved',
+    },
+  ]
+  const markdown = await composeRetrospective(current)
+  expect(markdown).toContain('Evidence: Observed successful retry')
+  expect(markdown).not.toContain('Tracking:')
+})

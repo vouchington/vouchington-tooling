@@ -121,7 +121,7 @@ export function readFrictionLog(
             droppedCount++
           }
         }
-        const coverage = droppedCount ? { truncated: true, droppedCount } : {}
+        const coverage = droppedCount ? { truncated: true as const, droppedCount } : {}
         return events.length
           ? { status: 'events', events, ...coverage }
           : { status: 'empty', ...coverage }

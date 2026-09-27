@@ -25,10 +25,13 @@ export type PermissionRequestObservation = {
 
 export type FrictionObservation = ToolResultObservation | PermissionRequestObservation
 
+type FrictionLogCoverage =
+  | { truncated: true; droppedCount: number }
+  | { truncated?: false; droppedCount?: never }
 export type FrictionLogReadResult =
   | { status: 'absent' }
-  | { status: 'empty'; truncated?: boolean; droppedCount?: number }
-  | { status: 'events'; events: FrictionEvent[]; truncated?: boolean; droppedCount?: number }
+  | ({ status: 'empty' } & FrictionLogCoverage)
+  | ({ status: 'events'; events: FrictionEvent[] } & FrictionLogCoverage)
 
 export type FrictionLogOptions = {
   directory: string

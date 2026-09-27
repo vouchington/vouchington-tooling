@@ -67,9 +67,9 @@ function errorMessage(error: unknown): string {
 
 function sandboxMarkdown(friction: FrictionLogReadResult): string {
   if (friction.status === 'events')
-    return `${friction.truncated ? `## Capture Coverage\nStatus: partial\nDropped records: ${friction.droppedCount ?? 0}\n\n` : ''}${buildSandboxSection(friction.events)}`
+    return `${friction.truncated ? `## Capture Coverage\nStatus: partial\nDropped records: ${friction.droppedCount}\n\n` : ''}${buildSandboxSection(friction.events)}`
   if (friction.status === 'empty' && friction.truncated)
-    return `## Sandbox & Permission Audit\nStatus: unavailable (partial capture; dropped ${friction.droppedCount ?? 0} records)`
+    return `## Sandbox & Permission Audit\nStatus: unavailable (partial capture; dropped ${friction.droppedCount} records)`
   const status = friction.status === 'empty' ? 'none observed' : 'unavailable (no friction log)'
   return `## Sandbox & Permission Audit\nStatus: ${status}`
 }
