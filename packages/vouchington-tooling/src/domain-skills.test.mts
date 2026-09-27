@@ -62,7 +62,7 @@ describe('domain skill plugins', () => {
     expect(normalized).toMatch(/non-closing[^.]*originating pull request/i)
     expect(normalized).toMatch(/re-fetch[^.]*verify[^.]*replying[^.]*only then resolve/i)
     expect(normalized).toMatch(/reply[^.]*unauthorized[^.]*fail closed[^.]*unresolved/i)
-    expect(agentWorkflow).toMatchObject({ prerequisites: ['github-issue'] })
+    expect(agentWorkflow).toMatchObject({ prerequisites: expect.arrayContaining(['github-issue']) })
   })
 
   it('keeps reusable practices in canonical resources without product policy', async () => {

@@ -13,6 +13,11 @@ Use before implementation. Inspect checkout status without discarding work; foll
 worktree, contribution, and CI policy. Read every applicable `AGENTS.md` from the repository root
 through changed files, plus relevant documentation and tests. Local instructions govern this skill.
 
+Use [PR descriptions](../pr-description/SKILL.md) before creating or updating a pull request.
+Diagnose failed CI with [CI-log review](../review-ci-logs/SKILL.md), then update confirmed harness
+gaps before handoff. Keep those records after checks pass; routine local successes stay in the
+evidence record.
+
 - During implementation, use [implementation](references/implementation.md).
 - Before handoff, use [evidence sweep](references/evidence-sweep.md).
 - For review, use [review](references/review.md).
