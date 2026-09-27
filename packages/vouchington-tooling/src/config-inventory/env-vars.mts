@@ -103,9 +103,7 @@ export function collectEnvVarReferencesFromFile(
 
 function matchEnvNames(source: string, pattern: RegExp): string[] {
   if (pattern === PROCESS_ENV_PATTERNS[2]) {
-    return [...source.matchAll(pattern)].flatMap((match) =>
-      parseDestructuredEnvNames(match[1] ?? ''),
-    )
+    return [...source.matchAll(pattern)].flatMap((match) => parseDestructuredEnvNames(match[1]!))
   }
   return matchNames(source, pattern)
 }

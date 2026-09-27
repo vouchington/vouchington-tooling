@@ -50,9 +50,10 @@ their first value until a recognized higher rank is supplied. Markdown includes 
 Docker build-argument evidence alongside other row fields; JSON remains the machine-readable form.
 
 Discovery is a conservative syntax scan, not a TypeScript data-flow analysis. Supported local
-wrappers are function declarations with simple parameters and direct indexed environment reads;
-dynamic names without supplied constants cannot be enumerated. Arbitrary comments or strings may
-look like syntax. Use the result as review evidence rather than a security proof or exhaustive
-runtime dependency graph. YAML parse failures produce no package-gate rows for that file.
+wrappers are function declarations with direct indexed environment reads. A destructured parameter
+before the env-name parameter retains its argument position, but destructured values are not
+analyzed. Dynamic names without supplied constants cannot be enumerated. Arbitrary comments or
+strings may look like syntax. Use the result as review evidence rather than a security proof or
+exhaustive runtime dependency graph. YAML parse failures produce no package-gate rows for that file.
 
 See the [package README](../packages/vouchington-tooling/README.md) for other libraries.

@@ -20,7 +20,7 @@ export function matchLocalEnvWrapperCallNames(
     const functionName = match[1]!
     const envNameArgumentIndex = envNameArgumentIndexes.get(functionName)
     if (envNameArgumentIndex === undefined) continue
-    const args = splitCallArguments(match[2] ?? '')
+    const args = splitCallArguments(match[2]!)
     const name = envNameFromArgument(args[envNameArgumentIndex], envConstants)
     if (name) names.add(name)
   }
@@ -38,7 +38,7 @@ export function matchLocalEnvWrapperCallPrefixes(
     const functionName = match[1]!
     const envNameArgumentIndex = envNameArgumentIndexes.get(functionName)
     if (envNameArgumentIndex === undefined) continue
-    const args = splitCallArguments(match[2] ?? '')
+    const args = splitCallArguments(match[2]!)
     const prefix = envNamePrefixFromArgument(args[envNameArgumentIndex], envConstants)
     if (prefix) prefixes.add(prefix)
   }
@@ -60,8 +60,8 @@ function findLocalEnvWrapperArgumentIndexes(source: string): Map<string, number>
   const indexes = new Map<string, number>()
   for (const match of source.matchAll(FUNCTION_DECLARATION_PATTERN)) {
     const functionName = match[1]!
-    const params = parseParameterNames(match[2] ?? '')
-    const body = match[3] ?? ''
+    const params = parseParameterNames(match[2]!)
+    const body = match[3]!
     const processEnvParams = new Set(
       [...body.matchAll(PROCESS_ENV_PARAM_PATTERN)].map((item) => item[1]!),
     )
@@ -100,9 +100,9 @@ function addEnvObjectWrapperIndexes(
 }
 
 function parseParameterNames(parameters: string): string[] {
-  return splitCallArguments(parameters).flatMap((parameter) => {
+  return splitCallArguments(parameters).map((parameter) => {
     const name = parameter.trim().match(/^([a-zA-Z_$][\w$]*)\b/)?.[1]
-    return name ? [name] : []
+    return name ?? ''
   })
 }
 

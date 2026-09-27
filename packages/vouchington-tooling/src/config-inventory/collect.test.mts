@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { collectConfigInventory, formatConfigInventoryMarkdown } from './index.mts'
 import { addEnvVar } from './env-var-accumulator.mts'
+import { matchNames } from './shared.mts'
 import type { EnvVarAccumulator } from './types.mts'
 import type { ConfigInventoryOptions, ConfigSourceRules } from './index.mts'
 
@@ -145,6 +146,21 @@ describe('configuration inventory', () => {
     }
   })
 
+  it('keeps wrapper argument positions when an earlier parameter is destructured', () => {
+    const source = [
+      'function read({ ignored }: { ignored: string }, name: string) {',
+      '  return process.env[name]',
+      '}',
+      "read({ ignored: 'x' }, 'AFTER_DESTRUCTURED')",
+    ].join('\n')
+    const result = inventory({ 'service.ts': source })
+    expect(result.envVars.map((row) => row.name)).toEqual(['AFTER_DESTRUCTURED'])
+  })
+
+  it('ignores regular-expression matches with no participating name capture', () => {
+    expect(matchNames('A AB', /A(B)?/g)).toEqual(['B'])
+  })
+
   it('merges contract metadata and applies caller annotations after evidence collection', () => {
     const result = inventory(
       { 'src.ts': 'process.env.API_KEY' },
@@ -204,6 +220,21 @@ describe('configuration inventory', () => {
       },
     )
     expect(result.envVars[0]?.sensitivity).toBe('restricted')
+  })
+
+  it('does not promote an unranked sensitivity over a ranked one', () => {
+    const result = inventory(
+      {},
+      {},
+      {
+        envContract: [
+          { name: 'CREDENTIAL', sensitivity: 'public' },
+          { name: 'CREDENTIAL', sensitivity: 'unranked' },
+        ],
+        sensitivityOrder: ['public', 'restricted'],
+      },
+    )
+    expect(result.envVars[0]?.sensitivity).toBe('public')
   })
 
   it('retains ARG and ENV when they are real environment variables', () => {
