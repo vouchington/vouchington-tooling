@@ -2,6 +2,9 @@
 
 Libraries and the `vouchington` CLI.
 
+The [workflow and compiler primitives](docs/workflow-and-compiler.md) provide consumer supplied
+GitHub Actions policy checks and compiler host freshness with bounded build settlement.
+
 ```bash
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast

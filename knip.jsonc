@@ -49,6 +49,8 @@
         "src/swift-source-offset/index.mts!",
         "src/swift-resolved-pin-delta/index.mts!",
         "src/gh-cli/index.mts!",
+        "src/workflow-policy/index.mts!",
+        "src/compiler-build/index.mts!",
         "src/github-projects/index.mts!",
         "src/markdown/index.mts!",
       ],

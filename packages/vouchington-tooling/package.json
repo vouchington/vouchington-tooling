@@ -303,6 +303,16 @@
       "import": "./dist/gh-cli/index.mjs",
       "default": "./dist/gh-cli/index.mjs"
     },
+    "./workflow-policy": {
+      "types": "./dist/workflow-policy/index.d.mts",
+      "import": "./dist/workflow-policy/index.mjs",
+      "default": "./dist/workflow-policy/index.mjs"
+    },
+    "./compiler-build": {
+      "types": "./dist/compiler-build/index.d.mts",
+      "import": "./dist/compiler-build/index.mjs",
+      "default": "./dist/compiler-build/index.mjs"
+    },
     "./github-projects": {
       "types": "./dist/github-projects/index.d.mts",
       "import": "./dist/github-projects/index.mjs",
