@@ -28,6 +28,11 @@
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
+    "./config-inventory": {
+      "types": "./dist/config-inventory/index.d.mts",
+      "import": "./dist/config-inventory/index.mjs",
+      "default": "./dist/config-inventory/index.mjs"
+    },
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
