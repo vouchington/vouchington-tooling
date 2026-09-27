@@ -23,7 +23,6 @@ export type ParsedCli =
   | { kind: 'error'; message: string }
   | { kind: 'runner-port-policy'; file?: string; reserved?: number }
   | { kind: 'with-host-lock'; args: string[] }
-  | { kind: 'agent-harness-config'; args: string[] }
   | { kind: 'script'; command: ScriptCommand; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
