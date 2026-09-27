@@ -8,7 +8,7 @@ export type ContractSchemaNode =
   | { type: 'null' }
   | { type: 'boolean' }
   | { type: 'number' }
-  | { type: 'string'; format?: 'uuid' }
+  | { type: 'string'; format?: 'uuid' | 'binary' }
   | { type: 'literal'; value: boolean | number | string }
   | {
       type: 'array'

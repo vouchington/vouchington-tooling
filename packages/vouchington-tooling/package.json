@@ -178,6 +178,11 @@
       "import": "./dist/api-fixtures/index.mjs",
       "default": "./dist/api-fixtures/index.mjs"
     },
+    "./api-contract-discovery": {
+      "types": "./dist/api-contract-discovery/index.d.mts",
+      "import": "./dist/api-contract-discovery/index.mjs",
+      "default": "./dist/api-contract-discovery/index.mjs"
+    },
     "./transient-retry": {
       "types": "./dist/transient-retry/index.d.mts",
       "import": "./dist/transient-retry/index.mjs",
@@ -343,10 +348,14 @@
     "agent-blackboard": "^0.6.0"
   },
   "peerDependencies": {
-    "typescript": ">=5"
+    "typescript": ">=5",
+    "vitest": ">=5"
   },
   "peerDependenciesMeta": {
     "typescript": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

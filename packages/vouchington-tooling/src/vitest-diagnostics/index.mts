@@ -1,5 +1,34 @@
 import { join, posix, win32 } from 'node:path'
 
+export {
+  registerForkExitSentinel,
+  setCurrentForkExitModule,
+  setCurrentForkExitProject,
+} from './vitest-fork-exit-sentinel.mts'
+export type { ForkExitSentinelOptions } from './vitest-fork-exit-sentinel.mts'
+export {
+  clearForkExitRecords,
+  formatForkExitSentinelSection,
+  readForkExitRecords,
+  summarizeForkExitRecords,
+} from './vitest-fork-exit-records.mts'
+export type { ForkExitSentinelRecord, ForkExitRecordSummary } from './vitest-fork-exit-records.mts'
+export {
+  createVitestWorkerExitDiagnosticsReporter,
+  formatWorkerExitDiagnostics,
+  isWorkerExitError,
+} from './vitest-worker-exit-diagnostics-reporter.mts'
+export {
+  createForkLeakDetector,
+  formatForkLeakDiagnostics,
+  waitForResourceCloseCallbacks,
+} from './vitest-fork-leak-detection.mts'
+export type {
+  ForkLeakDetector,
+  ForkLeakDetectorOptions,
+  ForkLeakVerdict,
+} from './vitest-fork-leak-detection.mts'
+
 import { isDiagnosticReportDirectoryCurrent, readDiagnosticReportDirectory } from './directory.mts'
 import { readBoundedRegularFile } from './read-file.mts'
 
