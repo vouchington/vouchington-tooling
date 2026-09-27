@@ -9,8 +9,13 @@ const KIND_ORDER: FrictionEventKind[] = [
 ]
 
 export function buildSandboxSection(events: FrictionEvent[]): string {
+  const observations = events.flatMap((event) =>
+    event.failure
+      ? [event, { ...event, kind: event.failure.kind, detail: event.failure.detail }]
+      : [event],
+  )
   const groups = KIND_ORDER.map((kind) => {
-    const selected = events.filter((event) => event.kind === kind)
+    const selected = observations.filter((event) => event.kind === kind)
     return selected.length
       ? [
           `- ${kind} (${selected.length})`,
@@ -21,5 +26,5 @@ export function buildSandboxSection(events: FrictionEvent[]): string {
         ].join('\n')
       : undefined
   }).filter((group): group is string => group !== undefined)
-  return `${SANDBOX_SECTION_HEADER}\nEvents observed: ${events.length}\n\n${groups.join('\n')}`
+  return `${SANDBOX_SECTION_HEADER}\nEvents observed: ${observations.length}\n\n${groups.join('\n')}`
 }

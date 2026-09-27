@@ -81,7 +81,10 @@ export async function flushFeedbackOutbox(input: {
       removeFeedbackOutbox(input.directory, record)
       deliveredCount++
     } catch (error) {
-      diagnostic = feedbackDiagnostic(error)
+      const current = feedbackDiagnostic(error)
+      diagnostic ??= current
+      if (['identity-conflict', 'event-conflict', 'archived-session'].includes(current)) continue
+      diagnostic = current
       break
     }
   }

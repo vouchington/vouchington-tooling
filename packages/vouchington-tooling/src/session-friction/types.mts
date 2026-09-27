@@ -6,6 +6,7 @@ export type FrictionEvent = {
   commandPrefix: string
   detail: string
   outcome?: 'requested' | 'approved' | 'denied' | 'unknown'
+  failure?: { kind: 'sandbox-failure' | 'ambiguous-failure'; detail: string }
 }
 
 export type ToolResultObservation = {

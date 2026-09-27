@@ -16,9 +16,21 @@ export function validEvent(value: unknown): value is FrictionEvent {
     isSafeAuditText(record.timestamp) &&
     isSafeAuditText(record.commandPrefix) &&
     isSafeAuditText(record.detail) &&
+    (record.failure === undefined || validFailure(record.failure)) &&
     (record.outcome === undefined ||
       (typeof record.outcome === 'string' &&
         ['requested', 'approved', 'denied', 'unknown'].includes(record.outcome)))
+  )
+}
+
+function validFailure(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  // oxlint-disable-next-line no-mistakes/ts-no-const-aliases -- establish a validated object view
+  const failure = value as Record<string, unknown>
+  return (
+    Object.keys(failure).length === 2 &&
+    (failure.kind === 'sandbox-failure' || failure.kind === 'ambiguous-failure') &&
+    isSafeAuditText(failure.detail)
   )
 }
 
@@ -61,7 +73,7 @@ export function readLogContent(descriptor: number, maximumBytes = LOG_MAX_BYTES)
   return decodeUtf8(buffer.subarray(0, length))
 }
 
-function validEventCount(content: string, limit: number): number {
+export function validEventCount(content: string, limit: number): number {
   let count = 0
   for (const line of content.split('\n')) {
     if (!line.trim()) continue
@@ -71,10 +83,6 @@ function validEventCount(content: string, limit: number): number {
     if (count >= limit) break
   }
   return count
-}
-
-export function atEventLimit(content: string, limit: number): boolean {
-  return validEventCount(content, limit) >= limit
 }
 
 export function writeAll(descriptor: number, value: string): void {

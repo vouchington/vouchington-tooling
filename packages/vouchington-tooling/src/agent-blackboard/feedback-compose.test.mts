@@ -207,3 +207,14 @@ it('preserves untracked findings without inventing a tracking reference', async 
   expect(markdown).toContain('Evidence: Observed successful retry')
   expect(markdown).not.toContain('Tracking:')
 })
+
+it('validates optional tracking references before rendering their text', async () => {
+  for (const trackingReference of ['', 'é'.repeat(121), ['owner/repo#1'], '\u0000', 42]) {
+    const current = input()
+    current.tools.findings![0]!.trackingReference = trackingReference as string
+    await expect(composeRetrospective(current)).rejects.toThrow(/assessment tracking reference/)
+  }
+  const current = input()
+  current.tools.findings![0]!.trackingReference = 'é'.repeat(120)
+  expect(await composeRetrospective(current)).toContain('Tracking: ' + 'é'.repeat(120))
+})

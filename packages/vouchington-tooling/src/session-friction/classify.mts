@@ -74,21 +74,25 @@ export function classifyFrictionObservation(
     !['approved', 'denied'].includes(observation.permissionOutcome)
   )
     return null
-  if (escalationDetail || observation.permissionOutcome) {
-    return {
-      kind: 'sandbox-escalation',
-      commandPrefix,
-      detail: escalationDetail || `permission-${observation.permissionOutcome}`,
-      outcome: observation.permissionOutcome ?? 'unknown',
-    }
-  }
+  const permission: Omit<FrictionEvent, 'timestamp'> | null =
+    escalationDetail || observation.permissionOutcome
+      ? {
+          kind: 'sandbox-escalation',
+          commandPrefix,
+          detail: escalationDetail || `permission-${observation.permissionOutcome}`,
+          outcome: observation.permissionOutcome ?? 'unknown',
+        }
+      : null
   const rawStderr = observation.structuredStderr
   if (rawStderr !== undefined && (typeof rawStderr !== 'string' || !isWellFormedUnicode(rawStderr)))
     return null
   const stderr = rawStderr ? boundedStderr(rawStderr) : rawStderr
-  if (stderr === undefined) return null
+  if (stderr === undefined) return permission
   const token = FAILURE_TOKENS.find(([, pattern]) => pattern.test(stderr))?.[0]
-  if (token) return { kind: 'sandbox-failure', commandPrefix, detail: `stderr matched "${token}"` }
+  if (token) {
+    const failure = { kind: 'sandbox-failure' as const, detail: `stderr matched "${token}"` }
+    return permission ? { ...permission, failure } : { ...failure, commandPrefix }
+  }
   if (
     stderr.split(/\r\n|[\r\n]/).some((rawLine) => {
       const line = withoutUrlUserinfo(rawLine)
@@ -97,11 +101,11 @@ export function classifyFrictionObservation(
       )
     })
   ) {
-    return {
-      kind: 'ambiguous-failure',
-      commandPrefix,
+    const failure = {
+      kind: 'ambiguous-failure' as const,
       detail: 'localhost connection refused; sandbox cause unverified',
     }
+    return permission ? { ...permission, failure } : { ...failure, commandPrefix }
   }
-  return null
+  return permission
 }

@@ -64,7 +64,7 @@ it('keeps requested permissions distinct from actual decisions and localhost cau
   ).toMatchObject({ kind: 'ambiguous-failure' })
 })
 
-it('reports a saturated coverage ledger as a capture failure and preserves prior drop evidence', async () => {
+it('preserves historical drop markers in a full event log while recording new drops in bounded state', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'friction-full-coverage-'))
   try {
     const options = { directory, maxEvents: 1 }
@@ -75,12 +75,10 @@ it('reports a saturated coverage ledger as a capture failure and preserves prior
     const count = Math.floor((2_000_000 - Buffer.byteLength(event)) / Buffer.byteLength(marker))
     const prefix = event + marker.repeat(count)
     await writeFile(path, prefix + ' '.repeat(2_000_000 - Buffer.byteLength(prefix)))
-    expect(() =>
-      recordFriction('owner', { type: 'permission-request', command: 'git push' }, options),
-    ).toThrow(/capture incomplete/)
+    recordFriction('owner', { type: 'permission-request', command: 'git push' }, options)
     expect(readFrictionLog('owner', options)).toMatchObject({
       truncated: true,
-      droppedCount: count,
+      droppedCount: count + 1,
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
@@ -115,4 +113,63 @@ it('reports dropped-only capture as unavailable rather than observed clean', asy
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+it('retains approved permission and failure facts from the same result in the stored audit', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'friction-combined-'))
+  try {
+    for (const structuredStderr of ['EPERM', 'ECONNREFUSED localhost:5432']) {
+      recordFriction(
+        'owner',
+        {
+          type: 'tool-result',
+          command: 'node test',
+          permissionOutcome: 'approved',
+          structuredStderr,
+        },
+        { directory },
+      )
+    }
+    const log = readFrictionLog('owner', { directory })
+    expect(log).toMatchObject({
+      status: 'events',
+      events: [
+        {
+          kind: 'sandbox-escalation',
+          outcome: 'approved',
+          failure: { kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' },
+        },
+        { kind: 'sandbox-escalation', outcome: 'approved', failure: { kind: 'ambiguous-failure' } },
+      ],
+    })
+    const report = await buildSessionFrictionReport('owner', {
+      directory,
+      journalLoader: () => ({ status: 'not-found' }),
+    })
+    expect(report.markdown).toContain('sandbox-escalation (2)')
+    expect(report.markdown).toContain('sandbox-failure (1)')
+    expect(report.markdown).toContain('ambiguous-failure (1)')
+    expect(report.markdown.match(/outcome: approved/g)).toHaveLength(2)
+    expect(report.markdown).toContain('Events observed: 4')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('retains escalation and a simultaneous failure', () => {
+  expect(
+    classifyFrictionObservation({
+      type: 'tool-result',
+      command: 'rtk git push',
+      commandWrappers: ['rtk'],
+      escalationDetail: 'sandbox override',
+      structuredStderr: 'EPERM',
+    }),
+  ).toEqual({
+    kind: 'sandbox-escalation',
+    commandPrefix: 'rtk git push',
+    detail: 'sandbox override',
+    outcome: 'unknown',
+    failure: { kind: 'sandbox-failure', detail: 'stderr matched "EPERM"' },
+  })
 })

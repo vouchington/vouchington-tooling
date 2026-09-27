@@ -382,15 +382,18 @@ absolute log directory, host-independent observation, and journal loader; it doe
 environment variables, install hooks, or connect to a journal service by itself. Invoking
 `recordFriction` touches the session log even when no event is classified, preserving the
 difference between an observed clean session and missing evidence. Report markdown keeps backend
-diagnostics separate from its paste-safe output. Capture stores at most 500 events per session and records overflow markers with visible
-`truncated`/`droppedCount` metadata. Malformed records also make the scan partial. It
+diagnostics separate from its paste-safe output. Capture stores at most 500 events per session and counts rejected captures in a fixed-size atomic
+sidecar under the same session lock for either the event or byte limit, with visible `truncated`/`droppedCount` metadata. Saturated
+capture reads only the bounded counter; reports also preserve historical overflow markers.
+Interrupted or inconsistent counter updates make coverage unavailable. Malformed records also make the scan partial. It
 truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
 when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
 Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
 Report liveness inherits the caller-supplied journal loader, which must bound its own I/O and yields.
 Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
 and rendered audit fields at 120 escaped characters. Permission requests record requested outcomes; explicit result observations may record approved
-or denied outcomes. Escalation detail without a decision remains unknown. Localhost connection
+or denied outcomes. A decision and simultaneous tool failure are both retained and counted in
+the report. Escalation detail without a decision remains unknown. Localhost connection
 refusal is an ambiguous failure and does not establish a sandbox cause. The supplied log directory must be dedicated
 to session-friction; existing directories must already be owner-only, while newly created
 directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
@@ -516,7 +519,8 @@ are removed only after matching readback. Pending state includes count and a saf
 interactive CLI exit zero means durable retention, and callers must inspect the printed status to
 know whether delivery was acknowledged. Autonomous errors and unpersisted writes fail nonzero.
 Identity, content, and archived-session conflicts fail in either mode while preserving the unsent
-record; they are not reported as transient pending delivery.
+record; they are not reported as transient pending delivery. Replay retains permanently conflicted
+records and continues to deliver unrelated pending records; transient failures stop that replay.
 
 Autonomous mode prohibits the filesystem outbox. `autonomousGate` requires a fresh source-event
 write plus readback; reusing an earlier admission source ID blocks admission. Trusted controllers

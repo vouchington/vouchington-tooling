@@ -12,6 +12,7 @@ import {
   type SessionFrictionReport,
 } from '../session-friction/index.mts'
 import { createFeedbackEnvelope, redactFeedbackText } from './feedback-codec.mts'
+import { validateFeedbackText } from './feedback-fields.mts'
 import type { FeedbackCoverage, FeedbackReference, WorkOutcome } from './feedback-types.mts'
 export type FeedbackAssessment = {
   status: 'findings' | 'none-observed' | 'not-assessed' | 'unavailable'
@@ -60,6 +61,8 @@ function assessment(title: string, value: FeedbackAssessment): string {
         throw new Error(
           'assessment finding must contain bounded observation, evidence and disposition',
         )
+    if (finding.trackingReference !== undefined)
+      validateFeedbackText(finding.trackingReference, 'assessment tracking reference', 240)
     return `- ${finding.observation}\n  - Evidence: ${finding.evidence}\n  - Disposition: ${finding.disposition}${finding.trackingReference ? `\n  - Tracking: ${finding.trackingReference}` : ''}`
   })
   return `## ${title}\nStatus: ${value.status.replaceAll('-', ' ')}${value.reason ? ` (${value.reason})` : ''}\n${lines.join('\n')}`

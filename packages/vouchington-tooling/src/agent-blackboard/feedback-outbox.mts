@@ -125,9 +125,14 @@ export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxR
     try {
       writeAll(descriptor, serialized)
       fsyncSync(descriptor)
-    } finally {
+    } catch (error) {
       closeSync(descriptor)
+      try {
+        unlinkSync(temporary)
+      } catch {}
+      throw error
     }
+    closeSync(descriptor)
     try {
       renameSync(temporary, join(path, name))
       syncDirectory(path)

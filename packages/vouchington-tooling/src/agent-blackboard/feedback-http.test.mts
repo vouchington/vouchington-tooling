@@ -385,3 +385,35 @@ it('delivers journal defaults and replays through the consumer context with defa
     pendingCount: 0,
   })
 })
+
+it('replays healthy records behind a permanent conflicting record while preserving the conflict', async () => {
+  const service = await provider()
+  const path = await directory()
+  for (const id of ['blocked:one', 'healthy:two'])
+    await writeFeedback({
+      identity,
+      envelope: envelope(id),
+      mode: 'interactive',
+      outboxDirectory: path,
+      env: {},
+    })
+  const { listFeedbackOutbox } = await import('./feedback-outbox.mts')
+  const records = listFeedbackOutbox(path)
+  service.entries.push({
+    createdAt: '2026-01-01T00:00:00.000Z',
+    data: { ...records[0]!.envelope, markdown: 'Different retained provider finding' },
+  })
+  const result = await flushFeedbackOutbox({ directory: path, env: service.env, dependencies })
+  expect(result).toMatchObject({
+    status: 'pending',
+    pendingCount: 1,
+    deliveredCount: 1,
+    diagnostic: 'event-conflict',
+  })
+  expect(listFeedbackOutbox(path)).toEqual([records[0]])
+  expect(
+    service.entries.some(
+      (entry) => JSON.stringify(entry.data) === JSON.stringify(records[1]!.envelope),
+    ),
+  ).toBe(true)
+})

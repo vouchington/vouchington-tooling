@@ -191,6 +191,12 @@ describe('buildSessionFrictionReport', () => {
       }),
     })
     expect(report).toMatchObject({
+      coverage: {
+        journalStatus: 'complete',
+        frictionStatus: 'events',
+        truncated: false,
+        droppedCount: 0,
+      },
       markdown: expect.stringContaining('Status: failures observed'),
     })
     expect(report.markdown).toContain('## Sandbox & Permission Audit')
@@ -225,6 +231,7 @@ describe('buildSessionFrictionReport', () => {
         journalLoader: async () => ({ status: 'not-found' }),
       }),
     ).resolves.toMatchObject({
+      coverage: { journalStatus: 'complete', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (no friction log for session missing)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -237,6 +244,7 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
@@ -362,6 +370,7 @@ describe('buildSessionFrictionReport', () => {
         journalLoader: async () => ({ status: 'not-found' }),
       }),
     ).resolves.toMatchObject({
+      coverage: { journalStatus: 'complete', frictionStatus: 'unreadable', truncated: true },
       markdown:
         '## CI Failures\nStatus: unavailable (friction log unreadable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -375,6 +384,7 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'unreadable', truncated: true },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)',
@@ -427,6 +437,12 @@ describe('buildSessionFrictionReport', () => {
         journalLoader: async () => ({ status: 'not-found' }),
       }),
     ).resolves.toMatchObject({
+      coverage: {
+        journalStatus: 'complete',
+        frictionStatus: 'empty',
+        truncated: false,
+        droppedCount: 0,
+      },
       markdown:
         '## CI Failures\nStatus: none observed\n\n' +
         '## Sandbox & Permission Audit\nStatus: none observed',
@@ -449,6 +465,7 @@ describe('buildSessionFrictionReport', () => {
         },
       }),
     ).resolves.toMatchObject({
+      coverage: { journalStatus: 'unavailable', frictionStatus: 'absent', truncated: false },
       markdown:
         '## CI Failures\nStatus: unavailable (blackboard unreachable)\n\n' +
         '## Sandbox & Permission Audit\nStatus: unavailable (no friction log)',
