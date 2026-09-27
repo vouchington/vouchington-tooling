@@ -15,6 +15,8 @@ npm install @libpg-query/parser
 # optional, only if you import vouchington-tooling/contract-schema
 # (classic compiler API; typescript@7's package root is version-only)
 npm install @typescript/typescript6
+# optional, only if you use the Vitest reporter export
+npm install vitest
 # optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
 npm install agent-blackboard@^0.6.0
 ```
@@ -233,6 +235,7 @@ import {
   validateFixtureContracts,
   writeGeneratedFiles,
 } from 'vouchington-tooling/api-fixtures'
+import { discoverAppRouteCtxContractsV1 } from 'vouchington-tooling/api-contract-discovery'
 import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
 import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import {
@@ -274,8 +277,11 @@ import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
 import {
+  createForkLeakDetector,
+  createVitestWorkerExitDiagnosticsReporter,
   formatDiagnosticReportSummaries,
   readDiagnosticReportSummaries,
+  registerForkExitSentinel,
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
@@ -405,6 +411,35 @@ token-source router remains deprecated for one release line.
 `vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
 filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
 native frame symbols. Both structured reads and text rendering have hard report-count limits.
+
+`api-contract-discovery` is the version-one adapter for `app.route('/path').get/post/...` and
+`ctx` response conventions. Pass a classic TypeScript `program` and its route `sourceFiles` to
+`discoverAppRouteCtxContractsV1`. The result contains registered routes and response, request,
+query, and header contracts. The caller owns program construction, route-file selection, and
+generation. Pass `options.formatAliases` and `options.boundedArrayAlias` for application type
+aliases; `options.onRouteError` enables lenient response and request extraction. The adapter
+does not cache programs or depend on the caller's repository layout. OpenAPI document assembly
+remains a separate `openapi-document` call.
+
+Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
+`apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
+`app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,
+`ctx.pipeline`, `ctx.response.empty/buffer/xml`, `ctx.request.json/buffer`, `parseJsonBody`,
+`ctx.setStatus`, and static `Content-Type` setters. The input source files and TypeScript checker
+are the source representation; the adapter does not parse or discover a repository on its own.
+
+Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
+main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
+update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct
+`createVitestWorkerExitDiagnosticsReporter({ recordDirectory })` in the Vitest reporter list
+before workers start. The reporter clears stale records at construction, preserves them across
+watch reruns, and prints an attribution summary only for abnormal worker exits. The worker writes
+a synchronous stderr line and one JSONL file per PID; a start record without an exit record
+identifies a fork killed before its handler could run. `createForkLeakDetector` accepts tracked
+resource names and warmup, threshold, and sustained-growth settings; the caller supplies each
+checkpoint's resource counts. Use a caller-owned run directory: the reporter clears only regular
+numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
+Application metrics and CI artifact handling stay with the caller.
 
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group

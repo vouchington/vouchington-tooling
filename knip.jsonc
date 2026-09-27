@@ -10,7 +10,7 @@
       // Loaded from the consumer package boundary only when the opt-in integration runs.
       // typescript: optional peer for classic-API-compatible installs; runtime import uses
       // optionalDependency @typescript/typescript6 under typescript@7 workspaces.
-      "ignoreDependencies": ["agent-blackboard", "typescript"],
+      "ignoreDependencies": ["agent-blackboard", "typescript", "vitest"],
       "entry": [
         "src/index.mts!",
         "src/cli/index.mts!",
@@ -30,6 +30,8 @@
         "src/openapi-document/index.mts!",
         "src/contract-schema/index.mts!",
         "src/api-fixtures/index.mts!",
+        "src/api-contract-discovery/index.mts!",
+        "src/vitest-diagnostics/index.mts!",
         "src/config-inventory/index.mts!",
         "src/coverage-transport/index.mts!",
         "src/pnpm-deploy/index.mts!",

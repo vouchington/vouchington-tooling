@@ -1,7 +1,7 @@
 export type OpenApiSchema = {
   $ref?: string
   type?: 'null' | 'boolean' | 'integer' | 'number' | 'string' | 'array' | 'object'
-  format?: 'uri' | 'uuid'
+  format?: 'uri' | 'uuid' | 'binary'
   const?: boolean | number | string
   enum?: (boolean | number | string)[]
   items?: OpenApiSchema | false
