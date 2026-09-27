@@ -4,7 +4,7 @@
     {
       "name": "agent-workflow",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "agent-workflow/SKILL.md",
       "prerequisites": ["github-issue"]
     },
@@ -18,13 +18,13 @@
     {
       "name": "blackboard",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "blackboard/SKILL.md"
     },
     {
       "name": "dependabot",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "dependabot/SKILL.md",
       "prerequisites": ["github-actions-checklist"]
     },
@@ -38,26 +38,26 @@
     {
       "name": "git-commit-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "git-commit-checklist/SKILL.md"
     },
     {
       "name": "github-actions-authoring",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "github-actions-authoring/SKILL.md",
       "prerequisites": ["github-actions-checklist"]
     },
     {
       "name": "github-actions-checklist",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "github-actions-checklist/SKILL.md"
     },
     {
       "name": "github-issue",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "github-issue/SKILL.md"
     },
     {
@@ -70,12 +70,127 @@
     {
       "name": "npm-publishing",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "npm-publishing/SKILL.md"
     },
     {
       "name": "organize-github-issues",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "organize-github-issues/SKILL.md",
       "prerequisites": ["github-issue"]
+    },
+    {
+      "name": "package-json-checklist",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "package-json-checklist/SKILL.md"
+    },
+    {
+      "name": "planning",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "planning/SKILL.md",
+      "prerequisites": ["github-issue"]
+    },
+    {
+      "name": "playwright-authoring",
+      "plugin": "vouchington-testing",
+      "pluginVersion": "0.2.0",
+      "path": "playwright-authoring/SKILL.md",
+      "prerequisites": ["test-authoring"]
+    },
+    {
+      "name": "postgres-node-performance-tuning",
+      "plugin": "vouchington-database",
+      "pluginVersion": "0.2.0",
+      "path": "postgres-node-performance-tuning/SKILL.md"
+    },
+    {
+      "name": "postgres-partitioning-uuid-v7",
+      "plugin": "vouchington-database",
+      "pluginVersion": "0.2.0",
+      "path": "postgres-partitioning-uuid-v7/SKILL.md"
+    },
+    {
+      "name": "pr-description",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "pr-description/SKILL.md"
+    },
+    {
+      "name": "retrospective",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "retrospective/SKILL.md"
+    },
+    {
+      "name": "retrospective-distill",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "retrospective-distill/SKILL.md",
+      "prerequisites": ["github-issue"]
+    },
+    {
+      "name": "review-ci-logs",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "review-ci-logs/SKILL.md",
+      "prerequisites": ["github-actions-checklist"]
+    },
+    {
+      "name": "review-github-issue-taxonomy",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "review-github-issue-taxonomy/SKILL.md",
+      "prerequisites": ["github-issue"]
+    },
+    {
+      "name": "revisit-followups",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "revisit-followups/SKILL.md",
+      "prerequisites": ["github-issue"]
+    },
+    {
+      "name": "stacked-prs",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "stacked-prs/SKILL.md"
+    },
+    {
+      "name": "static-analysis-checklist",
+      "plugin": "vouchington-workflow",
+      "pluginVersion": "0.9.0",
+      "path": "static-analysis-checklist/SKILL.md",
+      "prerequisites": ["github-actions-checklist"]
+    },
+    {
+      "name": "storybook-authoring",
+      "plugin": "vouchington-testing",
+      "pluginVersion": "0.2.0",
+      "path": "storybook-authoring/SKILL.md",
+      "prerequisites": ["test-authoring"]
+    },
+    {
+      "name": "swift-test-authoring",
+      "plugin": "vouchington-testing",
+      "pluginVersion": "0.2.0",
+      "path": "swift-test-authoring/SKILL.md",
+      "prerequisites": ["test-authoring"]
+    },
+    {
+      "name": "test-authoring",
+      "plugin": "vouchington-testing",
+      "pluginVersion": "0.2.0",
+      "path": "test-authoring/SKILL.md"
+    },
+    {
+      "name": "vitest-test-authoring",
+      "plugin": "vouchington-testing",
+      "pluginVersion": "0.2.0",
+      "path": "vitest-test-authoring/SKILL.md",
+      "prerequisites": ["test-authoring"]
+    }
+  ]
+}
