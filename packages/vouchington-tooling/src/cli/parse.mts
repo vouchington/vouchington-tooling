@@ -38,6 +38,7 @@ export type ParsedCli =
   | { kind: 'link-skill'; name: string; sourceRoot: string; targetRoot: string }
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
+  | { kind: 'mcp'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }
   | { kind: 'ast-grep-examples'; rules: string; config: string }

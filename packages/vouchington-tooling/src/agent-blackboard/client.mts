@@ -15,10 +15,16 @@ export type BlackboardClientModule = {
     patch(input: unknown): Promise<unknown>
     list(input: unknown): Promise<unknown>
     get(id: string): Promise<unknown>
+    // Optional so older clients and existing fakes still satisfy the type; callers of the
+    // session-tools wrappers get an actionable error when the installed client lacks them.
+    archive?(sessionId: string): Promise<unknown>
   }
   Entries: new (connection: BlackboardConnection) => {
     append(input: unknown): Promise<{ createdAt: string; data: unknown }>
     get(input: unknown): AsyncIterable<unknown>
+  }
+  Snapshots?: new (connection: BlackboardConnection) => {
+    export(options?: unknown): Promise<unknown>
   }
 }
 type BlackboardClientLoader = () => Promise<BlackboardClientModule>
@@ -59,7 +65,7 @@ async function defaultClientLoader(resolveFrom?: string | URL): Promise<Blackboa
   return (await import(specifier)) as BlackboardClientModule
 }
 
-function isMissingModuleError(error: unknown): boolean {
+export function isMissingModuleError(error: unknown): boolean {
   return (
     error instanceof Error &&
     'code' in error &&

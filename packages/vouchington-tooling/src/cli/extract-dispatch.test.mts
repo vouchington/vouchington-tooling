@@ -18,6 +18,9 @@ vi.mock('./commands/retrospective-facts.mts', () => ({
 vi.mock('./commands/agent-blackboard.mts', () => ({
   runAgentBlackboardCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/mcp.mts', () => ({
+  runMcpCommand: vi.fn(async () => 0),
+}))
 
 import { runCli } from './index.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
@@ -26,6 +29,7 @@ import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.
 import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
+import { runMcpCommand } from './commands/mcp.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
@@ -35,6 +39,7 @@ describe('runCli extract command dispatch', () => {
     vi.mocked(runPrepareVitestReportsCommand).mockClear()
     vi.mocked(runRetrospectiveFactsCommand).mockClear()
     vi.mocked(runAgentBlackboardCommand).mockClear()
+    vi.mocked(runMcpCommand).mockClear()
   })
 
   it('forwards pnpm-install and vitest-blob-manifest to their commands', async () => {
@@ -63,5 +68,12 @@ describe('runCli extract command dispatch', () => {
     expect(runRetrospectiveFactsCommand).toHaveBeenCalledWith(['--no-pr'])
     await expect(runCli(['node', 'vouchington', 'agent-blackboard', 'probe'])).resolves.toBe(0)
     expect(runAgentBlackboardCommand).toHaveBeenCalledWith(['probe'])
+  })
+
+  it('forwards the mcp subcommand and its arguments', async () => {
+    await expect(runCli(['node', 'vouchington', 'mcp'])).resolves.toBe(0)
+    expect(runMcpCommand).toHaveBeenCalledWith([])
+    await expect(runCli(['node', 'vouchington', 'mcp', 'extra'])).resolves.toBe(0)
+    expect(runMcpCommand).toHaveBeenLastCalledWith(['extra'])
   })
 })
