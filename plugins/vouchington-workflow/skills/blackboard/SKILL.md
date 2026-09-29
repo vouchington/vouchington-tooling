@@ -17,8 +17,8 @@ Journal operations are tools of the `vouchington-tooling` MCP server (`vouchingt
 `journal_append`, `journal_entries`, `outbox_status`, `outbox_flush`, `session_ensure`,
 `snapshot_export`, and `session_archive`. A harness may prefix the tool names with the server name.
 Every call takes the caller's exact `sessionId`, never inferred, and may take `worktree`, the
-absolute path of a worktree of the current repository (the launch worktree by default). Nothing
-else is needed: no provider skill, temporary file, `--file` flag, replay command, or shell command.
+absolute path of a worktree of the current repository (the launch worktree by default). Writing or
+retrying an entry needs no provider skill, temporary file, `--file` flag, or replay command.
 If these tools are not available because the server is not registered or not connected, stop and
 report that the journal server is unavailable. Do not fall back to a CLI command.
 
