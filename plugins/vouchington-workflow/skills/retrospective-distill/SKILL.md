@@ -12,9 +12,15 @@ Local policy overrides these defaults; do not reload an already-read adapter or 
 Use when completed retrospectives or journals should become durable follow-up work. Read local
 `AGENTS.md`, issue policy, and journal retention rules before any mutation.
 
-1. Enumerate only completed, eligible session records. For repository-scoped work, filter sessions
-   by repository membership and use only entries attributed to that repository. Leave untagged
-   legacy records unclassified. Do not infer their repository. Leave in-progress sessions intact.
+1. Enumerate only completed, eligible session records with the `snapshot_export` tool of the
+   `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
+   `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
+   private local file and returns the path, counts, checksum, and manifest, never the records. Read
+   one session's entries with `journal_entries`. For repository-scoped work, filter sessions by
+   repository membership (`dataArrayContains` with `repositories` and the exact `owner/name`) and
+   use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
+   not infer their repository. Leave in-progress sessions intact. If the server is not connected,
+   stop and report it; do not fall back to a CLI command.
 2. Validate storage type and the shared envelope independently of optional category. Never repair
    unknown legacy types or repository provenance by inference. Quarantine malformed sessions with
    an explicit reason while processing valid unrelated sessions. Deduplicate at-least-once records
@@ -31,7 +37,9 @@ Use when completed retrospectives or journals should become durable follow-up wo
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 6. Archive only records fully processed across every represented repository, under the repository's
-   retention rules. A one-repository pass leaves a multi-repository session active until the other
+   retention rules, with one `session_archive` call per session and its exact `sessionId`. Archiving
+   makes the session's metadata immutable, so it needs the archival authorization that local policy
+   requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and
    actionable dispositions with reasons. Keep the top five themes in human prose without dropping
    underlying findings or unresolved records.
@@ -40,8 +48,9 @@ Use source records only for local verification and leave them in the repository'
 or retention system. Public issue bodies contain only the minimum bounded facts or redacted
 summaries needed to establish the problem, proposed work, relevant areas, and validation. Never
 embed unredacted logs, command output, environment details, provider payloads, or transcript
-content.
+content. A snapshot file is a private local copy of source records: never commit or attach it, or
+copy its contents into an issue.
 
-This skill supplies no journal API, issue repository, labels, milestones, projects, archival
-command, or approval model. Consumer wrappers cannot weaken this export boundary; they provide only
-those local details.
+This skill supplies no issue repository, labels, milestones, projects, or approval model; it reads
+and archives sessions only through the MCP tools above. Consumer wrappers cannot weaken this export
+boundary; they provide only those local details.
