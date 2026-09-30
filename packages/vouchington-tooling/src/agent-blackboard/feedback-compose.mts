@@ -6,11 +6,14 @@ import {
   runRetrospectiveTranscriptReport,
   type ResolveOptions,
 } from '../retrospective-transcript/index.mts'
+import type { SessionFrictionReportOptions } from '../session-friction/index.mts'
 import {
-  buildSessionFrictionReport,
-  type SessionFrictionReportOptions,
-  type SessionFrictionReport,
-} from '../session-friction/index.mts'
+  assertSingleAuditSource,
+  auditAssessed,
+  buildAuditReport,
+  completeCoverageError,
+} from './feedback-audit-source.mts'
+import type { JournalAuditOptions } from './feedback-journal-audit.mts'
 import { createFeedbackEnvelope, redactFeedbackText } from './feedback-codec.mts'
 import { validateFeedbackText } from './feedback-fields.mts'
 import type { FeedbackCoverage, FeedbackReference, WorkOutcome } from './feedback-types.mts'
@@ -37,7 +40,10 @@ export type RetrospectiveCompositionInput = {
   narrative: string
   facts: Omit<RetrospectiveFactsOptions, 'raw'> | Unassessed
   transcript: ResolveOptions | Unassessed
+  /** CI failures and sandbox audit from a friction log plus journal. Exclusive with `journal`. */
   friction?: SessionFrictionReportOptions
+  /** CI failures and sandbox audit from journal entries alone (`frictionStatus: 'journal-only'`). */
+  journal?: JournalAuditOptions
   tools: FeedbackAssessment
   architecture: FeedbackAssessment
   knownSensitiveValues?: string[]
@@ -75,6 +81,7 @@ function unavailable(marker: string, input: Unassessed): string {
   return `${marker}\nStatus: ${input.status.replaceAll('-', ' ')} (${input.reason})`
 }
 export async function composeRetrospective(input: RetrospectiveCompositionInput): Promise<string> {
+  assertSingleAuditSource(input)
   const unavailableFacts =
     'status' in input.facts
       ? {
@@ -89,24 +96,14 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
           coverage: input.transcript.status,
         }
       : undefined
-  const [facts, transcript, friction] = await Promise.all([
+  const [facts, transcript, audit] = await Promise.all([
     'status' in input.facts
       ? Promise.resolve(unavailableFacts!)
       : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
     'status' in input.transcript
       ? Promise.resolve(unavailableTranscript!)
       : runRetrospectiveTranscriptReport(input.transcript),
-    input.friction
-      ? buildSessionFrictionReport(input.sessionId, input.friction)
-      : Promise.resolve<SessionFrictionReport>({
-          coverage: {
-            journalStatus: 'unavailable' as const,
-            frictionStatus: 'absent' as const,
-            truncated: false,
-          },
-          markdown:
-            '## CI Failures\nStatus: unavailable (not assessed)\n\n## Sandbox & Permission Audit\nStatus: unavailable (not assessed)',
-        }),
+    buildAuditReport(input.sessionId, input),
   ])
   if (
     input.feedbackCoverage.status === 'complete' &&
@@ -114,14 +111,10 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
       transcript.coverage !== 'complete' ||
       ['not-assessed', 'unavailable'].includes(input.tools.status) ||
       ['not-assessed', 'unavailable'].includes(input.architecture.status) ||
-      friction.coverage.journalStatus !== 'complete' ||
-      !['empty', 'events'].includes(friction.coverage.frictionStatus) ||
-      friction.coverage.truncated)
+      !auditAssessed(audit))
   )
-    throw new Error(
-      'complete feedback coverage requires assessed available factual and finding sources',
-    )
-  if ((friction.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
+    throw completeCoverageError(input)
+  if ((audit.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
     throw new Error('feedback coverage dropped count must include observed friction drops')
   const markdown = [
     '---',
@@ -138,7 +131,7 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
     `## Outcome\nWork outcome: ${input.workOutcome}\nFeedback coverage: ${input.feedbackCoverage.status}\nDropped records: ${input.feedbackCoverage.droppedCount}`,
     `## Verifiable Facts\n${facts.markdown.trim()}`,
     `## Transcript Facts\n${transcript.markdown.trim()}`,
-    friction.markdown,
+    audit.markdown,
     assessment('Tool Findings', input.tools),
     assessment('Architecture Findings', input.architecture),
   ].join('\n\n')

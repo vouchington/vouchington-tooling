@@ -1,11 +1,11 @@
 import type { FrictionLogReadResult, JournalEntry } from './types.mts'
-import { isWellFormedUnicode, markdownAuditText } from './text.mts'
+import { conformingBlocks, matchAuditBlock } from './audit-block.mts'
+import { markdownAuditText } from './text.mts'
 
 const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$/
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
 const ROOT_DIAGNOSTIC = /^ {2}- Root diagnostic: .*[^\s]$/
 const DISPOSITION = /^ {2}- Disposition: .*[^\s]$/
-const BLANK = /^\s*$/
 
 const CI_FAILURES_HEADER = '## CI Failures'
 const CI_FAILURE_BLOCK_MAX_BYTES = 10_000
@@ -17,36 +17,12 @@ const FIELD_PREFIXES = [
   '  - Disposition: ',
 ]
 
-function safeField(line: string): string | null {
-  const prefix = FIELD_PREFIXES.find((value) => line.startsWith(value))
-  /* v8 ignore next -- matchBlock currently passes only fields with a known prefix. */
-  if (!prefix) return markdownAuditText(line) || null
-  const content = markdownAuditText(line.slice(prefix.length))
-  return content ? `${prefix}${content}` : null
-}
-
 function matchBlock(markdown: string): string | null {
-  if (!isWellFormedUnicode(markdown)) return null
-  const lines = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
-  let index = 0
-  const consume = (pattern: RegExp): string | null => {
-    while (index < lines.length && BLANK.test(lines[index]!)) index++
-    const line = lines[index]
-    if (line === undefined || !pattern.test(line)) return null
-    index++
-    return line
-  }
-  const fields = [
-    consume(GROUP_HEADER),
-    consume(EVIDENCE),
-    consume(ROOT_DIAGNOSTIC),
-    consume(DISPOSITION),
-  ]
-  if (fields.some((field) => field === null)) return null
-  if (!lines.slice(index).every((line) => BLANK.test(line))) return null
-  const safeFields = fields.map((field) => safeField(field!))
-  if (safeFields.some((field) => field === null)) return null
-  return safeFields.join('\n')
+  return matchAuditBlock(
+    markdown,
+    [GROUP_HEADER, EVIDENCE, ROOT_DIAGNOSTIC, DISPOSITION],
+    FIELD_PREFIXES,
+  )
 }
 
 export function isConformingCiFailureBlock(markdown: string): boolean {
@@ -58,17 +34,15 @@ export function isConformingCiFailureBlock(markdown: string): boolean {
   return matchBlock(markdown) !== null
 }
 
-function journalMarkdown(entries: Iterable<JournalEntry>): string[] {
-  return [...entries].flatMap((entry) => {
-    const data = (entry as JournalEntry | null)?.data
-    return data?.type === 'journal' && typeof data.markdown === 'string' ? [data.markdown] : []
-  })
+export function getConformingGroups(entries: Iterable<JournalEntry>): string[] {
+  return conformingBlocks(entries, matchBlock)
 }
 
-export function getConformingGroups(entries: Iterable<JournalEntry>): string[] {
-  return journalMarkdown(entries)
-    .map(matchBlock)
-    .filter((block): block is string => block !== null)
+export function incompleteCiSection(markdownBlocks: string[]): string {
+  return [
+    `${CI_FAILURES_HEADER}\nStatus: unavailable (journal scan incomplete)`,
+    ...markdownBlocks,
+  ].join('\n\n')
 }
 
 export function buildCiFailuresSection(
@@ -76,7 +50,7 @@ export function buildCiFailuresSection(
   journal:
     | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
     | { status: 'unreachable'; diagnostic: string },
-  frictionStatus: FrictionLogReadResult['status'],
+  frictionStatus: FrictionLogReadResult['status'] | 'journal-only',
 ): string {
   if (journal.status === 'unreachable')
     return `${CI_FAILURES_HEADER}\nStatus: unavailable (blackboard unreachable)`

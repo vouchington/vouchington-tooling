@@ -578,3 +578,40 @@ aggregate dropped counts below observed friction drops and retains larger caller
 double counting. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
 for consumers to preserve or reject conflicting explicit overrides; trusted mode stays external.
 Human top-five summaries do not authorize dropping additional durable findings.
+
+The `## CI Failures` and `## Sandbox & Permission Audit` sections come from one optional audit
+source; the two inputs are mutually exclusive and supplying both throws before any collector runs.
+`friction: {directory, journalLoader, ...}` keeps reading the session-friction log together with the
+journal and is unchanged. `journal: {journalLoader}` needs no friction directory or log: both
+sections are assessed from the session's journal entries alone, and the report carries
+`coverage.frictionStatus: 'journal-only'` (in place of `empty` or `events`) so the text states that
+no log was observed. `feedbackCoverage.status: 'complete'` accepts either source. It is rejected
+when neither is supplied (the error names the missing source), and a journal-only audit does not
+count as assessed when the loader reports `not-found` (there is no log to establish that the session
+was observed), throws, or is truncated by the scan bounds.
+
+```ts
+await composeRetrospective({ ...input, journal: { journalLoader } })
+```
+
+`journalLoader` is the session-friction `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
+`JournalEntry`, and `JournalAuditOptions` are exported as types from
+`vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar and its three status
+lines (`failures observed`, `none observed`, `unavailable (<reason>)`) are the same for both sources.
+Journal-only sandbox and permission entries are journal Markdown entries that hold exactly one
+block, escaped and length-bounded like CI failures, and other entries are ignored:
+
+```markdown
+- `sandbox-escalation` — git push — network write blocked
+  - Outcome: requested | approved | denied | unknown
+  - Evidence: permission prompt shown
+  - Disposition: reran with approval
+- `sandbox-failure` — node test — EPERM writing outside the worktree
+  - Evidence: stderr showed EPERM
+  - Disposition: moved output under TMPDIR
+```
+
+`ambiguous-failure` takes the same shape as `sandbox-failure`. The section reports
+`Status: none observed` or `Status: events observed`, each followed by
+`(journal entries only; no friction log observed)`; a truncated scan reports
+`unavailable (journal scan incomplete)` with the entries read so far.
