@@ -16,33 +16,40 @@ Use when completed retrospectives or journals should become durable follow-up wo
    `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
    `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
    private local file and returns the path, counts, checksum, and manifest, never the records.
-   Read full records, with their storage type, repository tags, source identity, coverage, and
-   outcomes, from that file. Do not distill from `journal_entries`: it returns only each journal
-   entry's time and markdown, so it cannot attribute, validate, or deduplicate entries. For
-   repository-scoped work, filter sessions by repository membership (`dataArrayContains` with
-   `repositories` and the exact `owner/name`) and use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
-   not infer their repository. Leave in-progress sessions intact. If the server is not connected,
+   Before exporting, deliver this worktree's outbox with `outbox_flush`, and stop if
+   `outbox_status` still reports pending records: an archived session refuses later delivery, so a
+   retained record would never be distilled. Select with `inactiveForHours` so that other worktrees
+   have had time to deliver. Leave in-progress sessions intact. If the server is not connected,
    stop and report it; do not fall back to a CLI command.
-2. Validate storage type and the shared envelope independently of optional category. Never repair
+2. Before using any record, verify the file against the returned checksum, counts, and terminal
+   manifest with the consumer's approved snapshot reader, and stop on a mismatch rather than
+   treating missing records as absent. Read full records, with their storage type, repository
+   tags, source identity, coverage, and outcomes, from that file. Do not distill from
+   `journal_entries`: it returns only each journal entry's time and markdown, so it cannot
+   attribute, validate, or deduplicate entries. For repository-scoped work, filter sessions by
+   repository membership (`dataArrayContains` with `repositories` and the exact `owner/name`) and
+   use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
+   not infer their repository.
+3. Validate storage type and the shared envelope independently of optional category. Never repair
    unknown legacy types or repository provenance by inference. Quarantine malformed sessions with
    an explicit reason while processing valid unrelated sessions. Deduplicate at-least-once records
    by exact session/source identity and reject conflicting duplicate content. Retain coverage,
    dropped counts, requested versus observed outcomes, and useful resolved findings.
-3. Cluster findings by root cause. Prefer a few broad actionable themes over many narrow issues.
+4. Cluster findings by root cause. Prefer a few broad actionable themes over many narrow issues.
    Treat a finding already linked to an open tracker as context, not a duplicate.
-4. Verify each candidate against the current base. Search existing issues and open changes before
+5. Verify each candidate against the current base. Search existing issues and open changes before
    drafting. Skip work that is complete, explicitly rejected, or already covered. A first-party version
    bump is not proof of resolution: verify the adopted change against the original finding before
    deferring. Capture a new observation in the journal before filing it.
-5. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
+6. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
    validation. Route every authorized creation through
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
-6. Archive only records fully processed across every represented repository, under the repository's
-   retention rules, with one `session_archive` call per session whose `sessionId` is the archived
-   session, not the caller. Archiving
-   makes the session's metadata immutable, so it needs the archival authorization that local policy
-   requires. A one-repository pass leaves a multi-repository session active until the other
+7. Archive only verified records fully processed across every represented repository, and never
+   while `outbox_status` reports pending records, under the repository's retention rules. Make one
+   `session_archive` call per session, whose `sessionId` is the archived session, not the caller.
+   Archiving makes the session's metadata immutable, so it needs the archival authorization that
+   local policy requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and
    actionable dispositions with reasons. Keep the top five themes in human prose without dropping
    underlying findings or unresolved records.

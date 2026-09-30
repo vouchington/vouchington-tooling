@@ -59,9 +59,10 @@ report that the journal server is unavailable. Do not fall back to a CLI command
    persistence succeeds. A full, unsafe, or unwritable outbox blocks capture; never evict or
    silently discard an unsent record.
 5. Autonomous runners require online `session_ensure`, a fresh admission `journal_append`, and
-   readback before launching an attempt. Autonomous mode has no filesystem outbox, so a failed
-   delivery is an error. Terminal reporting preserves work outcome separately from feedback
-   coverage and delivery. A filesystem outbox never grants admission or acknowledged completion.
+   readback before launching an attempt. Give each attempt's admission entry a `sourceEventId`
+   unique to that attempt: reusing an earlier one returns the earlier receipt, which does not
+   prove a fresh write. Autonomous mode has no filesystem outbox, so a failed delivery is an error.
+   Terminal reporting preserves work outcome separately from feedback coverage and delivery. A filesystem outbox never grants admission or acknowledged completion.
 6. Use at-least-once delivery with consumer deduplication by exact session/source identity. To
    retry a pending or failed append, call `journal_append` again with the same `sourceEventId`,
    content, and `timestamp` from the first attempt: the whole envelope must match, and conflicting
