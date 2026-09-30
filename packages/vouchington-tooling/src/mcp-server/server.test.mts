@@ -71,7 +71,10 @@ describe('in-process client and server round trip', () => {
       name: 'journal_entries',
       arguments: { sessionId: 'native:owner' },
     })
-    expect(textOf(entries)).toContain('The build cache was cold.')
+    expect(JSON.parse(textOf(entries))).toMatchObject({
+      sessionId: 'native:owner',
+      entries: [{ data: { type: 'journal', markdown: JOURNAL_ARGS.markdown } }],
+    })
     const status = await client.callTool({
       name: 'outbox_status',
       arguments: { sessionId: 'native:owner' },

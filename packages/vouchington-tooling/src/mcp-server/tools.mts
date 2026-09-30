@@ -138,7 +138,9 @@ export const TOOLS: readonly ToolDefinition[] = [
   ),
   tool(
     'journal_entries',
-    'Returns the journal entries of one session, oldest first, as markdown.',
+    'Returns every entry of one session, oldest first, as JSON: { sessionId, entries }. Each ' +
+      'entry is exactly as the blackboard returns it ({ sessionId, createdAt, data }), including ' +
+      'non-journal types such as retrospective and legacy entries without a feedback envelope.',
     READ_ONLY,
   ),
   tool(

@@ -168,16 +168,100 @@ describe('journal_append', () => {
   })
 })
 
+const COVERAGE = { status: 'complete', sources: ['tool-result'], droppedCount: 0 }
+const LEGACY_ENTRY = {
+  sessionId: 'native:owner',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  data: { note: 'investigating' },
+}
+const JOURNAL_ENTRY = {
+  sessionId: 'native:owner',
+  createdAt: '2026-01-01T00:00:01.000Z',
+  data: {
+    schemaVersion: 1,
+    type: 'journal',
+    sourceEventId: 'journal:1',
+    timestamp: '2026-01-01T00:00:01.000Z',
+    repositories: ['owner/repo'],
+    markdown: 'The build cache was cold.',
+    workOutcome: 'success',
+    feedbackCoverage: COVERAGE,
+    category: 'tooling',
+  },
+}
+const RETROSPECTIVE_ENTRY = {
+  sessionId: 'native:owner',
+  createdAt: '2026-01-01T00:00:02.000Z',
+  data: {
+    schemaVersion: 1,
+    type: 'retrospective',
+    sourceEventId: 'retro:1',
+    timestamp: '2026-01-01T00:00:02.000Z',
+    repositories: ['owner/other', 'owner/repo'],
+    markdown: '## Retrospective\nCache warm-up helped.',
+    workOutcome: 'unknown',
+    feedbackCoverage: { ...COVERAGE, status: 'partial', droppedCount: 2 },
+    date: '2026-01-01',
+    issues: [12],
+    prs: ['owner/repo#3'],
+  },
+}
+
 describe('journal_entries', () => {
-  it('returns appended journal entries as markdown and reports an empty session', async () => {
+  it('returns every entry unchanged, oldest first, whatever order the client yields', async () => {
+    const h = harness(fixture(), {
+      entries: [RETROSPECTIVE_ENTRY, LEGACY_ENTRY, JOURNAL_ENTRY],
+    })
+    const result = await h.call('journal_entries', { sessionId: 'native:owner' })
+    expect(result.isError).toBeUndefined()
+    expect(jsonOf(result)).toEqual({
+      sessionId: 'native:owner',
+      entries: [LEGACY_ENTRY, JOURNAL_ENTRY, RETROSPECTIVE_ENTRY],
+    })
+  })
+
+  it('keeps the arrival order of entries created at the same time', async () => {
+    const later = { ...JOURNAL_ENTRY, data: { ...JOURNAL_ENTRY.data, sourceEventId: 'journal:2' } }
+    const h = harness(fixture(), { entries: [RETROSPECTIVE_ENTRY, later, JOURNAL_ENTRY] })
+    const { entries } = jsonOf(await h.call('journal_entries', { sessionId: 'native:owner' }))
+    expect(entries).toEqual([later, JOURNAL_ENTRY, RETROSPECTIVE_ENTRY])
+  })
+
+  it('never drops an entry that has no usable createdAt', async () => {
+    const undated = { data: { note: 'undated' } } as never
+    const h = harness(fixture(), { entries: [JOURNAL_ENTRY, undated] })
+    const { entries } = jsonOf(await h.call('journal_entries', { sessionId: 'native:owner' }))
+    expect(entries).toEqual([{ data: { note: 'undated' } }, JOURNAL_ENTRY])
+  })
+
+  it('returns what journal_append wrote with its whole envelope', async () => {
     const h = harness(fixture())
-    expect(textOf(await h.call('journal_entries', { sessionId: 'native:owner' }))).toBe(
-      'No journal entries found for session native:owner.',
-    )
-    await h.call('journal_append', JOURNAL_ARGS)
-    const text = textOf(await h.call('journal_entries', { sessionId: 'native:owner' }))
-    expect(text).toContain('The build cache was cold.')
-    expect(text).toContain('## 2026-01-01T00:00:00.000Z')
+    await h.call('journal_append', { ...JOURNAL_ARGS, category: 'tooling' })
+    const { entries } = jsonOf(await h.call('journal_entries', { sessionId: 'native:owner' }))
+    expect(entries).toEqual([
+      {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        data: {
+          schemaVersion: 1,
+          type: 'journal',
+          sourceEventId: 'journal:1',
+          timestamp: JOURNAL_ARGS.timestamp,
+          repositories: ['owner/repo'],
+          markdown: JOURNAL_ARGS.markdown,
+          workOutcome: 'success',
+          feedbackCoverage: COVERAGE,
+          category: 'tooling',
+        },
+      },
+    ])
+  })
+
+  it('reports an empty session as an empty list', async () => {
+    const h = harness(fixture())
+    expect(jsonOf(await h.call('journal_entries', { sessionId: 'native:owner' }))).toEqual({
+      sessionId: 'native:owner',
+      entries: [],
+    })
   })
 
   it('turns a non-Error rejection into a tool error', async () => {

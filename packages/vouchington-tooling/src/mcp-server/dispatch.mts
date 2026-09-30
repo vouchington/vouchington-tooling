@@ -81,14 +81,7 @@ export async function callTool(
       // The client resolves from the validated worktree, never from the server's own location.
       dependencies: { ...environment.blackboard, resolveFrom: join(worktree, 'package.json') },
     })
-    return {
-      content: [
-        {
-          type: 'text',
-          text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-        },
-      ],
-    }
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   } catch (error) {
     return { isError: true, content: [{ type: 'text', text: describeError(error) }] }
   }

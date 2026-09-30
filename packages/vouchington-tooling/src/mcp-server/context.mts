@@ -12,8 +12,7 @@ type ToolContext = {
   dependencies: BlackboardClientDependencies
 }
 
-type ToolResult = string | Record<string, unknown>
-export type ToolHandler = (args: Args, context: ToolContext) => Promise<ToolResult>
+export type ToolHandler = (args: Args, context: ToolContext) => Promise<Record<string, unknown>>
 
 /**
  * The consumer convention for the interactive outbox. It is derived, never accepted from the
