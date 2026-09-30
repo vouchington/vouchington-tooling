@@ -46,7 +46,8 @@ report that the journal server is unavailable. Do not fall back to a CLI command
    whole envelope validates. The tool writes journal entries; `category` is optional context and
    never changes storage type or distillation eligibility. Generate routine facts and metadata
    through the approved composer and pass its output as `markdown` instead of hand-authoring
-   factual markers.
+   factual markers. `journal_append` stores only journal entries: save a composed retrospective
+   through the retrospective skill's writer, never through `journal_append`.
 3. Preserve exact provider session and parent identities. Each agent writes only its own session.
    `journal_append` ensures that session and merges the entry's `repositories` into the session's
    cumulative repository union, so list every repository the entry concerns. Never infer another

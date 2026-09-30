@@ -49,7 +49,9 @@ Use when completed retrospectives or journals should become durable follow-up wo
 7. Archive only verified records fully processed across every represented repository, and never
    while any worktree's `outbox_status` reports pending records, under the repository's retention
    rules. Make one `session_archive` call per session, whose `sessionId` is the archived session,
-   not the caller.
+   not the caller. Immediately before each call, read that session with `journal_entries` and
+   archive only if its entries match the verified snapshot's by source identity; otherwise leave it
+   for the next pass, because an entry added after the export would never be distilled.
    Archiving makes the session's metadata immutable, so it needs the archival authorization that
    local policy requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and

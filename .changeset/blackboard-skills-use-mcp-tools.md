@@ -11,5 +11,7 @@ one returns the earlier receipt. An agent that cannot reach the server stops and
 Retrospectives read every entry and its envelope with `journal_entries`.
 `retrospective-distill` now drains every worktree's outbox before exporting, enumerates sessions
 with `snapshot_export`, verifies the snapshot file against its checksum, counts, and manifest before
-reading full records from it, and archives with `session_archive` only while nothing is pending.
+reading full records from it, and archives with `session_archive` only while nothing is pending
+and a fresh `journal_entries` read still matches the snapshot. Composed retrospectives are never
+saved through `journal_append`, which stores only journal entries.
 The `vouchington-workflow` plugin advances to 0.10.0.

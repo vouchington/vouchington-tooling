@@ -49,6 +49,8 @@ the pending count from `outbox_status` and delivery through `outbox_flush`. Fail
 identity/content conflicts block capture. Autonomous work requires fresh online append/readback
 before admission and acknowledged terminal reporting; missing or rejected credentials block it.
 Never substitute an ad hoc local journal file or use an outbox to authorize autonomous work.
+Opening a harness session here starts the server from the checked-out source with the blackboard
+credentials, so review untrusted branches without a session or with the credentials unset.
 
 ## Extracted modules
 
