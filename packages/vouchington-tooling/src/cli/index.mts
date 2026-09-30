@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runAgentHarnessConfigCli } from '../agent-harness-config/cli.mts'
 import { runPostReviewCli } from '../gha-post-review/cli.mts'
 import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
-import { readPackageVersion } from '../package-version.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
@@ -21,11 +20,13 @@ import { runRetrospectiveTranscriptCommand } from './commands/retrospective-tran
 import { runLinkSkill } from './commands/link-skill.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
+import { runMcpCommand } from './commands/mcp.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
 import { runAstGrepExamplesCommand } from './commands/ast-grep-examples.mts'
 import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
+import { readInstalledVersion } from './installed-version.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
 import { packageScriptPath } from './script-path.mts'
 import { commandUsage, printUsage } from './usage.mts'
@@ -131,6 +132,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runRetrospectiveFactsCommand(parsed.args)
     case 'agent-blackboard':
       return runAgentBlackboardCommand(parsed.args)
+    case 'mcp':
+      return runMcpCommand(parsed.args)
     case 'require-up-to-date':
       return runRequireUpToDate(parsed)
     case 'gitleaks-directory-scan':
@@ -146,12 +149,6 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
     case 'gha-workspace-policy':
       return runGhaWorkspacePolicy(parsed)
   }
-}
-
-function readInstalledVersion(): string {
-  return readPackageVersion(
-    JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
-  )
 }
 
 export function isMainModule(metaUrl: string, argv1: string | undefined): boolean {

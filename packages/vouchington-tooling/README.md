@@ -19,7 +19,12 @@ npm install @typescript/typescript6
 npm install vitest
 # optional, only for vouchington-tooling/agent-blackboard and agent-blackboard CLI commands
 npm install agent-blackboard@^0.6.0
+# optional, only for `vouchington mcp` (zod is a peer of the SDK)
+npm install @modelcontextprotocol/sdk zod
 ```
+
+[`vouchington mcp`](docs/mcp-server.md) serves the agent-blackboard journal tools to an agent over
+stdio, with Claude, Codex, and Cursor registration examples.
 
 ## CLI
 
@@ -70,6 +75,7 @@ vouchington agent-blackboard journal append --session-id <uuid> --agent codex --
 vouchington agent-blackboard journal entries --session-id <uuid>
 vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --checksum <sha256> --counts <counts.json>
 vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
+vouchington mcp
 vouchington install-playwright-chromium-arm64
 vouchington ghcr-package-retention example%2Fapi
 vouchington harness-admission-lane 4

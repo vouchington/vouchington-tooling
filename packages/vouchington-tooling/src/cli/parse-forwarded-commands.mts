@@ -12,6 +12,7 @@ type ForwardedCommand =
   | { kind: 'retrospective-transcript'; args: string[] }
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
+  | { kind: 'mcp'; args: string[] }
 
 export function parseForwardedCommand(
   command: string | undefined,
@@ -30,5 +31,6 @@ export function parseForwardedCommand(
   if (command === 'retrospective-transcript') return { kind: 'retrospective-transcript', args }
   if (command === 'retrospective-facts') return { kind: 'retrospective-facts', args }
   if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args }
+  if (command === 'mcp') return { kind: 'mcp', args }
   return undefined
 }

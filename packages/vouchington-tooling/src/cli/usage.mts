@@ -45,6 +45,7 @@ Commands:
   link-skill                    Link one packaged skill into an explicit consumer directory
   retrospective-facts           Gather immutable facts for a retrospective
   agent-blackboard              Probe and journal an Agent Blackboard deployment
+  mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
 
 Options:
   -h, --help       Show this help
@@ -124,6 +125,11 @@ agent-blackboard journal flush --outbox-directory PATH
 Interactive journal append requires --outbox-directory PATH.
 agent-blackboard snapshot partition --snapshot PATH --checksum SHA256 --counts '{"sessions":N,"entries":N,"records":N,"bytes":N}'
 agent-blackboard snapshot cleanup [--snapshot PATH] [--partition-directory PATH --receipt JSON]
+mcp
+  (no args)              Serve journal_append, journal_entries, outbox_status, outbox_flush,
+                         session_ensure, snapshot_export, and session_archive over stdio.
+                         Needs the optional @modelcontextprotocol/sdk peer (and zod).
+                         Launch it from inside the repository's git worktree.
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

@@ -358,15 +358,20 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@types/picomatch": "^4.0.3",
     "@types/spdx-expression-parse": "4.0.0",
     "agent-blackboard": "^0.6.0"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "typescript": ">=5",
     "vitest": ">=5"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
     "typescript": {
       "optional": true
     },

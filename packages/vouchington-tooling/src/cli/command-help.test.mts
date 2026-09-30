@@ -36,6 +36,7 @@ describe('subcommand help', () => {
     expect(commandUsage('with-host-lock')).toContain('--name')
     expect(commandUsage('with-host-lock')).not.toContain('agent-harness-config')
     expect(commandUsage('retrospective-facts')).toContain('--pr')
+    expect(commandUsage('mcp')).toContain('journal_append')
     expect(commandUsage('retrospective-transcript')).toContain('--session-id')
     expect(() => commandUsage('nope')).toThrow('unknown command: nope')
     const missing = 'Commands:\n  gamma   Gamma\n   \n\nOptions:\n\n'

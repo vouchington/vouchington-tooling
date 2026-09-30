@@ -332,6 +332,14 @@ describe('parseCli', () => {
     })
   })
 
+  it('forwards the mcp subcommand without interpreting its arguments', () => {
+    expect(parseCli(['node', 'vouchington', 'mcp'])).toEqual({ kind: 'mcp', args: [] })
+    expect(parseCli(['node', 'vouchington', 'mcp', '--file', 'x'])).toEqual({
+      kind: 'mcp',
+      args: ['--file', 'x'],
+    })
+  })
+
   it('parses gha-artifacts-cleanup subcommands', () => {
     expect(
       parseCli([
