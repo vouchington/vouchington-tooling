@@ -1,26 +1,12 @@
 [plugins."agent-blackboard@agent-blackboard"]
-enabled = true
+enabled = false
 
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.entry_append]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.entry_get]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_archive]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_create]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_ensure]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_patch]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.session_search]
-approval_mode = "approve"
-
-[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.snapshot_export]
-approval_mode = "approve"
+[mcp_servers.vouchington-tooling]
+command = "bash"
+args = [
+  "-c",
+  'exec node "$(git rev-parse --show-toplevel)/packages/vouchington-tooling/src/cli/index.mts" mcp',
+]
+env_vars = ["AGENT_BLACKBOARD_URL", "AGENT_BLACKBOARD_TOKEN"]
+default_tools_approval_mode = "approve"
+required = false

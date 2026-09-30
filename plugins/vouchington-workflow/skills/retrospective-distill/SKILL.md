@@ -16,17 +16,18 @@ Use when completed retrospectives or journals should become durable follow-up wo
    `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
    `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
    private local file and returns the path, counts, checksum, and manifest, never the records.
-   Before exporting, deliver this worktree's outbox with `outbox_flush`, and stop if
-   `outbox_status` still reports pending records: an archived session refuses later delivery, so a
-   retained record would never be distilled. Select with `inactiveForHours` so that other worktrees
-   have had time to deliver. Leave in-progress sessions intact. If the server is not connected,
-   stop and report it; do not fall back to a CLI command.
+   Before exporting, call `outbox_flush` and then `outbox_status` for every worktree that
+   `git worktree list` reports, passing each path as `worktree`, and stop if any still reports
+   pending records: an archived session refuses later delivery, so a retained record would never
+   be distilled. Outboxes in removed worktrees or on other machines cannot be drained this way, so
+   select with `inactiveForHours` to give them time to deliver. Leave in-progress sessions intact.
+   If the server is not connected, stop and report it; do not fall back to a CLI command.
 2. Before using any record, verify the file against the returned checksum, counts, and terminal
    manifest with the consumer's approved snapshot reader, and stop on a mismatch rather than
    treating missing records as absent. Read full records, with their storage type, repository
    tags, source identity, coverage, and outcomes, from that file. Do not distill from
-   `journal_entries`: it returns only each journal entry's time and markdown, so it cannot
-   attribute, validate, or deduplicate entries. For repository-scoped work, filter sessions by
+   `journal_entries`: it reads one session at a time and has no checksum or manifest to show that
+   the read is complete. For repository-scoped work, filter sessions by
    repository membership (`dataArrayContains` with `repositories` and the exact `owner/name`) and
    use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
    not infer their repository.
@@ -46,8 +47,9 @@ Use when completed retrospectives or journals should become durable follow-up wo
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 7. Archive only verified records fully processed across every represented repository, and never
-   while `outbox_status` reports pending records, under the repository's retention rules. Make one
-   `session_archive` call per session, whose `sessionId` is the archived session, not the caller.
+   while any worktree's `outbox_status` reports pending records, under the repository's retention
+   rules. Make one `session_archive` call per session, whose `sessionId` is the archived session,
+   not the caller.
    Archiving makes the session's metadata immutable, so it needs the archival authorization that
    local policy requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and

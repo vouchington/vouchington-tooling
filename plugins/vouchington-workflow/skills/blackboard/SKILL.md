@@ -62,14 +62,16 @@ report that the journal server is unavailable. Do not fall back to a CLI command
    readback before launching an attempt. Give each attempt's admission entry a `sourceEventId`
    unique to that attempt: reusing an earlier one returns the earlier receipt, which does not
    prove a fresh write. Autonomous mode has no filesystem outbox, so a failed delivery is an error.
-   Terminal reporting preserves work outcome separately from feedback coverage and delivery. A filesystem outbox never grants admission or acknowledged completion.
+   Terminal reporting preserves work outcome separately from feedback coverage and delivery. A
+   filesystem outbox never grants admission or acknowledged completion.
 6. Use at-least-once delivery with consumer deduplication by exact session/source identity. To
    retry a pending or failed append, call `journal_append` again with the same `sourceEventId`,
    content, and `timestamp` from the first attempt: the whole envelope must match, and conflicting
    source reuse is rejected. A transport timeout can leave a late
    durable write; pending or blocked is never an acknowledged receipt.
-7. Read journal entries oldest-first with `journal_entries` for retrospectives. It returns only each
-   journal entry's time and markdown, not its envelope. Record explicit
+7. Read the session's entries oldest-first with `journal_entries` for retrospectives. It returns
+   every entry with its envelope, including its type and repository tags, so a retrospective can
+   find an existing retrospective and keep entry-level tags. Record explicit
    none-observed with inspected scope, or not-assessed/unavailable with reason, when evidence does
    not establish a finding. A permission request is not proof of approval or denial; localhost
    refusal is not proof of sandbox enforcement. Mark partial capture and dropped counts instead of
