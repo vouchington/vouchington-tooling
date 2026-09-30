@@ -8,7 +8,7 @@ export const BLACKBOARD_ENV = {
   AGENT_BLACKBOARD_TOKEN: 'test-private-token',
 }
 
-type StoredEntry = { createdAt: string; data: unknown }
+type StoredEntry = { sessionId?: string; createdAt: string; data: unknown }
 
 export type FakeOptions = {
   archived?: boolean

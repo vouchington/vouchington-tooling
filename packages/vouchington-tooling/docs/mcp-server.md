@@ -45,7 +45,7 @@ as MCP tool errors (`isError: true`) with an actionable message rather than cras
 | Tool              | Arguments besides `sessionId` and `worktree`                                                                                                                                                    | Returns                                                                                         |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `journal_append`  | `parentSessionId`, `agent`, `version`, `mode` (`interactive` or `autonomous`), `markdown`, `sourceEventId`, `workOutcome`, `repositories`, `feedbackCoverage`, optional `timestamp`, `category` | `sessionId`, `timestamp`, delivery `status` (`delivered` with a verified receipt, or `pending`) |
-| `journal_entries` | none                                                                                                                                                                                            | the session's entries as markdown                                                               |
+| `journal_entries` | none                                                                                                                                                                                            | `sessionId` and `entries`, every entry oldest first                                             |
 | `outbox_status`   | none                                                                                                                                                                                            | `sessionId`, `status`, `pendingCount`                                                           |
 | `outbox_flush`    | none                                                                                                                                                                                            | `sessionId`, `status`, `pendingCount`, `deliveredCount`                                         |
 | `session_ensure`  | `parentSessionId`, `agent`, `version`                                                                                                                                                           | `sessionId`, `status` (`created` or `exists`), `archived`                                       |
@@ -58,6 +58,13 @@ result of `writeFeedback`. Delivery is at least once. The envelope includes its 
 retrying the same `sourceEventId`, resend the same content and the `timestamp` the first call
 returned; the server fixes a default timestamp and returns it for that reason. Markdown is limited
 to 12000 bytes.
+
+`journal_entries` returns `{ sessionId, entries }`. Each entry is exactly what the `agent-blackboard`
+client returns (`sessionId`, `createdAt`, `data`), so `data` keeps its envelope fields such as
+`repositories`, `sourceEventId`, `workOutcome`, and `feedbackCoverage`. Entries of every type come
+back, including `retrospective` and legacy entries without an envelope. The client documents no
+order, so they are sorted stably by `createdAt`, oldest first. An empty session returns
+`entries: []`. `vouchington agent-blackboard journal entries` still prints journal markdown only.
 
 `sessionId` on `outbox_status`, `outbox_flush`, and `snapshot_export` only identifies the caller.
 The outbox is per worktree and the status and flush cover every record in it. Flushing an empty

@@ -2,7 +2,6 @@ import {
   appendJournalMarkdown,
   feedbackOutboxStatus,
   flushFeedbackOutbox,
-  formatJournalEntries,
   readJournal,
   type FeedbackCoverage,
   type WorkOutcome,
@@ -79,11 +78,27 @@ export const journalAppend: ToolHandler = async (args, context) => {
   return { sessionId: context.sessionId, timestamp, ...result }
 }
 
-export const journalEntries: ToolHandler = async (_args, context) =>
-  formatJournalEntries(
-    context.sessionId,
-    await readJournal(context.sessionId, context.env, context.dependencies),
-  )
+// `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose
+// text order is time order. An entry without a usable `createdAt` sorts first rather than throwing.
+function createdAtOf(entry: unknown): string {
+  const createdAt = (entry as { createdAt?: unknown } | null)?.createdAt
+  return typeof createdAt === 'string' ? createdAt : ''
+}
+
+function byCreatedAt(left: unknown, right: unknown): number {
+  const leftAt = createdAtOf(left)
+  const rightAt = createdAtOf(right)
+  if (leftAt === rightAt) return 0
+  return leftAt < rightAt ? -1 : 1
+}
+
+/** Every entry as the client returns it, oldest first. Nothing is filtered or rewritten. */
+export const journalEntries: ToolHandler = async (_args, context) => ({
+  sessionId: context.sessionId,
+  entries: (await readJournal(context.sessionId, context.env, context.dependencies)).toSorted(
+    byCreatedAt,
+  ),
+})
 
 export const outboxStatus: ToolHandler = async (_args, context) => ({
   sessionId: context.sessionId,
