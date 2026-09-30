@@ -1,6 +1,6 @@
 {
   "name": "vouchington-workflow",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Portable implementation, dependency automation, planning, publishing, issue, retrospective, event-driven CI, stacked-PR, and PR workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington",

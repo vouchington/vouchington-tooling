@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "agent-blackboard": {
-      "command": "npx",
-      "args": ["-y", "agent-blackboard@0.6.0", "mcp"],
+    "vouchington-tooling": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "exec node \"$(git rev-parse --show-toplevel)/packages/vouchington-tooling/src/cli/index.mts\" mcp"
+      ],
       "env": {
         "AGENT_BLACKBOARD_URL": "${AGENT_BLACKBOARD_URL}",
         "AGENT_BLACKBOARD_TOKEN": "${AGENT_BLACKBOARD_TOKEN}"

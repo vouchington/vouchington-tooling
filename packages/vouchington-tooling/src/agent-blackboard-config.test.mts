@@ -1,71 +1,68 @@
-import { readFileSync as readFileSyncFromDisk } from 'node:fs'
+import { existsSync, readFileSync as readFileSyncFromDisk } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
+const repositoryUrl = (path: string) => new URL(`../../../${path}`, import.meta.url)
 const readFileSync = (path: string, encoding: 'utf8') =>
-  readFileSyncFromDisk(new URL(`../../../${path}`, import.meta.url), encoding)
+  readFileSyncFromDisk(repositoryUrl(path), encoding)
+const readJson = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
 
-const tools = [
-  'entry_append',
-  'entry_get',
-  'session_archive',
-  'session_create',
-  'session_ensure',
-  'session_patch',
-  'session_search',
-  'snapshot_export',
-] as const
+const entrypoint = 'packages/vouchington-tooling/src/cli/index.mts'
+const launcher = `exec node "$(git rev-parse --show-toplevel)/${entrypoint}" mcp`
 
-describe('agent-blackboard repository configuration', () => {
-  it('pins the shared MCP server and forwards only client credentials', () => {
-    const config = JSON.parse(readFileSync('.mcp.json', 'utf8')) as {
-      mcpServers?: Record<string, { args?: string[]; env?: Record<string, string> }>
+describe('vouchington-tooling MCP repository configuration', () => {
+  it('runs this repository`s own server from source and forwards only client credentials', () => {
+    const config = readJson('.mcp.json') as {
+      mcpServers?: Record<string, { command?: string; args?: string[]; env?: object }>
     }
-    const server = config.mcpServers?.['agent-blackboard']
-    const packageJson = JSON.parse(
-      readFileSyncFromDisk(new URL('../package.json', import.meta.url), 'utf8'),
-    ) as { devDependencies?: Record<string, string> }
-    const declaredVersion = packageJson.devDependencies?.['agent-blackboard']
-    if (!declaredVersion) throw new Error('agent-blackboard must be a development dependency')
 
-    expect(server?.args).toEqual([
-      '-y',
-      `agent-blackboard@${declaredVersion.replace(/^[~^]/u, '')}`,
-      'mcp',
-    ])
-    expect(server?.env).toEqual({
-      AGENT_BLACKBOARD_URL: '${AGENT_BLACKBOARD_URL}',
-      AGENT_BLACKBOARD_TOKEN: '${AGENT_BLACKBOARD_TOKEN}',
+    expect(Object.keys(config.mcpServers ?? {})).toEqual(['vouchington-tooling'])
+    expect(config.mcpServers?.['vouchington-tooling']).toEqual({
+      command: 'bash',
+      args: ['-c', launcher],
+      env: {
+        AGENT_BLACKBOARD_URL: '${AGENT_BLACKBOARD_URL}',
+        AGENT_BLACKBOARD_TOKEN: '${AGENT_BLACKBOARD_TOKEN}',
+      },
     })
+    expect(existsSync(repositoryUrl(entrypoint))).toBe(true)
   })
 
-  it('preauthorizes exactly the current tools for Claude', () => {
-    const settings = JSON.parse(readFileSync('.claude/settings.json', 'utf8')) as {
-      enabledMcpjsonServers?: string[]
-      permissions?: { allow?: string[] }
+  it('approves the whole server for Claude and disables the upstream plugin', () => {
+    const settings = readJson('.claude/settings.json')
+
+    expect(settings.enabledMcpjsonServers).toEqual(['vouchington-tooling'])
+    expect(settings.enabledPlugins).toEqual({ 'agent-blackboard@agent-blackboard': false })
+    expect(settings.permissions).toEqual({ allow: ['mcp__vouchington-tooling__*'] })
+  })
+
+  it('approves the whole server for Codex and disables the upstream plugin', () => {
+    const config = readFileSync('.codex/config.toml', 'utf8')
+
+    expect(config).toContain('[plugins."agent-blackboard@agent-blackboard"]\nenabled = false\n')
+    expect(config).toContain('[mcp_servers.vouchington-tooling]\ncommand = "bash"\n')
+    expect(config).toContain(`'${launcher}'`)
+    expect(config).toContain('env_vars = ["AGENT_BLACKBOARD_URL", "AGENT_BLACKBOARD_TOKEN"]')
+    expect(config).toContain('default_tools_approval_mode = "approve"')
+    expect(config).not.toContain('mcp_servers.agent-blackboard')
+  })
+
+  it('installs the client the server loads from the repository root', () => {
+    const root = readJson('package.json') as { devDependencies?: Record<string, string> }
+    const tooling = readJson('packages/vouchington-tooling/package.json') as {
+      devDependencies?: Record<string, string>
     }
 
-    expect(settings.enabledMcpjsonServers).toEqual(['agent-blackboard'])
-    expect(settings.permissions?.allow?.toSorted()).toEqual(
-      tools.map((tool) => `mcp__agent-blackboard__${tool}`).toSorted(),
+    expect(root.devDependencies?.['agent-blackboard']).toBe(
+      tooling.devDependencies?.['agent-blackboard'],
     )
   })
 
-  it('preauthorizes exactly the current tools for the Codex plugin', () => {
-    const config = readFileSync('.codex/config.toml', 'utf8')
-    const prefix =
-      '[plugins."agent-blackboard@agent-blackboard".mcp_servers.agent-blackboard.tools.'
-
-    for (const tool of tools) {
-      expect(config).toContain(`${prefix}${tool}]\napproval_mode = "approve"`)
-    }
-    expect(config.match(/approval_mode = "approve"/g)).toHaveLength(tools.length)
-  })
-
   it('keeps the integration development-only in the published package', () => {
-    const packageJson = JSON.parse(
-      readFileSync('packages/vouchington-tooling/package.json', 'utf8'),
-    ) as Record<string, Record<string, string> | undefined>
+    const packageJson = readJson('packages/vouchington-tooling/package.json') as Record<
+      string,
+      Record<string, string> | undefined
+    >
 
     expect(packageJson.devDependencies).toHaveProperty('agent-blackboard')
     expect(packageJson.dependencies?.['agent-blackboard']).toBeUndefined()

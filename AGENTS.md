@@ -32,22 +32,25 @@ Use `pr-shepherd` (not `gh pr checks`) to iterate pull requests.
 
 ## Agent Blackboard
 
-Use the upstream `agent-blackboard` skill for the MCP operation contract and
-`vouchington-workflow:blackboard` for journaling policy. Create or ensure an explicit root session
-before recording work, preserve exact parent/child session identities, and append contemporaneous
-notes for failed checks, denied permissions, scope changes, repeated fixes, and reusable tool gaps.
-For Agent Blackboard, maintain sorted, deduplicated lowercase `owner/name` values in
-`session.data.repositories`. Tag every new `entry.data.repositories` with only the repositories
-relevant to that entry. Patch the session union before appending; if the patch fails, do not append.
-Each agent writes only its own session. Start a new session for work after archival.
+Journal through this repository's own `vouchington mcp` server, registered as `vouchington-tooling`
+in `.mcp.json` and `.codex/config.toml` and run from `packages/vouchington-tooling/src`, and follow
+`vouchington-workflow:blackboard` for the tools and journaling policy. The upstream
+`agent-blackboard` plugin is disabled here. Choose an explicit root session id and ensure it before
+recording work, preserve exact parent/child session identities, and append contemporaneous notes
+for failed checks, denied permissions, scope changes, repeated fixes, and reusable tool gaps. Tag
+every entry's `repositories` with only the sorted, deduplicated lowercase `owner/name` values
+relevant to it; `journal_append` merges them into the session's repository union. Each agent writes
+only its own session. Start a new session for work after archival.
 
 The hosted connection requires `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`. Never search
 for, print, or mint credentials. Select the trusted runner mode explicitly: interactive work may
 continue after the shared writer persists sanitized feedback in its bounded private outbox, with
-visible pending count and replay action. Failed persistence or identity/content conflicts block
-capture. Autonomous work requires fresh online append/readback before admission and acknowledged
-terminal reporting; missing or rejected credentials block it. Never substitute an ad hoc local
-journal file or use an outbox to authorize autonomous work.
+the pending count from `outbox_status` and delivery through `outbox_flush`. Failed persistence or
+identity/content conflicts block capture. Autonomous work requires fresh online append/readback
+before admission and acknowledged terminal reporting; missing or rejected credentials block it.
+Never substitute an ad hoc local journal file or use an outbox to authorize autonomous work.
+Opening a harness session here starts the server from the checked-out source with the blackboard
+credentials, so review untrusted branches without a session or with the credentials unset.
 
 ## Extracted modules
 

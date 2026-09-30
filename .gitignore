@@ -5,6 +5,8 @@ coverage/
 .env
 .env.local
 .DS_Store
+# Private journal outbox that the vouchington mcp server writes during outages.
+.local/
 .codex/*
 !.codex/config.toml
 .claude/*
