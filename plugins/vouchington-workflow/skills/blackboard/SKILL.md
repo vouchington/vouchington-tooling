@@ -16,9 +16,18 @@ subagent-identity rules.
 Journal operations are tools of the `vouchington-tooling` MCP server (`vouchington mcp`):
 `journal_append`, `journal_entries`, `outbox_status`, `outbox_flush`, `session_ensure`,
 `snapshot_export`, and `session_archive`. A harness may prefix the tool names with the server name.
-Every call takes the caller's exact `sessionId`, never inferred, and may take `worktree`, the
-absolute path of a worktree of the current repository (the launch worktree by default). Writing or
-retrying an entry needs no provider skill, temporary file, `--file` flag, or replay command.
+Every call takes an exact `sessionId`, never inferred, whose meaning depends on the tool:
+
+- `journal_append` and `session_ensure`: the session written or ensured, which is the caller's own
+  session unless a runner ensures a child identity.
+- `journal_entries` and `session_archive`: the session read or archived, which during distillation
+  belongs to another agent.
+- `snapshot_export`, `outbox_status`, and `outbox_flush`: only the caller. The outbox tools cover
+  every record in the worktree outbox, not only that session's.
+
+Every call may take `worktree`, the absolute path of a worktree of the current repository (the
+launch worktree by default). Writing or retrying an entry needs no provider skill, temporary file,
+`--file` flag, or replay command.
 If these tools are not available because the server is not registered or not connected, stop and
 report that the journal server is unavailable. Do not fall back to a CLI command.
 
@@ -31,7 +40,9 @@ report that the journal server is unavailable. Do not fall back to a CLI command
 2. Record each observation with one `journal_append` call and pass the note as its `markdown`
    argument (at most 12000 bytes). Required arguments are `sessionId`, `parentSessionId` (null for a
    root session), `agent`, `version`, `mode`, `markdown`, a stable `sourceEventId`, `workOutcome`,
-   canonical exact `repositories`, and explicit `feedbackCoverage`. Nothing is written unless the
+   canonical exact `repositories`, and explicit `feedbackCoverage`. Also pass an ISO 8601
+   `timestamp` fixed before the first attempt: the server otherwise generates one, and a failed or
+   timed-out call returns no result to learn it from. Nothing is written unless the
    whole envelope validates. The tool writes journal entries; `category` is optional context and
    never changes storage type or distillation eligibility. Generate routine facts and metadata
    through the approved composer and pass its output as `markdown` instead of hand-authoring
@@ -53,10 +64,11 @@ report that the journal server is unavailable. Do not fall back to a CLI command
    coverage and delivery. A filesystem outbox never grants admission or acknowledged completion.
 6. Use at-least-once delivery with consumer deduplication by exact session/source identity. To
    retry a pending or failed append, call `journal_append` again with the same `sourceEventId`,
-   content, and `timestamp` (the first result returns the timestamp it used): the whole envelope
-   must match, and conflicting source reuse is rejected. A transport timeout can leave a late
+   content, and `timestamp` from the first attempt: the whole envelope must match, and conflicting
+   source reuse is rejected. A transport timeout can leave a late
    durable write; pending or blocked is never an acknowledged receipt.
-7. Read journal entries oldest-first with `journal_entries` for retrospectives. Record explicit
+7. Read journal entries oldest-first with `journal_entries` for retrospectives. It returns only each
+   journal entry's time and markdown, not its envelope. Record explicit
    none-observed with inspected scope, or not-assessed/unavailable with reason, when evidence does
    not establish a finding. A permission request is not proof of approval or denial; localhost
    refusal is not proof of sandbox enforcement. Mark partial capture and dropped counts instead of

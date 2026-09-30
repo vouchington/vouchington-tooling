@@ -15,10 +15,12 @@ Use when completed retrospectives or journals should become durable follow-up wo
 1. Enumerate only completed, eligible session records with the `snapshot_export` tool of the
    `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
    `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
-   private local file and returns the path, counts, checksum, and manifest, never the records. Read
-   one session's entries with `journal_entries`. For repository-scoped work, filter sessions by
-   repository membership (`dataArrayContains` with `repositories` and the exact `owner/name`) and
-   use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
+   private local file and returns the path, counts, checksum, and manifest, never the records.
+   Read full records, with their storage type, repository tags, source identity, coverage, and
+   outcomes, from that file. Do not distill from `journal_entries`: it returns only each journal
+   entry's time and markdown, so it cannot attribute, validate, or deduplicate entries. For
+   repository-scoped work, filter sessions by repository membership (`dataArrayContains` with
+   `repositories` and the exact `owner/name`) and use only entries attributed to that repository. Leave untagged legacy records unclassified. Do
    not infer their repository. Leave in-progress sessions intact. If the server is not connected,
    stop and report it; do not fall back to a CLI command.
 2. Validate storage type and the shared envelope independently of optional category. Never repair
@@ -37,7 +39,8 @@ Use when completed retrospectives or journals should become durable follow-up wo
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 6. Archive only records fully processed across every represented repository, under the repository's
-   retention rules, with one `session_archive` call per session and its exact `sessionId`. Archiving
+   retention rules, with one `session_archive` call per session whose `sessionId` is the archived
+   session, not the caller. Archiving
    makes the session's metadata immutable, so it needs the archival authorization that local policy
    requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and
@@ -52,5 +55,6 @@ content. A snapshot file is a private local copy of source records: never commit
 copy its contents into an issue.
 
 This skill supplies no issue repository, labels, milestones, projects, or approval model; it reads
-and archives sessions only through the MCP tools above. Consumer wrappers cannot weaken this export
+sessions only from the snapshot file that `snapshot_export` writes, and archives them only with
+`session_archive`. Consumer wrappers cannot weaken this export
 boundary; they provide only those local details.
