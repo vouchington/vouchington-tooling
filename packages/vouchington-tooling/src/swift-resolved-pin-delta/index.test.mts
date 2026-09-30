@@ -12,22 +12,22 @@ const retainedPin = {
   identity: 'skip-fuse-ui',
   kind: 'remoteSourceControl',
   location: 'https://source.skip.tools/skip-fuse-ui.git',
-  state: { revision: 'c'.repeat(40), version: '1.0.1' },
+  state: { revision: 'c'.repeat(40), version: '2.0.0' },
 }
 const addedPin = {
   identity: 'opencombine',
   kind: 'remoteSourceControl',
   location: 'https://github.com/OpenSwiftUIProject/OpenCombine.git',
-  state: { revision: '63aef318cb3a853bcb8d774cce15f4dcb1ccdfe4', version: '0.15.1' },
+  state: { revision: 'b'.repeat(40), version: '3.0.0' },
 }
 const trusted: ResolvedDocument = {
   originHash: 'f'.repeat(64),
-  pins: [skip('d'.repeat(40), '1.9.5'), retainedPin],
+  pins: [skip('d'.repeat(40), '1.0.0'), retainedPin],
   version: 3,
 }
 const candidate: ResolvedDocument = {
   originHash: 'e'.repeat(64),
-  pins: [addedPin, skip('a'.repeat(40), '1.9.7'), retainedPin],
+  pins: [addedPin, skip('a'.repeat(40), '1.0.1'), retainedPin],
   version: 3,
 }
 
@@ -54,7 +54,7 @@ describe('validateResolvedPinDelta', () => {
       validateResolvedPinDelta(
         trusted,
         replacePin('skip', {
-          ...skip('a'.repeat(40), '1.9.7'),
+          ...skip('a'.repeat(40), '1.0.1'),
           location: 'https://example.invalid/skip.git',
         }),
       ),

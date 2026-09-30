@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const execFileAsync = promisify(execFile)
 const script = join(process.cwd(), 'packages/vouchington-tooling/scripts/gha/prepare-trivy-db.sh')
+const downloadPrefix = 'image --download-db-only --no-progress --timeout 75s --db-repository'
+// The script owns the database schema tag; tests assert only that both sources share one.
+const mirrorCall = new RegExp(`^${downloadPrefix} mirror\\.gcr\\.io/aquasec/trivy-db:(\\d+)$`)
 
 describe('prepare-trivy-db', () => {
   const testDirs: string[] = []
@@ -64,9 +67,8 @@ esac
   it('downloads once from the Google mirror when it is available', async () => {
     const { calls, result } = await runPrepareTrivyDb()
     expect(result.ok).toBe(true)
-    expect(calls).toEqual([
-      'image --download-db-only --no-progress --timeout 75s --db-repository mirror.gcr.io/aquasec/trivy-db:2',
-    ])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatch(mirrorCall)
   })
 
   it('falls back to official GHCR after a mirror failure', async () => {
@@ -74,10 +76,9 @@ esac
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('expected success')
     expect(result.value.stdout).toContain('retrying from official GHCR')
-    expect(calls).toEqual([
-      'image --download-db-only --no-progress --timeout 75s --db-repository mirror.gcr.io/aquasec/trivy-db:2',
-      'image --download-db-only --no-progress --timeout 75s --db-repository ghcr.io/aquasecurity/trivy-db:2',
-    ])
+    const tag = mirrorCall.exec(calls[0] ?? '')?.[1]
+    expect(tag).toBeDefined()
+    expect(calls).toEqual([calls[0], `${downloadPrefix} ghcr.io/aquasecurity/trivy-db:${tag}`])
   })
 
   it('preserves a failing exit when both database sources are unavailable', async () => {

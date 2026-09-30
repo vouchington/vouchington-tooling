@@ -25,7 +25,7 @@ describe('persistent metadata', () => {
     await writeFile(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     process.chdir(root)
     const fingerprint = await persistentMetadataFingerprint(async (args) => {
-      if (args[0] === '--version') return { code: 0, output: '11.0.0\n' }
+      if (args[0] === '--version') return { code: 0, output: '1.0.0\n' }
       return { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
     })
     expect(fingerprint).toEqual({
@@ -57,7 +57,7 @@ describe('persistent metadata', () => {
     process.chdir(root)
     await expect(
       persistentMetadataFingerprint(async (args) => {
-        if (args[0] === '--version') return { code: 0, output: '11.0.0\n' }
+        if (args[0] === '--version') return { code: 0, output: '1.0.0\n' }
         return { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
       }),
     ).rejects.toMatchObject({ code: 'EISDIR' })
@@ -93,7 +93,7 @@ describe('persistent metadata', () => {
     process.chdir(root)
     const capture = async (args: string[]) =>
       args[0] === '--version'
-        ? { code: 0, output: '11.0.0\n' }
+        ? { code: 0, output: '1.0.0\n' }
         : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
     const provenance = await persistentMetadataFingerprint(capture)
     await writePersistentMetadataStamp(provenance, true, true)
@@ -116,7 +116,7 @@ describe('persistent metadata', () => {
     process.chdir(root)
     const capture = async (args: string[]) =>
       args[0] === '--version'
-        ? { code: 0, output: '11.0.0\n' }
+        ? { code: 0, output: '1.0.0\n' }
         : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) }
     const provenance = await persistentMetadataFingerprint(capture)
     await mkdir(join(root, 'node_modules'))
@@ -132,7 +132,7 @@ describe('persistent metadata', () => {
     dirs.push(root)
     await writeFile(join(root, 'package.json'), '{"name":"root"}\n')
     process.chdir(root)
-    let version = '11.0.0\n'
+    let version = '1.0.0\n'
     const capture = async (args: string[]) =>
       args[0] === '--version'
         ? { code: 0, output: version }
@@ -160,7 +160,7 @@ describe('persistent metadata', () => {
       writeFile(join(root, 'package.json'), '{"name":"changed"}\n'),
     )
     await assertCategory('pnpm', async () => {
-      version = '11.1.0\n'
+      version = '1.1.0\n'
     })
     const previousArch = process.env.npm_config_arch
     try {

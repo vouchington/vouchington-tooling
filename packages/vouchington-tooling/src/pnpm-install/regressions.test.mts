@@ -179,7 +179,7 @@ describe('pnpm install regression boundaries', () => {
       await expect(runInstaller(fixture, { maxAttempts: 3 })).rejects.toMatchObject({
         code: 1,
         stderr: expect.stringContaining(
-          'undici@8.10.0 published 2026-08-03T15:06:33.000Z, eligible at 2026-08-05T15:06:33.000Z',
+          'fixture-package@1.0.0 published 2026-08-03T15:06:33.000Z, eligible at 2026-08-05T15:06:33.000Z',
         ),
       })
       await expect(installCalls(fixture)).resolves.toHaveLength(1)

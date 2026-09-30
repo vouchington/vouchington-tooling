@@ -22,7 +22,7 @@ import {
 const ALPHA_STORE = '@services+alpha@file+backend+services+alpha'
 const CONFIG_STORE = '@workspace+config@file+backend+config'
 const UTILS_STORE = '@ts-shared+utils@file+ts-shared+utils'
-const PG_STORE = 'pg@8.0.0'
+const PG_STORE = 'pg@1.0.0'
 
 function relativeSymlink(linkPath: string, target: string): void {
   mkdirSync(path.dirname(linkPath), { recursive: true })

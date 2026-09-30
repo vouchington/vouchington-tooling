@@ -182,7 +182,7 @@ describe('code-review action', () => {
     const root = mkdtempSync(join(tmpdir(), 'code-review-node-'))
     const actionPath = join(root, '.github', 'actions', 'code-review')
     mkdirSync(actionPath, { recursive: true })
-    writeFileSync(join(root, '.nvmrc'), '24\n')
+    writeFileSync(join(root, '.nvmrc'), '99\n')
     const outputPath = join(root, 'github-output')
     writeFileSync(outputPath, '')
     const script = resolve('.github/actions/code-review/resolve-node-version.sh')
@@ -192,7 +192,7 @@ describe('code-review action', () => {
         env: { ...process.env, GITHUB_ACTION_PATH: actionPath, GITHUB_OUTPUT: outputPath },
       })
       expect(result.status).toBe(0)
-      expect(readFileSync(outputPath, 'utf8')).toBe('version=24\n')
+      expect(readFileSync(outputPath, 'utf8')).toBe('version=99\n')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

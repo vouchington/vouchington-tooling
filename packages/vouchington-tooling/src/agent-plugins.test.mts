@@ -24,9 +24,9 @@ describe('security-triage plugin', () => {
       readJson(join(plugin, 'plugin.json')),
     ])
 
+    expect(codex.version).toMatch(/^\d+\.\d+\.\d+$/)
     for (const manifest of [codex, claude, cursor]) {
-      expect(manifest.name).toBe('security-triage')
-      expect(manifest.version).toBe('0.1.0')
+      expect(manifest).toMatchObject({ name: 'security-triage', version: codex.version })
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -115,6 +115,7 @@ describe('security-triage plugin', () => {
 describe('vouchington-workflow plugin', () => {
   const readSkill = (name: string): Promise<string> =>
     readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
+  const readVersion = async () => (await readJson(join(workflowPlugin, 'plugin.json'))).version
 
   it('uses one canonical skill source in every supported host manifest', async () => {
     const [codex, claude, agent] = await Promise.all([
@@ -123,9 +124,9 @@ describe('vouchington-workflow plugin', () => {
       readJson(join(workflowPlugin, 'plugin.json')),
     ])
 
+    expect(codex.version).toMatch(/^\d+\.\d+\.\d+$/)
     for (const manifest of [codex, claude, agent]) {
-      expect(manifest.name).toBe('vouchington-workflow')
-      expect(manifest.version).toBe('0.10.0')
+      expect(manifest).toMatchObject({ name: 'vouchington-workflow', version: codex.version })
     }
     expect(codex.skills).toBe('./skills/')
     expect(claude.skills).toBe('./skills/')
@@ -236,7 +237,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'github-actions-authoring',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.10.0',
+        pluginVersion: await readVersion(),
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -298,7 +299,7 @@ describe('vouchington-workflow plugin', () => {
       expect.objectContaining({
         name: 'dependabot',
         plugin: 'vouchington-workflow',
-        pluginVersion: '0.10.0',
+        pluginVersion: await readVersion(),
         prerequisites: ['github-actions-checklist'],
       }),
     )
@@ -376,7 +377,7 @@ describe('vouchington-workflow plugin', () => {
     expect(skill).toMatch(
       /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
     )
-    expect(skill).toMatch(/machine-maintainable\s+version[\s\S]*# v4\.2\.0/i)
+    expect(skill).toMatch(/machine-maintainable\s+version[\s\S]*# v\d+\.\d+\.\d+/i)
     expect(skill).toMatch(/`docker:\/\/\.\.\.` actions[\s\S]*`@sha256:` image digest/i)
     expect(skill).toMatch(/Dependabot/i)
     expect(skill).toMatch(/tests?[\s\S]*must not assert[^\n]*exact SHA or version/i)

@@ -26,10 +26,10 @@ import {
 
 const roots: string[] = []
 const previousCwd = process.cwd()
-const pnpm11131DuplicateLedger = join(
+const duplicateLedger = join(
   import.meta.dirname,
   'fixtures',
-  'pnpm-11.13.1-duplicate-pending-builds.modules.yaml',
+  'duplicate-pending-builds.modules.yaml',
 )
 
 afterEach(async () => {
@@ -85,13 +85,13 @@ describe('pending builds', () => {
     }
   })
 
-  it('deduplicates the pnpm 11.13.1 duplicate ledger without discarding distinct IDs', async () => {
+  it('deduplicates a duplicated pnpm ledger without discarding distinct IDs', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pending-build-deduplication-'))
     roots.push(root)
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
-    await writeFile(modules, await readFile(pnpm11131DuplicateLedger, 'utf8'))
+    await writeFile(modules, await readFile(duplicateLedger, 'utf8'))
 
     await expect(deduplicatePendingBuilds()).resolves.toEqual({
       ids: ['.', 'backend'],
@@ -118,7 +118,7 @@ describe('pending builds', () => {
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
-    await writeFile(modules, await readFile(pnpm11131DuplicateLedger, 'utf8'))
+    await writeFile(modules, await readFile(duplicateLedger, 'utf8'))
     writeFailure.enabled = true
 
     await expect(deduplicatePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
@@ -133,7 +133,7 @@ describe('pending builds', () => {
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
-    const original = await readFile(pnpm11131DuplicateLedger, 'utf8')
+    const original = await readFile(duplicateLedger, 'utf8')
     await writeFile(modules, original)
     renameFailure.enabled = true
 
@@ -150,7 +150,7 @@ describe('pending builds', () => {
     const modules = join(modulesDir, '.modules.yaml')
     await writeFile(
       modules,
-      'custom: retained\nvirtualStoreDir: .pnpm\npendingBuilds: [no-mistakes@0.55.0, current@1.0.0, installed@1.0.0, backend, .]\n',
+      'custom: retained\nvirtualStoreDir: .pnpm\npendingBuilds: [stale-package@1.0.0, current@1.0.0, installed@1.0.0, backend, .]\n',
     )
     await writeFile(
       join(root, 'pnpm-lock.yaml'),
@@ -167,11 +167,11 @@ describe('pending builds', () => {
       kind: 'pending',
     })
     expect(warn).toHaveBeenCalledWith(
-      'pending-build-ledger-pruned-stale IDs: ["no-mistakes@0.55.0"]',
+      'pending-build-ledger-pruned-stale IDs: ["stale-package@1.0.0"]',
     )
     warn.mockRestore()
     await expect(readFile(modules, 'utf8')).resolves.toContain('custom: retained')
-    await expect(readFile(modules, 'utf8')).resolves.not.toContain('no-mistakes@0.55.0')
+    await expect(readFile(modules, 'utf8')).resolves.not.toContain('stale-package@1.0.0')
   })
 
   it('does not prune when the current lockfile cannot prove an ID is stale', async () => {
@@ -180,12 +180,12 @@ describe('pending builds', () => {
     await mkdir(join(root, 'node_modules'))
     process.chdir(root)
     const modules = join(root, 'node_modules', '.modules.yaml')
-    await writeFile(modules, 'pendingBuilds: [no-mistakes@0.55.0]\n')
+    await writeFile(modules, 'pendingBuilds: [stale-package@1.0.0]\n')
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
-    await writeFile(modules, 'virtualStoreDir: .pnpm\npendingBuilds: [no-mistakes@0.55.0]\n')
+    await writeFile(modules, 'virtualStoreDir: .pnpm\npendingBuilds: [stale-package@1.0.0]\n')
     await writeFile(join(root, 'pnpm-lock.yaml'), 'packages: nope\n')
 
     await expect(pruneStalePendingBuilds()).resolves.toEqual({ kind: 'unknown' })
-    await expect(readFile(modules, 'utf8')).resolves.toContain('no-mistakes@0.55.0')
+    await expect(readFile(modules, 'utf8')).resolves.toContain('stale-package@1.0.0')
   })
 })

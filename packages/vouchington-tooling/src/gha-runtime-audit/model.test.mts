@@ -70,7 +70,7 @@ describe('gha-runtime-audit model', () => {
             completed_at: null,
           },
           {
-            name: 'Run actions/checkout@v4',
+            name: 'Run actions/checkout',
             started_at: '2026-01-01T00:00:00.000Z',
             completed_at: '2026-01-01T00:01:00.000Z',
           },
@@ -78,7 +78,7 @@ describe('gha-runtime-audit model', () => {
       },
       run,
     )
-    expect(parsed?.sample.steps).toEqual([{ name: 'Run actions/checkout@v4', durationSeconds: 60 }])
+    expect(parsed?.sample.steps).toEqual([{ name: 'Run actions/checkout', durationSeconds: 60 }])
     expect(() => parseSample({ ...makeJob(1, 'test', 10), steps: 'nope' }, run)).toThrow(
       'steps must be an array',
     )

@@ -190,7 +190,7 @@ describe('pnpm install lifecycle', () => {
         'install --frozen-lockfile --force --prefer-offline --no-prod --config.disallow-workspace-cycles=false --ignore-scripts',
       ])
       await resetInstallCalls(fixture)
-      fixture.env.PNPM_VERSION = '11.1.0'
+      fixture.env.PNPM_VERSION = '1.1.0'
       await expect(runInstaller(fixture)).resolves.toBeDefined()
       await expect(installCalls(fixture)).resolves.toHaveLength(2)
     } finally {
