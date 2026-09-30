@@ -348,6 +348,11 @@ POSIX ownership and mode checks (Linux and macOS), so session-friction throws on
 Command-prefix normalization attempts limited redaction of obvious credential patterns but is not
 a secret scrubber; callers must not include credentials in captured commands.
 
+`composeRetrospective` (`vouchington-tooling/agent-blackboard`) can also assess `## CI Failures` and
+`## Sandbox & Permission Audit` from journal entries alone with `journal: {journalLoader}`, which
+needs no friction directory or log and reports `frictionStatus: 'journal-only'`. It is an
+alternative to the `friction` input, and the two are mutually exclusive.
+
 Security-sensitive helpers are provider-neutral and fail closed on malformed artifacts, payloads,
 response bodies, and pagination links. Product policy, credentials, and network transport remain in
 the consuming repository.

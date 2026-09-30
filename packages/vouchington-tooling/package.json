@@ -1,6 +1,6 @@
 {
   "name": "vouchington-tooling",
-  "version": "0.24.1",
+  "version": "0.25.0",
   "description": "Vouchington CLI and extractable tooling libraries.",
   "homepage": "https://github.com/vouchington/vouchington-tooling/tree/main/packages/vouchington-tooling#readme",
   "bugs": {
@@ -352,7 +352,7 @@
     "picomatch": "4.0.7",
     "remark": "15.0.1",
     "remark-gfm": "4.0.1",
-    "smol-toml": "1.8.0",
+    "smol-toml": "1.9.0",
     "spdx-expression-parse": "5.0.0",
     "yaml": "2.9.1"
   },
