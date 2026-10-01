@@ -53,9 +53,9 @@ esac
 const user = (login: string) => ({ login, type: 'User' })
 
 describe('gha-collaborator-trust', () => {
-  it('trusts admin and write collaborators and installed app bots', () => {
+  it('trusts admin and write collaborators and explicitly allowed app bots', () => {
     const result = runTrust(
-      ['owner/repo'],
+      ['owner/repo', '--allow-bot', 'github-actions[bot]'],
       JSON.stringify([
         user('carol'),
         user('alice'),
@@ -77,6 +77,24 @@ describe('gha-collaborator-trust', () => {
       'api repos/owner/repo/collaborators/carol/permission --jq .permission',
       'api repos/owner/repo/collaborators/ghost/permission --jq .permission',
     ])
+  })
+
+  it('does not trust bots unless each login is allowed', () => {
+    const bots = JSON.stringify([
+      { login: 'github-actions[bot]', type: 'Bot' },
+      { login: 'issues-only-app[bot]', type: 'Bot' },
+    ])
+    const none = runTrust(['owner/repo'], bots)
+    expect(JSON.parse(none.stdout)).toEqual({
+      trusted: [],
+      untrusted: ['github-actions[bot]', 'issues-only-app[bot]'],
+    })
+    const one = runTrust(['owner/repo', '--allow-bot', 'github-actions[bot]'], bots)
+    expect(JSON.parse(one.stdout)).toEqual({
+      trusted: ['github-actions[bot]'],
+      untrusted: ['issues-only-app[bot]'],
+    })
+    expect(one.calls).toEqual([])
   })
 
   it('accepts full GitHub user objects and an empty list', () => {
@@ -106,6 +124,10 @@ describe('gha-collaborator-trust', () => {
     expect(runTrust([], '[]').status).toBe(2)
     expect(runTrust(['../etc'], '[]').status).toBe(2)
     expect(runTrust(['owner/repo', 'extra'], '[]').status).toBe(2)
+    expect(runTrust(['owner/repo', '--allow-bot'], '[]').status).toBe(2)
+    expect(runTrust(['owner/repo', '--allow-bot', 'alice'], '[]').status).toBe(2)
+    expect(runTrust(['owner/repo'], '[{"login":"alice","type":{}}]').status).toBe(2)
+    expect(runTrust(['owner/repo'], '[null]').status).toBe(2)
     expect(runTrust(['owner/repo'], '{}').status).toBe(2)
     expect(runTrust(['owner/repo'], '[{"type":"User"}]').status).toBe(2)
     expect(runTrust(['owner/repo'], 'not json').status).toBe(2)

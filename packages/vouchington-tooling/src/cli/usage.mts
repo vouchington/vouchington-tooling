@@ -112,7 +112,7 @@ install-playwright-chromium-arm64 [name:archive...]
 ghcr-package-retention <url-encoded-package>...
 harness-admission-lane <lanes>
 harness-assert-gates <gate>...
-gha-collaborator-trust <owner/repo> < authors.json
+gha-collaborator-trust <owner/repo> [--allow-bot <login>]... < authors.json
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
 swift-semantic-equal <base> <head> <file.swift>
 post-review
