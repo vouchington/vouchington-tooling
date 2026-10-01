@@ -84,10 +84,10 @@ const AUDIT_PATHS = { lockfile: 'pnpm-lock.yaml', workspace: 'pnpm-workspace.yam
 const ENGINES_GRAPH = [
   'packages:',
   '  engines-only@1.0.0:',
-  '    engines: {node: ^20.9.0}',
+  '    engines: {node: ^999.0.0}',
   '  sharp-win32@1.0.0:',
   '    resolution: {integrity: sha512-fixture}',
-  "    engines: {node: '>=20.9.0'}",
+  "    engines: {node: '>=999.0.0'}",
   '    os: [win32]',
   '',
 ].join('\n')

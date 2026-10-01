@@ -107,7 +107,7 @@ describe('pending build lifecycle safety', () => {
     const fixture = await makeFixture()
     try {
       fixture.env.PNPM_PENDING_BUILDS = 'dependency'
-      fixture.env.PNPM_REBUILD_PENDING_BUILDS = 'no-mistakes@0.55.0'
+      fixture.env.PNPM_REBUILD_PENDING_BUILDS = 'stale-package@1.0.0'
       await runInstaller(fixture)
       await expect(installCalls(fixture)).resolves.toEqual([
         'install --frozen-lockfile --prefer-offline --no-prod --config.disallow-workspace-cycles=false',

@@ -148,14 +148,15 @@ describe('repository scc complexity wiring', () => {
   const doc = read('docs/scc-complexity.md')
   const packageJson = JSON.parse(read('package.json')) as { scripts: Record<string, string> }
 
-  it('pins scc 3.7.0 and runs that pin from lint after CI and Release install it', () => {
+  it('pins scc exactly and runs that pin from lint after CI and Release install it', () => {
     const tools = parseToml(read('.mise.toml')) as { tools: Record<string, string> }
-    expect(tools.tools['github:boyter/scc']).toBe('3.7.0')
+    const sccVersion = tools.tools['github:boyter/scc']
+    expect(sccVersion).toMatch(/^\d+\.\d+\.\d+$/)
     expect(packageJson.scripts['scc-complexity']).toBe(
       'mise exec -- node --experimental-strip-types packages/vouchington-tooling/src/scc-complexity/repo-cli.mts',
     )
     expect(packageJson.scripts.lint).toContain('pnpm run scc-complexity')
-    expect(doc).toContain('3.7.0')
+    expect(doc).toContain(sccVersion)
     expect(doc).toContain('50')
     expect(doc).toContain('There is no baseline.')
     expect(doc).toContain('CI and Release install the pinned `scc`')

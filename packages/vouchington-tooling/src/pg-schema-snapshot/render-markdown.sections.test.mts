@@ -23,7 +23,7 @@ describe('renderSchemaMarkdown — non-table sections', () => {
         widget_status: { values: ['active', 'archived'] },
         item_kind: { values: ['tool'] },
       },
-      extensions: { pgcrypto: { version: '1.3' }, uuid_ossp: { version: '1.1' } },
+      extensions: { pgcrypto: { version: '1.0' }, uuid_ossp: { version: '2.0' } },
       functions: {
         set_updated_at: {
           definition:
@@ -57,7 +57,7 @@ describe('renderSchemaMarkdown — non-table sections', () => {
     expect(files.get('enums.md')!.indexOf('item_kind')).toBeLessThan(
       files.get('enums.md')!.indexOf('widget_status'),
     )
-    expect(files.get('extensions.md')).toContain('| `pgcrypto` | 1.3 |')
+    expect(files.get('extensions.md')).toContain('| `pgcrypto` | 1.0 |')
     expect(files.get('extensions.md')!.indexOf('pgcrypto')).toBeLessThan(
       files.get('extensions.md')!.indexOf('uuid_ossp'),
     )

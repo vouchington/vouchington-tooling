@@ -55,11 +55,11 @@ describe('buildSchemaSnapshot — enums, views, extensions, functions, policies'
 
   it('keys extensions by name with their installed version', () => {
     const snapshot = buildSchemaSnapshot(
-      catalog({ extensions: [{ extension_name: 'pgcrypto', version: '1.3' }] }),
+      catalog({ extensions: [{ extension_name: 'pgcrypto', version: '1.0' }] }),
       emptyGrowth(),
     )
 
-    expect(snapshot.extensions).toEqual({ pgcrypto: { version: '1.3' } })
+    expect(snapshot.extensions).toEqual({ pgcrypto: { version: '1.0' } })
   })
 
   it('keys functions by bare name when there are no identity arguments', () => {

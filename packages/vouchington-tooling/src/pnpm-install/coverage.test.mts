@@ -63,7 +63,7 @@ describe('remaining install coverage', () => {
       expect(
         formatReleaseAgeFailure(
           'install',
-          '  undici@8.10.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)\n',
+          '  fixture-package@1.0.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)\n',
         ),
       ).not.toContain('eligible at')
       expect(warn).toHaveBeenCalled()

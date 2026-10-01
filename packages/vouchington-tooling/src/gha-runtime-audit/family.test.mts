@@ -45,11 +45,11 @@ describe('gha-runtime-audit job families', () => {
       [
         shard(1, 'backend (1, linux)', 200, [
           { name: 'skipped', started_at: null, completed_at: null },
-          step('Run actions/checkout@v4', 60),
+          step('Run actions/checkout', 60),
           step('Run vitest', 140, '2026-01-01T00:01:00.000Z'),
         ]),
         shard(1, 'backend (2, linux)', 220, [
-          step('Run actions/checkout@v4', 60),
+          step('Run actions/checkout', 60),
           step('Run vitest', 160, '2026-01-01T00:01:00.000Z'),
         ]),
         shard(1, 'api (1)', 100),

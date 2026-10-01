@@ -50,8 +50,8 @@ describe('validateNugetUpdate', () => {
     expect(() =>
       validateNugetUpdate(
         trusted,
-        trusted.replace('Version="$(MauiVersion)"', 'Version="10.0.1"'),
-        JSON.stringify([update('Microsoft.Maui.Controls', '$(MauiVersion)', '10.0.1')]),
+        trusted.replace('Version="$(MauiVersion)"', 'Version="2.0.1"'),
+        JSON.stringify([update('Microsoft.Maui.Controls', '$(MauiVersion)', '2.0.1')]),
       ),
     ).toThrow('MSBuild-managed version')
   })

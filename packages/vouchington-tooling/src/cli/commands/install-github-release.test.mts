@@ -42,7 +42,7 @@ describe('install-github-release', () => {
   it('rejects missing and malformed arguments', () => {
     const required = [
       '--version',
-      '0.24.2',
+      '1.2.3',
       '--asset',
       'lychee-{platform}.tar.gz',
       '--bin',
@@ -64,7 +64,7 @@ describe('install-github-release', () => {
         '--repo',
         'gitleaks/gitleaks',
         '--version',
-        '8.30.1',
+        '1.2.3',
         '--asset',
         'gitleaks_{version}_{platform}.tar.gz',
         '--bin',
@@ -87,7 +87,7 @@ describe('install-github-release', () => {
       '--repo',
       'lycheeverse/lychee',
       '--version',
-      '0.24.2',
+      '1.2.3',
       '--asset',
       'lychee-x86_64-unknown-linux-gnu.tar.gz',
       '--bin',
@@ -103,14 +103,14 @@ describe('install-github-release', () => {
     const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-skip-'))
     temporaryDirectories.push(temporaryDirectory)
     mkdirSync(join(temporaryDirectory, 'bin'))
-    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 0.24.2\n')
+    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 1.2.3\n')
     chmodSync(join(temporaryDirectory, 'bin', 'lychee'), 0o755)
     const skipped = runHelper(
       [
         '--repo',
         'lycheeverse/lychee',
         '--version',
-        '0.24.2',
+        '1.2.3',
         '--asset',
         'lychee-{platform}.tar.gz',
         '--bin',
@@ -121,7 +121,7 @@ describe('install-github-release', () => {
       { RUNNER_TEMP: temporaryDirectory },
     )
     expect(skipped.status).toBe(0)
-    expect(skipped.stdout).toContain('lychee 0.24.2 already installed')
+    expect(skipped.stdout).toContain('lychee 1.2.3 already installed')
     expect(skipped.stderr).not.toContain('curl should not run')
   })
 
@@ -129,14 +129,14 @@ describe('install-github-release', () => {
     const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-regex-'))
     temporaryDirectories.push(temporaryDirectory)
     mkdirSync(join(temporaryDirectory, 'bin'))
-    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 0x24x2\n')
+    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 1x2x3\n')
     chmodSync(join(temporaryDirectory, 'bin', 'lychee'), 0o755)
     const result = runHelper(
       [
         '--repo',
         'lycheeverse/lychee',
         '--version',
-        '0.24.2',
+        '1.2.3',
         '--asset',
         'lychee.tar.gz',
         '--bin',
@@ -152,14 +152,14 @@ describe('install-github-release', () => {
     const temporaryDirectory = mkdtempSync(join(tmpdir(), 'install-github-release-prefix-'))
     temporaryDirectories.push(temporaryDirectory)
     mkdirSync(join(temporaryDirectory, 'bin'))
-    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 0.24.20\n')
+    writeFileSync(join(temporaryDirectory, 'bin', 'lychee'), '#!/bin/sh\necho lychee 1.2.30\n')
     chmodSync(join(temporaryDirectory, 'bin', 'lychee'), 0o755)
     const result = runHelper(
       [
         '--repo',
         'lycheeverse/lychee',
         '--version',
-        '0.24.2',
+        '1.2.3',
         '--asset',
         'lychee.tar.gz',
         '--bin',

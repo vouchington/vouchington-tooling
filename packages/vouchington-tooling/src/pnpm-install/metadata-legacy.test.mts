@@ -43,7 +43,7 @@ function expectedFingerprint(
       platform: process.platform,
     }),
   )
-  add(hash, 'pnpm', '11.0.0')
+  add(hash, 'pnpm', '1.0.0')
   add(hash, 'installScripts', String(installScripts))
   for (const filename of [
     'pnpm-lock.yaml',
@@ -74,7 +74,7 @@ describe('legacy persistent metadata API', () => {
     process.chdir(root)
     const capture = async (args: string[]) =>
       args[0] === '--version'
-        ? { code: 0, output: '11.0.0\n' }
+        ? { code: 0, output: '1.0.0\n' }
         : {
             code: 0,
             output: JSON.stringify([
@@ -140,7 +140,7 @@ describe('legacy persistent metadata API', () => {
       persistentMetadataFingerprint(
         async (args) =>
           args[0] === '--version'
-            ? { code: 0, output: '11.0.0\n' }
+            ? { code: 0, output: '1.0.0\n' }
             : { code: 0, output: JSON.stringify([{ name: 'root', path: root }]) },
         true,
       ),

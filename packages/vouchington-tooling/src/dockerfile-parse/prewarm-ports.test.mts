@@ -11,22 +11,22 @@ function findMismatches(
 }
 
 const combinedDockerfile = `
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 FROM base-node AS api-prewarm
 COPY --link --from=deploy-api /prod/api ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 3000
 
 FROM base-node AS worker-cpu-prewarm
 COPY --link --from=deploy-worker-cpu /prod/worker-cpu ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 NODE_PREWARM_PORT=3001 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 3001
 
 FROM base-node AS worker-io-prewarm
 COPY --link --from=deploy-worker-io /prod/worker-io ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 NODE_PREWARM_PORT=3002 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 3002
 `.trim()
@@ -55,7 +55,7 @@ describe('parseDockerfilePrewarmStages', () => {
     const fixture = `
 FROM base-node AS worker-foo-prewarm
 COPY --link --from=deploy-worker-foo /prod/worker-foo ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 4000
 `.trim()
@@ -74,7 +74,7 @@ RUN NODE_PREWARM=1 \\
     const fixture = `
 FROM base-node AS worker-foo-prewarm
 COPY --link --from=deploy-worker-foo /prod/worker-foo ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 NODE_PREWARM_PORT=4001 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 4000
 `.trim()
@@ -93,7 +93,7 @@ RUN NODE_PREWARM=1 NODE_PREWARM_PORT=4001 \\
     const fixture = `
 FROM base-node AS worker-foo-prewarm
 COPY --link --from=deploy-worker-foo /prod/worker-foo ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 NODE_PREWARM_PORT=4000 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 4000
 `.trim()
@@ -105,7 +105,7 @@ RUN NODE_PREWARM=1 NODE_PREWARM_PORT=4000 \\
     const fixture = `
 FROM base-node AS api-prewarm
 COPY --link --from=deploy-api /prod/api ./
-ARG NODE_PREWARM_VERSION=0.3.0
+ARG NODE_PREWARM_VERSION=0.0.0-test
 RUN NODE_PREWARM=1 \\
     npx --yes node-prewarm@\${NODE_PREWARM_VERSION} "/nodejs/bin/node serve.mts" --port 3000
 `.trim()
@@ -179,7 +179,7 @@ RUN node-prewarm "/nodejs/bin/node serve.mts" --port abc NODE_PREWARM_PORT=nope
     const fixture = `
 FROM base-node AS worker-foo-prewarm
 COPY --link --from=deploy-worker-foo /deploy/worker-foo .
-RUN READY_PORT=4000 warmup@1.0.0 "/nodejs/bin/node serve.mts" --port 4000
+RUN READY_PORT=4000 warmup@0.0.0-test "/nodejs/bin/node serve.mts" --port 4000
 `.trim()
 
     expect(

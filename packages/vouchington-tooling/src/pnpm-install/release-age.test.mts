@@ -10,7 +10,7 @@ const minimumReleaseAge = 0
 
 const REAL_LOG = `✗ Lockfile failed supply-chain policy check (1857 entries in 3.7s)
 [ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 1 lockfile entries failed verification:
-  undici@8.10.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
+  fixture-package@1.0.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
 `
 
 const TRANSIENT_LOG = ' ERROR  GET http://127.0.0.1:1/pnpm: fetch failed\n'
@@ -30,7 +30,7 @@ describe('parseReleaseAgeViolations', () => {
     expect(parseReleaseAgeViolations(REAL_LOG)).toEqual([
       {
         cutoff: '2026-08-02T04:48:10.357Z',
-        packageSpec: 'undici@8.10.0',
+        packageSpec: 'fixture-package@1.0.0',
         publishedAt: '2026-08-03T15:06:33.000Z',
       },
     ])
@@ -38,7 +38,7 @@ describe('parseReleaseAgeViolations', () => {
 
   it('extracts every entry when pnpm reports more than one violation', () => {
     const multi = `[ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 2 lockfile entries failed verification:
-  undici@8.10.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
+  fixture-package@1.0.0 was published at 2026-08-03T15:06:33.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
   @fixture/dep@2.0.0 was published at 2026-08-03T16:00:00.000Z, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
 `
     expect(parseReleaseAgeViolations(multi)).toHaveLength(2)
@@ -59,7 +59,7 @@ describe('formatReleaseAgeFailure', () => {
     ).toISOString()
     expect(message).toContain('ordinary persistent install failed')
     expect(message).toContain(
-      `undici@8.10.0 published 2026-08-03T15:06:33.000Z, eligible at ${eligibleAt}`,
+      `fixture-package@1.0.0 published 2026-08-03T15:06:33.000Z, eligible at ${eligibleAt}`,
     )
     expect(message).toContain('pnpm minimumReleaseAge')
   })
@@ -85,9 +85,11 @@ describe('formatReleaseAgeFailure', () => {
 
   it('omits eligibility when the publish timestamp is not a date', () => {
     const log = `[ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION]
-  undici@8.10.0 was published at not-a-date, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
+  fixture-package@1.0.0 was published at not-a-date, within the minimumReleaseAge cutoff (2026-08-02T04:48:10.357Z)
 `
-    expect(formatReleaseAgeFailure('install', log)).toContain('undici@8.10.0 published not-a-date')
+    expect(formatReleaseAgeFailure('install', log)).toContain(
+      'fixture-package@1.0.0 published not-a-date',
+    )
     expect(formatReleaseAgeFailure('install', log)).not.toContain('eligible at')
   })
 })
