@@ -74,6 +74,10 @@ const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string }> = {
     path: 'scripts/gha/harness-admission-lane.sh',
   },
   'harness-assert-gates': { command: 'bash', path: 'scripts/gha/harness-assert-gates.sh' },
+  'gha-collaborator-trust': {
+    command: 'bash',
+    path: 'scripts/gha/gha-collaborator-trust.sh',
+  },
 }
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {

@@ -37,6 +37,7 @@ Commands:
   ghcr-package-retention        Delete old GHCR package versions past KEEP_MIN
   harness-admission-lane        Compute a GITHUB_RUN_ID admission lane for fleet fan-out
   harness-assert-gates          Fail if any named HARNESS_*_ENABLED gate is enabled
+  gha-collaborator-trust        Classify authors as write-access collaborators or not
   nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
   swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
   post-review                   Post one COMMENT review from a staged payload file
@@ -111,6 +112,7 @@ install-playwright-chromium-arm64 [name:archive...]
 ghcr-package-retention <url-encoded-package>...
 harness-admission-lane <lanes>
 harness-assert-gates <gate>...
+gha-collaborator-trust <owner/repo> < authors.json
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
 swift-semantic-equal <base> <head> <file.swift>
 post-review
