@@ -20,6 +20,7 @@ and `retrospective-distill` skills name the tool prefix of every harness (Claude
 and Cursor's deferred tools) and tell an agent to search for `journal_append` before concluding the
 server is unavailable. `retrospective-distill` drains on `worktreePendingCount`. The docs also record
 Cursor's per-user approval: `cursor-agent mcp enable vouchington-tooling` once, and `--approve-mcps`
-on every headless `cursor-agent -p` run. The `vouchington-workflow` plugin advances to 0.10.1.
+on every headless `cursor-agent -p` run. The `vouchington-workflow` plugin advances to 0.11.0,
+because its `blackboard` skill now teaches a retry contract that only this server honors.
 
 The lockfile now resolves `agent-blackboard` 0.6.1 within the existing `^0.6.0` range.

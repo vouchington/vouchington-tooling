@@ -36,9 +36,8 @@ launch worktree by default). Writing or retrying an entry needs no provider skil
 Search for `journal_append` (by bare name, so every prefix matches) before concluding the server is
 unavailable; a deferred harness lists the tool only on request. If the search finds no such tool
 because the server is not registered, not connected, or not approved, stop and report that the
-journal server is unavailable. Cursor needs a per-user approval to load the server:
-`cursor-agent mcp enable vouchington-tooling` once, and `--approve-mcps` on every headless
-`cursor-agent -p` run, which does not persist. Do not fall back to a CLI command.
+journal server is unavailable, and name any per-user approval the harness still needs to load
+it (the consumer wrapper documents it). Do not fall back to a CLI command.
 
 1. Capture consequential observations before filing an issue: failed or recovered checks, denied or
    approved permissions, repeated fixes, scope changes, first-party tool behavior, and architectural
