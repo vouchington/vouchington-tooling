@@ -202,6 +202,7 @@ describe('agent-blackboard CLI', () => {
         sessionId: 'session',
         sourceEventId: 'cli:note',
         createdAt: '2026-01-01T00:00:00.000Z',
+        timestamp: '2026-01-01T00:00:00.000Z',
         verified: true,
       },
     })
@@ -353,6 +354,7 @@ it('reports interactive durable pending without failing primary work', async () 
   vi.mocked(appendJournal).mockResolvedValue({
     status: 'pending',
     sourceEventId: 'cli:pending',
+    timestamp: '2026-01-01T00:00:00.000Z',
     pendingCount: 2,
     diagnostic: 'configuration-invalid',
   })

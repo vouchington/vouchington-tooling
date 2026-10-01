@@ -19,6 +19,8 @@ export type FakeOptions = {
   conflictingSession?: { id: string; parentSessionId: null; agent: string; version: string }
   entries?: StoredEntry[]
   entriesError?: unknown
+  /** An entry another caller writes just before the next append, after that append's read. */
+  lateEntry?: StoredEntry
 }
 
 export type FakeBlackboard = {
@@ -27,6 +29,7 @@ export type FakeBlackboard = {
     ensure: unknown[]
     patch: unknown[]
     append: unknown[]
+    get: unknown[]
     archive: string[]
     export: unknown[]
   }
@@ -47,6 +50,7 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     ensure: [],
     patch: [],
     append: [],
+    get: [],
     archive: [],
     export: [],
   }
@@ -74,9 +78,12 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     }
   }
   if (options.omitArchive) delete (Sessions.prototype as { archive?: unknown }).archive
+  let lateEntry = options.lateEntry
   class Entries {
     async append(input: unknown) {
       calls.append.push(input)
+      if (lateEntry) stored.push(lateEntry)
+      lateEntry = undefined
       const entry = {
         createdAt: `2026-01-01T00:00:${String(stored.length).padStart(2, '0')}.000Z`,
         data: (input as { data: unknown }).data,
@@ -84,7 +91,8 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
       stored.push(entry)
       return entry
     }
-    async *get() {
+    async *get(input: unknown) {
+      calls.get.push(input)
       if (options.entriesError !== undefined) throw options.entriesError
       yield* stored
     }

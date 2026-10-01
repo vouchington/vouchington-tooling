@@ -1,6 +1,6 @@
 import { feedbackDeadline } from './feedback-deadline.mts'
 import { FeedbackDeliveryError, feedbackDiagnostic } from './feedback-online-error.mts'
-import { canonicalFeedback } from './feedback-canonical.mts'
+import { canonicalFeedback, canonicalFeedbackEvent } from './feedback-canonical.mts'
 import { loadClient, resolveBlackboardConnection, type BlackboardClientModule } from './client.mts'
 import { normalizeRepositories, validateFeedbackEnvelope } from './feedback-codec.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
@@ -39,10 +39,10 @@ async function findEvent(
   entries: AsyncIterable<unknown>,
   envelope: FeedbackEnvelope,
   expectedCreatedAt?: string,
-): Promise<{ createdAt: string } | undefined> {
+): Promise<{ createdAt: string; timestamp: string } | undefined> {
   let count = 0
   let inspectedBytes = 0
-  let found: { createdAt: string } | undefined
+  let found: { createdAt: string; timestamp: string } | undefined
   let matching = 0
   for await (const entry of entries) {
     inspectedBytes += Buffer.byteLength(JSON.stringify(entry))
@@ -59,15 +59,22 @@ async function findEvent(
     } catch {
       throw new FeedbackDeliveryError('event-conflict')
     }
+    // Same event means same content; the stored `timestamp` may differ from this attempt's.
     if (
-      canonicalFeedback(entry.data) !== canonicalFeedback(envelope) ||
+      canonicalFeedbackEvent(entry.data) !== canonicalFeedbackEvent(envelope) ||
       typeof entry.createdAt !== 'string'
     )
       throw new FeedbackDeliveryError('event-conflict')
     if (++matching > 1 && expectedCreatedAt !== undefined)
       throw new FeedbackDeliveryError('event-conflict')
-    if (expectedCreatedAt === undefined || entry.createdAt === expectedCreatedAt)
-      found = { createdAt: entry.createdAt }
+    // Duplicates of one event (a late write beside a retry) report the earliest stored record, so
+    // every retry returns the same timestamp.
+    if (
+      expectedCreatedAt === undefined
+        ? found === undefined || entry.createdAt < found.createdAt
+        : entry.createdAt === expectedCreatedAt
+    )
+      found = { createdAt: entry.createdAt, timestamp: entry.data.timestamp }
   }
   return found
 }
@@ -127,6 +134,7 @@ export async function deliverFeedbackOnline(
           sessionId: input.identity.sessionId,
           sourceEventId: input.envelope.sourceEventId,
           createdAt: existing.createdAt,
+          timestamp: existing.timestamp,
           verified: true,
         }
       const appended = await entries.append({
@@ -151,6 +159,7 @@ export async function deliverFeedbackOnline(
         sessionId: input.identity.sessionId,
         sourceEventId: input.envelope.sourceEventId,
         createdAt: confirmed.createdAt,
+        timestamp: confirmed.timestamp,
         verified: true,
       }
     } catch (error) {

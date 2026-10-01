@@ -4,7 +4,8 @@ import type { BlackboardClientDependencies } from '../agent-blackboard/client.mt
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import { optionalString, rejectUnknown, requireObject } from './args.mts'
 import { readSessionId, type ToolHandler } from './context.mts'
-import { journalAppend, journalEntries, outboxFlush, outboxStatus } from './handlers-journal.mts'
+import { journalAppend, journalEntries } from './handlers-journal.mts'
+import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
 import { sessionArchive, sessionEnsure, snapshotExport } from './handlers-session.mts'
 import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
@@ -35,15 +36,15 @@ const HANDLERS: Record<string, ToolHandler> = {
 const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
   'identity-conflict': 'the session already exists with a different parent, agent, or version',
   'event-conflict':
-    'sourceEventId was already used with different content or timestamp; use a new sourceEventId',
+    'sourceEventId was already used with different content; use a new sourceEventId',
   'archived-session': 'the session is archived; write to a new session',
   'authentication-rejected': 'the blackboard rejected AGENT_BLACKBOARD_TOKEN',
   'blackboard-unavailable': 'the blackboard could not be reached or returned an error',
   'configuration-invalid': 'AGENT_BLACKBOARD_URL or AGENT_BLACKBOARD_TOKEN is missing or invalid',
   'client-unavailable': 'agent-blackboard is not installed in the worktree',
   'readback-unconfirmed':
-    'the write could not be confirmed; retry with the same sourceEventId and timestamp',
-  'delivery-timeout': 'delivery timed out; retry with the same sourceEventId and timestamp',
+    'the write could not be confirmed; retry the same call (same sourceEventId and content)',
+  'delivery-timeout': 'delivery timed out; retry the same call (same sourceEventId and content)',
 }
 
 function describeError(error: unknown): string {

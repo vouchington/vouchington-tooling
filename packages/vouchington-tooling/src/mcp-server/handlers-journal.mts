@@ -1,7 +1,5 @@
 import {
   appendJournalMarkdown,
-  feedbackOutboxStatus,
-  flushFeedbackOutbox,
   readJournal,
   type FeedbackCoverage,
   type WorkOutcome,
@@ -16,6 +14,7 @@ import {
   type Args,
 } from './args.mts'
 import { outboxDirectory, readIdentity, type ToolHandler } from './context.mts'
+import { outboxCounts } from './handlers-outbox.mts'
 
 const MODES = ['interactive', 'autonomous'] as const
 const OUTCOMES: readonly WorkOutcome[] = [
@@ -56,26 +55,36 @@ function readCoverage(args: Args): FeedbackCoverage {
 export const journalAppend: ToolHandler = async (args, context) => {
   const identity = readIdentity(args, context.sessionId)
   const mode = requiredChoice(args, 'mode', MODES)
-  // The envelope includes the timestamp, so a retry of one sourceEventId must reuse it. Fixing the
-  // default here and returning it lets the caller do that.
-  const timestamp = optionalString(args, 'timestamp') ?? new Date().toISOString()
+  const sourceEventId = requiredString(args, 'sourceEventId')
   const category = optionalString(args, 'category')
-  const result = await appendJournalMarkdown({
-    ...identity,
-    mode,
-    // Interactive delivery needs a durable outbox; autonomous delivery forbids one.
-    ...(mode === 'interactive' ? { outboxDirectory: outboxDirectory(context.worktree) } : {}),
+  const entry = {
     markdown: requiredString(args, 'markdown'),
-    sourceEventId: requiredString(args, 'sourceEventId'),
     workOutcome: requiredChoice(args, 'workOutcome', OUTCOMES),
     repositories: requiredStringArray(args, 'repositories'),
     feedbackCoverage: readCoverage(args),
-    timestamp,
+  }
+  // Interactive delivery needs a durable outbox; autonomous delivery forbids one.
+  const directory = mode === 'interactive' ? outboxDirectory(context.worktree) : undefined
+  const result = await appendJournalMarkdown({
+    ...identity,
+    ...entry,
+    mode,
+    sourceEventId,
+    ...(directory === undefined ? {} : { outboxDirectory: directory }),
     ...(category === undefined ? {} : { category }),
     env: context.env,
     dependencies: context.dependencies,
   })
-  return { sessionId: context.sessionId, timestamp, ...result }
+  // The server owns the timestamp: a first append takes the current time, and a retry of the same
+  // event (same session, sourceEventId, and content) reports the one already stored or retained.
+  const timestamp = result.status === 'delivered' ? result.receipt.timestamp : result.timestamp
+  // Autonomous delivery never uses an outbox, so it has nothing pending. Interactive delivery
+  // reports the outbox as it is after delivery, split into the caller's session and the worktree.
+  const counts =
+    mode === 'interactive'
+      ? outboxCounts(context.worktree, context.sessionId)
+      : { pendingCount: 0, worktreePendingCount: 0 }
+  return { sessionId: context.sessionId, ...result, timestamp, ...counts }
 }
 
 // `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose
@@ -99,23 +108,3 @@ export const journalEntries: ToolHandler = async (_args, context) => ({
     byCreatedAt,
   ),
 })
-
-export const outboxStatus: ToolHandler = async (_args, context) => ({
-  sessionId: context.sessionId,
-  ...feedbackOutboxStatus(outboxDirectory(context.worktree)),
-})
-
-export const outboxFlush: ToolHandler = async (_args, context) => {
-  const directory = outboxDirectory(context.worktree)
-  // Flushing creates the outbox directory, so an empty or absent outbox is reported as is.
-  if (feedbackOutboxStatus(directory).pendingCount === 0)
-    return { sessionId: context.sessionId, status: 'empty', pendingCount: 0, deliveredCount: 0 }
-  return {
-    sessionId: context.sessionId,
-    ...(await flushFeedbackOutbox({
-      directory,
-      env: context.env,
-      dependencies: context.dependencies,
-    })),
-  }
-}

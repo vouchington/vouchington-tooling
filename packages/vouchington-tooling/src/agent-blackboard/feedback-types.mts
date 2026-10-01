@@ -39,6 +39,8 @@ export type FeedbackReceipt = {
   sessionId: string
   sourceEventId: string
   createdAt: string
+  /** The `timestamp` of the stored entry, which may be earlier than the attempt that confirmed it. */
+  timestamp: string
   verified: true
 }
 export type FeedbackDiagnostic =
@@ -62,6 +64,8 @@ export type FeedbackDeliveryResult =
   | {
       status: 'pending'
       sourceEventId: string
+      /** The `timestamp` of the retained record that a later flush delivers. */
+      timestamp: string
       pendingCount: number
       diagnostic: FeedbackDiagnostic
     }

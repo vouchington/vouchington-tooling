@@ -1,4 +1,4 @@
-import { canonicalFeedback } from './feedback-canonical.mts'
+import { canonicalFeedback, canonicalFeedbackEvent } from './feedback-canonical.mts'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   closeSync,
@@ -95,7 +95,21 @@ export function listFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
   const path = outboxDirectory(directory, true)
   return withFileLock(join(path, '.records'), () => records(path).map((item) => item.record))
 }
-export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxRecord): number {
+/** Reads the retained records without creating the outbox directory. */
+export function readFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
+  const path = outboxDirectory(directory, false)
+  if (!ensurePrivateDirectory(path, false)) return []
+  return withFileLock(join(path, '.records'), () => records(path).map((item) => item.record))
+}
+/**
+ * Retains the record unless the same event is already retained, in which case that record stays:
+ * the event is the session, `sourceEventId`, and content, and the earlier `timestamp` wins. The
+ * returned record is the one to deliver.
+ */
+export function persistFeedbackOutbox(
+  directory: string,
+  record: FeedbackOutboxRecord,
+): FeedbackOutboxRecord {
   validateFeedbackIdentity(record.identity)
   validateFeedbackEnvelope(record.envelope)
   const path = outboxDirectory(directory, true)
@@ -105,9 +119,12 @@ export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxR
     const existing = current.find((item) => item.path === join(path, name))
     const serialized = JSON.stringify(record)
     if (existing) {
-      if (canonicalFeedback(existing.record) !== canonicalFeedback(record))
+      if (
+        canonicalFeedback(existing.record.identity) !== canonicalFeedback(record.identity) ||
+        canonicalFeedbackEvent(existing.record.envelope) !== canonicalFeedbackEvent(record.envelope)
+      )
         throw new Error('feedback source event conflicts with a retained unsent record')
-      return current.length
+      return existing.record
     }
     const bytes = Buffer.byteLength(serialized)
     if (
@@ -142,7 +159,7 @@ export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxR
       } catch {}
       throw error
     }
-    return current.length + 1
+    return record
   })
 }
 export function removeFeedbackOutbox(

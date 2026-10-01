@@ -61,7 +61,23 @@ describe('tool contract', () => {
         'workOutcome',
       ].toSorted(),
     )
-    expect(Object.keys(properties)).toEqual(expect.arrayContaining(['timestamp', 'category']))
+    expect(Object.keys(properties)).toContain('category')
+  })
+
+  it('keeps the entry timestamp server-owned and documents how a retry works', () => {
+    const { properties } = byName('journal_append').inputSchema
+    expect(Object.keys(properties)).not.toContain('timestamp')
+    const { description } = byName('journal_append')
+    expect(description).toContain('The server owns the entry timestamp and returns it')
+    expect(description).toContain('repeat the identical call')
+  })
+
+  it('names the session count and the worktree count apart on every outbox result', () => {
+    for (const name of ['journal_append', 'outbox_status', 'outbox_flush']) {
+      const { description } = byName(name)
+      expect(description, name).toContain('pendingCount')
+      expect(description, name).toContain('worktreePendingCount')
+    }
   })
 
   it('marks reads read-only and archive as the only destructive tool', () => {

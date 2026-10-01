@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { afterEach, beforeEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { callTool, type ServerEnvironment, type ToolCallResult } from './dispatch.mts'
 import {
   BLACKBOARD_ENV,
@@ -63,5 +63,19 @@ export const JOURNAL_ARGS = {
   workOutcome: 'success',
   repositories: ['owner/repo'],
   feedbackCoverage: { status: 'complete', sources: ['tool-result'], droppedCount: 0 },
-  timestamp: '2026-01-01T00:00:00.000Z',
+}
+
+/** The time `useFixedClock` pins, which is the timestamp the server mints for a first append. */
+export const NOW = '2026-01-01T00:00:00.000Z'
+
+/** Pins `Date` only, so timers and child processes keep running. */
+export function useFixedClock(): { advance: (milliseconds: number) => void } {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(NOW))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+  return { advance: (milliseconds) => vi.setSystemTime(new Date(Date.now() + milliseconds)) }
 }

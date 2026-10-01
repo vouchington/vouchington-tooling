@@ -1,6 +1,10 @@
 import { chmod, rename, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
-import { persistFeedbackOutbox, removeFeedbackOutbox } from './feedback-outbox.mts'
+import {
+  persistFeedbackOutbox,
+  readFeedbackOutbox,
+  removeFeedbackOutbox,
+} from './feedback-outbox.mts'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -83,8 +87,8 @@ it('rejects conflicting source records, corrupt persistence and unsafe private d
 it('preserves idempotent pending records and prevents wrong-content delivery removal', async () => {
   const path = await directory()
   const record = { identity, envelope: envelope('same:source') }
-  expect(persistFeedbackOutbox(path, record)).toBe(1)
-  expect(persistFeedbackOutbox(path, { envelope: record.envelope, identity })).toBe(1)
+  expect(persistFeedbackOutbox(path, record)).toEqual(record)
+  expect(persistFeedbackOutbox(path, { envelope: record.envelope, identity })).toEqual(record)
   expect(() =>
     removeFeedbackOutbox(path, {
       ...record,
@@ -99,6 +103,31 @@ it('preserves idempotent pending records and prevents wrong-content delivery rem
     pendingCount: 0,
   })
   expect(() => feedbackOutboxStatus('relative')).toThrow(/absolute/)
+})
+it('keeps one record per event and the earlier timestamp when only the timestamp differs', async () => {
+  const path = await directory()
+  const record = { identity, envelope: envelope('same:event') }
+  const later = { ...record.envelope, timestamp: '2026-01-01T00:10:00.000Z' }
+  persistFeedbackOutbox(path, record)
+  expect(persistFeedbackOutbox(path, { identity, envelope: later })).toEqual(record)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+  const conflicting = /conflicts with a retained unsent record/
+  expect(() =>
+    persistFeedbackOutbox(path, { identity, envelope: { ...later, markdown: 'Changed' } }),
+  ).toThrow(conflicting)
+  expect(() =>
+    persistFeedbackOutbox(path, { identity: { ...identity, agent: 'other' }, envelope: later }),
+  ).toThrow(conflicting)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+})
+it('reads retained records without creating the directory', async () => {
+  const path = await directory()
+  const record = { identity, envelope: envelope('read:source') }
+  expect(readFeedbackOutbox(join(path, 'not-created'))).toEqual([])
+  expect(await readdir(path)).toEqual([])
+  persistFeedbackOutbox(path, record)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+  expect(() => readFeedbackOutbox('relative')).toThrow(/absolute/)
 })
 it('rejects oversized, unowned-mode, unrecognized and identity-mismatched persisted records', async () => {
   for (const mutation of [
