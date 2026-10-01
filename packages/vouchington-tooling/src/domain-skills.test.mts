@@ -29,6 +29,7 @@ describe('domain skill plugins', () => {
     await expect(skillNames('vouchington-database')).resolves.toEqual([
       'postgres-node-performance-tuning',
       'postgres-partitioning-uuid-v7',
+      'postgres-schema-design',
     ])
   })
 
@@ -85,6 +86,10 @@ describe('domain skill plugins', () => {
         'vouchington-database',
         'postgres-partitioning-uuid-v7/references/partition-lifecycle.md',
       ),
+      readSkill('vouchington-database', 'postgres-schema-design/SKILL.md'),
+      readSkill('vouchington-database', 'postgres-schema-design/references/naming.md'),
+      readSkill('vouchington-database', 'postgres-schema-design/references/relations.md'),
+      readSkill('vouchington-database', 'postgres-schema-design/references/table-shapes.md'),
     ])
     expect(resources.join('\n')).toMatch(
       /accepted-decision ledger|failure paths|acceptance criterion|typed module shape|collision-safe|locator|stopLoading|read-after-write|partition key/i,

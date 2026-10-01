@@ -1,6 +1,6 @@
 {
   "name": "vouchington-database",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Portable PostgreSQL schema and performance guidance.",
   "author": {
     "name": "Vouchington"

@@ -9,6 +9,9 @@ Read applicable `AGENTS.md` and their declared adapter alias, otherwise
 `.agents/skills/postgres-partitioning-uuid-v7/SKILL.md` from the repository root if present.
 Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
+For schema names, references, and canonical table shapes, read
+[postgres-schema-design](../postgres-schema-design/SKILL.md).
+
 Partition only after lifecycle, retention, and query predicates show that it helps.
 
 - Treat a UUIDv7 as time ordered. Where the meaning matters, keep an explicit business timestamp.
