@@ -1,6 +1,6 @@
 {
   "name": "vouchington-database",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Portable PostgreSQL schema and performance guidance.",
   "author": {
     "name": "Vouchington",
@@ -13,7 +13,7 @@
   "interface": {
     "displayName": "Database foundations",
     "shortDescription": "Portable PostgreSQL guidance.",
-    "longDescription": "Reusable PostgreSQL guidance for Node.js performance, UUIDv7 partitioning, migration safety, and data lifecycle design.",
+    "longDescription": "Reusable PostgreSQL guidance for schema design, naming, relations, history, work queues, cursors, Node.js performance, UUIDv7 partitioning, and data lifecycle design.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],

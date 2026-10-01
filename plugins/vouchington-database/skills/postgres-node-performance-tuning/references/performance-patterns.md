@@ -12,3 +12,25 @@ Check query predicates, joins, ordering, and selected columns against index shap
 evidence to confirm planner behavior. Add extended statistics only when observed estimates show a
 correlation problem; verify the statistics are collected and used. Partitioning can reduce scanned
 data, but it does not replace suitable local indexes or predicates that permit pruning.
+
+## Query shapes
+
+Test existence with `EXISTS`, not `COUNT(*) > 0`. Use correlated `NOT EXISTS` rather than
+`NOT IN (SELECT ...)`, whose NULL behavior can silently exclude expected rows. Filter and order
+UUIDv7 rows by `id`, not generated `created_at`, so the key's index supports the query.
+Read and return tables with explicit columns: no `SELECT *`, `alias.*`, or `RETURNING *`.
+A view may use `*` when its reviewed column list is the reader contract.
+
+Use keyset pagination, never `OFFSET`. An optimizer fence is a `MATERIALIZED` CTE, not
+`OFFSET 0`. Constrain a partitioned table's partition key, or document the reason for a
+cross-partition query. Choose the partition key from dominant access patterns; a hot reader
+of `RANGE (id)` needs an id or time bound.
+
+A UUIDv7 child cannot predate its parent. For a `RANGE (id)` child read by parent id, use a
+shared lower-bound helper equivalent to
+`id >= min_uuidv7(uuid_extract_timestamp(parent_id) - interval '1 hour')` to prune earlier
+partitions; the overlap allows clock skew. Rate limits query an actor-keyed table rather than
+recipient-keyed fan-out rows. Verify actual pruning with EXPLAIN.
+
+Generic `jonathanong/no-mistakes` checks include `postgres-no-offset`; inspect available rules
+and configure reviewed cross-partition exceptions rather than treating a rule as plan evidence.
