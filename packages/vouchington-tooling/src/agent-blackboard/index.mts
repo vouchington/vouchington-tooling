@@ -99,8 +99,6 @@ export {
   FeedbackDeliveryError,
 } from './feedback-delivery.mts'
 export { feedbackOutboxStatus, readFeedbackOutbox } from './feedback-outbox.mts'
-export { findFeedbackEventTimestamp } from './feedback-event-lookup.mts'
-export type { FeedbackEventLookup } from './feedback-event-lookup.mts'
 export { composeRetrospective } from './feedback-compose.mts'
 export type { RetrospectiveCompositionInput, FeedbackAssessment } from './feedback-compose.mts'
 export type { JournalAuditOptions } from './feedback-journal-audit.mts'

@@ -38,7 +38,8 @@ Use when completed retrospectives or journals should become durable follow-up wo
 3. Validate storage type and the shared envelope independently of optional category. Never repair
    unknown legacy types or repository provenance by inference. Quarantine malformed sessions with
    an explicit reason while processing valid unrelated sessions. Deduplicate at-least-once records
-   by exact session/source identity and reject conflicting duplicate content. Retain coverage,
+   by exact session/source identity and reject conflicting duplicate content. Records that differ
+   only in their server-assigned `timestamp` are one event. Retain coverage,
    dropped counts, requested versus observed outcomes, and useful resolved findings.
 4. Cluster findings by root cause. Prefer a few broad actionable themes over many narrow issues.
    Treat a finding already linked to an open tracker as context, not a duplicate.

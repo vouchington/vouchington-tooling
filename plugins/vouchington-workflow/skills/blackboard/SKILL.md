@@ -75,9 +75,10 @@ it (the consumer wrapper documents it). Do not fall back to a CLI command.
    filesystem outbox never grants admission or acknowledged completion.
 6. Use at-least-once delivery with consumer deduplication by exact session/source identity. To
    retry a pending or failed append, repeat the identical `journal_append` call with the same
-   `sourceEventId` and content: the server reuses the timestamp already recorded for that session
-   and `sourceEventId`, even after a restart. The whole envelope must match, and conflicting source
-   reuse is rejected. A transport timeout can leave a late
+   `sourceEventId` and content. The server's timestamp is not part of an event's identity, so a
+   retry of an event already stored or retained reports the stored timestamp, even after a restart
+   or an outage. The same `sourceEventId` with different content is rejected as a conflict, so use
+   a new `sourceEventId` for a changed note. A transport timeout can leave a late
    durable write; pending or blocked is never an acknowledged receipt.
 7. Read the session's entries oldest-first with `journal_entries` for retrospectives. It returns
    every entry with its envelope, including its type and repository tags, so a retrospective can

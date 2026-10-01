@@ -57,20 +57,21 @@ anything is written, so a missing required field writes nothing. It returns the 
 result of `writeFeedback`. Delivery is at least once. Markdown is limited to 12000 bytes.
 
 The server owns the entry `timestamp`: the tool takes no `timestamp` argument and rejects one, so an
-agent cannot fabricate it, and the result returns the timestamp used. The envelope includes its
-timestamp, and a retry must match the original envelope. To retry, repeat the identical call. Before
-minting the current time the server looks for an envelope with the same `sessionId` and
-`sourceEventId` and reuses its timestamp: first in the worktree's durable outbox (interactive mode),
-then in the session's remote entries. The outbox lookup survives a server restart. The remote lookup
-is a bounded read with a 5 second deadline, and any failure of it falls through to the current time,
-so offline interactive capture keeps working. The same `sourceEventId` with changed content is still
-rejected, as `event-conflict` when it was already delivered or as a conflict with the retained unsent
-record.
-
-Known limits: a retry of an already delivered interactive append made while the provider is
-unreachable mints a new timestamp, so the retained record later flushes as `event-conflict`; and an
-autonomous write that lands between the lookup and the append can only produce `event-conflict`,
-never a duplicate entry.
+agent cannot fabricate it, and the result returns the timestamp it reports. An event is identified by
+`sessionId`, `sourceEventId`, and content; the timestamp is not part of that identity. The server
+stamps each attempt with the current time, and the delivery step compares the new attempt with what
+the blackboard or the worktree outbox already holds while ignoring only `timestamp`. To retry, repeat
+the identical call. A retry of an event that is already stored, or already retained in the outbox,
+is the same event: it writes nothing, drops the duplicate retained record, and returns the stored
+record's `timestamp` and `receipt`, so repeated retries report the same timestamp, including after a
+server restart and when the provider was unreachable for the retry. An outbox record that was
+delivered before the retry is recognized the same way when it is flushed, so it drains instead of
+blocking. Any difference in the other envelope fields under the same `sessionId` and
+`sourceEventId` is an `event-conflict` (or a conflict with the retained unsent record) and writes
+nothing. If an autonomous write of the same event lands between the check and the append, both
+entries exist, but the report names the earliest stored one and later retries report it again.
+Admission freshness (`verifyFreshFeedback`) keeps its stricter rule: any earlier record of the event,
+whatever its timestamp, is a conflict.
 
 `journal_entries` returns `{ sessionId, entries }`. Each entry is exactly what the `agent-blackboard`
 client returns (`sessionId`, `createdAt`, `data`), so `data` keeps its envelope fields such as

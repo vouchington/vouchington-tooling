@@ -1,9 +1,7 @@
 import { feedbackDeadline } from './feedback-deadline.mts'
 import { FeedbackDeliveryError, feedbackDiagnostic } from './feedback-online-error.mts'
-import { canonicalFeedback } from './feedback-canonical.mts'
-import { loadClient, type BlackboardClientModule } from './client.mts'
-import { resolveFeedbackConnection } from './feedback-connection.mts'
-import { boundedEntries } from './feedback-entry-bounds.mts'
+import { canonicalFeedback, canonicalFeedbackEvent } from './feedback-canonical.mts'
+import { loadClient, resolveBlackboardConnection, type BlackboardClientModule } from './client.mts'
 import { normalizeRepositories, validateFeedbackEnvelope } from './feedback-codec.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { isObject } from './snapshot-partition-guards.mts'
@@ -41,10 +39,15 @@ async function findEvent(
   entries: AsyncIterable<unknown>,
   envelope: FeedbackEnvelope,
   expectedCreatedAt?: string,
-): Promise<{ createdAt: string } | undefined> {
-  let found: { createdAt: string } | undefined
+): Promise<{ createdAt: string; timestamp: string } | undefined> {
+  let count = 0
+  let inspectedBytes = 0
+  let found: { createdAt: string; timestamp: string } | undefined
   let matching = 0
-  for await (const entry of boundedEntries(entries)) {
+  for await (const entry of entries) {
+    inspectedBytes += Buffer.byteLength(JSON.stringify(entry))
+    if (++count > 10_000 || inspectedBytes > 2_000_000)
+      throw new FeedbackDeliveryError('readback-unconfirmed')
     if (
       !isObject(entry) ||
       !isObject(entry.data) ||
@@ -56,15 +59,22 @@ async function findEvent(
     } catch {
       throw new FeedbackDeliveryError('event-conflict')
     }
+    // Same event means same content; the stored `timestamp` may differ from this attempt's.
     if (
-      canonicalFeedback(entry.data) !== canonicalFeedback(envelope) ||
+      canonicalFeedbackEvent(entry.data) !== canonicalFeedbackEvent(envelope) ||
       typeof entry.createdAt !== 'string'
     )
       throw new FeedbackDeliveryError('event-conflict')
     if (++matching > 1 && expectedCreatedAt !== undefined)
       throw new FeedbackDeliveryError('event-conflict')
-    if (expectedCreatedAt === undefined || entry.createdAt === expectedCreatedAt)
-      found = { createdAt: entry.createdAt }
+    // Duplicates of one event (a late write beside a retry) report the earliest stored record, so
+    // every retry returns the same timestamp.
+    if (
+      expectedCreatedAt === undefined
+        ? found === undefined || entry.createdAt < found.createdAt
+        : entry.createdAt === expectedCreatedAt
+    )
+      found = { createdAt: entry.createdAt, timestamp: entry.data.timestamp }
   }
   return found
 }
@@ -76,7 +86,22 @@ export async function deliverFeedbackOnline(
   validateFeedbackEnvelope(input.envelope)
   return feedbackDeadline(async () => {
     try {
-      const connection = resolveFeedbackConnection(input.env)
+      let connection
+      try {
+        connection = resolveBlackboardConnection(input.env)
+        const url = new URL(connection.baseUrl)
+        if (
+          url.username ||
+          url.password ||
+          (url.protocol !== 'https:' &&
+            !(
+              url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+            ))
+        )
+          throw new Error('invalid connection URL')
+      } catch {
+        throw new FeedbackDeliveryError('configuration-invalid')
+      }
       let client
       try {
         client = await loadClient(input.dependencies)
@@ -109,6 +134,7 @@ export async function deliverFeedbackOnline(
           sessionId: input.identity.sessionId,
           sourceEventId: input.envelope.sourceEventId,
           createdAt: existing.createdAt,
+          timestamp: existing.timestamp,
           verified: true,
         }
       const appended = await entries.append({
@@ -133,6 +159,7 @@ export async function deliverFeedbackOnline(
         sessionId: input.identity.sessionId,
         sourceEventId: input.envelope.sourceEventId,
         createdAt: confirmed.createdAt,
+        timestamp: confirmed.timestamp,
         verified: true,
       }
     } catch (error) {

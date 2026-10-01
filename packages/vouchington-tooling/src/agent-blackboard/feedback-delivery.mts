@@ -32,13 +32,14 @@ export async function writeFeedback(
   }
   if (!input.outboxDirectory)
     throw new Error('interactive feedback requires an explicit durable outbox directory')
-  persistFeedbackOutbox(input.outboxDirectory, { identity: input.identity, envelope })
+  // A retained record for the same event keeps its own timestamp and is the one delivered.
+  const record = persistFeedbackOutbox(input.outboxDirectory, {
+    identity: input.identity,
+    envelope,
+  })
   try {
-    const receipt = await deliverFeedbackOnline({ ...input, envelope })
-    const cleanup = removeFeedbackOutbox(input.outboxDirectory, {
-      identity: input.identity,
-      envelope,
-    })
+    const receipt = await deliverFeedbackOnline({ ...input, envelope: record.envelope })
+    const cleanup = removeFeedbackOutbox(input.outboxDirectory, record)
     return { status: 'delivered', sourceEventId: envelope.sourceEventId, ...cleanup, receipt }
   } catch (error) {
     const diagnostic = feedbackDiagnostic(error)
@@ -47,6 +48,7 @@ export async function writeFeedback(
     return {
       status: 'pending',
       sourceEventId: envelope.sourceEventId,
+      timestamp: record.envelope.timestamp,
       pendingCount: feedbackOutboxStatus(input.outboxDirectory).pendingCount,
       diagnostic,
     }

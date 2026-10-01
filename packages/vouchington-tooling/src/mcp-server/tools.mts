@@ -94,11 +94,12 @@ export const TOOLS: readonly ToolDefinition[] = [
     'Appends one journal entry to the caller session and returns the verified read-back receipt. ' +
       'Nothing is written unless every required field validates. Interactive mode retains the ' +
       'envelope in the worktree outbox when the blackboard is unreachable. The server owns the ' +
-      'entry timestamp and returns it; to retry, repeat the identical call, and the server reuses ' +
-      'the timestamp already recorded for that sessionId and sourceEventId, so the retry is ' +
-      'idempotent even after a restart. pendingCount counts unsent records of the caller ' +
-      'sessionId; worktreePendingCount counts those of every session in the worktree outbox ' +
-      '(both 0 in autonomous mode, which never uses an outbox).',
+      'entry timestamp and returns it. An event is identified by sessionId, sourceEventId, and ' +
+      'content, never by timestamp: to retry, repeat the identical call, and a retry of an ' +
+      'event already stored or retained reports the stored timestamp instead of a new one. The ' +
+      'same sourceEventId with different content is an event-conflict. pendingCount counts ' +
+      'unsent records of the caller sessionId; worktreePendingCount counts those of every ' +
+      'session in the worktree outbox (both 0 in autonomous mode, which never uses an outbox).',
     ADDITIVE,
     {
       ...IDENTITY,

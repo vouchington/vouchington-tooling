@@ -1,6 +1,5 @@
 import {
   appendJournalMarkdown,
-  findFeedbackEventTimestamp,
   readJournal,
   type FeedbackCoverage,
   type WorkOutcome,
@@ -66,35 +65,26 @@ export const journalAppend: ToolHandler = async (args, context) => {
   }
   // Interactive delivery needs a durable outbox; autonomous delivery forbids one.
   const directory = mode === 'interactive' ? outboxDirectory(context.worktree) : undefined
-  // The envelope includes the timestamp and a retry must rebuild it exactly, so the server owns it:
-  // a retry reuses the one already recorded for this session and event, from the outbox first (it
-  // survives a restart) and then the remote session. Only a first append mints a new one.
-  const timestamp =
-    (await findFeedbackEventTimestamp({
-      sessionId: context.sessionId,
-      sourceEventId,
-      ...(directory === undefined ? {} : { outboxDirectory: directory }),
-      env: context.env,
-      dependencies: context.dependencies,
-    })) ?? new Date().toISOString()
   const result = await appendJournalMarkdown({
     ...identity,
     ...entry,
     mode,
     sourceEventId,
-    timestamp,
     ...(directory === undefined ? {} : { outboxDirectory: directory }),
     ...(category === undefined ? {} : { category }),
     env: context.env,
     dependencies: context.dependencies,
   })
+  // The server owns the timestamp: a first append takes the current time, and a retry of the same
+  // event (same session, sourceEventId, and content) reports the one already stored or retained.
+  const timestamp = result.status === 'delivered' ? result.receipt.timestamp : result.timestamp
   // Autonomous delivery never uses an outbox, so it has nothing pending. Interactive delivery
   // reports the outbox as it is after delivery, split into the caller's session and the worktree.
   const counts =
     mode === 'interactive'
       ? outboxCounts(context.worktree, context.sessionId)
       : { pendingCount: 0, worktreePendingCount: 0 }
-  return { sessionId: context.sessionId, timestamp, ...result, ...counts }
+  return { sessionId: context.sessionId, ...result, timestamp, ...counts }
 }
 
 // `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose

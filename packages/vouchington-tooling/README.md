@@ -554,7 +554,10 @@ Identity, content, and archived-session conflicts fail in either mode while pres
 record; they are not reported as transient pending delivery. Replay retains permanently conflicted
 records and continues to deliver unrelated pending records; transient failures stop that replay.
 Verified delivery retains its receipt when local cleanup fails, returning
-`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is safe to replay with exact dedup.
+`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is
+safe to replay: an event is identified by session, `sourceEventId`, and content, and a duplicate that
+differs only in `timestamp` is the same event, so it reports the stored record's `timestamp` and
+receipt and the retained duplicate is removed.
 Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
 records after connectivity returns.
 
