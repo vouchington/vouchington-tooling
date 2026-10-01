@@ -1,7 +1,9 @@
 import { feedbackDeadline } from './feedback-deadline.mts'
 import { FeedbackDeliveryError, feedbackDiagnostic } from './feedback-online-error.mts'
 import { canonicalFeedback } from './feedback-canonical.mts'
-import { loadClient, resolveBlackboardConnection, type BlackboardClientModule } from './client.mts'
+import { loadClient, type BlackboardClientModule } from './client.mts'
+import { resolveFeedbackConnection } from './feedback-connection.mts'
+import { boundedEntries } from './feedback-entry-bounds.mts'
 import { normalizeRepositories, validateFeedbackEnvelope } from './feedback-codec.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { isObject } from './snapshot-partition-guards.mts'
@@ -40,14 +42,9 @@ async function findEvent(
   envelope: FeedbackEnvelope,
   expectedCreatedAt?: string,
 ): Promise<{ createdAt: string } | undefined> {
-  let count = 0
-  let inspectedBytes = 0
   let found: { createdAt: string } | undefined
   let matching = 0
-  for await (const entry of entries) {
-    inspectedBytes += Buffer.byteLength(JSON.stringify(entry))
-    if (++count > 10_000 || inspectedBytes > 2_000_000)
-      throw new FeedbackDeliveryError('readback-unconfirmed')
+  for await (const entry of boundedEntries(entries)) {
     if (
       !isObject(entry) ||
       !isObject(entry.data) ||
@@ -79,22 +76,7 @@ export async function deliverFeedbackOnline(
   validateFeedbackEnvelope(input.envelope)
   return feedbackDeadline(async () => {
     try {
-      let connection
-      try {
-        connection = resolveBlackboardConnection(input.env)
-        const url = new URL(connection.baseUrl)
-        if (
-          url.username ||
-          url.password ||
-          (url.protocol !== 'https:' &&
-            !(
-              url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
-            ))
-        )
-          throw new Error('invalid connection URL')
-      } catch {
-        throw new FeedbackDeliveryError('configuration-invalid')
-      }
+      const connection = resolveFeedbackConnection(input.env)
       let client
       try {
         client = await loadClient(input.dependencies)

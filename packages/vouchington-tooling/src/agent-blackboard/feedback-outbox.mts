@@ -95,6 +95,12 @@ export function listFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
   const path = outboxDirectory(directory, true)
   return withFileLock(join(path, '.records'), () => records(path).map((item) => item.record))
 }
+/** Reads the retained records without creating the outbox directory. */
+export function readFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
+  const path = outboxDirectory(directory, false)
+  if (!ensurePrivateDirectory(path, false)) return []
+  return withFileLock(join(path, '.records'), () => records(path).map((item) => item.record))
+}
 export function persistFeedbackOutbox(directory: string, record: FeedbackOutboxRecord): number {
   validateFeedbackIdentity(record.identity)
   validateFeedbackEnvelope(record.envelope)

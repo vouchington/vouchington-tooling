@@ -45,7 +45,8 @@ only its own session. Start a new session for work after archival.
 The hosted connection requires `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`. Never search
 for, print, or mint credentials. Select the trusted runner mode explicitly: interactive work may
 continue after the shared writer persists sanitized feedback in its bounded private outbox, with
-the pending count from `outbox_status` and delivery through `outbox_flush`. Failed persistence or
+the `pendingCount` (this session) and `worktreePendingCount` (every session) from `outbox_status`
+and delivery through `outbox_flush`. Failed persistence or
 identity/content conflicts block capture. Autonomous work requires fresh online append/readback
 before admission and acknowledged terminal reporting; missing or rejected credentials block it.
 Never substitute an ad hoc local journal file or use an outbox to authorize autonomous work.

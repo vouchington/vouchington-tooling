@@ -1,6 +1,10 @@
 import { chmod, rename, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
-import { persistFeedbackOutbox, removeFeedbackOutbox } from './feedback-outbox.mts'
+import {
+  persistFeedbackOutbox,
+  readFeedbackOutbox,
+  removeFeedbackOutbox,
+} from './feedback-outbox.mts'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -99,6 +103,15 @@ it('preserves idempotent pending records and prevents wrong-content delivery rem
     pendingCount: 0,
   })
   expect(() => feedbackOutboxStatus('relative')).toThrow(/absolute/)
+})
+it('reads retained records without creating the directory', async () => {
+  const path = await directory()
+  const record = { identity, envelope: envelope('read:source') }
+  expect(readFeedbackOutbox(join(path, 'not-created'))).toEqual([])
+  expect(await readdir(path)).toEqual([])
+  persistFeedbackOutbox(path, record)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+  expect(() => readFeedbackOutbox('relative')).toThrow(/absolute/)
 })
 it('rejects oversized, unowned-mode, unrecognized and identity-mismatched persisted records', async () => {
   for (const mutation of [

@@ -17,7 +17,14 @@ import { runIsolatedGit } from './worktree.mts'
 const fixture = useRepoFixture()
 
 function writeNothing(h: ReturnType<typeof harness>, root: string) {
-  expect(h.fake.calls).toEqual({ ensure: [], patch: [], append: [], archive: [], export: [] })
+  expect(h.fake.calls).toEqual({
+    ensure: [],
+    patch: [],
+    append: [],
+    get: [],
+    archive: [],
+    export: [],
+  })
   expect(existsSync(outboxPath(root))).toBe(false)
 }
 

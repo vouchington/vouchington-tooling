@@ -37,7 +37,19 @@ describe('in-process client and server round trip', () => {
     const { client } = await connect()
     expect(client.getServerVersion()).toMatchObject({ name: SERVER_NAME, version: '9.8.7' })
     expect(client.getServerCapabilities()).toMatchObject({ tools: {} })
-    expect(client.getInstructions()).toContain('explicit sessionId')
+    const instructions = client.getInstructions() ?? ''
+    expect(instructions).toContain('explicit sessionId')
+    for (const form of [
+      'mcp__vouchington-tooling__<tool>',
+      'mcp__vouchington_tooling__<tool>',
+      'vouchington-tooling__<tool>',
+      'GetDynamicTools',
+      'CallDynamicTool',
+      'search_tool',
+      'use_tool',
+      'Search for journal_append before concluding this server is unavailable',
+    ])
+      expect(instructions, form).toContain(form)
     const { tools } = await client.listTools()
     expect(tools.map((tool) => tool.name)).toEqual([
       'journal_append',
@@ -83,6 +95,7 @@ describe('in-process client and server round trip', () => {
       sessionId: 'native:owner',
       status: 'empty',
       pendingCount: 0,
+      worktreePendingCount: 0,
     })
   })
 

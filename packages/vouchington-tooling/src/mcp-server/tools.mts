@@ -93,7 +93,12 @@ export const TOOLS: readonly ToolDefinition[] = [
     'journal_append',
     'Appends one journal entry to the caller session and returns the verified read-back receipt. ' +
       'Nothing is written unless every required field validates. Interactive mode retains the ' +
-      'envelope in the worktree outbox when the blackboard is unreachable.',
+      'envelope in the worktree outbox when the blackboard is unreachable. The server owns the ' +
+      'entry timestamp and returns it; to retry, repeat the identical call, and the server reuses ' +
+      'the timestamp already recorded for that sessionId and sourceEventId, so the retry is ' +
+      'idempotent even after a restart. pendingCount counts unsent records of the caller ' +
+      'sessionId; worktreePendingCount counts those of every session in the worktree outbox ' +
+      '(both 0 in autonomous mode, which never uses an outbox).',
     ADDITIVE,
     {
       ...IDENTITY,
@@ -118,12 +123,6 @@ export const TOOLS: readonly ToolDefinition[] = [
         additionalProperties: false,
         description: 'Explicit coverage; sources default to [] and droppedCount to 0.',
       },
-      timestamp: {
-        type: 'string',
-        description:
-          'Optional ISO 8601 time; defaults to now and is returned. Reuse the same sourceEventId ' +
-          'and timestamp when retrying, because the whole envelope must match.',
-      },
       category: { type: 'string', description: 'Optional context; never changes entry type.' },
     },
     [
@@ -145,14 +144,15 @@ export const TOOLS: readonly ToolDefinition[] = [
   ),
   tool(
     'outbox_status',
-    'Reports how many unsent journal records the worktree outbox retains. sessionId identifies ' +
-      'the caller; the count covers the whole outbox.',
+    'Reports unsent journal records in the worktree outbox. pendingCount and status (empty or ' +
+      'pending) cover the caller sessionId only; worktreePendingCount covers every session.',
     READ_ONLY,
   ),
   tool(
     'outbox_flush',
-    'Delivers retained outbox records and returns the remaining count. sessionId identifies the ' +
-      'caller; the flush covers every record in the worktree outbox.',
+    'Delivers every retained record in the worktree outbox, whichever session wrote it, and ' +
+      'returns deliveredCount for the whole flush. pendingCount and status cover the remaining ' +
+      'records of the caller sessionId; worktreePendingCount covers every session.',
     IDEMPOTENT_ADDITIVE,
   ),
   tool(

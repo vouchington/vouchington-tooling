@@ -17,11 +17,15 @@ Use when completed retrospectives or journals should become durable follow-up wo
    `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
    private local file and returns the path, counts, checksum, and manifest, never the records.
    Before exporting, call `outbox_flush` and then `outbox_status` for every worktree that
-   `git worktree list` reports, passing each path as `worktree`, and stop if any still reports
-   pending records: an archived session refuses later delivery, so a retained record would never
-   be distilled. Outboxes in removed worktrees or on other machines cannot be drained this way, so
-   select with `inactiveForHours` to give them time to deliver. Leave in-progress sessions intact.
-   If the server is not connected, stop and report it; do not fall back to a CLI command.
+   `git worktree list` reports, passing each path as `worktree`, and stop if any reports a
+   `worktreePendingCount` above 0. Use the worktree count, never `pendingCount` or `status`, which
+   cover only the caller's own session: the sessions to distill belong to other agents, and an
+   archived session refuses later delivery, so a retained record would never be distilled. Outboxes
+   in removed worktrees or on other machines cannot be drained this way, so select with
+   `inactiveForHours` to give them time to deliver. Leave in-progress sessions intact. If a search
+   for `snapshot_export` (the tool names carry a harness prefix, see the
+   [blackboard skill](../blackboard/SKILL.md)) finds no server, stop and report it; do not fall back
+   to a CLI command.
 2. Before using any record, verify the file against the returned checksum, counts, and terminal
    manifest with the consumer's approved snapshot reader, and stop on a mismatch rather than
    treating missing records as absent. Read full records, with their storage type, repository
@@ -47,8 +51,8 @@ Use when completed retrospectives or journals should become durable follow-up wo
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 7. Archive only verified records fully processed across every represented repository, and never
-   while any worktree's `outbox_status` reports pending records, under the repository's retention
-   rules. Make one `session_archive` call per session, whose `sessionId` is the archived session,
+   while any worktree's `outbox_status` reports a `worktreePendingCount` above 0, under the
+   repository's retention rules. Make one `session_archive` call per session, whose `sessionId` is the archived session,
    not the caller. Immediately before each call, read that session with `journal_entries` and
    archive only if its entries match the verified snapshot's by source identity; otherwise leave it
    for the next pass, because an entry added after the export would never be distilled.

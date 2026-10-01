@@ -27,6 +27,7 @@ export type FakeBlackboard = {
     ensure: unknown[]
     patch: unknown[]
     append: unknown[]
+    get: unknown[]
     archive: string[]
     export: unknown[]
   }
@@ -47,6 +48,7 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     ensure: [],
     patch: [],
     append: [],
+    get: [],
     archive: [],
     export: [],
   }
@@ -84,7 +86,8 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
       stored.push(entry)
       return entry
     }
-    async *get() {
+    async *get(input: unknown) {
+      calls.get.push(input)
       if (options.entriesError !== undefined) throw options.entriesError
       yield* stored
     }
