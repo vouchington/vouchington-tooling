@@ -1,5 +1,6 @@
 import { beforeAll, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
+import { responseStatusCodesForContract } from './response-contract-status.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app:any;
@@ -9,6 +10,19 @@ const preamble = `declare const app:any;
   type Bad={status:number;bodyKind:'none'};
   declare const value:Http<Good|Bad>;`
 const sources = {
+  'context-free-handler': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+    function handler(){stream.write(apiSseFrame('GET:/events',{event:'ok',data:{ok:true}}))}app.route('/events').get(handler)`,
+  'missing-carrier': `declare const app:any;declare function apiOpenApiHttpResponse<K extends string,T>(key:K,value:T):T;declare const value:Response;
+    app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',value);ctx.setStatus(response.status);ctx.pipeline(response.body)})`,
+  'custom-promise': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+    class Promise{constructor(executor:()=>void){}}app.route('/events').get((ctx:any)=>new Promise(()=>stream.write(apiSseFrame('GET:/events',{event:'never',data:{ok:true}}))))`,
+  'timer-frame': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+    app.route('/events').get((ctx:any)=>setInterval(async()=>stream.write(apiSseFrame('GET:/events',{event:'stats',data:{ok:true}})),2000))`,
+  'promise-timer-helper': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+    function pipe(options:{emit:()=>void}){const {emit}=options;return new Promise<void>(resolve=>{function flush(){emit()}setInterval(flush,2000)})}
+    app.route('/events').get((ctx:any)=>pipe({emit:()=>stream.write(apiSseFrame('GET:/events',{event:'progress',data:{ok:true}}))}))`,
+  'promise-created': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+    app.route('/events').get((ctx:any)=>{ctx.setStatus(201);return new Promise<void>(resolve=>{stream.write(apiSseFrame('GET:/events',{event:'ok',data:{ok:true}}));resolve()})})`,
   'erased-this-callback': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
     function invoke(this:void,first:()=>void,second:()=>void){first()}
     app.route('/events').get((ctx:any)=>invoke(()=>{},()=>stream.write(apiSseFrame('GET:/events',{event:'never',data:{ok:true}}))))`,
@@ -193,4 +207,46 @@ it('binds the actual HTTP context after an erased this parameter', () => {
       'POST:/rpc'
     ]?.statusCodes,
   ).toEqual([200])
+})
+
+it.each(['timer-frame', 'promise-timer-helper', 'promise-created'] as const)(
+  'proves the concrete platform callback path in %s',
+  (name) => {
+    const contract = discoverApiResponseContracts(matrix.program, [matrix.sourceFile(name)])[
+      'GET:/events'
+    ]
+    expect(contract?.unavailableReason).toBeUndefined()
+    expect(contract && responseStatusCodesForContract(contract)).toEqual([
+      name === 'promise-created' ? 201 : 200,
+    ])
+  },
+)
+
+it('rejects a custom constructor that never invokes its frame callback', () => {
+  expect(() =>
+    discoverApiResponseContracts(matrix.program, [matrix.sourceFile('custom-promise')]),
+  ).toThrow('uninvoked callback')
+})
+
+it('supports a registered named SSE handler without a context parameter', () => {
+  const contract = discoverApiResponseContracts(matrix.program, [
+    matrix.sourceFile('context-free-handler'),
+  ])['GET:/events']!
+  expect(responseStatusCodesForContract(contract)).toEqual([200])
+})
+
+it('does not fabricate a requested variant when a response has no carrier metadata', () => {
+  const errors: unknown[] = []
+  expect(
+    discoverApiResponseContracts(
+      matrix.program,
+      [matrix.sourceFile('missing-carrier')],
+      new Set(['POST:/rpc#protocol-2']),
+      { onRouteError: (error) => errors.push(error) },
+    ),
+  ).toEqual({})
+  expect(errors).toHaveLength(1)
+  expect(() =>
+    discoverApiResponseContracts(matrix.program, [matrix.sourceFile('missing-carrier')]),
+  ).toThrow('apiHttpResponseVariants')
 })

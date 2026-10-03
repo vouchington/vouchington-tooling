@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { nextProtocolKey } from './protocol-contract-keys.mts'
 import { extractContractSchema } from '../contract-schema/index.mts'
 import { extractHttpVariants, extractSseEvents } from './protocol-contract-extraction.mts'
+import { extractHttpBodyKinds } from './protocol-http-body-kinds.mts'
 import { registerHttpProtocols, type PendingHttp } from './protocol-http-registration.mts'
 import { protocolBindingRequested, requestedProtocolKey } from './protocol-requested-keys.mts'
 import { protocolMarker } from './protocol-marker-analysis.mts'
@@ -17,7 +18,7 @@ import {
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
-import { writeReceiver, sameWriteReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import { rejectRawSseWrites, type SseRouteWrites } from './protocol-sse-raw-writes.mts'
 import { sseEmission } from './protocol-sse-emission.mts'
 
 export function discoverProtocolContracts(
@@ -32,13 +33,13 @@ export function discoverProtocolContracts(
   const pending: PendingHttp[] = []
   const allocated = new Map<string, undefined>()
   const framedWrites = new Set<ts.CallExpression>()
-  const sseBindings = new Map<string, WriteReceiver[]>()
+  const sseBindings = new Map<string, SseRouteWrites>()
   for (const file of sourceFiles)
     visit(file, (node) => {
       if (!ts.isCallExpression(node)) return
       const marker = protocolMarker(node.expression, checker)
       if (!marker) return
-      const binding = enclosingRouteBinding(node, checker, bindings)
+      const binding = enclosingRouteBinding(node, checker, bindings, false)
       if (!binding) throw contractError(file, node, `${marker} must be inside an app.route handler`)
       if (!protocolBindingRequested(binding, requestedKeys)) return
       const keyNode = node.arguments[0]
@@ -80,9 +81,10 @@ export function discoverProtocolContracts(
             sseEvents,
           })
           framedWrites.add(write)
-          const receivers = sseBindings.get(prefix) ?? []
-          receivers.push(receiver)
-          sseBindings.set(prefix, receivers)
+          const routeWrites = sseBindings.get(prefix) ?? { receivers: [], keys: [] }
+          routeWrites.receivers.push(receiver)
+          routeWrites.keys.push(rowKey)
+          sseBindings.set(prefix, routeWrites)
         } else {
           const declaration = node.parent
           const symbol =
@@ -113,6 +115,7 @@ export function discoverProtocolContracts(
             symbol,
             binding,
             variants,
+            declaredBodyKinds: extractHttpBodyKinds(checker.getTypeAtLocation(node), checker),
             keys,
           })
         }
@@ -125,32 +128,26 @@ export function discoverProtocolContracts(
     for (const key of response.keys)
       unavailable(contracts, key, response.binding, response.variants[0]!.source, error, options)
   })
-  for (const file of sourceFiles)
-    visit(file, (node) => {
-      if (
-        !ts.isCallExpression(node) ||
-        framedWrites.has(node) ||
-        !ts.isPropertyAccessExpression(node.expression) ||
-        node.expression.name.text !== 'write'
-      )
-        return
-      const binding = enclosingRouteBinding(node, checker, bindings)
-      const key = binding && `${binding.method}:${binding.routeTemplate}`
-      if (
-        key &&
-        sseBindings
-          .get(key)
-          ?.some((receiver) => sameWriteReceiver(receiver, writeReceiver(node, checker)))
-      )
+  rejectRawSseWrites(
+    sourceFiles,
+    checker,
+    bindings,
+    framedWrites,
+    sseBindings,
+    (node, binding, keys) => {
+      for (const key of keys) {
+        contracts.delete(key)
         unavailable(
           contracts,
           key,
-          binding!,
-          sourceLocation(file, node),
+          binding,
+          sourceLocation(node.getSourceFile(), node),
           new Error('SSE route writes an unmarked frame'),
           options,
         )
-    })
+      }
+    },
+  )
   return covered
 }
 

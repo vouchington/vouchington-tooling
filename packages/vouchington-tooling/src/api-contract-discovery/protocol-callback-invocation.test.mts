@@ -290,4 +290,85 @@ describe('protocol callback invocation proof', () => {
       ),
     ).toEqual({ unused: false })
   })
+
+  it('propagates forwarded callback replacement and invokes only called local helpers', () => {
+    expect(
+      check(`
+      function replace(options: {emit: () => void}) { options.emit = () => {} }
+      function mutateAlias(options: {emit: () => void}) { const saved=options; saved.emit=()=>{} }
+      function consume(options: {emit: () => void}) { replace(options); options.emit() }
+      function alias(options: {emit: () => void}) { mutateAlias(options); options.emit() }
+      consume({emit: () => mark('replaced-forward')});
+      alias({emit: () => mark('alias-forward')});
+      app.route('/called').get(ctx=>{function called(){mark('called')}called()});
+      app.route('/unused').get(ctx=>{function ignored(){mark('ignored-local')}});
+    `),
+    ).toEqual({
+      'replaced-forward': false,
+      'alias-forward': false,
+      called: true,
+      'ignored-local': false,
+    })
+  })
+
+  it('fails closed on unresolved, numeric, and destructured callback bindings', () => {
+    expect(
+      check(`
+      function options(value:{emit:()=>void}){value.emit()}
+      function numeric(value:{0:()=>void}){const {0:emit}=value;emit()}
+      function parameter({emit}:{emit:()=>void}){emit()}
+      function array(value:(()=>void)[]){const [emit]=value;emit()}
+      numeric({0:()=>mark('numeric')});
+      parameter({emit:()=>mark('parameter-pattern')});
+      array([()=>mark('array-pattern')]);
+      // @ts-expect-error unresolved shorthand callback must not prove invocation
+      options({emit});
+      // @ts-expect-error unresolved callee must not prove invocation
+      missing(()=>mark('unresolved'));
+    `),
+    ).toEqual({
+      numeric: false,
+      'parameter-pattern': false,
+      'array-pattern': false,
+      unresolved: false,
+    })
+  })
+
+  it('returns no callback value for an unresolved shorthand or a declaration node', () => {
+    expect(
+      check(
+        `
+      // @ts-expect-error unresolved callback shorthand must fail closed
+      const options={missing};
+      const result=options.missing;
+    `,
+        '',
+        (checker, source) => {
+          const statement = source.statements.find(
+            (node) =>
+              ts.isVariableStatement(node) &&
+              node.declarationList.declarations.some(
+                (declaration) =>
+                  ts.isIdentifier(declaration.name) && declaration.name.text === 'result',
+              ),
+          ) as ts.VariableStatement
+          const declaration = statement.declarationList.declarations[0]!
+          const resolver = createProtocolCallbackValueResolver(checker)
+          expect(resolver.resolve(declaration.initializer!, new Map())).toBeUndefined()
+          expect(resolver.resolve(declaration, new Map())).toBeUndefined()
+        },
+      ),
+    ).toEqual({})
+  })
+
+  it('proves a callback while skipping omitted optional and spread rest arguments', () => {
+    expect(
+      check(`
+      function optional(callback:()=>void,unused?:()=>void){callback()}
+      function rest(callback:()=>void,...unused:unknown[]){callback()}
+      optional(()=>mark('optional'));
+      rest(()=>mark('rest'),...[]);
+    `),
+    ).toEqual({ optional: true, rest: true })
+  })
 })

@@ -10,6 +10,7 @@ export type PendingHttp = {
   keys: string[]
   binding: RouteBinding
   variants: Omit<BackendResponseContract, 'method' | 'routeTemplate'>[]
+  declaredBodyKinds: ReadonlySet<'content' | 'none'>
 }
 
 export function registerHttpProtocols(
@@ -28,7 +29,8 @@ export function registerHttpProtocols(
       const kinds = new Set(emissions.values())
       if (
         !kinds.has('status') ||
-        response.variants.some((variant) => !kinds.has(variant.bodyKind!)) ||
+        [...response.declaredBodyKinds].some((kind) => !kinds.has(kind)) ||
+        [...kinds].some((kind) => kind !== 'status' && !response.declaredBodyKinds.has(kind)) ||
         [...emissions].some(
           ([call, kind]) => kind !== 'status' && !statusDominatesEmission(call, statuses),
         )

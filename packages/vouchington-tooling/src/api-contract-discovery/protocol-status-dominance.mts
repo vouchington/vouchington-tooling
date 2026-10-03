@@ -2,7 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 
 /** Requires a direct status setter on every lexical path reaching one body emission. */
 export function statusDominatesEmission(
-  emission: ts.CallExpression,
+  emission: ts.CallExpression | ts.NewExpression,
   statuses: ReadonlySet<ts.CallExpression>,
 ): boolean {
   let current: ts.Node = emission

@@ -30,7 +30,7 @@ export function responseStatusCodesForContract(contract: BackendResponseContract
  * same route apart when they're preceded by different statuses.
  */
 export function resolveEmissionStatus(
-  call: ts.CallExpression,
+  call: ts.CallExpression | ts.NewExpression,
   matchesContext: (expression: ts.Expression) => boolean = (expression) =>
     isContextMethod(expression, 'setStatus'),
 ): {
@@ -38,7 +38,8 @@ export function resolveEmissionStatus(
   statusKnowledge: 'default' | 'explicit' | 'unknown'
   unavailableReason?: string
 } {
-  if (matchesContext(call.expression)) return statusArgument(call.arguments[0])
+  if (ts.isCallExpression(call) && matchesContext(call.expression))
+    return statusArgument(call.arguments[0])
   let statement: ts.Node = call
   while (!ts.isStatement(statement)) statement = statement.parent
   return precedingStatus(statement as ts.Statement, matchesContext)

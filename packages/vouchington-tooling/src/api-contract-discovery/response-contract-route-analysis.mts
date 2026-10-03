@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 
 export {
   isContextMethod,
@@ -43,6 +44,7 @@ export function enclosingRouteBinding(
   node: ts.Node,
   checker: ts.TypeChecker,
   handlerBindings: HandlerBindings,
+  proveCallbacks = true,
 ): RouteBinding | undefined {
   let current: ts.Node | undefined = node
   let insideHandlerFunction = false
@@ -51,14 +53,20 @@ export function enclosingRouteBinding(
     if (insideHandlerFunction && ts.isCallExpression(current)) {
       const method = propertyName(current.expression)?.toUpperCase()
       const routeTemplate = routeTemplateFromExpression(current.expression)
-      if (method && HTTP_METHODS.has(method) && routeTemplate) return { method, routeTemplate }
+      if (method && HTTP_METHODS.has(method) && routeTemplate)
+        return !proveCallbacks || executableProtocolPath(node, checker)
+          ? { method, routeTemplate }
+          : undefined
     }
     if (isFunctionLike(current) && ts.isCallExpression(current.parent)) {
       const handlerCall = current.parent
       const method = propertyName(handlerCall.expression)?.toUpperCase()
       if (method && HTTP_METHODS.has(method)) {
         const routeTemplate = routeTemplateFromExpression(handlerCall.expression)
-        if (routeTemplate) return { method, routeTemplate }
+        if (routeTemplate)
+          return !proveCallbacks || executableProtocolPath(node, checker)
+            ? { method, routeTemplate }
+            : undefined
       }
     }
     const handlerSymbol = functionSymbol(current, checker)

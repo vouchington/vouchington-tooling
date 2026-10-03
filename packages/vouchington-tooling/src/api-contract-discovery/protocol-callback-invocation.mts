@@ -1,7 +1,10 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { invokedResult, registeredHandler } from './protocol-callback-registration.mts'
+import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
-import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { callbackBindingReplaced } from './protocol-callback-mutations.mts'
+import { enclosingFunction } from './protocol-marker-analysis.mts'
 import {
   createProtocolCallbackValueResolver,
   isProtocolCallbackFunction as functionNode,
@@ -10,59 +13,39 @@ import {
   type CallbackBindings as Bindings,
 } from './protocol-callback-values.mts'
 type FunctionNode = ts.FunctionLikeDeclaration
-function registeredHandler(call: ts.CallExpression): boolean {
-  const method = unwrapExpression(call.expression)
-  return (
-    ts.isPropertyAccessExpression(method) &&
-    ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method.name.text) &&
-    ts.isCallExpression(method.expression) &&
-    ts.isPropertyAccessExpression(method.expression.expression) &&
-    method.expression.expression.name.text === 'route'
-  )
-}
-function invokedResult(call: ts.CallExpression): boolean {
-  let node: ts.Node = call
-  while (
-    ts.isParenthesizedExpression(node.parent) ||
-    ts.isAsExpression(node.parent) ||
-    ts.isNonNullExpression(node.parent) ||
-    ts.isAwaitExpression(node.parent)
-  )
-    node = node.parent
-  const parent = node.parent
-  return (
-    ts.isCallExpression(parent) &&
-    (parent.expression === node ||
-      (registeredHandler(parent) && parent.arguments.includes(node as ts.Expression)))
-  )
-}
 /** Proves callback consumption through concrete helper bodies, without executing nested closures. */
 export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeChecker): boolean {
   if (!fn.body || fn.asteriskToken || protocolCallbackHasWrittenBindings(fn, checker)) return false
   const { resolve, symbol } = createProtocolCallbackValueResolver(checker)
+  let invalidated = false
   function consumed(
-    call: ts.CallExpression,
+    call: ts.CallExpression | ts.NewExpression,
     env: Bindings,
     active: Set<FunctionNode>,
     returned = false,
   ): boolean {
-    const callee = resolve(call.expression, env)
+    const platform = platformCallbackArgument(call, checker)
+    if (ts.isNewExpression(call) && !platform) return false
+    const callee = resolve(platform ?? call.expression, env)
     if (!callee || !functionNode(callee.node) || callee.node.asteriskToken) return false
-    if (protocolCallbackHasWrittenBindings(callee.node, checker)) return false
+    if (protocolCallbackHasWrittenBindings(callee.node, checker)) {
+      invalidated = true
+      return false
+    }
     if (callee.node === fn) return true
     if (!callee.node.body || active.has(callee.node)) return false
+    const chain = new Set([...active, callee.node])
+    if (platform) return body(callee.node.body, callee.env, chain, false)
     const next = new Map(callee.env)
     runtimeParameters(callee.node).forEach((parameter, index) => {
-      const argument = call.arguments[index]
-      const target = ts.isIdentifier(parameter.name) && symbol(parameter.name)
-      if (target && argument && !ts.isSpreadElement(argument))
-        next.set(target, { node: argument, env })
+      const argument = call.arguments![index]
+      const target = symbol(parameter.name)!
+      if (argument && !ts.isSpreadElement(argument)) next.set(target, { node: argument, env })
     })
-    const chain = new Set([...active, callee.node])
-    return body(callee.node, next, chain, returned || invokedResult(call))
+    return body(callee.node.body, next, chain, returned || invokedResult(call))
   }
   function body(
-    owner: FunctionNode,
+    content: ts.ConciseBody,
     env: Bindings,
     active: Set<FunctionNode>,
     returned: boolean,
@@ -72,24 +55,13 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
     function visit(node: ts.Node) {
       if (found || replaced || !potentiallyExecuted(node)) return
       if (functionNode(node)) return
-      const write = ts.isDeleteExpression(node)
-        ? node.expression
-        : ts.isBinaryExpression(node) &&
-            node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-            node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-          ? node.left
-          : undefined
-      if (write) {
-        let root = unwrapExpression(write)
-        while (ts.isPropertyAccessExpression(root) || ts.isElementAccessExpression(root))
-          root = unwrapExpression(root.expression)
-        if ((ts.isIdentifier(root) && env.has(symbol(root)!)) || resolve(write, env)?.node === fn) {
-          replaced = true
-          return
-        }
+      if (callbackBindingReplaced(node, env, fn, { resolve, symbol })) {
+        replaced = true
+        invalidated = true
+        return
       }
       if (
-        ts.isCallExpression(node) &&
+        (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
         consumed(node, env, active, returned && ts.isReturnStatement(node.parent))
       ) {
         found = true
@@ -103,7 +75,7 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
           value.node.body &&
           !value.node.asteriskToken &&
           !active.has(value.node) &&
-          body(value.node, value.env, new Set([...active, value.node]), false)
+          body(value.node.body, value.env, new Set([...active, value.node]), false)
         ) {
           found = true
           return
@@ -111,8 +83,8 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
       }
       ts.forEachChild(node, visit)
     }
-    if (owner.body) visit(owner.body)
-    return found
+    visit(content)
+    return found && !invalidated
   }
   let argument: ts.Node = fn
   while (
@@ -124,7 +96,10 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
   )
     argument = argument.parent
   const call = argument.parent
-  if (!ts.isCallExpression(call))
+  if (!ts.isCallExpression(call) && !ts.isNewExpression(call)) {
+    const owner = enclosingFunction(fn)
+    if (owner && isSupportedProtocolCallback(owner, checker))
+      return body(owner.body!, new Map(), new Set([owner]), false)
     return protocolCallbackSourceCalls(fn).some(
       (candidate) =>
         potentiallyExecuted(candidate) &&
@@ -132,8 +107,11 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
           candidate.arguments.some((value) => resolve(value, new Map())?.node === fn)) ||
           consumed(candidate, new Map(), new Set())),
     )
+  }
   if (!potentiallyExecuted(call)) return false
-  if (call.expression === argument) return true
-  if (argument === fn && registeredHandler(call)) return true
-  return call.arguments.includes(argument as ts.Expression) && consumed(call, new Map(), new Set())
+  if (ts.isCallExpression(call) && call.expression === argument) return true
+  if (argument === fn && ts.isCallExpression(call) && registeredHandler(call)) return true
+  return (
+    !!call.arguments?.includes(argument as ts.Expression) && consumed(call, new Map(), new Set())
+  )
 }

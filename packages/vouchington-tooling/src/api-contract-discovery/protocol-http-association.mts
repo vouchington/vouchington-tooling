@@ -3,6 +3,7 @@ import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { httpEmissionKind, contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unsupportedContextAlias } from './protocol-context-alias.mts'
 import { visit } from './response-contract-route-analysis.mts'
 
@@ -15,6 +16,8 @@ export function associateHttpResponse(
   const name = handler && runtimeParameters(handler)[0]?.name
   const context = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
   if (!handler || !context) throw new Error('HTTP response must bind the handler context')
+  if (!executableProtocolPath(call, checker))
+    throw new Error('HTTP response must be inside a supported executable handler callback')
   const emissions = new Map<ts.CallExpression, 'content' | 'none' | 'status'>()
   visit(handler, (node) => {
     if (

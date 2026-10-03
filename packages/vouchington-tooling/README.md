@@ -480,17 +480,22 @@ Caller-owned `apiSseFrame(key, { event, data })` markers expose literal event na
 payloads from the frames actually written by a route, including callbacks passed to a handler
 factory. SSE responses keep a string body schema and describe each payload under the media
 type's `x-sse-events` map. Callback arguments require a concrete helper invocation path; ignored,
-declaration-only, deferred, or rewritten callbacks fail closed. Stable named handlers are followed
-within their declaring source file. Broad names, unknown root payloads, unmarked frames through
-stream aliases, and conditional or mutable-context status changes also fail closed.
+declaration-only, deferred, or rewritten callbacks fail closed. Compiler-resolved platform timers
+and Promise executors supply invocation paths; shadowed or custom APIs do not. Stable named
+handlers and called local helpers are followed within their declaring source file. Ordinary response,
+request, query, and header markers also require callback invocation before route attribution.
+Broad names, unknown root payloads, executable unmarked frames through stream aliases, and
+conditional or mutable-context status changes fail closed. A raw stream failure invalidates all
+selected SSE rows, including when only one protocol variant was requested.
 
 Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
 carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
 `status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
 the marked variable's status and body emissions without reading or replacing response bytes.
 A status setter must dominate each body emission, including separate branches; constant context
-aliases are followed and unrelated raw emissions remain unavailable. Exact requested protocol rows
-are selected before other variants are validated. In lenient mode, incomplete marker evidence
+aliases are followed and unrelated raw emissions remain unavailable. Observed content and bodyless
+emissions must match the complete metadata union. Exact requested protocol rows are selected before
+other payloads, media types, or statuses are validated. In lenient mode, incomplete marker evidence
 keeps every selected sibling unavailable. Explicit 400 content variants also include the framework's
 JSON error schema independently of their own media type.
 

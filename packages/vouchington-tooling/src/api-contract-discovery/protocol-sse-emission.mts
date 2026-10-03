@@ -24,7 +24,7 @@ export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
   if (receiver.mutableAlias) throw new Error('SSE frame uses a mutable stream alias')
   let fn = enclosingFunction(call)
   let context: ts.Symbol | undefined
-  const callbacks: ts.CallExpression[] = []
+  const callbacks: (ts.CallExpression | ts.NewExpression)[] = []
   const functions: ts.FunctionLikeDeclaration[] = []
   while (fn) {
     functions.push(fn)
@@ -40,7 +40,8 @@ export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
       let value: ts.Node = fn
       while (ts.isPropertyAssignment(value.parent) || ts.isObjectLiteralExpression(value.parent))
         value = value.parent
-      if (ts.isCallExpression(value.parent)) callbacks.push(value.parent)
+      if (ts.isCallExpression(value.parent) || ts.isNewExpression(value.parent))
+        callbacks.push(value.parent)
       if (
         (ts.isCallExpression(value.parent) &&
           ts.isPropertyAccessExpression(value.parent.expression) &&
