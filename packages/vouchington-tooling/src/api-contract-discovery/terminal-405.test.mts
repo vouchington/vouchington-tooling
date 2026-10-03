@@ -36,6 +36,10 @@ const sources = {
   'non-call': handler('return 405'),
   'external-helper': `${preamble} declare function reject(context: Ctx): never;
     app.route('/api/example').get((ctx: Ctx) => reject(ctx))`,
+  'unbound-helper': `${preamble} function reject(context: Ctx) { context.throw(405) }
+    app.route('/api/example').get((ctx: Ctx) => reject(other))`,
+  'no-context': `${preamble} app.route('/api/example').get(() => other.throw(405))`,
+  'destructured-context': `${preamble} app.route('/api/example').get(({throw: reject}: Ctx) => reject(405))`,
   conditional: handler('if (condition) ctx.throw(405)'),
   caught: handler('try { ctx.throw(405) } catch {}'),
   fallthrough: handler('if (condition) return; ctx.throw(405)'),
@@ -102,6 +106,9 @@ describe('terminal error-only route proof', () => {
     'bare-return',
     'non-call',
     'external-helper',
+    'unbound-helper',
+    'no-context',
+    'destructured-context',
   ] as const)('keeps %s outside error-only classification', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'ordinary' },
