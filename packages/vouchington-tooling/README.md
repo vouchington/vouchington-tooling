@@ -484,11 +484,13 @@ declaration-only, deferred, or rewritten callbacks fail closed. Callback options
 without a concrete implementation also fail closed. Factory callbacks must execute from the returned request handler; registration-time invocations do not
 prove a request emission. Compiler-resolved platform timers
 and Promise executors supply invocation paths using the caller Program's actual standard-library
-identities; shadowed or custom APIs do not. Fluent route registrations retain their method. Stable named
+identities; shadowed, custom, or reassigned platform APIs do not. Fluent route registrations retain their method. Stable named
 handlers and called local helpers are followed within their declaring source file. Ordinary response,
 request, query, and header markers also require callback invocation before route attribution.
 Broad names, unknown root payloads, executable unmarked frames through stream aliases, and
-conditional or mutable-context status changes fail closed. A raw stream failure invalidates all
+conditional or mutable-context status changes fail closed. Called SSE helpers inherit the proven
+request context and its status at the invocation; mutually exclusive complete status branches retain
+their separate responses. Ambiguous caller contexts fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
 are matched to the original stream, including proven helper-parameter forwarding and literal bracket
@@ -500,10 +502,12 @@ carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete uni
 `status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
 the marked variable's status and body emissions without reading or replacing response bytes.
 A status setter must dominate each body emission, including separate branches; constant context
-aliases are followed, assigned mutable context aliases fail closed, and unrelated raw emissions
+aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
+and unrelated raw emissions
 remain unavailable. Separate branded response branches are checked together, and the nearest
 proven status setter for each body must belong to that response. Observed content and bodyless
-emissions must match the complete metadata union. Exact requested protocol rows are selected before
+emissions must match the complete metadata union, including an empty response in the `else` branch
+of a positive body check. Exact requested protocol rows are selected before
 other payloads, media types, or statuses are validated. In lenient mode, incomplete marker evidence
 keeps every selected sibling unavailable. Explicit 400 content variants also include the framework's
 JSON error schema independently of their own media type. Explicit bodyless 400 metadata also

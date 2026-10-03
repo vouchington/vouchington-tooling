@@ -30,6 +30,11 @@ export function discoverProtocolContracts(
   requestedKeys?: ReadonlySet<string>,
 ): Set<ts.CallExpression> {
   if (requestedKeys?.size === 0) return new Set()
+  const calls: ts.CallExpression[] = []
+  for (const file of sourceFiles)
+    visit(file, (node) => {
+      if (ts.isCallExpression(node)) calls.push(node)
+    })
   const pending: PendingHttp[] = []
   const allocated = new Map<string, undefined>()
   const framedWrites = new Set<ts.CallExpression>()
@@ -53,7 +58,7 @@ export function discoverProtocolContracts(
           `Contract key "${keyNode.text}" does not match enclosing route ${prefix}`,
         )
       const location = sourceLocation(file, node)
-      let errorKeys = [keyNode.text]
+      let errorKeys: string[] = []
       try {
         if (marker === 'apiSseFrame') {
           const rowKey = reserveKey(allocated, keyNode.text)
@@ -64,7 +69,7 @@ export function discoverProtocolContracts(
           }
           const body = node.arguments[1]
           if (!body) throw new Error(`${marker} requires a protocol body`)
-          const { write, receiver, status } = sseEmission(node, checker)
+          const { write, receiver, status } = sseEmission(node, checker, calls, binding, bindings)
           const sseEvents = extractSseEvents(
             checker.getTypeAtLocation(body),
             checker,
@@ -121,7 +126,7 @@ export function discoverProtocolContracts(
           })
         }
       } catch (error) {
-        for (const key of errorKeys.length ? errorKeys : [keyNode.text])
+        for (const key of errorKeys.length ? errorKeys : [reserveKey(allocated, keyNode.text)])
           unavailable(contracts, key, binding, location, error, options)
       }
     })

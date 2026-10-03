@@ -1,0 +1,84 @@
+import ts from '../contract-schema/typescript-api.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
+import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
+import { contextResponseMethod } from './protocol-http-emission.mts'
+import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { statusCanPrecede } from './protocol-sse-feasible-status.mts'
+import { statusDominatesEmission } from './protocol-status-dominance.mts'
+import { visit } from './response-contract-route-analysis.mts'
+import { resolveEmissionStatus } from './response-contract-status.mts'
+
+export function resolveSseStatus(
+  paths: readonly (readonly (ts.CallExpression | ts.NewExpression)[])[],
+  functions: readonly ts.FunctionLikeDeclaration[],
+  contexts: ReadonlySet<ts.Symbol>,
+  checker: ts.TypeChecker,
+): ReturnType<typeof resolveEmissionStatus> {
+  const matches = (expression: ts.Expression) =>
+    [...contexts].some(
+      (context) => contextResponseMethod(expression, context, checker) === 'setStatus',
+    )
+  const setters = new Set<ts.CallExpression>()
+  for (const fn of functions)
+    visit(fn, (node) => {
+      if (!executableProtocolPath(node, checker)) return
+      if (
+        [...contexts].some(
+          (context) =>
+            (ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context, checker)) ||
+            unsupportedContextAssignment(node, context, checker),
+        )
+      )
+        throw new Error('SSE context has an unsupported mutable or destructured alias')
+      if (ts.isCallExpression(node) && matches(node.expression)) setters.add(node)
+    })
+  const statuses = paths.map((path) => {
+    for (const setter of setters) {
+      const anchors = path.filter(
+        (anchor) => enclosingFunction(anchor) === enclosingFunction(setter),
+      )
+      if (
+        (!anchors.length || anchors.some((anchor) => statusCanPrecede(setter, anchor))) &&
+        !anchors.some((anchor) => statusDominatesEmission(anchor, new Set([setter])))
+      )
+        throw new Error('SSE status does not dominate its frame emission')
+    }
+    for (const anchor of path) {
+      const setter = nearestSetter(anchor, setters)
+      if (setter) {
+        const status = resolveEmissionStatus(setter, matches)
+        if (status.unavailableReason) throw new Error(status.unavailableReason)
+        return status
+      }
+    }
+    return { statusKnowledge: 'default' as const }
+  })
+  if (statuses.every((status) => status.statusKnowledge === 'default'))
+    return { statusKnowledge: 'default' }
+  const codes = [...new Set(statuses.flatMap((status) => status.statusCodes ?? [200]))].toSorted(
+    (a, b) => a - b,
+  ) as [number, ...number[]]
+  return { statusKnowledge: 'explicit', statusCodes: codes }
+}
+
+function nearestSetter(
+  anchor: ts.Node,
+  setters: ReadonlySet<ts.CallExpression>,
+): ts.CallExpression | undefined {
+  let current = anchor
+  while (current.parent && !ts.isFunctionLike(current.parent)) {
+    const parent = current.parent
+    if (ts.isBlock(parent)) {
+      const index = parent.statements.indexOf(current as ts.Statement)
+      for (const statement of parent.statements.slice(0, index).toReversed())
+        if (
+          ts.isExpressionStatement(statement) &&
+          ts.isCallExpression(statement.expression) &&
+          setters.has(statement.expression)
+        )
+          return statement.expression
+    }
+    current = parent
+  }
+  return undefined
+}

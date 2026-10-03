@@ -25,6 +25,7 @@ import {
   type HandlerBindings,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
+import { unsupportedContextResponse } from './protocol-http-emission.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 export function discoverImplicitContract(
@@ -40,6 +41,11 @@ export function discoverImplicitContract(
   if (!binding) return
   const key = requestedKeyForBinding(binding, requestedKeys)
   if (!key) return
+
+  if (unsupportedContextResponse(call, checker)) {
+    markBufferedRouteUnavailable(contracts, key, binding, sourceLocation(sourceFile, call))
+    return
+  }
 
   const body = responseBodyExpression(call)
   if (body) {

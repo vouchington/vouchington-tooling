@@ -1,18 +1,25 @@
 import { basename, dirname, resolve as resolvePath } from 'node:path'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { writtenPlatformSymbols } from './protocol-platform-writes.mts'
 
 const standardLibrary = dirname(resolvePath(ts.getDefaultLibFilePath({})))
+const platformWrites = new WeakMap<ts.TypeChecker, ReadonlySet<ts.Symbol>>()
 const compilerLibraries = new WeakMap<ts.TypeChecker, ReadonlySet<ts.SourceFile>>()
 
 /** Records the actual caller compiler's library identities, including another installation. */
 export function registerPlatformCompilerLibraries(program: ts.Program): void {
   const checker = program.getTypeChecker()
-  if (!compilerLibraries.has(checker))
-    compilerLibraries.set(
-      checker,
-      new Set(program.getSourceFiles().filter((file) => program.isSourceFileDefaultLibrary(file))),
+  if (!compilerLibraries.has(checker)) {
+    const libraries = new Set(
+      program.getSourceFiles().filter((file) => program.isSourceFileDefaultLibrary(file)),
     )
+    compilerLibraries.set(checker, libraries)
+    platformWrites.set(
+      checker,
+      writtenPlatformSymbols(program.getSourceFiles(), checker, libraries),
+    )
+  }
 }
 
 function standardDeclaration(
@@ -78,6 +85,9 @@ export function platformCallbackArgument(
   const timer = symbol.name === 'setInterval' || symbol.name === 'setTimeout'
   if (!(timer ? ts.isCallExpression(node) : symbol.name === 'Promise' && ts.isNewExpression(node)))
     return undefined
+  const writes =
+    platformWrites.get(checker) ?? writtenPlatformSymbols([node.getSourceFile()], checker)
+  if (writes.has(symbol)) return undefined
   return symbol.declarations.every((declaration) =>
     standardDeclaration(declaration, timer, checker),
   )

@@ -51,7 +51,7 @@ export function associateHttpResponse(
     if (kind) emissions.set(node, kind)
     else if (
       ['setStatus', 'pipeline', 'json', 'response.buffer', 'response.empty'].includes(
-        contextResponseMethod(node.expression, context, checker) ?? '',
+        contextResponseMethod(node.expression, context, checker, true) ?? '',
       )
     )
       if (

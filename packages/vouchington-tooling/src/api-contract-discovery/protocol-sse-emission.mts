@@ -1,17 +1,20 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { isSupportedProtocolCallback } from './protocol-callback-invocation.mts'
-import { executableProtocolPath } from './protocol-execution-path.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
-import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
-import { contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
-import { statusDominatesEmission } from './protocol-status-dominance.mts'
-import { visit } from './response-contract-route-analysis.mts'
+import type { HandlerBindings, RouteBinding } from './response-contract-route-analysis.mts'
+import { sseCallerScope } from './protocol-sse-callers.mts'
+import { resolveSseStatus } from './protocol-sse-status.mts'
 import { writeReceiver } from './protocol-write-receiver.mts'
-import { resolveEmissionStatus } from './response-contract-status.mts'
 
-export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
+export function sseEmission(
+  call: ts.CallExpression,
+  checker: ts.TypeChecker,
+  calls: readonly ts.CallExpression[],
+  binding: RouteBinding,
+  bindings: HandlerBindings,
+) {
   const write = call.parent
   if (
     !ts.isCallExpression(write) ||
@@ -55,45 +58,15 @@ export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
     }
     fn = enclosingFunction(fn)
   }
-  let status = context
-    ? resolveEmissionStatus(
-        write,
-        (expression) => contextResponseMethod(expression, context!, checker) === 'setStatus',
-      )
-    : resolveEmissionStatus(write)
-  if (context && status.statusKnowledge === 'default') {
-    for (const callback of callbacks) {
-      status = resolveEmissionStatus(
-        callback,
-        (expression) => contextResponseMethod(expression, context!, checker) === 'setStatus',
-      )
-      if (status.statusKnowledge !== 'default') break
-    }
-  }
-  if (context) {
-    const setters = new Set<ts.CallExpression>()
-    for (const fn of functions)
-      visit(fn, (node) => {
-        if (
-          executableProtocolPath(node, checker) &&
-          ((ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context!, checker)) ||
-            unsupportedContextAssignment(node, context!, checker))
-        )
-          throw new Error('SSE context has an unsupported mutable or destructured alias')
-        if (
-          ts.isCallExpression(node) &&
-          executableProtocolPath(node, checker) &&
-          contextResponseMethod(node.expression, context!, checker) === 'setStatus'
-        )
-          setters.add(node)
-      })
-    for (const setter of setters) {
-      if (
-        ![write, ...callbacks].some((anchor) => statusDominatesEmission(anchor, new Set([setter])))
-      )
-        throw new Error('SSE status does not dominate its frame emission')
-    }
-  }
-  if (status.unavailableReason) throw new Error(status.unavailableReason)
+  const caller = sseCallerScope(functions, calls, binding, bindings, checker)
+  const anchors = [write, ...callbacks]
+  const paths = caller ? caller.paths.map((path) => [...anchors, ...path]) : [anchors]
+  const contexts = caller?.contexts ?? new Set(context ? [context] : [])
+  const status = resolveSseStatus(
+    paths,
+    [...new Set([...functions, ...(caller?.functions ?? [])])],
+    contexts,
+    checker,
+  )
   return { write, receiver, status }
 }

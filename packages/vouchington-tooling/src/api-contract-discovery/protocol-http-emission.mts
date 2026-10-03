@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
+import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 
 export function httpEmissionKind(
   call: ts.CallExpression,
@@ -44,14 +45,32 @@ export function contextResponseMethod(
   expression: ts.Expression,
   context: ts.Symbol,
   checker: ts.TypeChecker,
+  allowMutable = false,
 ): string | undefined {
   if (!ts.isPropertyAccessExpression(expression)) return undefined
   const receiver = expressionReceiver(expression.expression, checker)
-  if (receiver?.root !== context || receiver.mutableAlias) return undefined
+  if (receiver?.root !== context || (receiver.mutableAlias && !allowMutable)) return undefined
   if (receiver.path.length === 0) return expression.name.text
   if (receiver.path.length === 1 && receiver.path[0] === 'response')
     return `response.${expression.name.text}`
   return undefined
+}
+
+/** Mutable context wrappers cannot establish a complete response contract. */
+export function unsupportedContextResponse(
+  call: ts.CallExpression,
+  checker: ts.TypeChecker,
+): boolean {
+  const handler = enclosingFunction(call)
+  const name = handler && runtimeParameters(handler)[0]?.name
+  const context = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
+  if (!context) return false
+  const method = contextResponseMethod(call.expression, context, checker, true)
+  return (
+    method !== undefined &&
+    ['setStatus', 'pipeline', 'json', 'response.buffer', 'response.empty'].includes(method) &&
+    contextResponseMethod(call.expression, context, checker) === undefined
+  )
 }
 
 function responseProperty(
@@ -73,12 +92,18 @@ function emptyBodyBranch(node: ts.Node, response: ts.Symbol, checker: ts.TypeChe
   let current: ts.Node = node
   while (current.parent && !ts.isFunctionLike(current.parent)) {
     const parent = current.parent
-    if (ts.isIfStatement(parent) && parent.thenStatement === current) {
+    if (ts.isIfStatement(parent)) {
       const condition = unwrapExpression(parent.expression)
       if (
+        parent.thenStatement === current &&
         ts.isPrefixUnaryExpression(condition) &&
         condition.operator === ts.SyntaxKind.ExclamationToken &&
         responseProperty(condition.operand, response, 'body', checker)
+      )
+        return true
+      if (
+        parent.elseStatement === current &&
+        responseProperty(condition, response, 'body', checker)
       )
         return true
     }
