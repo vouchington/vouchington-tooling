@@ -20,10 +20,10 @@ export function intersectionToOpenApi(
     return { allOf: node.variants.map((variant) => nodeToOpenApi(variant, ctx)) }
   }
 
-  const properties: Record<string, { schema: ContractSchemaNode; required: boolean }> = {}
+  const properties = new Map<string, { schema: ContractSchemaNode; required: boolean }>()
   for (const variant of resolved) {
     for (const [key, property] of Object.entries(variant!.properties)) {
-      const existing = properties[key]
+      const existing = properties.get(key)
       if (
         existing &&
         hashSchemaNode(existing.schema, ctx) !== hashSchemaNode(property.schema, ctx)
@@ -34,37 +34,37 @@ export function intersectionToOpenApi(
         // narrower type, not a conflict. Prefer whichever side is the narrower one; only two
         // genuinely incompatible schemas (neither a subset of the other) are a real conflict.
         if (isNarrowerVariant(property.schema, existing.schema, ctx)) {
-          properties[key] = {
+          properties.set(key, {
             schema: property.schema,
             required: existing.required || property.required,
-          }
+          })
           continue
         }
         /* v8 ignore next 6 -- symmetric of the previous branch; covered by order-swapped fixtures */
         if (isNarrowerVariant(existing.schema, property.schema, ctx)) {
-          properties[key] = {
+          properties.set(key, {
             schema: existing.schema,
             required: existing.required || property.required,
-          }
+          })
           continue
         }
         throw new Error(
           `Cannot merge intersection: property "${key}" has conflicting schemas across members`,
         )
       }
-      properties[key] = {
+      properties.set(key, {
         schema: property.schema,
         required: existing?.required || property.required,
-      }
+      })
     }
   }
 
-  const sortedKeys = Object.keys(properties).toSorted()
-  const required = sortedKeys.filter((key) => properties[key]!.required)
+  const sortedKeys = [...properties.keys()].toSorted()
+  const required = sortedKeys.filter((key) => properties.get(key)!.required)
   return {
     type: 'object',
     properties: Object.fromEntries(
-      sortedKeys.map((key) => [key, nodeToOpenApi(properties[key]!.schema, ctx)]),
+      sortedKeys.map((key) => [key, nodeToOpenApi(properties.get(key)!.schema, ctx)]),
     ),
     ...(required.length > 0 ? { required } : {}),
     additionalProperties: false,

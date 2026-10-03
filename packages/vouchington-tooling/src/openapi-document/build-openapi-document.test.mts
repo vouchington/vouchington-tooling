@@ -102,7 +102,9 @@ describe('buildOpenApiDocument', () => {
       ],
     })
     expect(doc.paths['/stream']!.get!['x-schema-unavailable']).toBe(true)
-    expect(doc['x-unavailable-routes']).toEqual(['DELETE:/gone', 'GET:/stream'])
+    expect(doc.paths['/gone']!.delete!['x-schema-unavailable']).toBeUndefined()
+    expect(doc.paths['/gone']!.delete!.responses[200]).toBeUndefined()
+    expect(doc['x-unavailable-routes']).toEqual(['GET:/stream'])
     expect(doc.paths['/ack']!.post!.responses['204']).toEqual({ description: 'No Content' })
   })
 

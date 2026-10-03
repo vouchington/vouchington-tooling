@@ -20,7 +20,7 @@ export function boundedArraySchema(
   type: ts.Type,
   context: ExtractionContext,
   schemaForType: SchemaForType,
-): Extract<ContractSchemaNode, { type: 'array' }> | undefined {
+): ContractSchemaNode | undefined {
   const alias = context.options.boundedArrayAlias
   if (!alias || type.aliasSymbol?.name !== alias) return undefined
   const [itemType, minItemsType, maxItemsType, uniqueItemsType] = type.aliasTypeArguments ?? []
@@ -34,6 +34,11 @@ export function boundedArraySchema(
   }
   if (!(uniqueItemsType.flags & ts.TypeFlags.BooleanLiteral)) {
     throw unsupportedType(type, context.checker, `${alias} uniqueness must be literal`)
+  }
+  if (itemType.flags & ts.TypeFlags.Never) {
+    if (minItems !== 0)
+      throw unsupportedType(type, context.checker, `${alias} has impossible never element bounds`)
+    return { type: 'tuple', items: [], optionalItems: 0 }
   }
   return {
     type: 'array',

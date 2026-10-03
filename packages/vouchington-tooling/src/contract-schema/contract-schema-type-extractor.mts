@@ -95,6 +95,17 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     return buildUnion()
   }
   if (type.isIntersection()) {
+    const index = checker.getIndexTypeOfType(type, ts.IndexKind.String)
+    const properties = checker.getPropertiesOfType(type)
+    if (index && index.flags & ts.TypeFlags.Never && properties.length > 0) {
+      if (properties.some((property) => !(property.flags & ts.SymbolFlags.Optional)))
+        throw unsupportedType(type, checker, 'never string index conflicts with named properties')
+      if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0)
+        throw unsupportedType(type, checker, 'callable types are not supported')
+      if (checker.getSignaturesOfType(type, ts.SignatureKind.Construct).length > 0)
+        throw unsupportedType(type, checker, 'constructable types are not supported')
+      return { type: 'object', properties: {}, additionalProperties: false }
+    }
     return {
       type: 'intersection',
       variants: distinctNodes(type.types.map((variant) => schemaForType(variant, context))),
@@ -113,6 +124,8 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     const typeArguments = checker.getTypeArguments(type as ts.TypeReference)
     /* v8 ignore next */
     if (!typeArguments[0]) throw unsupportedType(type, checker, 'array element type is missing')
+    if (typeArguments[0].flags & ts.TypeFlags.Never)
+      return { type: 'tuple', items: [], optionalItems: 0 }
     return { type: 'array', items: schemaForType(typeArguments[0], context) }
   }
   if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0) {

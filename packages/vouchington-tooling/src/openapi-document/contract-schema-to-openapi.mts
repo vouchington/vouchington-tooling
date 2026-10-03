@@ -61,16 +61,16 @@ function objectToOpenApi(
   ctx: OpenApiConverterContext,
 ): OpenApiSchema {
   const keys = Object.keys(node.properties).toSorted()
-  const properties: Record<string, OpenApiSchema> = {}
+  const properties = new Map<string, OpenApiSchema>()
   const required: string[] = []
   for (const key of keys) {
     const property = node.properties[key]!
-    properties[key] = nodeToOpenApi(property.schema, ctx)
+    properties.set(key, nodeToOpenApi(property.schema, ctx))
     if (property.required) required.push(key)
   }
   return {
     type: 'object',
-    properties,
+    properties: Object.fromEntries(properties),
     ...(required.length > 0 ? { required } : {}),
     additionalProperties:
       node.additionalProperties === false ? false : nodeToOpenApi(node.additionalProperties, ctx),
