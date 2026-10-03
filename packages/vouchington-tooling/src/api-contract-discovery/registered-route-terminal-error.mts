@@ -107,7 +107,23 @@ function isInertStatement(
   checker: ts.TypeChecker,
 ): boolean {
   if (ts.isEmptyStatement(statement)) return true
-  if (ts.isExpressionStatement(statement)) return ts.isStringLiteral(statement.expression)
+  if (ts.isExpressionStatement(statement)) {
+    const expression = statement.expression
+    if (ts.isStringLiteral(expression)) return true
+    if (!ts.isCallExpression(expression) || expression.arguments.length !== 2) return false
+    const callee = expression.expression
+    const [header, value] = expression.arguments
+    return (
+      ts.isPropertyAccessExpression(callee) &&
+      callee.name.text === 'set' &&
+      ts.isIdentifier(callee.expression) &&
+      checker.getSymbolAtLocation(callee.expression) === context &&
+      ts.isStringLiteral(header!) &&
+      header.text.toLowerCase() === 'allow' &&
+      ts.isStringLiteral(value!) &&
+      /^[A-Z]+(?:, *[A-Z]+)*$/.test(value.text)
+    )
+  }
   if (!ts.isVariableStatement(statement)) return false
   return statement.declarationList.declarations.every(
     (declaration) =>

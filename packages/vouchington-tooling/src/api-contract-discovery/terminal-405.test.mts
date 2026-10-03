@@ -9,7 +9,7 @@ import { isTerminal405Handler } from './registered-route-terminal-error.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app: any
-  interface Ctx { throw(status: number): never; json(body: unknown): void }
+  interface Ctx { throw(status: number): never; json(body: unknown): void; set(name:string,value:string):void }
   declare const condition: boolean
   declare const status: number
   declare const other: Ctx;`
@@ -31,6 +31,11 @@ const sources = {
   parenthesized: handler("; 'directive'; const code = 405; return (ctx.throw(405))"),
   defaults: `${preamble} function reject(context: Ctx, reason = 'unsupported') { context.throw(405) }
     app.route('/api/example').get((ctx: Ctx) => reject(ctx))`,
+  allow: handler("ctx.set('Allow','GET, PATCH'); ctx.throw(405)"),
+  'dynamic-header': handler("ctx.set('Allow',condition ? 'POST' : 'GET'); ctx.throw(405)"),
+  'other-header-context': handler("other.set('Allow','POST'); ctx.throw(405)"),
+  'invalid-header-value': handler("ctx.set('Allow','POST\\r\\nInjected: true'); ctx.throw(405)"),
+  'unrecognized-header': handler("ctx.set('Content-Type','application/json'); ctx.throw(405)"),
   empty: handler(''),
   'bare-return': handler('return'),
   'non-call': handler('return 405'),
@@ -82,6 +87,7 @@ describe('terminal error-only route proof', () => {
     'awaited',
     'parenthesized',
     'defaults',
+    'allow',
   ] as const)('proves the handler context terminates with 405 in %s', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'error-only' },
@@ -109,6 +115,10 @@ describe('terminal error-only route proof', () => {
     'unbound-helper',
     'no-context',
     'destructured-context',
+    'dynamic-header',
+    'other-header-context',
+    'invalid-header-value',
+    'unrecognized-header',
   ] as const)('keeps %s outside error-only classification', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'ordinary' },
