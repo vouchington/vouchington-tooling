@@ -41,7 +41,8 @@ WHERE item.id = due.id
 RETURNING item.id, item.invoice_id, item.lease_token;
 ```
 
-Renewal, completion, and failure add `AND lease_token = $mine`; see
+Renewal moves `lease_expires_at` and `available_at` to the same new deadline, so a renewed lease
+is not due. Renewal, completion, and failure all add `AND lease_token = $mine`; see
 [table shapes](../../postgres-schema-design/references/table-shapes.md).
 
 ## Dirty marker or work item
@@ -138,9 +139,9 @@ A short batch ends the sweep: set the cursor to the sweep's end the same way, an
 starts a new sweep. Rows in the overlap are read twice, so the export must be idempotent.
 
 A time position works the same way on a column the database sets at insert, such as
-`received_at timestamptz NOT NULL DEFAULT now()`, with the same overlap rule. Never use a business
+`received_at timestamptz NOT NULL DEFAULT clock_timestamp()`, with the same overlap rule. Never use a business
 time such as `occurred_at`: a late-arriving row carries an old timestamp and falls behind every
-later window. Fix the window's end when the window opens, keep a composite `(time, id)` keyset
+later window. Avoid `now()` too, because it records the transaction's start, not the insert. Fix the window's end when the window opens, keep a composite `(time, id)` keyset
 position inside it, and read
 `WHERE (received_at, id) > ($1, $2) AND received_at <= $3 ORDER BY received_at, id`, where `$3` is
 the window's end. Rows that share a timestamp are neither skipped nor repeated, and new arrivals
@@ -317,10 +318,13 @@ ORDER BY available_at, id
 LIMIT $1
 FOR UPDATE SKIP LOCKED;
 
+BEGIN;
 EXPLAIN (ANALYZE, BUFFERS) EXECUTE claim_due (200);
+ROLLBACK;
 ```
 
-Under contention, `SKIP LOCKED` passes over rows other claimers hold, and those rows sit under the
+`EXPLAIN ANALYZE` runs the statement, so check the claim `UPDATE` or the `DELETE` inside a
+transaction that you roll back, or on a disposable copy. Under contention, `SKIP LOCKED` passes over rows other claimers hold, and those rows sit under the
 `Limit`, so the scan reads the cap plus the rows concurrent claims hold. That stays bounded by the
 number of workers times the batch size when claims are short, so keep the claim transaction to the
 claim statement, and check the index scan's actual rows while several workers claim at once.
