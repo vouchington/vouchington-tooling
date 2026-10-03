@@ -497,7 +497,8 @@ selected SSE rows, including when only one protocol variant was requested. Objec
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
 are matched to the original stream, including proven helper-parameter forwarding and literal bracket
 methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
-stream `end` calls are raw emissions; empty terminal cleanup is preserved. A callback that captures
+stream `end` calls and streams used as pipe destinations are raw emissions; empty terminal cleanup
+is preserved. A callback that captures
 the route's stream or HTTP context and escapes to a callee without a concrete implementation can
 write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
 dead branches, and implemented helpers that ignore their callback preserve the proven contracts.
@@ -510,7 +511,8 @@ carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete uni
 the marked variable's status and body emissions without reading or replacing response bytes.
 A status setter must dominate each body emission, including separate branches; constant context
 aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
-and unrelated raw emissions
+and helper parameters must resolve to the registered caller's unchanged response context.
+Literal bracket response methods have the same emission checks as property methods. Unrelated raw emissions
 remain unavailable. Separate branded response branches are checked together, and the nearest
 proven status setter for each body must belong to that response. Observed content and bodyless
 emissions must match the complete metadata union, including an empty response in the `else` branch

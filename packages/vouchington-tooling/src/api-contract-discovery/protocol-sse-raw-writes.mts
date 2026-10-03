@@ -42,12 +42,16 @@ export function rejectRawSseWrites(
       executableProtocolPath(node, checker) || opaqueProtocolCallbackPath(node, checker)
     const helpers = helperBindings(node, calls, checker, bindings)
     if (!proven && !helpers.length) continue
-    const receiver = expressionReceiver(access.receiver, checker)
     const binding = proven ? enclosingRouteBinding(node, checker, bindings, false) : undefined
     const candidates = binding ? [binding] : helpers
     for (const candidate of candidates) {
       const route = routes.get(routeKey(candidate))
       if (!route) continue
+      if (!access.receiver) {
+        reject(node, candidate, route.keys)
+        continue
+      }
+      const receiver = expressionReceiver(access.receiver, checker)
       if (!receiver) {
         reject(node, candidate, route.keys)
         continue

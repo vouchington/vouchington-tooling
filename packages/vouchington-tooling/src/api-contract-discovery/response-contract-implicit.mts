@@ -25,7 +25,12 @@ import {
   type HandlerBindings,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
-import { opaqueHttpResponse, unsupportedContextResponse } from './protocol-http-association.mts'
+import {
+  opaqueHttpResponse,
+  unsupportedContextResponse,
+  supportedResponseContext,
+} from './protocol-http-association.mts'
+import { contextResponseMethod } from './protocol-http-context.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 export function discoverImplicitContract(
@@ -43,8 +48,15 @@ export function discoverImplicitContract(
   const key = requestedKeyForBinding(binding, requestedKeys)
   if (!key) return
 
+  const context = supportedResponseContext(call, checker)
+  const bracketResponse =
+    context &&
+    (ts.isElementAccessExpression(call.expression) ||
+      (ts.isPropertyAccessExpression(call.expression) &&
+        ts.isElementAccessExpression(call.expression.expression))) &&
+    contextResponseMethod(call.expression, context, checker)
   const mutableResponse = unsupportedContextResponse(call, checker)
-  if (opaqueResponse || mutableResponse) {
+  if (opaqueResponse || mutableResponse || (bracketResponse && !containsResponseMarker(call))) {
     markBufferedRouteUnavailable(contracts, key, binding, sourceLocation(sourceFile, call))
     if (mutableResponse)
       contracts.get(key)!.unavailableReason =

@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { httpHandlerContext } from './protocol-http-context.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { httpEmissionKind, contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
@@ -25,8 +26,7 @@ export function associateHttpResponse(
   siblings?: ReadonlySet<ts.Symbol>,
 ): Map<ts.CallExpression, 'content' | 'none' | 'status'> {
   const handler = enclosingFunction(call)
-  const name = handler && runtimeParameters(handler)[0]?.name
-  const context = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
+  const context = handler && httpHandlerContext(handler, checker)
   if (!handler || !context) throw new Error('HTTP response must bind the handler context')
   if (!executableProtocolPath(call, checker))
     throw new Error('HTTP response must be inside a supported executable handler callback')
@@ -100,7 +100,7 @@ export function unsupportedContextResponse(
   return !!context && contextResponseMethod(call.expression, context, checker) === undefined
 }
 
-function supportedResponseContext(
+export function supportedResponseContext(
   call: ts.CallExpression,
   checker: ts.TypeChecker,
 ): ts.Symbol | undefined {
@@ -111,6 +111,7 @@ function supportedResponseContext(
     if (
       symbol &&
       responseMethods.has(contextResponseMethod(call.expression, symbol, checker, true) ?? '') &&
+      httpHandlerContext(handler, checker) === symbol &&
       isSupportedProtocolCallback(handler, checker) &&
       executableProtocolPath(handler, checker)
     )

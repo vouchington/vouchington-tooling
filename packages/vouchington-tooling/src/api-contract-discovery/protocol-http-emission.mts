@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
-import { expressionReceiver } from './protocol-write-receiver.mts'
+import { contextResponseMethod } from './protocol-http-context.mts'
+export { contextResponseMethod } from './protocol-http-context.mts'
 
 export function httpEmissionKind(
   call: ts.CallExpression,
@@ -38,21 +39,6 @@ export function httpEmissionKind(
     responseProperty(expression.arguments[0], response, 'body', checker)
     ? 'content'
     : undefined
-}
-
-export function contextResponseMethod(
-  expression: ts.Expression,
-  context: ts.Symbol,
-  checker: ts.TypeChecker,
-  allowMutable = false,
-): string | undefined {
-  if (!ts.isPropertyAccessExpression(expression)) return undefined
-  const receiver = expressionReceiver(expression.expression, checker)
-  if (receiver?.root !== context || (receiver.mutableAlias && !allowMutable)) return undefined
-  if (receiver.path.length === 0) return expression.name.text
-  if (receiver.path.length === 1 && receiver.path[0] === 'response')
-    return `response.${expression.name.text}`
-  return undefined
 }
 
 function responseProperty(

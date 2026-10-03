@@ -2,7 +2,10 @@ import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 
 type WriteAccess = { receiver: ts.Expression; method: string | undefined }
-type WriteInvocation = WriteAccess & { rawBytes: boolean }
+type WriteInvocation = Omit<WriteAccess, 'receiver'> & {
+  receiver: ts.Expression | undefined
+  rawBytes: boolean
+}
 
 /** Resolves direct and Function.call/apply SSE writes without losing their actual receiver. */
 export function sseWriteInvocation(
@@ -11,6 +14,10 @@ export function sseWriteInvocation(
 ): WriteInvocation | undefined {
   const access = writeAccess(call.expression)
   if (!access) return undefined
+  if (access.method === 'pipe')
+    return call.arguments[0]
+      ? { receiver: call.arguments[0], method: 'write', rawBytes: true }
+      : undefined
   if (access.method !== 'call' && access.method !== 'apply')
     return { ...access, rawBytes: hasRawBytes(access.method, call.arguments, checker, false) }
 
@@ -19,6 +26,14 @@ export function sseWriteInvocation(
   const receiver = call.arguments[0]
   if (!receiver) return undefined
   const payload = indirectPayload(access.method, call, checker)
+  if (target?.method === 'pipe') {
+    const destination = payload?.[0]
+    return {
+      receiver: destination,
+      method: 'write',
+      rawBytes: payload === undefined || destination !== undefined,
+    }
+  }
   const method = target?.method === 'write' || target?.method === 'end' ? target.method : undefined
   return {
     receiver,
