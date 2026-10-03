@@ -119,13 +119,28 @@ ORDER BY id
 LIMIT $3;
 ```
 
-Persist the last `id` as `cursor_invoice_id` after each batch. A short batch ends the sweep: set
-the cursor to the sweep's end, and the next run starts a new sweep. Rows in the overlap are read
-twice, so the export must be idempotent. A time position works the same way: inside a window,
-keep a composite `(time, id)` keyset position and read `WHERE (occurred_at, id) > ($1, $2)` in
-that order, so rows that share a timestamp are neither skipped nor repeated. Advance
-`<verb>_through_at` to the window's end only after the window is drained, and start the next
-window an overlap earlier.
+Persist the last `id` as the cursor after each batch with a compare-and-set, so a stale or
+overlapping worker cannot move the position backward or into another sweep. `$1` is the new
+position, `$2` the cursor this batch started from (NULL at the start), and `$3` the sweep's end.
+Zero updated rows means another worker moved on, so the run stops:
+
+```sql
+UPDATE invoice_export_cursors
+SET cursor_invoice_id = $1
+WHERE is_singleton
+  AND cursor_invoice_id IS NOT DISTINCT FROM $2::uuid
+  AND sweep_upper_bound_invoice_id = $3;
+```
+
+A short batch ends the sweep: set the cursor to the sweep's end the same way, and the next run
+starts a new sweep. Rows in the overlap are read twice, so the export must be idempotent.
+
+A time position works the same way. Fix the window's end when the window opens, keep a composite
+`(time, id)` keyset position inside it, and read
+`WHERE (occurred_at, id) > ($1, $2) AND occurred_at <= $3 ORDER BY occurred_at, id`, where `$3` is
+the window's end. Rows that share a timestamp are neither skipped nor repeated, and new arrivals
+wait for the next window. Advance `<verb>_through_at` to the window's end only after the window is
+drained, and start the next window an overlap earlier.
 
 ## Capped batch loop with `hasMore`
 
