@@ -20,6 +20,12 @@ export function hasBindingWrite(
       node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
     )
       referencesBinding(node.left)
+    if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken ||
+        node.operator === ts.SyntaxKind.MinusMinusToken)
+    )
+      referencesBinding(node.operand)
     if (ts.isForOfStatement(node) || ts.isForInStatement(node)) referencesBinding(node.initializer)
     node.forEachChild(inspect)
   }

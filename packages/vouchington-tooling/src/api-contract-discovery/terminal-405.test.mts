@@ -55,6 +55,12 @@ const sources = {
   'rewritten-wrapper': `${preamble} type Handler=(ctx:Ctx)=>void
     const reject=(ctx:Ctx)=>ctx.throw(405);function wrap(handler:Handler){handler=(ctx)=>ctx.json({ok:true});return handler}
     app.route('/api/example').get(wrap(reject))`,
+  'postfix-write': `${preamble} function reject(ctx:Ctx){ctx.throw(405)}
+    (reject as any)++;app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'prefix-write': `${preamble} function reject(ctx:Ctx){ctx.throw(405)}
+    --(reject as any);app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'unary-read': `${preamble} function reject(ctx:Ctx){ctx.throw(405)}
+    const value=+(reject as any);app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
   'computed-helper': `${preamble} function make(ctx:Ctx) {ctx.json({ok:true});return {reject(context:Ctx){context.throw(405)}}}
     app.route('/api/example').get((ctx:Ctx)=>make(ctx).reject(ctx))`,
   'mutable-helper': `${preamble} let reject:(ctx:Ctx)=>void=(ctx)=>ctx.throw(405)
@@ -140,6 +146,7 @@ describe('terminal error-only route proof', () => {
     'transparent',
     'void-adapter-awaited',
     'void-adapter-returned',
+    'unary-read',
   ] as const)('proves the handler context terminates with 405 in %s', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'error-only' },
@@ -183,6 +190,8 @@ describe('terminal error-only route proof', () => {
     'void-adapter',
     'rewritten-wrapper',
     'destructured-wrapper',
+    'postfix-write',
+    'prefix-write',
     'generator-helper',
     'async-generator-helper',
     'optional-throw',

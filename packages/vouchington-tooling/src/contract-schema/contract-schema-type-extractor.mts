@@ -95,6 +95,9 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     return buildUnion()
   }
   if (type.isIntersection()) {
+    const index = checker.getIndexTypeOfType(type, ts.IndexKind.String)
+    if (index && index.flags & ts.TypeFlags.Never && checker.getPropertiesOfType(type).length > 0)
+      throw unsupportedType(type, checker, 'never string index conflicts with named properties')
     return {
       type: 'intersection',
       variants: distinctNodes(type.types.map((variant) => schemaForType(variant, context))),

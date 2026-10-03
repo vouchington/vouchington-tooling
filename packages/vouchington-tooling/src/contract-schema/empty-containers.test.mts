@@ -16,6 +16,7 @@ const sources = {
     interface ApiResponseContracts { zero: BoundedArray<never,0,0,false>; capacity: BoundedArray<never,0,5,true> }`,
   'bounded-impossible': `type BoundedArray<T, Min extends number, Max extends number, Unique extends boolean> = T[]
     interface ApiResponseContracts { result: BoundedArray<never,1,5,false> }`,
+  intersection: `interface ApiResponseContracts { result: { foo: string } & Record<string, never> }`,
   never: 'interface ApiResponseContracts { result: never }',
   any: 'interface ApiResponseContracts { result: any }',
   property: 'interface ApiResponseContracts { result: { impossible: never } }',
@@ -63,6 +64,12 @@ describe('closed empty JSON containers', () => {
         options,
       ),
     ).toThrow('impossible never element bounds')
+  })
+
+  it('rejects named properties conflicting with a never string index', () => {
+    expect(() =>
+      extractResponseContracts(matrix.program, matrix.sourceFile('intersection')),
+    ).toThrow('never string index conflicts with named properties')
   })
 
   it('extracts a closed empty record and preserves nested container bounds', () => {
