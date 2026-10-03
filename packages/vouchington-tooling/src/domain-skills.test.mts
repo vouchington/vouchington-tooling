@@ -27,6 +27,7 @@ describe('domain skill plugins', () => {
       'vitest-test-authoring',
     ])
     await expect(skillNames('vouchington-database')).resolves.toEqual([
+      'bounded-iteration',
       'postgres-node-performance-tuning',
       'postgres-partitioning-uuid-v7',
       'postgres-schema-design',
@@ -90,6 +91,8 @@ describe('domain skill plugins', () => {
       readSkill('vouchington-database', 'postgres-schema-design/references/naming.md'),
       readSkill('vouchington-database', 'postgres-schema-design/references/relations.md'),
       readSkill('vouchington-database', 'postgres-schema-design/references/table-shapes.md'),
+      readSkill('vouchington-database', 'bounded-iteration/SKILL.md'),
+      readSkill('vouchington-database', 'bounded-iteration/references/sweep-patterns.md'),
     ])
     expect(resources.join('\n')).toMatch(
       /accepted-decision ledger|failure paths|acceptance criterion|typed module shape|collision-safe|locator|stopLoading|read-after-write|partition key/i,

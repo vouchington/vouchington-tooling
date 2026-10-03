@@ -18,4 +18,6 @@ Local policy overrides these portable conventions.
 
 For query shape, read [performance patterns](../postgres-node-performance-tuning/references/performance-patterns.md).
 For partition lifecycle, use [UUIDv7 partitioning](../postgres-partitioning-uuid-v7/SKILL.md).
+For how jobs choose, cap, and resume over work-item and cursor tables, read
+[bounded iteration](../bounded-iteration/SKILL.md).
 Consumer policy owns lifecycle, retention, migration strategy, and enforcement configuration.
