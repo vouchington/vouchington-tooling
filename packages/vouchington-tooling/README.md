@@ -479,14 +479,20 @@ Standalone `never` and `any` remain unsupported contracts.
 Caller-owned `apiSseFrame(key, { event, data })` markers expose literal event names and concrete
 payloads from the frames actually written by a route, including callbacks passed to a handler
 factory. SSE responses keep a string body schema and describe each payload under the media
-type's `x-sse-events` map. Broad names, unknown root payloads, and unmarked frames fail closed.
+type's `x-sse-events` map. Callback arguments require a concrete helper invocation path; ignored,
+declaration-only, deferred, or rewritten callbacks fail closed. Stable named handlers are followed
+within their declaring source file. Broad names, unknown root payloads, unmarked frames through
+stream aliases, and conditional or mutable-context status changes also fail closed.
 
 Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
 carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
 `status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
 the marked variable's status and body emissions without reading or replacing response bytes.
-Unrelated raw emissions remain unavailable, and explicit 400 content variants also include the
-framework's error body schema.
+A status setter must dominate each body emission, including separate branches; constant context
+aliases are followed and unrelated raw emissions remain unavailable. Exact requested protocol rows
+are selected before other variants are validated. In lenient mode, incomplete marker evidence
+keeps every selected sibling unavailable. Explicit 400 content variants also include the framework's
+JSON error schema independently of their own media type.
 
 Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
 main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then

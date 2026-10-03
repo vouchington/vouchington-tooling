@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { expressionReceiver } from './protocol-write-receiver.mts'
 
 export function httpEmissionKind(
   call: ts.CallExpression,
@@ -45,15 +46,10 @@ export function contextResponseMethod(
   checker: ts.TypeChecker,
 ): string | undefined {
   if (!ts.isPropertyAccessExpression(expression)) return undefined
-  const receiver = unwrapExpression(expression.expression)
-  if (ts.isIdentifier(receiver) && checker.getSymbolAtLocation(receiver) === context)
-    return expression.name.text
-  if (
-    ts.isPropertyAccessExpression(receiver) &&
-    receiver.name.text === 'response' &&
-    ts.isIdentifier(receiver.expression) &&
-    checker.getSymbolAtLocation(receiver.expression) === context
-  )
+  const receiver = expressionReceiver(expression.expression, checker)
+  if (receiver?.root !== context || receiver.mutableAlias) return undefined
+  if (receiver.path.length === 0) return expression.name.text
+  if (receiver.path.length === 1 && receiver.path[0] === 'response')
     return `response.${expression.name.text}`
   return undefined
 }

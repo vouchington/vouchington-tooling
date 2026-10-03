@@ -8,6 +8,7 @@ import { visit } from './response-contract-route-analysis.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app: any
+  function subscribe(options:{emit:()=>void}):void {options.emit()}
   declare const stream: { write(frame: string): void }
   declare function apiSseFrame<K extends string, T>(key: K, event: T): string
   type Http<T> = Response & { readonly apiHttpResponseVariants?: T }
@@ -38,7 +39,7 @@ const sources = {
     ? {event:'done',data:{}} : {event:'progress',data:{count:1}}
     stream.write(apiSseFrame('GET:/events',event))`),
   factory: `${preamble}
-    declare function factory<T>(options:{value:T;emit:(stream:{write(frame:string):void},event:{event:'snapshot';data:T}|{event:'error';data:{message:string}})=>void}):(ctx:any)=>void
+    function factory<T>(options:{value:T;emit:(stream:{write(frame:string):void},event:{event:'snapshot';data:T}|{event:'error';data:{message:string}})=>void}):(ctx:any)=>void {return ctx=>options.emit(stream,{event:'snapshot',data:options.value})}
     app.route('/events').get(factory({value:{count:1},emit:(stream,event)=>stream.write(apiSseFrame('GET:/events',event))}))`,
   nested: sse(
     `stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
@@ -155,8 +156,23 @@ const sources = {
   'one-branch-http': http(`if(ctx.query.flag) return; ${emit}`),
   'branch-missing-else-http': http(`if(ctx.query.flag) {} ${emit}`),
   'block-read-http': http(`{ctx.set('X','ok')}; ${emit}`),
+  'conditional-sse-status': sse(
+    "if(ctx.query.created) ctx.setStatus(201); stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'conditional-sse-block-status': sse(
+    "if(ctx.query.created) {ctx.setStatus(201)}; stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'dead-sse-status': sse(
+    "if(false) ctx.setStatus(201); stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'separate-http-status-path': `${preamble} app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',opaque); if(!response.body){ctx.setStatus(response.status);ctx.response.empty()}else ctx.pipeline(response.body)})`,
+  'per-branch-http-status': `${preamble} app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',opaque); if(!response.body){ctx.setStatus(response.status);ctx.response.empty()}else {ctx.setStatus(response.status);ctx.pipeline(response.body)}})`,
+  'partly-broad-sse': sse(
+    "stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}));stream.write(apiSseFrame('GET:/events',{event:'broad' as string,data:{}}))",
+  ),
+  'ignored-callback': `${preamble} function ignore(callback:()=>void){};app.route('/events').get((ctx:any)=>ignore(()=>stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))))`,
   'nullable-property-stream': sse(
-    "let sse:{stream:typeof stream}|null=null; sse={stream}; ctx.subscribe({emit:()=>sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})",
+    "let sse:{stream:typeof stream}|null=null; sse={stream}; subscribe({emit:()=>sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})",
   ),
   'property-stream-raw': sse(
     "const sse={stream}; sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); sse.stream.write('raw')",
@@ -174,7 +190,7 @@ const sources = {
   'named-sse-created': `${preamble} function handler(context:any) {context.setStatus(201);stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}; app.route('/events').get(handler)`,
   'generator-sse': `${preamble} function* handler(ctx:any) {stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}; app.route('/events').get(handler)`,
   'nested-sse-created': sse(
-    "ctx.setStatus(201); ctx.subscribe({emit:()=>{stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}})",
+    "ctx.setStatus(201); subscribe({emit:()=>{stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}})",
   ).replaceAll('ctx', 'context'),
   'uncalled-sse-function': sse(
     "function unused() {stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}",
@@ -228,6 +244,7 @@ describe('compiler-discovered protocol contracts', () => {
     'named-sse',
     'no-sse-context',
     'nullable-property-stream',
+    'dead-sse-status',
     'different-property-stream',
   ] as const)('extracts actual named payloads from %s', (name) => {
     const contracts = discover(name)
@@ -300,6 +317,26 @@ describe('compiler-discovered protocol contracts', () => {
     },
   )
 
+  it('validates only the requested generated protocol variants', () => {
+    expect(
+      Object.keys(
+        discoverApiResponseContracts(
+          matrix.program,
+          [matrix.sourceFile('partly-broad-sse')],
+          new Set(['GET:/events']),
+        ),
+      ),
+    ).toEqual(['GET:/events'])
+    expect(() =>
+      discoverApiResponseContracts(
+        matrix.program,
+        [matrix.sourceFile('partly-broad-sse')],
+        new Set(['GET:/events#protocol-2']),
+      ),
+    ).toThrow()
+    expect(() => discover('partly-broad-sse')).toThrow()
+  })
+
   it('validates the actual data shape rather than the framed string', () => {
     const events = Object.values(discover('sse')).flatMap((contract) => contract.sseEvents ?? [])
     const progress = events.find((event) => event.eventName === 'progress')!.contract
@@ -335,6 +372,7 @@ describe('compiler-discovered protocol contracts', () => {
     'once-do-http',
     'unbounded-for-http',
     'dynamic-loop-http',
+    'per-branch-http-status',
   ] as const)('extracts JSON200/batch/error, bodyless202 and JSON400 from %s', (name) => {
     const contracts = discover(name)
     expect(Object.values(contracts).map((contract) => contract.statusCodes)).toEqual([
@@ -403,6 +441,10 @@ describe('compiler-discovered protocol contracts', () => {
     'local-readable',
     'computed-stream',
     'property-stream-raw',
+    'conditional-sse-status',
+    'conditional-sse-block-status',
+    'separate-http-status-path',
+    'ignored-callback',
     'dead-else-http',
     'terminal-block-http',
     'terminal-branches-http',
