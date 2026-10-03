@@ -72,7 +72,10 @@ export function enclosingRouteBinding(
     const handlerSymbol = functionSymbol(current, checker)
     if (handlerSymbol) {
       const binding = handlerBindings.get(resolveSymbol(handlerSymbol, checker))
-      if (binding) return binding
+      if (binding)
+        return !proveCallbacks || executableProtocolPath(node, checker, current)
+          ? binding
+          : undefined
     }
     current = current.parent
   }
@@ -134,7 +137,12 @@ function handlerArgumentSymbols(node: ts.CallExpression, checker: ts.TypeChecker
     }
     if (isFunctionLike(argument)) {
       visit(argument, (child) => {
-        if (!ts.isCallExpression(child) || !ts.isIdentifier(child.expression)) return
+        if (
+          !ts.isCallExpression(child) ||
+          !ts.isIdentifier(child.expression) ||
+          !executableProtocolPath(child, checker)
+        )
+          return
         const symbol = checker.getSymbolAtLocation(child.expression)
         if (symbol) symbols.push(symbol)
       })

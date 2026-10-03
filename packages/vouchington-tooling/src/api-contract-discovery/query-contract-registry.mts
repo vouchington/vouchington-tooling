@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
 
 import { extractQueryParameterDescriptor } from './query-contract-extraction.mts'
 import { contractError } from './response-contract-registration.mts'
@@ -18,6 +19,7 @@ export function discoverApiQueryContracts(
   sourceFiles: readonly ts.SourceFile[],
   knownResponseRoutes: ReadonlySet<string>,
 ): BackendQueryContractRegistry {
+  registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const handlerBindings = collectHandlerBindings(sourceFiles, checker)
   const contracts = new Map<string, BackendQueryContract>()

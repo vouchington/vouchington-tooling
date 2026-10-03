@@ -177,7 +177,7 @@ const sources = {
   'property-stream-raw': sse(
     "const sse={stream}; sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); sse.stream.write('raw')",
   ),
-  'different-property-stream': sse(
+  'same-stream-wrappers': sse(
     "const sse={stream}; const other={stream}; sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); other.stream.write('log')",
   ),
   'computed-stream': sse(
@@ -245,7 +245,6 @@ describe('compiler-discovered protocol contracts', () => {
     'no-sse-context',
     'nullable-property-stream',
     'dead-sse-status',
-    'different-property-stream',
   ] as const)('extracts actual named payloads from %s', (name) => {
     const contracts = discover(name)
     const events = Object.values(contracts).flatMap((contract) => contract.sseEvents ?? [])
@@ -441,6 +440,7 @@ describe('compiler-discovered protocol contracts', () => {
     'local-readable',
     'computed-stream',
     'property-stream-raw',
+    'same-stream-wrappers',
     'conditional-sse-status',
     'conditional-sse-block-status',
     'separate-http-status-path',

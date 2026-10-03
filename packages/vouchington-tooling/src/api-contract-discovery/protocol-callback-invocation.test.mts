@@ -225,6 +225,19 @@ describe('protocol callback invocation proof', () => {
     })
   })
 
+  it('inspects proven inline route bodies for named emitters while excluding deferred calls', () => {
+    expect(
+      check(`
+      function emit() { mark('route-emitter') }
+      function ignored() { mark('ignored-emitter') }
+      function dead() { mark('dead-emitter') }
+      app.route('/events').get(() => emit());
+      app.route('/unused').get(() => { function unused() { ignored() } });
+      app.route('/dead').get(() => { if (false) dead() });
+    `),
+    ).toEqual({ 'route-emitter': true, 'ignored-emitter': false, 'dead-emitter': false })
+  })
+
   it('resolves shorthand and literal method callbacks through implemented option consumers', () => {
     expect(
       check(`

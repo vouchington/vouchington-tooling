@@ -70,6 +70,7 @@ export function extractHttpVariants(
             statusKnowledge: 'explicit' as const,
             bodyKind: 'none' as const,
             mediaTypeKnowledge: 'none' as const,
+            ...(value === 400 ? { includeDefaultError: true } : {}),
           },
         ]
       if (kinds[0] !== 'content') throw new Error('HTTP response body kind is invalid')

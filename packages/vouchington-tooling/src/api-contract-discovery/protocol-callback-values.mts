@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { registeredHandler } from './protocol-callback-registration.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
@@ -9,7 +10,7 @@ export type CallbackBindings = ReadonlyMap<ts.Symbol, CallbackValue>
 export function isProtocolCallbackFunction(node: ts.Node): node is FunctionNode {
   return ts.isFunctionLike(node) && 'body' in node
 }
-/** Resolves stable named callback uses only in this file's executed outer statements. */
+/** Resolves stable named uses in outer statements and directly registered inline handlers. */
 export function protocolCallbackSourceCalls(fn: FunctionNode): ts.CallExpression[] {
   const declaration = fn.parent
   if (
@@ -22,7 +23,15 @@ export function protocolCallbackSourceCalls(fn: FunctionNode): ts.CallExpression
     return []
   const calls: ts.CallExpression[] = []
   function visit(node: ts.Node) {
-    if (isProtocolCallbackFunction(node)) return
+    if (
+      isProtocolCallbackFunction(node) &&
+      !(
+        ts.isCallExpression(node.parent) &&
+        registeredHandler(node.parent) &&
+        node.parent.arguments.includes(node as ts.Expression)
+      )
+    )
+      return
     if (ts.isCallExpression(node)) calls.push(node)
     ts.forEachChild(node, visit)
   }

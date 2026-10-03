@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
 
 import { extractContractSchema } from '../contract-schema/index.mts'
 import {
@@ -32,6 +33,7 @@ export function discoverApiRequestContracts(
   requestedKeys?: ReadonlySet<string>,
   options?: DiscoverApiRequestContractsOptions,
 ): Record<string, BackendRequestContract> {
+  registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendRequestContract>()
   const markerKeys = new Set<string>()

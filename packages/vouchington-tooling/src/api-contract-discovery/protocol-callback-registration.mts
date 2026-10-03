@@ -3,13 +3,17 @@ import { unwrapExpression } from './protocol-marker-analysis.mts'
 
 export function registeredHandler(call: ts.CallExpression): boolean {
   const method = unwrapExpression(call.expression)
-  return (
-    ts.isPropertyAccessExpression(method) &&
-    ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method.name.text) &&
-    ts.isCallExpression(method.expression) &&
-    ts.isPropertyAccessExpression(method.expression.expression) &&
-    method.expression.expression.name.text === 'route'
+  if (
+    !ts.isPropertyAccessExpression(method) ||
+    !['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method.name.text)
   )
+    return false
+  let receiver: ts.Expression = method.expression
+  while (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)) {
+    if (receiver.expression.name.text === 'route') return true
+    receiver = receiver.expression.expression
+  }
+  return false
 }
 export function invokedResult(call: ts.CallExpression | ts.NewExpression): boolean {
   let node: ts.Node = call

@@ -3,12 +3,32 @@ import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 
 const standardLibrary = dirname(resolvePath(ts.getDefaultLibFilePath({})))
+const compilerLibraries = new WeakMap<ts.TypeChecker, ReadonlySet<ts.SourceFile>>()
 
-function standardDeclaration(declaration: ts.Declaration, timer: boolean): boolean {
+/** Records the actual caller compiler's library identities, including another installation. */
+export function registerPlatformCompilerLibraries(program: ts.Program): void {
+  const checker = program.getTypeChecker()
+  if (!compilerLibraries.has(checker))
+    compilerLibraries.set(
+      checker,
+      new Set(program.getSourceFiles().filter((file) => program.isSourceFileDefaultLibrary(file))),
+    )
+}
+
+function standardDeclaration(
+  declaration: ts.Declaration,
+  timer: boolean,
+  checker: ts.TypeChecker,
+): boolean {
   const source = declaration.getSourceFile()
   if (!source.isDeclarationFile) return false
   const file = resolvePath(source.fileName)
-  if (dirname(file) === standardLibrary && /^lib(?:\.[\w.-]+)?\.d\.ts$/.test(basename(file)))
+  const libraries = compilerLibraries.get(checker)
+  if (
+    libraries
+      ? libraries.has(source)
+      : dirname(file) === standardLibrary && /^lib(?:\.[\w.-]+)?\.d\.ts$/.test(basename(file))
+  )
     return true
   return (
     timer &&
@@ -58,7 +78,9 @@ export function platformCallbackArgument(
   const timer = symbol.name === 'setInterval' || symbol.name === 'setTimeout'
   if (!(timer ? ts.isCallExpression(node) : symbol.name === 'Promise' && ts.isNewExpression(node)))
     return undefined
-  return symbol.declarations.every((declaration) => standardDeclaration(declaration, timer))
+  return symbol.declarations.every((declaration) =>
+    standardDeclaration(declaration, timer, checker),
+  )
     ? argument
     : undefined
 }

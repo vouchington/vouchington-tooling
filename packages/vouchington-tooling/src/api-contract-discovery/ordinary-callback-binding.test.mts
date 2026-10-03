@@ -23,11 +23,29 @@ const sources = Object.fromEntries(
     ],
     [name + '-unused', `${preamble}app.route('/x').get((ctx:any)=>{function unused(){${marker}}})`],
     [
+      name + '-named-unused',
+      `${preamble}function handler(ctx:any){function unused(){${marker}}}app.route('/x').get(handler)`,
+    ],
+    [
+      name + '-global-unused',
+      `${preamble}function helper(){${marker}}app.route('/x').get((ctx:any)=>{function unused(){helper()}})`,
+    ],
+    [
+      name + '-global-called',
+      `${preamble}function helper(){${marker}}app.route('/x').get((ctx:any)=>{helper()})`,
+    ],
+    [
+      name + '-global-dead',
+      `${preamble}function helper(){${marker}}app.route('/x').get((ctx:any)=>{if(false)helper()})`,
+    ],
+    [
       name + '-called',
       `${preamble}app.route('/x').get((ctx:any)=>{function called(){${marker}}called()})`,
     ],
   ]),
 )
+sources['chained-response'] =
+  `${preamble}app.route('/x').get((ctx:any)=>{}).patch((ctx:any)=>{}).delete((ctx:any)=>apiResponse('DELETE:/x',{ok:true}))`
 let matrix: VirtualProgramMatrix<string>
 beforeAll(() => {
   matrix = buildVirtualProgramMatrix(import.meta, sources)
@@ -45,7 +63,19 @@ it.each(Object.keys(discover) as (keyof typeof discover)[])(
       discover[name](matrix.program, [matrix.sourceFile(name + suffix)], new Set(['GET:/x']))
     expect(() => run('-ignored')).toThrow('must be inside')
     expect(() => run('-unused')).toThrow('must be inside')
+    expect(() => run('-named-unused')).toThrow('must be inside')
+    expect(() => run('-global-unused')).toThrow('must be inside')
+    expect(() => run('-global-dead')).toThrow('must be inside')
+    expect(Object.keys(run('-global-called'))).toEqual(['GET:/x'])
     expect(Object.keys(run('-invoked'))).toEqual(['GET:/x'])
     expect(Object.keys(run('-called'))).toEqual(['GET:/x'])
   },
 )
+
+it('attributes a response to its actual method in a fluent registration chain', () => {
+  const contracts = discoverApiResponseContracts(matrix.program, [
+    matrix.sourceFile('chained-response'),
+  ])
+  expect(Object.keys(contracts)).toEqual(['DELETE:/x'])
+  expect(contracts['DELETE:/x']?.method).toBe('DELETE')
+})

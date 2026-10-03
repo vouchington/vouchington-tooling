@@ -5,6 +5,7 @@ import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unsupportedContextAlias } from './protocol-context-alias.mts'
+import { expressionReceiver } from './protocol-write-receiver.mts'
 import { visit } from './response-contract-route-analysis.mts'
 
 export function associateHttpResponse(
@@ -20,6 +21,19 @@ export function associateHttpResponse(
     throw new Error('HTTP response must be inside a supported executable handler callback')
   const emissions = new Map<ts.CallExpression, 'content' | 'none' | 'status'>()
   visit(handler, (node) => {
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      executableProtocolPath(node, checker)
+    ) {
+      const receiver = expressionReceiver(node.right, checker)
+      if (
+        receiver?.root === context &&
+        (receiver.path.length === 0 ||
+          (receiver.path.length === 1 && receiver.path[0] === 'response'))
+      )
+        throw new Error('HTTP response context has an unsupported mutable alias')
+    }
     if (
       ts.isVariableDeclaration(node) &&
       enclosingFunction(node) === handler &&

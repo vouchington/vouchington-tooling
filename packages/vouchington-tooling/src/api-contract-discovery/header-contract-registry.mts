@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
 
 import { contractError } from './response-contract-registration.mts'
 import { parseHeaderContract } from './header-contract-parser.mts'
@@ -14,6 +15,7 @@ export function discoverApiHeaderContracts(
   sourceFiles: readonly ts.SourceFile[],
   knownResponseRoutes: ReadonlySet<string>,
 ): HeaderContractRegistry {
+  registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const bindings = collectHandlerBindings(sourceFiles, checker)
   const contracts = new Map<string, HeaderContract>()

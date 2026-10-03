@@ -30,29 +30,69 @@ export function expressionReceiver(
   if (ts.isIdentifier(value)) {
     const symbol = checker.getSymbolAtLocation(value)
     if (!symbol) return undefined
-    const root = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
-    if (active.has(root)) return undefined
-    const declaration = root.valueDeclaration
-    if (
-      declaration &&
-      ts.isVariableDeclaration(declaration) &&
-      declaration.initializer &&
-      ts.isVariableDeclarationList(declaration.parent)
-    ) {
-      const initializer = unwrapExpression(declaration.initializer)
-      if (ts.isIdentifier(initializer) || ts.isPropertyAccessExpression(initializer)) {
-        const receiver = expressionReceiver(initializer, checker, new Set(active).add(root))
-        return (
-          receiver && {
-            ...receiver,
-            ...(!(declaration.parent.flags & ts.NodeFlags.Const) ? { mutableAlias: true } : {}),
-          }
-        )
-      }
-    }
-    return { root, path: [] }
+    return symbolReceiver(symbol, checker, active)
   }
   if (!ts.isPropertyAccessExpression(value)) return undefined
+  const propertySymbol = checker.getSymbolAtLocation(value.name)
+  if (propertySymbol && active.has(propertySymbol)) return undefined
+  const property = literalProperty(value, checker) ?? propertySymbol?.valueDeclaration
+  const propertyActive = new Set(active)
+  if (propertySymbol) propertyActive.add(propertySymbol)
+  // Object literal properties remain writable even when their variable is const.
+  // Track the original receiver for raw-write rejection; never trust a marked wrapper.
+  if (property && ts.isPropertyAssignment(property)) {
+    const receiver = expressionReceiver(property.initializer, checker, propertyActive)
+    return receiver && { ...receiver, mutableAlias: true }
+  }
+  if (property && ts.isShorthandPropertyAssignment(property)) {
+    const symbol = checker.getShorthandAssignmentValueSymbol(property)
+    const receiver = symbol && symbolReceiver(symbol, checker, propertyActive)
+    return receiver && { ...receiver, mutableAlias: true }
+  }
   const parent = expressionReceiver(value.expression, checker, active)
   return parent ? { ...parent, path: [...parent.path, value.name.text] } : undefined
+}
+
+function symbolReceiver(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+  active: Set<ts.Symbol>,
+): WriteReceiver | undefined {
+  const root = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+  if (active.has(root)) return undefined
+  const declaration = root.valueDeclaration
+  if (
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    declaration.initializer &&
+    ts.isVariableDeclarationList(declaration.parent)
+  ) {
+    const initializer = unwrapExpression(declaration.initializer)
+    if (ts.isIdentifier(initializer) || ts.isPropertyAccessExpression(initializer)) {
+      const receiver = expressionReceiver(initializer, checker, new Set(active).add(root))
+      return (
+        receiver && {
+          ...receiver,
+          ...(!(declaration.parent.flags & ts.NodeFlags.Const) ? { mutableAlias: true } : {}),
+        }
+      )
+    }
+  }
+  return { root, path: [] }
+}
+
+function literalProperty(value: ts.PropertyAccessExpression, checker: ts.TypeChecker) {
+  const base = unwrapExpression(value.expression)
+  if (!ts.isIdentifier(base)) return undefined
+  const declaration = checker.getSymbolAtLocation(base)?.valueDeclaration
+  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+    return undefined
+  const initializer = unwrapExpression(declaration.initializer)
+  if (!ts.isObjectLiteralExpression(initializer)) return undefined
+  return initializer.properties.find(
+    (member) =>
+      (ts.isPropertyAssignment(member) || ts.isShorthandPropertyAssignment(member)) &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === value.name.text,
+  )
 }

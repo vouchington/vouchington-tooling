@@ -162,7 +162,7 @@ it('supports a constant named SSE handler registered by identifier', () => {
 it('rejects a named emitter referenced only by an uncalled nested closure', () => {
   expect(() =>
     discoverApiResponseContracts(matrix.program, [matrix.sourceFile('deferred-named-sse')]),
-  ).toThrow('uninvoked callback')
+  ).toThrow('must be inside an app.route handler')
 })
 
 it('rejects a rewritten named SSE handler even when its original declaration emits a frame', () => {
