@@ -120,6 +120,78 @@ const sources = {
   'no-http-context': http(emit)
     .replace('(ctx:any)', '()')
     .replace('app.route', 'declare const ctx:any; app.route'),
+  'false-while-http': http(`while(false) {${emit}}`),
+  'false-for-http': http(`for(;false;) {${emit}}`),
+  'break-http': http(`while(ctx.query.flag) {break; ${emit}}`),
+  'continue-http': http(`while(ctx.query.flag) {continue; ${emit}}`),
+  'once-do-http': http(`do {${emit}} while(false)`),
+  'unbounded-for-http': http(`for(;;) {${emit}; break}`),
+  'dynamic-loop-http': http(`for(;ctx.query.flag;) {${emit}; break}`),
+  'false-and-http': http(`false && ctx.response.empty(); ctx.pipeline(response.body)`),
+  'true-or-http': http(
+    `true || ctx.pipeline(response.body); if(!response.body) ctx.response.empty()`,
+  ),
+  'false-ternary-http': http(
+    `false ? ctx.pipeline(response.body) : undefined; if(!response.body)ctx.response.empty()`,
+  ),
+  'true-ternary-http': http(
+    `true ? undefined : ctx.pipeline(response.body); if(!response.body)ctx.response.empty()`,
+  ),
+  'false-and-sse': sse(
+    "false && stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'dynamic-ternary-http': http(
+    `ctx.query.flag ? ctx.pipeline(response.body) : undefined; if(!response.body) ctx.response.empty()`,
+  ),
+  'dynamic-logical-http': http(
+    `ctx.query.flag && ctx.pipeline(response.body); if(!response.body) ctx.response.empty()`,
+  ),
+  'parameter-sse': sse(
+    "stream.write(apiSseFrame('GET:/events/:id',{event:'done' as const,data:{}}));stream.write(apiSseFrame('GET:/events/:id',{event:'progress' as const,data:{count:1}}))",
+  ).replace("route('/events')", "route('/events/:id')"),
+  'dead-else-http': http(`if(true) {} else {${emit}}`),
+  'terminal-block-http': http(`{return}; ${emit}`),
+  'terminal-branches-http': http(`if(ctx.query.flag) return; else throw new Error(); ${emit}`),
+  'one-branch-http': http(`if(ctx.query.flag) return; ${emit}`),
+  'branch-missing-else-http': http(`if(ctx.query.flag) {} ${emit}`),
+  'block-read-http': http(`{ctx.set('X','ok')}; ${emit}`),
+  'computed-stream': sse(
+    "({stream}).stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'no-sse-context': sse(
+    "stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ).replace('(ctx:any)', '()'),
+  'named-sse': `${preamble} function handler(ctx:any) {stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}; app.route('/events').get(handler)`,
+  'named-sse-created': `${preamble} function handler(context:any) {context.setStatus(201);stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}; app.route('/events').get(handler)`,
+  'generator-sse': `${preamble} function* handler(ctx:any) {stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}; app.route('/events').get(handler)`,
+  'nested-sse-created': sse(
+    "ctx.setStatus(201); ctx.subscribe({emit:()=>{stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}})",
+  ).replaceAll('ctx', 'context'),
+  'uncalled-sse-function': sse(
+    "function unused() {stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))}",
+  ),
+  'uncalled-sse-arrow': sse(
+    "const unused=()=>stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'dead-sse': sse(
+    "if(false) stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ),
+  'unrelated-write': sse(
+    "stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); const log={write:(value:string)=>value}; log.write('log')",
+  ),
+  'renamed-sse-created': sse(
+    "ctx.setStatus(201); stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ).replaceAll('ctx', 'context'),
+  'renamed-sse-dynamic': sse(
+    "ctx.setStatus(ctx.query.status); stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+  ).replaceAll('ctx', 'context'),
+  'dead-http': http(`if(false) {${emit}}`),
+  'unreachable-http': http(`return; ${emit}`),
+  'renamed-http-raw': http(`${emit}; ctx.pipeline(unknownBody)`).replaceAll('ctx', 'context'),
+  'local-readable': http(
+    'if(!response.body)ctx.response.empty(); else ctx.pipeline(Readable.from(response.body))',
+    'declare const Readable:{from(body:unknown):unknown}',
+  ),
   'renamed-http-context': http(emit).replaceAll('ctx', 'context'),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
@@ -138,29 +210,34 @@ describe('compiler-discovered protocol contracts', () => {
     matrix = buildVirtualProgramMatrix(import.meta, sources)
   })
 
-  it.each(['sse', 'union', 'factory', 'nested'] as const)(
-    'extracts actual named payloads from %s',
-    (name) => {
-      const contracts = discover(name)
-      const events = Object.values(contracts).flatMap((contract) => contract.sseEvents ?? [])
-      expect(events.length).toBeGreaterThan(0)
-      expect(
-        Object.values(contracts).every((contract) => contract.mediaType === 'text/event-stream'),
-      ).toBe(true)
-      const document = buildOpenApiDocument({
-        title: 'Protocol fixture',
-        responseContracts: contracts,
-      })
-      expect(document['x-unavailable-routes']).toEqual([])
-      const media = (document.paths['/events']!.get!.responses[200] as OpenApiResponse).content![
-        'text/event-stream'
-      ]!
-      expect(media.schema).toEqual({ type: 'string' })
-      expect(Object.keys(media['x-sse-events']!)).toEqual(
-        expect.arrayContaining(events.map((event) => event.eventName)),
-      )
-    },
-  )
+  it.each([
+    'sse',
+    'union',
+    'factory',
+    'nested',
+    'unrelated-write',
+    'named-sse',
+    'no-sse-context',
+  ] as const)('extracts actual named payloads from %s', (name) => {
+    const contracts = discover(name)
+    const events = Object.values(contracts).flatMap((contract) => contract.sseEvents ?? [])
+    expect(events.length).toBeGreaterThan(0)
+    expect(
+      Object.values(contracts).every((contract) => contract.mediaType === 'text/event-stream'),
+    ).toBe(true)
+    const document = buildOpenApiDocument({
+      title: 'Protocol fixture',
+      responseContracts: contracts,
+    })
+    expect(document['x-unavailable-routes']).toEqual([])
+    const media = (document.paths['/events']!.get!.responses[200] as OpenApiResponse).content![
+      'text/event-stream'
+    ]!
+    expect(media.schema).toEqual({ type: 'string' })
+    expect(Object.keys(media['x-sse-events']!)).toEqual(
+      expect.arrayContaining(events.map((event) => event.eventName)),
+    )
+  })
 
   it.each(
     [
@@ -179,6 +256,17 @@ describe('compiler-discovered protocol contracts', () => {
     expect(Object.keys(contracts)).toEqual(keys.filter((key) => key !== 'GET:/unrelated'))
   })
 
+  it('does not validate excluded protocol routes', () => {
+    for (const name of ['broad-name', 'dynamic-key', 'http-broad-status'] as const) {
+      const contracts = discoverApiResponseContracts(
+        matrix.program,
+        [matrix.sourceFile(name)],
+        new Set(['GET:/unrelated']),
+      )
+      expect(contracts).toEqual({})
+    }
+  })
+
   it('restricts branded HTTP variants to their exact requested key', () => {
     const contracts = discoverApiResponseContracts(
       matrix.program,
@@ -188,6 +276,18 @@ describe('compiler-discovered protocol contracts', () => {
     expect(Object.keys(contracts)).toEqual(['POST:/rpc#protocol-2'])
     expect(contracts['POST:/rpc#protocol-2']!.statusCodes).toEqual([202])
   })
+
+  it.each(['GET:/events/:eventId', 'GET:/events/:eventId#protocol-2'])(
+    'maps normalized requested protocol key %s',
+    (key) => {
+      const contracts = discoverApiResponseContracts(
+        matrix.program,
+        [matrix.sourceFile('parameter-sse')],
+        new Set([key]),
+      )
+      expect(Object.keys(contracts)).toEqual([key])
+    },
+  )
 
   it('validates the actual data shape rather than the framed string', () => {
     const events = Object.values(discover('sse')).flatMap((contract) => contract.sseEvents ?? [])
@@ -212,33 +312,38 @@ describe('compiler-discovered protocol contracts', () => {
     },
   )
 
-  it.each(['http', 'buffered', 'renamed-http-context'] as const)(
-    'extracts JSON200/batch/error, bodyless202 and JSON400 from %s',
-    (name) => {
-      const contracts = discover(name)
-      expect(Object.values(contracts).map((contract) => contract.statusCodes)).toEqual([
-        [200],
-        [202],
-        [400],
-      ])
-      expect(
-        Object.values(contracts).find((contract) => contract.statusCodes?.[0] === 400)
-          ?.includeDefaultError,
-      ).toBe(true)
-      const response = Object.values(contracts).find(
-        (contract) => contract.statusCodes?.[0] === 200,
-      )!
-      expect(validateResponseContract(response.schema, [{ id: 'batch' }])).toEqual([])
-      expect(validateResponseContract(response.schema, { id: null, error: { code: -1 } })).toEqual(
-        [],
-      )
-      const document = buildOpenApiDocument({ title: 'HTTP', responseContracts: contracts })
-      expect(document['x-unavailable-routes']).toEqual([])
-      expect(
-        (document.paths['/rpc']!.post!.responses[202] as OpenApiResponse).content,
-      ).toBeUndefined()
-    },
-  )
+  it.each([
+    'http',
+    'buffered',
+    'renamed-http-context',
+    'one-branch-http',
+    'branch-missing-else-http',
+    'block-read-http',
+    'dynamic-ternary-http',
+    'dynamic-logical-http',
+    'once-do-http',
+    'unbounded-for-http',
+    'dynamic-loop-http',
+  ] as const)('extracts JSON200/batch/error, bodyless202 and JSON400 from %s', (name) => {
+    const contracts = discover(name)
+    expect(Object.values(contracts).map((contract) => contract.statusCodes)).toEqual([
+      [200],
+      [202],
+      [400],
+    ])
+    expect(
+      Object.values(contracts).find((contract) => contract.statusCodes?.[0] === 400)
+        ?.includeDefaultError,
+    ).toBe(true)
+    const response = Object.values(contracts).find((contract) => contract.statusCodes?.[0] === 200)!
+    expect(validateResponseContract(response.schema, [{ id: 'batch' }])).toEqual([])
+    expect(validateResponseContract(response.schema, { id: null, error: { code: -1 } })).toEqual([])
+    const document = buildOpenApiDocument({ title: 'HTTP', responseContracts: contracts })
+    expect(document['x-unavailable-routes']).toEqual([])
+    expect(
+      (document.paths['/rpc']!.post!.responses[202] as OpenApiResponse).content,
+    ).toBeUndefined()
+  })
 
   it('retains an unrelated raw response as unavailable', () => {
     const contracts = discover('unknown-raw', true)
@@ -277,14 +382,41 @@ describe('compiler-discovered protocol contracts', () => {
     'shadowed-http-context',
     'http-dynamic-status',
     'no-http-context',
+    'uncalled-sse-function',
+    'uncalled-sse-arrow',
+    'dead-sse',
+    'renamed-sse-dynamic',
+    'dead-http',
+    'unreachable-http',
+    'renamed-http-raw',
+    'local-readable',
+    'computed-stream',
+    'dead-else-http',
+    'terminal-block-http',
+    'terminal-branches-http',
+    'false-while-http',
+    'false-for-http',
+    'break-http',
+    'continue-http',
+    'false-and-http',
+    'true-or-http',
+    'false-ternary-http',
+    'true-ternary-http',
+    'false-and-sse',
+    'generator-sse',
   ] as const)('rejects unsound HTTP metadata or emissions %s', (name) => {
     expect(() => discover(name)).toThrow()
     expect(Object.values(discover(name, true)).some((contract) => contract.unavailableReason)).toBe(
       true,
     )
   })
-  it('documents a literal SSE status without inventing a default 200', () => {
-    const contracts = discover('sse-created')
+  it.each([
+    'sse-created',
+    'renamed-sse-created',
+    'nested-sse-created',
+    'named-sse-created',
+  ] as const)('documents a literal SSE status for %s', (name) => {
+    const contracts = discover(name)
     expect(Object.values(contracts)[0]?.statusCodes).toEqual([201])
     const document = buildOpenApiDocument({ title: 'SSE created', responseContracts: contracts })
     expect(document.paths['/events']!.get!.responses[201]).toBeDefined()

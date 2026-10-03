@@ -34,6 +34,52 @@ function streamDocument(variants: ResponseContract[]) {
 }
 
 describe('protocol response documents', () => {
+  it('fails closed when a bodyless 400 also permits framework JSON errors', () => {
+    const doc = buildOpenApiDocument({
+      title: 'Protocol examples',
+      responseContracts: {
+        error: {
+          source: 'POST:/rpc',
+          method: 'POST',
+          routeTemplate: '/rpc',
+          statusCodes: [400],
+          bodyKind: 'none',
+          includeDefaultError: true,
+          schema: { root: { type: 'null' }, definitions: {} },
+        },
+      },
+    })
+    expect(doc['x-unavailable-routes']).toEqual(['POST:/rpc'])
+    expect(doc.paths['/rpc']!.post!['x-schema-unavailable-reason']).toContain(
+      'status 400 has both body and no-body variants',
+    )
+  })
+
+  it.each(['text/plain', 'application/problem+json'])(
+    'retains framework JSON errors beside an explicit 400 %s body',
+    (mediaType) => {
+      const doc = buildOpenApiDocument({
+        title: 'Protocol examples',
+        responseContracts: {
+          error: {
+            source: 'POST:/rpc',
+            method: 'POST',
+            routeTemplate: '/rpc',
+            statusCodes: [400],
+            mediaType,
+            includeDefaultError: true,
+            schema: { root: { type: 'string' }, definitions: {} },
+          },
+        },
+      })
+      expect((doc.paths['/rpc']!.post!.responses['400'] as OpenApiResponse).content).toEqual({
+        [mediaType]: { schema: { type: 'string' } },
+        'application/json': { schema: { $ref: '#/components/schemas/ErrorBody' } },
+      })
+      expect(doc['x-unavailable-routes']).toEqual([])
+    },
+  )
+
   it('renders the stream body as text and registers named event payload definitions', () => {
     const snapshot = {
       type: 'object',

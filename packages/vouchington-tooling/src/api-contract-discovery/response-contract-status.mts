@@ -29,34 +29,45 @@ export function responseStatusCodesForContract(contract: BackendResponseContract
  * and the route-wide map (keyed only on `method:routeTemplate`) can't tell two markers in the
  * same route apart when they're preceded by different statuses.
  */
-export function resolveEmissionStatus(call: ts.CallExpression): {
+export function resolveEmissionStatus(
+  call: ts.CallExpression,
+  matchesContext: (expression: ts.Expression) => boolean = (expression) =>
+    isContextMethod(expression, 'setStatus'),
+): {
   statusCodes?: readonly [number, ...number[]]
   statusKnowledge: 'default' | 'explicit' | 'unknown'
   unavailableReason?: string
 } {
-  if (isContextMethod(call.expression, 'setStatus')) return statusArgument(call.arguments[0])
+  if (matchesContext(call.expression)) return statusArgument(call.arguments[0])
   let statement: ts.Node = call
   while (!ts.isStatement(statement)) statement = statement.parent
-  return precedingStatus(statement as ts.Statement)
+  return precedingStatus(statement as ts.Statement, matchesContext)
 }
 
-function precedingStatus(statement: ts.Statement): ReturnType<typeof statusArgument> {
+function precedingStatus(
+  statement: ts.Statement,
+  matchesContext: (expression: ts.Expression) => boolean,
+): ReturnType<typeof statusArgument> {
   const block = statement.parent
   if (!ts.isBlock(block)) return { statusKnowledge: 'default' }
   const index = block.statements.indexOf(statement)
   for (let i = index - 1; i >= 0; i--) {
-    const status = statusStatement(block.statements[i]!)
+    const status = statusStatement(block.statements[i]!, matchesContext)
     if (status) return status
   }
   const enclosing = block.parent
-  return ts.isStatement(enclosing) ? precedingStatus(enclosing) : { statusKnowledge: 'default' }
+  return ts.isStatement(enclosing)
+    ? precedingStatus(enclosing, matchesContext)
+    : { statusKnowledge: 'default' }
 }
 
-function statusStatement(statement: ts.Statement): ReturnType<typeof statusArgument> | undefined {
+function statusStatement(
+  statement: ts.Statement,
+  matchesContext: (expression: ts.Expression) => boolean,
+): ReturnType<typeof statusArgument> | undefined {
   if (!ts.isExpressionStatement(statement)) return undefined
   const expression = statement.expression
-  if (!ts.isCallExpression(expression) || !isContextMethod(expression.expression, 'setStatus'))
-    return undefined
+  if (!ts.isCallExpression(expression) || !matchesContext(expression.expression)) return undefined
   return statusArgument(expression.arguments[0])
 }
 

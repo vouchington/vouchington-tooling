@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
@@ -42,9 +43,12 @@ export function discoverApiResponseContracts(
     handlerBindings,
     protocolContracts,
     options,
+    requestedKeys,
   )
-  for (const [key, contract] of protocolContracts)
-    if (!requestedKeys || requestedKeys.has(key)) contracts.set(key, contract)
+  for (const [key, contract] of protocolContracts) {
+    const requestedKey = requestedProtocolKey(key, contract, requestedKeys)
+    if (requestedKey) contracts.set(requestedKey, contract)
+  }
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {

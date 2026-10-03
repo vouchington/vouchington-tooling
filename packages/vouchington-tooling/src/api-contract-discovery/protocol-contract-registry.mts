@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { extractContractSchema } from '../contract-schema/index.mts'
 import { extractHttpVariants, extractSseEvents } from './protocol-contract-extraction.mts'
 import { associateHttpResponse } from './protocol-http-association.mts'
+import { protocolBindingRequested } from './protocol-requested-keys.mts'
 import { protocolMarker } from './protocol-marker-analysis.mts'
 import {
   registerRouteContract,
@@ -15,7 +16,7 @@ import {
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
-import { resolveEmissionStatus } from './response-contract-status.mts'
+import { sseEmission, writeReceiver } from './protocol-sse-emission.mts'
 
 type PendingHttp = {
   call: ts.CallExpression
@@ -31,10 +32,12 @@ export function discoverProtocolContracts(
   bindings: HandlerBindings,
   contracts: Map<string, BackendResponseContract>,
   options: DiscoverApiResponseContractsOptions | undefined,
+  requestedKeys?: ReadonlySet<string>,
 ): Set<ts.CallExpression> {
+  if (requestedKeys?.size === 0) return new Set()
   const pending: PendingHttp[] = []
   const framedWrites = new Set<ts.CallExpression>()
-  const sseBindings = new Map<string, RouteBinding>()
+  const sseBindings = new Map<string, Set<ts.Symbol>>()
   for (const file of sourceFiles)
     visit(file, (node) => {
       if (!ts.isCallExpression(node)) return
@@ -42,6 +45,7 @@ export function discoverProtocolContracts(
       if (!marker) return
       const binding = enclosingRouteBinding(node, checker, bindings)
       if (!binding) throw contractError(file, node, `${marker} must be inside an app.route handler`)
+      if (!protocolBindingRequested(binding, requestedKeys)) return
       const keyNode = node.arguments[0]
       if (!keyNode || !ts.isStringLiteral(keyNode))
         throw contractError(file, node, `${marker} requires a literal contract key`)
@@ -57,22 +61,13 @@ export function discoverProtocolContracts(
         const body = node.arguments[1]
         if (!body) throw new Error(`${marker} requires a protocol body`)
         if (marker === 'apiSseFrame') {
-          const write = node.parent
-          if (
-            !ts.isCallExpression(write) ||
-            !ts.isPropertyAccessExpression(write.expression) ||
-            write.expression.name.text !== 'write' ||
-            write.arguments[0] !== node
-          )
-            throw new Error('apiSseFrame must be the frame written by its route')
+          const { write, receiver, status } = sseEmission(node, checker)
           const sseEvents = extractSseEvents(
             checker.getTypeAtLocation(body),
             checker,
             location,
             options,
           )
-          const status = resolveEmissionStatus(write)
-          if (status.unavailableReason) throw new Error(status.unavailableReason)
           contracts.set(nextProtocolKey(contracts, keyNode.text), {
             ...extractContractSchema(checker.getStringType(), checker, location, options),
             ...binding,
@@ -83,7 +78,9 @@ export function discoverProtocolContracts(
             sseEvents,
           })
           framedWrites.add(write)
-          sseBindings.set(prefix, binding)
+          const receivers = sseBindings.get(prefix) ?? new Set<ts.Symbol>()
+          receivers.add(receiver)
+          sseBindings.set(prefix, receivers)
         } else {
           const declaration = node.parent
           const symbol =
@@ -157,7 +154,7 @@ export function discoverProtocolContracts(
         return
       const binding = enclosingRouteBinding(node, checker, bindings)
       const key = binding && `${binding.method}:${binding.routeTemplate}`
-      if (key && sseBindings.has(key))
+      if (key && sseBindings.get(key)?.has(writeReceiver(node, checker)!))
         unavailable(
           contracts,
           key,

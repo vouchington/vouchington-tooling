@@ -40,6 +40,7 @@ export function buildOperationResponse(
         const reasons = bodyless.get(status) ?? []
         if (converted.failureReason) reasons.push(converted.failureReason)
         bodyless.set(status, reasons)
+        if (contract.includeDefaultError) addDefaultError(content, status, registry)
         continue
       }
       const mediaType = mediaTypeFor(contract)
@@ -58,12 +59,11 @@ export function buildOperationResponse(
       )
       bucket.failureReasons.push(...events.failureReasons)
       if (converted.failureReason) bucket.failureReasons.push(converted.failureReason)
-      if (contract.includeDefaultError && mediaType === 'application/json')
-        bucket.schemas.push({ $ref: `#/components/schemas/${registry.refName('ErrorBody')}` })
       for (const [name, schemas] of events.schemas)
         bucket.sseEvents.set(name, [...(bucket.sseEvents.get(name) ?? []), ...schemas])
       byMedia.set(mediaType, bucket)
       content.set(status, byMedia)
+      if (contract.includeDefaultError) addDefaultError(content, status, registry)
     }
   }
 
@@ -84,6 +84,22 @@ export function buildOperationResponse(
     unavailable: reasons.length > 0,
     ...(reasons.length > 0 ? { unavailableReason: reasons.join('; ') } : {}),
   }
+}
+
+function addDefaultError(
+  content: Map<number, Map<string, ResponseBucket>>,
+  status: number,
+  registry: ComponentRegistry,
+): void {
+  const byMedia = content.get(status) ?? new Map<string, ResponseBucket>()
+  const bucket: ResponseBucket = byMedia.get('application/json') ?? {
+    schemas: [],
+    failureReasons: [],
+    sseEvents: new Map(),
+  }
+  bucket.schemas.push({ $ref: `#/components/schemas/${registry.refName('ErrorBody')}` })
+  byMedia.set('application/json', bucket)
+  content.set(status, byMedia)
 }
 
 function renderStatusResponse(

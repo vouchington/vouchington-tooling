@@ -31,10 +31,8 @@ export function httpEmissionKind(
   )
     return 'content'
   const symbol = checker.getSymbolAtLocation(method.expression)
-  const resolved =
-    symbol && (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol)
   return method.name.text === 'from' &&
-    resolved?.name === 'Readable' &&
+    isNodeReadable(symbol) &&
     expression.arguments[0] &&
     responseProperty(expression.arguments[0], response, 'body', checker)
     ? 'content'
@@ -91,4 +89,18 @@ function emptyBodyBranch(node: ts.Node, response: ts.Symbol, checker: ts.TypeChe
     current = parent
   }
   return false
+}
+
+function isNodeReadable(symbol: ts.Symbol | undefined): boolean {
+  return !!symbol?.declarations?.some((declaration) => {
+    if (!ts.isImportSpecifier(declaration)) return false
+    const imported = declaration.propertyName ?? declaration.name
+    const statement = declaration.parent.parent.parent
+    return (
+      imported.text === 'Readable' &&
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === 'node:stream'
+    )
+  })
 }
