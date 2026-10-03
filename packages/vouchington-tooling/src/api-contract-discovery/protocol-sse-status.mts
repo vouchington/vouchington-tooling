@@ -58,6 +58,8 @@ export function resolveSseStatus(
   const codes = [...new Set(statuses.flatMap((status) => status.statusCodes ?? [200]))].toSorted(
     (a, b) => a - b,
   ) as [number, ...number[]]
+  if (codes.some((code) => !Number.isInteger(code) || code < 100 || code > 599))
+    throw new Error('SSE status must be an integer from 100 through 599')
   return { statusKnowledge: 'explicit', statusCodes: codes }
 }
 

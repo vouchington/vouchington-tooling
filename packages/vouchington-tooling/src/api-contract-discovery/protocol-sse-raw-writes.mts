@@ -4,6 +4,7 @@ import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import {
   enclosingRouteBinding,
   visit,
@@ -18,7 +19,7 @@ import {
 
 export type SseRouteWrites = { receivers: WriteReceiver[]; keys: string[] }
 
-/** Reports only executable unmarked writes to a selected frame's stream. */
+/** Reports unmarked writes on executable or opaque escaping paths to a selected frame's stream. */
 export function rejectRawSseWrites(
   files: readonly ts.SourceFile[],
   checker: ts.TypeChecker,
@@ -41,7 +42,8 @@ export function rejectRawSseWrites(
       !potentiallyExecuted(node)
     )
       continue
-    const proven = executableProtocolPath(node, checker)
+    const proven =
+      executableProtocolPath(node, checker) || opaqueProtocolCallbackPath(node, checker)
     const helpers = helperBindings(node, calls, checker, bindings)
     if (!proven && !helpers.length) continue
     const receiver = expressionReceiver(access.receiver, checker)

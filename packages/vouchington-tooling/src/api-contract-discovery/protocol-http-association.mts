@@ -7,6 +7,16 @@ import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unsupportedContextAlias } from './protocol-context-alias.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { visit } from './response-contract-route-analysis.mts'
+import { isSupportedProtocolCallback } from './protocol-callback-invocation.mts'
+import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
+
+const responseMethods = new Set([
+  'setStatus',
+  'pipeline',
+  'json',
+  'response.buffer',
+  'response.empty',
+])
 
 export function associateHttpResponse(
   call: ts.CallExpression,
@@ -22,6 +32,8 @@ export function associateHttpResponse(
     throw new Error('HTTP response must be inside a supported executable handler callback')
   const emissions = new Map<ts.CallExpression, 'content' | 'none' | 'status'>()
   visit(handler, (node) => {
+    if (ts.isCallExpression(node) && opaqueHttpResponse(node, checker, context))
+      throw new Error('HTTP response context escapes through an opaque callback')
     if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
@@ -50,9 +62,7 @@ export function associateHttpResponse(
     const kind = httpEmissionKind(node, response, context, checker)
     if (kind) emissions.set(node, kind)
     else if (
-      ['setStatus', 'pipeline', 'json', 'response.buffer', 'response.empty'].includes(
-        contextResponseMethod(node.expression, context, checker, true) ?? '',
-      )
+      responseMethods.has(contextResponseMethod(node.expression, context, checker, true) ?? '')
     )
       if (
         siblings &&
@@ -64,4 +74,31 @@ export function associateHttpResponse(
       else throw new Error('HTTP response has an unrelated status or body emission')
   })
   return emissions
+}
+
+/** Opaque callbacks may emit through an independently proven handler's context. */
+export function opaqueHttpResponse(
+  call: ts.CallExpression,
+  checker: ts.TypeChecker,
+  context?: ts.Symbol,
+): boolean {
+  if (context)
+    return (
+      responseMethods.has(contextResponseMethod(call.expression, context, checker, true) ?? '') &&
+      opaqueProtocolCallbackPath(call, checker)
+    )
+  let handler = enclosingFunction(call)
+  while (handler) {
+    const name = runtimeParameters(handler)[0]?.name
+    const symbol = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
+    if (
+      symbol &&
+      responseMethods.has(contextResponseMethod(call.expression, symbol, checker, true) ?? '') &&
+      isSupportedProtocolCallback(handler, checker) &&
+      executableProtocolPath(handler, checker)
+    )
+      return opaqueProtocolCallbackPath(call, checker)
+    handler = enclosingFunction(handler)
+  }
+  return false
 }

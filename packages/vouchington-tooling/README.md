@@ -490,12 +490,16 @@ request, query, and header markers also require callback invocation before route
 Broad names, unknown root payloads, executable unmarked frames through stream aliases, and
 conditional or mutable-context status changes fail closed. Called SSE helpers inherit the proven
 request context and its status at the invocation; mutually exclusive complete status branches retain
-their separate responses. Ambiguous caller contexts fail closed. A raw stream failure invalidates all
+their separate responses. Explicit SSE statuses must be integers from 100 through 599.
+Ambiguous caller contexts fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
 are matched to the original stream, including proven helper-parameter forwarding and literal bracket
 methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
-stream `end` calls are raw emissions; empty terminal cleanup is preserved.
+stream `end` calls are raw emissions; empty terminal cleanup is preserved. A callback that captures
+the route's stream or HTTP context and escapes to a callee without a concrete implementation can
+write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
+dead branches, and implemented helpers that ignore their callback preserve the proven contracts.
 
 Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
 carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
