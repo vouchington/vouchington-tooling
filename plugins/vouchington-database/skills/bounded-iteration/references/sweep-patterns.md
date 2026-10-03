@@ -81,7 +81,7 @@ parent id, `WHERE account_id = $1`, for the one account it was started for.
 ## High-water-mark window with an overlap
 
 An export reads `invoices` added since the last sweep. The cursor row holds the position and the
-sweep's fixed end:
+sweep's fixed end, and the job seeds its own row:
 
 ```sql
 CREATE TABLE invoice_export_cursors (
@@ -89,6 +89,8 @@ CREATE TABLE invoice_export_cursors (
   cursor_invoice_id uuid,
   sweep_upper_bound_invoice_id uuid
 );
+
+INSERT INTO invoice_export_cursors DEFAULT VALUES ON CONFLICT DO NOTHING;
 ```
 
 A UUIDv7 is assigned at insert, not commit, so a row below the last sweep's end can commit after
@@ -135,9 +137,12 @@ WHERE is_singleton
 A short batch ends the sweep: set the cursor to the sweep's end the same way, and the next run
 starts a new sweep. Rows in the overlap are read twice, so the export must be idempotent.
 
-A time position works the same way. Fix the window's end when the window opens, keep a composite
-`(time, id)` keyset position inside it, and read
-`WHERE (occurred_at, id) > ($1, $2) AND occurred_at <= $3 ORDER BY occurred_at, id`, where `$3` is
+A time position works the same way on a column the database sets at insert, such as
+`received_at timestamptz NOT NULL DEFAULT now()`, with the same overlap rule. Never use a business
+time such as `occurred_at`: a late-arriving row carries an old timestamp and falls behind every
+later window. Fix the window's end when the window opens, keep a composite `(time, id)` keyset
+position inside it, and read
+`WHERE (received_at, id) > ($1, $2) AND received_at <= $3 ORDER BY received_at, id`, where `$3` is
 the window's end. Rows that share a timestamp are neither skipped nor repeated, and new arrivals
 wait for the next window. Advance `<verb>_through_at` to the window's end only after the window is
 drained, and start the next window an overlap earlier.
@@ -314,6 +319,11 @@ FOR UPDATE SKIP LOCKED;
 
 EXPLAIN (ANALYZE, BUFFERS) EXECUTE claim_due (200);
 ```
+
+Under contention, `SKIP LOCKED` passes over rows other claimers hold, and those rows sit under the
+`Limit`, so the scan reads the cap plus the rows concurrent claims hold. That stays bounded by the
+number of workers times the batch size when claims are short, so keep the claim transaction to the
+claim statement, and check the index scan's actual rows while several workers claim at once.
 
 ## Anti-patterns
 
