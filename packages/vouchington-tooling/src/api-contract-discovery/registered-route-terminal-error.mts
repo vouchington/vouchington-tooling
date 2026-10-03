@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 
+import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { handlerNodes, type HandlerProof } from './registered-route-handler-analysis.mts'
 
 /** Proves a terminal 405 on the handler's own context, rather than finding a nested throw. */
@@ -18,7 +19,7 @@ export function isTerminal405Handler(
     !node.body
   )
     return false
-  const context = node.parameters[0]?.name
+  const context = runtimeParameters(node)[0]?.name
   const symbol =
     context && ts.isIdentifier(context) ? checker.getSymbolAtLocation(context) : undefined
   return !!symbol && terminalBody(node, symbol, checker, new Set(), true, bindings)
@@ -109,7 +110,7 @@ function terminalCall(
         (argument) =>
           ts.isIdentifier(argument) && checker.getSymbolAtLocation(argument) === context,
       )
-      const parameter = implementation.parameters[index]?.name
+      const parameter = runtimeParameters(implementation)[index]?.name
       const symbol =
         parameter && ts.isIdentifier(parameter) ? checker.getSymbolAtLocation(parameter) : undefined
       return !!symbol && terminalBody(implementation, symbol, checker, active, returned, captured)

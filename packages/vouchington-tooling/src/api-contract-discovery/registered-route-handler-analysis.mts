@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { returnedExpressions, returnsOnEveryPath } from './registered-route-factory-returns.mts'
+import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 
 export type HandlerProof = {
@@ -46,11 +47,13 @@ export function handlerNodes(
             implementation.modifiers?.some(
               (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
             ) ||
-            implementation.parameters.some((parameter) => hasBindingWrite(parameter, checker)))
+            runtimeParameters(implementation).some((parameter) =>
+              hasBindingWrite(parameter, checker),
+            ))
         )
           return []
         const bindings = new Map(parameterBindings)
-        implementation.parameters.forEach((parameter, index) => {
+        runtimeParameters(implementation).forEach((parameter, index) => {
           const callArgument = argument.arguments[index]
           const symbol = checker.getSymbolAtLocation(parameter.name)
           if (callArgument && symbol) bindings.set(symbol, callArgument)

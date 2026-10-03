@@ -17,6 +17,12 @@ const preamble = `declare const app: any
 const handler = (body: string) => `${preamble}
   app.route('/api/example').get((ctx: Ctx) => { ${body} })`
 const sources = {
+  'this-factory-success': `${preamble}type Handler=(ctx:Ctx)=>void;const success:Handler=ctx=>ctx.json({ok:true});const deny:Handler=ctx=>ctx.throw(405);
+    function choose(this:void,first:Handler,second:Handler){return first};app.route('/api/example').get(choose(success,deny))`,
+  'this-factory-deny': `${preamble}type Handler=(ctx:Ctx)=>void;const success:Handler=ctx=>ctx.json({ok:true});const deny:Handler=ctx=>ctx.throw(405);
+    function choose(this:void,first:Handler,second:Handler){return first};app.route('/api/example').get(choose(deny,success))`,
+  'this-handler': `${preamble}function deny(this:void,ctx:Ctx){ctx.throw(405)};app.route('/api/example').get(deny)`,
+  'this-helper': `${preamble}function deny(this:void,ctx:Ctx){ctx.throw(405)};app.route('/api/example').get((ctx:Ctx)=>deny(ctx))`,
   direct: handler('ctx.throw(405)'),
   renamed: `${preamble} app.route('/api/example').get((context: Ctx) => context.throw(405))`,
   helper: `${preamble}
@@ -153,6 +159,9 @@ describe('terminal error-only route proof', () => {
   })
 
   it.each([
+    'this-factory-deny',
+    'this-handler',
+    'this-helper',
     'direct',
     'renamed',
     'helper',
@@ -176,6 +185,7 @@ describe('terminal error-only route proof', () => {
   })
 
   it.each([
+    'this-factory-success',
     'conditional',
     'caught',
     'fallthrough',

@@ -14,7 +14,7 @@ export function objectSchema(
   context: ExtractionContext,
   schemaForType: SchemaForType,
 ): ContractSchemaNode {
-  const properties: Record<string, { required: boolean; schema: ContractSchemaNode }> = {}
+  const properties = new Map<string, { required: boolean; schema: ContractSchemaNode }>()
   for (const property of context.checker.getPropertiesOfType(type).toSorted(compareSymbols)) {
     const declaration = property.valueDeclaration
     /* v8 ignore start */
@@ -24,10 +24,10 @@ export function objectSchema(
     if (!propertyType) throw new Error(`Property "${property.name}" has no type`)
     /* v8 ignore stop */
     try {
-      properties[property.name] = {
+      properties.set(property.name, {
         required: !(property.flags & ts.SymbolFlags.Optional),
         schema: schemaForType(propertyType, context),
-      }
+      })
     } catch (error) {
       throw new Error(`Property "${property.name}": ${(error as Error).message}`, { cause: error })
     }
@@ -35,7 +35,7 @@ export function objectSchema(
   const stringIndex = context.checker.getIndexInfoOfType(type, ts.IndexKind.String)
   return {
     type: 'object',
-    properties,
+    properties: Object.fromEntries(properties),
     additionalProperties:
       stringIndex && !(stringIndex.type.flags & ts.TypeFlags.Never)
         ? schemaForType(stringIndex.type, context)
