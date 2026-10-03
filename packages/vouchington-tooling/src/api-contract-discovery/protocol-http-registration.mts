@@ -21,9 +21,9 @@ export function registerHttpProtocols(
   reject: (response: PendingHttp, error: unknown) => void,
 ): Set<ts.CallExpression> {
   const covered = new Set<ts.CallExpression>()
-  const groups = new Map<ts.Node, PendingHttp[]>()
+  const groups = new Map<ts.Node | undefined, PendingHttp[]>()
   for (const response of pending) {
-    const handler = enclosingFunction(response.call) ?? response.call
+    const handler = enclosingFunction(response.call)
     const group = groups.get(handler) ?? []
     group.push(response)
     groups.set(handler, group)

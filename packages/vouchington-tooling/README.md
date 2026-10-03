@@ -491,7 +491,8 @@ Broad names, unknown root payloads, executable unmarked frames through stream al
 conditional or mutable-context status changes fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
-are matched to the original stream, including proven helper-parameter forwarding. Byte-bearing
+are matched to the original stream, including proven helper-parameter forwarding and literal bracket
+methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
 stream `end` calls are raw emissions; empty terminal cleanup is preserved.
 
 Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response

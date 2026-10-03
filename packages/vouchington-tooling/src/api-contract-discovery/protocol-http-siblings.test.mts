@@ -46,6 +46,8 @@ const sources = {
   'unrelated-route': `${route(first, second)}
     app.route('/other').post((ctx:any)=>{const unselected=apiOpenApiHttpResponse('POST:/other',unknownPayload);
     ctx.setStatus(unselected.status);ctx.pipeline(unselected.body)})`,
+  'outside-handler': `${preamble}const response=apiOpenApiHttpResponse('POST:/rpc',json);
+    app.route('/rpc').post((ctx:any)=>{ctx.setStatus(response.status);ctx.pipeline(response.body)})`,
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
 function discover(name: keyof typeof sources, keys?: readonly string[], lenient = false) {
@@ -118,5 +120,11 @@ describe('coordinated opaque HTTP sibling proof', () => {
     expect(discover('unrelated-route', ['POST:/absent'])).toEqual({})
     expect(discover('unrelated-route', [])).toEqual({})
     expect(discover('branches', ['POST:/rpc#absent'])).toEqual({})
+  })
+  it('rejects a marker outside its registered handler', () => {
+    expect(() => discover('outside-handler')).toThrow('must be inside an app.route handler')
+    expect(() => discover('outside-handler', undefined, true)).toThrow(
+      'must be inside an app.route handler',
+    )
   })
 })

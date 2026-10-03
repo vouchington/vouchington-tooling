@@ -2,7 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
-import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import {
   enclosingRouteBinding,
@@ -33,17 +33,18 @@ export function rejectRawSseWrites(
       if (ts.isCallExpression(node)) calls.push(node)
     })
   for (const node of calls) {
+    const access = writeAccess(node.expression)
     if (
       framedWrites.has(node) ||
-      !ts.isPropertyAccessExpression(node.expression) ||
-      !hasRawBytes(node, checker) ||
+      !access ||
+      !hasRawBytes(node, access.method, checker) ||
       !potentiallyExecuted(node)
     )
       continue
     const proven = executableProtocolPath(node, checker)
     const helpers = helperBindings(node, calls, checker, bindings)
     if (!proven && !helpers.length) continue
-    const receiver = expressionReceiver(node.expression.expression, checker)
+    const receiver = expressionReceiver(access.receiver, checker)
     const binding = proven ? enclosingRouteBinding(node, checker, bindings, false) : undefined
     const candidates = binding ? [binding] : helpers
     for (const candidate of candidates) {
@@ -69,9 +70,25 @@ export function rejectRawSseWrites(
   }
 }
 
-function hasRawBytes(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
-  const method = (call.expression as ts.PropertyAccessExpression).name.text
-  if (method === 'write') return true
+function writeAccess(expression: ts.Expression) {
+  expression = unwrapExpression(expression)
+  if (ts.isPropertyAccessExpression(expression))
+    return { receiver: expression.expression, method: expression.name.text }
+  if (!ts.isElementAccessExpression(expression)) return undefined
+  const method = unwrapExpression(expression.argumentExpression)
+  return {
+    receiver: expression.expression,
+    method: ts.isStringLiteralLike(method) ? method.text : undefined,
+  }
+}
+
+function hasRawBytes(
+  call: ts.CallExpression,
+  method: string | undefined,
+  checker: ts.TypeChecker,
+): boolean {
+  // An unsupported computed method may emit bytes on this receiver.
+  if (method === undefined || method === 'write') return true
   if (method !== 'end' || !call.arguments[0]) return false
   const type = checker.getTypeAtLocation(call.arguments[0])
   return (

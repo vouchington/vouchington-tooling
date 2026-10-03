@@ -47,6 +47,15 @@ const sources = {
   'end-other': route(`other.end('log')`),
   'end-helper': route(`function end(output:typeof stream){output.end('raw')}end(stream)`),
   'end-helper-other': route(`function end(output:typeof stream){output.end('log')}end(other)`),
+  'bracket-write': route(`stream['write']('raw')`),
+  'bracket-end': route(`stream['end']('raw')`),
+  'bracket-template': route('stream[`write`](`raw`)'),
+  'bracket-wrapped': route(`stream[('write' as const)]('raw')`),
+  'bracket-helper': route(`function raw(output:typeof stream){output['write']('raw')}raw(stream)`),
+  'bracket-dynamic': route(`const method=Math.random()>0.5?'write':'end';stream[method]('raw')`),
+  'bracket-empty-end': route(`stream['end']()`),
+  'bracket-callback-end': route(`stream['end'](()=>{})`),
+  'bracket-other': route(`other['write']('log')`),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
 beforeAll(() => {
@@ -79,6 +88,12 @@ it.each([
   'end-string',
   'end-bytes',
   'end-helper',
+  'bracket-write',
+  'bracket-end',
+  'bracket-template',
+  'bracket-wrapped',
+  'bracket-helper',
+  'bracket-dynamic',
 ] as const)('rejects extra bytes in %s', (name) => {
   expect(() => discover(name)).toThrow('unmarked frame')
   expect(discover(name, true)['GET:/events']?.unavailableReason).toContain('unmarked frame')
@@ -96,6 +111,9 @@ it.each([
   'end-callback',
   'end-other',
   'end-helper-other',
+  'bracket-empty-end',
+  'bracket-callback-end',
+  'bracket-other',
 ] as const)('preserves framed writes in %s', (name) => {
   const contracts = discover(name)
   expect(Object.keys(contracts)).toEqual(['GET:/events'])
