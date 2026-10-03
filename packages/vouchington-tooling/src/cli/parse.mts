@@ -74,6 +74,7 @@ export type ScriptCommand =
   | 'ghcr-package-retention'
   | 'harness-admission-lane'
   | 'harness-assert-gates'
+  | 'gha-collaborator-trust'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'gha-output',
@@ -97,6 +98,7 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'ghcr-package-retention',
   'harness-admission-lane',
   'harness-assert-gates',
+  'gha-collaborator-trust',
 ])
 
 export function parseCli(argv: readonly string[]): ParsedCli {

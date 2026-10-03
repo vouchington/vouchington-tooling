@@ -272,6 +272,11 @@ describe('parseCli', () => {
       command: 'harness-assert-gates',
       args: ['GATE'],
     })
+    expect(parseCli(['node', 'vouchington', 'gha-collaborator-trust', 'owner/repo'])).toEqual({
+      kind: 'script',
+      command: 'gha-collaborator-trust',
+      args: ['owner/repo'],
+    })
   })
 
   it('parses http-origin flags', () => {
