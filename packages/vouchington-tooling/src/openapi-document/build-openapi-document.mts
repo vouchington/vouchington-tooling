@@ -1,6 +1,7 @@
 import { queryParameters } from './build-openapi-query.mts'
 import { buildOperationRequestBody } from './build-openapi-request.mts'
 import { buildOperationResponse } from './build-openapi-response.mts'
+import { retainCatalogSseResponse } from './build-openapi-catalog-sse.mts'
 import { createComponentRegistry } from './component-registry.mts'
 import {
   responseStatusCodesForContract,
@@ -167,9 +168,15 @@ function renderOperation(
   variants: ResponseContract[] | undefined,
   registry: ReturnType<typeof createComponentRegistry>,
 ) {
-  if (catalogRoute?.kind === 'sse' || catalogRoute?.kind === 'fixed-no-content')
+  if (catalogRoute?.kind === 'fixed-no-content')
     return catalogResponse(catalogRoute.kind, catalogRoute.fixedStatus)
-  if (variants) return buildOperationResponse(variants, registry)
+  if (variants)
+    return retainCatalogSseResponse(
+      catalogRoute?.kind,
+      variants,
+      buildOperationResponse(variants, registry),
+    )
+  if (catalogRoute?.kind === 'sse') return catalogResponse('sse')
   if (catalogRoute?.kind === 'error-only') return catalogResponse('error-only')
   return catalogResponse('ordinary')
 }

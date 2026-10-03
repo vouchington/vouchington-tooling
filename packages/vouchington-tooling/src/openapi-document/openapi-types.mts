@@ -34,7 +34,13 @@ export type OpenApiParameter =
 
 export type OpenApiResponse = {
   description: string
-  content?: Record<string, { schema: OpenApiSchema }>
+  content?: Record<
+    string,
+    {
+      schema: OpenApiSchema
+      'x-sse-events'?: Record<string, { dataSchema: OpenApiSchema }>
+    }
+  >
   'x-schema-unavailable'?: true
   'x-schema-unavailable-reason'?: string
 }

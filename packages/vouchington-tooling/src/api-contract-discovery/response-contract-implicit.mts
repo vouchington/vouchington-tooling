@@ -25,6 +25,7 @@ import {
   type HandlerBindings,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
+import { opaqueHttpResponse, unsupportedContextResponse } from './protocol-http-association.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 export function discoverImplicitContract(
@@ -36,10 +37,20 @@ export function discoverImplicitContract(
   requestedKeys: ReadonlySet<string> | undefined,
   options: DiscoverApiResponseContractsOptions | undefined,
 ): void {
-  const binding = enclosingRouteBinding(call, checker, handlerBindings)
+  const opaqueResponse = opaqueHttpResponse(call, checker)
+  const binding = enclosingRouteBinding(call, checker, handlerBindings, !opaqueResponse)
   if (!binding) return
   const key = requestedKeyForBinding(binding, requestedKeys)
   if (!key) return
+
+  const mutableResponse = unsupportedContextResponse(call, checker)
+  if (opaqueResponse || mutableResponse) {
+    markBufferedRouteUnavailable(contracts, key, binding, sourceLocation(sourceFile, call))
+    if (mutableResponse)
+      contracts.get(key)!.unavailableReason =
+        'route emits a response through a mutable context wrapper whose status or body is not statically determinable'
+    return
+  }
 
   const body = responseBodyExpression(call)
   if (body) {

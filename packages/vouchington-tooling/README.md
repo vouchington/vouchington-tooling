@@ -476,6 +476,50 @@ fallthrough, and callback-only throws do not prove an error-only route. Empty `n
 render as arrays with no items, and `Record<string, never>` renders as a closed empty object.
 Standalone `never` and `any` remain unsupported contracts.
 
+Caller-owned `apiSseFrame(key, { event, data })` markers expose literal event names and concrete
+payloads from the frames actually written by a route, including callbacks passed to a handler
+factory. SSE responses keep a string body schema and describe each payload under the media
+type's `x-sse-events` map. Callback arguments require a concrete helper invocation path; ignored,
+declaration-only, deferred, or rewritten callbacks fail closed. Callback options passed to a callee
+without a concrete implementation also fail closed. Factory callbacks must execute from the returned request handler; registration-time invocations do not
+prove a request emission. Compiler-resolved platform timers
+and Promise executors supply invocation paths using the caller Program's actual standard-library
+identities; shadowed, custom, or reassigned platform APIs do not. Fluent route registrations retain their method. Stable named
+handlers and called local helpers are followed within their declaring source file. Ordinary response,
+request, query, and header markers also require callback invocation before route attribution.
+Broad names, unknown root payloads, executable unmarked frames through stream aliases, and
+conditional or mutable-context status changes fail closed. Called SSE helpers inherit the proven
+request context and its status at the invocation; mutually exclusive complete status branches retain
+their separate responses. Explicit SSE statuses must be integers from 100 through 599.
+Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
+Ambiguous caller contexts fail closed. A raw stream failure invalidates all
+selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
+receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
+are matched to the original stream, including proven helper-parameter forwarding and literal bracket
+methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
+stream `end` calls are raw emissions; empty terminal cleanup is preserved. A callback that captures
+the route's stream or HTTP context and escapes to a callee without a concrete implementation can
+write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
+dead branches, and implemented helpers that ignore their callback preserve the proven contracts.
+Cataloged SSE routes with only extracted non-SSE variants retain an unavailable event-stream
+possibility alongside those responses until the extracted variants describe the stream.
+
+Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
+carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
+`status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
+the marked variable's status and body emissions without reading or replacing response bytes.
+A status setter must dominate each body emission, including separate branches; constant context
+aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
+and unrelated raw emissions
+remain unavailable. Separate branded response branches are checked together, and the nearest
+proven status setter for each body must belong to that response. Observed content and bodyless
+emissions must match the complete metadata union, including an empty response in the `else` branch
+of a positive body check. Exact requested protocol rows are selected before
+other payloads, media types, or statuses are validated. In lenient mode, incomplete marker evidence
+keeps every selected sibling unavailable. Explicit 400 content variants also include the framework's
+JSON error schema independently of their own media type. Explicit bodyless 400 metadata also
+retains that framework JSON possibility and fails closed on the conflicting body kinds.
+
 Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
 main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
 update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct
