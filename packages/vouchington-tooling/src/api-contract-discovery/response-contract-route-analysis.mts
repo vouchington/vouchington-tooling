@@ -45,7 +45,14 @@ export function enclosingRouteBinding(
   handlerBindings: HandlerBindings,
 ): RouteBinding | undefined {
   let current: ts.Node | undefined = node
+  let insideHandlerFunction = false
   while (current) {
+    if (ts.isFunctionLike(current)) insideHandlerFunction = true
+    if (insideHandlerFunction && ts.isCallExpression(current)) {
+      const method = propertyName(current.expression)?.toUpperCase()
+      const routeTemplate = routeTemplateFromExpression(current.expression)
+      if (method && HTTP_METHODS.has(method) && routeTemplate) return { method, routeTemplate }
+    }
     if (isFunctionLike(current) && ts.isCallExpression(current.parent)) {
       const handlerCall = current.parent
       const method = propertyName(handlerCall.expression)?.toUpperCase()

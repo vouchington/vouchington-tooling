@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
 import {
@@ -34,6 +35,13 @@ export function discoverApiResponseContracts(
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendResponseContract>()
   const handlerBindings = collectHandlerBindings(sourceFiles, checker)
+  const protocolEmissions = discoverProtocolContracts(
+    sourceFiles,
+    checker,
+    handlerBindings,
+    contracts,
+    options,
+  )
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
@@ -86,7 +94,12 @@ export function discoverApiResponseContracts(
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
-      if (!ts.isCallExpression(node) || responseMarker(node.expression)) return
+      if (
+        !ts.isCallExpression(node) ||
+        responseMarker(node.expression) ||
+        protocolEmissions.has(node)
+      )
+        return
       discoverImplicitContract(
         node,
         checker,

@@ -1,6 +1,11 @@
 import { STATUS_CODES } from 'node:http'
 
 import type { ComponentRegistry } from './component-registry.mts'
+import {
+  collectSseEventSchemas,
+  renderSseEvents,
+  type SseEventSchemas,
+} from './build-openapi-sse-events.mts'
 import { nodeToOpenApi } from './contract-schema-to-openapi.mts'
 import { responseStatusCodesForContract, type ResponseContract } from './operation-types.mts'
 import type { OpenApiResponse, OpenApiResponseOrRef, OpenApiSchema } from './openapi-types.mts'
@@ -8,6 +13,7 @@ import type { OpenApiResponse, OpenApiResponseOrRef, OpenApiSchema } from './ope
 type ResponseBucket = {
   schemas: OpenApiSchema[]
   failureReasons: string[]
+  sseEvents: SseEventSchemas
 }
 
 export function buildOperationResponse(
@@ -24,6 +30,8 @@ export function buildOperationResponse(
 
   for (const contract of variants) {
     const converted = convertContract(contract, registry)
+    const events = collectSseEventSchemas(contract, registry)
+    operationFailures.push(...events.failureReasons)
     if (converted.failureReason) operationFailures.push(converted.failureReason)
     if (contract.statusKnowledge === 'unknown' && !converted.failureReason)
       operationFailures.push('response status is not statically known')
@@ -40,9 +48,20 @@ export function buildOperationResponse(
         continue
       }
       const byMedia = content.get(status) ?? new Map<string, ResponseBucket>()
-      const bucket = byMedia.get(mediaType) ?? { schemas: [], failureReasons: [] }
-      bucket.schemas.push(converted.schema ?? {})
+      const bucket: ResponseBucket = byMedia.get(mediaType) ?? {
+        schemas: [],
+        failureReasons: [],
+        sseEvents: new Map(),
+      }
+      bucket.schemas.push(
+        mediaType === 'text/event-stream' ? { type: 'string' } : (converted.schema ?? {}),
+      )
+      bucket.failureReasons.push(...events.failureReasons)
       if (converted.failureReason) bucket.failureReasons.push(converted.failureReason)
+      if (contract.includeDefaultError && mediaType === 'application/json')
+        bucket.schemas.push({ $ref: `#/components/schemas/${registry.refName('ErrorBody')}` })
+      for (const [name, schemas] of events.schemas)
+        bucket.sseEvents.set(name, [...(bucket.sseEvents.get(name) ?? []), ...schemas])
       byMedia.set(mediaType, bucket)
       content.set(status, byMedia)
     }
@@ -96,7 +115,12 @@ function renderStatusResponse(
               .toSorted(([left], [right]) => left.localeCompare(right))
               .map(([mediaType, bucket]) => [
                 mediaType,
-                { schema: mergeVariantSchemas(bucket.schemas) },
+                {
+                  schema: mergeVariantSchemas(bucket.schemas),
+                  ...(bucket.sseEvents.size
+                    ? { 'x-sse-events': renderSseEvents(bucket.sseEvents) }
+                    : {}),
+                },
               ]),
           ),
         }

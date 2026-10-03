@@ -167,9 +167,10 @@ function renderOperation(
   variants: ResponseContract[] | undefined,
   registry: ReturnType<typeof createComponentRegistry>,
 ) {
-  if (catalogRoute?.kind === 'sse' || catalogRoute?.kind === 'fixed-no-content')
+  if (catalogRoute?.kind === 'fixed-no-content')
     return catalogResponse(catalogRoute.kind, catalogRoute.fixedStatus)
   if (variants) return buildOperationResponse(variants, registry)
+  if (catalogRoute?.kind === 'sse') return catalogResponse('sse')
   if (catalogRoute?.kind === 'error-only') return catalogResponse('error-only')
   return catalogResponse('ordinary')
 }

@@ -476,6 +476,18 @@ fallthrough, and callback-only throws do not prove an error-only route. Empty `n
 render as arrays with no items, and `Record<string, never>` renders as a closed empty object.
 Standalone `never` and `any` remain unsupported contracts.
 
+Caller-owned `apiSseFrame(key, { event, data })` markers expose literal event names and concrete
+payloads from the frames actually written by a route, including callbacks passed to a handler
+factory. SSE responses keep a string body schema and describe each payload under the media
+type's `x-sse-events` map. Broad names, unknown root payloads, and unmarked frames fail closed.
+
+Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
+carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
+`status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
+the marked variable's status and body emissions without reading or replacing response bytes.
+Unrelated raw emissions remain unavailable, and explicit 400 content variants also include the
+framework's error body schema.
+
 Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
 main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
 update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct
