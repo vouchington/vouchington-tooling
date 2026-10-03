@@ -65,12 +65,14 @@ CREATE TABLE order_reconcile_work_items (
 INSERT INTO order_reconcile_work_items (order_id)
 VALUES ($1)
 ON CONFLICT (order_id) DO UPDATE
-SET available_at = now(),
+SET available_at = GREATEST(order_reconcile_work_items.available_at, now()),
     completed_at = NULL,
     generation = order_reconcile_work_items.generation + 1;
 ```
 
-Completion adds `AND generation = $claimed`: a re-mark during a run leaves the row due. Run cost
+Completion adds `AND generation = $claimed`. A re-mark never makes a leased row due early, since
+the claim moved `available_at` to the lease expiry. A completion that finds a newer generation
+releases the lease with `available_at = now()`, and the next claim takes the row again. Run cost
 follows the number of changes, not the number of orders. A job fanned out per account reads by
 parent id, `WHERE account_id = $1`, for the one account it was started for.
 
@@ -90,7 +92,10 @@ CREATE TABLE invoice_export_cursors (
 A UUIDv7 is assigned at insert, not commit, so a row below the last sweep's end can commit after
 that sweep passed it. A new sweep starts an overlap before the previous end and fixes its own end
 now, only when the previous sweep reached its end. `$1` is the overlap, and NULL means the start,
-so the first sweep begins at the start:
+so the first sweep begins at the start. The overlap must exceed the longest insert-to-commit
+delay, which the consumer enforces, for example with a transaction timeout; a row that commits
+after the overlap has passed is missed for good. Work that cannot tolerate a miss writes a
+work-item row in the same transaction instead:
 
 ```sql
 UPDATE invoice_export_cursors
@@ -114,9 +119,11 @@ LIMIT $3;
 
 Persist the last `id` as `cursor_invoice_id` after each batch. A short batch ends the sweep: set
 the cursor to the sweep's end, and the next run starts a new sweep. Rows in the overlap are read
-twice, so the export must be idempotent. A time position works the same way: advance
-`<verb>_through_at` to the window's end only after the window is drained, start the next window an
-overlap earlier, and order by the time column then `id` inside a window.
+twice, so the export must be idempotent. A time position works the same way: inside a window,
+keep a composite `(time, id)` keyset position and read `WHERE (occurred_at, id) > ($1, $2)` in
+that order, so rows that share a timestamp are neither skipped nor repeated. Advance
+`<verb>_through_at` to the window's end only after the window is drained, and start the next
+window an overlap earlier.
 
 ## Capped batch loop with `hasMore`
 
