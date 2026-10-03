@@ -21,7 +21,10 @@ const sources = {
   replaced: route(`const output={stream};output.stream=other;output.stream.write(${frame})`),
   cycle: route(`// @ts-expect-error Deliberately cyclic wrapper cannot prove a runtime receiver.
     const output:{stream:typeof stream}={stream:output.stream};output.stream.write(${frame})`),
-  different: route(`stream.write(${frame});const output={stream:other};output.stream.write('log')`),
+  'uncertain-other-wrapper': route(
+    `stream.write(${frame});const output={stream:other};output.stream.write('log')`,
+  ),
+  different: route(`stream.write(${frame});other.write('log')`),
   direct: route(`stream.write(${frame})`),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
@@ -37,6 +40,7 @@ it.each([
   'annotated',
   'replaced',
   'cycle',
+  'uncertain-other-wrapper',
 ] as const)('fails closed for wrapper receiver %s', (name) => {
   const discover = (lenient = false) =>
     discoverApiResponseContracts(

@@ -3,7 +3,7 @@ import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { invokedResult, registeredHandler } from './protocol-callback-registration.mts'
 import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
-import { callbackBindingReplaced } from './protocol-callback-mutations.mts'
+import { callbackBindingReplaced, callbackOptionsEscape } from './protocol-callback-mutations.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import {
   createProtocolCallbackValueResolver,
@@ -16,7 +16,8 @@ type FunctionNode = ts.FunctionLikeDeclaration
 /** Proves callback consumption through concrete helper bodies, without executing nested closures. */
 export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeChecker): boolean {
   if (!fn.body || fn.asteriskToken || protocolCallbackHasWrittenBindings(fn, checker)) return false
-  const { resolve, symbol } = createProtocolCallbackValueResolver(checker)
+  const resolver = createProtocolCallbackValueResolver(checker)
+  const { resolve, symbol } = resolver
   let invalidated = false
   function consumed(
     call: ts.CallExpression | ts.NewExpression,
@@ -25,15 +26,17 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
     returned = false,
   ): boolean {
     const platform = platformCallbackArgument(call, checker)
-    if (ts.isNewExpression(call) && !platform) return false
     const callee = resolve(platform ?? call.expression, env)
-    if (!callee || !functionNode(callee.node) || callee.node.asteriskToken) return false
+    if (!callee || !functionNode(callee.node) || !callee.node.body || callee.node.asteriskToken) {
+      invalidated ||= callbackOptionsEscape(call, env, fn, resolver)
+      return false
+    }
     if (protocolCallbackHasWrittenBindings(callee.node, checker)) {
       invalidated = true
       return false
     }
-    if (callee.node === fn) return true
-    if (!callee.node.body || active.has(callee.node)) return false
+    if (callee.node === fn) return !returned
+    if (active.has(callee.node)) return false
     const chain = new Set([...active, callee.node])
     if (platform) return body(callee.node.body, callee.env, chain, false)
     const next = new Map(callee.env)
@@ -55,14 +58,15 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
     function visit(node: ts.Node) {
       if (found || replaced || !potentiallyExecuted(node)) return
       if (functionNode(node)) return
-      if (callbackBindingReplaced(node, env, fn, { resolve, symbol })) {
+      if (callbackBindingReplaced(node, env, fn, resolver)) {
         replaced = true
         invalidated = true
         return
       }
       if (
         (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
-        consumed(node, env, active, returned && ts.isReturnStatement(node.parent))
+        consumed(node, env, active, returned && ts.isReturnStatement(node.parent)) &&
+        (!returned || ts.isReturnStatement(node.parent))
       ) {
         found = true
         return

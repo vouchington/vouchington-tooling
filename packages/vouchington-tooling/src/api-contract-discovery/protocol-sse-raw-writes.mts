@@ -1,4 +1,8 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { hasBindingWrite } from './registered-route-binding-writes.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
+import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import {
   enclosingRouteBinding,
@@ -6,7 +10,11 @@ import {
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
-import { sameWriteReceiver, writeReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import {
+  expressionReceiver,
+  sameWriteReceiver,
+  type WriteReceiver,
+} from './protocol-write-receiver.mts'
 
 export type SseRouteWrites = { receivers: WriteReceiver[]; keys: string[] }
 
@@ -19,24 +27,124 @@ export function rejectRawSseWrites(
   routes: ReadonlyMap<string, SseRouteWrites>,
   reject: (node: ts.CallExpression, binding: RouteBinding, keys: readonly string[]) => void,
 ): void {
+  const calls: ts.CallExpression[] = []
   for (const file of files)
     visit(file, (node) => {
-      if (
-        !ts.isCallExpression(node) ||
-        framedWrites.has(node) ||
-        !ts.isPropertyAccessExpression(node.expression) ||
-        node.expression.name.text !== 'write' ||
-        !executableProtocolPath(node, checker)
+      if (ts.isCallExpression(node)) calls.push(node)
+    })
+  for (const node of calls) {
+    if (
+      framedWrites.has(node) ||
+      !ts.isPropertyAccessExpression(node.expression) ||
+      !hasRawBytes(node, checker) ||
+      !potentiallyExecuted(node)
+    )
+      continue
+    const proven = executableProtocolPath(node, checker)
+    const helpers = helperBindings(node, calls, checker, bindings)
+    if (!proven && !helpers.length) continue
+    const receiver = expressionReceiver(node.expression.expression, checker)
+    const binding = proven ? enclosingRouteBinding(node, checker, bindings, false) : undefined
+    const candidates = binding ? [binding] : helpers
+    for (const candidate of candidates) {
+      const route = routes.get(routeKey(candidate))
+      if (!route) continue
+      if (!receiver) {
+        reject(node, candidate, route.keys)
+        continue
+      }
+      const actual = actualReceivers(receiver, candidate, calls, checker, bindings)
+      const framed = route.receivers.flatMap((value) =>
+        actualReceivers(value, candidate, calls, checker, bindings),
       )
-        return
-      const binding = enclosingRouteBinding(node, checker, bindings, false)
-      if (!binding) return
-      const route = routes.get(`${binding.method}:${binding.routeTemplate}`)
       if (
-        route?.receivers.some((receiver) =>
-          sameWriteReceiver(receiver, writeReceiver(node, checker)),
+        actual.some(
+          (value) =>
+            value === undefined ||
+            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
         )
       )
-        reject(node, binding, route.keys)
-    })
+        reject(node, candidate, route.keys)
+    }
+  }
+}
+
+function hasRawBytes(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
+  const method = (call.expression as ts.PropertyAccessExpression).name.text
+  if (method === 'write') return true
+  if (method !== 'end' || !call.arguments[0]) return false
+  const type = checker.getTypeAtLocation(call.arguments[0])
+  return (
+    !(type.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null)) &&
+    type.getCallSignatures().length === 0
+  )
+}
+
+function routeKey(binding: RouteBinding): string {
+  return `${binding.method}:${binding.routeTemplate}`
+}
+
+function helperBindings(
+  node: ts.Node,
+  calls: readonly ts.CallExpression[],
+  checker: ts.TypeChecker,
+  bindings: HandlerBindings,
+): RouteBinding[] {
+  const fn = enclosingFunction(node)
+  if (!fn || fn.asteriskToken) return []
+  return calls.flatMap((call) => {
+    if (
+      checker.getResolvedSignature(call)?.declaration !== fn ||
+      !executableProtocolPath(call, checker)
+    )
+      return []
+    const binding = enclosingRouteBinding(call, checker, bindings, false)
+    return binding ? [binding] : []
+  })
+}
+
+function actualReceivers(
+  receiver: WriteReceiver,
+  binding: RouteBinding,
+  calls: readonly ts.CallExpression[],
+  checker: ts.TypeChecker,
+  bindings: HandlerBindings,
+  active = new Set<ts.Symbol>(),
+): (WriteReceiver | undefined)[] {
+  const declaration = receiver.root.valueDeclaration
+  if (
+    receiver.mutableAlias ||
+    (declaration &&
+      (ts.isBindingElement(declaration) ||
+        (ts.isVariableDeclaration(declaration) &&
+          !(declaration.parent.flags & ts.NodeFlags.Const)) ||
+        (ts.isParameter(declaration) && hasBindingWrite(declaration, checker))))
+  )
+    return [undefined]
+  const fn = declaration && enclosingFunction(declaration)
+  if (!declaration || !ts.isParameter(declaration) || !fn) return [receiver]
+  if (active.has(receiver.root)) return [undefined]
+  const index = runtimeParameters(fn).indexOf(declaration)
+  const actuals = calls.flatMap((call) => {
+    if (
+      checker.getResolvedSignature(call)?.declaration !== fn ||
+      !executableProtocolPath(call, checker)
+    )
+      return []
+    const callBinding = enclosingRouteBinding(call, checker, bindings, false)
+    if (!callBinding || routeKey(callBinding) !== routeKey(binding)) return []
+    const argument = call.arguments[index] ?? declaration.initializer
+    const actual = argument && expressionReceiver(argument, checker)
+    // A forwarded object path requires a stable property proof; don't invent one.
+    if (!actual || receiver.path.length) return [undefined]
+    return actualReceivers(
+      actual,
+      binding,
+      calls,
+      checker,
+      bindings,
+      new Set(active).add(receiver.root),
+    )
+  })
+  return actuals.length ? actuals : [receiver]
 }

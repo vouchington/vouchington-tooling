@@ -1,8 +1,9 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { isSupportedProtocolCallback } from './protocol-callback-invocation.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
-import { unsupportedContextAlias } from './protocol-context-alias.mts'
+import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
 import { contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { statusDominatesEmission } from './protocol-status-dominance.mts'
@@ -74,16 +75,14 @@ export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
     for (const fn of functions)
       visit(fn, (node) => {
         if (
-          ts.isVariableDeclaration(node) &&
-          functions.includes(enclosingFunction(node)!) &&
-          potentiallyExecuted(node) &&
-          unsupportedContextAlias(node, context!, checker)
+          executableProtocolPath(node, checker) &&
+          ((ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context!, checker)) ||
+            unsupportedContextAssignment(node, context!, checker))
         )
           throw new Error('SSE context has an unsupported mutable or destructured alias')
         if (
           ts.isCallExpression(node) &&
-          functions.includes(enclosingFunction(node)!) &&
-          potentiallyExecuted(node) &&
+          executableProtocolPath(node, checker) &&
           contextResponseMethod(node.expression, context!, checker) === 'setStatus'
         )
           setters.add(node)

@@ -12,6 +12,7 @@ export function associateHttpResponse(
   call: ts.CallExpression,
   response: ts.Symbol,
   checker: ts.TypeChecker,
+  siblings?: ReadonlySet<ts.Symbol>,
 ): Map<ts.CallExpression, 'content' | 'none' | 'status'> {
   const handler = enclosingFunction(call)
   const name = handler && runtimeParameters(handler)[0]?.name
@@ -53,7 +54,14 @@ export function associateHttpResponse(
         contextResponseMethod(node.expression, context, checker) ?? '',
       )
     )
-      throw new Error('HTTP response has an unrelated status or body emission')
+      if (
+        siblings &&
+        [...siblings].some(
+          (symbol) => symbol !== response && !!httpEmissionKind(node, symbol, context, checker),
+        )
+      )
+        return
+      else throw new Error('HTTP response has an unrelated status or body emission')
   })
   return emissions
 }

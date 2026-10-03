@@ -17,3 +17,17 @@ export function unsupportedContextAlias(
       !(node.parent.flags & ts.NodeFlags.Const))
   )
 }
+
+export function unsupportedContextAssignment(
+  node: ts.Node,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+): boolean {
+  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken)
+    return false
+  const receiver = expressionReceiver(node.right, checker)
+  return (
+    receiver?.root === context &&
+    (receiver.path.length === 0 || (receiver.path.length === 1 && receiver.path[0] === 'response'))
+  )
+}

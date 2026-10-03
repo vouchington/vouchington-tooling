@@ -54,8 +54,12 @@ function terminates(statement: ts.Statement): boolean {
   )
     return true
   if (ts.isBlock(statement)) return statement.statements.some(terminates)
+  if (!ts.isIfStatement(statement)) return false
+  const condition = unwrapExpression(statement.expression).kind
+  if (condition === ts.SyntaxKind.TrueKeyword) return terminates(statement.thenStatement)
+  if (condition === ts.SyntaxKind.FalseKeyword)
+    return !!statement.elseStatement && terminates(statement.elseStatement)
   return (
-    ts.isIfStatement(statement) &&
     !!statement.elseStatement &&
     terminates(statement.thenStatement) &&
     terminates(statement.elseStatement)

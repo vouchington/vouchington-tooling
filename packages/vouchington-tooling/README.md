@@ -480,7 +480,9 @@ Caller-owned `apiSseFrame(key, { event, data })` markers expose literal event na
 payloads from the frames actually written by a route, including callbacks passed to a handler
 factory. SSE responses keep a string body schema and describe each payload under the media
 type's `x-sse-events` map. Callback arguments require a concrete helper invocation path; ignored,
-declaration-only, deferred, or rewritten callbacks fail closed. Compiler-resolved platform timers
+declaration-only, deferred, or rewritten callbacks fail closed. Callback options passed to a callee
+without a concrete implementation also fail closed. Factory callbacks must execute from the returned request handler; registration-time invocations do not
+prove a request emission. Compiler-resolved platform timers
 and Promise executors supply invocation paths using the caller Program's actual standard-library
 identities; shadowed or custom APIs do not. Fluent route registrations retain their method. Stable named
 handlers and called local helpers are followed within their declaring source file. Ordinary response,
@@ -489,7 +491,8 @@ Broad names, unknown root payloads, executable unmarked frames through stream al
 conditional or mutable-context status changes fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
-are matched to the original stream.
+are matched to the original stream, including proven helper-parameter forwarding. Byte-bearing
+stream `end` calls are raw emissions; empty terminal cleanup is preserved.
 
 Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opaque response
 carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
@@ -497,7 +500,8 @@ carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete uni
 the marked variable's status and body emissions without reading or replacing response bytes.
 A status setter must dominate each body emission, including separate branches; constant context
 aliases are followed, assigned mutable context aliases fail closed, and unrelated raw emissions
-remain unavailable. Observed content and bodyless
+remain unavailable. Separate branded response branches are checked together, and the nearest
+proven status setter for each body must belong to that response. Observed content and bodyless
 emissions must match the complete metadata union. Exact requested protocol rows are selected before
 other payloads, media types, or statuses are validated. In lenient mode, incomplete marker evidence
 keeps every selected sibling unavailable. Explicit 400 content variants also include the framework's

@@ -88,6 +88,43 @@ describe('protocol callback invocation proof', () => {
     })
   })
 
+  it('rejects callbacks whose option bindings escape to opaque mutators before invocation', () => {
+    expect(
+      check(`
+      declare function mutate(value: {emit:()=>void}):void;
+      function consume(options:{emit:()=>void}){mutate(options);options.emit()}
+      function aliased(options:{emit:()=>void}){const value=options;mutate(value);options.emit()}
+      function clean(options:{emit:()=>void}){mutate({emit:()=>{}});options.emit()}
+      const emit=()=>mark('opaque-shorthand');consume({emit});
+      consume({emit(){mark('opaque-method')}});
+      consume({emit:()=>mark('opaque')});
+      aliased({emit:()=>mark('opaque-alias')});
+      clean({emit:()=>mark('clean')});
+    `),
+    ).toEqual({
+      opaque: false,
+      'opaque-alias': false,
+      'opaque-shorthand': false,
+      'opaque-method': false,
+      clean: true,
+    })
+  })
+
+  it('requires registered factory callbacks to execute from the returned request handler', () => {
+    expect(
+      check(`
+      function setup(cb:()=>void){cb();return(ctx:unknown)=>undefined}
+      function request(cb:()=>void){return(ctx:unknown)=>cb()}
+      function both(cb:()=>void){cb();return(ctx:unknown)=>cb()}
+      function setupReturned(cb:()=>()=>void){return cb()}
+      app.route('/setup').get(setup(()=>mark('setup-only')));
+      app.route('/request').get(request(()=>mark('request-only')));
+      app.route('/both').get(both(()=>mark('both')));
+      app.route('/setup-returned').get(setupReturned(()=>{mark('setup-returned');return()=>{}}));
+    `),
+    ).toEqual({ 'setup-only': false, 'request-only': true, both: true, 'setup-returned': false })
+  })
+
   it('resolves imported helper aliases and executable forwarding wrappers', () => {
     expect(
       check(

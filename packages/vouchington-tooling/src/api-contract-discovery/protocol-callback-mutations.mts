@@ -25,3 +25,35 @@ export function callbackBindingReplaced(
     root = unwrapExpression(root.expression)
   return (ts.isIdentifier(root) && env.has(symbol(root)!)) || resolve(write, env)?.node === fn
 }
+
+/** An opaque callee may replace a callback stored in a forwarded options object. */
+export function callbackOptionsEscape(
+  node: ts.CallExpression | ts.NewExpression,
+  env: CallbackBindings,
+  fn: ts.FunctionLikeDeclaration,
+  resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
+): boolean {
+  function contains(
+    value: ts.Node,
+    bindings: CallbackBindings,
+    seen = new Set<ts.Node>(),
+  ): boolean {
+    const resolved = resolver.resolve(value, bindings)
+    if (!resolved || seen.has(resolved.node)) return false
+    seen.add(resolved.node)
+    if (resolved.node === fn) return true
+    if (!ts.isObjectLiteralExpression(resolved.node)) return false
+    return resolved.node.properties.some(
+      (member) =>
+        member === fn ||
+        (ts.isPropertyAssignment(member)
+          ? contains(member.initializer, resolved.env, seen)
+          : ts.isShorthandPropertyAssignment(member) &&
+            (() => {
+              const target = resolver.property(resolved, member.name.text, new Set())
+              return !!target && contains(target.node, target.env, seen)
+            })()),
+    )
+  }
+  return !!node.arguments?.some((argument) => contains(argument, env))
+}

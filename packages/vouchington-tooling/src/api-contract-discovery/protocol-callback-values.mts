@@ -129,7 +129,7 @@ export function createProtocolCallbackValueResolver(checker: ts.TypeChecker) {
     }
     return undefined
   }
-  return { resolve, symbol }
+  return { resolve, symbol, property }
 }
 
 export function protocolCallbackHasWrittenBindings(

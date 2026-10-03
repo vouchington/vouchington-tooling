@@ -109,13 +109,14 @@ export function discoverProtocolContracts(
               return true
             },
           )
-          if (variants.length === 0) return
           pending.push({
             call: node,
             symbol,
             binding,
             variants,
-            declaredBodyKinds: extractHttpBodyKinds(checker.getTypeAtLocation(node), checker),
+            get declaredBodyKinds() {
+              return extractHttpBodyKinds(checker.getTypeAtLocation(node), checker)
+            },
             keys,
           })
         }
