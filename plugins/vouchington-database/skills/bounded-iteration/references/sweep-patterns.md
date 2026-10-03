@@ -121,8 +121,11 @@ overlap earlier, and order by the time column then `id` inside a window.
 ## Capped batch loop with `hasMore`
 
 The run stops at a batch cap or a deadline and says whether work remains. A short batch is the
-only proof that nothing is left. A cap that stops the run reports `hasMore: true`, even when the
-last batch happened to drain the work; the continuation finds nothing and stops:
+only proof that nothing is left. Rows a `SKIP LOCKED` claim passed over are held by another
+claimer, who owns them; if that claim rolls back, they are due again on the next scheduled run,
+so a short batch still ends this run's backlog. A cap that stops the run reports
+`hasMore: true`, even when the last batch happened to drain the work; the continuation finds
+nothing and stops:
 
 ```ts
 interface RunResult {
@@ -184,14 +187,18 @@ lookup and an external API's documented page maximum are contracts, not tunables
 ## List endpoint
 
 The API schema keeps a static ceiling. The runtime default and effective maximum are tunable but
-never above it, and the server clamps whatever the client asks for:
+never above it, and the server rejects an invalid size and clamps a large one:
 
 ```ts
 const API_MAX_PAGE_SIZE = 100
 
 export function pageSize(requested: number | undefined, config: PageConfig): number {
   const ceiling = Math.min(config.maxPageSize, API_MAX_PAGE_SIZE)
-  return Math.min(requested ?? config.defaultPageSize, ceiling)
+  const value = requested ?? config.defaultPageSize
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError('Page size must be a positive integer')
+  }
+  return Math.min(value, ceiling)
 }
 ```
 
