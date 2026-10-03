@@ -155,8 +155,17 @@ const sources = {
   'one-branch-http': http(`if(ctx.query.flag) return; ${emit}`),
   'branch-missing-else-http': http(`if(ctx.query.flag) {} ${emit}`),
   'block-read-http': http(`{ctx.set('X','ok')}; ${emit}`),
+  'nullable-property-stream': sse(
+    "let sse:{stream:typeof stream}|null=null; sse={stream}; ctx.subscribe({emit:()=>sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})",
+  ),
+  'property-stream-raw': sse(
+    "const sse={stream}; sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); sse.stream.write('raw')",
+  ),
+  'different-property-stream': sse(
+    "const sse={stream}; const other={stream}; sse!.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}})); other.stream.write('log')",
+  ),
   'computed-stream': sse(
-    "({stream}).stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
+    "({stream})['stream'].write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
   ),
   'no-sse-context': sse(
     "stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
@@ -218,6 +227,8 @@ describe('compiler-discovered protocol contracts', () => {
     'unrelated-write',
     'named-sse',
     'no-sse-context',
+    'nullable-property-stream',
+    'different-property-stream',
   ] as const)('extracts actual named payloads from %s', (name) => {
     const contracts = discover(name)
     const events = Object.values(contracts).flatMap((contract) => contract.sseEvents ?? [])
@@ -391,6 +402,7 @@ describe('compiler-discovered protocol contracts', () => {
     'renamed-http-raw',
     'local-readable',
     'computed-stream',
+    'property-stream-raw',
     'dead-else-http',
     'terminal-block-http',
     'terminal-branches-http',

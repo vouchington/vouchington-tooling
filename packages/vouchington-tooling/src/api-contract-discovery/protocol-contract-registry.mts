@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { nextProtocolKey } from './protocol-contract-keys.mts'
 import { extractContractSchema } from '../contract-schema/index.mts'
 import { extractHttpVariants, extractSseEvents } from './protocol-contract-extraction.mts'
 import { associateHttpResponse } from './protocol-http-association.mts'
@@ -16,7 +17,8 @@ import {
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
-import { sseEmission, writeReceiver } from './protocol-sse-emission.mts'
+import { writeReceiver, sameWriteReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import { sseEmission } from './protocol-sse-emission.mts'
 
 type PendingHttp = {
   call: ts.CallExpression
@@ -37,7 +39,7 @@ export function discoverProtocolContracts(
   if (requestedKeys?.size === 0) return new Set()
   const pending: PendingHttp[] = []
   const framedWrites = new Set<ts.CallExpression>()
-  const sseBindings = new Map<string, Set<ts.Symbol>>()
+  const sseBindings = new Map<string, WriteReceiver[]>()
   for (const file of sourceFiles)
     visit(file, (node) => {
       if (!ts.isCallExpression(node)) return
@@ -78,8 +80,8 @@ export function discoverProtocolContracts(
             sseEvents,
           })
           framedWrites.add(write)
-          const receivers = sseBindings.get(prefix) ?? new Set<ts.Symbol>()
-          receivers.add(receiver)
+          const receivers = sseBindings.get(prefix) ?? []
+          receivers.push(receiver)
           sseBindings.set(prefix, receivers)
         } else {
           const declaration = node.parent
@@ -154,7 +156,12 @@ export function discoverProtocolContracts(
         return
       const binding = enclosingRouteBinding(node, checker, bindings)
       const key = binding && `${binding.method}:${binding.routeTemplate}`
-      if (key && sseBindings.get(key)?.has(writeReceiver(node, checker)!))
+      if (
+        key &&
+        sseBindings
+          .get(key)
+          ?.some((receiver) => sameWriteReceiver(receiver, writeReceiver(node, checker)))
+      )
         unavailable(
           contracts,
           key,
@@ -165,13 +172,6 @@ export function discoverProtocolContracts(
         )
     })
   return covered
-}
-
-function nextProtocolKey(contracts: Map<string, BackendResponseContract>, key: string): string {
-  if (!contracts.has(key)) return key
-  let index = 2
-  while (contracts.has(`${key}#protocol-${index}`)) index++
-  return `${key}#protocol-${index}`
 }
 
 function unavailable(

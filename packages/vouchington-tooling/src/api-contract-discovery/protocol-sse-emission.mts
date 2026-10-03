@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { writeReceiver } from './protocol-write-receiver.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
 
 export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
@@ -60,14 +61,4 @@ export function sseEmission(call: ts.CallExpression, checker: ts.TypeChecker) {
   }
   if (status.unavailableReason) throw new Error(status.unavailableReason)
   return { write, receiver, status }
-}
-
-export function writeReceiver(
-  call: ts.CallExpression,
-  checker: ts.TypeChecker,
-): ts.Symbol | undefined {
-  return ts.isPropertyAccessExpression(call.expression) &&
-    ts.isIdentifier(call.expression.expression)
-    ? checker.getSymbolAtLocation(call.expression.expression)
-    : undefined
 }
