@@ -12,7 +12,8 @@ Local policy overrides these defaults; do not reload an already-read adapter or 
 Measure the query plan and the workload shape before changing code.
 
 - Select only the required columns.
-- Bound each result set. Paginate or stream a large read.
+- Bound each result set. Paginate or stream a large read. A stream bounds memory, not work: cap
+  the rows per run as in [bounded iteration](../bounded-iteration/SKILL.md).
 - Batch writes inside an explicit transaction limit.
 - Keep connection-pool usage bounded.
 - Validate a query change at representative cardinality. Watch latency, memory, lock time, and
