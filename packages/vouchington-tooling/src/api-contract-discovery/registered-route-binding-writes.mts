@@ -1,11 +1,12 @@
 import ts from '../contract-schema/typescript-api.mts'
 
-/** Imported function declarations can still be reassigned in the module that owns them. */
-export function hasFunctionBindingWrite(
-  declaration: ts.FunctionDeclaration,
+/** Helper and factory parameter bindings must remain unchanged in their declaring source. */
+export function hasBindingWrite(
+  declaration: ts.FunctionDeclaration | ts.ParameterDeclaration,
   checker: ts.TypeChecker,
 ): boolean {
   if (!declaration.name) return false
+  if (!ts.isIdentifier(declaration.name)) return true
   const binding = checker.getSymbolAtLocation(declaration.name)
   let written = false
   const referencesBinding = (node: ts.Node): void => {

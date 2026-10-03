@@ -25,6 +25,7 @@ function terminalBody(
   context: ts.Symbol,
   checker: ts.TypeChecker,
   active: Set<ts.Node>,
+  returned = true,
 ): boolean {
   if (!node.body || node.asteriskToken || active.has(node)) return false
   if (
@@ -37,7 +38,7 @@ function terminalBody(
   )
     return false
   const next = new Set(active).add(node)
-  if (!ts.isBlock(node.body)) return terminalCall(node.body, context, checker, next, true)
+  if (!ts.isBlock(node.body)) return terminalCall(node.body, context, checker, next, returned)
   const statements = node.body.statements
   const terminal = statements.at(-1)
   if (
@@ -50,7 +51,7 @@ function terminalBody(
   return (
     ts.isReturnStatement(terminal) &&
     !!terminal.expression &&
-    terminalCall(terminal.expression, context, checker, next, true)
+    terminalCall(terminal.expression, context, checker, next, returned)
   )
 }
 
@@ -103,7 +104,7 @@ function terminalCall(
       const parameter = implementation.parameters[index]?.name
       const symbol =
         parameter && ts.isIdentifier(parameter) ? checker.getSymbolAtLocation(parameter) : undefined
-      return !!symbol && terminalBody(implementation, symbol, checker, active)
+      return !!symbol && terminalBody(implementation, symbol, checker, active, returned)
     })
   )
 }

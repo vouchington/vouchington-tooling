@@ -44,6 +44,17 @@ const sources = {
     app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
   'optional-throw': `${preamble} app.route('/api/example').get((ctx:{throw?:(status:number)=>never})=>ctx.throw?.(405))`,
   'optional-context': `${preamble} app.route('/api/example').get((ctx:Ctx|undefined)=>ctx?.throw(405))`,
+  'void-adapter': `${preamble} async function deny(ctx:Ctx){ctx.throw(405)}
+    const adapter:(ctx:Ctx)=>void=(ctx)=>deny(ctx);app.route('/api/example').get((ctx:Ctx)=>{adapter(ctx)})`,
+  'void-adapter-awaited': `${preamble} async function deny(ctx:Ctx){ctx.throw(405)}
+    const adapter:(ctx:Ctx)=>void=(ctx)=>deny(ctx);app.route('/api/example').get(async(ctx:Ctx)=>{await adapter(ctx)})`,
+  'void-adapter-returned': `${preamble} async function deny(ctx:Ctx){ctx.throw(405)}
+    const adapter:(ctx:Ctx)=>void=(ctx)=>deny(ctx);app.route('/api/example').get((ctx:Ctx)=>adapter(ctx))`,
+  'destructured-wrapper': `${preamble} function wrap({unused}:{unused:string}){return(ctx:Ctx)=>ctx.throw(405)}
+    app.route('/api/example').get(wrap({unused:''}))`,
+  'rewritten-wrapper': `${preamble} type Handler=(ctx:Ctx)=>void
+    const reject=(ctx:Ctx)=>ctx.throw(405);function wrap(handler:Handler){handler=(ctx)=>ctx.json({ok:true});return handler}
+    app.route('/api/example').get(wrap(reject))`,
   'computed-helper': `${preamble} function make(ctx:Ctx) {ctx.json({ok:true});return {reject(context:Ctx){context.throw(405)}}}
     app.route('/api/example').get((ctx:Ctx)=>make(ctx).reject(ctx))`,
   'mutable-helper': `${preamble} let reject:(ctx:Ctx)=>void=(ctx)=>ctx.throw(405)
@@ -127,6 +138,8 @@ describe('terminal error-only route proof', () => {
     'allow',
     'nested-wrapper',
     'transparent',
+    'void-adapter-awaited',
+    'void-adapter-returned',
   ] as const)('proves the handler context terminates with 405 in %s', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'error-only' },
@@ -167,6 +180,9 @@ describe('terminal error-only route proof', () => {
     'destructured-write',
     'virtual-method',
     'erased-async',
+    'void-adapter',
+    'rewritten-wrapper',
+    'destructured-wrapper',
     'generator-helper',
     'async-generator-helper',
     'optional-throw',

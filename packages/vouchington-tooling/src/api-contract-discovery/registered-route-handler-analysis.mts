@@ -1,5 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { hasFunctionBindingWrite } from './registered-route-binding-writes.mts'
+import { hasBindingWrite } from './registered-route-binding-writes.mts'
 
 export function handlerNodes(
   argument: ts.Expression,
@@ -29,6 +29,11 @@ export function handlerNodes(
   if (ts.isCallExpression(argument)) {
     return callableImplementations(argument.expression, checker, staticProof).flatMap(
       (implementation) => {
+        if (
+          staticProof &&
+          implementation.parameters.some((parameter) => hasBindingWrite(parameter, checker))
+        )
+          return []
         const bindings = new Map(parameterBindings)
         implementation.parameters.forEach((parameter, index) => {
           const callArgument = argument.arguments[index]
@@ -118,7 +123,7 @@ function hasStableBinding(declaration: ts.Declaration, checker: ts.TypeChecker):
       ts.isVariableDeclarationList(declaration.parent) &&
       !!(declaration.parent.flags & ts.NodeFlags.Const)
     )
-  return !ts.isFunctionDeclaration(declaration) || !hasFunctionBindingWrite(declaration, checker)
+  return !ts.isFunctionDeclaration(declaration) || !hasBindingWrite(declaration, checker)
 }
 
 function unwrapHandlerExpression(node: ts.Expression): ts.Expression {
