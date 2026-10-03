@@ -470,6 +470,12 @@ Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRaw
 `ctx.setStatus`, and static `Content-Type` setters. The input source files and TypeScript checker
 are the source representation; the adapter does not parse or discover a repository on its own.
 
+Error-only 405 routes require a terminal throw on the handler's own context. Named handlers and
+imported wrappers are followed through compiler declarations; conditional, caught, recursive,
+fallthrough, and callback-only throws do not prove an error-only route. Empty `never[]` contracts
+render as arrays with no items, and `Record<string, never>` renders as a closed empty object.
+Standalone `never` and `any` remain unsupported contracts.
+
 Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
 main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
 update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct

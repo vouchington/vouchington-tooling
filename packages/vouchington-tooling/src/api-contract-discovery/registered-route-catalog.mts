@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { handlerNodes } from './registered-route-handler-analysis.mts'
+import { isTerminal405Handler } from './registered-route-terminal-error.mts'
 import {
   propertyName,
   routeTemplateFromExpression,
@@ -61,7 +62,9 @@ function classifyHandler(
   if (nodes.length === 0)
     throw new Error(`Cannot inspect registered route handler ${method}:${routeTemplate}`)
   let sse = false
-  let error405 = false
+  const handlers = nodes.filter((node) => ts.isFunctionLike(node))
+  const error405 =
+    handlers.length > 0 && handlers.every((node) => isTerminal405Handler(node, checker))
   let fixedStatus: number | undefined
   nodes.forEach((node) => {
     visit(node, (child) => {
@@ -88,14 +91,6 @@ function classifyHandler(
         child.arguments[0].text.toLowerCase() === 'text/event-stream'
       )
         sse = true
-      if (
-        ts.isPropertyAccessExpression(child.expression) &&
-        child.expression.name.text === 'throw' &&
-        child.arguments[0] &&
-        ts.isNumericLiteral(child.arguments[0]) &&
-        child.arguments[0].text === '405'
-      )
-        error405 = true
     })
   })
   if (fixedStatus !== undefined) {

@@ -45,11 +45,9 @@ export function catalogResponse(
     }
   }
   if (kind === 'error-only') {
-    const reason = 'registered route has no success response'
     return {
       responses: { 405: { $ref: '#/components/responses/Error' } },
-      unavailable: true,
-      unavailableReason: reason,
+      unavailable: false,
     }
   }
   const reason =

@@ -113,6 +113,8 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
     const typeArguments = checker.getTypeArguments(type as ts.TypeReference)
     /* v8 ignore next */
     if (!typeArguments[0]) throw unsupportedType(type, checker, 'array element type is missing')
+    if (typeArguments[0].flags & ts.TypeFlags.Never)
+      return { type: 'tuple', items: [], optionalItems: 0 }
     return { type: 'array', items: schemaForType(typeArguments[0], context) }
   }
   if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0) {

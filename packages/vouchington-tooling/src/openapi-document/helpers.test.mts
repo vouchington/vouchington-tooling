@@ -108,7 +108,10 @@ describe('route helpers', () => {
       description: 'No Content',
     })
     expect(() => catalogResponse('fixed-no-content')).toThrow('requires a status')
-    expect(catalogResponse('error-only').unavailableReason).toMatch(/no success response/)
+    expect(catalogResponse('error-only')).toEqual({
+      responses: { 405: { $ref: '#/components/responses/Error' } },
+      unavailable: false,
+    })
     expect(catalogResponse('sse').responses[200]).toMatchObject({
       content: { 'text/event-stream': { schema: {} } },
     })

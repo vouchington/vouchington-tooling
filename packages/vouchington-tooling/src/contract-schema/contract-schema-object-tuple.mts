@@ -36,7 +36,10 @@ export function objectSchema(
   return {
     type: 'object',
     properties,
-    additionalProperties: stringIndex ? schemaForType(stringIndex.type, context) : false,
+    additionalProperties:
+      stringIndex && !(stringIndex.type.flags & ts.TypeFlags.Never)
+        ? schemaForType(stringIndex.type, context)
+        : false,
   }
 }
 
