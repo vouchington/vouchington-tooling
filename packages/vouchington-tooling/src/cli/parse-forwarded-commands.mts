@@ -1,6 +1,5 @@
 type ForwardedCommand =
   | { kind: 'with-host-lock'; args: string[] }
-  | { kind: 'agent-harness-config'; args: string[] }
   | { kind: 'pnpm-install'; args: string[] }
   | { kind: 'vitest-blob-manifest'; args: string[] }
   | { kind: 'vitest-report-attempt'; args: string[] }
@@ -19,7 +18,6 @@ export function parseForwardedCommand(
   args: string[],
 ): ForwardedCommand | undefined {
   if (command === 'with-host-lock') return { kind: 'with-host-lock', args }
-  if (command === 'agent-harness-config') return { kind: 'agent-harness-config', args }
   if (command === 'pnpm-install') return { kind: 'pnpm-install', args }
   if (command === 'vitest-blob-manifest') return { kind: 'vitest-blob-manifest', args }
   if (command === 'vitest-report-attempt') return { kind: 'vitest-report-attempt', args }

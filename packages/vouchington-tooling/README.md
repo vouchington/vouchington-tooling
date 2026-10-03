@@ -34,9 +34,6 @@ vouchington runner-port-policy
 vouchington runner-port-policy --file ./policy.json
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
-vouchington agent-harness-config dump
-vouchington agent-harness-config check --global
-vouchington agent-harness-config apply --global --repo /path/to/checkout
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
 vouchington require-up-to-date --remote origin --branch main
 vouchington gitleaks-directory-scan --config .gitleaks.toml
@@ -199,11 +196,6 @@ import {
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements, stripSqlComments } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
-import {
-  applyHarnessConfig,
-  checkHarnessConfig,
-  dumpHarnessPolicy,
-} from 'vouchington-tooling/agent-harness-config'
 import {
   inspectHarnessEnvironment,
   selectHarnessSession,
@@ -374,14 +366,8 @@ summaries and quoted attributes; it is not a general HTML validator or sanitizer
 the input or infers semantic relevance, cost, schema conformance, or failure causes. The existing
 `markdownSectionBetweenHeadings` API retains its original boundary behavior.
 
-`agent-harness-config` merges classifier-auto and sandbox keys into Claude, Codex, Grok, and Cursor
-config files. See [docs/agent-harness-config.md](./docs/agent-harness-config.md). `--global` updates
-home-directory configs; `--repo` updates a checkout. It does not copy allowlists, hooks, or plugins.
-Grok uses `permission_mode = "auto"` plus `auto_mode.enabled` and `default_auto_mode` so the
-classifier stays available in plan mode; its defined sandbox profile still requires
-`--sandbox workspace-write` at launch. Cursor uses global `approvalMode = "auto-review"`;
-`unrestricted` disables the sandbox. Repo checks surface user-level trust or mode prerequisites
-instead of claiming that repo files alone activate them.
+Machine-wide agent configuration now belongs to [vouchington-machines](https://github.com/vouchington/vouchington-machines/blob/main/docs/agent-config.md).
+Use its `configure-agents.sh` and `diagnose-agents.sh`; project hooks and MCP configuration remain in their checkouts.
 
 `agent-harness-identity` inspects the four harness environment signals without choosing a winner.
 Callers supply their own precedence to `selectHarnessSession`, keeping product-specific identity
