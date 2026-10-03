@@ -26,7 +26,7 @@ function terminalBody(
   checker: ts.TypeChecker,
   active: Set<ts.Node>,
 ): boolean {
-  if (!node.body || active.has(node)) return false
+  if (!node.body || node.asteriskToken || active.has(node)) return false
   if (
     node.parameters.some(
       (parameter) =>
@@ -65,7 +65,7 @@ function terminalCall(
     return terminalCall(expression.expression, context, checker, active, true)
   if (ts.isParenthesizedExpression(expression))
     return terminalCall(expression.expression, context, checker, active, returned)
-  if (!ts.isCallExpression(expression)) return false
+  if (!ts.isCallExpression(expression) || expression.questionDotToken) return false
   if (
     expression.arguments.some(
       (argument) => !ts.isIdentifier(argument) && !ts.isLiteralExpression(argument),
@@ -76,6 +76,7 @@ function terminalCall(
   if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'throw') {
     const status = expression.arguments[0]
     return (
+      !callee.questionDotToken &&
       ts.isIdentifier(callee.expression) &&
       checker.getSymbolAtLocation(callee.expression) === context &&
       !!status &&
@@ -83,12 +84,18 @@ function terminalCall(
       Number(status.text) === 405
     )
   }
-  const implementations = callableImplementations(callee, checker)
+  if (!ts.isIdentifier(callee)) return false
+  const implementations = callableImplementations(callee, checker, true)
   if (!returned && checker.getPropertyOfType(checker.getTypeAtLocation(expression), 'then'))
     return false
   return (
     implementations.length > 0 &&
     implementations.every((implementation) => {
+      if (
+        !returned &&
+        implementation.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+      )
+        return false
       const index = expression.arguments.findIndex(
         (argument) =>
           ts.isIdentifier(argument) && checker.getSymbolAtLocation(argument) === context,

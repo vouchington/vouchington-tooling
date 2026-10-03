@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import ts from '../contract-schema/typescript-api.mts'
 import { discoverRegisteredRoutes } from './registered-route-catalog.mts'
+import { handlerNodes } from './registered-route-handler-analysis.mts'
 import { isTerminal405Handler } from './registered-route-terminal-error.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
@@ -32,6 +33,40 @@ const sources = {
   defaults: `${preamble} function reject(context: Ctx, reason = 'unsupported') { context.throw(405) }
     app.route('/api/example').get((ctx: Ctx) => reject(ctx))`,
   allow: handler("ctx.set('Allow','GET, PATCH'); ctx.throw(405)"),
+  'nested-wrapper': `${preamble} const reject=(ctx:Ctx)=>ctx.throw(405)
+    const wrap=<T>(handler:T):T=>handler;app.route('/api/example').get(wrap(wrap(reject)))`,
+  transparent: `${preamble} type Handler=(ctx:Ctx)=>never
+    const reject=(((ctx:Ctx)=>ctx.throw(405)) satisfies Handler) as Handler
+    app.route('/api/example').get((reject))`,
+  'generator-helper': `${preamble} function* reject(ctx:Ctx){ctx.throw(405)}
+    app.route('/api/example').get((ctx:Ctx)=>{reject(ctx)})`,
+  'async-generator-helper': `${preamble} async function* reject(ctx:Ctx){ctx.throw(405)}
+    app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'optional-throw': `${preamble} app.route('/api/example').get((ctx:{throw?:(status:number)=>never})=>ctx.throw?.(405))`,
+  'optional-context': `${preamble} app.route('/api/example').get((ctx:Ctx|undefined)=>ctx?.throw(405))`,
+  'computed-helper': `${preamble} function make(ctx:Ctx) {ctx.json({ok:true});return {reject(context:Ctx){context.throw(405)}}}
+    app.route('/api/example').get((ctx:Ctx)=>make(ctx).reject(ctx))`,
+  'mutable-helper': `${preamble} let reject:(ctx:Ctx)=>void=(ctx)=>ctx.throw(405)
+    reject=(ctx)=>ctx.json({ok:true});app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'mutable-middleware': `${preamble} let middleware:(ctx:Ctx)=>void=(ctx)=>ctx.json({ok:true})
+    const reject=(ctx:Ctx)=>ctx.throw(405);app.route('/api/example').get(middleware,reject)`,
+  'loop-write': `${preamble} function reject(ctx:Ctx):void {ctx.throw(405)}
+    // @ts-expect-error Intentional loop assignment to a declaration binding.
+    for(reject of [(ctx:Ctx)=>ctx.json({ok:true})]) {}
+    app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'mutable-direct': `${preamble} let handler:(ctx:Ctx)=>void=(ctx)=>ctx.throw(405)
+    handler=(ctx)=>ctx.json({ok:true});app.route('/api/example').get(handler)`,
+  'rewritten-function': `${preamble} function reject(ctx:Ctx):void {ctx.throw(405)}
+    // @ts-expect-error Intentional runtime overwrite of a declaration binding.
+    reject=(ctx:Ctx)=>ctx.json({ok:true});app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'destructured-write': `${preamble} function reject(ctx:Ctx):void {ctx.throw(405)}
+    // @ts-expect-error Intentional destructured runtime overwrite of a declaration binding.
+    [reject]=[(ctx:Ctx)=>ctx.json({ok:true})];app.route('/api/example').get((ctx:Ctx)=>reject(ctx))`,
+  'virtual-method': `${preamble} class Base {reject(ctx:Ctx):void{ctx.throw(405)}}
+    class Child extends Base {override reject(ctx:Ctx){ctx.json({ok:true})}}
+    const receiver:Base=new Child();app.route('/api/example').get((ctx:Ctx)=>receiver.reject(ctx))`,
+  'erased-async': `${preamble} const reject:(ctx:Ctx)=>void=async(ctx)=>{ctx.throw(405)}
+    app.route('/api/example').get((ctx:Ctx)=>{reject(ctx)})`,
   'dynamic-header': handler("ctx.set('Allow',condition ? 'POST' : 'GET'); ctx.throw(405)"),
   'other-header-context': handler("other.set('Allow','POST'); ctx.throw(405)"),
   'invalid-header-value': handler("ctx.set('Allow','POST\\r\\nInjected: true'); ctx.throw(405)"),
@@ -69,6 +104,8 @@ const sources = {
   'parameter-destructuring': `${preamble} declare function sideEffect(): 0
     function reject(context: Ctx, { [sideEffect()]: value }: string = 'x') { context.throw(405) }
     app.route('/api/example').get((ctx: Ctx) => reject(ctx))`,
+  'recursive-wrapper': `${preamble} const reject=(ctx:Ctx)=>ctx.throw(405)
+    const wrap=<T>(handler:T):T=>wrap(handler);app.route('/api/example').get(wrap(reject))`,
   'recursive-factory': `${preamble} function factory(): (ctx: Ctx) => never { return factory() }
     app.route('/api/example').get(factory())`,
 } as const
@@ -88,6 +125,8 @@ describe('terminal error-only route proof', () => {
     'parenthesized',
     'defaults',
     'allow',
+    'nested-wrapper',
+    'transparent',
   ] as const)('proves the handler context terminates with 405 in %s', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'error-only' },
@@ -119,10 +158,42 @@ describe('terminal error-only route proof', () => {
     'other-header-context',
     'invalid-header-value',
     'unrecognized-header',
+    'computed-helper',
+    'mutable-helper',
+    'mutable-direct',
+    'mutable-middleware',
+    'loop-write',
+    'rewritten-function',
+    'destructured-write',
+    'virtual-method',
+    'erased-async',
+    'generator-helper',
+    'async-generator-helper',
+    'optional-throw',
+    'optional-context',
   ] as const)('keeps %s outside error-only classification', (name) => {
     expect(discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toMatchObject([
       { kind: 'ordinary' },
     ])
+  })
+
+  it('terminates a self-referential compiler parameter binding', () => {
+    const source = matrix.sourceFile('recursive-wrapper')
+    const declaration = source.statements.find(
+      (node) =>
+        ts.isVariableStatement(node) &&
+        node.declarationList.declarations[0]?.name.getText() === 'wrap',
+    ) as ts.VariableStatement
+    const factory = declaration.declarationList.declarations[0]!.initializer as ts.ArrowFunction
+    const parameter = factory.parameters[0]!.name as ts.Identifier
+    const checker = matrix.program.getTypeChecker()
+    expect(
+      handlerNodes(
+        parameter,
+        checker,
+        new Map([[checker.getSymbolAtLocation(parameter)!, parameter]]),
+      ),
+    ).toEqual([])
   })
 
   it('rejects a source module rather than treating it as an executable handler', () => {
@@ -131,11 +202,14 @@ describe('terminal error-only route proof', () => {
     )
   })
 
-  it('fails closed without recursing forever through a factory cycle', () => {
-    expect(() =>
-      discoverRegisteredRoutes(matrix.program, [matrix.sourceFile('recursive-factory')]),
-    ).toThrow('Cannot inspect registered route handler GET:/api/example')
-  })
+  it.each(['recursive-factory', 'recursive-wrapper'] as const)(
+    'fails closed through %s',
+    (name) => {
+      expect(() => discoverRegisteredRoutes(matrix.program, [matrix.sourceFile(name)])).toThrow(
+        'Cannot inspect registered route handler GET:/api/example',
+      )
+    },
+  )
 
   it('resolves imported renamed helper and factory declarations with the compiler', () => {
     const root = mkdtempSync(join(tmpdir(), 'terminal-405-'))
@@ -146,13 +220,15 @@ describe('terminal error-only route proof', () => {
         shared,
         `export interface Ctx { throw(status: number): never }
         export function reject(context: Ctx) { context.throw(405) }
-        export const wrap = <T>(handler: T): T => handler`,
+        export const wrap = <T>(handler: T): T => handler
+        export default function(context: Ctx) { context.throw(405) }`,
       )
       writeFileSync(
         entry,
-        `import { reject as deny, wrap as handlerFactory, type Ctx } from './shared'
+        `import defaultDeny, { reject as deny, wrap as handlerFactory, type Ctx } from './shared'
         declare const app: any
-        app.route('/api/example').get(handlerFactory((ctx: Ctx) => deny(ctx)))`,
+        app.route('/api/example').get(handlerFactory((ctx: Ctx) => deny(ctx)))
+        app.route('/api/default').get(defaultDeny)`,
       )
       const program = ts.createProgram([shared, entry], {
         module: ts.ModuleKind.ESNext,
@@ -163,6 +239,7 @@ describe('terminal error-only route proof', () => {
       })
       expect(ts.getPreEmitDiagnostics(program)).toEqual([])
       expect(discoverRegisteredRoutes(program, [program.getSourceFile(entry)!])).toMatchObject([
+        { kind: 'error-only' },
         { kind: 'error-only' },
       ])
     } finally {

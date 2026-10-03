@@ -62,9 +62,17 @@ function classifyHandler(
   if (nodes.length === 0)
     throw new Error(`Cannot inspect registered route handler ${method}:${routeTemplate}`)
   let sse = false
-  const handlers = nodes.filter((node) => ts.isFunctionLike(node))
+  const proofGroups = call.arguments
+    .filter((argument) => !ts.isStringLiteral(argument))
+    .map((argument) =>
+      handlerNodes(argument, checker, new Map(), new Set(), true).filter(ts.isFunctionLike),
+    )
   const error405 =
-    handlers.length > 0 && handlers.every((node) => isTerminal405Handler(node, checker))
+    proofGroups.length > 0 &&
+    proofGroups.every(
+      (handlers) =>
+        handlers.length > 0 && handlers.every((node) => isTerminal405Handler(node, checker)),
+    )
   let fixedStatus: number | undefined
   nodes.forEach((node) => {
     visit(node, (child) => {
