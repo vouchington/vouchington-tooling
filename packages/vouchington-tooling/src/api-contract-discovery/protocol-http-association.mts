@@ -87,6 +87,23 @@ export function opaqueHttpResponse(
       responseMethods.has(contextResponseMethod(call.expression, context, checker, true) ?? '') &&
       opaqueProtocolCallbackPath(call, checker)
     )
+  return !!supportedResponseContext(call, checker) && opaqueProtocolCallbackPath(call, checker)
+}
+
+/** Mutable wrappers on supported callback paths cannot establish a complete contract. */
+export function unsupportedContextResponse(
+  call: ts.CallExpression,
+  checker: ts.TypeChecker,
+): boolean {
+  if (!executableProtocolPath(call, checker)) return false
+  const context = supportedResponseContext(call, checker)
+  return !!context && contextResponseMethod(call.expression, context, checker) === undefined
+}
+
+function supportedResponseContext(
+  call: ts.CallExpression,
+  checker: ts.TypeChecker,
+): ts.Symbol | undefined {
   let handler = enclosingFunction(call)
   while (handler) {
     const name = runtimeParameters(handler)[0]?.name
@@ -97,8 +114,8 @@ export function opaqueHttpResponse(
       isSupportedProtocolCallback(handler, checker) &&
       executableProtocolPath(handler, checker)
     )
-      return opaqueProtocolCallbackPath(call, checker)
+      return symbol
     handler = enclosingFunction(handler)
   }
-  return false
+  return undefined
 }

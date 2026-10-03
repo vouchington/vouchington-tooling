@@ -8,7 +8,7 @@ import {
 } from './build-openapi-sse-events.mts'
 import { nodeToOpenApi } from './contract-schema-to-openapi.mts'
 import { responseStatusCodesForContract, type ResponseContract } from './operation-types.mts'
-import type { OpenApiResponse, OpenApiResponseOrRef, OpenApiSchema } from './openapi-types.mts'
+import type { OpenApiResponse, OpenApiSchema } from './openapi-types.mts'
 
 type ResponseBucket = {
   schemas: OpenApiSchema[]
@@ -20,7 +20,7 @@ export function buildOperationResponse(
   variants: ResponseContract[],
   registry: ComponentRegistry,
 ): {
-  responses: Record<number, OpenApiResponseOrRef>
+  responses: Record<number, OpenApiResponse>
   unavailable: boolean
   unavailableReason?: string
 } {

@@ -1,7 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
-import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 
 export function httpEmissionKind(
   call: ts.CallExpression,
@@ -54,23 +53,6 @@ export function contextResponseMethod(
   if (receiver.path.length === 1 && receiver.path[0] === 'response')
     return `response.${expression.name.text}`
   return undefined
-}
-
-/** Mutable context wrappers cannot establish a complete response contract. */
-export function unsupportedContextResponse(
-  call: ts.CallExpression,
-  checker: ts.TypeChecker,
-): boolean {
-  const handler = enclosingFunction(call)
-  const name = handler && runtimeParameters(handler)[0]?.name
-  const context = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
-  if (!context) return false
-  const method = contextResponseMethod(call.expression, context, checker, true)
-  return (
-    method !== undefined &&
-    ['setStatus', 'pipeline', 'json', 'response.buffer', 'response.empty'].includes(method) &&
-    contextResponseMethod(call.expression, context, checker) === undefined
-  )
 }
 
 function responseProperty(

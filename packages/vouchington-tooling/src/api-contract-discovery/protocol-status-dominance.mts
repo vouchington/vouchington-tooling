@@ -12,16 +12,31 @@ export function statusDominatesEmission(
     if (ts.isBlock(parent)) {
       const index = parent.statements.indexOf(current as ts.Statement)
       for (const statement of parent.statements.slice(0, index).toReversed())
-        if (containsStatus(statement, allStatuses))
-          return (
-            ts.isExpressionStatement(statement) &&
-            ts.isCallExpression(statement.expression) &&
-            statuses.has(statement.expression)
-          )
+        if (containsStatus(statement, allStatuses)) {
+          const setter = unconditionalStatusSetter(statement, allStatuses)
+          return !!setter && statuses.has(setter)
+        }
     }
     current = parent
   }
   return false
+}
+
+/** Finds the last setter through unconditional blocks, excluding conditional compound statements. */
+export function unconditionalStatusSetter(
+  statement: ts.Statement,
+  statuses: ReadonlySet<ts.CallExpression>,
+): ts.CallExpression | undefined {
+  if (ts.isBlock(statement)) {
+    for (const child of statement.statements.toReversed())
+      if (containsStatus(child, statuses)) return unconditionalStatusSetter(child, statuses)
+  } else if (
+    ts.isExpressionStatement(statement) &&
+    ts.isCallExpression(statement.expression) &&
+    statuses.has(statement.expression)
+  )
+    return statement.expression
+  return undefined
 }
 
 function containsStatus(node: ts.Node, statuses: ReadonlySet<ts.CallExpression>): boolean {

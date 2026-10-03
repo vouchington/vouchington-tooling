@@ -4,7 +4,7 @@ import { unsupportedContextAlias, unsupportedContextAssignment } from './protoco
 import { contextResponseMethod } from './protocol-http-emission.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { statusCanPrecede } from './protocol-sse-feasible-status.mts'
-import { statusDominatesEmission } from './protocol-status-dominance.mts'
+import { statusDominatesEmission, unconditionalStatusSetter } from './protocol-status-dominance.mts'
 import { visit } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
 
@@ -72,13 +72,10 @@ function nearestSetter(
     const parent = current.parent
     if (ts.isBlock(parent)) {
       const index = parent.statements.indexOf(current as ts.Statement)
-      for (const statement of parent.statements.slice(0, index).toReversed())
-        if (
-          ts.isExpressionStatement(statement) &&
-          ts.isCallExpression(statement.expression) &&
-          setters.has(statement.expression)
-        )
-          return statement.expression
+      for (const statement of parent.statements.slice(0, index).toReversed()) {
+        const setter = unconditionalStatusSetter(statement, setters)
+        if (setter) return setter
+      }
     }
     current = parent
   }
