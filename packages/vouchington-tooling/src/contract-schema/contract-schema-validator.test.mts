@@ -4,6 +4,21 @@ import type { ContractSchema } from '../openapi-document/contract-schema-types.m
 import { validateResponseContract } from './contract-schema-validator.mts'
 
 describe('validateResponseContract', () => {
+  it('requires own fields while accepting explicitly declared prototype-named fields', () => {
+    const schema: ContractSchema = {
+      root: {
+        type: 'object',
+        properties: { constructor: { required: true, schema: { type: 'number' as const } } },
+        additionalProperties: false,
+      },
+      definitions: {},
+    }
+    expect(validateResponseContract(schema, {})).toEqual([
+      expect.objectContaining({ kind: 'missing-required' }),
+    ])
+    expect(validateResponseContract(schema, { constructor: 1 })).toEqual([])
+  })
+
   it('accepts primitives, literals, null, unknown, and refs', () => {
     const schema: ContractSchema = {
       root: {

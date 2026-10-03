@@ -107,6 +107,17 @@ describe('closed empty JSON containers', () => {
     },
   )
 
+  it.each(['constructor', 'toString', '__proto__'])(
+    'rejects own prototype-named JSON key %s',
+    (key) => {
+      const contract = extractResponseContracts(matrix.program, matrix.sourceFile('empty')).record!
+      const body: unknown = JSON.parse(`{"${key}":1}`)
+      expect(validateResponseContract(contract.schema, body)).toEqual([
+        expect.objectContaining({ kind: 'unexpected' }),
+      ])
+    },
+  )
+
   it('extracts a closed empty record and preserves nested container bounds', () => {
     const contracts = extractResponseContracts(matrix.program, matrix.sourceFile('empty'))
     const record = contracts.record!

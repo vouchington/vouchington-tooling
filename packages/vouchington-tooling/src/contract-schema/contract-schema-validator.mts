@@ -126,7 +126,7 @@ function validateObject(
   if (!isObject(value)) return requireType(false, 'object', value, path, context)
 
   for (const [key, property] of Object.entries(node.properties)) {
-    if (!(key in value)) {
+    if (!Object.hasOwn(value, key)) {
       if (property.required) {
         addIssue(context, propertyPath(path, key), 'missing-required', 'Required field is missing')
       }
@@ -137,7 +137,7 @@ function validateObject(
 
   if (!checkUnexpected) return
   for (const [key, nested] of Object.entries(value)) {
-    if (key in node.properties) continue
+    if (Object.hasOwn(node.properties, key)) continue
     if (node.additionalProperties === false) {
       addUnexpectedIssue(context, propertyPath(path, key))
       continue
