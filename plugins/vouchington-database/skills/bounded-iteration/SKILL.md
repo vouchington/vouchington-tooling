@@ -40,7 +40,8 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    current on write. A full pass is an explicit, capped, resumable backfill, not a scheduled pass
    over everything.
 10. **Verify with a plan.** EXPLAIN at representative cardinality shows no Seq Scan on an
-    unbounded table.
+    unbounded table, and an index that supplies the `ORDER BY`, so the scan stops at the
+    `LIMIT` instead of reading and sorting every match.
 
 For work-item, lease, and cursor tables, read [postgres-schema-design](../postgres-schema-design/SKILL.md).
 For query shape and streaming, read [performance patterns](../postgres-node-performance-tuning/references/performance-patterns.md).

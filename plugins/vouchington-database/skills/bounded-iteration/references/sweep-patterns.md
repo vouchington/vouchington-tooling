@@ -70,7 +70,9 @@ SET available_at = GREATEST(order_reconcile_work_items.available_at, now()),
     generation = order_reconcile_work_items.generation + 1;
 ```
 
-Completion adds `AND generation = $claimed`. A re-mark never makes a leased row due early, since
+The claim above applies with `order_id` for `invoice_id`, and its `RETURNING` also includes
+`generation`, so `$claimed` is captured in the same statement as the lease. Completion adds
+`AND generation = $claimed`. A re-mark never makes a leased row due early, since
 the claim moved `available_at` to the lease expiry. A completion that finds a newer generation
 releases the lease with `available_at = now()`, and the next claim takes the row again. Run cost
 follows the number of changes, not the number of orders. A job fanned out per account reads by
@@ -281,8 +283,10 @@ window. A scheduler never starts it as a pass over everything.
 
 Run each statement with representative parameters against representative table sizes, because a
 small table scans sequentially for good reason. The `due` query of the claim above should plan as
-a `Limit` over a `LockRows` over an index scan on the partial index. A `Seq Scan` on a table that grows is the
-finding:
+a `Limit` over a `LockRows` over an index scan on the partial index, with no `Sort` between the
+scan and the `Limit`. Read the rows each node returns, not only the scan type: an index scan that
+feeds a `Sort` below the `Limit` still reads every match. A `Seq Scan` on a table that grows is
+also a finding:
 
 ```sql
 PREPARE claim_due (integer) AS
