@@ -162,6 +162,33 @@ describe('compiler-discovered protocol contracts', () => {
     },
   )
 
+  it.each(
+    [
+      [],
+      ['GET:/unrelated'],
+      ['GET:/events'],
+      ['GET:/events#protocol-2'],
+      ['GET:/events', 'GET:/events#protocol-2'],
+    ].map((keys) => ({ keys })),
+  )('restricts protocol contracts to requested SSE keys $keys', ({ keys }) => {
+    const contracts = discoverApiResponseContracts(
+      matrix.program,
+      [matrix.sourceFile('sse')],
+      new Set(keys),
+    )
+    expect(Object.keys(contracts)).toEqual(keys.filter((key) => key !== 'GET:/unrelated'))
+  })
+
+  it('restricts branded HTTP variants to their exact requested key', () => {
+    const contracts = discoverApiResponseContracts(
+      matrix.program,
+      [matrix.sourceFile('http')],
+      new Set(['POST:/rpc#protocol-2']),
+    )
+    expect(Object.keys(contracts)).toEqual(['POST:/rpc#protocol-2'])
+    expect(contracts['POST:/rpc#protocol-2']!.statusCodes).toEqual([202])
+  })
+
   it('validates the actual data shape rather than the framed string', () => {
     const events = Object.values(discover('sse')).flatMap((contract) => contract.sseEvents ?? [])
     const progress = events.find((event) => event.eventName === 'progress')!.contract

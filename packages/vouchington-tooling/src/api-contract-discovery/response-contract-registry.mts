@@ -35,13 +35,16 @@ export function discoverApiResponseContracts(
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendResponseContract>()
   const handlerBindings = collectHandlerBindings(sourceFiles, checker)
+  const protocolContracts = new Map<string, BackendResponseContract>()
   const protocolEmissions = discoverProtocolContracts(
     sourceFiles,
     checker,
     handlerBindings,
-    contracts,
+    protocolContracts,
     options,
   )
+  for (const [key, contract] of protocolContracts)
+    if (!requestedKeys || requestedKeys.has(key)) contracts.set(key, contract)
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
