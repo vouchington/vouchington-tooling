@@ -17,6 +17,10 @@ const sources = {
   'bounded-impossible': `type BoundedArray<T, Min extends number, Max extends number, Unique extends boolean> = T[]
     interface ApiResponseContracts { result: BoundedArray<never,1,5,false> }`,
   intersection: `interface ApiResponseContracts { result: { foo: string } & Record<string, never> }`,
+  optional: `interface ApiResponseContracts { result: { foo?: string; bar?: number } & Record<string, never> }`,
+  'mixed-required': `interface ApiResponseContracts { result: { foo?: string; bar: number } & Record<string, never> }`,
+  'optional-callable': `interface ApiResponseContracts { result: (() => string) & { foo?: string } & Record<string, never> }`,
+  'optional-constructable': `interface ApiResponseContracts { result: (new () => object) & { foo?: string } & Record<string, never> }`,
   never: 'interface ApiResponseContracts { result: never }',
   any: 'interface ApiResponseContracts { result: any }',
   property: 'interface ApiResponseContracts { result: { impossible: never } }',
@@ -66,11 +70,42 @@ describe('closed empty JSON containers', () => {
     ).toThrow('impossible never element bounds')
   })
 
-  it('rejects named properties conflicting with a never string index', () => {
-    expect(() =>
-      extractResponseContracts(matrix.program, matrix.sourceFile('intersection')),
-    ).toThrow('never string index conflicts with named properties')
+  it.each(['intersection', 'mixed-required'] as const)(
+    'rejects required named properties conflicting with a never string index in %s',
+    (name) => {
+      expect(() => extractResponseContracts(matrix.program, matrix.sourceFile(name))).toThrow(
+        'never string index conflicts with named properties',
+      )
+    },
+  )
+
+  it('collapses optional properties forbidden by a never string index to a closed empty object', () => {
+    const contract = extractResponseContracts(matrix.program, matrix.sourceFile('optional')).result!
+    expect(contract.schema.root).toEqual({
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    })
+    expect(validateResponseContract(contract.schema, {})).toEqual([])
+    expect(validateResponseContract(contract.schema, { foo: 'present' })).not.toEqual([])
+    expect(validateResponseContract(contract.schema, { bar: 1 })).not.toEqual([])
+    expect(validateResponseContract(contract.schema, { extra: true })).not.toEqual([])
+    expect(
+      nodeToOpenApi(contract.schema.root, {
+        definitions: contract.schema.definitions,
+        refName: (value) => value,
+      }),
+    ).toEqual({ type: 'object', properties: {}, additionalProperties: false })
   })
+
+  it.each(['optional-callable', 'optional-constructable'] as const)(
+    'still rejects non-JSON %s intersections',
+    (name) => {
+      expect(() => extractResponseContracts(matrix.program, matrix.sourceFile(name))).toThrow(
+        `${name === 'optional-callable' ? 'callable' : 'constructable'} types are not supported`,
+      )
+    },
+  )
 
   it('extracts a closed empty record and preserves nested container bounds', () => {
     const contracts = extractResponseContracts(matrix.program, matrix.sourceFile('empty'))

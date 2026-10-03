@@ -96,8 +96,16 @@ function schemaForType(type: ts.Type, context: ExtractionContext): ContractSchem
   }
   if (type.isIntersection()) {
     const index = checker.getIndexTypeOfType(type, ts.IndexKind.String)
-    if (index && index.flags & ts.TypeFlags.Never && checker.getPropertiesOfType(type).length > 0)
-      throw unsupportedType(type, checker, 'never string index conflicts with named properties')
+    const properties = checker.getPropertiesOfType(type)
+    if (index && index.flags & ts.TypeFlags.Never && properties.length > 0) {
+      if (properties.some((property) => !(property.flags & ts.SymbolFlags.Optional)))
+        throw unsupportedType(type, checker, 'never string index conflicts with named properties')
+      if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0)
+        throw unsupportedType(type, checker, 'callable types are not supported')
+      if (checker.getSignaturesOfType(type, ts.SignatureKind.Construct).length > 0)
+        throw unsupportedType(type, checker, 'constructable types are not supported')
+      return { type: 'object', properties: {}, additionalProperties: false }
+    }
     return {
       type: 'intersection',
       variants: distinctNodes(type.types.map((variant) => schemaForType(variant, context))),

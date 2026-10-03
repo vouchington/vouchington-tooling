@@ -33,6 +33,25 @@ const sources = {
   defaults: `${preamble} function reject(context: Ctx, reason = 'unsupported') { context.throw(405) }
     app.route('/api/example').get((ctx: Ctx) => reject(ctx))`,
   allow: handler("ctx.set('Allow','GET, PATCH'); ctx.throw(405)"),
+  'closure-wrapper': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    const wrap=(handler:(ctx:Ctx)=>void)=>(ctx:Ctx)=>handler(ctx);app.route('/api/example').get(wrap(deny))`,
+  'closure-arrow-argument': `${preamble} const wrap=(handler:(ctx:Ctx)=>void)=>(ctx:Ctx)=>handler(ctx)
+    app.route('/api/example').get(wrap((ctx:Ctx)=>ctx.throw(405)))`,
+  'unresolved-factory-return': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    const handlers={success:(ctx:Ctx)=>ctx.json({ok:true})};function choose(flag:boolean){if(flag)return deny;return handlers.success}
+    app.route('/api/example').get(choose(false))`,
+  'fallthrough-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    function choose(flag:boolean){if(flag)return deny};app.route('/api/example').get(choose(false))`,
+  'mutable-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405);let choose=()=>deny;app.route('/api/example').get(choose())`,
+  'generator-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405);function* wrap(){return deny};app.route('/api/example').get(wrap())`,
+  'async-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405);async function wrap(){return deny};app.route('/api/example').get(wrap())`,
+  'bare-return-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    function choose(flag:boolean){if(flag)return deny;return};app.route('/api/example').get(choose(false))`,
+  'branch-closures-success': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    const success=(ctx:Ctx)=>ctx.json({ok:true});const wrap=(handler:(ctx:Ctx)=>void)=>(ctx:Ctx)=>handler(ctx)
+    function choose(flag:boolean){if(flag)return wrap(deny);return wrap(success)};app.route('/api/example').get(choose(false))`,
+  'all-branches-factory': `${preamble} const deny=(ctx:Ctx)=>ctx.throw(405)
+    function choose(flag:boolean){if(flag)return deny;else return (ctx:Ctx)=>ctx.throw(405)};app.route('/api/example').get(choose(false))`,
   'nested-wrapper': `${preamble} const reject=(ctx:Ctx)=>ctx.throw(405)
     const wrap=<T>(handler:T):T=>handler;app.route('/api/example').get(wrap(wrap(reject)))`,
   transparent: `${preamble} type Handler=(ctx:Ctx)=>never
@@ -138,6 +157,9 @@ describe('terminal error-only route proof', () => {
     'renamed',
     'helper',
     'wrapper',
+    'closure-wrapper',
+    'closure-arrow-argument',
+    'all-branches-factory',
     'awaited',
     'parenthesized',
     'defaults',
@@ -188,6 +210,13 @@ describe('terminal error-only route proof', () => {
     'virtual-method',
     'erased-async',
     'void-adapter',
+    'unresolved-factory-return',
+    'fallthrough-factory',
+    'bare-return-factory',
+    'mutable-factory',
+    'generator-factory',
+    'async-factory',
+    'branch-closures-success',
     'rewritten-wrapper',
     'destructured-wrapper',
     'postfix-write',
@@ -246,14 +275,16 @@ describe('terminal error-only route proof', () => {
         `export interface Ctx { throw(status: number): never }
         export function reject(context: Ctx) { context.throw(405) }
         export const wrap = <T>(handler: T): T => handler
+        export const closure = (handler: (ctx: Ctx) => void) => (ctx: Ctx) => handler(ctx)
         export default function(context: Ctx) { context.throw(405) }`,
       )
       writeFileSync(
         entry,
-        `import defaultDeny, { reject as deny, wrap as handlerFactory, type Ctx } from './shared'
+        `import defaultDeny, { reject as deny, wrap as handlerFactory, closure as delegateFactory, type Ctx } from './shared'
         declare const app: any
         app.route('/api/example').get(handlerFactory((ctx: Ctx) => deny(ctx)))
-        app.route('/api/default').get(defaultDeny)`,
+        app.route('/api/default').get(defaultDeny)
+        app.route('/api/closure').get(delegateFactory(deny))`,
       )
       const program = ts.createProgram([shared, entry], {
         module: ts.ModuleKind.ESNext,
@@ -264,6 +295,7 @@ describe('terminal error-only route proof', () => {
       })
       expect(ts.getPreEmitDiagnostics(program)).toEqual([])
       expect(discoverRegisteredRoutes(program, [program.getSourceFile(entry)!])).toMatchObject([
+        { kind: 'error-only' },
         { kind: 'error-only' },
         { kind: 'error-only' },
       ])

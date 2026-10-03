@@ -1,5 +1,11 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { returnedExpressions, returnsOnEveryPath } from './registered-route-factory-returns.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
+
+export type HandlerProof = {
+  node: ts.FunctionLikeDeclaration
+  bindings: Map<ts.Symbol, ts.Expression>
+}
 
 export function handlerNodes(
   argument: ts.Expression,
@@ -7,10 +13,11 @@ export function handlerNodes(
   parameterBindings = new Map<ts.Symbol, ts.Expression>(),
   active = new Set<ts.Node>(),
   staticProof = false,
+  proofs?: HandlerProof[],
 ): ts.Node[] {
   const unwrapped = unwrapHandlerExpression(argument)
   if (unwrapped !== argument)
-    return handlerNodes(unwrapped, checker, parameterBindings, active, staticProof)
+    return handlerNodes(unwrapped, checker, parameterBindings, active, staticProof, proofs)
   let bound = argument
   const boundIdentifiers = new Set<ts.Node>()
   while (ts.isIdentifier(bound)) {
@@ -22,16 +29,24 @@ export function handlerNodes(
     bound = nextArgument
   }
   if (bound !== argument)
-    return handlerNodes(bound, checker, parameterBindings, active, staticProof)
+    return handlerNodes(bound, checker, parameterBindings, active, staticProof, proofs)
   if (active.has(argument)) return []
   const next = new Set(active).add(argument)
-  if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) return [argument]
+  if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) {
+    proofs?.push({ node: argument, bindings: parameterBindings })
+    return [argument]
+  }
   if (ts.isCallExpression(argument)) {
-    return callableImplementations(argument.expression, checker, staticProof).flatMap(
+    const resolvedProofs: HandlerProof[] = []
+    const groups = callableImplementations(argument.expression, checker, staticProof).map(
       (implementation) => {
         if (
           staticProof &&
-          implementation.parameters.some((parameter) => hasBindingWrite(parameter, checker))
+          (implementation.asteriskToken ||
+            implementation.modifiers?.some(
+              (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
+            ) ||
+            implementation.parameters.some((parameter) => hasBindingWrite(parameter, checker)))
         )
           return []
         const bindings = new Map(parameterBindings)
@@ -40,16 +55,28 @@ export function handlerNodes(
           const symbol = checker.getSymbolAtLocation(parameter.name)
           if (callArgument && symbol) bindings.set(symbol, callArgument)
         })
-        return returnedExpressions(implementation).flatMap((returnedExpression) =>
-          handlerNodes(returnedExpression, checker, bindings, next, staticProof),
+        const returned = returnedExpressions(implementation)
+        if (
+          staticProof &&
+          (!returnsOnEveryPath(implementation.body!) || returned.some((value) => !value))
         )
+          return []
+        const results = returned.map((value) =>
+          value ? handlerNodes(value, checker, bindings, next, staticProof, resolvedProofs) : [],
+        )
+        return staticProof && results.some((result) => !result.some(ts.isFunctionLike))
+          ? []
+          : results.flat()
       },
     )
+    if (staticProof && groups.some((group) => group.length === 0)) return []
+    proofs?.push(...resolvedProofs)
+    return groups.flat()
   }
-  return declarationImplementations(argument, checker, next, staticProof)
+  return declarationImplementations(argument, checker, next, staticProof, parameterBindings, proofs)
 }
 
-export function callableImplementations(
+function callableImplementations(
   node: ts.Node,
   checker: ts.TypeChecker,
   staticProof = false,
@@ -76,27 +103,13 @@ export function callableImplementations(
   return implementations
 }
 
-function returnedExpressions(declaration: ts.FunctionLikeDeclaration): ts.Expression[] {
-  const body = declaration.body!
-  if (!ts.isBlock(body)) return [body]
-  const returned: ts.Expression[] = []
-  const collect = (node: ts.Node): void => {
-    if (node !== declaration && ts.isFunctionLike(node)) return
-    if (ts.isReturnStatement(node)) {
-      if (node.expression) returned.push(node.expression)
-      return
-    }
-    node.forEachChild(collect)
-  }
-  body.forEachChild(collect)
-  return returned
-}
-
 function declarationImplementations(
   node: ts.Node,
   checker: ts.TypeChecker,
   active: Set<ts.Node>,
   staticProof: boolean,
+  parameterBindings: Map<ts.Symbol, ts.Expression>,
+  proofs?: HandlerProof[],
 ): ts.Node[] {
   const symbol = checker.getSymbolAtLocation(node)
   if (!symbol) return []
@@ -106,12 +119,21 @@ function declarationImplementations(
     if (
       ts.isFunctionDeclaration(declaration) ||
       (!staticProof && ts.isMethodDeclaration(declaration))
-    )
+    ) {
+      if (declaration.body) proofs?.push({ node: declaration, bindings: parameterBindings })
       return declaration.body ? [declaration] : []
+    }
     if (ts.isVariableDeclaration(declaration) && declaration.initializer)
       return [
         declaration,
-        ...handlerNodes(declaration.initializer, checker, new Map(), active, staticProof),
+        ...handlerNodes(
+          declaration.initializer,
+          checker,
+          parameterBindings,
+          active,
+          staticProof,
+          proofs,
+        ),
       ]
     return []
   })

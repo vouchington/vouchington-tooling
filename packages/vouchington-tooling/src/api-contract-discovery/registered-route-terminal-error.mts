@@ -1,9 +1,13 @@
 import ts from '../contract-schema/typescript-api.mts'
 
-import { callableImplementations } from './registered-route-handler-analysis.mts'
+import { handlerNodes, type HandlerProof } from './registered-route-handler-analysis.mts'
 
 /** Proves a terminal 405 on the handler's own context, rather than finding a nested throw. */
-export function isTerminal405Handler(node: ts.Node, checker: ts.TypeChecker): boolean {
+export function isTerminal405Handler(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+  bindings = new Map<ts.Symbol, ts.Expression>(),
+): boolean {
   if (
     !(
       ts.isArrowFunction(node) ||
@@ -17,7 +21,7 @@ export function isTerminal405Handler(node: ts.Node, checker: ts.TypeChecker): bo
   const context = node.parameters[0]?.name
   const symbol =
     context && ts.isIdentifier(context) ? checker.getSymbolAtLocation(context) : undefined
-  return !!symbol && terminalBody(node, symbol, checker, new Set())
+  return !!symbol && terminalBody(node, symbol, checker, new Set(), true, bindings)
 }
 
 function terminalBody(
@@ -26,6 +30,7 @@ function terminalBody(
   checker: ts.TypeChecker,
   active: Set<ts.Node>,
   returned = true,
+  bindings = new Map<ts.Symbol, ts.Expression>(),
 ): boolean {
   if (!node.body || node.asteriskToken || active.has(node)) return false
   if (
@@ -38,7 +43,8 @@ function terminalBody(
   )
     return false
   const next = new Set(active).add(node)
-  if (!ts.isBlock(node.body)) return terminalCall(node.body, context, checker, next, returned)
+  if (!ts.isBlock(node.body))
+    return terminalCall(node.body, context, checker, next, returned, bindings)
   const statements = node.body.statements
   const terminal = statements.at(-1)
   if (
@@ -47,11 +53,11 @@ function terminalBody(
   )
     return false
   if (ts.isExpressionStatement(terminal))
-    return terminalCall(terminal.expression, context, checker, next, false)
+    return terminalCall(terminal.expression, context, checker, next, false, bindings)
   return (
     ts.isReturnStatement(terminal) &&
     !!terminal.expression &&
-    terminalCall(terminal.expression, context, checker, next, returned)
+    terminalCall(terminal.expression, context, checker, next, returned, bindings)
   )
 }
 
@@ -61,11 +67,12 @@ function terminalCall(
   checker: ts.TypeChecker,
   active: Set<ts.Node>,
   returned: boolean,
+  bindings: Map<ts.Symbol, ts.Expression>,
 ): boolean {
   if (ts.isAwaitExpression(expression))
-    return terminalCall(expression.expression, context, checker, active, true)
+    return terminalCall(expression.expression, context, checker, active, true, bindings)
   if (ts.isParenthesizedExpression(expression))
-    return terminalCall(expression.expression, context, checker, active, returned)
+    return terminalCall(expression.expression, context, checker, active, returned, bindings)
   if (!ts.isCallExpression(expression) || expression.questionDotToken) return false
   if (
     expression.arguments.some(
@@ -86,12 +93,13 @@ function terminalCall(
     )
   }
   if (!ts.isIdentifier(callee)) return false
-  const implementations = callableImplementations(callee, checker, true)
+  const implementations: HandlerProof[] = []
+  handlerNodes(callee, checker, bindings, new Set(), true, implementations)
   if (!returned && checker.getPropertyOfType(checker.getTypeAtLocation(expression), 'then'))
     return false
   return (
     implementations.length > 0 &&
-    implementations.every((implementation) => {
+    implementations.every(({ node: implementation, bindings: captured }) => {
       if (
         !returned &&
         implementation.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
@@ -104,7 +112,7 @@ function terminalCall(
       const parameter = implementation.parameters[index]?.name
       const symbol =
         parameter && ts.isIdentifier(parameter) ? checker.getSymbolAtLocation(parameter) : undefined
-      return !!symbol && terminalBody(implementation, symbol, checker, active, returned)
+      return !!symbol && terminalBody(implementation, symbol, checker, active, returned, captured)
     })
   )
 }

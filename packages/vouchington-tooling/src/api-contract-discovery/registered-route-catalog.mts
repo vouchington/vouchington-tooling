@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 
-import { handlerNodes } from './registered-route-handler-analysis.mts'
+import { handlerNodes, type HandlerProof } from './registered-route-handler-analysis.mts'
 import { isTerminal405Handler } from './registered-route-terminal-error.mts'
 import {
   propertyName,
@@ -64,14 +64,17 @@ function classifyHandler(
   let sse = false
   const proofGroups = call.arguments
     .filter((argument) => !ts.isStringLiteral(argument))
-    .map((argument) =>
-      handlerNodes(argument, checker, new Map(), new Set(), true).filter(ts.isFunctionLike),
-    )
+    .map((argument) => {
+      const proofs: HandlerProof[] = []
+      const nodes = handlerNodes(argument, checker, new Map(), new Set(), true, proofs)
+      return nodes.some(ts.isFunctionLike) ? proofs : []
+    })
   const error405 =
     proofGroups.length > 0 &&
     proofGroups.every(
       (handlers) =>
-        handlers.length > 0 && handlers.every((node) => isTerminal405Handler(node, checker)),
+        handlers.length > 0 &&
+        handlers.every((proof) => isTerminal405Handler(proof.node, checker, proof.bindings)),
     )
   let fixedStatus: number | undefined
   nodes.forEach((node) => {
