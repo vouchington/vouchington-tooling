@@ -52,11 +52,11 @@ generic skills remain host-neutral and read the consuming repository's local ins
 
 This repository adopts Agent Blackboard for durable agent-session notes. The `vouchington-workflow`
 journaling skills call the tools of the [`vouchington mcp` server](packages/vouchington-tooling/docs/mcp-server.md),
-so a repository that adopts them registers that server and installs its packages. This repository's
-checked-in Codex and Claude configuration runs its own server from source, approves all of its
-tools, and disables the upstream `agent-blackboard` plugin. Credential-management commands remain
-CLI-only. When MCP is unavailable, the journaling skill permits the supported CLI fallback and
-requires both a journal entry and a human-facing notice.
+which is installed and registered once per machine in each harness, not per repository. This
+repository registers no server, approves all of its tools for Claude, and disables the upstream
+`agent-blackboard` plugin. Credential-management commands remain CLI-only. When MCP is unavailable,
+the journaling skill permits the supported CLI fallback and requires both a journal entry and a
+human-facing notice.
 
 ### Install (opt-in)
 

@@ -1,12 +1,2 @@
 [plugins."agent-blackboard@agent-blackboard"]
 enabled = false
-
-[mcp_servers.vouchington-tooling]
-command = "bash"
-args = [
-  "-c",
-  'exec node "$(git rev-parse --show-toplevel)/packages/vouchington-tooling/src/cli/index.mts" mcp',
-]
-env_vars = ["AGENT_BLACKBOARD_URL", "AGENT_BLACKBOARD_TOKEN"]
-default_tools_approval_mode = "approve"
-required = false
