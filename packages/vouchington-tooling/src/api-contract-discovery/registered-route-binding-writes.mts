@@ -10,6 +10,13 @@ export function hasBindingWrite(
   const binding = checker.getSymbolAtLocation(declaration.name)
   let written = false
   const referencesBinding = (node: ts.Node): void => {
+    // Index expressions and computed property names read their keys, not write them.
+    // inspect still visits these expressions separately to detect nested side-effect writes.
+    if (ts.isComputedPropertyName(node)) return
+    if (ts.isElementAccessExpression(node)) {
+      referencesBinding(node.expression)
+      return
+    }
     if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === binding) written = true
     node.forEachChild(referencesBinding)
   }
