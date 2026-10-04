@@ -87,6 +87,11 @@ describe('serial-cursor-drains', () => {
     'enabled ? [] : rows.map(drain)',
     'rows.map(drain) ? [] : []',
     '[...rows.map(drain)]',
+    'rows.map(drain).filter(Boolean)',
+    'passThrough(rows.map(drain))',
+    'new Collection(rows.map(drain))',
+    'rows.map(drain)[method]()',
+    'object[rows.map(drain)]()',
     '[first(), rows.map(drain)]',
     '(first(), rows.map(drain))',
   ])('rejects eager drains nested in %s', async (argument) => {
@@ -102,21 +107,27 @@ describe('serial-cursor-drains', () => {
     ).toEqual(['serial'])
   })
 
-  it.each(['enabled ? [] : []', '[] ?? []', '[, () => rows.map(drain)]', '(first(), [])', ''])(
-    'allows arguments without eagerly evaluated iterations: %s',
-    async (argument) => {
-      expect(
-        messageIds(
-          await lintRule(
-            'serial-cursor-drains',
-            `function writeRows() { Promise.all(${argument}) }`,
-            OPTIONS,
-            'src/export.js',
-          ),
+  it.each([
+    'enabled ? [] : []',
+    '[] ?? []',
+    '[, () => rows.map(drain)]',
+    'passThrough(() => rows.map(drain))',
+    'new Collection([])',
+    'object[method]()',
+    '(first(), [])',
+    '',
+  ])('allows arguments without eagerly evaluated iterations: %s', async (argument) => {
+    expect(
+      messageIds(
+        await lintRule(
+          'serial-cursor-drains',
+          `function writeRows() { Promise.all(${argument}) }`,
+          OPTIONS,
+          'src/export.js',
         ),
-      ).toEqual([])
-    },
-  )
+      ),
+    ).toEqual([])
+  })
 
   it('keeps selected methods, owners and files configurable', async () => {
     const code = `function writeRows() { Promise.all(rows.map(drain)) }`
