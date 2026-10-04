@@ -68,8 +68,11 @@ export function isMemberReadException(
   member: NodeLike,
   exceptions: readonly MemberReadException[],
 ): boolean {
-  const call = member.parent
-  if (call?.type !== 'CallExpression' || call.callee !== member) return false
+  let expression = member
+  while (expression.parent && unwrap(expression.parent) === member) expression = expression.parent
+  const call = expression.parent
+  if (call?.type !== 'CallExpression' || unwrap(call.callee as NodeLike | undefined) !== member)
+    return false
   const object = unwrap(member.object as NodeLike | undefined)
   const args = call.arguments as NodeLike[]
   return exceptions.some((exception) => {

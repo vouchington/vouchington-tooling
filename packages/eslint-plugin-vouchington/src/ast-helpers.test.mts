@@ -267,3 +267,27 @@ describe('patternPropertyName and memberIsRead', () => {
     ).toBe(false)
   })
 })
+
+it('ignores erased ambient definitions while retaining outer runtime bindings', () => {
+  const runtime: VariableLike = { name: 'Promise', defs: [], references: [] }
+  for (const definition of [
+    {
+      type: 'Variable',
+      node: { type: 'VariableDeclarator' },
+      parent: { type: 'VariableDeclaration', declare: true },
+    },
+    { type: 'ClassName', node: { type: 'ClassDeclaration', declare: true } },
+  ]) {
+    const ambient: VariableLike = { name: 'Promise', defs: [definition], references: [] }
+    const context: RuleContextLike = {
+      filename: 'src/example.mts',
+      options: [],
+      report: () => {},
+      sourceCode: {
+        getScope: () => ({ variables: [ambient], upper: { variables: [runtime], upper: null } }),
+      },
+    }
+    expect(findVariable(context, { type: 'Identifier', name: 'Promise' }, true)).toBe(runtime)
+    expect(findVariable(context, { type: 'Identifier', name: 'Promise' })).toBe(ambient)
+  }
+})

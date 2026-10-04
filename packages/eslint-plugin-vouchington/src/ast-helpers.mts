@@ -69,7 +69,16 @@ export function findVariable(
     const variable =
       (typeof scope.set?.get === 'function' && scope.set.get(identifier.name)) ||
       scope.variables?.find((candidate) => candidate.name === identifier.name)
-    if (variable && (!valueOnly || variable.isValueVariable !== false)) return variable
+    if (
+      variable &&
+      (!valueOnly ||
+        (variable.isValueVariable !== false &&
+          (!variable.defs.length ||
+            variable.defs.some(
+              (definition) => !definition.node.declare && !definition.parent?.declare,
+            ))))
+    )
+      return variable
     scope = scope.upper
   }
   return null
