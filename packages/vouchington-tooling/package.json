@@ -333,6 +333,11 @@
       "types": "./dist/basic-auth-doc-sync/index.d.mts",
       "import": "./dist/basic-auth-doc-sync/index.mjs",
       "default": "./dist/basic-auth-doc-sync/index.mjs"
+    },
+    "./basic-auth-doc-sync/runbook": {
+      "types": "./dist/basic-auth-doc-sync/runbook.d.mts",
+      "import": "./dist/basic-auth-doc-sync/runbook.mjs",
+      "default": "./dist/basic-auth-doc-sync/runbook.mjs"
     }
   },
   "publishConfig": {

@@ -36,6 +36,8 @@ describe('basic-auth runbook facts', () => {
     '| Path | Methods |\n| --- | missing |\n| `/status` | `GET` |',
     '| Path | Methods |\n| --- |\n| `/status` | `GET` |',
     '| Path | Methods |\n| --- | --- |',
+    '| Path | Path | Methods |\n| - | - | - |\n| `/wrong` | `/status` | `GET` |',
+    '| Path | Methods | METHODS |\n| - | - | - |\n| `/status` | `GET` | `POST` |',
     '| Methods | Path |\n| - | - |\n| `GET` |',
     '| Path | Verbs |\n| - | - |\n| `/status` | `GET` |',
     '| Path | Methods |\n| - | - |\n| `` | `GET` |',
@@ -58,5 +60,30 @@ describe('basic-auth runbook facts', () => {
       { path: '/status', methods: ['GET'] },
       { path: '/status', methods: ['HEAD'] },
     ])
+  })
+})
+
+describe('runbook section boundaries', () => {
+  it.each(['<!--\n### Routes\n-->', '    ### Routes', '```md\n### Routes\n```', '> ### Routes'])(
+    'ignores non-heading text: %s',
+    (lookalike) => {
+      expect(findRunbookExemptRoutes(lookalike + '\n\n' + table, 'Routes')).toBeNull()
+    },
+  )
+  it('accepts closed ATX headings and heading formatting', () => {
+    expect(findRunbookExemptRoutes('### **Routes** ###\n\n' + table, 'Routes')).toEqual(expected)
+  })
+  it.each(['# Other', '## Other', '### Other'])('never reads an unrelated section: %s', (next) => {
+    expect(
+      findRunbookExemptRoutes('### Routes\nprose\n\n' + next + '\n\n' + table, 'Routes'),
+    ).toBeNull()
+  })
+  it('includes nested subsections but stops at the next peer heading', () => {
+    expect(
+      findRunbookExemptRoutes(
+        '### Routes\n\n#### Details\n\n' + table + '\n\n### Other\n\n' + table,
+        'Routes',
+      ),
+    ).toEqual(expected)
   })
 })

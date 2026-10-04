@@ -1,14 +1,17 @@
 # Basic Auth exemption facts
 
 Import from `vouchington-tooling/basic-auth-doc-sync`. TypeScript source parsing uses
-the optional `@typescript/typescript6` dependency.
+the optional `@typescript/typescript6` dependency. Markdown-only callers can import
+`findRunbookExemptRoutes` from `vouchington-tooling/basic-auth-doc-sync/runbook`
+without installing that optional compiler.
 
 - `findBasicAuthExemptPaths(source, variableName)` returns the literal strings in a
   top-level `const` initialized with `new Set([...])`.
 - `findBasicAuthExemptMethodsByPath(source, variableName)` returns a map of literal
   paths to literal uppercase HTTP method tokens from `new Map([[path, new Set([...])]])`.
 - `findRunbookExemptRoutes(markdown, heading)` reads the first GFM table following
-  the configured level-three heading (case insensitive). Columns are named `Path`
+  the configured real GFM level-three heading (case insensitive), stopping at the
+  next same-or-higher-level heading. Duplicate `Path` or `Methods` columns are rejected. Columns are named `Path`
   and `Methods`; paths and comma-separated method tokens must be inline code.
 
 All functions return `null` for absent or unsupported declarations/tables. Source
