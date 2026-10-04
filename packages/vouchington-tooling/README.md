@@ -492,13 +492,15 @@ conditional or mutable-context status changes fail closed. Called SSE helpers in
 request context and its status at the invocation; mutually exclusive complete status branches retain
 their separate responses. Explicit SSE statuses must be integers from 100 through 599.
 Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
+Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assuming status 200.
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
 are matched to the original stream, including proven helper-parameter forwarding and literal bracket
 methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
 stream `end` calls and streams used as pipe destinations are raw emissions; empty terminal cleanup
-is preserved. A callback that captures
+is preserved. Binding a selected stream's `write` or `end` method fails closed because the bound
+method can escape the proven emission path. A callback that captures
 the route's stream or HTTP context and escapes to a callee without a concrete implementation can
 write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
 dead branches, and implemented helpers that ignore their callback preserve the proven contracts.

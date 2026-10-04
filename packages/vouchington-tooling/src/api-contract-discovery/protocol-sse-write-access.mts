@@ -18,6 +18,11 @@ export function sseWriteInvocation(
     return call.arguments[0]
       ? { receiver: call.arguments[0], method: 'write', rawBytes: true }
       : undefined
+  if (access.method === 'bind') {
+    const target = writeAccess(access.receiver)
+    if (target?.method !== 'write' && target?.method !== 'end') return undefined
+    return { receiver: call.arguments[0], method: target.method, rawBytes: true }
+  }
   if (access.method !== 'call' && access.method !== 'apply')
     return { ...access, rawBytes: hasRawBytes(access.method, call.arguments, checker, false) }
 

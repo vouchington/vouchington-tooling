@@ -2,7 +2,8 @@ import ts from '../contract-schema/typescript-api.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
 import { contextResponseMethod } from './protocol-http-emission.mts'
-import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { expressionReceiver } from './protocol-write-receiver.mts'
 import { statusCanPrecede } from './protocol-sse-feasible-status.mts'
 import { statusDominatesEmission, unconditionalStatusSetter } from './protocol-status-dominance.mts'
 import { visit } from './response-contract-route-analysis.mts'
@@ -30,6 +31,8 @@ export function resolveSseStatus(
         )
       )
         throw new Error('SSE context has an unsupported mutable or destructured alias')
+      if (ts.isCallExpression(node) && indirectSetter(node.expression, contexts, checker))
+        throw new Error('SSE context uses an unsupported indirect status setter')
       if (ts.isCallExpression(node) && matches(node.expression)) setters.add(node)
     })
   const statuses = paths.map((path) => {
@@ -61,6 +64,27 @@ export function resolveSseStatus(
   if (codes.some((code) => !Number.isInteger(code) || code < 100 || code > 599))
     throw new Error('SSE status must be an integer from 100 through 599')
   return { statusKnowledge: 'explicit', statusCodes: codes }
+}
+
+function indirectSetter(
+  expression: ts.Expression,
+  contexts: ReadonlySet<ts.Symbol>,
+  checker: ts.TypeChecker,
+): boolean {
+  const access = unwrapExpression(expression)
+  const name = ts.isPropertyAccessExpression(access)
+    ? access.name.text
+    : ts.isElementAccessExpression(access) && ts.isStringLiteral(access.argumentExpression)
+      ? access.argumentExpression.text
+      : undefined
+  if (!name || !['call', 'apply', 'bind'].includes(name)) return false
+  const target = (access as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression
+  if (
+    [...contexts].some((context) => contextResponseMethod(target, context, checker) === 'setStatus')
+  )
+    return true
+  const receiver = expressionReceiver(target, checker)
+  return !!receiver && contexts.has(receiver.root) && receiver.path[0] === 'setStatus'
 }
 
 function nearestSetter(
