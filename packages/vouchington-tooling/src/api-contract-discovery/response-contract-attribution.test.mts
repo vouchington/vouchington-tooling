@@ -92,14 +92,23 @@ const sources = {
   'cyclic-local-aliases': `
     declare const app: any
     function send(ctx: any) { ctx.json({ shared: true }) }
-    var first: any = second
-    var second: any = first
+    const first: any = second
+    const second: any = first
     app.route('/api/v1/items').post(first)
     app.route('/api/v1/widgets').post(second)
   `,
+  'reassigned-local-alias': `
+    declare const app: any
+    function sendA(ctx: any) { ctx.json({ a: true }) }
+    function sendB(ctx: any) { ctx.json({ b: true }) }
+    let alias = sendA
+    alias = sendB
+    app.route('/api/v1/a').post(sendA)
+    app.route('/api/v1/b').post(alias)
+  `,
   'unresolved-local-alias': `
     declare const app: any
-    var alias: any = missingHandler
+    const alias: any = missingHandler
     app.route('/api/v1/items').post(alias)
   `,
   'shared-dynamic-success': `
@@ -337,7 +346,18 @@ describe('implicit response attribution facts', () => {
 
   it('stops resolving malformed cyclic local handler aliases', () => {
     const facts: AmbiguousAttributionFact[] = []
-    expect(() => discover('cyclic-local-aliases', facts)).not.toThrow()
+    const source = matrix.program.getSourceFile('/virtual/cyclic-local-aliases.ts')!
+    expect(() =>
+      discoverApiResponseContracts(matrix.program, [source], undefined, {
+        onAmbiguousAttribution: (fact) => facts.push(fact),
+      }),
+    ).not.toThrow()
+    expect(facts).toEqual([])
+  })
+
+  it('does not follow mutable handler aliases after reassignment', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('reassigned-local-alias', facts)
     expect(facts).toEqual([])
   })
 

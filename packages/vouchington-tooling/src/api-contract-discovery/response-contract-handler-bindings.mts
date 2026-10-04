@@ -84,6 +84,11 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
     const declaration = current.valueDeclaration
     if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
       return current
+    if (
+      !ts.isVariableDeclarationList(declaration.parent) ||
+      !(declaration.parent.flags & ts.NodeFlags.Const)
+    )
+      return current
     const initializer = declaration.initializer
     if (!ts.isIdentifier(initializer)) return current
     const next = checker.getSymbolAtLocation(initializer)
