@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useRepoFixture } from './harness.test-helpers.mts'
@@ -31,18 +32,30 @@ describe('vouchington mcp over real stdio', () => {
     expect(rejected.isError).toBe(true)
   }, 30_000)
 
-  it('exits non-zero with the reason on stderr outside a git worktree', async () => {
+  it('starts outside a git worktree and accepts any explicit git worktree', async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [cli, 'mcp'],
       cwd: fixture().root,
       stderr: 'pipe',
     })
-    const stderr: string[] = []
-    transport.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()))
     const client = new Client({ name: 'stdio-test', version: '1.0.0' })
     clients.push(client)
-    await expect(client.connect(transport)).rejects.toThrow()
-    expect(stderr.join('')).toContain('must be launched inside a git worktree')
+    await client.connect(transport)
+    const omitted = await client.callTool({
+      name: 'outbox_status',
+      arguments: { sessionId: 'native:owner' },
+    })
+    expect(omitted.isError).toBe(true)
+    const subdirectory = await client.callTool({
+      name: 'outbox_status',
+      arguments: { sessionId: 'native:owner', worktree: join(fixture().main, 'nested') },
+    })
+    expect(subdirectory.isError).toBe(true)
+    const accepted = await client.callTool({
+      name: 'outbox_status',
+      arguments: { sessionId: 'native:owner', worktree: fixture().outside },
+    })
+    expect(accepted.isError).toBeUndefined()
   }, 30_000)
 })

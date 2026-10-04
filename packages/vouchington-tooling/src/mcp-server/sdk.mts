@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type {
@@ -40,5 +41,20 @@ export async function loadMcpSdk(importSdk: SdkImporter = defaultImporter): Prom
   } catch (error) {
     if (isMissingModuleError(error)) throw new Error(MISSING_SDK_MESSAGE, { cause: error })
     throw error
+  }
+}
+
+export const MISSING_BLACKBOARD_MESSAGE =
+  'vouchington mcp needs agent-blackboard, which is an optional peer dependency of ' +
+  'vouchington-tooling and is not installed. Install it next to vouchington-tooling: ' +
+  'pnpm add -D agent-blackboard'
+
+/** Fails fast at startup when `agent-blackboard` cannot be resolved from this package's install. */
+export function assertBlackboardInstalled(resolveFrom: string | URL = import.meta.url): void {
+  try {
+    createRequire(resolveFrom).resolve('agent-blackboard')
+  } catch (error) {
+    // `resolve` only fails when the package cannot be found from `resolveFrom`.
+    throw new Error(MISSING_BLACKBOARD_MESSAGE, { cause: error })
   }
 }

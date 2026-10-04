@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BLACKBOARD_ENV, fakeBlackboard } from './fake-blackboard.test-helpers.mts'
 import { JOURNAL_ARGS, useRepoFixture } from './harness.test-helpers.mts'
@@ -109,10 +110,10 @@ describe('in-process client and server round trip', () => {
     expect(textOf(invalid)).toContain('parentSessionId is required')
     const outside = await client.callTool({
       name: 'session_archive',
-      arguments: { sessionId: 'native:owner', worktree: fixture().outside },
+      arguments: { sessionId: 'native:owner', worktree: fixture().root },
     })
     expect(outside.isError).toBe(true)
-    expect(textOf(outside)).toContain('is not a worktree of the repository')
+    expect(textOf(outside)).toContain('is not the top level of a git worktree')
     const unknown = await client.callTool({ name: 'entry_append', arguments: {} })
     expect(unknown.isError).toBe(true)
     expect(fake.calls.archive).toEqual([])
@@ -154,10 +155,42 @@ describe('runMcpServer startup', () => {
     ).rejects.toThrow('pnpm add -D @modelcontextprotocol/sdk zod')
   })
 
-  it('fails when launched outside a git worktree', async () => {
+  it('fails with an install hint when agent-blackboard is missing from the install', async () => {
     const [, serverTransport] = InMemoryTransport.createLinkedPair()
     await expect(
-      runMcpServer({ cwd: fixture().root, env: {}, version: '1', transport: serverTransport }),
-    ).rejects.toThrow('must be launched inside a git worktree')
+      runMcpServer({
+        cwd: fixture().main,
+        env: {},
+        version: '1',
+        transport: serverTransport,
+        resolveFrom: join(fixture().root, 'empty', 'server.mjs'),
+      }),
+    ).rejects.toThrow('pnpm add -D agent-blackboard')
+  })
+
+  it('starts outside a git worktree and needs an explicit worktree per call', async () => {
+    const fake = fakeBlackboard()
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await runMcpServer({
+      cwd: fixture().root,
+      env: BLACKBOARD_ENV,
+      version: '1',
+      transport: serverTransport,
+      blackboard: fake.dependencies,
+    })
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    clients.push(client)
+    await client.connect(clientTransport)
+    const omitted = await client.callTool({
+      name: 'outbox_status',
+      arguments: { sessionId: 'native:owner' },
+    })
+    expect(omitted.isError).toBe(true)
+    expect(textOf(omitted)).toContain('worktree is required')
+    const explicit = await client.callTool({
+      name: 'outbox_status',
+      arguments: { sessionId: 'native:owner', worktree: fixture().outside },
+    })
+    expect(explicit.isError).toBeUndefined()
   })
 })

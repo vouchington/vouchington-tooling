@@ -34,3 +34,5 @@ await copyFile(
   new URL('../skills/manifest.json', import.meta.url),
 )
 await chmod(new URL('../dist/cli/index.mjs', import.meta.url), 0o755)
+await chmod(new URL('../bin/vouchington.mjs', import.meta.url), 0o755)
+await chmod(new URL('../bin/vouchington-mcp.mjs', import.meta.url), 0o755)

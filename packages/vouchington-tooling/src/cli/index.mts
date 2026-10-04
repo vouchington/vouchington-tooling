@@ -164,19 +164,20 @@ export function isMainModule(metaUrl: string, argv1: string | undefined): boolea
   }
 }
 
-/* v8 ignore next 8 */
-if (isMainModule(import.meta.url, process.argv[1])) {
-  const result = runCli()
-  if (typeof result === 'number') process.exitCode = result
-  else {
-    result.then(
-      (code) => {
-        process.exitCode = code
-      },
-      (error: unknown) => {
-        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-        process.exitCode = 1
-      },
-    )
+/** Runs the CLI and records its exit code. `bin/vouchington.mjs` calls this after its Node check. */
+export async function runMain(
+  argv: readonly string[] = process.argv,
+  run: typeof runCli = runCli,
+): Promise<void> {
+  try {
+    process.exitCode = await run(argv)
+  } catch (error: unknown) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    process.exitCode = 1
   }
+}
+
+/* v8 ignore next 3 */
+if (isMainModule(import.meta.url, process.argv[1])) {
+  void runMain()
 }
