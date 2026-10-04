@@ -35,9 +35,71 @@ launch worktree by default). Writing or retrying an entry needs no provider skil
 `--file` flag, or replay command.
 Search for `journal_append` (by bare name, so every prefix matches) before concluding the server is
 unavailable; a deferred harness lists the tool only on request. If the search finds no such tool
-because the server is not registered, not connected, or not approved, stop and report that the
-journal server is unavailable, and name any per-user approval the harness still needs to load
-it (the consumer wrapper documents it). Do not fall back to a CLI command.
+because the server is not registered or not connected, use the supported CLI fallback below.
+Tell the human that MCP is unavailable and which CLI is being used. Record the fallback reason,
+entrypoint, affected operations, and observed delivery status in the caller's journal before
+continuing primary work. Do not treat a permission denial as tool unavailability or bypass a host
+approval requirement through the CLI. If neither path persists the note, stop and report the blocker.
+
+## CLI fallback
+
+Use a trusted machine-installed `vouchington` executable at a verified absolute path outside the
+consumer worktree. Resolve its symlinks and verify the installation's source and version before
+using credentials or requesting an unsandboxed run; its runtime dependencies must also belong to
+that trusted installation. The CLI resolves its client relative to its own installation; installing
+`agent-blackboard` only in the consumer worktree is insufficient for CLI fallback. Do not resolve the executable through the consumer's `node_modules/.bin`,
+`pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
+script path, and bind any approval request to the same interpreter, script, and arguments.
+Never execute the script directly: its `#!/usr/bin/env node` line would pick whichever `node` comes
+first on `PATH`, which a consumer worktree can control. Set `BLACKBOARD_NODE` to a verified
+absolute Node 24+ binary outside the consumer worktree, and run it with `env -i` so only `HOME`, a
+fixed system `PATH`, and the two blackboard variables reach it. That also drops `NODE_OPTIONS` and
+other loader variables. If no trusted CLI is
+available, report the blocker; do not escalate a consumer-supplied executable. For local development,
+the reviewed source CLI may run inside the sandbox, subject to the harness's credential policy.
+`journal append` invokes the same validated writer as MCP, ensures the exact session identity,
+patches its repository union, and verifies delivery. Use a temporary `0600` markdown input file,
+remove it after the call, and inspect the JSON result: exit zero can mean retained pending feedback.
+The input file is transport to the supported writer, never a replacement journal. Append returns
+`pendingCount` for the caller and `worktreePendingCount` for the whole outbox. Use `journal status`
+or pass `--session-id` to `journal flush` for the same two counts; an unfiltered legacy flush reports
+only the whole-outbox count.
+
+```bash
+blackboard() {
+  env -i HOME="$HOME" PATH=/usr/bin:/bin \
+    AGENT_BLACKBOARD_URL="$AGENT_BLACKBOARD_URL" \
+    AGENT_BLACKBOARD_TOKEN="$AGENT_BLACKBOARD_TOKEN" \
+    "$BLACKBOARD_NODE" "$BLACKBOARD_CLI" agent-blackboard "$@"
+}
+blackboard journal append \
+  --session-id SESSION --agent AGENT --version VERSION \
+  --mode interactive --source-event-id EVENT --work-outcome unknown \
+  --repository owner/name --coverage-status not-assessed --dropped-count 0 \
+  --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
+blackboard journal entries --session-id SESSION
+blackboard journal status \
+  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
+blackboard journal flush \
+  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
+```
+
+Pass `--parent-session-id` for a child, repeat `--repository` for additional repositories, and use
+explicit coverage sources when assessed. Omit `--timestamp` so the writer owns time. Autonomous
+mode omits `--outbox-directory` and still requires fresh online admission plus readback.
+For session-only or snapshot operations not exposed by this CLI, use the upstream
+`agent-blackboard` CLI under its skill's operation contract; preserve exact identities and tags.
+A sandboxed fallback may only write the outbox: the machine's harness sandbox can withhold
+`AGENT_BLACKBOARD_TOKEN`, so it cannot deliver or read back. If delivery or readback needs the
+credentials and the sandbox withholds them, run that one command unsandboxed through the harness's
+normal approval path for running one command outside the sandbox, with each such run approved
+individually. Never read, print, copy, or export the token
+to work around the sandbox. If approval is denied, leave the record pending in the outbox, report
+`pendingCount`, and tell the human.
+Return to MCP when available and journal recovery. Never silently downgrade envelope validation,
+retention, or delivery checks because the transport changed.
+
+## Journaling policy
 
 1. Capture consequential observations before filing an issue: failed or recovered checks, denied or
    approved permissions, repeated fixes, scope changes, first-party tool behavior, and architectural
@@ -65,7 +127,7 @@ it (the consumer wrapper documents it). Do not fall back to a CLI command.
    `journal_append` reports it as pending. Report `pendingCount` (this session's unsent records),
    and `worktreePendingCount` when other sessions' records are also unsent, from `journal_append`
    or `outbox_status`. Deliver with `outbox_flush` once the provider is reachable, and continue
-   primary work only after persistence succeeds. A full, unsafe, or unwritable outbox blocks
+   primary work only after persistence succeeds. A full, corrupt, or unwritable outbox blocks
    capture; never evict or silently discard an unsent record.
 5. Autonomous runners require online `session_ensure`, a fresh admission `journal_append`, and
    readback before launching an attempt. Give each attempt's admission entry a `sourceEventId`

@@ -55,7 +55,8 @@ journaling skills call the tools of the [`vouchington mcp` server](packages/vouc
 so a repository that adopts them registers that server and installs its packages. This repository's
 checked-in Codex and Claude configuration runs its own server from source, approves all of its
 tools, and disables the upstream `agent-blackboard` plugin. Credential-management commands remain
-CLI-only.
+CLI-only. When MCP is unavailable, the journaling skill permits the supported CLI fallback and
+requires both a journal entry and a human-facing notice.
 
 ### Install (opt-in)
 
@@ -394,7 +395,7 @@ node packages/vouchington-tooling/dist/cli/index.mjs --help
 ```
 
 Validated journal and retrospective feedback uses the existing `agent-blackboard` subpath. Explicit
-interactive mode persists sanitized pending records in a bounded private outbox; autonomous mode
+interactive mode persists sanitized pending records in a bounded outbox; autonomous mode
 requires fresh online admission and acknowledged terminal readback. Work outcome, evidence coverage,
 and delivery remain separate. See the [feedback contract](packages/vouchington-tooling/README.md#validated-feedback-and-delivery)
 for current APIs, privacy bounds, stable event replay, and the breaking journal writer adoption.

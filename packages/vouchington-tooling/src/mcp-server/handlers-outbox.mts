@@ -1,4 +1,4 @@
-import { flushFeedbackOutbox, readFeedbackOutbox } from '../agent-blackboard/index.mts'
+import { flushFeedbackOutbox, feedbackOutboxCounts } from '../agent-blackboard/index.mts'
 import { outboxDirectory, type ToolHandler } from './context.mts'
 
 /**
@@ -9,12 +9,7 @@ export function outboxCounts(
   worktree: string,
   sessionId: string,
 ): { pendingCount: number; worktreePendingCount: number } {
-  // A read that never creates the directory, so asking about an empty outbox leaves no trace.
-  const records = readFeedbackOutbox(outboxDirectory(worktree))
-  return {
-    pendingCount: records.filter((record) => record.identity.sessionId === sessionId).length,
-    worktreePendingCount: records.length,
-  }
+  return feedbackOutboxCounts(outboxDirectory(worktree), sessionId)
 }
 
 function sessionStatus(pendingCount: number): 'empty' | 'pending' {

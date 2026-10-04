@@ -11,7 +11,7 @@ import {
   unlinkSync,
 } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
-import { ensurePrivateDirectory } from '../session-friction/directory.mts'
+import { ensureOutboxDirectory } from './feedback-outbox-directory.mts'
 import { withFileLock } from '../session-friction/lock.mts'
 import { openLogFile, readLogContent, writeAll } from '../session-friction/log-file.mts'
 import { validateFeedbackEnvelope } from './feedback-codec.mts'
@@ -23,9 +23,9 @@ const FEEDBACK_OUTBOX_MAX_BYTES = 2_000_000
 const RECORD_MAX_BYTES = 18_000
 function outboxDirectory(directory: string, create: boolean): string {
   if (typeof directory !== 'string' || directory.length > 4096 || !isAbsolute(directory))
-    throw new Error('feedback outbox requires an absolute private directory')
+    throw new Error('feedback outbox requires an absolute directory')
   const path = resolve(directory)
-  ensurePrivateDirectory(path, create)
+  ensureOutboxDirectory(path, create)
   return path
 }
 function filename(record: FeedbackOutboxRecord): string {
@@ -37,8 +37,6 @@ function readRecord(path: string): { record: FeedbackOutboxRecord; bytes: number
   const descriptor = openLogFile(path, constants.O_RDONLY)
   try {
     const status = fstatSync(descriptor)
-    if ((status.mode & 0o777) !== 0o600 || status.uid !== process.geteuid?.())
-      throw new Error('feedback outbox record must be private and owned by caller')
     const bytes = status.size
     if (bytes > RECORD_MAX_BYTES) throw new Error('feedback outbox record is too large')
     const value: unknown = JSON.parse(readLogContent(descriptor, RECORD_MAX_BYTES))
@@ -85,7 +83,7 @@ function syncDirectory(directory: string): void {
 }
 export function feedbackOutboxStatus(directory: string): FeedbackOutboxStatus {
   const path = outboxDirectory(directory, false)
-  if (!ensurePrivateDirectory(path, false)) return { status: 'empty', pendingCount: 0 }
+  if (!ensureOutboxDirectory(path, false)) return { status: 'empty', pendingCount: 0 }
   return withFileLock(join(path, '.records'), () => {
     const pendingCount = records(path).length
     return { status: pendingCount ? 'pending' : 'empty', pendingCount }
@@ -98,7 +96,7 @@ export function listFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
 /** Reads the retained records without creating the outbox directory. */
 export function readFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
   const path = outboxDirectory(directory, false)
-  if (!ensurePrivateDirectory(path, false)) return []
+  if (!ensureOutboxDirectory(path, false)) return []
   return withFileLock(join(path, '.records'), () => records(path).map((item) => item.record))
 }
 /**

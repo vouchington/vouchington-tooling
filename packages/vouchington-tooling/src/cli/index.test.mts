@@ -23,7 +23,12 @@ describe('runCli', () => {
       expect(
         USAGE.split('\n').find((line) => line.startsWith('agent-blackboard journal append')),
       ).toContain(flag)
-    expect(USAGE).toContain('agent-blackboard journal flush --outbox-directory PATH')
+    expect(USAGE).toContain(
+      'agent-blackboard journal flush --outbox-directory PATH [--session-id UUID]',
+    )
+    expect(USAGE).toContain(
+      'agent-blackboard journal status --session-id UUID --outbox-directory PATH',
+    )
     expect(runCli(['node', 'vouchington', '--version'])).toBe(0)
     expect(String(stdout.mock.calls.at(-1)?.[0])).toMatch(/^\d+\.\d+\.\d+\n$/)
   })

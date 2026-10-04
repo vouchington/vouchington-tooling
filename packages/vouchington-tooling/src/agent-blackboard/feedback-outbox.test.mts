@@ -54,7 +54,7 @@ it('preserves all 128 unsent records when the bounded outbox saturates', async (
   expect(files).toHaveLength(128)
   expect((await stat(join(path, files[0]!))).mode & 0o777).toBe(0o600)
 }, 15_000)
-it('rejects conflicting source records, corrupt persistence and unsafe private directory boundaries', async () => {
+it('rejects conflicting source records, corrupt persistence and non-directory outboxes', async () => {
   const path = await directory()
   await writeFeedback({
     identity,
@@ -76,12 +76,9 @@ it('rejects conflicting source records, corrupt persistence and unsafe private d
   const file = (await readdir(path))[0]!
   await writeFile(join(path, file), 'malformed')
   expect(() => feedbackOutboxStatus(path)).toThrow()
-  const unsafe = await directory()
-  await chmod(unsafe, 0o755)
-  expect(() => feedbackOutboxStatus(unsafe)).toThrow(/private/)
   const parent = await directory()
   await symlink(path, join(parent, 'linked'))
-  expect(() => feedbackOutboxStatus(join(parent, 'linked'))).toThrow(/private/)
+  expect(() => feedbackOutboxStatus(join(parent, 'linked'))).toThrow(/must be a directory/)
 })
 
 it('preserves idempotent pending records and prevents wrong-content delivery removal', async () => {
@@ -129,21 +126,13 @@ it('reads retained records without creating the directory', async () => {
   expect(readFeedbackOutbox(path)).toEqual([record])
   expect(() => readFeedbackOutbox('relative')).toThrow(/absolute/)
 })
-it('rejects oversized, unowned-mode, unrecognized and identity-mismatched persisted records', async () => {
-  for (const mutation of [
-    'oversize',
-    'mode',
-    'unknown-field',
-    'identity-name',
-    'temporary',
-    'capacity',
-  ]) {
+it('rejects oversized, unrecognized and identity-mismatched persisted records', async () => {
+  for (const mutation of ['oversize', 'unknown-field', 'identity-name', 'temporary', 'capacity']) {
     const path = await directory()
     const record = { identity, envelope: envelope('stored:source') }
     persistFeedbackOutbox(path, record)
     const file = (await readdir(path))[0]!
     if (mutation === 'oversize') await writeFile(join(path, file), 'x'.repeat(18001))
-    if (mutation === 'mode') await chmod(join(path, file), 0o644)
     if (mutation === 'unknown-field')
       await writeFile(join(path, file), JSON.stringify({ ...record, raw: 'not allowed' }))
     if (mutation === 'identity-name')
@@ -190,3 +179,20 @@ it('refuses byte saturation without discarding previously retained records', asy
   await writeFile(join(path, name), JSON.stringify(extra), { mode: 0o600 })
   expect(() => feedbackOutboxStatus(path)).toThrow(/byte capacity/)
 }, 15_000)
+
+it('retains and drains records under writable and symlinked parents without mode policing', async () => {
+  const parent = await directory()
+  await chmod(parent, 0o777)
+  const alias = join(await directory(), 'worktree')
+  await symlink(parent, alias)
+  const path = join(alias, '.local', 'outbox')
+  const record = { identity, envelope: envelope('writable:parent') }
+  persistFeedbackOutbox(path, record)
+  expect((await stat(path)).mode & 0o777).toBe(0o700)
+  await chmod(path, 0o775)
+  const file = (await readdir(path))[0]!
+  await chmod(join(path, file), 0o644)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+  expect(feedbackOutboxStatus(path)).toEqual({ status: 'pending', pendingCount: 1 })
+  expect(removeFeedbackOutbox(path, record)).toEqual({ pendingCount: 0 })
+})
