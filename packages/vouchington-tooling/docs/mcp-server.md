@@ -11,17 +11,29 @@ are later phases.
 
 ## Install
 
-The server needs three packages next to `vouchington-tooling`. The last two are optional peer
-dependencies, so nothing else in the CLI requires them:
+Install the server once per machine, in its own dedicated directory, not in a project or a
+worktree: `pnpm add` installs into the directory it runs in. The server needs these packages
+installed next to `vouchington-tooling`. `agent-blackboard` and `@modelcontextprotocol/sdk` are
+optional peer dependencies, so nothing else in the CLI requires them. Pin exact versions; replace
+the placeholders with the current releases:
 
 ```bash
-pnpm add -D vouchington-tooling agent-blackboard@^0.6.0
-pnpm add -D @modelcontextprotocol/sdk zod
+mkdir -p ~/.local/share/vouchington-mcp
+cd ~/.local/share/vouchington-mcp
+pnpm init
+pnpm add --save-exact vouchington-tooling@<version> agent-blackboard@<version>
+pnpm add --save-exact @modelcontextprotocol/sdk@<version> zod@<version>
 ```
 
-`zod` is required by the SDK. When the SDK is missing, `vouchington mcp` writes a message naming the
-package to stderr and exits with status 1. `agent-blackboard` is resolved from the validated
-worktree at call time (`createRequire` on `<worktree>/package.json`), never from this package.
+Launch the server by the absolute path into that directory, for example
+`/abs/node ~/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs`
+with `~` expanded to an absolute path (see [Launch](#launch)).
+
+`zod` is required by the SDK. Both `agent-blackboard` and the SDK are resolved from the server's own
+install, relative to this package's module, never from the worktree a tool call names, so
+repositories do not need to depend on `agent-blackboard`. When either is missing, `vouchington mcp`
+writes a message naming the package and the install directory to add it in to stderr and exits with
+status 1.
 
 The connection comes from `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the server's
 environment. The server never searches for, prints, or mints them.
@@ -41,9 +53,26 @@ A missing MCP connection does not waive persistence or readback requirements.
 vouchington mcp
 ```
 
-The command takes no arguments. Start it inside the repository's git worktree: that repository
-defines which worktrees the tools accept. stdout carries only protocol frames, and diagnostics go
-to stderr.
+The stable entry point, for a harness that launches the server without a shell or a `PATH`
+lookup, is this package-relative file:
+
+```text
+node_modules/vouchington-tooling/bin/vouchington-mcp.mjs
+```
+
+Run it with an absolute Node, for example
+`/abs/node /abs/machine/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs`. It is also the
+`vouchington-mcp` bin (`node_modules/.bin/vouchington-mcp`) and the `vouchington-tooling/mcp-server/bin`
+export. It takes no arguments, skips CLI argument parsing, and is a hand-written plain-JavaScript
+file that a CLI refactor does not move; a test pins the path. Both it and `bin/vouchington.mjs` check
+the Node version first: on Node older than 24 they print one line to stderr, such as
+`vouchington requires Node >=24 (found 18.19.0)`, and exit with status 1.
+
+The command takes no arguments and may be launched with any working directory, including one outside
+every git repository (for example `~`). When the working directory is inside a git worktree, that
+worktree's top level is the default for tools called without `worktree`. Otherwise those calls fail
+with a tool error asking for an explicit `worktree`. stdout carries only protocol frames, and
+diagnostics go to stderr.
 
 ## Tools
 
@@ -122,41 +151,61 @@ instructions shows it to the agent.
 
 ## Worktree validation
 
-`worktree` must be an absolute path that, after resolving symlinks, exactly matches an entry of
-`git worktree list --porcelain` for the repository the server was launched from. The list is read on
-every call, so worktrees created after launch are accepted and removed ones are refused. Anything
-else is rejected: a subdirectory of a worktree, a relative or nonexistent path, and a separate
-repository, including one made with `git init` elsewhere. It defaults to the launch worktree's root.
-Git runs without `GIT_*` variables, so `GIT_DIR` cannot redirect the check.
+`worktree` is checked on every call. It must be an absolute path that, after resolving symlinks,
+equals the top level of a git worktree, that is, what `git rev-parse --show-toplevel` prints when
+run in it. Any git worktree on the machine is accepted, including one of a repository unrelated to
+the launch directory, so the tools can act on every checkout the user can reach. Worktrees created
+after launch are accepted and removed ones are refused. Rejected: a subdirectory of a worktree, a
+relative or nonexistent path, and a directory that is not in a git worktree. Git runs without
+`GIT_*` variables, so `GIT_DIR` cannot redirect the check, and with `LC_ALL=C` and no `LANGUAGE`, so
+its "not a git repository" diagnostic is never translated.
+
+`worktree` only chooses where the outbox lives. It is not a trust boundary for loading code: the
+server never imports modules from it, and a tool that needs to must first get a repository allowlist
+from the machine registration.
+
+When `worktree` is omitted, the launch directory's worktree top level is used if the launch
+directory is inside one, and it is validated like any explicit path. If the server was launched
+outside a git worktree, the call fails with a tool error asking for an explicit `worktree`.
 
 ## Registering the server
 
-The commands below run `vouchington` from the repository's own `node_modules`, so a fresh worktree
-uses the version its lockfile pins. Set the blackboard credentials in the environment the harness
-gives the server.
+Register the machine-wide installation from [Install](#install) at user level, with absolute paths.
+Never check a registration into a repository: it names a path and a Node that exist only on your
+machine, and every worktree inherits it from your user config. Replace `/abs/node` with the absolute
+path of a Node >= 24 and `/home/you` with your home directory (neither file expands `~`). Set the
+blackboard credentials in the environment you start the harness from.
 
-Claude Code, `.mcp.json`:
+Claude Code, `mcpServers` in `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "vouchington-tooling": {
-      "command": "bash",
-      "args": ["-c", "exec \"$(git rev-parse --show-toplevel)/node_modules/.bin/vouchington\" mcp"]
+      "command": "/abs/node",
+      "args": [
+        "/home/you/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs"
+      ]
     }
   }
 }
 ```
 
-Codex, `.codex/config.toml`:
+Codex, `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.vouchington-tooling]
-command = "bash"
-args = ["-c", "exec \"$(git rev-parse --show-toplevel)/node_modules/.bin/vouchington\" mcp"]
+command = "/abs/node"
+args = [
+  "/home/you/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs",
+]
+env_vars = ["AGENT_BLACKBOARD_URL", "AGENT_BLACKBOARD_TOKEN"]
 default_tools_approval_mode = "approve"
 required = false
 ```
+
+`env_vars` forwards those variables from Codex's own environment. Codex does not expand `${VAR}`
+inside `env`, so do not write the credentials there.
 
 Approving every tool of the server at once:
 

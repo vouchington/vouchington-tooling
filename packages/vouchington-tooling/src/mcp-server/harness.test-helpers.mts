@@ -32,11 +32,11 @@ export type Harness = {
 /** Calls tools against a repository fixture with the blackboard client faked. */
 export function harness(
   fixture: RepoFixture,
-  options: FakeOptions & { env?: NodeJS.ProcessEnv } = {},
+  options: FakeOptions & { env?: NodeJS.ProcessEnv; launchRoot?: string | undefined } = {},
 ): Harness {
   const fake = fakeBlackboard(options)
   const environment: ServerEnvironment = {
-    launchRoot: fixture.main,
+    launchRoot: 'launchRoot' in options ? options.launchRoot : fixture.main,
     env: options.env ?? BLACKBOARD_ENV,
     runGit: runIsolatedGit,
     blackboard: fake.dependencies,

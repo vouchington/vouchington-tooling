@@ -2,7 +2,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import type { ServerEnvironment } from './dispatch.mts'
-import { loadMcpSdk, type SdkImporter } from './sdk.mts'
+import { assertBlackboardInstalled, loadMcpSdk, type SdkImporter } from './sdk.mts'
 import { createMcpServer } from './server.mts'
 import { launchWorktreeRoot, runIsolatedGit } from './worktree.mts'
 
@@ -14,6 +14,8 @@ export type RunMcpServerOptions = {
   runGit?: RunTextCommand
   /** Defaults to stdio. Tests pass one half of an in-memory pair. */
   transport?: Transport
+  /** Test seam: where the startup check looks for `agent-blackboard`. Defaults to this module. */
+  resolveFrom?: string | URL
   /** Test seam: replaces how the consumer's `agent-blackboard` client is loaded. */
   blackboard?: BlackboardClientDependencies
 }
@@ -25,11 +27,13 @@ export type RunMcpServerOptions = {
 export async function runMcpServer(options: RunMcpServerOptions): Promise<void> {
   const runGit = options.runGit ?? runIsolatedGit
   const sdk = await loadMcpSdk(options.importSdk)
+  if (options.blackboard === undefined) assertBlackboardInstalled(options.resolveFrom)
   const launchRoot = await launchWorktreeRoot(options.cwd, runGit)
   const environment: ServerEnvironment = {
     launchRoot,
     env: options.env,
     runGit,
+    ...(options.resolveFrom === undefined ? {} : { resolveFrom: options.resolveFrom }),
     ...(options.blackboard === undefined ? {} : { blackboard: options.blackboard }),
   }
   const server = createMcpServer(sdk, environment, options.version)

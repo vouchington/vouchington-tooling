@@ -1,5 +1,45 @@
 import { describe, expect, it } from 'vitest'
-import { MISSING_SDK_MESSAGE, loadMcpSdk } from './sdk.mts'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { tmpdir } from 'node:os'
+import {
+  assertBlackboardInstalled,
+  installDirectory,
+  loadMcpSdk,
+  missingBlackboardMessage,
+  missingSdkMessage,
+} from './sdk.mts'
+
+describe('assertBlackboardInstalled', () => {
+  it("resolves agent-blackboard from this package's own location by default", () => {
+    expect(() => assertBlackboardInstalled()).not.toThrow()
+  })
+
+  it('names the package to install when it cannot be resolved', () => {
+    const from = join(tmpdir(), 'vouchington-no-such-install', 'server.mjs')
+    expect(() => assertBlackboardInstalled(from)).toThrow(missingBlackboardMessage(dirname(from)))
+    expect(missingBlackboardMessage('/m')).toContain('cd /m && pnpm add agent-blackboard')
+  })
+
+  it('names the install directory of the server, not the worktree, in the message', () => {
+    const from = join(tmpdir(), 'machine', 'node_modules', 'vouchington-tooling', 'dist', 'x.mjs')
+    expect(() => assertBlackboardInstalled(from)).toThrow(`cd ${join(tmpdir(), 'machine')} &&`)
+  })
+})
+
+describe('installDirectory', () => {
+  it('is the parent of the outermost node_modules, for paths and file URLs', () => {
+    const file = join('/m', 'node_modules', '.pnpm', 'v@1', 'node_modules', 'v', 'dist', 'sdk.mjs')
+    expect(installDirectory(file)).toBe('/m')
+    expect(installDirectory(pathToFileURL(file))).toBe('/m')
+    expect(installDirectory(pathToFileURL(file).href)).toBe('/m')
+  })
+
+  it('is the module directory outside any node_modules, and defaults to this module', () => {
+    expect(installDirectory(join('/src', 'mcp-server', 'sdk.mts'))).toBe(join('/src', 'mcp-server'))
+    expect(installDirectory()).toBe(dirname(fileURLToPath(import.meta.url)))
+  })
+})
 
 describe('loadMcpSdk', () => {
   it('loads the server pieces from the installed SDK', async () => {
@@ -17,13 +57,13 @@ describe('loadMcpSdk', () => {
       })
       const rejection = loadMcpSdk(async () => {
         throw missing
-      })
-      await expect(rejection).rejects.toThrow(MISSING_SDK_MESSAGE)
+      }, '/machine')
+      await expect(rejection).rejects.toThrow(missingSdkMessage('/machine'))
       await expect(rejection).rejects.toMatchObject({ cause: missing })
     }
-    expect(MISSING_SDK_MESSAGE).toContain('@modelcontextprotocol/sdk')
-    expect(MISSING_SDK_MESSAGE).toContain('zod')
-    expect(MISSING_SDK_MESSAGE).toContain('pnpm add -D')
+    expect(missingSdkMessage('/machine')).toContain(
+      'cd /machine && pnpm add @modelcontextprotocol/sdk zod',
+    )
   })
 
   it('rethrows any other import failure unchanged', async () => {

@@ -14,10 +14,12 @@
     "directory": "packages/vouchington-tooling"
   },
   "bin": {
-    "vouchington": "dist/cli/index.mjs"
+    "vouchington": "bin/vouchington.mjs",
+    "vouchington-mcp": "bin/vouchington-mcp.mjs"
   },
   "files": [
     "ast-grep",
+    "bin",
     "dist",
     "docs",
     "skills",
@@ -68,6 +70,7 @@
       "import": "./dist/agent-blackboard/index.mjs",
       "default": "./dist/agent-blackboard/index.mjs"
     },
+    "./mcp-server/bin": "./bin/vouchington-mcp.mjs",
     "./session-friction": {
       "types": "./dist/session-friction/index.d.mts",
       "import": "./dist/session-friction/index.mjs",
@@ -360,10 +363,14 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
+    "agent-blackboard": "^0.6.0",
     "typescript": ">=5",
     "vitest": ">=5"
   },
   "peerDependenciesMeta": {
+    "agent-blackboard": {
+      "optional": true
+    },
     "@modelcontextprotocol/sdk": {
       "optional": true
     },

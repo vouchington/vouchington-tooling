@@ -1,4 +1,3 @@
-import { join } from 'node:path'
 import { FeedbackDeliveryError, type FeedbackDiagnostic } from '../agent-blackboard/index.mts'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import type { RunTextCommand } from '../gh-cli/exec.mts'
@@ -11,9 +10,12 @@ import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
 
 export type ServerEnvironment = {
-  launchRoot: string
+  /** The launch directory's worktree top level, or undefined when it is not inside one. */
+  launchRoot: string | undefined
   env: NodeJS.ProcessEnv
   runGit: RunTextCommand
+  /** Test seam: where `agent-blackboard` resolves from. Defaults to this package's own module. */
+  resolveFrom?: string | URL
   /** Test seam: replaces how the consumer's `agent-blackboard` client is loaded. */
   blackboard?: BlackboardClientDependencies
 }
@@ -41,7 +43,7 @@ const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
   'authentication-rejected': 'the blackboard rejected AGENT_BLACKBOARD_TOKEN',
   'blackboard-unavailable': 'the blackboard could not be reached or returned an error',
   'configuration-invalid': 'AGENT_BLACKBOARD_URL or AGENT_BLACKBOARD_TOKEN is missing or invalid',
-  'client-unavailable': 'agent-blackboard is not installed in the worktree',
+  'client-unavailable': 'agent-blackboard is not installed next to vouchington-tooling',
   'readback-unconfirmed':
     'the write could not be confirmed; retry the same call (same sourceEventId and content)',
   'delivery-timeout': 'delivery timed out; retry the same call (same sourceEventId and content)',
@@ -79,8 +81,11 @@ export async function callTool(
       sessionId,
       worktree,
       env: environment.env,
-      // The client resolves from the validated worktree, never from the server's own location.
-      dependencies: { ...environment.blackboard, resolveFrom: join(worktree, 'package.json') },
+      // The client resolves from this package's install, like the SDK, never from the worktree.
+      dependencies: {
+        ...environment.blackboard,
+        resolveFrom: environment.resolveFrom ?? import.meta.url,
+      },
     })
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   } catch (error) {

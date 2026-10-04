@@ -11,7 +11,7 @@
       // Loaded from the consumer package boundary only when the opt-in integration runs.
       // typescript: optional peer for classic-API-compatible installs; runtime import uses
       // optionalDependency @typescript/typescript6 under typescript@7 workspaces.
-      "ignoreDependencies": ["agent-blackboard", "typescript", "vitest"],
+      "ignoreDependencies": ["typescript", "vitest"],
       "entry": [
         "src/index.mts!",
         "src/agent-blackboard/index.mts!",

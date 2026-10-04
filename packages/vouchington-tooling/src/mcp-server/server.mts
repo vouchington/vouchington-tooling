@@ -7,8 +7,9 @@ export const SERVER_NAME = 'vouchington-tooling'
 
 const INSTRUCTIONS =
   'Journals agent-blackboard feedback for a vouchington consumer. Every tool takes an explicit ' +
-  'sessionId and an optional worktree (an absolute path listed by `git worktree list` for the ' +
-  'repository this server was launched from). Hosts prefix the tool names differently: Claude ' +
+  'sessionId and an optional worktree (the absolute path of a git worktree top level; it ' +
+  'defaults to the launch directory worktree and is required when the server was launched ' +
+  'outside one). Hosts prefix the tool names differently: Claude ' +
   'Code mcp__vouchington-tooling__<tool>, Codex mcp__vouchington_tooling__<tool>, Grok ' +
   'vouchington-tooling__<tool> (through search_tool and use_tool), Cursor the vouchington-tooling ' +
   'namespace (through GetDynamicTools and CallDynamicTool). Search for journal_append before ' +

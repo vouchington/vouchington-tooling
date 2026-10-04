@@ -80,6 +80,7 @@ describe('vouchington-tooling MCP repository configuration', () => {
     expect(packageJson.devDependencies).toHaveProperty('agent-blackboard')
     expect(packageJson.dependencies?.['agent-blackboard']).toBeUndefined()
     expect(packageJson.optionalDependencies?.['agent-blackboard']).toBeUndefined()
-    expect(packageJson.peerDependencies?.['agent-blackboard']).toBeUndefined()
+    expect(packageJson.peerDependencies?.['agent-blackboard']).toBeDefined()
+    expect(packageJson.peerDependenciesMeta?.['agent-blackboard']).toEqual({ optional: true })
   })
 })

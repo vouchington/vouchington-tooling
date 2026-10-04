@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isMainModule, runCli } from './index.mts'
+import { isMainModule, runCli, runMain } from './index.mts'
 import { printUsage, USAGE } from './usage.mts'
 import { hostLockScriptPath } from './commands/with-host-lock.mts'
 
@@ -154,6 +154,26 @@ describe('runCli', () => {
         status: null,
       })),
     ).toThrow('spawn failed')
+  })
+
+  it('records the exit code of a synchronous, asynchronous, or failing command', async () => {
+    const previous = process.exitCode
+    try {
+      await runMain(['node', 'vouchington', '--version'])
+      expect(process.exitCode).toBe(0)
+      await runMain(['node', 'vouchington', 'nope'])
+      expect(process.exitCode).toBe(2)
+      await runMain(['node', 'vouchington', 'post-review'])
+      expect(process.exitCode).toBe(1)
+      process.exitCode = 0
+      await runMain([], () => Promise.reject(new Error('boom')))
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toBe('boom\n')
+      expect(process.exitCode).toBe(1)
+      await runMain([], () => Promise.reject('plain'))
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toBe('plain\n')
+    } finally {
+      process.exitCode = previous
+    }
   })
 
   it('identifies the main module from argv', () => {

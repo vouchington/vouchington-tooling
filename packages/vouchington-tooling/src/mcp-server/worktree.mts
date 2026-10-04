@@ -7,9 +7,17 @@ import { gitEnv } from '../shared-context/index.mts'
 
 const execFileAsync = promisify(execFile)
 
-/** Runs git without inherited `GIT_*` variables so `GIT_DIR` cannot redirect the check. */
+/**
+ * The environment for git: no inherited `GIT_*` variables, so `GIT_DIR` cannot redirect the check,
+ * and the C locale, so git's diagnostics are not translated and can be classified reliably.
+ */
+export function isolatedGitEnv(): NodeJS.ProcessEnv {
+  const { LANGUAGE: _language, ...env } = gitEnv()
+  return { ...env, LC_ALL: 'C' }
+}
+
 export const runIsolatedGit: RunTextCommand = createCommandRunner('git', (command, args) =>
-  execFileAsync(command, args, { env: gitEnv() }),
+  execFileAsync(command, args, { env: isolatedGitEnv() }),
 )
 
 async function canonical(path: string): Promise<string | undefined> {
@@ -20,54 +28,68 @@ async function canonical(path: string): Promise<string | undefined> {
   }
 }
 
-/** The worktree root containing `cwd`, or a message that says how to fix the launch directory. */
-export async function launchWorktreeRoot(cwd: string, runGit: RunTextCommand): Promise<string> {
-  try {
-    return await realpath((await runGit(['-C', cwd, 'rev-parse', '--show-toplevel'])).trim())
-  } catch (error) {
-    throw new Error(
-      `vouchington mcp must be launched inside a git worktree; ${cwd} is not one (${errorText(error)})`,
-    )
-  }
-}
-
-/** Paths of the non-bare entries in `git worktree list --porcelain` output. */
-export function parseWorktreeList(porcelain: string): string[] {
-  const paths: string[] = []
-  for (const block of porcelain.split(/\r?\n\r?\n/)) {
-    const lines = block.split(/\r?\n/)
-    const first = lines.find((line) => line.startsWith('worktree '))
-    if (first !== undefined && !lines.includes('bare')) paths.push(first.slice('worktree '.length))
-  }
-  return paths
+/**
+ * git's two "no worktree here" outcomes: outside any repository, and inside a `.git` directory.
+ * The messages are English because `isolatedGitEnv` forces the C locale.
+ */
+function isNotAGitRepository(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { stderr, message } = error as { stderr?: unknown; message?: unknown }
+  return [stderr, message].some(
+    (text) =>
+      typeof text === 'string' && /not a git repository|must be run in a work tree/i.test(text),
+  )
 }
 
 /**
- * Resolves the worktree a tool call may act on. The list is read from git on every call, so
- * worktrees created after the server started are accepted and removed ones are not. The
- * comparison is exact on real paths: a subdirectory of a worktree, or an unrelated repository,
- * is rejected.
+ * The worktree root containing `cwd`, or undefined when git reports `cwd` is not inside one (so
+ * the server may be launched from anywhere). Any other git failure, such as a missing git binary
+ * or an unsafe repository, is thrown with the cause rather than reported as "outside a worktree".
+ */
+export async function launchWorktreeRoot(
+  cwd: string,
+  runGit: RunTextCommand,
+): Promise<string | undefined> {
+  let output: string
+  try {
+    output = await runGit(['-C', cwd, 'rev-parse', '--show-toplevel'])
+  } catch (error) {
+    if (isNotAGitRepository(error)) return undefined
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `git could not determine the worktree of ${cwd}: ${reason}. Check that git is installed and ` +
+        'on PATH, that the directory exists, and that the repository is readable by this user ' +
+        '(see safe.directory).',
+      { cause: error },
+    )
+  }
+  return realpath(output.trim())
+}
+
+/**
+ * Resolves the worktree a tool call may act on. It must be an absolute path that, after
+ * resolving symlinks, is exactly the top level of a git worktree (of any repository on the
+ * machine). A subdirectory, a relative or nonexistent path, and a non-git directory are rejected.
+ * Git is asked on every call, so worktrees created after the server started are accepted and
+ * removed ones are not. Without `requested`, the launch worktree is used when there is one.
  */
 export async function resolveWorktree(input: {
-  launchRoot: string
+  launchRoot: string | undefined
   requested?: string | undefined
   runGit: RunTextCommand
 }): Promise<string> {
   const { launchRoot, requested, runGit } = input
-  if (requested !== undefined && !isAbsolute(requested))
-    throw new Error('worktree must be an absolute path to a git worktree of the launch repository')
-  const target = requested === undefined ? launchRoot : await canonical(requested)
-  const listing = await runGit(['-C', launchRoot, 'worktree', 'list', '--porcelain'])
-  const known = (await Promise.all(parseWorktreeList(listing).map(canonical))).filter(
-    (path): path is string => path !== undefined,
-  )
-  if (target !== undefined && known.includes(target)) return target
+  if (requested === undefined && launchRoot === undefined)
+    throw new Error(
+      'worktree is required: this server was launched outside a git worktree, so pass ' +
+        'worktree as the absolute path of the git worktree to act on',
+    )
+  const path = requested ?? (launchRoot as string)
+  if (!isAbsolute(path)) throw new Error('worktree must be an absolute path to a git worktree')
+  const target = await canonical(path)
+  if (target !== undefined && (await launchWorktreeRoot(target, runGit)) === target) return target
   throw new Error(
-    `worktree ${requested ?? launchRoot} is not a worktree of the repository this server was ` +
-      `launched from (${launchRoot}). Registered worktrees: ${known.join(', ')}`,
+    `worktree ${path} is not the top level of a git worktree: it must exist and be the ` +
+      'directory `git rev-parse --show-toplevel` reports, not a subdirectory of it',
   )
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

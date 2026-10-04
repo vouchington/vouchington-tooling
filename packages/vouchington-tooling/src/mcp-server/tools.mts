@@ -28,8 +28,9 @@ const SESSION_ID: JsonSchema = {
 const WORKTREE: JsonSchema = {
   type: 'string',
   description:
-    'Absolute path of a worktree listed by `git worktree list` for the repository the server ' +
-    'was launched from. Defaults to the launch worktree.',
+    'Absolute path of the top level of a git worktree (`git rev-parse --show-toplevel`), not a ' +
+    'subdirectory. Defaults to the launch directory worktree; required when the server was ' +
+    'launched outside a git worktree.',
 }
 const PARENT_SESSION_ID: JsonSchema = {
   type: ['string', 'null'],

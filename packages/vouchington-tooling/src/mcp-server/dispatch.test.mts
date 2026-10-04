@@ -94,17 +94,51 @@ describe('worktree gate', () => {
     expect(existsSync(outboxPath(fixture().linked))).toBe(true)
   })
 
-  it('rejects a separate git init repository and writes nothing', async () => {
+  it('accepts the worktree of a second, unrelated repository', async () => {
     const h = harness(fixture())
     const result = await h.call('journal_append', {
       ...JOURNAL_ARGS,
       mode: 'interactive',
       worktree: fixture().outside,
     })
+    expect(jsonOf(result).status).toBe('delivered')
+    expect(existsSync(outboxPath(fixture().outside))).toBe(true)
+    expect(existsSync(outboxPath(fixture().main))).toBe(false)
+  })
+
+  it('works from a non-git launch directory with an explicit worktree', async () => {
+    const h = harness(fixture(), { launchRoot: undefined })
+    const result = await h.call('journal_append', {
+      ...JOURNAL_ARGS,
+      mode: 'interactive',
+      worktree: fixture().linked,
+    })
+    expect(jsonOf(result).status).toBe('delivered')
+    expect(existsSync(outboxPath(fixture().linked))).toBe(true)
+  })
+
+  it('asks for an explicit worktree when launched outside git and none is given', async () => {
+    for (const tool of TOOLS) {
+      const h = harness(fixture(), { launchRoot: undefined })
+      const result = await h.call(tool.name, { sessionId: 's' })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain('worktree is required')
+      expect(textOf(result)).toContain('pass worktree as the absolute path')
+      writeNothing(h, fixture().main)
+    }
+  })
+
+  it('rejects a non-git directory and writes nothing', async () => {
+    const h = harness(fixture())
+    const result = await h.call('journal_append', {
+      ...JOURNAL_ARGS,
+      mode: 'interactive',
+      worktree: fixture().root,
+    })
     expect(result.isError).toBe(true)
-    expect(textOf(result)).toContain('is not a worktree of the repository this server was launched')
+    expect(textOf(result)).toContain('is not the top level of a git worktree')
     writeNothing(h, fixture().main)
-    expect(existsSync(outboxPath(fixture().outside))).toBe(false)
+    expect(existsSync(outboxPath(fixture().root))).toBe(false)
   })
 
   it('rejects a subdirectory of a worktree and a relative path on every tool', async () => {
@@ -113,16 +147,16 @@ describe('worktree gate', () => {
     for (const tool of TOOLS) {
       const h = harness(fixture())
       const inside = await h.call(tool.name, { sessionId: 's', worktree: nested })
-      expect(textOf(inside)).toContain('is not a worktree of the repository')
+      expect(textOf(inside)).toContain('is not the top level of a git worktree')
       const relative = await h.call(tool.name, { sessionId: 's', worktree: 'main' })
       expect(textOf(relative)).toContain('worktree must be an absolute path')
       writeNothing(h, fixture().main)
     }
   })
 
-  it('resolves agent-blackboard from the validated worktree, not from the server', async () => {
-    const install = (worktree: string, status: string) => {
-      const stub = join(worktree, 'node_modules', 'agent-blackboard')
+  it("resolves agent-blackboard from the server's own install, not from the worktree", async () => {
+    const install = (directory: string, status: string) => {
+      const stub = join(directory, 'node_modules', 'agent-blackboard')
       mkdirSync(stub, { recursive: true })
       writeFileSync(
         join(stub, 'package.json'),
@@ -136,20 +170,52 @@ describe('worktree gate', () => {
         export class Entries {}`,
       )
     }
-    install(fixture().main, 'exists')
-    install(fixture().linked, 'created')
-    const environment = { launchRoot: fixture().main, env: BLACKBOARD_ENV, runGit: runIsolatedGit }
+    const installation = join(fixture().root, 'machine-install')
+    install(installation, 'exists')
+    install(fixture().main, 'decoy-main')
+    install(fixture().linked, 'decoy-linked')
+    const environment = {
+      launchRoot: fixture().main,
+      env: BLACKBOARD_ENV,
+      runGit: runIsolatedGit,
+      resolveFrom: join(installation, 'server.mjs'),
+    }
     const args = { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' }
-    const ensure = async (worktree?: string) =>
-      jsonOf(
-        await callTool(
-          'session_ensure',
-          worktree === undefined ? args : { ...args, worktree },
-          environment,
-        ),
-      ).status
-    expect(await ensure()).toBe('exists')
-    expect(await ensure(fixture().main)).toBe('exists')
-    expect(await ensure(fixture().linked)).toBe('created')
+    for (const worktree of [undefined, fixture().main, fixture().linked, fixture().outside]) {
+      const result = await callTool(
+        'session_ensure',
+        worktree === undefined ? args : { ...args, worktree },
+        environment,
+      )
+      expect(jsonOf(result).status).toBe('exists')
+    }
+  })
+
+  it("defaults to this package's own location, ignoring a client installed in the worktree", async () => {
+    const stub = join(fixture().main, 'node_modules', 'agent-blackboard')
+    mkdirSync(stub, { recursive: true })
+    writeFileSync(join(stub, 'package.json'), '{"name":"agent-blackboard","main":"index.mjs"}')
+    writeFileSync(join(stub, 'index.mjs'), 'throw new Error("worktree decoy was loaded")')
+    const result = await callTool(
+      'session_ensure',
+      { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' },
+      { launchRoot: fixture().main, env: {}, runGit: runIsolatedGit },
+    )
+    expect(textOf(result)).not.toContain('decoy')
+  })
+
+  it('reports a missing agent-blackboard peer as a tool error naming the install', async () => {
+    const result = await callTool(
+      'session_ensure',
+      { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' },
+      {
+        launchRoot: fixture().main,
+        env: BLACKBOARD_ENV,
+        runGit: runIsolatedGit,
+        resolveFrom: join(fixture().root, 'empty', 'server.mjs'),
+      },
+    )
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('agent-blackboard is not installed')
   })
 })
