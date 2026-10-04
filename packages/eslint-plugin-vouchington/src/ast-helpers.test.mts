@@ -85,6 +85,31 @@ describe('findVariable', () => {
   })
 })
 
+it('resolves runtime bindings past type-only namespaces while preserving value shadows', () => {
+  const typeOnly: VariableLike = {
+    name: 'Promise',
+    isValueVariable: false,
+    defs: [],
+    references: [],
+  }
+  const runtime: VariableLike = { name: 'Promise', isValueVariable: true, defs: [], references: [] }
+  const context: RuleContextLike = {
+    filename: 'src/example.mts',
+    options: [],
+    report: () => {},
+    sourceCode: {
+      getScope: () => ({ variables: [typeOnly], upper: { variables: [runtime], upper: null } }),
+    },
+  }
+  expect(findVariable(context, identifier('Promise'))).toBe(typeOnly)
+  expect(findVariable(context, identifier('Promise'), true)).toBe(runtime)
+  const onlyTypes: RuleContextLike = {
+    ...context,
+    sourceCode: { getScope: () => ({ variables: [typeOnly], upper: null }) },
+  }
+  expect(findVariable(onlyTypes, identifier('Promise'), true)).toBeNull()
+})
+
 describe('propertyName', () => {
   it('reads static member names and ignores dynamic ones', () => {
     expect(propertyName(identifier('x'))).toBeNull()

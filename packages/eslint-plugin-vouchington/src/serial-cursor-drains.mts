@@ -45,18 +45,22 @@ function enclosingFunctionName(node: NodeLike): string | null {
       return typeof id?.name === 'string' ? id.name : null
     }
     if (current.type === 'ArrowFunctionExpression' || current.type === 'FunctionExpression') {
-      if (current.parent?.type === 'VariableDeclarator') {
-        const binding = current.parent.id as NodeLike | undefined
+      let expression = current
+      while (expression.parent && unwrap(expression.parent) === current)
+        expression = expression.parent
+      const parent = expression.parent
+      if (parent?.type === 'VariableDeclarator') {
+        const binding = parent.id as NodeLike | undefined
         if (binding?.type === 'Identifier') return binding.name as string
       }
       const id = current.id as NodeLike | undefined
       if (id?.type === 'Identifier') return id.name as string
       if (
-        current.parent?.type === 'Property' ||
-        current.parent?.type === 'MethodDefinition' ||
-        current.parent?.type === 'PropertyDefinition'
+        parent?.type === 'Property' ||
+        parent?.type === 'MethodDefinition' ||
+        parent?.type === 'PropertyDefinition'
       ) {
-        const name = patternPropertyName(current.parent)
+        const name = patternPropertyName(parent)
         return typeof name === 'string' ? name : null
       }
     }
@@ -69,7 +73,7 @@ function unshadowedPromise(context: RuleContextLike, node: NodeLike | null | und
   return (
     node?.type === 'Identifier' &&
     node.name === 'Promise' &&
-    !findVariable(context, node)?.defs.length
+    !findVariable(context, node, true)?.defs.length
   )
 }
 

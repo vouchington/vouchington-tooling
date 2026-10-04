@@ -1,4 +1,4 @@
-import { findVariable, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
+import { findVariable, unwrap, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
 import { type MemberReadException } from './member-read-exception-options.mts'
 
 export function canonicalConstructor(
@@ -36,7 +36,7 @@ export function constantArgument(
     findVariable(context, argument)?.defs.some((definition) => {
       const declaration = definition.node
       const id = declaration.id as NodeLike | undefined
-      const initializer = declaration.init as NodeLike | undefined
+      const initializer = unwrap(declaration.init as NodeLike | undefined)
       return (
         definition.type === 'Variable' &&
         declaration.type === 'VariableDeclarator' &&

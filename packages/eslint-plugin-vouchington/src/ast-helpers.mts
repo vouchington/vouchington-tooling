@@ -11,6 +11,7 @@ type ScopeLike = {
 }
 
 export type VariableLike = {
+  isValueVariable?: boolean
   name: string
   defs: DefinitionLike[]
   references: ReferenceLike[]
@@ -57,14 +58,18 @@ export function unwrap(node: NodeLike | null | undefined): NodeLike | null | und
   return current
 }
 
-export function findVariable(context: RuleContextLike, identifier: NodeLike): VariableLike | null {
+export function findVariable(
+  context: RuleContextLike,
+  identifier: NodeLike,
+  valueOnly = false,
+): VariableLike | null {
   if (typeof identifier.name !== 'string') return null
   let scope: ScopeLike | null = context.sourceCode.getScope(identifier)
   while (scope) {
     const variable =
       (typeof scope.set?.get === 'function' && scope.set.get(identifier.name)) ||
       scope.variables?.find((candidate) => candidate.name === identifier.name)
-    if (variable) return variable
+    if (variable && (!valueOnly || variable.isValueVariable !== false)) return variable
     scope = scope.upper
   }
   return null
