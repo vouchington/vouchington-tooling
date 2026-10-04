@@ -88,6 +88,7 @@ export function createFactoryProvenance(
       return isFactory(current.expression as NodeLike, active)
     if (current?.type === 'SequenceExpression')
       return isFactory((current.expressions as NodeLike[]).at(-1), active)
+    if (current?.type === 'AwaitExpression') return isFactory(current.argument as NodeLike, active)
     if (current?.type === 'MemberExpression') {
       const name = propertyName(current)
       return (

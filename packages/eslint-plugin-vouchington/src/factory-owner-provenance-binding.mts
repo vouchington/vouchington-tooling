@@ -26,6 +26,8 @@ export function awaitedModuleSpecifier(
 ): string | null {
   const current = unwrap(value)
   if (current?.type === 'ImportExpression') return staticModuleSpecifier(current.source as NodeLike)
+  if (current?.type === 'SequenceExpression')
+    return awaitedModuleSpecifier(context, (current.expressions as NodeLike[]).at(-1), active)
   if (current?.type !== 'Identifier') return null
   const variable = findVariable(context, current)
   if (!variable || active.has(variable)) return null

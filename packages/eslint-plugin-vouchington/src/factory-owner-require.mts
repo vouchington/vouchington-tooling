@@ -62,7 +62,24 @@ export function isNamespaceImport(
       value,
       modules,
       new Set(['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']),
-    ) || hasImport(context, value, modules, new Set(['ImportSpecifier']), 'default')
+    ) ||
+    hasImport(context, value, modules, new Set(['ImportSpecifier']), 'default') ||
+    (value?.type === 'Identifier' &&
+      Boolean(
+        findVariable(context, value)?.defs.some((definition) => {
+          const declaration = definition.node
+          const reference = declaration?.moduleReference as NodeLike | undefined
+          const specifier = reference?.expression as NodeLike | undefined
+          return (
+            declaration?.type === 'TSImportEqualsDeclaration' &&
+            !declaration.isTypeOnly &&
+            reference?.type === 'TSExternalModuleReference' &&
+            specifier?.type === 'Literal' &&
+            typeof specifier.value === 'string' &&
+            modules.has(specifier.value)
+          )
+        }),
+      ))
   )
 }
 

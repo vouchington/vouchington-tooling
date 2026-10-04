@@ -47,6 +47,12 @@ export default makeGraph<string>
 globalThis.Reflect.apply(makeGraph, null, [])
 globalThis.Reflect.construct(makeGraph, [])
 function shadowGlobal(globalThis) { globalThis.Reflect.apply(makeGraph, null, []) }
+(await (0, import('@compiler/runtime'))).makeGraph()
+makeGraph.call(null)
+makeGraph.apply(null, [])
+;(await makeGraph)()
+const awaitedFactory = await makeGraph
+awaitedFactory()
 `,
     )
     writeFileSync(
@@ -56,6 +62,25 @@ function shadowGlobal(globalThis) { globalThis.Reflect.apply(makeGraph, null, []
     writeFileSync(
       join(root, 'src/ts-import-equals.ts'),
       `export import compiler = require('@compiler/runtime')\n`,
+    )
+    writeFileSync(
+      join(root, 'src/ts-import-binding.ts'),
+      `import compiler = require('@compiler/runtime')
+compiler.makeGraph()
+export = compiler
+function shadow(compiler: { makeGraph(): void }) { compiler.makeGraph() }
+`,
+    )
+    writeFileSync(
+      join(root, 'src/ts-import-unrelated.ts'),
+      `import compiler = require('@other/runtime')
+compiler.makeGraph()
+export = compiler
+`,
+    )
+    writeFileSync(
+      join(root, 'src/await-export.mts'),
+      `import { makeGraph } from '@compiler/runtime'\nexport default await makeGraph\n`,
     )
     writeFileSync(
       join(root, 'src/owner.mts'),
@@ -96,14 +121,16 @@ function shadowGlobal(globalThis) { globalThis.Reflect.apply(makeGraph, null, []
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 22 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 30 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
         ({ filename }) =>
           filename.endsWith('src/check.mts') ||
+          filename.endsWith('src/await-export.mts') ||
           filename.endsWith('src/ts-export.ts') ||
-          filename.endsWith('src/ts-import-equals.ts'),
+          filename.endsWith('src/ts-import-equals.ts') ||
+          filename.endsWith('src/ts-import-binding.ts'),
       ),
     ).toBe(true)
   } finally {

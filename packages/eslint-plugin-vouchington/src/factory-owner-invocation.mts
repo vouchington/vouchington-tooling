@@ -37,6 +37,16 @@ function directReflectFactory(
   return (method === 'apply' || method === 'construct') && isFactory(args[0])
 }
 
+function directFactoryMember(
+  callee: NodeLike | null | undefined,
+  isFactory: (value: NodeLike | null | undefined) => boolean,
+): boolean {
+  const member = unwrap(callee)
+  if (member?.type !== 'MemberExpression') return false
+  const method = propertyName(member)
+  return (method === 'call' || method === 'apply') && isFactory(member.object as NodeLike)
+}
+
 export function createFactoryInvocationVisitors(
   context: RuleContextLike,
   isFactory: (value: NodeLike | null | undefined) => boolean,
@@ -47,7 +57,12 @@ export function createFactoryInvocationVisitors(
     CallExpression(value) {
       const callee = value.callee as NodeLike
       const args = value.arguments as NodeLike[]
-      if (isFactory(callee) || directReflectFactory(context, callee, args, isFactory)) report(value)
+      if (
+        isFactory(callee) ||
+        directFactoryMember(callee, isFactory) ||
+        directReflectFactory(context, callee, args, isFactory)
+      )
+        report(value)
     },
     NewExpression(value) {
       if (isFactory(value.callee as NodeLike)) report(value)
