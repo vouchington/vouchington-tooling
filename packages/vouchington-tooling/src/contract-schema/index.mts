@@ -19,3 +19,12 @@ export type {
 } from './types.mts'
 export { buildVirtualProgramMatrix, virtualProgramBuildCountForTest } from './virtual-program.mts'
 export type { VirtualProgramMatrix } from './virtual-program.mts'
+export { getExportedTypeFacts } from './type-query.mts'
+export type {
+  ExportedTypeFactsRequest,
+  TypeFacts,
+  TypeFactsRequest,
+  ExportedTypeSelector,
+} from './type-query.mts'
+export { getCallRowTypeFacts } from './type-query-call.mts'
+export type { CallRowTypeFacts, CallRowTypeFactsRequest } from './type-query-call.mts'

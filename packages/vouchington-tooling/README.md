@@ -584,6 +584,20 @@ the dedicated process group to exit after the direct child closes so descendants
 `isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
 process-group probe and bounded-drain semantics outside a browser session.
 
+### Contract schema type queries
+
+`getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
+`contract-schema` subpath. Pass the exact `SourceFile.fileName`, an exported name or exact call
+expression text, and only the property names and exported comparison types the consumer needs.
+Facts include the displayed type, whether it is `any`, requested property displays, and requested
+assignability booleans. `defaultTypeParameterIndex` selects an exported generic default;
+`rowSource: 'typeArgument'` selects a call's explicit type argument, while
+`rowSource: 'awaitedRows'` selects `Awaited<ReturnType>.rows[number]`.
+Call results are source ordered and include one-based line and column. An absent call returns an
+empty array so the consumer can enforce its own cardinality; a selected call missing its requested
+row type fails with a descriptive error. The package does not choose source files, expected
+properties, or contract policy.
+
 ## Workflow skills outside plugins
 
 The package ships a flat union of canonical workflow, testing, and database skills at
