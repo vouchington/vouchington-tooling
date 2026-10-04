@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 
 export {
@@ -14,6 +15,7 @@ export type RouteBinding = {
 }
 
 export type HandlerBindings = Map<ts.Symbol, RouteBinding>
+export type AmbiguousHandlerBindings = Map<ts.Symbol, readonly string[]>
 
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -85,6 +87,7 @@ export function enclosingRouteBinding(
 export function collectHandlerBindings(
   sourceFiles: readonly ts.SourceFile[],
   checker: ts.TypeChecker,
+  ambiguousBindings?: AmbiguousHandlerBindings,
 ): HandlerBindings {
   const bindingsBySymbol = new Map<ts.Symbol, RouteBinding[]>()
   for (const sourceFile of sourceFiles) {
@@ -114,7 +117,16 @@ export function collectHandlerBindings(
     // A symbol bound to more than one distinct route (a genuinely shared handler function) can't
     // be attributed to either one — recording an arbitrary winner would misdocument whichever
     // route lost.
-    if (unambiguous) bindings.set(symbol, first!)
+    if (unambiguous) {
+      bindings.set(symbol, first!)
+    } else if (ambiguousBindings) {
+      ambiguousBindings.set(
+        symbol,
+        [
+          ...new Set(candidates.map(({ method, routeTemplate }) => `${method}:${routeTemplate}`)),
+        ].toSorted(),
+      )
+    }
   }
   return bindings
 }
@@ -149,22 +161,6 @@ function handlerArgumentSymbols(node: ts.CallExpression, checker: ts.TypeChecker
     }
   }
   return symbols
-}
-
-function functionSymbol(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
-  if (ts.isFunctionDeclaration(node) && node.name) return checker.getSymbolAtLocation(node.name)
-  if (
-    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
-    ts.isVariableDeclaration(node.parent) &&
-    ts.isIdentifier(node.parent.name)
-  ) {
-    return checker.getSymbolAtLocation(node.parent.name)
-  }
-  return undefined
-}
-
-function resolveSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
-  return symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
 }
 
 export function routeTemplateFromExpression(expression: ts.Expression): string | undefined {

@@ -43,6 +43,18 @@ const sources = {
       ctx.pipeline(stream)
     })
   `,
+  'marked-streams': `
+    declare const app: any
+    declare function apiResponse<K extends string, T>(key: K, body: T): T
+    app.route('/api/v1/csv').get((ctx: any) => {
+      ctx.set('Content-Type', 'text/csv; charset=utf-8')
+      ctx.pipeline(apiResponse('GET:/api/v1/csv', { id: 'one' }))
+    })
+    app.route('/api/v1/xml').get((ctx: any) => {
+      ctx.set('Content-Type', 'application/xml; charset=utf-8')
+      ctx.pipeline(apiResponse('GET:/api/v1/xml', { id: 'one' }))
+    })
+  `,
 } as const
 
 let matrix: VirtualProgramMatrix<keyof typeof sources>
@@ -81,5 +93,17 @@ describe('API response media contracts', () => {
     expect(contracts['GET:/api/v1/dynamic']!.unavailableReason).toBeDefined()
     expect(contracts['GET:/api/v1/overwritten']!.mediaTypeKnowledge).toBe('unknown')
     expect(contracts['GET:/api/v1/dynamic']!.mediaTypeKnowledge).toBe('unknown')
+  })
+
+  it('retains CSV/XML media inference for pipelines containing explicit response markers', () => {
+    const sourceFile = matrix.sourceFile('marked-streams')
+    const normal = discoverApiResponseContracts(matrix.program, [sourceFile])
+    const strict = discoverApiResponseContracts(matrix.program, [sourceFile], undefined, {
+      onAmbiguousAttribution: () => {},
+    })
+
+    expect(strict).toEqual(normal)
+    expect(normal['GET:/api/v1/csv#implicit-2']?.mediaType).toBe('text/csv')
+    expect(normal['GET:/api/v1/xml#implicit-2']?.mediaType).toBe('application/xml')
   })
 })

@@ -4,6 +4,8 @@ import { requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
+import { ambiguousRoutesForCall } from './response-contract-attribution.mts'
+import { implicitResponseCallLabel } from './response-contract-call-classification.mts'
 import {
   registerRouteContract,
   type DiscoverApiResponseContractsOptions,
@@ -20,6 +22,7 @@ import {
   enclosingRouteBinding,
   isContextMethod,
   responseMarker,
+  type AmbiguousHandlerBindings,
   visit,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
@@ -37,7 +40,8 @@ export function discoverApiResponseContracts(
   registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendResponseContract>()
-  const handlerBindings = collectHandlerBindings(sourceFiles, checker)
+  const ambiguousBindings: AmbiguousHandlerBindings = new Map()
+  const handlerBindings = collectHandlerBindings(sourceFiles, checker, ambiguousBindings)
   const protocolContracts = new Map<string, BackendResponseContract>()
   const protocolEmissions = discoverProtocolContracts(
     sourceFiles,
@@ -103,18 +107,30 @@ export function discoverApiResponseContracts(
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
-      if (
-        !ts.isCallExpression(node) ||
-        responseMarker(node.expression) ||
-        protocolEmissions.has(node)
-      )
-        return
+      if (!ts.isCallExpression(node)) return
+      const callLabel = implicitResponseCallLabel(node)
+      if (options?.onAmbiguousAttribution) {
+        const attributionLabel = implicitResponseCallLabel(node, true)
+        const routes = attributionLabel
+          ? ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)
+          : undefined
+        if (attributionLabel && routes) {
+          const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+          options.onAmbiguousAttribution({
+            sourceLocation: `${sourceLocation(sourceFile, node)}:${position.line + 1}:${position.character + 1}`,
+            label: attributionLabel,
+            routes,
+          })
+        }
+      }
+      if (responseMarker(node.expression) || protocolEmissions.has(node)) return
       discoverImplicitContract(
         node,
         checker,
         sourceFile,
         contracts,
         handlerBindings,
+        callLabel,
         requestedKeys,
         options,
       )

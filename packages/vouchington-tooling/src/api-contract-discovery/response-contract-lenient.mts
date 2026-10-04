@@ -15,8 +15,25 @@ export type RouteDiscoveryError = {
   reason: string
 }
 
+/**
+ * A response emitter found in a named handler registered for multiple routes. `sourceLocation`
+ * is a normalized source path followed by one-based line and column; `routes` contains unique,
+ * lexically sorted `METHOD:path` keys. `label` identifies the implicit response form.
+ */
+export type AmbiguousAttributionFact = {
+  sourceLocation: string
+  label: string
+  routes: readonly string[]
+}
+
 export type DiscoverApiResponseContractsOptions = ExtractContractSchemaOptions & {
   onRouteError?: (error: RouteDiscoveryError) => void
+  /**
+   * Opt in to response-attribution facts during the existing discovery walk. Dynamic error
+   * payloads paired with a non-literal status are excluded from these facts; discovery output
+   * keeps its existing behavior. Consumers choose whether a fact needs a diagnostic or policy.
+   */
+  onAmbiguousAttribution?: (fact: AmbiguousAttributionFact) => void
 }
 
 /** Placeholder contract for a route whose response type could not be extracted. */

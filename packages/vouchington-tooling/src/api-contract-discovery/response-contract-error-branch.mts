@@ -15,10 +15,18 @@ import { isContextMethod } from './response-contract-route-analysis.mts'
  * two independent, self-contained early-return guards, even though neither guard's error status
  * is in effect on the path that reaches the trailing statement.
  */
-export function isInErrorBranch(call: ts.CallExpression): boolean {
+export function isInErrorBranch(
+  call: ts.CallExpression,
+  excludeDynamicErrorObjects = false,
+): boolean {
   let statement: ts.Node = call
   while (!ts.isStatement(statement)) statement = statement.parent
-  return precededByErrorStatus(statement as ts.Statement)
+  if (precededByErrorStatus(statement)) return true
+  return (
+    excludeDynamicErrorObjects &&
+    isErrorObjectJson(call) &&
+    precededByStatus(statement, isDynamicStatusStatement)
+  )
 }
 
 /**
@@ -29,12 +37,41 @@ export function isInErrorBranch(call: ts.CallExpression): boolean {
  * bodies nested one block deeper.
  */
 function precededByErrorStatus(statement: ts.Statement): boolean {
+  return precededByStatus(statement, isBareErrorStatusStatement)
+}
+
+function precededByStatus(
+  statement: ts.Statement,
+  matches: (statement: ts.Statement) => boolean,
+): boolean {
   const block = statement.parent
   if (!ts.isBlock(block)) return false
   const index = block.statements.indexOf(statement)
-  if (block.statements.slice(0, index).some(isBareErrorStatusStatement)) return true
+  if (block.statements.slice(0, index).some(matches)) return true
   const enclosing = block.parent
-  return ts.isStatement(enclosing) ? precededByErrorStatus(enclosing) : false
+  return ts.isStatement(enclosing) ? precededByStatus(enclosing, matches) : false
+}
+
+function isDynamicStatusStatement(statement: ts.Statement): boolean {
+  if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression))
+    return false
+  if (!isContextMethod(statement.expression.expression, 'setStatus')) return false
+  const status = statement.expression.arguments[0]
+  return !!status && !ts.isNumericLiteral(status)
+}
+
+function isErrorObjectJson(call: ts.CallExpression): boolean {
+  if (!isContextMethod(call.expression, 'json')) return false
+  const body = call.arguments[0]
+  return (
+    !!body &&
+    ts.isObjectLiteralExpression(body) &&
+    body.properties.some((property) => {
+      if (ts.isSpreadAssignment(property) || !property.name || !ts.isIdentifier(property.name))
+        return false
+      return property.name.text === 'error'
+    })
+  )
 }
 
 function isBareErrorStatusStatement(statement: ts.Statement): boolean {
