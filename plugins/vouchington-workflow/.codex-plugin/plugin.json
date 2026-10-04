@@ -31,6 +31,5 @@
     "category": "Productivity",
     "capabilities": [],
     "defaultPrompt": ["Use the repository's local instructions to guide this workflow change."]
-  },
-  "mcpServers": "./mcp.json"
+  }
 }

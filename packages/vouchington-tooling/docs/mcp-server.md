@@ -26,16 +26,7 @@ worktree at call time (`createRequire` on `<worktree>/package.json`), never from
 The connection comes from `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the server's
 environment. The server never searches for, prints, or mints them.
 
-## Workflow plugin
-
-The `vouchington-workflow` plugin bundles the server registration for portable, Codex, and Claude
-hosts. Its bundled Node launcher resolves the CLI from the packages installed above in the consumer
-worktree. Set `MCP_WORKTREE` to that absolute path in the host server environment when the host
-launches from the plugin root; portable hosts do this by default. Hosts launching from the consumer
-worktree may omit it. Configure native pass-through of `MCP_WORKTREE`, `AGENT_BLACKBOARD_URL`, and
-`AGENT_BLACKBOARD_TOKEN` when the host sanitizes ambient variables. The manifests do not overwrite
-credentials with interpolation placeholders. No additional manual MCP registration is needed.
-Repositories already registering this server should disable one registration to avoid duplicate tools.
+## CLI fallback
 
 If MCP is unavailable, use `vouchington agent-blackboard journal append|entries|flush|status` as described
 in the blackboard skill. Record the fallback and delivery status in the journal and tell the human.
