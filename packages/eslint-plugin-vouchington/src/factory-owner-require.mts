@@ -55,11 +55,14 @@ export function isNamespaceImport(
   node: NodeLike | null | undefined,
   modules: ReadonlySet<string>,
 ): boolean {
-  return hasImport(
-    context,
-    unwrap(node),
-    modules,
-    new Set(['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']),
+  const value = unwrap(node)
+  return (
+    hasImport(
+      context,
+      value,
+      modules,
+      new Set(['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']),
+    ) || hasImport(context, value, modules, new Set(['ImportSpecifier']), 'default')
   )
 }
 

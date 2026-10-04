@@ -34,6 +34,8 @@ export function createFactoryProvenance(
     active = new Set<VariableLike>(),
   ): boolean {
     const current = unwrap(value)
+    if (current?.type === 'SequenceExpression')
+      return isNamespace((current.expressions as NodeLike[]).at(-1), active)
     if (current?.type === 'AwaitExpression') {
       const argument = unwrap(current.argument as NodeLike)
       const moduleName = awaitedModuleSpecifier(context, argument)
@@ -82,6 +84,8 @@ export function createFactoryProvenance(
     active = new Set<VariableLike>(),
   ): boolean {
     const current = unwrap(value)
+    if (current?.type === 'SequenceExpression')
+      return isFactory((current.expressions as NodeLike[]).at(-1), active)
     if (current?.type === 'MemberExpression') {
       const name = propertyName(current)
       return (

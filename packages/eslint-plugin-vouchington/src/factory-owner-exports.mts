@@ -13,6 +13,15 @@ function name(value: unknown): string | null {
   return typeof entry?.value === 'string' ? entry.value : null
 }
 
+function bindingNodes(value: NodeLike): NodeLike[] {
+  if (value.type === 'AssignmentPattern') return bindingNodes(value.left as NodeLike)
+  if (value.type === 'ObjectPattern')
+    return (value.properties as NodeLike[]).flatMap((property) =>
+      bindingNodes((property.value ?? property.argument) as NodeLike),
+    )
+  return [value]
+}
+
 export function createFactoryExportVisitors(
   context: RuleContextLike,
   options: FactoryProvenanceOptions,
@@ -37,6 +46,9 @@ export function createFactoryExportVisitors(
     ExportDefaultDeclaration(value) {
       if (restricted(node(value.declaration))) report(value)
     },
+    TSExportAssignment(value) {
+      if (restricted(node(value.expression))) report(value)
+    },
     ExportNamedDeclaration(value) {
       if (value.exportKind === 'type') return
       const specifiers = value.specifiers as NodeLike[]
@@ -57,13 +69,7 @@ export function createFactoryExportVisitors(
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
           const id = node(declarator.id)
-          const bindings =
-            id?.type === 'ObjectPattern'
-              ? (id.properties as NodeLike[]).map((property) => {
-                  const value = node(property.value)
-                  return value?.type === 'AssignmentPattern' ? node(value.left) : value
-                })
-              : [id]
+          const bindings = id?.type === 'ObjectPattern' ? bindingNodes(id) : [id]
           if (bindings.some(restricted)) report(declarator)
         }
       }

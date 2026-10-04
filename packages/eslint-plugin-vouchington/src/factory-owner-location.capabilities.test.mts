@@ -67,6 +67,20 @@ export const { makeHost: host = fallback } = compiler`,
     reports: 3,
   },
   {
+    name: 'nested default namespace destructuring retains factory provenance',
+    code: `const { default: { makeGraph: build } } = await import('@compiler/runtime')
+build()
+export const { default: { makeHost: host } } = await import('@compiler/runtime')`,
+    reports: 2,
+  },
+  {
+    name: 'named default import spelling retains namespace provenance',
+    code: `import { default as runtime } from '@compiler/runtime'
+runtime.makeGraph()
+export { runtime }`,
+    reports: 2,
+  },
+  {
     name: 'direct default namespace members',
     code: `import * as runtime from '@compiler/runtime'
 import { createRequire } from 'node:module'
@@ -140,6 +154,16 @@ new makeGraph()
 makeGraph\`source\`
 Reflect.apply(makeGraph, null, [])
 Reflect.construct(makeGraph, [])`,
+    reports: 4,
+  },
+  {
+    name: 'final sequence operands retain direct factory and namespace provenance',
+    code: `import { makeGraph } from '@compiler/runtime'
+import * as runtime from '@compiler/runtime'
+new (0, makeGraph)();
+(0, makeGraph)();
+(0, makeGraph)\`source\`;
+(0, runtime).makeGraph()`,
     reports: 4,
   },
   {
@@ -353,5 +377,30 @@ import('@compiler/runtime').then(() => {})`
       source: { type: 'Literal', value: '@compiler/runtime' },
     } as NodeLike)
     expect(reports).toEqual([])
+  })
+
+  it('reports TypeScript export assignments only for configured namespaces', () => {
+    const reports: string[] = []
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report: ({ messageId }) => reports.push(messageId),
+      sourceCode: { getScope: () => ({ upper: null }) },
+    }
+    const visitors = createFactoryExportVisitors(
+      context,
+      { modules: new Set(['@compiler/runtime']), factories: new Set(['makeGraph']) },
+      {
+        isFactory: () => false,
+        isNamespace: (value) => value?.type === 'Identifier' && value.name === 'compiler',
+      },
+    )
+    for (const name of ['other', 'compiler']) {
+      visitors.TSExportAssignment?.({
+        type: 'TSExportAssignment',
+        expression: { type: 'Identifier', name },
+      } as NodeLike)
+    }
+    expect(reports).toEqual(['constructionOwner'])
   })
 })

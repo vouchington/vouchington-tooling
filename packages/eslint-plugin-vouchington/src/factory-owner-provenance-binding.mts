@@ -46,19 +46,27 @@ export function namedPatternSource(
 ): NodeLike | null {
   const pattern = declarator.id as NodeLike
   if (pattern?.type !== 'ObjectPattern') return null
-  const properties = pattern.properties as NodeLike[]
-  return properties.some((property) => {
+  return patternHasBinding(pattern, localName, names) ? (declarator.init as NodeLike) : null
+}
+
+function patternHasBinding(
+  pattern: NodeLike,
+  localName: string,
+  names: ReadonlySet<string>,
+): boolean {
+  return (pattern.properties as NodeLike[]).some((property) => {
     const value = property.value as NodeLike
     const local = value?.type === 'AssignmentPattern' ? (value.left as NodeLike) : value
     const name = patternPropertyName(property)
     return (
       property.type === 'Property' &&
-      local?.type === 'Identifier' &&
-      local.name === localName &&
-      name !== null &&
-      names.has(String(name))
+      ((local?.type === 'Identifier' &&
+        local.name === localName &&
+        name !== null &&
+        names.has(String(name))) ||
+        (name === 'default' &&
+          local?.type === 'ObjectPattern' &&
+          patternHasBinding(local, localName, names)))
     )
   })
-    ? (declarator.init as NodeLike)
-    : null
 }

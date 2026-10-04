@@ -35,7 +35,16 @@ const awaited = await promise
 awaited.makeGraph()
 let load = createRequire(import.meta.url)
 load('@compiler/runtime').makeGraph()
+const { default: { makeGraph: nested } } = await import('@compiler/runtime')
+nested()
+import { default as defaultAlias } from '@compiler/runtime'
+defaultAlias.makeGraph()
+new (0, makeGraph)()
 `,
+    )
+    writeFileSync(
+      join(root, 'src/ts-export.ts'),
+      `import * as compiler from '@compiler/runtime'\nexport = compiler\n`,
     )
     writeFileSync(
       join(root, 'src/owner.mts'),
@@ -59,7 +68,7 @@ load('@compiler/runtime').makeGraph()
               modules: ['@compiler/runtime'],
               factories: ['makeGraph'],
               owners: ['src/owner.mts'],
-              include: ['src/**/*.mts'],
+              include: ['src/**/*.mts', 'src/**/*.ts'],
             },
           ],
         },
@@ -76,9 +85,14 @@ load('@compiler/runtime').makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 12 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 16 }, () => 'vouchington(factory-owner-location)'),
     )
-    expect(diagnostics.every(({ filename }) => filename.endsWith('src/check.mts'))).toBe(true)
+    expect(
+      diagnostics.every(
+        ({ filename }) =>
+          filename.endsWith('src/check.mts') || filename.endsWith('src/ts-export.ts'),
+      ),
+    ).toBe(true)
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
