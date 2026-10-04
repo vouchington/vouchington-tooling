@@ -60,7 +60,10 @@ export function resolveMemberReadExceptions(raw: unknown): MemberReadException[]
     } else if (value.kind !== 'const-instance-prefix' || typeof value.prefix !== 'string') {
       return null
     }
-    resolved.push(value as MemberReadException)
+    resolved.push({
+      ...value,
+      file: (value.file as string).replace(/^(?:\.\/)+/, ''),
+    } as MemberReadException)
   }
   return resolved
 }

@@ -64,7 +64,7 @@ If `members` is missing or empty, the rule loads and reports nothing. File-wide 
 
 ### Binding-aware member exceptions
 
-Each exception specifies an exact relative `file`, banned `member`, imported constructor `module` / `imported` name, and required `local` binding name. The rule verifies the import binding, so shadowed and lookalike constructors remain forbidden.
+Each exception specifies an exact relative `file`, banned `member`, imported constructor `module` / `imported` name, and required `local` binding name. Leading `./` segments are normalized consistently with file selection. The rule verifies the import binding, so shadowed and lookalike constructors remain forbidden.
 
 - `kind: 'constructor-constant'` additionally requires `constant: { name, value }`. Only a direct constructor member call with one argument bound to that exact literal `const` is allowed.
 - `kind: 'const-instance-prefix'` additionally requires `prefix`. Only a direct zero-argument call on an unreassigned `const` instance is allowed. Its constructor options must have that effective literal `prefix`; later spreads, computed keys or conflicting duplicate prefixes invalidate it. Optional instance calls remain forbidden.
@@ -75,7 +75,7 @@ Aliases, extracted methods and destructured reads do not inherit exceptions. Exc
 
 Reject an unshadowed global `Promise` combinator called with an eager collection iteration inside a configured draining function. This protects configured streams from starting all drains before previous database clients are released; ordinary serial iteration is allowed.
 
-Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `includeFiles` selectors. Optional `promiseMethods` defaults to `['all', 'allSettled', 'any', 'race']`; `iterationMethods` defaults to `['flatMap', 'forEach', 'map']`. With missing/empty `functions` the rule reports nothing. The nearest named function owns the call; unrelated nested functions and shadowed `Promise` bindings are excluded. Function declarations and variable-bound function/arrow expressions are supported.
+Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `includeFiles` selectors. Optional `promiseMethods` defaults to `['all', 'allSettled', 'any', 'race']`; `iterationMethods` defaults to `['flatMap', 'forEach', 'map']`. With missing/empty `functions` the rule reports nothing. The nearest named function owns the call; unrelated nested functions and shadowed `Promise` bindings are excluded. Function declarations, named callbacks, variable-bound function/arrow expressions, and object/class methods are supported. Awaiting the iteration argument does not make an eager drain serial.
 
 ## `factory-owner-location`
 

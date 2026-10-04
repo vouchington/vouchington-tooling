@@ -54,10 +54,30 @@ describe('serial-cursor-drains', () => {
     `const { writeRows } = async () => Promise.all(rows.map(drain))`,
     `export default function () { Promise.all(rows.map(drain)) }`,
     `async function writeRows() { function nested() { Promise.all(rows.map(drain)) } }`,
+    `function writeRows() { consume(function nested() { Promise.all(rows.map(drain)) }) }`,
+    `function writeRows() { const object = { nested() { Promise.all(rows.map(drain)) } } }`,
+    `function writeRows() { const object = { nested: () => Promise.all(rows.map(drain)) } }`,
+    `function writeRows() { class Nested { nested() { Promise.all(rows.map(drain)) } } }`,
+    `function writeRows() { class Nested { nested = () => Promise.all(rows.map(drain)) } }`,
+    `function writeRows() { const object = { [key]() { Promise.all(rows.map(drain)) } } }`,
   ])('allows serial, unrelated and shadowed cases: %s', async (code) => {
     expect(
       messageIds(await lintRule('serial-cursor-drains', code, OPTIONS, 'src/export.js')),
     ).toEqual([])
+  })
+
+  it.each([
+    `async function writeRows() { await Promise.all(await rows.map(drain)) }`,
+    `async function writeRows() { await Promise.all(await (await rows.map(drain))) }`,
+    `consume(function writeRows() { Promise.all(rows.map(drain)) })`,
+    `const object = { writeRows() { Promise.all(rows.map(drain)) } }`,
+    `class Exporter { writeRows() { Promise.all(rows.map(drain)) } }`,
+    `const writeRows = function internal() { Promise.all(rows.map(drain)) }`,
+    `function writeRows() { consume(() => Promise.all(rows.map(drain))) }`,
+  ])('rejects eager drains through wrappers and selected nearest owners: %s', async (code) => {
+    expect(
+      messageIds(await lintRule('serial-cursor-drains', code, OPTIONS, 'src/export.js')),
+    ).toEqual(['serial'])
   })
 
   it('keeps selected methods, owners and files configurable', async () => {

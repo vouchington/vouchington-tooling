@@ -19,6 +19,35 @@ const OPTIONS = {
 }
 
 describe('member-read binding exceptions', () => {
+  it.each(['./', '././'])('normalizes exact exception paths beginning with %s', async (prefix) => {
+    for (const [options, code] of [
+      [
+        OPTIONS,
+        `import { CacheClient } from '@store/cache'; const CACHE_GROUP = 'cache:group'; CacheClient.invalidate(CACHE_GROUP)`,
+      ],
+      [
+        INSTANCE_OPTIONS,
+        `import { CacheClient } from '@store/cache'; const cache = new CacheClient({ prefix: 'validation' }); cache.invalidate()`,
+      ],
+    ] as const) {
+      const configured = {
+        ...options,
+        include: [],
+        includeFiles: [`${prefix}src/service.js`],
+        exceptions: options.exceptions.map((exception) => ({
+          ...exception,
+          file: `${prefix}src/service.js`,
+        })),
+      }
+      expect(messageIds(await lintRule('banned-member-read', code, configured))).toEqual([])
+      expect(
+        messageIds(
+          await lintRule('banned-member-read', code, configured, `${prefix}src/service.js`),
+        ),
+      ).toEqual([])
+    }
+  })
+
   it('allows only the configured imported constructor and constant argument', async () => {
     const prelude = `import { CacheClient } from '@store/cache'; const CACHE_GROUP = 'cache:group';`
     expect(

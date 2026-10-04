@@ -1,5 +1,6 @@
 import {
   findVariable,
+  patternPropertyName,
   propertyName,
   unwrap,
   type NodeLike,
@@ -43,12 +44,21 @@ function enclosingFunctionName(node: NodeLike): string | null {
       const id = current.id as NodeLike | undefined
       return typeof id?.name === 'string' ? id.name : null
     }
-    if (
-      (current.type === 'ArrowFunctionExpression' || current.type === 'FunctionExpression') &&
-      current.parent?.type === 'VariableDeclarator'
-    ) {
-      const id = current.parent.id as NodeLike | undefined
+    if (current.type === 'ArrowFunctionExpression' || current.type === 'FunctionExpression') {
+      if (current.parent?.type === 'VariableDeclarator') {
+        const binding = current.parent.id as NodeLike | undefined
+        if (binding?.type === 'Identifier') return binding.name as string
+      }
+      const id = current.id as NodeLike | undefined
       if (id?.type === 'Identifier') return id.name as string
+      if (
+        current.parent?.type === 'Property' ||
+        current.parent?.type === 'MethodDefinition' ||
+        current.parent?.type === 'PropertyDefinition'
+      ) {
+        const name = patternPropertyName(current.parent)
+        return typeof name === 'string' ? name : null
+      }
     }
     current = current.parent
   }
@@ -105,7 +115,10 @@ export function createSerialCursorDrainsRule() {
           )
             return
           const args = node.arguments as NodeLike[]
-          const mapped = unwrap(args[0])
+          let mapped = unwrap(args[0])
+          while (mapped?.type === 'AwaitExpression') {
+            mapped = unwrap(mapped.argument as NodeLike | undefined)
+          }
           const mappedCallee = unwrap(mapped?.callee as NodeLike | undefined)
           const iterator = propertyName(mappedCallee)
           if (

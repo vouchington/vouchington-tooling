@@ -230,7 +230,7 @@ describe('vouchington/banned-member-read', () => {
               ],
               exceptions: [
                 {
-                  file: 'src/test-helpers/entities/scopes.mts',
+                  file: './src/test-helpers/entities/scopes.mts',
                   member: 'invalidate',
                   module: '@store/cache',
                   imported: 'CacheClient',
@@ -239,7 +239,7 @@ describe('vouchington/banned-member-read', () => {
                   constant: { name: 'CACHE_GROUP_PREFIX', value: 'cache:group:active' },
                 },
                 {
-                  file: 'src/test-helpers/entities/domains.mts',
+                  file: '././src/test-helpers/entities/domains.mts',
                   member: 'invalidate',
                   module: '@store/cache',
                   imported: 'CacheClient',

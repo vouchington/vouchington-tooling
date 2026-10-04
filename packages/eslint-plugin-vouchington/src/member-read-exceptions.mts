@@ -73,7 +73,10 @@ export function isMemberReadException(
   const object = unwrap(member.object as NodeLike | undefined)
   const args = call.arguments as NodeLike[]
   return exceptions.some((exception) => {
-    if (normalizeFilename(context) !== exception.file || propertyName(member) !== exception.member)
+    if (
+      normalizeFilename(context).replace(/^(?:\.\/)+/, '') !== exception.file ||
+      propertyName(member) !== exception.member
+    )
       return false
     if (exception.kind === 'constructor-constant') {
       return (
