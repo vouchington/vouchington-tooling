@@ -28,6 +28,7 @@ function bodyMatches(node: NodeLike, matches: (node: NodeLike) => boolean): bool
 
 export function invokedBodyMatches(
   callee: NodeLike | null | undefined,
+  args: readonly NodeLike[],
   matches: (node: NodeLike) => boolean,
 ): boolean {
   if (
@@ -36,5 +37,10 @@ export function invokedBodyMatches(
     callee.generator
   )
     return false
-  return bodyMatches(callee.body as NodeLike, matches)
+  const parameters = callee.params as NodeLike[]
+  return (
+    parameters.some(
+      (parameter, index) => index >= args.length && bodyMatches(parameter, matches),
+    ) || bodyMatches(callee.body as NodeLike, matches)
+  )
 }

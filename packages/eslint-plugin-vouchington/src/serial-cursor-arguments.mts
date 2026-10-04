@@ -1,4 +1,5 @@
 import { invokedBodyMatches } from './serial-cursor-immediate.mts'
+import { runtimeChildren } from './serial-cursor-runtime-children.mts'
 import { propertyName, unwrap, type NodeLike } from './ast-helpers.mts'
 
 export function eagerIteration(
@@ -7,29 +8,7 @@ export function eagerIteration(
 ): boolean {
   const expression = unwrap(node)
   if (!expression) return false
-  if (expression.type === 'AwaitExpression' || expression.type === 'SpreadElement')
-    return eagerIteration(expression.argument as NodeLike | undefined, methods)
-  if (expression.type === 'LogicalExpression')
-    return (
-      eagerIteration(expression.left as NodeLike, methods) ||
-      eagerIteration(expression.right as NodeLike, methods)
-    )
-  if (expression.type === 'ConditionalExpression')
-    return (
-      eagerIteration(expression.test as NodeLike, methods) ||
-      eagerIteration(expression.consequent as NodeLike, methods) ||
-      eagerIteration(expression.alternate as NodeLike, methods)
-    )
-  if (expression.type === 'ArrayExpression' || expression.type === 'SequenceExpression') {
-    const children = (expression.elements ?? expression.expressions) as (NodeLike | null)[]
-    return children.some((child) => eagerIteration(child, methods))
-  }
-  if (expression.type === 'MemberExpression')
-    return (
-      eagerIteration(expression.object as NodeLike, methods) ||
-      (Boolean(expression.computed) && eagerIteration(expression.property as NodeLike, methods))
-    )
-  const callee = unwrap(expression.callee as NodeLike | undefined)
+  const callee = unwrap((expression.callee ?? expression.tag) as NodeLike | undefined)
   const iterator = propertyName(callee)
   if (
     expression.type === 'CallExpression' &&
@@ -38,11 +17,19 @@ export function eagerIteration(
     methods.has(iterator)
   )
     return true
-  if (expression.type === 'CallExpression' || expression.type === 'NewExpression')
-    return (
-      invokedBodyMatches(callee, (node) => eagerIteration(node, methods)) ||
-      eagerIteration(callee, methods) ||
-      (expression.arguments as NodeLike[]).some((argument) => eagerIteration(argument, methods))
+  if (
+    ['CallExpression', 'NewExpression', 'TaggedTemplateExpression'].includes(expression.type) &&
+    invokedBodyMatches(
+      callee,
+      expression.type === 'TaggedTemplateExpression'
+        ? [
+            expression.quasi as NodeLike,
+            ...((expression.quasi as NodeLike).expressions as NodeLike[]),
+          ]
+        : (expression.arguments as NodeLike[]),
+      (child) => eagerIteration(child, methods),
     )
-  return false
+  )
+    return true
+  return runtimeChildren(expression).some((child) => eagerIteration(child, methods))
 }

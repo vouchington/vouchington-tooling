@@ -1,3 +1,4 @@
+import { eagerIteration } from './serial-cursor-arguments.mts'
 import { expect, it } from 'vitest'
 import type { NodeLike, RuleContextLike } from './ast-helpers.mts'
 import { createSerialCursorDrainsRule } from './serial-cursor-drains.mts'
@@ -46,3 +47,9 @@ it.each(['writeRows', 'other'])(
     expect(reports).toEqual(name === 'writeRows' ? ['serial'] : [])
   },
 )
+
+it('accepts absent expression input at the visitor boundary', () => {
+  const methods = new Set(['map'])
+  expect(eagerIteration(null, methods)).toBe(false)
+  expect(eagerIteration(undefined, methods)).toBe(false)
+})

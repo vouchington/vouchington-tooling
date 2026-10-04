@@ -39,8 +39,11 @@ export function resolveSerialDrainOptions(raw: unknown): SerialDrainOptions | nu
 }
 
 function enclosingFunctionName(node: NodeLike): string | null {
+  let child = node
   let current = node.parent
   while (current) {
+    if (current.type === 'PropertyDefinition' && !current.static && current.value === child)
+      return null
     if (current.type === 'FunctionDeclaration') {
       const id = current.id as NodeLike | undefined
       return typeof id?.name === 'string' ? id.name : null
@@ -65,6 +68,7 @@ function enclosingFunctionName(node: NodeLike): string | null {
         return typeof name === 'string' ? name : null
       }
     }
+    child = current
     current = current.parent
   }
   return null
@@ -120,7 +124,7 @@ export function createSerialCursorDrainsRule() {
           )
             return
           const args = node.arguments as NodeLike[]
-          if (eagerIteration(args[0], options.iterationMethods)) {
+          if (args.some((argument) => eagerIteration(argument, options.iterationMethods))) {
             context.report({ messageId: 'serial', node })
           }
         },
