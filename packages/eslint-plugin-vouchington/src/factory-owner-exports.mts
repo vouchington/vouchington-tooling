@@ -1,5 +1,9 @@
 import type { NodeLike, RuleContextLike } from './ast-helpers.mts'
-import { bindingNodes, patternSelectsFactory } from './factory-owner-export-pattern.mts'
+import {
+  bindingNodes,
+  mutableExportInitializer,
+  patternSelectsFactory,
+} from './factory-owner-export-pattern.mts'
 import type { FactoryProvenanceOptions } from './factory-owner-provenance.mts'
 
 function node(value: unknown): NodeLike | undefined {
@@ -61,7 +65,11 @@ export function createFactoryExportVisitors(
       if (declaration?.type === 'TSImportEqualsDeclaration') {
         const moduleReference = node(declaration.moduleReference)
         const moduleName = name(node(moduleReference?.expression))
-        if (moduleName !== null && options.modules.has(moduleName)) report(declaration)
+        if (
+          (moduleName !== null && options.modules.has(moduleName)) ||
+          provenance.isFactory(node(declaration.id))
+        )
+          report(declaration)
       }
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
@@ -79,7 +87,13 @@ export function createFactoryExportVisitors(
         }
       }
       for (const specifier of specifiers) {
-        if (specifier.exportKind !== 'type' && restricted(node(specifier.local))) report(specifier)
+        const local = node(specifier.local)
+        if (
+          specifier.exportKind !== 'type' &&
+          (restricted(local) ||
+            (local?.type === 'Identifier' && restricted(mutableExportInitializer(context, local))))
+        )
+          report(specifier)
       }
     },
   }

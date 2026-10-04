@@ -50,6 +50,14 @@ export function isNamedImport(
   return hasImport(context, unwrap(node), modules, new Set(['ImportSpecifier']), imported)
 }
 
+export function isDefaultImport(
+  context: RuleContextLike,
+  node: NodeLike | null | undefined,
+  modules: ReadonlySet<string>,
+): boolean {
+  return hasImport(context, unwrap(node), modules, new Set(['ImportDefaultSpecifier']))
+}
+
 export function isNamespaceImport(
   context: RuleContextLike,
   node: NodeLike | null | undefined,

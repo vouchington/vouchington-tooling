@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
 import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
+import { createFactoryProvenance } from './factory-owner-provenance.mts'
 
 const OPTIONS = {
   modules: ['@compiler/runtime'],
@@ -61,5 +63,122 @@ export let { makeGraph: selected } = runtime`),
 export let graph = () => 1
 export let { unrelated: { makeGraph: nested } } = runtime`),
     ).toEqual([])
+  })
+
+  it('keeps nested default patterns specific to configured factories', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+export const { default: { makeGraph: graph } } = runtime
+export let { default: { makeGraph: mutableGraph } = {} } = runtime
+export let { default: mutableNamespace } = runtime
+export let { default: { version } } = runtime
+const key = 'makeGraph'
+export let { [key]: computed } = runtime`),
+    ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
+  })
+
+  it('follows factory-valued destructuring defaults in calls and direct exports', async () => {
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+const { missing = makeGraph } = {}
+missing()
+const { nested: { deep = makeGraph } } = { nested: {} }
+deep()
+export const { absent = makeGraph } = {}`),
+    ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
+  })
+
+  it('checks split mutable exports from their scoped initializer', async () => {
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export { graph }
+const another = () => 1
+export { another }
+let { makeGraph: selected } = { makeGraph }
+export { selected }
+let unrelated = () => 1
+export { unrelated }`),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('follows the final Reflect receiver and an explicitly configured default factory', async () => {
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+(0, Reflect).apply(makeGraph, null, [])
+function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
+    ).toEqual(['constructionOwner'])
+    expect(
+      messageIds(
+        await lintRule(
+          'factory-owner-location',
+          `import build from '@compiler/runtime'\nbuild()`,
+          { ...OPTIONS, factories: ['default'] },
+          'src/check.js',
+        ),
+      ),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('resolves qualified TypeScript import-equals aliases through their scoped namespace', () => {
+    const variables = new Map<string, VariableLike>()
+    for (const [name, moduleName] of [
+      ['runtime', '@compiler/runtime'],
+      ['foreign', '@other/runtime'],
+    ] as const) {
+      variables.set(name, {
+        name,
+        defs: [
+          {
+            type: 'ImportBinding',
+            node: { type: 'ImportNamespaceSpecifier' },
+            parent: {
+              type: 'ImportDeclaration',
+              source: { type: 'Literal', value: moduleName },
+            },
+          },
+        ],
+        references: [],
+      })
+    }
+    for (const [name, namespace] of [
+      ['graph', 'runtime'],
+      ['unrelated', 'foreign'],
+    ] as const) {
+      variables.set(name, {
+        name,
+        defs: [
+          {
+            type: 'ImportBinding',
+            node: {
+              type: 'TSImportEqualsDeclaration',
+              moduleReference: {
+                type: 'TSQualifiedName',
+                left: { type: 'Identifier', name: namespace },
+                right: { type: 'Identifier', name: 'makeGraph' },
+              },
+            },
+          },
+        ],
+        references: [],
+      })
+    }
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report() {},
+      sourceCode: {
+        getScope: (_node: NodeLike) => ({
+          set: { get: (name: string) => variables.get(name) },
+          upper: null,
+        }),
+      },
+    }
+    const provenance = createFactoryProvenance(context, {
+      modules: new Set(['@compiler/runtime']),
+      factories: new Set(['makeGraph']),
+    })
+    expect(provenance.isFactory({ type: 'Identifier', name: 'graph' })).toBe(true)
+    expect(provenance.isFactory({ type: 'Identifier', name: 'unrelated' })).toBe(false)
   })
 })

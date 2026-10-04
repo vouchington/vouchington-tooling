@@ -26,15 +26,22 @@ function directReflectFactory(
 ): boolean {
   const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
-  const object = unwrap(member.object as NodeLike)
+  const object = finalSequenceValue(member.object as NodeLike)
   const reflectGlobal =
     isUnshadowedGlobal(context, object, 'Reflect') ||
     (object?.type === 'MemberExpression' &&
       propertyName(object) === 'Reflect' &&
-      isUnshadowedGlobal(context, object.object as NodeLike, 'globalThis'))
+      isUnshadowedGlobal(context, finalSequenceValue(object.object as NodeLike), 'globalThis'))
   if (!reflectGlobal) return false
   const method = propertyName(member)
   return (method === 'apply' || method === 'construct') && isFactory(args[0])
+}
+
+function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null | undefined {
+  const current = unwrap(value)
+  return current?.type === 'SequenceExpression'
+    ? finalSequenceValue((current.expressions as NodeLike[]).at(-1))
+    : current
 }
 
 function directFactoryMember(

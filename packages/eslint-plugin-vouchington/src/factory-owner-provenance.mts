@@ -10,12 +10,15 @@ import {
   awaitedModuleSpecifier,
   constantDefinition,
   namedPatternSource,
+  patternDefaultValue,
 } from './factory-owner-provenance-binding.mts'
 import {
   isNamedImport,
   isNamespaceImport,
+  isDefaultImport,
   requiredModuleSpecifier,
 } from './factory-owner-require.mts'
+import { isQualifiedImportFactory } from './factory-owner-qualified-import.mts'
 
 export type FactoryProvenanceOptions = {
   modules: ReadonlySet<string>
@@ -102,10 +105,18 @@ export function createFactoryProvenance(
       [...options.factories].some((name) => isNamedImport(context, current, options.modules, name))
     )
       return true
+    if (options.factories.has('default') && isDefaultImport(context, current, options.modules))
+      return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
+    if (
+      isQualifiedImportFactory(context, current, options.factories, (value) => isNamespace(value))
+    )
+      return true
     const declarator = constantDefinition(variable)
     if (!declarator) return false
+    const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
+    if (defaultValue && isFactory(defaultValue, active)) return true
     const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
     if (patternSource) return isNamespace(patternSource)
     if ((declarator.id as NodeLike).type !== 'Identifier') return false

@@ -51,6 +51,20 @@ export function namedPatternSource(
   return patternHasBinding(pattern, localName, names) ? (declarator.init as NodeLike) : null
 }
 
+export function patternDefaultValue(pattern: NodeLike, localName: string): NodeLike | null {
+  if (pattern.type !== 'ObjectPattern') return null
+  for (const property of pattern.properties as NodeLike[]) {
+    if (property.type !== 'Property') continue
+    const value = property.value as NodeLike
+    if (value.type === 'AssignmentPattern' && (value.left as NodeLike).name === localName) {
+      return value.right as NodeLike
+    }
+    const nested = patternDefaultValue(value, localName)
+    if (nested) return nested
+  }
+  return null
+}
+
 function patternHasBinding(
   pattern: NodeLike,
   localName: string,

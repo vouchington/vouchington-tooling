@@ -57,6 +57,14 @@ export let mutableFactory = makeGraph
 export var mutableRuntime = runtime
 export let { makeGraph: mutableSelection } = runtime
 export let { unrelated: { makeGraph: unrelatedSelection } } = runtime
+const { missing = makeGraph } = {}
+missing()
+export const { absent = makeGraph } = {}
+;(0, Reflect).apply(makeGraph, null, [])
+let split = makeGraph
+export { split }
+export const { default: { makeGraph: nestedDefault } } = runtime
+export const { default: { version } } = runtime
 `,
     )
     writeFileSync(
@@ -80,6 +88,13 @@ function shadow(compiler: { makeGraph(): void }) { compiler.makeGraph() }
       `import compiler = require('@other/runtime')
 compiler.makeGraph()
 export = compiler
+`,
+    )
+    writeFileSync(
+      join(root, 'src/ts-qualified.ts'),
+      `import * as runtime from '@compiler/runtime'
+export import graph = runtime.makeGraph
+graph()
 `,
     )
     writeFileSync(
@@ -125,7 +140,7 @@ export = compiler
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 33 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 40 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
@@ -134,9 +149,45 @@ export = compiler
           filename.endsWith('src/await-export.mts') ||
           filename.endsWith('src/ts-export.ts') ||
           filename.endsWith('src/ts-import-equals.ts') ||
-          filename.endsWith('src/ts-import-binding.ts'),
+          filename.endsWith('src/ts-import-binding.ts') ||
+          filename.endsWith('src/ts-qualified.ts'),
       ),
     ).toBe(true)
+    writeFileSync(
+      join(root, 'src/default-factory.mts'),
+      `import build from '@compiler/runtime'\nbuild()\n`,
+    )
+    writeFileSync(
+      join(root, '.oxlintrc-default.json'),
+      JSON.stringify({
+        categories: { correctness: 'off', suspicious: 'off', perf: 'off' },
+        plugins: [],
+        jsPlugins: [
+          {
+            name: 'vouchington',
+            specifier: resolve('packages/eslint-plugin-vouchington/src/index.mts'),
+          },
+        ],
+        rules: {
+          'vouchington/factory-owner-location': [
+            'error',
+            {
+              modules: ['@compiler/runtime'],
+              factories: ['default'],
+              owners: ['src/owner.mts'],
+              include: ['src/**/*.mts'],
+            },
+          ],
+        },
+      }),
+    )
+    const defaultResult = spawnSync(
+      resolve('node_modules/.bin/oxlint'),
+      ['-c', '.oxlintrc-default.json', '--format', 'json', 'src/default-factory.mts'],
+      { cwd: root, encoding: 'utf8' },
+    )
+    expect(defaultResult.status).toBe(1)
+    expect(JSON.parse(defaultResult.stdout).diagnostics).toHaveLength(1)
   } finally {
     rmSync(root, { force: true, recursive: true })
   }
