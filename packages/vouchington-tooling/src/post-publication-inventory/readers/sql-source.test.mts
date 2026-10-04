@@ -223,6 +223,15 @@ describe('reader SQL source fragments', () => {
     ])
   })
 
+  it('preserves CRLF and CR source bytes instead of using normalized cooked text', () => {
+    expect(extract('function load() { return queryText`SELECT\r\n id`; }')).toEqual([
+      'SELECT\r\n id',
+    ])
+    expect(
+      extract('function load() { return queryText`SELECT\r\n ${first}\r ${second}\r\n end`; }'),
+    ).toEqual(['SELECT\r\n slot_1\r slot_2\r\n end'])
+  })
+
   it('uses configured names and placeholders independently across calls', () => {
     const source = 'function load() { return sql`SELECT ${value}`; }'
     expect(extract(source)).toEqual([])

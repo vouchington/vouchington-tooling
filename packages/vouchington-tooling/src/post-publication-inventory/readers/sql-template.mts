@@ -27,15 +27,19 @@ export function staticSqlTemplateText(
     if (simpleName(node.tag) !== options.templateTag) return undefined
     node = node.template
   }
-  if (ts.isNoSubstitutionTemplateLiteral(node)) return node.rawText ?? node.text
+  if (ts.isNoSubstitutionTemplateLiteral(node)) return rawQuasi(node)
   if (!ts.isTemplateExpression(node)) return undefined
   return [
-    node.head.rawText ?? node.head.text,
+    rawQuasi(node.head),
     ...node.templateSpans.map(
-      (span, index) =>
-        `${options.placeholderPrefix}${index + 1}${span.literal.rawText ?? span.literal.text}`,
+      (span, index) => `${options.placeholderPrefix}${index + 1}${rawQuasi(span.literal)}`,
     ),
   ].join('')
+}
+
+function rawQuasi(node: ts.TemplateLiteralLikeNode): string {
+  const closingWidth = ts.isTemplateHead(node) || ts.isTemplateMiddle(node) ? 2 : 1
+  return node.getText().slice(1, -closingWidth)
 }
 
 export function walk(root: ts.Node, visit: (node: ts.Node) => void): void {
