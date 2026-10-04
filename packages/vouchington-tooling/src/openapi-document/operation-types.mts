@@ -1,3 +1,4 @@
+import type { ExtractedResponseContract } from '../contract-schema/types.mts'
 import type { ContractSchema } from './contract-schema-types.mts'
 import type { OpenApiQueryContract } from './query-types.mts'
 
@@ -12,6 +13,9 @@ export type ResponseContract = {
   mediaType?: string
   mediaTypeKnowledge?: 'known' | 'none' | 'unknown'
   unavailableReason?: string
+  sseEvents?: readonly { eventName: string; contract: ExtractedResponseContract }[]
+  /** Merge the framework error body into this explicit response's JSON variants. */
+  includeDefaultError?: boolean
 }
 
 export type RequestContract = {

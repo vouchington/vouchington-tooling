@@ -12,6 +12,10 @@ export type BackendResponseContract = ExtractedResponseContract & {
   mediaType?: string
   /** Raw buffers and arbitrary streams have an unknown media type; bodyless emissions have none. */
   mediaTypeKnowledge?: 'known' | 'none' | 'unknown'
+  /** Named SSE frames carried by the string stream body. */
+  sseEvents?: readonly { eventName: string; contract: ExtractedResponseContract }[]
+  /** A concrete error status can also be produced by the framework before dispatch. */
+  includeDefaultError?: boolean
   /** Set when the route's response schema could not be extracted (lenient discovery mode). */
   unavailableReason?: string
 }

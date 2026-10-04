@@ -25,6 +25,13 @@ import {
   type HandlerBindings,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
+import {
+  opaqueHttpResponse,
+  unsupportedContextResponse,
+  supportedResponseContext,
+} from './protocol-http-association.mts'
+import { contextResponseMethod } from './protocol-http-context.mts'
+import { taintRouteKeys, markRouteTaint, isSseSetter } from './protocol-http-implicit-taint.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 export function discoverImplicitContract(
@@ -36,9 +43,38 @@ export function discoverImplicitContract(
   requestedKeys: ReadonlySet<string> | undefined,
   options: DiscoverApiResponseContractsOptions | undefined,
 ): void {
-  const binding = enclosingRouteBinding(call, checker, handlerBindings)
+  const opaqueResponse = opaqueHttpResponse(call, checker)
+  const binding = enclosingRouteBinding(call, checker, handlerBindings, !opaqueResponse)
   if (!binding) return
   const key = requestedKeyForBinding(binding, requestedKeys)
+  const taintKeys = taintRouteKeys(contracts, binding, key)
+  if (!taintKeys.length) return
+
+  const context = supportedResponseContext(call, checker)
+  const bracketResponse =
+    context &&
+    (ts.isElementAccessExpression(call.expression) ||
+      (ts.isPropertyAccessExpression(call.expression) &&
+        ts.isElementAccessExpression(call.expression.expression))) &&
+    contextResponseMethod(call.expression, context, checker)
+  const mutableResponse = unsupportedContextResponse(call, checker)
+  const sseSetter = isSseSetter(contracts, binding, bracketResponse || undefined)
+  if (
+    opaqueResponse ||
+    mutableResponse ||
+    (bracketResponse && !sseSetter && !containsResponseMarker(call))
+  ) {
+    markRouteTaint(
+      contracts,
+      taintKeys,
+      binding,
+      sourceLocation(sourceFile, call),
+      !!mutableResponse &&
+        !!context &&
+        !!contextResponseMethod(call.expression, context, checker, true),
+    )
+    return
+  }
   if (!key) return
 
   const body = responseBodyExpression(call)
@@ -57,18 +93,14 @@ export function discoverImplicitContract(
       ...status,
     }
 
-    // Primary body (bare key, or requested key in subset mode) uses the lenient path, so a
-    // genuine single-variant route still reports a real `unavailableReason` on failure.
+    // Keep primary extraction failures unavailable in both full and subset discovery.
     if (requestedKeys || !contracts.has(key)) {
       registerRouteContract(contracts, key, binding, location, emission, extract, options)
       return
     }
 
-    // Full-scope discovery: a route can emit more than one distinct unmarked success body across
-    // branches (e.g. a webhook's `{received}` vs `{ignored}`); register each under its own key —
-    // `groupContractsByRoute` merges by method/routeTemplate, not this key. This route already has
-    // a primary contract, so retain this one under a deterministic variant key. A failed secondary
-    // extraction is registered as unavailable so the operation never silently omits a real branch.
+    // Preserve every additional unmarked body under a deterministic variant key, including
+    // unavailable secondary extractions. Route grouping merges these without hiding a branch.
     registerRouteContract(
       contracts,
       nextImplicitVariantKey(contracts, key),
@@ -125,8 +157,7 @@ export function discoverImplicitContract(
     return
   }
 
-  // Empty and raw branches can coexist; AST order must not let empty hide an unmarked raw body,
-  // so every buffer or pipeline without an explicit response marker makes the route unavailable.
+  // Empty branches must not hide any unmarked buffer or pipeline body.
   if (
     isContextResponseBufferCall(call.expression) ||
     (isContextMethod(call.expression, 'pipeline') && !body && !containsResponseMarker(call))
