@@ -7,7 +7,7 @@ import {
   type VariableLike,
 } from './ast-helpers.mts'
 
-function staticModuleSpecifier(value: NodeLike | undefined): string | null {
+function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
   return value?.type === 'Literal' && typeof value.value === 'string' ? value.value : null
 }
 
@@ -25,7 +25,8 @@ export function awaitedModuleSpecifier(
   active = new Set<VariableLike>(),
 ): string | null {
   const current = unwrap(value)
-  if (current?.type === 'ImportExpression') return staticModuleSpecifier(current.source as NodeLike)
+  if (current?.type === 'ImportExpression')
+    return staticModuleSpecifier(unwrap(current.source as NodeLike))
   if (current?.type === 'SequenceExpression')
     return awaitedModuleSpecifier(context, (current.expressions as NodeLike[]).at(-1), active)
   if (current?.type !== 'Identifier') return null

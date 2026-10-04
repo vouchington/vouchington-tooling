@@ -28,6 +28,8 @@ const { makeGraph: defaulted = fallback } = runtime
 defaulted()
 runtime.default.makeGraph();
 (await import('@compiler/runtime')).default.makeGraph()
+const assertedRuntime = await import('@compiler/runtime' as string)
+assertedRuntime.makeGraph()
 export const pending = import('@compiler/runtime')
 const promise = import('@compiler/runtime')
 promise.makeGraph()
@@ -140,7 +142,7 @@ graph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 40 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 41 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

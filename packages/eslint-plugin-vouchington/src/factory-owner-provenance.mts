@@ -115,13 +115,13 @@ export function createFactoryProvenance(
       return true
     const declarator = constantDefinition(variable)
     if (!declarator) return false
-    const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
-    if (defaultValue && isFactory(defaultValue, active)) return true
-    const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
-    if (patternSource) return isNamespace(patternSource)
-    if ((declarator.id as NodeLike).type !== 'Identifier') return false
     active.add(variable)
     try {
+      const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
+      if (defaultValue && isFactory(defaultValue, active)) return true
+      const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
+      if (patternSource) return isNamespace(patternSource)
+      if ((declarator.id as NodeLike).type !== 'Identifier') return false
       return isFactory(declarator.init as NodeLike, active)
     } finally {
       active.delete(variable)

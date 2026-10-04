@@ -88,6 +88,15 @@ export const { absent = makeGraph } = {}`),
     ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
   })
 
+  it('stops at cyclic destructuring defaults', async () => {
+    expect(
+      await diagnostics(`const { missing = missing } = {}
+missing()
+const { first = second, second = first } = {}
+first()`),
+    ).toEqual([])
+  })
+
   it('checks split mutable exports from their scoped initializer', async () => {
     expect(
       await diagnostics(`import { makeGraph } from '@compiler/runtime'
