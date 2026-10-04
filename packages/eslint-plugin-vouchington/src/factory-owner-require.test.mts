@@ -104,6 +104,18 @@ describe('factory-owner-require', () => {
 
   it('ignores non-call receivers and non-string require arguments', () => {
     const context = contextWithImport({ type: 'Identifier', name: 'createProgram' })
+    expect(
+      isNamedImport(
+        context,
+        {
+          type: 'MemberExpression',
+          object: { type: 'Identifier', name: 'namespace' },
+          property: { type: 'Identifier', name: 'createProgram' },
+        },
+        new Set(['typescript']),
+        'createProgram',
+      ),
+    ).toBe(false)
     expect(requiredModuleSpecifier(context, { type: 'Identifier', name: 'require' })).toBeNull()
     expect(
       requiredModuleSpecifier(context, {
