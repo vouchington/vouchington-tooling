@@ -1,4 +1,10 @@
-import { findVariable, unwrap, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
+import {
+  findVariable,
+  staticPropertyName,
+  unwrap,
+  type NodeLike,
+  type RuleContextLike,
+} from './ast-helpers.mts'
 import { type MemberReadException } from './member-read-exception-options.mts'
 
 export function canonicalConstructor(
@@ -44,8 +50,7 @@ export function constantArgument(
         id?.type === 'Identifier' &&
         id.name === expected.name &&
         declaration.parent?.kind === 'const' &&
-        initializer?.type === 'Literal' &&
-        initializer.value === expected.value
+        staticPropertyName(initializer) === expected.value
       )
     }),
   )

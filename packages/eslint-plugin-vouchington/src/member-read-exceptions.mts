@@ -5,6 +5,7 @@ import {
   normalizeFilename,
   patternPropertyName,
   propertyName,
+  staticPropertyName,
   unwrap,
   type NodeLike,
   type RuleContextLike,
@@ -22,7 +23,7 @@ function effectivePrefix(object: NodeLike | null | undefined, prefix: string): b
     const name = patternPropertyName(property)
     if (name === 'prefix') {
       const value = unwrap(property.value as NodeLike | undefined)
-      matches = value?.type === 'Literal' && value.value === prefix
+      matches = staticPropertyName(value) === prefix
     } else if (name === null && property.computed) {
       matches = false
     }
@@ -83,6 +84,8 @@ export function isMemberReadException(
       return false
     if (exception.kind === 'constructor-constant') {
       return (
+        !call.optional &&
+        !member.optional &&
         args.length === 1 &&
         canonicalConstructor(context, object ?? undefined, exception) &&
         constantArgument(context, args[0], exception.constant)

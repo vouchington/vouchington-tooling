@@ -18,6 +18,7 @@ export type VariableLike = {
 }
 
 type DefinitionLike = {
+  isVariableDefinition?: boolean
   type: string
   node: NodeLike
   parent?: NodeLike | null
@@ -75,7 +76,10 @@ export function findVariable(
         (variable.isValueVariable !== false &&
           (!variable.defs.length ||
             variable.defs.some(
-              (definition) => !definition.node.declare && !definition.parent?.declare,
+              (definition) =>
+                definition.isVariableDefinition !== false &&
+                !definition.node.declare &&
+                !definition.parent?.declare,
             ))))
     )
       return variable
@@ -99,7 +103,10 @@ export function patternPropertyName(
   property: NodeLike | null | undefined,
 ): string | number | boolean | bigint | null {
   if (!property) return null
-  if (!property.computed && (property.key as NodeLike | undefined)?.type === 'Identifier') {
+  if (
+    !property.computed &&
+    ['Identifier', 'PrivateIdentifier'].includes((property.key as NodeLike | undefined)?.type ?? '')
+  ) {
     const name = (property.key as NodeLike).name
     return typeof name === 'string' ? name : null
   }
@@ -120,7 +127,9 @@ export function normalizeFilename(context: { filename: string; cwd?: string }): 
   return cwd && filename.startsWith(`${cwd}/`) ? filename.slice(cwd.length + 1) : filename
 }
 
-function staticPropertyName(node: NodeLike | undefined): string | number | boolean | bigint | null {
+export function staticPropertyName(
+  node: NodeLike | null | undefined,
+): string | number | boolean | bigint | null {
   const value = unwrap(node)
   if (value?.type === 'Literal') return literalName(value.value)
   if (

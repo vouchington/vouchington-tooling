@@ -61,6 +61,8 @@ describe('member-read binding exceptions', () => {
     ).toEqual([])
     for (const code of [
       `${prelude} CacheClient.invalidate('cache:group')`,
+      `${prelude} CacheClient.invalidate?.(CACHE_GROUP)`,
+      `${prelude} CacheClient?.invalidate(CACHE_GROUP)`,
       `${prelude} const reset = CacheClient.invalidate`,
       `${prelude} function f(CacheClient) { CacheClient.invalidate(CACHE_GROUP) }`,
       `import { Other as CacheClient } from '@store/cache'; const CACHE_GROUP = 'cache:group'; CacheClient.invalidate(CACHE_GROUP)`,
@@ -185,4 +187,32 @@ describe('const-instance prefix exceptions', () => {
       ]),
     ).toBeNull()
   })
+})
+
+it('accepts static template literals without accepting interpolation', async () => {
+  const prelude = "import { CacheClient } from '@store/cache'; "
+  for (const [initializer, allowed] of [
+    ['`cache:group`', true],
+    ['`other`', false],
+    ['`cache:${group}`', false],
+  ] as const) {
+    expect(
+      messageIds(
+        await lintRule(
+          'banned-member-read',
+          prelude + 'const CACHE_GROUP = ' + initializer + '; CacheClient.invalidate(CACHE_GROUP)',
+          OPTIONS,
+        ),
+      ),
+    ).toEqual(allowed ? [] : ['bannedRead'])
+  }
+  expect(
+    messageIds(
+      await lintRule(
+        'banned-member-read',
+        prelude + 'const cache = new CacheClient({ prefix: `validation` }); cache.invalidate()',
+        INSTANCE_OPTIONS,
+      ),
+    ),
+  ).toEqual([])
 })

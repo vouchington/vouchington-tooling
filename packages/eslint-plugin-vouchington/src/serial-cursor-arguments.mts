@@ -1,3 +1,4 @@
+import { invokedBodyMatches } from './serial-cursor-immediate.mts'
 import { propertyName, unwrap, type NodeLike } from './ast-helpers.mts'
 
 export function eagerIteration(
@@ -39,6 +40,7 @@ export function eagerIteration(
     return true
   if (expression.type === 'CallExpression' || expression.type === 'NewExpression')
     return (
+      invokedBodyMatches(callee, (node) => eagerIteration(node, methods)) ||
       eagerIteration(callee, methods) ||
       (expression.arguments as NodeLike[]).some((argument) => eagerIteration(argument, methods))
     )

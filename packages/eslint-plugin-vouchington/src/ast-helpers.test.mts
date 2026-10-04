@@ -220,6 +220,7 @@ describe('normalizeFilename', () => {
 describe('patternPropertyName and memberIsRead', () => {
   it('reads object-pattern keys and treats assignment/delete as non-reads', () => {
     expect(patternPropertyName(null)).toBeNull()
+    expect(patternPropertyName({ type: 'Property' })).toBeNull()
     expect(
       patternPropertyName({
         type: 'Property',

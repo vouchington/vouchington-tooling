@@ -66,8 +66,8 @@ If `members` is missing or empty, the rule loads and reports nothing. File-wide 
 
 Each exception specifies an exact relative `file`, banned `member`, imported constructor `module` / `imported` name, and required `local` binding name. Leading `./` segments are normalized consistently with file selection. The rule verifies the import binding, so shadowed and lookalike constructors remain forbidden.
 
-- `kind: 'constructor-constant'` additionally requires `constant: { name, value }`. Only a direct constructor member call with one argument bound to that exact literal `const` is allowed.
-- `kind: 'const-instance-prefix'` additionally requires `prefix`. Only a direct zero-argument call on an unreassigned `const` instance is allowed. Its constructor options must have that effective literal `prefix`; later spreads, computed keys or conflicting duplicate prefixes invalidate it. Optional instance calls remain forbidden.
+- `kind: 'constructor-constant'` additionally requires `constant: { name, value }`. Only a non-optional direct constructor member call with one argument bound to that exact literal `const` is allowed. Static template literals and transparent TypeScript assertions preserve the verified value.
+- `kind: 'const-instance-prefix'` additionally requires `prefix`. Only a direct zero-argument call on an unreassigned `const` instance is allowed. Its constructor options must have that effective literal `prefix`; later spreads, computed keys or conflicting duplicate prefixes invalidate it. Optional calls remain forbidden.
 
 Aliases, extracted methods and destructured reads do not inherit exceptions. Exception data is configuration, not executable AST callbacks.
 
@@ -75,7 +75,7 @@ Aliases, extracted methods and destructured reads do not inherit exceptions. Exc
 
 Reject an unshadowed global `Promise` combinator called with an eager collection iteration inside a configured draining function. This protects configured streams from starting all drains before previous database clients are released; ordinary serial iteration is allowed.
 
-Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `includeFiles` selectors. Optional `promiseMethods` defaults to `['all', 'allSettled', 'any', 'race']`; `iterationMethods` defaults to `['flatMap', 'forEach', 'map']`. With missing/empty `functions` the rule reports nothing. The nearest named function owns the call; unrelated nested functions and shadowed `Promise` bindings are excluded. Function declarations, named callbacks, variable-bound function/arrow expressions, and object/class methods are supported. Awaiting the iteration argument does not make an eager drain serial.
+Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `includeFiles` selectors. Optional `promiseMethods` defaults to `['all', 'allSettled', 'any', 'race']`; `iterationMethods` defaults to `['flatMap', 'forEach', 'map']`. With missing/empty `functions` the rule reports nothing. The nearest named function owns the call; unrelated nested functions and shadowed `Promise` bindings are excluded. Function declarations, named callbacks, variable-bound function/arrow expressions, and object/class methods (including private methods and fields) are supported. Type-only and erased ambient declarations do not shadow the runtime `Promise`. The rule follows eager branches, elements, nested calls, and directly invoked function bodies while excluding deferred callbacks and generator bodies. Awaiting the iteration argument does not make an eager drain serial.
 
 ## `factory-owner-location`
 

@@ -32,11 +32,13 @@ checked.invalidate();
     Promise.all([...rows.map(drain)])
     Promise.all(rows.map(drain).filter(Boolean))
     Promise.all(passThrough(rows.map(drain)))
+    Promise.all((() => rows.map(drain))())
     Promise.all([() => rows.map(drain)])
   }
 }
 {
   declare const Promise: PromiseConstructor
+  interface Promise<T> { marker: T }
   async function writeRows() { Promise.all(rows.map(drain)) }
 }
 { const writeRows = (async () => Promise.all(rows.map(drain))) as Drain }
@@ -119,7 +121,7 @@ checked.invalidate();
     expect(result.status).toBe(1)
     const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 11 }, () => 'vouchington(serial-cursor-drains)'),
+      Array.from({ length: 12 }, () => 'vouchington(serial-cursor-drains)'),
     )
   } finally {
     rmSync(root, { force: true, recursive: true })
