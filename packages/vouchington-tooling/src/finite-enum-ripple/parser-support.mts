@@ -28,6 +28,15 @@ export function parseRouteConfigEntries(
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body))
       throw new Error(`${file}: ${name}.${key} must be an object literal`)
+    const names = new Set<string>()
+    for (const member of body.properties) {
+      if (!ts.isPropertyAssignment(member))
+        throw new Error(`${file}: ${name}.${key} contains an uninspectable member`)
+      const memberName = getPropertyNameText(member.name)
+      if (!memberName || names.has(memberName))
+        throw new Error(`${file}: ${name}.${key} contains an uninspectable or duplicate key`)
+      names.add(memberName)
+    }
     const pluralPath = getStringProperty(body, pluralPathProperty)
     const singularPath = getStringProperty(body, singularPathProperty)
     if (!pluralPath) throw new Error(`${file}: ${name}.${key} is missing ${pluralPathProperty}`)
@@ -84,13 +93,7 @@ export function getStringProperty(
 }
 
 export function hasTrueProperty(object: ts.ObjectLiteralExpression, property: string): boolean {
-  for (const member of object.properties) {
-    if (!ts.isPropertyAssignment(member)) continue
-    const key = getPropertyNameText(member.name)
-    if (key !== property) continue
-    return unwrapExpression(member.initializer).kind === ts.SyntaxKind.TrueKeyword
-  }
-  return false
+  return getPropertyValue(object, property)?.kind === ts.SyntaxKind.TrueKeyword
 }
 
 function unwrapTypeNode(type: ts.TypeNode): ts.TypeNode {

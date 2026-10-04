@@ -7,20 +7,22 @@ export function collectCreatePageLiterals(
   file: string,
   properties: readonly string[],
 ): string[] {
-  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const scriptKind =
+    file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, scriptKind)
   const names = new Set(properties)
   const values: string[] = []
   const visit = (node: ts.Node): void => {
     if (ts.isPropertyAssignment(node) && getPropertyNameText(node.name)) {
       const name = getPropertyNameText(node.name)!
       const value = getStringLiteralValue(node.initializer)
-      if (names.has(name) && value) values.push(value)
+      if (names.has(name) && value !== undefined) values.push(value)
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && names.has(node.name.text)) {
       const value =
         node.initializer && ts.isJsxExpression(node.initializer)
           ? getStringLiteralValue(node.initializer.expression)
           : getStringLiteralValue(node.initializer)
-      if (value) values.push(value)
+      if (value !== undefined) values.push(value)
     } else if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken
@@ -33,7 +35,7 @@ export function collectCreatePageLiterals(
             ? getStringLiteralValue(node.left.argumentExpression)
             : undefined
       const value = getStringLiteralValue(node.right)
-      if (name && names.has(name) && value) values.push(value)
+      if (name && names.has(name) && value !== undefined) values.push(value)
     }
     ts.forEachChild(node, visit)
   }

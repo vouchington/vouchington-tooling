@@ -11,6 +11,18 @@ it('keeps executable backtick route literals while ignoring embedded examples', 
   expect(collectActivePatternCaptures(source, /[`]\/([^`]*)[`]/g, file)).toEqual(['right'])
 })
 
+it('rescans interpolated template tails before later active route literals', () => {
+  const source =
+    "const note = `prefix ${({ key: value }).key} suffix`; const route = { path: '/wrong' }"
+  expect(collectActivePatternCaptures(source, /path:\s*'\/([^']+)'/g, file)).toEqual(['wrong'])
+  const nested =
+    "const note = `prefix ${`nested ${value}`} suffix`; const route = { path: '/right' }"
+  expect(collectActivePatternCaptures(nested, /path:\s*'\/([^']+)'/g, file)).toEqual(['right'])
+  const multiple =
+    "const note = `prefix ${value} middle ${other} suffix`; const route = { path: '/again' }"
+  expect(collectActivePatternCaptures(multiple, /path:\s*'\/([^']+)'/g, file)).toEqual(['again'])
+})
+
 it('accepts an empty string constituent in a finite union', () => {
   expect(parseUnionTypeUnion("type Kind = '' | 'entry'", file, 'Kind')).toEqual(['', 'entry'])
 })
@@ -30,6 +42,21 @@ it('rejects route members that cannot be fully inspected', () => {
     'must be an object literal',
   )
   expect(() => parse('const routes = {}')).toThrow('could not parse routes entries')
+  expect(() =>
+    parse(
+      "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'], ...overrides } }",
+    ),
+  ).toThrow('contains an uninspectable member')
+  expect(() =>
+    parse(
+      "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'], [dynamic]: 'value' } }",
+    ),
+  ).toThrow('uninspectable or duplicate key')
+  expect(() =>
+    parse(
+      "const routes = { entries: { singular: 'entry', singular: 'other', plural: 'entries', kinds: ['entry'] } }",
+    ),
+  ).toThrow('uninspectable or duplicate key')
 })
 
 it('collects literal element-access assignments but not dynamic property names', () => {
@@ -53,4 +80,25 @@ it('reports a selected create page without a matching single-type route', () => 
     'record',
   )
   expect(errors.join('\n')).toContain('no matching single-type route config for "drafts"')
+})
+
+it('retains empty create-page values in objects, JSX, and assignments', () => {
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { action: '' }; action = ''; form.action = ''",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['', '', ''])
+  expect(
+    collectCreatePageLiterals("const view = <Form action='' type={''} />", 'page.tsx', [
+      'action',
+      'type',
+    ]),
+  ).toEqual(['', ''])
+})
+
+it('parses non-JSX create pages as TypeScript after angle-bracket assertions', () => {
+  const source = "const cast = <string>input; const fields = { action: 'wrong' }"
+  expect(collectCreatePageLiterals(source, 'page.mts', ['action'])).toEqual(['wrong'])
 })

@@ -203,7 +203,7 @@ describe('finite enum parsers', () => {
       ),
     ).toThrow('missing slug')
     const routes =
-      "const kindRoutes = { alpha: { ...extra, singular: 'alpha', plural: 'alphas', kinds: ['alpha'], special: true } }"
+      "const kindRoutes = { alpha: { singular: 'alpha', plural: 'alphas', kinds: ['alpha'], special: true } }"
     expect(
       parseStructuredRouteConfigEntries(
         routes,

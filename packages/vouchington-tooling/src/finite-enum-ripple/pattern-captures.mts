@@ -23,7 +23,18 @@ export function collectActivePatternCaptures(
     ts.SyntaxKind.TemplateTail,
     ts.SyntaxKind.RegularExpressionLiteral,
   ])
+  const templateBraceDepth: number[] = []
   for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if (kind === ts.SyntaxKind.TemplateHead) templateBraceDepth.push(0)
+    else if (kind === ts.SyntaxKind.OpenBraceToken && templateBraceDepth.length) {
+      templateBraceDepth[templateBraceDepth.length - 1]!++
+    } else if (kind === ts.SyntaxKind.CloseBraceToken && templateBraceDepth.length) {
+      const depth = templateBraceDepth.length - 1
+      if (templateBraceDepth[depth] === 0) {
+        kind = scanner.reScanTemplateToken(false)
+        if (kind === ts.SyntaxKind.TemplateTail) templateBraceDepth.pop()
+      } else templateBraceDepth[depth]!--
+    }
     if (inactiveKinds.has(kind))
       inactive.push({
         start: scanner.getTokenPos(),
