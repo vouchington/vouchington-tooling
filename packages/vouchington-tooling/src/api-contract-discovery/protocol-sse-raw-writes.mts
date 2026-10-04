@@ -63,8 +63,18 @@ export function rejectRawSseWrites(
             if (mutationNode.getSourceFile() === source && isSourceLevelMutation(mutationNode))
               return true
             const candidate = enclosingRouteBinding(mutationNode, checker, bindings, false)
-            return !!candidate && routeKey(candidate) === routeKey(binding)
+            if (candidate && routeKey(candidate) === routeKey(binding)) return true
+            if (
+              !candidate &&
+              mutationNode.getSourceFile() === source &&
+              opaqueProtocolCallbackPath(mutationNode, checker)
+            )
+              return true
+            return helperBindings(mutationNode, calls, checker, bindings).some(
+              (helper) => routeKey(helper) === routeKey(binding),
+            )
           },
+          (mutationNode) => helperBindings(mutationNode, calls, checker, bindings).length > 0,
           (expression) => {
             const receiver = expressionReceiver(expression, checker)
             return receiver && actualReceivers(receiver, binding, calls, checker, bindings)
