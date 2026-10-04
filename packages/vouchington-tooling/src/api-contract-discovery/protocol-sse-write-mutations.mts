@@ -33,7 +33,11 @@ export function mutationAffectsSelectedStream(
 ): boolean {
   const framed = frameReceivers.flatMap(resolveFrame)
   return mutations.some(({ node, receiver }) => {
-    if (!executableProtocolPath(node, checker) || !isSameRoute(node)) return false
+    if (
+      (!isSourceLevelMutation(node) && !executableProtocolPath(node, checker)) ||
+      !isSameRoute(node)
+    )
+      return false
     const actual = resolveActual(receiver)
     if (!actual) return true
     return actual.some(
@@ -42,4 +46,8 @@ export function mutationAffectsSelectedStream(
         framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
     )
   })
+}
+
+export function isSourceLevelMutation(node: ts.Node): boolean {
+  return ts.isExpressionStatement(node.parent) && ts.isSourceFile(node.parent.parent)
 }
