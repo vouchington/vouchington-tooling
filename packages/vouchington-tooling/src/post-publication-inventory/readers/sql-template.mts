@@ -64,7 +64,21 @@ export function walk(root: ts.Node, visit: (node: ts.Node) => void): void {
     for (const typeArgument of root.typeArguments ?? []) walk(typeArgument, visit)
     return
   }
-  if (ts.isFunctionDeclaration(root) || ts.isFunctionExpression(root) || ts.isArrowFunction(root)) {
+  if (
+    ts.isFunctionDeclaration(root) ||
+    ts.isFunctionExpression(root) ||
+    ts.isArrowFunction(root) ||
+    ts.isMethodDeclaration(root) ||
+    ts.isConstructorDeclaration(root) ||
+    ts.isGetAccessorDeclaration(root) ||
+    ts.isSetAccessorDeclaration(root)
+  ) {
+    if (
+      ts.isMethodDeclaration(root) ||
+      ts.isGetAccessorDeclaration(root) ||
+      ts.isSetAccessorDeclaration(root)
+    )
+      walk(root.name, visit)
     if (root.body) walk(root.body, visit)
     for (const parameter of root.parameters) walk(parameter, visit)
     return

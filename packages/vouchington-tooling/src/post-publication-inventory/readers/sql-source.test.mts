@@ -202,6 +202,32 @@ describe('reader SQL source fragments', () => {
     ])
   })
 
+  it('visits class method and constructor bodies before default parameters', () => {
+    expect(
+      extract(`
+        import { fetchRows } from 'fixture-db';
+        class Repository {
+          constructor(p = fetchRows(queryText\`CTOR PARAM\`)) {
+            fetchRows(queryText\`CTOR BODY\`);
+          }
+          [fetchRows(queryText\`METHOD NAME\`)](p = fetchRows(queryText\`METHOD PARAM\`)) {
+            fetchRows(queryText\`METHOD BODY\`);
+          }
+          get current() { return fetchRows(queryText\`GET BODY\`); }
+          set current(value) { fetchRows(queryText\`SET BODY\`); }
+        }
+      `),
+    ).toEqual([
+      'CTOR BODY',
+      'CTOR PARAM',
+      'METHOD NAME',
+      'METHOD BODY',
+      'METHOD PARAM',
+      'GET BODY',
+      'SET BODY',
+    ])
+  })
+
   it('preserves alternate-before-consequent branch collection and source-position guards', () => {
     expect(
       extract(`

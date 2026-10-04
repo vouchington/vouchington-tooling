@@ -23,7 +23,9 @@ The analysis remains name-based: it does not prove binding identity or exclude s
 calls and does not follow arbitrary alias chains or unwrap assertions. Parentheses
 are transparent, matching the source parser's previous representation.
 
-Returned or exported template bindings and direct executor arguments are collected.
+Explicit `return` statements, exported variable declarations, and direct executor arguments
+are collected. Export-list specifiers and expression-bodied arrow returns are outside this
+source-fact collector's current heuristic.
 Only bare templates and templates with the configured simple tag are accepted. Raw quasi
 text is retained, and each interpolation becomes the configured prefix plus a one-based
 index. Direct fragments precede consumed variable bindings; repeated references do not
