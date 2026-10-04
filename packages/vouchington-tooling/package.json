@@ -328,7 +328,12 @@
       "import": "./dist/gh-api-shell-quoting/index.mjs",
       "default": "./dist/gh-api-shell-quoting/index.mjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./basic-auth-doc-sync": {
+      "types": "./dist/basic-auth-doc-sync/index.d.mts",
+      "import": "./dist/basic-auth-doc-sync/index.mjs",
+      "default": "./dist/basic-auth-doc-sync/index.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"
