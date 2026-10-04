@@ -73,6 +73,7 @@ export function walk(root: ts.Node, visit: (node: ts.Node) => void): void {
     ts.isGetAccessorDeclaration(root) ||
     ts.isSetAccessorDeclaration(root)
   ) {
+    for (const modifier of root.modifiers ?? []) if (ts.isDecorator(modifier)) walk(modifier, visit)
     if (
       ts.isMethodDeclaration(root) ||
       ts.isGetAccessorDeclaration(root) ||

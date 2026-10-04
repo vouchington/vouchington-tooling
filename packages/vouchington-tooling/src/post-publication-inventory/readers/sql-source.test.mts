@@ -207,23 +207,30 @@ describe('reader SQL source fragments', () => {
       extract(`
         import { fetchRows } from 'fixture-db';
         class Repository {
-          constructor(p = fetchRows(queryText\`CTOR PARAM\`)) {
+          public constructor(p = fetchRows(queryText\`CTOR PARAM\`)) {
             fetchRows(queryText\`CTOR BODY\`);
           }
-          [fetchRows(queryText\`METHOD NAME\`)](p = fetchRows(queryText\`METHOD PARAM\`)) {
+          @dec(fetchRows(queryText\`METHOD DECORATOR\`))
+          [fetchRows(queryText\`METHOD NAME\`)](@dec(fetchRows(queryText\`PARAM DECORATOR\`)) p = fetchRows(queryText\`METHOD PARAM\`)) {
             fetchRows(queryText\`METHOD BODY\`);
           }
+          @dec(fetchRows(queryText\`GET DECORATOR\`))
           get current() { return fetchRows(queryText\`GET BODY\`); }
+          @dec(fetchRows(queryText\`SET DECORATOR\`))
           set current(value) { fetchRows(queryText\`SET BODY\`); }
         }
       `),
     ).toEqual([
       'CTOR BODY',
       'CTOR PARAM',
+      'METHOD DECORATOR',
       'METHOD NAME',
       'METHOD BODY',
+      'PARAM DECORATOR',
       'METHOD PARAM',
+      'GET DECORATOR',
       'GET BODY',
+      'SET DECORATOR',
       'SET BODY',
     ])
   })
