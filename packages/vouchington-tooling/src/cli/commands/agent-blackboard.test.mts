@@ -83,16 +83,18 @@ describe('agent-blackboard CLI', () => {
       pendingCount: 0,
       worktreePendingCount: 2,
     })
-    expect(
-      await runAgentBlackboardCommand([
-        'journal',
-        'flush',
-        '--session-id',
-        'bad/id',
-        '--outbox-directory',
-        '/private/outbox',
-      ]),
-    ).toBe(2)
+    for (const sessionId of ['bad/id', '', 'x'.repeat(257)]) {
+      expect(
+        await runAgentBlackboardCommand([
+          'journal',
+          'flush',
+          '--session-id',
+          sessionId,
+          '--outbox-directory',
+          '/private/outbox',
+        ]),
+      ).toBe(2)
+    }
     expect(flushFeedbackOutbox).not.toHaveBeenCalled()
     expect(
       await runAgentBlackboardCommand([

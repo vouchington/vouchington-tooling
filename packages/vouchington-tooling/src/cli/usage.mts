@@ -123,7 +123,8 @@ retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] 
 agent-blackboard probe
 agent-blackboard journal append --mode interactive|autonomous --source-event-id ID --work-outcome OUTCOME --coverage-status STATUS --session-id UUID --agent NAME --version VERSION --file PATH --repository OWNER/NAME [--repository OWNER/NAME ...] [--parent-session-id UUID] [--timestamp ISO8601] [--coverage-source SOURCE,...] [--dropped-count N] [--outbox-directory PATH]
 agent-blackboard journal entries --session-id UUID
-agent-blackboard journal flush --outbox-directory PATH
+agent-blackboard journal status --session-id UUID --outbox-directory PATH
+agent-blackboard journal flush --outbox-directory PATH [--session-id UUID]
 Interactive journal append requires --outbox-directory PATH.
 agent-blackboard snapshot partition --snapshot PATH --checksum SHA256 --counts '{"sessions":N,"entries":N,"records":N,"bytes":N}'
 agent-blackboard snapshot cleanup [--snapshot PATH] [--partition-directory PATH --receipt JSON]

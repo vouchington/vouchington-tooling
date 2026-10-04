@@ -83,10 +83,13 @@ async function runJournal(args: string[]): Promise<number> {
     assertAllowed(values, ['outbox-directory', 'session-id'])
     const directory = required(values, 'outbox-directory')
     const sessionId = action === 'status' ? required(values, 'session-id') : values['session-id']
-    if (sessionId) assertSessionId(sessionId)
+    if (sessionId !== undefined) {
+      assertSessionId(sessionId)
+      if (sessionId.length > 256) throw new Error('session identity is too long')
+    }
     const result =
       action === 'flush' ? await flushFeedbackOutbox({ directory }) : { pendingCount: 0 }
-    const counts = sessionId ? feedbackOutboxCounts(directory, sessionId) : result
+    const counts = sessionId !== undefined ? feedbackOutboxCounts(directory, sessionId) : result
     process.stdout.write(
       `${JSON.stringify({
         ...result,
