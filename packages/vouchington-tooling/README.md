@@ -375,6 +375,22 @@ Positions use 1-indexed line/column coordinates and JavaScript string offsets, i
 Unicode source text. These APIs return facts rather than mdast nodes so callers can apply their own
 content policy without binding it to parser internals.
 
+```ts
+import {
+  hasUncheckedMarkdownTask,
+  markdownHtmlBlocks,
+  markdownLiteralSpans,
+} from 'vouchington-tooling/markdown'
+
+const hasOpenTask = hasUncheckedMarkdownTask(body)
+const literalSpans = markdownLiteralSpans(body)
+const blockHtml = markdownHtmlBlocks(body)
+```
+
+`markdownHtmlBlocks` reports CommonMark types 1, 6, and 7; inline tags do not appear in that result.
+Use `markdownHtmlFacts` when inline/block classification and other CommonMark HTML block types are
+also needed.
+
 Machine-wide agent configuration now belongs to [vouchington-machines](https://github.com/vouchington/vouchington-machines/blob/main/docs/agent-config.md).
 Use its `configure-agents.sh` and `diagnose-agents.sh`; project hooks and MCP configuration remain in their checkouts.
 
