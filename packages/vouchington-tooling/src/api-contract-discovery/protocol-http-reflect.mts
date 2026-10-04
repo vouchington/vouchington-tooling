@@ -9,7 +9,7 @@ import {
 } from './protocol-http-method-access.mts'
 
 /** Both the actual invoked value and signature must belong to the compiler library. */
-function standardReflectApply(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
+export function standardReflectApply(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
   const access = methodAccess(unwrapExpression(call.expression))
   const receiver = expressionReceiver(access?.receiver ?? call.expression, checker)
   if (!receiver) return false
