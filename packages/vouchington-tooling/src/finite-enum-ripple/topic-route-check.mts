@@ -70,9 +70,9 @@ export function checkTopicRouteConfigs(
         )
       }
       for (const routeConfig of enumRouteConfigs) {
-        const topicType = routeConfig.topicTypes[0]
-        const expectedSlug = topicType ? backendSlugByValue.get(topicType) : undefined
-        const expectedSlugPlural = topicType ? slugPluralByValue.get(topicType) : undefined
+        const topicType = routeConfig.topicTypes[0]!
+        const expectedSlug = backendSlugByValue.get(topicType)
+        const expectedSlugPlural = slugPluralByValue.get(topicType)
         if (
           routeConfig.topicTypes.length === 1 &&
           routeConfig.singularPath === expectedSlug &&
@@ -102,9 +102,7 @@ export function checkTopicRouteConfigs(
         actualValues: enumRouteConfigs.map((routeConfig) => routeConfig.pluralPath),
         expectedLabel: `${backendTopicsPath} ${config.typeObject} ${config.slugPluralProperty}`,
         expectedValues: enumRouteConfigs.flatMap((routeConfig) => {
-          const slugPlural = routeConfig.topicTypes[0]
-            ? slugPluralByValue.get(routeConfig.topicTypes[0])
-            : undefined
+          const slugPlural = slugPluralByValue.get(routeConfig.topicTypes[0]!)
           return slugPlural ? [slugPlural] : []
         }),
       })

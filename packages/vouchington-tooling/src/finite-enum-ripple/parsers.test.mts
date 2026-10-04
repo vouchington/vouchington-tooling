@@ -207,4 +207,22 @@ describe('finite enum parsers', () => {
       ),
     ).toEqual([{ slug: 'alpha' }])
   })
+
+  it('ignores factory calls without configured literal arguments', () => {
+    expect(
+      parsePostDetailRouteFactoryArgs(
+        "pageFactory('entry'); pageFactory(value, 'entry')",
+        file,
+        /^pageFactory$/,
+      ),
+    ).toEqual([])
+    expect(
+      parseTopicRouteFactoryArgs("otherFactory('skip'); pageFactory(value)", file, /^pageFactory$/),
+    ).toEqual([])
+  })
+
+  it('ignores computed topic callees while recognizing a configured factory', () => {
+    const source = "(() => 1)('skip'); pageFactory('alpha')"
+    expect(parseTopicRouteFactoryArgs(source, file, /^pageFactory$/)).toEqual([{ slug: 'alpha' }])
+  })
 })

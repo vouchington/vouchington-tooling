@@ -276,4 +276,60 @@ describe('checkFiniteEnumRipple', () => {
     )
     expect(check().every((error) => error.endsWith(' Follow local guide.'))).toBe(true)
   })
+
+  it('accepts either optional family and reports non-Error provider failures', () => {
+    const { ctx, config, check } = fixture()
+    delete config.topic
+    expect(check()).toEqual([])
+    ctx.readTrackedFile = () => {
+      throw 'provider unavailable'
+    }
+    expect(check()).toContain('provider unavailable')
+    delete config.post
+    expect(check()).toEqual([])
+  })
+
+  it('skips absent optional route configuration and reports extra routes', () => {
+    const { files, contents, check } = fixture()
+    files.existingFileSet = new Set(
+      [...files.existingFileSet].filter((file) => file !== paths.routes),
+    )
+    expect(check()).toEqual([])
+    files.existingFileSet = new Set(contents.keys())
+    contents.set(paths.routes, contents.get(paths.routes)!.replace('kindRoutes', 'otherRoutes'))
+    files.topicDetailPages.push({ file: paths.detail, slug: 'extra', isTopLevel: true })
+    expect(check()).toContainEqual(expect.stringContaining('kind route directories mismatch'))
+  })
+
+  it('reports unknown configured kinds, multi-kind create routes, and missing mapped record type', () => {
+    const { contents, files, check } = fixture()
+    files.postDetailPages[0]!.slug = 'unknown'
+    contents.set(
+      paths.routes,
+      contents
+        .get(paths.routes)!
+        .replace("kinds: ['alpha']", "kinds: ['ghost']")
+        .replace("kinds: ['entry']", "kinds: ['entry', 'other']")
+        .replace("singular: 'entry'", "singular: 'unknown'"),
+    )
+    expect(check()).toContainEqual(expect.stringContaining('kindRoutes.alphas maps'))
+    expect(check()).toContainEqual(expect.stringContaining('recordRoutes.entries maps'))
+    expect(check()).toContainEqual(expect.stringContaining('expected type is "missing"'))
+  })
+
+  it('filters consumer-ignored navigation paths', () => {
+    const { contents, config, check } = fixture()
+    contents.set(paths.component, "push('/ignored')")
+    config.topic!.ignoredNavigationPaths = ['ignored']
+    expect(check()).toEqual([])
+  })
+
+  it('returns non-Error source-reader failures as diagnostics', () => {
+    const { ctx, config, check } = fixture()
+    delete config.post
+    ctx.readTrackedFile = () => {
+      throw 'source unavailable'
+    }
+    expect(check()).toContain('source unavailable')
+  })
 })

@@ -38,7 +38,7 @@ function collectPostCreateTypeLiterals(content: string, properties: readonly str
     const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     return [
       ...content.matchAll(new RegExp(`\\b${escaped}\\s*(?:=|:)\\s*['"]([^'"]+)['"]`, 'g')),
-    ].flatMap((item) => (item[1] ? [item[1]] : []))
+    ].map((item) => item[1]!)
   })
 }
 
