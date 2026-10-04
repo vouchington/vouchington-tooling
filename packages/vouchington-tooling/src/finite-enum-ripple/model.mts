@@ -35,6 +35,8 @@ export interface FiniteEnumRippleConfig {
     slugPluralProperty: string
     factoryCallPattern: RegExp
     routeConfigExceptions: readonly string[]
+    /** Declared values intentionally without a collection route. */
+    collectionRouteExclusions: readonly string[]
     routeLabels: { detailTop: string; detail: string; collectionTop: string; collection: string }
     collectionLabel: string
     ignoredNavigationPaths: readonly string[]

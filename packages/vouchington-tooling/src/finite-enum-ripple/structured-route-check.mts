@@ -95,11 +95,9 @@ export function checkStructuredRouteConfigs(
         actualValues: enumRouteConfigs.flatMap((routeConfig) => routeConfig.structuredTypes),
         expectedLabel: backendStructuredsPath,
         expectedFile: backendStructuredsPath,
-        expectedValues: uniqueSorted(
-          enumRouteConfigs.flatMap((routeConfig) =>
-            routeConfig.structuredTypes.filter((value) => slugPluralByValue.has(value)),
-          ),
-        ),
+        expectedValues: backendEntries
+          .filter((entry) => !config.collectionRouteExclusions.includes(entry.value))
+          .map((entry) => entry.value),
       })
       compareSets(errors, {
         label: `${config.collectionLabel} collection route config paths`,

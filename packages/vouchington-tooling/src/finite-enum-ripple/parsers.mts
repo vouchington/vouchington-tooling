@@ -57,6 +57,8 @@ export function parseStructuredTypeEntries(
   const object = findConstObjectLiteral(content, name, file)
   const entries: StructuredTypeEntry[] = []
   for (const property of object.properties) {
+    if (ts.isSpreadAssignment(property))
+      throw new Error(`${file}: ${name} contains an uninspectable spread`)
     if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
     if (!value) continue
@@ -84,7 +86,7 @@ export function parseUnionSlugToType(
     const key = getPropertyNameText(property.name)
     if (!key) continue
     const value = getStringLiteralValue(property.initializer)
-    if (!value) continue
+    if (value === undefined) throw new Error(`${file}: ${name}.${key} must be a string literal`)
     entries.set(key, value)
   }
   if (entries.size === 0) throw new Error(`${file}: could not parse ${name} entries`)

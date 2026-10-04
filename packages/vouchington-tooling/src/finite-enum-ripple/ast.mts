@@ -45,6 +45,7 @@ export function getCallExpressionName(expression: ts.Expression): string | undef
   const node = unwrapExpression(expression)
   if (ts.isIdentifier(node)) return node.text
   if (ts.isPropertyAccessExpression(node)) return node.name.text
+  if (ts.isElementAccessExpression(node)) return getStringLiteralValue(node.argumentExpression)
   return undefined
 }
 

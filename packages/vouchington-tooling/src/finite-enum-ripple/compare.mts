@@ -50,7 +50,7 @@ export function checkCollectionPagePathLiterals(
   for (const page of pages) {
     if (!routeSlugs.has(page.slug)) continue
     const content = readTracked(page.file)
-    for (const literalPath of collectActivePatternCaptures(content, pathPattern)) {
+    for (const literalPath of collectActivePatternCaptures(content, pathPattern, page.file)) {
       if (literalPath === page.slug || literalPath.startsWith(`${page.slug}/`)) continue
       errors.push(
         finiteEnumError(
@@ -78,6 +78,7 @@ export function checkStructuredCollectionComponentPathLiterals(
     const content = readTracked(file)
     for (const literalPath of collectNavigationPathLiterals(
       content,
+      file,
       ignoredNavigationPaths,
       navigationPattern,
     )) {
@@ -95,11 +96,12 @@ export function checkStructuredCollectionComponentPathLiterals(
 
 function collectNavigationPathLiterals(
   content: string,
+  file: string,
   ignoredPaths: ReadonlySet<string>,
   pattern: RegExp,
 ): string[] {
   const paths: string[] = []
-  for (const literalPath of collectActivePatternCaptures(content, pattern)) {
+  for (const literalPath of collectActivePatternCaptures(content, pattern, file)) {
     if (!ignoredPaths.has(literalPath)) paths.push(literalPath)
   }
   return paths

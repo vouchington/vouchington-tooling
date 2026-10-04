@@ -106,16 +106,26 @@ describe('finite enum parsers', () => {
     ).toThrow('could not find kinds')
   })
 
-  it('ignores non-string values and unsupported object members', () => {
+  it('rejects nonliteral slug-map values while ignoring computed keys', () => {
     const source =
-      "const recordSlugs = { 'entry': 'entry', 7: 'number', [dynamic]: 'ignored', other: false, ...extra }"
+      "const recordSlugs = { 'entry': 'entry', 7: 'number', [dynamic]: 'ignored', ...extra }"
     expect([...parseUnionSlugToType(source, file, 'recordSlugs')]).toEqual([
       ['entry', 'entry'],
       ['7', 'number'],
     ])
     expect(() =>
       parseUnionSlugToType('const recordSlugs = { other: false }', file, 'recordSlugs'),
-    ).toThrow('could not parse recordSlugs entries')
+    ).toThrow('recordSlugs.other must be a string literal')
+    expect(() =>
+      parseUnionSlugToType(
+        "const recordSlugs = { entry: 'entry', draft: computeType() }",
+        file,
+        'recordSlugs',
+      ),
+    ).toThrow('recordSlugs.draft must be a string literal')
+    expect(() => parseUnionSlugToType('const recordSlugs = {}', file, 'recordSlugs')).toThrow(
+      'could not parse recordSlugs entries',
+    )
   })
 
   it('reports missing configured route properties and unsupported union values', () => {
@@ -145,21 +155,35 @@ describe('finite enum parsers', () => {
   })
 
   it('recognizes member factory calls and ignores computed callees', () => {
-    const source = "factories.pageFactory('entry', 'entry'); (() => 1)('ignored')"
+    const source =
+      "factories.pageFactory('entry', 'entry'); factories['pageFactory']('entry', 'entry'); (() => 1)('ignored')"
     expect(parseUnionDetailRouteFactoryArgs(source, file, /^pageFactory$/)).toEqual([
+      { unionType: 'entry', slug: 'entry' },
       { unionType: 'entry', slug: 'entry' },
     ])
   })
 
-  it('skips unsupported members and rejects empty configured objects', () => {
+  it('rejects structured spreads and skips other unsupported members', () => {
     const source =
-      "const kinds = { ...extra, [dynamic]: { slug: 'x', slugs: 'xs' }, scalar: 1, alpha: { ...extra, slug: 'alpha', slugs: 'alphas' } }"
+      "const kinds = { [dynamic]: { slug: 'x', slugs: 'xs' }, scalar: 1, alpha: { ...extra, slug: 'alpha', slugs: 'alphas' } }"
     expect(parseStructuredTypeEntries(source, file, 'kinds', 'slug', 'slugs')).toEqual([
       { value: 'alpha', slug: 'alpha', slugPlural: 'alphas' },
     ])
     expect(() =>
       parseStructuredTypeEntries('const kinds = { ...extra }', file, 'kinds', 'slug', 'slugs'),
+    ).toThrow('kinds contains an uninspectable spread')
+    expect(() =>
+      parseStructuredTypeEntries('const kinds = {}', file, 'kinds', 'slug', 'slugs'),
     ).toThrow('could not parse kinds entries')
+    expect(
+      parseStructuredTypeEntries(
+        "const kinds = { method() {}, alpha: { slug: 'alpha', slugs: 'alphas' } }",
+        file,
+        'kinds',
+        'slug',
+        'slugs',
+      ),
+    ).toHaveLength(1)
     expect(() =>
       parseStructuredTypeEntries(
         "const kinds = { alpha: { slugs: 'alphas' } }",

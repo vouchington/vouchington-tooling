@@ -75,6 +75,7 @@ function fixture() {
       singularPathProperty: 'singular',
       factoryCallPattern: /^createKindPage$/,
       routeConfigExceptions: [],
+      collectionRouteExclusions: [],
       ignoredNavigationPaths: [],
       collectionPathLiteralPattern: /\bpath:\s*['"]\/([^'"]*)['"]/g,
       navigationPathLiteralPattern: /\b(?:push|replace|redirect)\(\s*['"`]\/([^'"`$)}]+)/g,
@@ -114,8 +115,16 @@ function fixture() {
 }
 
 describe('checkFiniteEnumRipple', () => {
-  it('accepts configured compact declarations and matching routes', () => {
-    expect(fixture().check()).toEqual([])
+  it('accepts compact declarations and catches a missing collection route for a new value', () => {
+    const { contents, config, check } = fixture()
+    expect(check()).toEqual([])
+    const expanded =
+      "export const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' }, beta: { slug: 'beta', slugs: 'betas' } }"
+    contents.set(paths.source, expanded)
+    contents.set(paths.client, expanded)
+    expect(check()).toContainEqual(expect.stringContaining('kind route config values mismatch'))
+    config.structured!.collectionRouteExclusions = ['beta']
+    expect(check()).not.toContainEqual(expect.stringContaining('kind route config values mismatch'))
   })
 
   it('reports structured slug disagreement and ignores commented entries', () => {
@@ -140,7 +149,7 @@ describe('checkFiniteEnumRipple', () => {
       paths.routes,
       contents.get(paths.routes)!.replace("singular: 'alpha'", "singular: 'wrong'"),
     )
-    contents.set(paths.detail, "const Page = createKindPage('wrong')")
+    contents.set(paths.detail, "const Page = factories['createKindPage']('wrong')")
     expect(check()).toContainEqual(expect.stringContaining('kind route factory slug mismatch'))
     expect(check()).toContainEqual(expect.stringContaining('kindRoutes.alphas maps'))
   })
