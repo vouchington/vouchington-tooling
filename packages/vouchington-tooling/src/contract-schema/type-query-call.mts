@@ -33,8 +33,10 @@ function rowType(
     return { type: checker.getTypeFromTypeNode(typeArgument), at: typeArgument }
   }
   const result = checker.getAwaitedType(checker.getTypeAtLocation(call))
+  if (result && result.flags & ts.TypeFlags.Any) return { type: result, at: call }
   const rowsProperty = result && checker.getPropertyOfType(result, 'rows')
   const rows = rowsProperty && checker.getTypeOfSymbolAtLocation(rowsProperty, call)
+  if (rows && rows.flags & ts.TypeFlags.Any) return { type: rows, at: call }
   const element = rows && checker.getIndexTypeOfType(rows, ts.IndexKind.Number)
   if (!element) {
     throw new Error(

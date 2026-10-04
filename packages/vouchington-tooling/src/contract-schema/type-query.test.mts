@@ -17,6 +17,9 @@ export type AnyRow = any
 export interface ProtoRow { '__proto__': string }
 export interface Executor { <T = Projected>(): Promise<{ rows: T[] }> }
 export type Box<T = Projected> = { value: T }
+export type DependentBox<T = Projected, U = T> = { value: U }
+namespace Types { export interface External { id: string } }
+export type QualifiedBox<U = Types.External> = { value: U }
 export declare function read<T = Projected>(): Promise<{ rows: T[] }>
 export declare function write<T = Projected>(): Promise<{ rows: T[] }>
 export declare function scalar(): Promise<number>
@@ -26,11 +29,15 @@ declare function read<T>(): Promise<{ rows: T[] }>
 declare function write<T>(): Promise<{ rows: T[] }>
 declare function scalar(): Promise<number>
 declare function pair<Key, Row>(): Promise<{ rows: Row[] }>
+declare function readAny(): any
+declare function readAnyRows(): Promise<{ rows: any }>
 read<{ id: string }>()
 write<{ id: string; title: string }>()
 read<{ id: string }>()
 scalar()
-pair<number, { id: string }>()`,
+pair<number, { id: string }>()
+readAny()
+readAnyRows()`,
 })
 const program = matrix.program
 const contracts = matrix.sourceFile('contracts').fileName
@@ -89,6 +96,29 @@ describe('type-query exported facts', () => {
         assignableTo: { entity: false },
       })
     }
+    expect(
+      getExportedTypeFacts({
+        program,
+        fileName: contracts,
+        exportName: 'DependentBox',
+        defaultTypeParameterIndex: 1,
+        propertyNames: ['id'],
+        assignableTo: { entity },
+      }),
+    ).toMatchObject({
+      isAny: false,
+      properties: { id: 'string' },
+      assignableTo: { entity: false },
+    })
+    expect(
+      getExportedTypeFacts({
+        program,
+        fileName: contracts,
+        exportName: 'QualifiedBox',
+        defaultTypeParameterIndex: 0,
+        propertyNames: ['id'],
+      }),
+    ).toMatchObject({ isAny: false, properties: { id: 'string' } })
   })
 
   it('follows a reexport to its declared type in a second real source file', () => {
@@ -162,7 +192,7 @@ describe('type-query call rows', () => {
     }
     expect(getCallRowTypeFacts(request)).toEqual([
       {
-        line: 6,
+        line: 8,
         column: 1,
         display: '{ id: string; }',
         isAny: false,
@@ -170,7 +200,7 @@ describe('type-query call rows', () => {
         assignableTo: { entity: false },
       },
       {
-        line: 8,
+        line: 10,
         column: 1,
         display: '{ id: string; }',
         isAny: false,
@@ -196,11 +226,26 @@ describe('type-query call rows', () => {
     expect(awaited).toEqual(explicit)
     expect(awaited).toMatchObject([
       {
-        line: 7,
+        line: 9,
         properties: { id: 'string', title: 'string' },
         assignableTo: { entity: true },
       },
     ])
+  })
+
+  it('propagates any from awaited results and their rows property', () => {
+    for (const calleeText of ['readAny', 'readAnyRows']) {
+      expect(
+        getCallRowTypeFacts({
+          program,
+          fileName: calls,
+          calleeText,
+          rowSource: 'awaitedRows',
+          propertyNames: ['id'],
+          assignableTo: { entity },
+        }),
+      ).toMatchObject([{ isAny: true, properties: { id: undefined } }])
+    }
   })
 
   it('reports missing selected row type arguments and awaited rows', () => {
@@ -232,7 +277,7 @@ describe('type-query call rows', () => {
         typeArgumentIndex: 1,
         propertyNames: ['id'],
       }),
-    ).toMatchObject([{ line: 10, properties: { id: 'string' } }])
+    ).toMatchObject([{ line: 12, properties: { id: 'string' } }])
     expect(() =>
       getCallRowTypeFacts({
         program,

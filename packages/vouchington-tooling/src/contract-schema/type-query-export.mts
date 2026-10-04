@@ -51,23 +51,34 @@ export function exportedDefaultType(
 ): ts.Type {
   const sourceFile = sourceFileForQuery(program, selector.fileName)
   const symbol = exportedSymbol(checker, sourceFile, selector.exportName)
-  const directDefault = symbol.declarations
+  const directParameters = symbol.declarations
     ?.map(
       (declaration) =>
         (
           declaration as ts.Declaration & {
             typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>
           }
-        ).typeParameters?.[parameterIndex]?.default,
+        ).typeParameters,
     )
-    .find((defaultNode) => defaultNode !== undefined)
-  const signature = exportedType(program, checker, selector).getCallSignatures()[0]
-  const defaultNode =
-    directDefault ?? signature?.getDeclaration()?.typeParameters?.[parameterIndex]?.default
+    .find((parameters) => parameters?.[parameterIndex]?.default)
+  const signatureParameters = exportedType(program, checker, selector)
+    .getCallSignatures()[0]
+    ?.getDeclaration()?.typeParameters
+  const parameters = directParameters ?? signatureParameters
+  const defaultNode = parameters?.[parameterIndex]?.default
   if (!defaultNode) {
     throw new Error(
       `Missing default for type parameter ${parameterIndex} of export "${selector.exportName}" in "${selector.fileName}"`,
     )
+  }
+  if (ts.isTypeReferenceNode(defaultNode) && ts.isIdentifier(defaultNode.typeName)) {
+    const referencedName = defaultNode.typeName.text
+    const previousIndex = parameters?.findIndex(
+      (parameter, index) => index < parameterIndex && parameter.name.text === referencedName,
+    )
+    if (previousIndex !== undefined && previousIndex >= 0 && parameters?.[previousIndex]?.default) {
+      return exportedDefaultType(program, checker, selector, previousIndex)
+    }
   }
   return checker.getTypeAtLocation(defaultNode)
 }
