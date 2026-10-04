@@ -36,6 +36,7 @@
         "src/api-contract-discovery/index.mts!",
         "src/vitest-diagnostics/index.mts!",
         "src/config-inventory/index.mts!",
+        "src/finite-enum-ripple/index.mts!",
         "src/coverage-transport/index.mts!",
         "src/pnpm-deploy/index.mts!",
         "src/dockerfile-parse/index.mts!",
