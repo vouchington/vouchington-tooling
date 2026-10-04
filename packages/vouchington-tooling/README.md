@@ -736,3 +736,8 @@ Capture imports/calls are name-based and order-independent; relation-variable ap
 order-sensitive. DML recognition examines literal/template text. Static table matching lowercases
 the extracted name; dynamic literal table matching preserves case. Malformed TypeScript uses the
 compiler's recovery tree. An argument-free append returns no relation fact.
+Pass TypeScript source (`.ts` or `.mts`); the parser uses TypeScript mode even if the file name ends
+in `.tsx`. Template expressions join their static fragments for DML matching, while DML prefixes
+for generated-table facts come from templates rather than ordinary quoted strings. Dynamic
+eligibility-table matching expects an unquoted literal immediately after the DML prefix and does
+not recognize `DELETE FROM ONLY`.
