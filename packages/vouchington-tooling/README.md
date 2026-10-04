@@ -366,6 +366,31 @@ summaries and quoted attributes; it is not a general HTML validator or sanitizer
 the input or infers semantic relevance, cost, schema conformance, or failure causes. The existing
 `markdownSectionBetweenHeadings` API retains its original boundary behavior.
 
+`hasUncheckedMarkdownTask` reports parsed unchecked GFM task items, ignoring code and non-task text.
+`markdownLiteralSpans` returns source-backed `{ kind, position, value }` facts for fenced or indented
+code, inline code, and raw HTML. `markdownHtmlFacts` distinguishes inline HTML from block HTML and
+labels CommonMark block types 1–7; `markdownHtmlBlocks` selects block types 1, 6, and 7, retaining
+the parser's source bounds, including type 1 blocks through their matching closer or end of input.
+Positions use 1-indexed line/column coordinates and JavaScript string offsets, including CRLF and
+Unicode source text. These APIs return facts rather than mdast nodes so callers can apply their own
+content policy without binding it to parser internals.
+
+```ts
+import {
+  hasUncheckedMarkdownTask,
+  markdownHtmlBlocks,
+  markdownLiteralSpans,
+} from 'vouchington-tooling/markdown'
+
+const hasOpenTask = hasUncheckedMarkdownTask(body)
+const literalSpans = markdownLiteralSpans(body)
+const blockHtml = markdownHtmlBlocks(body)
+```
+
+`markdownHtmlBlocks` reports CommonMark types 1, 6, and 7; inline tags do not appear in that result.
+Use `markdownHtmlFacts` when inline/block classification and other CommonMark HTML block types are
+also needed.
+
 Machine-wide agent configuration now belongs to [vouchington-machines](https://github.com/vouchington/vouchington-machines/blob/main/docs/agent-config.md).
 Use its `configure-agents.sh` and `diagnose-agents.sh`; project hooks and MCP configuration remain in their checkouts.
 
