@@ -8,7 +8,11 @@ import {
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
-import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import {
+  expressionReceiver,
+  sameWriteReceiver,
+  type WriteReceiver,
+} from './protocol-write-receiver.mts'
 
 export function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
@@ -30,6 +34,30 @@ function implementationDeclaration(
     )
   }
   return undefined
+}
+
+export function opaqueCallReceivesSelectedStream(
+  call: ts.CallExpression,
+  selectedReceivers: readonly WriteReceiver[],
+  binding: RouteBinding,
+  calls: readonly ts.CallExpression[],
+  checker: ts.TypeChecker,
+  bindings: HandlerBindings,
+): boolean {
+  if (implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker))
+    return false
+  const framed = selectedReceivers.flatMap((receiver) =>
+    actualReceivers(receiver, binding, calls, checker, bindings),
+  )
+  return call.arguments.some((argument) => {
+    const receiver = expressionReceiver(argument, checker)
+    if (!receiver) return false
+    return actualReceivers(receiver, binding, calls, checker, bindings).some(
+      (value) =>
+        value === undefined ||
+        framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
+    )
+  })
 }
 
 export function helperBindings(
