@@ -1,5 +1,5 @@
 import ts from '@typescript/typescript6'
-import { getPropertyNameText, getStringLiteralValue } from './ast.mts'
+import { getPropertyNameText, getStringLiteralValue, unwrapExpression } from './ast.mts'
 
 /** Inspect syntax nodes so comments and strings containing example code are ignored. */
 export function collectCreatePageLiterals(
@@ -30,7 +30,8 @@ export function collectCreatePageLiterals(
         const member = node.properties[index]!
         if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
           const overridden = new Set<string>()
-          if (ts.isObjectLiteralExpression(member.expression)) {
+          const expression = unwrapExpression(member.expression)
+          if (ts.isObjectLiteralExpression(expression)) {
             for (const later of node.properties.slice(index + 1)) {
               const name = ts.isPropertyAssignment(later)
                 ? getPropertyNameText(later.name)
@@ -40,7 +41,7 @@ export function collectCreatePageLiterals(
               if (name && names.has(name)) overridden.add(name)
             }
           }
-          visit(member.expression, overridden)
+          visit(expression, overridden)
         } else {
           visit(member, ignoredProperties)
         }

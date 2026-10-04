@@ -59,10 +59,9 @@ export function parseStructuredTypeEntries(
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property))
       throw new Error(`${file}: ${name} contains an uninspectable spread`)
-    if (!ts.isPropertyAssignment(property))
-      throw new Error(`${file}: ${name} contains an uninspectable member`)
+    if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
-    if (value === undefined) throw new Error(`${file}: ${name} contains an uninspectable key`)
+    if (value === undefined) continue
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body))
       throw new Error(`${file}: ${name}.${value} must be an object literal`)

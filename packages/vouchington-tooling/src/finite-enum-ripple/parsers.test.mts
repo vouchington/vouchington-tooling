@@ -172,9 +172,9 @@ describe('finite enum parsers', () => {
     ])
   })
 
-  it('rejects structured spreads and skips other unsupported members', () => {
+  it('rejects dynamic structured values and ignores computed keys and methods', () => {
     const source =
-      "const kinds = { [dynamic]: { slug: 'x', slugs: 'xs' }, scalar: 1, alpha: { slug: 'alpha', slugs: 'alphas' } }"
+      "const kinds = { [dynamic]: { slug: 'x', slugs: 'xs' }, alpha: { slug: 'alpha', slugs: 'alphas' } }"
     expect(parseStructuredTypeEntries(source, file, 'kinds', 'slug', 'slugs')).toEqual([
       { value: 'alpha', slug: 'alpha', slugPlural: 'alphas' },
     ])
@@ -193,6 +193,17 @@ describe('finite enum parsers', () => {
         'slugs',
       ),
     ).toHaveLength(1)
+    for (const value of ['1', 'buildKind()']) {
+      expect(() =>
+        parseStructuredTypeEntries(
+          `const kinds = { alpha: ${value} }`,
+          file,
+          'kinds',
+          'slug',
+          'slugs',
+        ),
+      ).toThrow('kinds.alpha must be an object literal')
+    }
     expect(() =>
       parseStructuredTypeEntries(
         "const kinds = { alpha: { slugs: 'alphas' } }",

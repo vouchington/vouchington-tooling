@@ -123,7 +123,16 @@ export function checkUnionTypes(
       label: `${config.collectionLabel} collection route config singular paths`,
       actualLabel: `${routeConfigsPath} ${config.routeConfigObject}`,
       actualFile: routeConfigsPath,
-      actualValues: typedRouteConfigs.map((routeConfig) => routeConfig.singularPath),
+      actualValues: routeConfigs.flatMap((routeConfig) => {
+        if (routeConfig.unionTypes.length > 0) return [routeConfig.singularPath]
+        if (
+          config.routeConfigExceptions.includes(routeConfig.key) &&
+          slugToType.has(routeConfig.singularPath)
+        ) {
+          return [routeConfig.singularPath]
+        }
+        return []
+      }),
       expectedLabel: `${routeConfigsPath} ${config.slugMapObject} slugs`,
       expectedFile: routeConfigsPath,
       expectedValues: [...slugToType.keys()],

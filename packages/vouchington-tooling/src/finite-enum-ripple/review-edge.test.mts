@@ -56,10 +56,10 @@ it('accepts an empty string constituent in a finite union', () => {
 
 it('accepts an empty union value mapped through a single-type route', () => {
   const contents = new Map([
-    ['types.ts', "type Kind = ''"],
+    ['types.ts', "type Kind = '' | 'entry'"],
     [
       'routes.ts',
-      "const slugs = { root: '' }; const routes = { roots: { singular: 'root', plural: 'roots', kinds: [''] } }",
+      "const slugs = { root: '', entry: 'entry' }; const routes = { roots: { singular: 'root', plural: 'roots', kinds: [''] }, entries: { singular: 'entry', plural: 'entries' } }",
     ],
   ])
   const files: FiniteEnumFiles = {
@@ -82,7 +82,7 @@ it('accepts an empty union value mapped through a single-type route', () => {
     singularPathProperty: 'singular',
     factoryCallPattern: /^createPage$/,
     internalTypes: [],
-    routeConfigExceptions: [],
+    routeConfigExceptions: ['entries'],
     routeLabels: {
       detailTop: 'top',
       detail: 'detail',
@@ -97,6 +97,7 @@ it('accepts an empty union value mapped through a single-type route', () => {
   const errors: string[] = []
   checkUnionTypes(errors, files, (path) => contents.get(path)!, config)
   expect(errors.join('\n')).not.toContain('maps singular')
+  expect(errors.join('\n')).not.toContain('route config singular paths mismatch')
 })
 
 it('counts an inferred exempt structured route as a present declaration value', () => {
@@ -282,6 +283,13 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
       'action',
     ]),
   ).toEqual(['entry'])
+  for (const spread of ["({ action: 'wrong' })", "({ action: 'wrong' } as const)"]) {
+    expect(
+      collectCreatePageLiterals(`const fields = { ...${spread}, action: 'entry' }`, 'page.ts', [
+        'action',
+      ]),
+    ).toEqual(['entry'])
+  }
 })
 
 it('retains empty create-page values in objects, JSX, and assignments', () => {
