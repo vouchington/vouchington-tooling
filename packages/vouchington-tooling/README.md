@@ -533,6 +533,8 @@ A status setter must dominate each body emission, including separate branches; c
 aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
 and helper parameters must resolve to the registered caller's unchanged response context.
 Helper-owned contracts also account for response emissions in their proven caller scopes.
+Opaque callees receiving the canonical HTTP context or its response object invalidate its contract;
+implemented helpers and consumed callbacks retain their proven dispatch behavior.
 Feasible assignments or deletions of response methods through canonical context aliases invalidate
 that dispatch evidence; dead, ignored, or unrelated method mutations preserve the contract.
 Indirect response `call`, `apply`, and `bind` forms fail closed, including borrowed context receivers.

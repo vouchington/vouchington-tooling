@@ -28,6 +28,7 @@ const invalid = {
   'forwarded-caller': route(`function send(ctx:any){${dispatch}}
     function relay(ctx:any){ctx.pipeline(raw);send(ctx)}relay(ctx)`),
   call: route(`${dispatch}ctx.pipeline.call(ctx,raw)`),
+  'canonical-target-foreign-this': route(`${dispatch}ctx.pipeline.call(sink,raw)`),
   apply: route(`${dispatch}ctx.pipeline.apply(ctx,[raw])`),
   bind: route(`${dispatch}const emit=ctx.pipeline.bind(ctx);emit(raw)`),
   'method-alias': route(`${dispatch}const emit=ctx.pipeline;emit.call(ctx,raw)`),
@@ -39,6 +40,8 @@ const invalid = {
   ),
   'response-empty': route(`${dispatch}ctx.response.empty.apply(ctx.response,[])`),
   'status-call': route(`${dispatch}ctx.setStatus.call(ctx,201)`),
+  'unrecognized-borrowed': route(`${dispatch}sink.unrelated.call(ctx,raw)`),
+  'unknown-borrowed': route(`${dispatch}sink.call(ctx,raw)`),
   'borrowed-call': route(`${dispatch}sink.pipeline.call(ctx,raw)`),
   'borrowed-buffer': route(`${dispatch}sink.buffer.call(ctx.response,raw)`),
   'helper-indirect-caller': helper('send(ctx);ctx.pipeline.call(ctx,raw)'),
@@ -60,8 +63,6 @@ const valid = {
   'foreign-indirect': route(`${dispatch}sink.pipeline.call(sink,raw)`),
   'foreign-alias': route(`${dispatch}const emit=sink.pipeline;emit.call(sink,raw)`),
   'context-data-method': route(`${dispatch}ctx.query.run.call(ctx.query,raw)`),
-  'unrecognized-borrowed': route(`${dispatch}sink.unrelated.call(ctx,raw)`),
-  'unknown-borrowed': route(`${dispatch}sink.call(ctx,raw)`),
   'noncontext-this': route(`${dispatch}sink.pipeline.call(ctx.params,raw)`),
 } as const
 const ordinary = {

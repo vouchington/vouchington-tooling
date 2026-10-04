@@ -14,6 +14,7 @@ import { visit } from './response-contract-route-analysis.mts'
 import { isSupportedProtocolCallback } from './protocol-callback-invocation.mts'
 import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
+import { opaqueHttpContextArgument } from './protocol-http-context-escapes.mts'
 
 const responseMethods = new Set([
   'setStatus',
@@ -37,6 +38,8 @@ export function associateHttpResponse(
   const emissions = new Map<ts.CallExpression, 'content' | 'none' | 'status'>()
   for (const [scope, context] of httpContextScopes(handler, checker))
     visit(scope, (node) => {
+      if (ts.isCallExpression(node) && opaqueHttpContextArgument(node, checker, context))
+        throw new Error('HTTP response context escapes through an opaque argument')
       if (mutatesHttpResponseMethod(node, context, checker))
         throw new Error('HTTP response context method is mutated')
       if (
@@ -95,6 +98,7 @@ export function opaqueHttpResponse(
   checker: ts.TypeChecker,
   context?: ts.Symbol,
 ): boolean {
+  if (opaqueHttpContextArgument(call, checker, context)) return true
   if (context)
     return (
       responseMethods.has(

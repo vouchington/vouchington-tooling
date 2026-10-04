@@ -56,7 +56,7 @@ const valid = {
   'shadowed-reflect':
     route(`${dispatch}const Reflect={apply(_target:unknown,_this:unknown,_args:unknown[]){}};
     Reflect.apply(ctx.pipeline,ctx,[raw])`),
-  'project-reflect': `${preamble}declare const Reflect:{apply(target:unknown,receiver:unknown,args:unknown[]):void};
+  'project-reflect': `${preamble}const Reflect={apply(_target:unknown,_receiver:unknown,_args:unknown[]){}};
     app.route('/rpc').post((ctx:any)=>{${dispatch}Reflect.apply(ctx.pipeline,ctx,[raw])})`,
 } as const
 const ordinary = {
