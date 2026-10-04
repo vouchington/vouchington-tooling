@@ -504,6 +504,8 @@ Caller-owned `apiOpenApiHttpResponse(key, response)` markers bind a constant opa
 carrying optional readonly `apiHttpResponseVariants` metadata. Each concrete union variant has
 `status` and `bodyKind`; content variants also have `mediaType` and `body`. Discovery associates
 the marked variable's status and body emissions without reading or replacing response bytes.
+Feasible assignments, deletions, or updates to its body or status, including cast and constant
+aliases, invalidate the selected contracts because their metadata no longer proves the dispatch.
 A status setter must dominate each body emission, including separate branches; constant context
 aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
 and helper parameters must resolve to the registered caller's unchanged response context.
