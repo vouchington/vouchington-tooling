@@ -19,3 +19,16 @@ Map replacement semantics. The runbook reader accepts short table separators and
 
 Callers own symbol names, route inventory, document locations, comparisons, and
 diagnostics. These functions return data without exposing AST nodes.
+
+## Source provenance
+
+The fact readers were extracted from `vouchington/vouchington` at
+`99a0948e4e3cc0c5b9791062df6e9de37e4cf3f1`:
+
+- `static-code-analysis/targeted-guardrails/basic-auth-doc-sync-parsers.mts`
+- `static-code-analysis/targeted-guardrails/basic-auth-doc-sync.test.mts`
+- `static-code-analysis/targeted-guardrails/basic-auth-doc-sync-parser-edge.test.mts`
+
+The original parser and its characterization tests informed the extraction. The
+first extraction commit misspelled the edge-test basename in its provenance body;
+the paths above are the authoritative source list.
