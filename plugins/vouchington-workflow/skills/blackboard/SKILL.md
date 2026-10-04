@@ -49,7 +49,12 @@ using credentials or requesting an unsandboxed run; its runtime dependencies mus
 that trusted installation. The CLI resolves its client relative to its own installation; installing
 `agent-blackboard` only in the consumer worktree is insufficient for CLI fallback. Do not resolve the executable through the consumer's `node_modules/.bin`,
 `pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
-path, and bind any approval request to the same executable and arguments. If no trusted CLI is
+script path, and bind any approval request to the same interpreter, script, and arguments.
+Never execute the script directly: its `#!/usr/bin/env node` line would pick whichever `node` comes
+first on `PATH`, which a consumer worktree can control. Set `BLACKBOARD_NODE` to a verified
+absolute Node 24+ binary outside the consumer worktree, and run it with `env -i` so only `HOME`, a
+fixed system `PATH`, and the two blackboard variables reach it. That also drops `NODE_OPTIONS` and
+other loader variables. If no trusted CLI is
 available, report the blocker; do not escalate a consumer-supplied executable. For local development,
 the reviewed source CLI may run inside the sandbox, subject to the harness's credential policy.
 `journal append` invokes the same validated writer as MCP, ensures the exact session identity,
@@ -61,15 +66,21 @@ or pass `--session-id` to `journal flush` for the same two counts; an unfiltered
 only the whole-outbox count.
 
 ```bash
-"$BLACKBOARD_CLI" agent-blackboard journal append \
+blackboard() {
+  env -i HOME="$HOME" PATH=/usr/bin:/bin \
+    AGENT_BLACKBOARD_URL="$AGENT_BLACKBOARD_URL" \
+    AGENT_BLACKBOARD_TOKEN="$AGENT_BLACKBOARD_TOKEN" \
+    "$BLACKBOARD_NODE" "$BLACKBOARD_CLI" agent-blackboard "$@"
+}
+blackboard journal append \
   --session-id SESSION --agent AGENT --version VERSION \
   --mode interactive --source-event-id EVENT --work-outcome unknown \
   --repository owner/name --coverage-status not-assessed --dropped-count 0 \
   --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
-"$BLACKBOARD_CLI" agent-blackboard journal entries --session-id SESSION
-"$BLACKBOARD_CLI" agent-blackboard journal status \
+blackboard journal entries --session-id SESSION
+blackboard journal status \
   --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
-"$BLACKBOARD_CLI" agent-blackboard journal flush \
+blackboard journal flush \
   --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
 ```
 

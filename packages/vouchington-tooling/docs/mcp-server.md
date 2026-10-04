@@ -31,6 +31,8 @@ environment. The server never searches for, prints, or mints them.
 If MCP is unavailable, use `vouchington agent-blackboard journal append|entries|flush|status` as described
 in the blackboard skill. Record the fallback and delivery status in the journal and tell the human. The CLI resolves its
 client from its own installation, so install `agent-blackboard` alongside that trusted CLI.
+Run the script with a verified absolute `node` and a cleared environment (`env -i`), never through
+its `#!/usr/bin/env node` line, which takes `node` from a possibly repository-controlled `PATH`.
 A missing MCP connection does not waive persistence or readback requirements.
 
 ## Launch
