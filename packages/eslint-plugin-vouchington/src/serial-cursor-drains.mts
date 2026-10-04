@@ -1,3 +1,4 @@
+import { eagerIteration } from './serial-cursor-arguments.mts'
 import {
   findVariable,
   patternPropertyName,
@@ -119,18 +120,7 @@ export function createSerialCursorDrainsRule() {
           )
             return
           const args = node.arguments as NodeLike[]
-          let mapped = unwrap(args[0])
-          while (mapped?.type === 'AwaitExpression') {
-            mapped = unwrap(mapped.argument as NodeLike | undefined)
-          }
-          const mappedCallee = unwrap(mapped?.callee as NodeLike | undefined)
-          const iterator = propertyName(mappedCallee)
-          if (
-            mapped?.type === 'CallExpression' &&
-            mappedCallee?.type === 'MemberExpression' &&
-            typeof iterator === 'string' &&
-            options.iterationMethods.has(iterator)
-          ) {
+          if (eagerIteration(args[0], options.iterationMethods)) {
             context.report({ messageId: 'serial', node })
           }
         },

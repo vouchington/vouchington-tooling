@@ -13,6 +13,23 @@ it('preserves asserted bindings and separates type-only from runtime shadowing i
 import { CacheClient } from '@store/cache'
 const CACHE_GROUP = 'cache:group' as const
 CacheClient.invalidate(CACHE_GROUP)
+CacheClient.invalidate(CACHE_GROUP satisfies string)
+CacheClient.invalidate(CACHE_GROUP as string)
+CacheClient.invalidate(CACHE_GROUP!)
+{ interface CacheClient { marker: string }; CacheClient.invalidate(CACHE_GROUP) }
+{ type CacheClient = { marker: string }; CacheClient.invalidate(CACHE_GROUP) }
+const instance = new CacheClient({ prefix: 'validation' as const })
+instance.invalidate()
+const checked = new CacheClient({ prefix: 'validation' satisfies string })
+checked.invalidate()
+{
+  async function writeRows() {
+    Promise.all(rows?.map(drain) ?? [])
+    Promise.all(enabled ? rows.map(drain) : [])
+    Promise.all([...rows.map(drain)])
+    Promise.all([() => rows.map(drain)])
+  }
+}
 { const writeRows = (async () => Promise.all(rows.map(drain))) as Drain }
 { const writeRows = (async () => Promise.all(rows.map(drain))) satisfies Drain }
 { const writeRows = ((async () => Promise.all(rows.map(drain))) as Drain) satisfies Drain }
@@ -66,6 +83,15 @@ CacheClient.invalidate(CACHE_GROUP)
                   module: '@store/cache',
                   imported: 'CacheClient',
                   local: 'CacheClient',
+                  kind: 'const-instance-prefix',
+                  prefix: 'validation',
+                },
+                {
+                  file: 'selected.mts',
+                  member: 'invalidate',
+                  module: '@store/cache',
+                  imported: 'CacheClient',
+                  local: 'CacheClient',
                   kind: 'constructor-constant',
                   constant: { name: 'CACHE_GROUP', value: 'cache:group' },
                 },
@@ -84,7 +110,7 @@ CacheClient.invalidate(CACHE_GROUP)
     expect(result.status).toBe(1)
     const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 5 }, () => 'vouchington(serial-cursor-drains)'),
+      Array.from({ length: 8 }, () => 'vouchington(serial-cursor-drains)'),
     )
   } finally {
     rmSync(root, { force: true, recursive: true })

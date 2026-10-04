@@ -8,7 +8,7 @@ export function canonicalConstructor(
 ): boolean {
   if (identifier?.type !== 'Identifier' || identifier.name !== exception.local) return false
   return Boolean(
-    findVariable(context, identifier)?.defs.some((definition) => {
+    findVariable(context, identifier, true)?.defs.some((definition) => {
       const specifier = definition.node
       const declaration = definition.parent ?? specifier.parent
       const imported = specifier.imported as NodeLike | undefined
@@ -28,12 +28,13 @@ export function canonicalConstructor(
 
 export function constantArgument(
   context: RuleContextLike,
-  argument: NodeLike | undefined,
+  argument: NodeLike | null | undefined,
   expected: { name: string; value: string },
 ): boolean {
+  argument = unwrap(argument)
   if (argument?.type !== 'Identifier' || argument.name !== expected.name) return false
   return Boolean(
-    findVariable(context, argument)?.defs.some((definition) => {
+    findVariable(context, argument, true)?.defs.some((definition) => {
       const declaration = definition.node
       const id = declaration.id as NodeLike | undefined
       const initializer = unwrap(declaration.init as NodeLike | undefined)

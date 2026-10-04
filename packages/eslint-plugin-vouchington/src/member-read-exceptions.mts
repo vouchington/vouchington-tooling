@@ -21,7 +21,7 @@ function effectivePrefix(object: NodeLike | null | undefined, prefix: string): b
     }
     const name = patternPropertyName(property)
     if (name === 'prefix') {
-      const value = property.value as NodeLike | undefined
+      const value = unwrap(property.value as NodeLike | undefined)
       matches = value?.type === 'Literal' && value.value === prefix
     } else if (name === null && property.computed) {
       matches = false
@@ -36,7 +36,7 @@ function constantInstance(
   exception: MemberReadException & { kind: 'const-instance-prefix' },
 ): boolean {
   if (identifier?.type !== 'Identifier') return false
-  const variable = findVariable(context, identifier)
+  const variable = findVariable(context, identifier, true)
   return Boolean(
     variable?.defs.some((definition) => {
       const declaration = definition.node
