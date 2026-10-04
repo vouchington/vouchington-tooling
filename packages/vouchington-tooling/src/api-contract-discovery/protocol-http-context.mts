@@ -4,6 +4,9 @@ import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { contextResponseMethod, methodAccess } from './protocol-http-method-access.mts'
+import { reflectHttpResponseMethod } from './protocol-http-reflect.mts'
+export { contextResponseMethod } from './protocol-http-method-access.mts'
 
 /** A helper parameter is a response context only when every executable caller passes one. */
 export function httpHandlerContext(
@@ -40,40 +43,6 @@ export function httpHandlerContext(
   return result
 }
 
-/** Literal bracket access is equivalent to property access for response methods. */
-export function contextResponseMethod(
-  expression: ts.Expression,
-  context: ts.Symbol,
-  checker: ts.TypeChecker,
-  allowMutable = false,
-): string | undefined {
-  const access = methodAccess(expression)
-  if (!access) return undefined
-  const receiver =
-    expressionReceiver(access.receiver, checker) ??
-    bracketResponseReceiver(access.receiver, checker)
-  if (receiver?.root !== context || (receiver.mutableAlias && !allowMutable)) return undefined
-  if (receiver.path.length === 0) return access.name
-  if (receiver.path.length === 1 && receiver.path[0] === 'response')
-    return `response.${access.name}`
-  return undefined
-}
-
-function methodAccess(expression: ts.Expression) {
-  if (ts.isPropertyAccessExpression(expression))
-    return { receiver: expression.expression, name: expression.name.text }
-  if (ts.isElementAccessExpression(expression) && ts.isStringLiteral(expression.argumentExpression))
-    return { receiver: expression.expression, name: expression.argumentExpression.text }
-  return undefined
-}
-
-function bracketResponseReceiver(expression: ts.Expression, checker: ts.TypeChecker) {
-  const access = methodAccess(expression)
-  if (!access || access.name !== 'response') return undefined
-  const receiver = expressionReceiver(access.receiver, checker)
-  return receiver && { ...receiver, path: [...receiver.path, 'response'] }
-}
-
 /** Follow only caller contexts already admitted by the actual-argument proof. */
 export function httpContextScopes(fn: ts.FunctionLikeDeclaration, checker: ts.TypeChecker) {
   const scopes = new Map<ts.FunctionLikeDeclaration, ts.Symbol>()
@@ -101,6 +70,8 @@ export function indirectHttpResponseMethod(
   context: ts.Symbol,
   checker: ts.TypeChecker,
 ) {
+  const reflected = reflectHttpResponseMethod(call, context, checker)
+  if (reflected) return reflected
   const outer = methodAccess(call.expression)
   if (!outer || !['call', 'apply', 'bind'].includes(outer.name)) return undefined
   const direct = contextResponseMethod(outer.receiver, context, checker, true)
