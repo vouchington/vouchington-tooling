@@ -66,7 +66,9 @@ function familyError(
     ...files.unionCreatePages.map((page) => page.file),
   ]
   const file =
-    selectedPaths.find((path) => message.startsWith(`${path}:`) || message.endsWith(`: ${path}`)) ??
+    [...selectedPaths]
+      .sort((a, b) => b.length - a.length)
+      .find((path) => message.startsWith(`${path}:`) || message.endsWith(`: ${path}`)) ??
     defaultFile
   return finiteEnumError(
     file,
