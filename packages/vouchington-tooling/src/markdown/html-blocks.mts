@@ -9,29 +9,28 @@ const TYPE6_NAMES =
   'hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|' +
   'section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul'
 const TYPE6 = new RegExp(`^ {0,3}</?(?:${TYPE6_NAMES})(?:[\\s>]|/>|$)`, 'i')
-const TAG = /^ {0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:[\s>]|\/>|$)/
 
-function htmlType(value: string): MarkdownHtmlBlockType | null {
+function htmlType(value: string): MarkdownHtmlBlockType {
   if (TYPE1.test(value)) return 1
   if (/^ {0,3}<!--/.test(value)) return 2
   if (/^ {0,3}<\?/.test(value)) return 3
   if (/^ {0,3}<![A-Za-z]/.test(value)) return 4
   if (/^ {0,3}<!\[CDATA\[/i.test(value)) return 5
   if (TYPE6.test(value)) return 6
-  if (TAG.test(value)) return 7
-  return null
+  // Parsed block HTML outside types 1–6 is CommonMark type 7 by definition.
+  return 7
 }
 
 /** Returns source-backed HTML facts, classifying inline occurrences separately from block nodes. */
 export function markdownHtmlFacts(markdown: string): MarkdownHtmlFact[] {
   const facts: MarkdownHtmlFact[] = []
   const visit = (node: MarkdownNode, inBlockContainer: boolean): void => {
-    if (node.type === 'html' && node.position) {
+    if (node.type === 'html') {
       const kind = inBlockContainer ? 'block' : 'inline'
       facts.push({
         kind,
         commonMarkType: kind === 'block' ? htmlType(node.value) : null,
-        position: node.position,
+        position: node.position!,
         value: node.value,
       })
     }

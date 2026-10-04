@@ -55,6 +55,12 @@ describe('Markdown content facts', () => {
 
   it('distinguishes inline HTML from block HTML', () => {
     const facts = markdownHtmlFacts('Text <span>inline</span> here.\n\n<div>\nblock\n</div>')
+    expect(facts.filter(({ kind }) => kind === 'inline')).not.toHaveLength(0)
+    expect(
+      facts
+        .filter(({ kind }) => kind === 'inline')
+        .every(({ commonMarkType }) => commonMarkType === null),
+    ).toBe(true)
     expect(
       facts
         .filter(({ commonMarkType }) => commonMarkType !== null)

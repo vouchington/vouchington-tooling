@@ -9,10 +9,9 @@ export function markdownLiteralSpans(markdown: string): MarkdownSourceSpan[] {
   const spans: MarkdownSourceSpan[] = []
   walkMarkdown(parseGfmMarkdown(markdown), (node) => {
     if (node.type !== 'code' && node.type !== 'inlineCode' && node.type !== 'html') return
-    if (!node.position) return
     spans.push({
       kind: node.type === 'inlineCode' ? 'inline-code' : node.type,
-      position: node.position,
+      position: node.position!,
       value: node.value,
     })
   })
