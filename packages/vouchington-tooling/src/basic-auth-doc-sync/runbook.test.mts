@@ -36,6 +36,7 @@ describe('basic-auth runbook facts', () => {
     '| Path | Methods |\n| --- | missing |\n| `/status` | `GET` |',
     '| Path | Methods |\n| --- |\n| `/status` | `GET` |',
     '| Path | Methods |\n| --- | --- |',
+    '| Methods | Path |\n| - | - |\n| `GET` |',
     '| Path | Verbs |\n| - | - |\n| `/status` | `GET` |',
     '| Path | Methods |\n| - | - |\n| `` | `GET` |',
     '| Path | Methods |\n| - | - |\n| `/status` | |',

@@ -72,8 +72,7 @@ export function findRunbookExemptRoutes(markdown: string, heading: string): Exem
   if (!table || table.length < 2) return null
 
   const routes: ExemptRoute[] = []
-  const header = table[0]
-  const columns = tableHeaderColumns(header?.cells ?? [])
+  const columns = tableHeaderColumns(table[0]!.cells)
   const pathColumn = columns.get('path') ?? -1
   const methodsColumn = columns.get('methods') ?? -1
   if (pathColumn === -1 || methodsColumn === -1) return null
@@ -86,7 +85,7 @@ export function findRunbookExemptRoutes(markdown: string, heading: string): Exem
     routes.push({ methods, path })
   }
 
-  return routes.length > 0 ? routes : null
+  return routes
 }
 
 function findTopLevelConstInitializer(code: string, name: string): ts.Expression | null {

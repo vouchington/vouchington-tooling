@@ -33,6 +33,7 @@ describe('basic-auth source facts', () => {
   })
 
   it.each([
+    'const ROUTES = new Set',
     'const ROUTES = new Set()',
     'const ROUTES;',
     'const { ROUTES } = config',
