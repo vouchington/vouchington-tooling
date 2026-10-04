@@ -12,6 +12,7 @@ import { unsupportedContextAlias } from './protocol-context-alias.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { visit } from './response-contract-route-analysis.mts'
 import { isSupportedProtocolCallback } from './protocol-callback-invocation.mts'
+import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 
 const responseMethods = new Set([
@@ -36,6 +37,8 @@ export function associateHttpResponse(
   const emissions = new Map<ts.CallExpression, 'content' | 'none' | 'status'>()
   for (const [scope, context] of httpContextScopes(handler, checker))
     visit(scope, (node) => {
+      if (mutatesHttpResponseMethod(node, context, checker))
+        throw new Error('HTTP response context method is mutated')
       if (
         ts.isCallExpression(node) &&
         executableProtocolPath(node, checker) &&
