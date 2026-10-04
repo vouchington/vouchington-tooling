@@ -28,6 +28,7 @@ const invalid = {
   'forwarded-caller': route(`function send(ctx:any){${dispatch}}
     function relay(ctx:any){ctx.pipeline(raw);send(ctx)}relay(ctx)`),
   call: route(`${dispatch}ctx.pipeline.call(ctx,raw)`),
+  'canonical-target-foreign-this': route(`${dispatch}ctx.pipeline.call(sink,raw)`),
   apply: route(`${dispatch}ctx.pipeline.apply(ctx,[raw])`),
   bind: route(`${dispatch}const emit=ctx.pipeline.bind(ctx);emit(raw)`),
   'method-alias': route(`${dispatch}const emit=ctx.pipeline;emit.call(ctx,raw)`),
