@@ -1,3 +1,5 @@
 export { analyzePostPublicationWriterSource } from './writers/source.mts'
 export type { PostPublicationWriterSourceAnalysis } from './writers/source.mts'
 export type { PostPublicationWriterSourceOptions } from './writers/types.mts'
+export { extractStaticSqlTemplateQuasis } from './readers/sql-source.mts'
+export type { ReaderSqlTemplateOptions } from './readers/sql-template.mts'
