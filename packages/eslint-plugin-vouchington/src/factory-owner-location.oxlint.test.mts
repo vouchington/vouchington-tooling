@@ -22,6 +22,14 @@ interface Reflect { marker: string }
 Reflect.apply(makeGraph, null, [])
 export type { makeGraph } from '@compiler/runtime'
 export { makeGraph as graph } from '@compiler/runtime'
+import * as runtime from '@compiler/runtime'
+const { makeGraph: defaulted = fallback } = runtime
+defaulted()
+runtime.default.makeGraph();
+(await import('@compiler/runtime')).default.makeGraph()
+export const pending = import('@compiler/runtime')
+const promise = import('@compiler/runtime')
+promise.makeGraph()
 `,
     )
     writeFileSync(
@@ -63,7 +71,7 @@ export { makeGraph as graph } from '@compiler/runtime'
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 7 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 10 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(diagnostics.every(({ filename }) => filename.endsWith('src/check.mts'))).toBe(true)
   } finally {

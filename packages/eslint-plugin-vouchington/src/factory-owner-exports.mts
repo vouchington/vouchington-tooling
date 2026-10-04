@@ -59,7 +59,10 @@ export function createFactoryExportVisitors(
           const id = node(declarator.id)
           const bindings =
             id?.type === 'ObjectPattern'
-              ? (id.properties as NodeLike[]).map((property) => node(property.value))
+              ? (id.properties as NodeLike[]).map((property) => {
+                  const value = node(property.value)
+                  return value?.type === 'AssignmentPattern' ? node(value.left) : value
+                })
               : [id]
           if (bindings.some(restricted)) report(declarator)
         }

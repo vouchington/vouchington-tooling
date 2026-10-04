@@ -1,12 +1,16 @@
 import {
   findVariable,
-  patternPropertyName,
   propertyName,
   unwrap,
   type NodeLike,
   type RuleContextLike,
   type VariableLike,
 } from './ast-helpers.mts'
+import {
+  constantDefinition,
+  namedPatternSource,
+  staticModuleSpecifier,
+} from './factory-owner-provenance-binding.mts'
 import {
   isNamedImport,
   isNamespaceImport,
@@ -16,39 +20,6 @@ import {
 export type FactoryProvenanceOptions = {
   modules: ReadonlySet<string>
   factories: ReadonlySet<string>
-}
-
-function staticModuleSpecifier(value: NodeLike | undefined): string | null {
-  return value?.type === 'Literal' && typeof value.value === 'string' ? value.value : null
-}
-
-function constantDefinition(variable: VariableLike | null): NodeLike | null {
-  const definition = variable?.defs.find((entry) => entry.type === 'Variable')
-  if (!definition || definition.node.type !== 'VariableDeclarator') return null
-  return definition.parent?.type === 'VariableDeclaration' && definition.parent.kind === 'const'
-    ? definition.node
-    : null
-}
-
-function namedPatternSource(
-  declarator: NodeLike,
-  localName: string,
-  names: ReadonlySet<string>,
-): NodeLike | null {
-  const pattern = declarator.id as NodeLike
-  if (pattern?.type !== 'ObjectPattern') return null
-  const properties = pattern.properties as NodeLike[]
-  return properties.some((property) => {
-    const local = property.value as NodeLike
-    return (
-      property.type === 'Property' &&
-      local?.type === 'Identifier' &&
-      local.name === localName &&
-      names.has(String(patternPropertyName(property)))
-    )
-  })
-    ? (declarator.init as NodeLike)
-    : null
 }
 
 export function createFactoryProvenance(
@@ -63,11 +34,14 @@ export function createFactoryProvenance(
     active = new Set<VariableLike>(),
   ): boolean {
     const current = unwrap(value)
-    if (current?.type === 'AwaitExpression')
-      return isNamespace(current.argument as NodeLike, active)
-    if (current?.type === 'ImportExpression') {
-      const moduleName = staticModuleSpecifier(current.source as NodeLike)
+    if (current?.type === 'AwaitExpression') {
+      const argument = unwrap(current.argument as NodeLike)
+      if (argument?.type !== 'ImportExpression') return isNamespace(argument, active)
+      const moduleName = staticModuleSpecifier(argument.source as NodeLike)
       return moduleName !== null && options.modules.has(moduleName)
+    }
+    if (current?.type === 'MemberExpression') {
+      return propertyName(current) === 'default' && isNamespace(current.object as NodeLike, active)
     }
     if (current?.type === 'CallExpression') {
       const loader = findVariable(context, unwrap(current.callee as NodeLike) as NodeLike)
@@ -108,8 +82,10 @@ export function createFactoryProvenance(
   ): boolean {
     const current = unwrap(value)
     if (current?.type === 'MemberExpression') {
+      const name = propertyName(current)
       return (
-        options.factories.has(String(propertyName(current))) &&
+        name !== null &&
+        options.factories.has(String(name)) &&
         isNamespace(current.object as NodeLike)
       )
     }

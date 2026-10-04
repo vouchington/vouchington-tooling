@@ -57,6 +57,33 @@ loaded.makeHost()`,
     reports: 2,
   },
   {
+    name: 'defaulted destructuring retains factory and namespace provenance',
+    code: `import * as compiler from '@compiler/runtime'
+const { makeGraph: graph = fallback } = compiler
+const { default: runtime = fallback } = await import('@compiler/runtime')
+graph()
+runtime.makeHost()
+export const { makeHost: host = fallback } = compiler`,
+    reports: 3,
+  },
+  {
+    name: 'direct default namespace members',
+    code: `import * as runtime from '@compiler/runtime'
+import { createRequire } from 'node:module'
+runtime.default.makeGraph();
+(await import('@compiler/runtime')).default.makeHost();
+createRequire(import.meta.url)('@compiler/runtime').default.makeGraph()`,
+    reports: 3,
+  },
+  {
+    name: 'unawaited import promises are not namespaces',
+    code: `export const pending = import('@compiler/runtime')
+const runtime = import('@compiler/runtime')
+runtime.makeGraph()
+import('@compiler/runtime').makeHost()`,
+    reports: 0,
+  },
+  {
     name: 'destructured factory shadowed in a function',
     code: `import * as compiler from '@compiler/runtime'
 const { makeGraph: build } = compiler
@@ -80,6 +107,14 @@ const compiler = load('@compiler/runtime')
 compiler.makeGraph()
 createRequire(import.meta.url)('@compiler/runtime').makeHost()`,
     reports: 2,
+  },
+  {
+    name: 'awaited createRequire result remains a namespace',
+    code: `import { createRequire } from 'node:module'
+const load = createRequire(import.meta.url)
+const runtime = await load('@compiler/runtime')
+runtime.makeGraph()`,
+    reports: 1,
   },
   {
     name: 'new, tag, and direct Reflect calls',
@@ -220,6 +255,22 @@ describe('factory-owner-location direct provenance', () => {
     expect(
       messageIds(await lintRule('factory-owner-location', code, OPTIONS, 'src/nested/owner.js')),
     ).toEqual(['constructionOwner'])
+  })
+
+  it('does not confuse unknown computed keys with a configured null or then factory', async () => {
+    const code = `import * as runtime from '@compiler/runtime'
+runtime[key]()
+const { [key]: local } = runtime
+local()
+import('@compiler/runtime').then(() => {})`
+    const result = await lintRule(
+      'factory-owner-location',
+      code,
+      { ...OPTIONS, factories: ['null', 'then'] },
+      'src/check.js',
+    )
+    expect(result.fatalErrorCount).toBe(0)
+    expect(messageIds(result)).toEqual([])
   })
 
   it('reports a decorator using a configured factory', () => {
