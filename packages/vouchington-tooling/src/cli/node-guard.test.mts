@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -51,4 +51,14 @@ describe.each(SHIMS)('bin/$name Node version guard', ({ name, args, run }) => {
     expect(result.stdout).toBe(`ran ${run}\n`)
     expect(result.stderr).toBe('')
   })
+})
+
+describe('old-Node parseability', () => {
+  it.each([...SHIMS.map((shim) => shim.name), 'node-guard.mjs'])(
+    'bin/%s uses no syntax newer than Node 12 can parse',
+    (file) => {
+      const source = readFileSync(join(bin, file), 'utf8').replace(/^\s*\/\/.*$/gm, '')
+      expect(source).not.toMatch(/\?\?|\?\.[^\d]|\bawait\b/)
+    },
+  )
 })

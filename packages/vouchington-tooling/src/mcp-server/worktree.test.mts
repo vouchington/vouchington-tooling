@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
-import { launchWorktreeRoot, resolveWorktree, runIsolatedGit } from './worktree.mts'
+import { isolatedGitEnv, launchWorktreeRoot, resolveWorktree, runIsolatedGit } from './worktree.mts'
 
 let fixture: RepoFixture
 beforeAll(() => {
@@ -16,6 +16,24 @@ const resolve = (requested?: string, ...launch: [launchRoot?: string | undefined
     requested,
     runGit: runIsolatedGit,
   })
+
+describe('isolatedGitEnv', () => {
+  it('forces the C locale, drops LANGUAGE, and strips GIT_* variables', () => {
+    vi.stubEnv('LANG', 'de_DE.UTF-8')
+    vi.stubEnv('LC_ALL', 'de_DE.UTF-8')
+    vi.stubEnv('LANGUAGE', 'de')
+    vi.stubEnv('GIT_DIR', '/elsewhere')
+    try {
+      const env = isolatedGitEnv()
+      expect(env.LC_ALL).toBe('C')
+      expect(env).not.toHaveProperty('LANGUAGE')
+      expect(env).not.toHaveProperty('GIT_DIR')
+      expect(env.PATH).toBe(process.env.PATH)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
 
 describe('launchWorktreeRoot', () => {
   it('returns the real worktree root from the root, a subdirectory, or a symlink', async () => {

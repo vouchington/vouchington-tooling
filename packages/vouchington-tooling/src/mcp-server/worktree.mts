@@ -7,9 +7,17 @@ import { gitEnv } from '../shared-context/index.mts'
 
 const execFileAsync = promisify(execFile)
 
-/** Runs git without inherited `GIT_*` variables so `GIT_DIR` cannot redirect the check. */
+/**
+ * The environment for git: no inherited `GIT_*` variables, so `GIT_DIR` cannot redirect the check,
+ * and the C locale, so git's diagnostics are not translated and can be classified reliably.
+ */
+export function isolatedGitEnv(): NodeJS.ProcessEnv {
+  const { LANGUAGE: _language, ...env } = gitEnv()
+  return { ...env, LC_ALL: 'C' }
+}
+
 export const runIsolatedGit: RunTextCommand = createCommandRunner('git', (command, args) =>
-  execFileAsync(command, args, { env: gitEnv() }),
+  execFileAsync(command, args, { env: isolatedGitEnv() }),
 )
 
 async function canonical(path: string): Promise<string | undefined> {
@@ -20,7 +28,10 @@ async function canonical(path: string): Promise<string | undefined> {
   }
 }
 
-/** git's two "no worktree here" outcomes: outside any repository, and inside a `.git` directory. */
+/**
+ * git's two "no worktree here" outcomes: outside any repository, and inside a `.git` directory.
+ * The messages are English because `isolatedGitEnv` forces the C locale.
+ */
 function isNotAGitRepository(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false
   const { stderr, message } = error as { stderr?: unknown; message?: unknown }

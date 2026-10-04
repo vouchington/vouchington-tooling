@@ -148,7 +148,8 @@ run in it. Any git worktree on the machine is accepted, including one of a repos
 the launch directory, so the tools can act on every checkout the user can reach. Worktrees created
 after launch are accepted and removed ones are refused. Rejected: a subdirectory of a worktree, a
 relative or nonexistent path, and a directory that is not in a git worktree. Git runs without
-`GIT_*` variables, so `GIT_DIR` cannot redirect the check.
+`GIT_*` variables, so `GIT_DIR` cannot redirect the check, and with `LC_ALL=C` and no `LANGUAGE`, so
+its "not a git repository" diagnostic is never translated.
 
 `worktree` only chooses where the outbox lives. It is not a trust boundary for loading code: the
 server never imports modules from it, and a tool that needs to must first get a repository allowlist
@@ -160,32 +161,42 @@ outside a git worktree, the call fails with a tool error asking for an explicit 
 
 ## Registering the server
 
-The commands below run `vouchington` from the repository's own `node_modules`, so a fresh worktree
-uses the version its lockfile pins. Set the blackboard credentials in the environment the harness
-gives the server.
+Register the machine-wide installation from [Install](#install) at user level, with absolute paths.
+Never check a registration into a repository: it names a path and a Node that exist only on your
+machine, and every worktree inherits it from your user config. Replace `/abs/node` with the absolute
+path of a Node >= 24 and `/home/you` with your home directory (neither file expands `~`). Set the
+blackboard credentials in the environment you start the harness from.
 
-Claude Code, `.mcp.json`:
+Claude Code, `mcpServers` in `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "vouchington-tooling": {
-      "command": "bash",
-      "args": ["-c", "exec \"$(git rev-parse --show-toplevel)/node_modules/.bin/vouchington\" mcp"]
+      "command": "/abs/node",
+      "args": [
+        "/home/you/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs"
+      ]
     }
   }
 }
 ```
 
-Codex, `.codex/config.toml`:
+Codex, `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.vouchington-tooling]
-command = "bash"
-args = ["-c", "exec \"$(git rev-parse --show-toplevel)/node_modules/.bin/vouchington\" mcp"]
+command = "/abs/node"
+args = [
+  "/home/you/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs",
+]
+env_vars = ["AGENT_BLACKBOARD_URL", "AGENT_BLACKBOARD_TOKEN"]
 default_tools_approval_mode = "approve"
 required = false
 ```
+
+`env_vars` forwards those variables from Codex's own environment. Codex does not expand `${VAR}`
+inside `env`, so do not write the credentials there.
 
 Approving every tool of the server at once:
 
