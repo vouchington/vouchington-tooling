@@ -455,6 +455,8 @@ Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRaw
 `ctx.pipeline`, `ctx.response.empty/buffer/xml`, `ctx.request.json/buffer`, `parseJsonBody`,
 `ctx.setStatus`, and static `Content-Type` setters. The input source files and TypeScript checker
 are the source representation; the adapter does not parse or discover a repository on its own.
+Reading the handler context in another object's computed assignment key preserves its binding;
+assignments or updates to the context itself, including side effects inside that key, still reject it.
 
 Error-only 405 routes require a terminal throw on the handler's own context. Named handlers and
 imported wrappers are followed through compiler declarations; conditional, caught, recursive,
