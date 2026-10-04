@@ -26,3 +26,10 @@ it('ignores route-like examples rendered as JSX text', () => {
     'right',
   ])
 })
+
+it('preserves literal-focused route patterns but ignores examples inside string values', () => {
+  const content = `const example = "path: '/old'"; const route = { path: '/right' }`
+  expect(collectActivePatternCaptures(content, /['"]\/([^'"]*)['"]/g, 'page.tsx')).toEqual([
+    'right',
+  ])
+})

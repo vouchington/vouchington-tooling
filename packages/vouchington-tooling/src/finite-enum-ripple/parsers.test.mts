@@ -106,13 +106,22 @@ describe('finite enum parsers', () => {
     ).toThrow('could not find kinds')
   })
 
-  it('rejects nonliteral slug-map values while ignoring computed keys', () => {
-    const source =
-      "const recordSlugs = { 'entry': 'entry', 7: 'number', [dynamic]: 'ignored', ...extra }"
+  it('rejects uninspectable slug-map members and nonliteral values', () => {
+    const source = "const recordSlugs = { 'entry': 'entry', 7: 'number' }"
     expect([...parseUnionSlugToType(source, file, 'recordSlugs')]).toEqual([
       ['entry', 'entry'],
       ['7', 'number'],
     ])
+    expect(() =>
+      parseUnionSlugToType("const recordSlugs = { entry: 'entry', ...extra }", file, 'recordSlugs'),
+    ).toThrow('uninspectable member')
+    expect(() =>
+      parseUnionSlugToType(
+        "const recordSlugs = { entry: 'entry', [dynamic]: 'other' }",
+        file,
+        'recordSlugs',
+      ),
+    ).toThrow('uninspectable key')
     expect(() =>
       parseUnionSlugToType('const recordSlugs = { other: false }', file, 'recordSlugs'),
     ).toThrow('recordSlugs.other must be a string literal')
@@ -251,13 +260,13 @@ describe('finite enum parsers', () => {
   })
 
   it('rejects structured factory calls without configured literal arguments', () => {
-    expect(
+    expect(() =>
       parseUnionDetailRouteFactoryArgs(
         "pageFactory('entry'); pageFactory(value, 'entry')",
         file,
         /^pageFactory$/,
       ),
-    ).toEqual([])
+    ).toThrow('configured route factory call needs literal type and slug')
     expect(() =>
       parseStructuredRouteFactoryArgs(
         "otherFactory('skip'); pageFactory(value)",
@@ -265,6 +274,16 @@ describe('finite enum parsers', () => {
         /^pageFactory$/,
       ),
     ).toThrow('configured route factory call needs a string literal slug')
+  })
+
+  it('rejects dynamic union factory calls even after a valid call', () => {
+    expect(() =>
+      parseUnionDetailRouteFactoryArgs(
+        "createRecordPage('entry', 'entry'); createRecordPage(dynamicType, dynamicSlug)",
+        file,
+        /^createRecordPage$/,
+      ),
+    ).toThrow('configured route factory call needs literal type and slug')
   })
 
   it('ignores computed structured callees while recognizing a configured factory', () => {

@@ -82,9 +82,10 @@ export function parseUnionSlugToType(
   const object = findConstObjectLiteral(content, name, file)
   const entries = new Map<string, string>()
   for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
+    if (!ts.isPropertyAssignment(property))
+      throw new Error(`${file}: ${name} contains an uninspectable member`)
     const key = getPropertyNameText(property.name)
-    if (!key) continue
+    if (!key) throw new Error(`${file}: ${name} contains an uninspectable key`)
     const value = getStringLiteralValue(property.initializer)
     if (value === undefined) throw new Error(`${file}: ${name}.${key} must be a string literal`)
     entries.set(key, value)
@@ -143,7 +144,9 @@ export function parseUnionDetailRouteFactoryArgs(
     if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
     const unionType = getStringLiteralValue(call.arguments[0])
     const slug = getStringLiteralValue(call.arguments[1])
-    if (unionType && slug) args.push({ unionType, slug })
+    if (!unionType || !slug)
+      throw new Error(`${file}: configured route factory call needs literal type and slug`)
+    args.push({ unionType, slug })
   }
   return args
 }
