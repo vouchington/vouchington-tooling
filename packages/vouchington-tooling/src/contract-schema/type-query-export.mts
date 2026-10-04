@@ -43,6 +43,34 @@ export function exportedType(
   return checker.getTypeOfSymbolAtLocation(symbol, declaration)
 }
 
+export function exportedAssignableType(
+  program: ts.Program,
+  checker: ts.TypeChecker,
+  selector: ExportedTypeSelector,
+): ts.Type {
+  const sourceFile = sourceFileForQuery(program, selector.fileName)
+  const symbol = exportedSymbol(checker, sourceFile, selector.exportName)
+  const defaultedDeclaration = symbol.declarations?.find((declaration) =>
+    (
+      declaration as ts.Declaration & {
+        typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>
+      }
+    ).typeParameters?.some((parameter) => parameter.default),
+  )
+  const type = exportedType(program, checker, selector)
+  const defaultedSignature = type
+    .getCallSignatures()
+    .some((signature) =>
+      signature.getDeclaration()?.typeParameters?.some((parameter) => parameter.default),
+    )
+  if (defaultedDeclaration || defaultedSignature) {
+    throw new Error(
+      `Assignable target "${selector.exportName}" in "${selector.fileName}" has defaulted type parameters; export and select a named instantiated type instead`,
+    )
+  }
+  return type
+}
+
 export function exportedDefaultType(
   program: ts.Program,
   checker: ts.TypeChecker,
@@ -79,6 +107,27 @@ export function exportedDefaultType(
     if (previousIndex !== undefined && previousIndex >= 0 && parameters?.[previousIndex]?.default) {
       return exportedDefaultType(program, checker, selector, previousIndex)
     }
+  }
+  const previousSymbols = new Set(
+    parameters
+      ?.slice(0, parameterIndex)
+      .map((parameter) => checker.getSymbolAtLocation(parameter.name))
+      .filter((symbol): symbol is ts.Symbol => symbol !== undefined),
+  )
+  let hasDependentReference = false
+  function visit(node: ts.Node): void {
+    const symbol = ts.isIdentifier(node) ? checker.getSymbolAtLocation(node) : undefined
+    if (symbol && previousSymbols.has(symbol)) {
+      hasDependentReference = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(defaultNode)
+  if (hasDependentReference) {
+    throw new Error(
+      `Unsupported dependent composite default for type parameter ${parameterIndex} of export "${selector.exportName}" in "${selector.fileName}"; export and query a named instantiated type instead`,
+    )
   }
   return checker.getTypeAtLocation(defaultNode)
 }

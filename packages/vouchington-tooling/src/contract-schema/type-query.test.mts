@@ -18,6 +18,13 @@ export interface ProtoRow { '__proto__': string }
 export interface Executor { <T = Projected>(): Promise<{ rows: T[] }> }
 export type Box<T = Projected> = { value: T }
 export type DependentBox<T = Projected, U = T> = { value: U }
+export type CompositeDependentBox<T = Projected, U = { row: T }> = { value: U }
+export type UnionDependentBox<T = Projected, U = T | null> = { value: U }
+export type IndexedDependentBox<T extends Projected = Projected, U = T['id']> = { value: U }
+export type ConditionalDependentBox<T = Projected, U = T extends object ? T : never> = { value: U }
+export type IndependentCompositeBox<T = Projected, U = { row: Projected[] }> = { value: U }
+export type DefaultedTarget<T = Projected> = { value: T }
+export type InstantiatedTarget = DefaultedTarget
 namespace Types { export interface External { id: string } }
 export type QualifiedBox<U = Types.External> = { value: U }
 export declare function read<T = Projected>(): Promise<{ rows: T[] }>
@@ -30,14 +37,14 @@ declare function write<T>(): Promise<{ rows: T[] }>
 declare function scalar(): Promise<number>
 declare function pair<Key, Row>(): Promise<{ rows: Row[] }>
 declare function readAny(): any
-declare function readAnyRows(): Promise<{ rows: any }>
+declare function readAnyRows(): Promise<{ rows: any }>; declare function readNever(): Promise<{ rows: never }>
 read<{ id: string }>()
 write<{ id: string; title: string }>()
 read<{ id: string }>()
 scalar()
 pair<number, { id: string }>()
 readAny()
-readAnyRows()`,
+readAnyRows(); readNever()`,
 })
 const program = matrix.program
 const contracts = matrix.sourceFile('contracts').fileName
@@ -119,6 +126,58 @@ describe('type-query exported facts', () => {
         propertyNames: ['id'],
       }),
     ).toMatchObject({ isAny: false, properties: { id: 'string' } })
+  })
+
+  it('rejects defaults that require compiler instantiation', () => {
+    for (const exportName of [
+      'CompositeDependentBox',
+      'UnionDependentBox',
+      'IndexedDependentBox',
+      'ConditionalDependentBox',
+    ]) {
+      expect(() =>
+        getExportedTypeFacts({
+          program,
+          fileName: contracts,
+          exportName,
+          defaultTypeParameterIndex: 1,
+        }),
+      ).toThrow(/Unsupported dependent composite default.*named instantiated type/)
+    }
+    expect(
+      getExportedTypeFacts({
+        program,
+        fileName: contracts,
+        exportName: 'IndependentCompositeBox',
+        defaultTypeParameterIndex: 1,
+        propertyNames: ['row'],
+      }).properties,
+    ).toEqual({ row: 'Projected[]' })
+    expect(() =>
+      getExportedTypeFacts({
+        program,
+        ...rowAlias,
+        assignableTo: {
+          target: { fileName: contracts, exportName: 'DefaultedTarget' },
+        },
+      }),
+    ).toThrow(/Assignable target "DefaultedTarget".*named instantiated type/)
+    expect(() =>
+      getExportedTypeFacts({
+        program,
+        ...rowAlias,
+        assignableTo: { target: { fileName: contracts, exportName: 'Executor' } },
+      }),
+    ).toThrow(/Assignable target "Executor".*named instantiated type/)
+    expect(
+      getExportedTypeFacts({
+        program,
+        ...rowAlias,
+        assignableTo: {
+          target: { fileName: contracts, exportName: 'InstantiatedTarget' },
+        },
+      }).assignableTo,
+    ).toEqual({ target: false })
   })
 
   it('follows a reexport to its declared type in a second real source file', () => {
@@ -246,6 +305,17 @@ describe('type-query call rows', () => {
         }),
       ).toMatchObject([{ isAny: true, properties: { id: undefined } }])
     }
+  })
+
+  it('propagates never from an awaited rows property', () => {
+    expect(
+      getCallRowTypeFacts({
+        program,
+        fileName: calls,
+        calleeText: 'readNever',
+        rowSource: 'awaitedRows',
+      }),
+    ).toMatchObject([{ display: 'never', isAny: false }])
   })
 
   it('reports missing selected row type arguments and awaited rows', () => {

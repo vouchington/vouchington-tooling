@@ -1,6 +1,7 @@
 import ts from './typescript-api.mts'
 
 import {
+  exportedAssignableType,
   exportedDefaultType,
   exportedType,
   sourceFileForQuery,
@@ -49,7 +50,7 @@ export function factsForType(
         ([label, target]) =>
           [
             label,
-            checker.isTypeAssignableTo(type, exportedType(program, checker, target)),
+            checker.isTypeAssignableTo(type, exportedAssignableType(program, checker, target)),
           ] as const,
       ),
   )
