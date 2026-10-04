@@ -43,9 +43,14 @@ approval requirement through the CLI. If neither path persists the note, stop an
 
 ## CLI fallback
 
-Use the repository's installed `vouchington agent-blackboard` CLI (normally
-`pnpm exec vouchington agent-blackboard`). In this tooling repository, run
-`node packages/vouchington-tooling/src/cli/index.mts agent-blackboard` from the worktree root.
+Use a trusted machine-installed `vouchington` executable at a verified absolute path outside the
+consumer worktree. Resolve its symlinks and verify the installation's source and version before
+using credentials or requesting an unsandboxed run; its runtime dependencies must also belong to
+that trusted installation. Do not resolve the executable through the consumer's `node_modules/.bin`,
+`pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
+path, and bind any approval request to the same executable and arguments. If no trusted CLI is
+available, report the blocker; do not escalate a consumer-supplied executable. For local development,
+the reviewed source CLI may run inside the sandbox, subject to the harness's credential policy.
 `journal append` invokes the same validated writer as MCP, ensures the exact session identity,
 patches its repository union, and verifies delivery. Use a temporary `0600` markdown input file,
 remove it after the call, and inspect the JSON result: exit zero can mean retained pending feedback.
@@ -55,15 +60,15 @@ or pass `--session-id` to `journal flush` for the same two counts; an unfiltered
 only the whole-outbox count.
 
 ```bash
-pnpm exec vouchington agent-blackboard journal append \
+"$BLACKBOARD_CLI" agent-blackboard journal append \
   --session-id SESSION --agent AGENT --version VERSION \
   --mode interactive --source-event-id EVENT --work-outcome unknown \
   --repository owner/name --coverage-status not-assessed --dropped-count 0 \
   --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
-pnpm exec vouchington agent-blackboard journal entries --session-id SESSION
-pnpm exec vouchington agent-blackboard journal status \
+"$BLACKBOARD_CLI" agent-blackboard journal entries --session-id SESSION
+"$BLACKBOARD_CLI" agent-blackboard journal status \
   --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
-pnpm exec vouchington agent-blackboard journal flush \
+"$BLACKBOARD_CLI" agent-blackboard journal flush \
   --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
 ```
 

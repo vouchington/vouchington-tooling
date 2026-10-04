@@ -1,8 +1,12 @@
-import { assertAllowed, flagsToValues, required } from './agent-blackboard-flags.mts'
+import {
+  assertAllowed,
+  flagsToValues,
+  required,
+  validatedSessionId,
+} from './agent-blackboard-flags.mts'
 import { join } from 'node:path'
 import {
   appendJournal,
-  assertSessionId,
   feedbackOutboxCounts,
   flushFeedbackOutbox,
   formatJournalEntries,
@@ -82,11 +86,9 @@ async function runJournal(args: string[]): Promise<number> {
   if (action === 'flush' || action === 'status') {
     assertAllowed(values, ['outbox-directory', 'session-id'])
     const directory = required(values, 'outbox-directory')
-    const sessionId = action === 'status' ? required(values, 'session-id') : values['session-id']
-    if (sessionId !== undefined) {
-      assertSessionId(sessionId)
-      if (sessionId.length > 256) throw new Error('session identity is too long')
-    }
+    const sessionId = validatedSessionId(
+      action === 'status' ? required(values, 'session-id') : values['session-id'],
+    )
     const result =
       action === 'flush' ? await flushFeedbackOutbox({ directory }) : { pendingCount: 0 }
     const counts = sessionId !== undefined ? feedbackOutboxCounts(directory, sessionId) : result

@@ -1,3 +1,5 @@
+import { assertSessionId } from '../../agent-blackboard/session-id.mts'
+
 export function flagsToValues(flags: string[]): Record<string, string> {
   const values: Record<string, string> = {}
   for (let index = 0; index < flags.length; index += 2) {
@@ -21,4 +23,12 @@ export function required(values: Record<string, string>, key: string): string {
   const value = values[key]
   if (!value) throw new Error(`--${key} is required`)
   return value
+}
+
+export function validatedSessionId(sessionId: string | undefined): string | undefined {
+  if (sessionId !== undefined) {
+    assertSessionId(sessionId)
+    if (sessionId.length > 256) throw new Error('session identity is too long')
+  }
+  return sessionId
 }
