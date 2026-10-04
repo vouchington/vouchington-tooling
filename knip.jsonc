@@ -7,6 +7,10 @@
   // mise installs the pinned scc binary. It is not an npm package.
   "ignoreBinaries": ["mise"],
   "workspaces": {
+    ".": {
+      // Bundled workflow-plugin executable launched through MCP manifests.
+      "entry": ["plugins/vouchington-workflow/scripts/mcp.mjs"],
+    },
     "packages/vouchington-tooling": {
       // Loaded from the consumer package boundary only when the opt-in integration runs.
       // typescript: optional peer for classic-API-compatible installs; runtime import uses

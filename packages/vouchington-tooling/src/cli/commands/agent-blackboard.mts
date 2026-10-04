@@ -1,5 +1,9 @@
+import { assertAllowed, flagsToValues, required } from './agent-blackboard-flags.mts'
+import { join } from 'node:path'
 import {
   appendJournal,
+  assertSessionId,
+  feedbackOutboxCounts,
   flushFeedbackOutbox,
   formatJournalEntries,
   probeBlackboard,
@@ -30,7 +34,7 @@ export async function runAgentBlackboardCommand(args: string[]): Promise<number>
     if (command === 'journal') return await runJournal(rest)
     if (command === 'snapshot') return await runSnapshot(rest)
     throw new Error(
-      'usage: agent-blackboard probe | journal append|entries|flush | snapshot partition|cleanup',
+      'usage: agent-blackboard probe | journal append|entries|flush|status | snapshot partition|cleanup',
     )
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
@@ -75,10 +79,22 @@ async function runJournal(args: string[]): Promise<number> {
   const { repositories, remaining } =
     action === 'append' ? extractRepositories(flags) : { repositories: [], remaining: flags }
   const values = flagsToValues(remaining)
-  if (action === 'flush') {
-    assertAllowed(values, ['outbox-directory'])
-    const result = await flushFeedbackOutbox({ directory: required(values, 'outbox-directory') })
-    process.stdout.write(`${JSON.stringify(result)}\n`)
+  if (action === 'flush' || action === 'status') {
+    assertAllowed(values, ['outbox-directory', 'session-id'])
+    const directory = required(values, 'outbox-directory')
+    const sessionId = action === 'status' ? required(values, 'session-id') : values['session-id']
+    if (sessionId) assertSessionId(sessionId)
+    const result =
+      action === 'flush' ? await flushFeedbackOutbox({ directory }) : { pendingCount: 0 }
+    const counts = sessionId ? feedbackOutboxCounts(directory, sessionId) : result
+    process.stdout.write(
+      `${JSON.stringify({
+        ...result,
+        ...counts,
+        sessionId,
+        status: counts.pendingCount ? 'pending' : 'empty',
+      })}\n`,
+    )
     return 0
   }
   if (action === 'entries') {
@@ -128,10 +144,14 @@ async function runJournal(args: string[]): Promise<number> {
       ...('timestamp' in values ? { timestamp: values.timestamp } : {}),
       parentSessionId: values['parent-session-id'] ?? null,
     })
-    process.stdout.write(`${JSON.stringify(result)}\n`)
+    const counts = feedbackOutboxCounts(
+      values['outbox-directory'] ?? join(process.cwd(), '.local', 'blackboard-outbox'),
+      required(values, 'session-id'),
+    )
+    process.stdout.write(`${JSON.stringify({ ...result, ...counts })}\n`)
     return 0
   }
-  throw new Error('usage: agent-blackboard journal append|entries|flush')
+  throw new Error('usage: agent-blackboard journal append|entries|flush|status')
 }
 
 function extractRepositories(flags: string[]): { repositories: string[]; remaining: string[] } {
@@ -153,28 +173,6 @@ function requiredRepositories(repositories: string[]): string[] {
   return repositories
 }
 
-function flagsToValues(flags: string[]): Record<string, string> {
-  const values: Record<string, string> = {}
-  for (let index = 0; index < flags.length; index += 2) {
-    const flag = flags[index]
-    const value = flags[index + 1]
-    if (!flag?.startsWith('--') || value === undefined)
-      throw new Error(`invalid option: ${flag ?? ''}`)
-    const key = flag.slice(2)
-    if (key in values) throw new Error(`duplicate option: ${flag}`)
-    values[key] = value
-  }
-  return values
-}
-function assertAllowed(values: Record<string, string>, allowed: string[]): void {
-  for (const key of Object.keys(values))
-    if (!allowed.includes(key)) throw new Error(`unknown option: --${key}`)
-}
-function required(values: Record<string, string>, key: string): string {
-  const value = values[key]
-  if (!value) throw new Error(`--${key} is required`)
-  return value
-}
 function isNotFound(error: unknown): boolean {
   return (
     typeof error === 'object' &&

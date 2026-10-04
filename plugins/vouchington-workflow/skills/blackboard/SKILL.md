@@ -49,7 +49,10 @@ Use the repository's installed `vouchington agent-blackboard` CLI (normally
 `journal append` invokes the same validated writer as MCP, ensures the exact session identity,
 patches its repository union, and verifies delivery. Use a temporary `0600` markdown input file,
 remove it after the call, and inspect the JSON result: exit zero can mean retained pending feedback.
-The input file is transport to the supported writer, never a replacement journal.
+The input file is transport to the supported writer, never a replacement journal. Append returns
+`pendingCount` for the caller and `worktreePendingCount` for the whole outbox. Use `journal status`
+or pass `--session-id` to `journal flush` for the same two counts; an unfiltered legacy flush reports
+only the whole-outbox count.
 
 ```bash
 pnpm exec vouchington agent-blackboard journal append \
@@ -58,8 +61,10 @@ pnpm exec vouchington agent-blackboard journal append \
   --repository owner/name --coverage-status not-assessed --dropped-count 0 \
   --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
 pnpm exec vouchington agent-blackboard journal entries --session-id SESSION
+pnpm exec vouchington agent-blackboard journal status \
+  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
 pnpm exec vouchington agent-blackboard journal flush \
-  --outbox-directory "$PWD/.local/blackboard-outbox"
+  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
 ```
 
 Pass `--parent-session-id` for a child, repeat `--repository` for additional repositories, and use

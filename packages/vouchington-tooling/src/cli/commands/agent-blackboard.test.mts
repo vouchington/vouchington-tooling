@@ -5,6 +5,7 @@ vi.mock('../../agent-blackboard/index.mts', async (importOriginal) => {
   return {
     ...actual,
     appendJournal: vi.fn(),
+    feedbackOutboxCounts: vi.fn(actual.feedbackOutboxCounts),
     flushFeedbackOutbox: vi.fn(),
     probeBlackboard: vi.fn(),
   }
@@ -21,6 +22,7 @@ vi.mock('../../agent-blackboard/snapshot.mts', async (importOriginal) => {
 import { runAgentBlackboardCommand, setJournalReaderForTest } from './agent-blackboard.mts'
 import {
   appendJournal,
+  feedbackOutboxCounts,
   flushFeedbackOutbox,
   probeBlackboard,
 } from '../../agent-blackboard/index.mts'
@@ -58,6 +60,74 @@ describe('agent-blackboard CLI', () => {
     expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('"deliveredCount":1')
     expect(await runAgentBlackboardCommand(['journal', 'flush'])).toBe(2)
     expect(await runAgentBlackboardCommand(['journal', 'flush', '--mode', 'autonomous'])).toBe(2)
+  })
+
+  it('reports per-session status and validates session-aware flush before delivery', async () => {
+    vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({
+      pendingCount: 0,
+      worktreePendingCount: 2,
+    })
+    expect(
+      await runAgentBlackboardCommand([
+        'journal',
+        'status',
+        '--session-id',
+        'owner',
+        '--outbox-directory',
+        '/private/outbox',
+      ]),
+    ).toBe(0)
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
+      sessionId: 'owner',
+      status: 'empty',
+      pendingCount: 0,
+      worktreePendingCount: 2,
+    })
+    expect(
+      await runAgentBlackboardCommand([
+        'journal',
+        'flush',
+        '--session-id',
+        'bad/id',
+        '--outbox-directory',
+        '/private/outbox',
+      ]),
+    ).toBe(2)
+    expect(flushFeedbackOutbox).not.toHaveBeenCalled()
+    expect(
+      await runAgentBlackboardCommand([
+        'journal',
+        'status',
+        '--outbox-directory',
+        '/private/outbox',
+      ]),
+    ).toBe(2)
+    vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({
+      pendingCount: 1,
+      worktreePendingCount: 2,
+    })
+    vi.mocked(flushFeedbackOutbox).mockResolvedValue({
+      status: 'pending',
+      pendingCount: 2,
+      deliveredCount: 0,
+    })
+    expect(
+      await runAgentBlackboardCommand([
+        'journal',
+        'flush',
+        '--session-id',
+        'owner',
+        '--outbox-directory',
+        '/private/outbox',
+      ]),
+    ).toBe(0)
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
+      sessionId: 'owner',
+      status: 'pending',
+      pendingCount: 1,
+      worktreePendingCount: 2,
+      deliveredCount: 0,
+    })
   })
 
   it('rejects malformed commands before loading the optional integration dependency', async () => {
@@ -350,7 +420,8 @@ describe('agent-blackboard CLI', () => {
   })
 })
 
-it('reports interactive durable pending without failing primary work', async () => {
+it('reports interactive session and worktree counts without failing primary work', async () => {
+  vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({ pendingCount: 1, worktreePendingCount: 2 })
   vi.mocked(appendJournal).mockResolvedValue({
     status: 'pending',
     sourceEventId: 'cli:pending',
@@ -390,7 +461,8 @@ it('reports interactive durable pending without failing primary work', async () 
     ).resolves.toBe(0)
     expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
       status: 'pending',
-      pendingCount: 2,
+      pendingCount: 1,
+      worktreePendingCount: 2,
     })
   } finally {
     stdout.mockRestore()

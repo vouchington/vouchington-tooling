@@ -54,9 +54,11 @@ This repository adopts Agent Blackboard for durable agent-session notes. The `vo
 journaling skills call the tools of the [`vouchington mcp` server](packages/vouchington-tooling/docs/mcp-server.md),
 and bundles its stdio registration. Install the server packages in each consuming repository
 (`pnpm add -D vouchington-tooling agent-blackboard @modelcontextprotocol/sdk zod`) and provide
-`AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the host environment. The plugin launches
-`pnpm exec vouchington mcp` from the consuming worktree; enabling skills alone no longer leaves the
-server unregistered. Avoid duplicate server registrations when adopting the plugin. This repository's
+`AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the host server environment. The bundled
+launcher resolves the installed CLI from the consuming worktree. Set `MCP_WORKTREE` to its absolute
+path when the host starts servers in the plugin directory (portable hosts do); hosts launching in
+the consumer worktree can omit it. Configure native environment pass-through if the host sanitizes
+ambient variables. Credentials are inherited, never replaced by interpolation placeholders. Avoid duplicate server registrations when adopting the plugin. This repository's
 checked-in Codex and Claude configuration runs its own server from source, approves all of its
 tools, and disables the upstream `agent-blackboard` plugin. Credential-management commands remain
 CLI-only. When MCP is unavailable, the journaling skill permits the supported CLI fallback and
