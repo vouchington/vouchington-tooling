@@ -23,12 +23,11 @@ export function isInErrorBranch(
 ): boolean {
   let statement: ts.Node = call
   while (!ts.isStatement(statement)) statement = statement.parent
-  if (precededByErrorStatus(statement)) return true
-  return (
-    excludeDynamicErrorObjects &&
-    isErrorObjectJson(call) &&
-    precededByStatus(statement, isDynamicStatusStatement)
-  )
+  if (!excludeDynamicErrorObjects) return precededByErrorStatus(statement)
+  const latestStatus = latestStatusSetter(statement)
+  if (!latestStatus) return false
+  if (isBareErrorStatusStatement(latestStatus)) return true
+  return isErrorObjectJson(call) && isDynamicStatusStatement(latestStatus)
 }
 
 /**
@@ -54,10 +53,29 @@ function precededByStatus(
   return ts.isStatement(enclosing) ? precededByStatus(enclosing, matches) : false
 }
 
-function isDynamicStatusStatement(statement: ts.Statement): boolean {
-  if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression))
-    return false
-  if (!isContextMethod(statement.expression.expression, 'setStatus')) return false
+type StatusSetterStatement = ts.ExpressionStatement & { expression: ts.CallExpression }
+
+function latestStatusSetter(statement: ts.Statement): StatusSetterStatement | undefined {
+  const block = statement.parent
+  if (!ts.isBlock(block)) return undefined
+  const index = block.statements.indexOf(statement)
+  for (let previous = index - 1; previous >= 0; previous--) {
+    const candidate = block.statements[previous]!
+    if (isStatusSetterStatement(candidate)) return candidate
+  }
+  const enclosing = block.parent
+  return ts.isStatement(enclosing) ? latestStatusSetter(enclosing) : undefined
+}
+
+function isStatusSetterStatement(statement: ts.Statement): statement is StatusSetterStatement {
+  return (
+    ts.isExpressionStatement(statement) &&
+    ts.isCallExpression(statement.expression) &&
+    isContextMethod(statement.expression.expression, 'setStatus')
+  )
+}
+
+function isDynamicStatusStatement(statement: StatusSetterStatement): boolean {
   const status = statement.expression.arguments[0]
   return !!status && !ts.isNumericLiteral(status)
 }

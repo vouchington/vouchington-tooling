@@ -1,7 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { executableProtocolPath } from './protocol-execution-path.mts'
-import { resolveSymbol } from './response-contract-symbols.mts'
+import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import {
   propertyName,
   routeTemplateFromExpression,
@@ -36,11 +36,17 @@ export function collectHandlerBindings(
         const candidates = bindingsBySymbol.get(resolved) ?? []
         candidates.push(binding)
         bindingsBySymbol.set(resolved, candidates)
-        if (ambiguousBindings) {
-          const attributionSymbol = resolveHandlerSymbol(symbol, checker)
-          const attributionCandidates = attributionBindingsBySymbol.get(attributionSymbol) ?? []
+      }
+      if (ambiguousBindings) {
+        for (const symbol of handlerArgumentSymbols(node, checker, true)) {
+          const resolvedAttributionSymbol = attributionSymbol(
+            resolveHandlerSymbol(symbol, checker),
+            checker,
+          )
+          const attributionCandidates =
+            attributionBindingsBySymbol.get(resolvedAttributionSymbol) ?? []
           attributionCandidates.push(binding)
-          attributionBindingsBySymbol.set(attributionSymbol, attributionCandidates)
+          attributionBindingsBySymbol.set(resolvedAttributionSymbol, attributionCandidates)
         }
       }
     })
@@ -99,11 +105,23 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
   return current
 }
 
-function handlerArgumentSymbols(node: ts.CallExpression, checker: ts.TypeChecker): ts.Symbol[] {
+function handlerArgumentSymbols(
+  node: ts.CallExpression,
+  checker: ts.TypeChecker,
+  unwrapArguments = false,
+): ts.Symbol[] {
   const symbols: ts.Symbol[] = []
-  for (const argument of node.arguments) {
+  for (const originalArgument of node.arguments) {
+    const argument = unwrapArguments
+      ? unwrapTransparentExpression(originalArgument)
+      : originalArgument
     if (ts.isIdentifier(argument)) {
       const symbol = checker.getSymbolAtLocation(argument)
+      if (symbol) symbols.push(symbol)
+      continue
+    }
+    if (unwrapArguments && ts.isPropertyAccessExpression(argument)) {
+      const symbol = checker.getSymbolAtLocation(argument.name)
       if (symbol) symbols.push(symbol)
       continue
     }

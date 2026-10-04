@@ -1,7 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { executableProtocolPath } from './protocol-execution-path.mts'
-import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
+import { attributionFunctionSymbol, attributionSymbol } from './response-contract-symbols.mts'
 import {
   propertyName,
   routeTemplateFromExpression,
@@ -20,9 +20,9 @@ export function ambiguousRoutesForCall(
   let current: ts.Node | undefined = node
   while (current) {
     if (isLexicalRoute(current)) return undefined
-    const symbol = functionSymbol(current, checker)
+    const symbol = attributionFunctionSymbol(current, checker)
     if (symbol) {
-      const resolved = resolveSymbol(symbol, checker)
+      const resolved = attributionSymbol(symbol, checker)
       const routes = ambiguousBindings.get(resolved)
       if (routes) return executableProtocolPath(node, checker, current) ? routes : undefined
       if (handlerBindings.has(resolved)) return undefined
