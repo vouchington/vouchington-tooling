@@ -48,7 +48,7 @@ export function checkStructuredRouteConfigs(
         if (
           routeConfig.structuredTypes.length > 0 ||
           routeConfig.routeExempt ||
-          !routeConfig.inferredStructuredType ||
+          routeConfig.inferredStructuredType === undefined ||
           config.routeConfigExceptions.includes(routeConfig.key)
         ) {
           continue
@@ -97,7 +97,7 @@ export function checkStructuredRouteConfigs(
         actualValues: typedRouteConfigs.flatMap((routeConfig) =>
           routeConfig.structuredTypes.length > 0
             ? routeConfig.structuredTypes
-            : routeConfig.inferredStructuredType &&
+            : routeConfig.inferredStructuredType !== undefined &&
                 (routeConfig.routeExempt || config.routeConfigExceptions.includes(routeConfig.key))
               ? [routeConfig.inferredStructuredType]
               : [],

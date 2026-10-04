@@ -109,7 +109,12 @@ export function checkUnionTypes(
       label: `${config.collectionLabel} collection route config values`,
       actualLabel: `${routeConfigsPath} ${config.routeConfigObject}`,
       actualFile: routeConfigsPath,
-      actualValues: typedRouteConfigs.flatMap((routeConfig) => routeConfig.unionTypes),
+      actualValues: routeConfigs.flatMap((routeConfig) => {
+        if (routeConfig.unionTypes.length > 0) return routeConfig.unionTypes
+        if (!config.routeConfigExceptions.includes(routeConfig.key)) return []
+        const inferredType = slugToType.get(routeConfig.singularPath)
+        return inferredType === undefined ? [] : [inferredType]
+      }),
       expectedLabel: `${unionTypesPath} public ${config.typeAlias} values`,
       expectedFile: unionTypesPath,
       expectedValues: publicUnionTypes,

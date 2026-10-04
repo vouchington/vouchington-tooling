@@ -12,7 +12,7 @@ export function collectCreatePageLiterals(
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, scriptKind)
   const names = new Set(properties)
   const values: string[] = []
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node, ignoredProperties: ReadonlySet<string> = new Set()): void => {
     if (ts.isObjectLiteralExpression(node) || ts.isJsxAttributes(node)) {
       let configuredBeforeSpread = false
       for (const member of node.properties) {
@@ -26,13 +26,33 @@ export function collectCreatePageLiterals(
           configuredBeforeSpread = true
         }
       }
+      for (let index = 0; index < node.properties.length; index += 1) {
+        const member = node.properties[index]!
+        if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
+          const overridden = new Set<string>()
+          if (ts.isObjectLiteralExpression(member.expression)) {
+            for (const later of node.properties.slice(index + 1)) {
+              const name = ts.isPropertyAssignment(later)
+                ? getPropertyNameText(later.name)
+                : ts.isJsxAttribute(later) && ts.isIdentifier(later.name)
+                  ? later.name.text
+                  : undefined
+              if (name && names.has(name)) overridden.add(name)
+            }
+          }
+          visit(member.expression, overridden)
+        } else {
+          visit(member, ignoredProperties)
+        }
+      }
+      return
     }
     if (ts.isPropertyAssignment(node) && getPropertyNameText(node.name)) {
       const name = getPropertyNameText(node.name)!
       const value = getStringLiteralValue(node.initializer)
-      if (names.has(name) && value === undefined)
+      if (names.has(name) && !ignoredProperties.has(name) && value === undefined)
         throw new Error(`${file}: create page ${name} must be a string literal`)
-      if (names.has(name) && value !== undefined) values.push(value)
+      if (names.has(name) && !ignoredProperties.has(name) && value !== undefined) values.push(value)
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && names.has(node.name.text)) {
       const value =
         node.initializer && ts.isJsxExpression(node.initializer)
@@ -57,7 +77,7 @@ export function collectCreatePageLiterals(
         throw new Error(`${file}: create page ${name} must be a string literal`)
       if (name && names.has(name) && value !== undefined) values.push(value)
     }
-    ts.forEachChild(node, visit)
+    ts.forEachChild(node, (child) => visit(child))
   }
   visit(source)
   return values
