@@ -48,4 +48,18 @@ export default await makeGraph`),
 export const { ...rest } = runtime`),
     ).toEqual([])
   })
+
+  it('checks directly exported mutable initializers and selected namespace properties', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+export let graph = runtime.makeGraph
+export var namespace = runtime
+export let { makeGraph: selected } = runtime`),
+    ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+export let graph = () => 1
+export let { unrelated: { makeGraph: nested } } = runtime`),
+    ).toEqual([])
+  })
 })

@@ -1,4 +1,5 @@
 import type { NodeLike, RuleContextLike } from './ast-helpers.mts'
+import { bindingNodes, patternSelectsFactory } from './factory-owner-export-pattern.mts'
 import type { FactoryProvenanceOptions } from './factory-owner-provenance.mts'
 
 function node(value: unknown): NodeLike | undefined {
@@ -11,15 +12,6 @@ function name(value: unknown): string | null {
   const entry = node(value)
   if (typeof entry?.name === 'string') return entry.name
   return typeof entry?.value === 'string' ? entry.value : null
-}
-
-function bindingNodes(value: NodeLike): NodeLike[] {
-  if (value.type === 'AssignmentPattern') return bindingNodes(value.left as NodeLike)
-  if (value.type === 'ObjectPattern')
-    return (value.properties as NodeLike[]).flatMap((property) =>
-      bindingNodes((property.value ?? property.argument) as NodeLike),
-    )
-  return [value]
 }
 
 export function createFactoryExportVisitors(
@@ -75,7 +67,15 @@ export function createFactoryExportVisitors(
         for (const declarator of declaration.declarations as NodeLike[]) {
           const id = node(declarator.id)
           const bindings = id?.type === 'ObjectPattern' ? bindingNodes(id) : [id]
-          if (bindings.some(restricted)) report(declarator)
+          const initializer = node(declarator.init)
+          if (
+            bindings.some(restricted) ||
+            (id?.type === 'Identifier' && restricted(initializer)) ||
+            (id &&
+              patternSelectsFactory(id, options.factories) &&
+              provenance.isNamespace(initializer))
+          )
+            report(declarator)
         }
       }
       for (const specifier of specifiers) {
