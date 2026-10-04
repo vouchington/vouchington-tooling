@@ -9,7 +9,8 @@ const route = (status: string) => `declare const app:any;
   app.route('/events').get((ctx:any)=>{ctx.setStatus(${status});
     stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
-  minimum: route('100'),
+  minimum: route('200'),
+  informational: route('100'),
   maximum: route('599'),
   ordinary: route('200'),
   union: route('Math.random() ? 201 : 202'),
@@ -33,7 +34,7 @@ const discover = (name: keyof typeof sources, lenient = false) =>
     lenient ? { onRouteError: () => {} } : undefined,
   )
 it.each([
-  ['minimum', [100]],
+  ['minimum', [200]],
   ['maximum', [599]],
   ['ordinary', [200]],
   ['union', [201, 202]],
@@ -52,4 +53,10 @@ it.each(['low', 'high', 'fractional', 'invalid-union'] as const)(
 it.each(['negative', 'nan', 'infinity'] as const)('fails closed for %s', (name) => {
   expect(() => discover(name)).toThrow()
   expect(discover(name, true)['GET:/events']?.unavailableReason).toBeTruthy()
+})
+it('rejects informational status content despite a numerically valid HTTP code', () => {
+  expect(() => discover('informational')).toThrow('forbids response content')
+  expect(discover('informational', true)['GET:/events']?.unavailableReason).toContain(
+    'forbids response content',
+  )
 })

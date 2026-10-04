@@ -8,6 +8,7 @@ import { statusCanPrecede } from './protocol-sse-feasible-status.mts'
 import { statusDominatesEmission, unconditionalStatusSetter } from './protocol-status-dominance.mts'
 import { visit } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
+import { statusForbidsBody } from './protocol-body-status.mts'
 
 export function resolveSseStatus(
   paths: readonly (readonly (ts.CallExpression | ts.NewExpression)[])[],
@@ -63,6 +64,7 @@ export function resolveSseStatus(
   ) as [number, ...number[]]
   if (codes.some((code) => !Number.isInteger(code) || code < 100 || code > 599))
     throw new Error('SSE status must be an integer from 100 through 599')
+  if (codes.some(statusForbidsBody)) throw new Error('SSE HTTP status forbids response content')
   return { statusKnowledge: 'explicit', statusCodes: codes }
 }
 

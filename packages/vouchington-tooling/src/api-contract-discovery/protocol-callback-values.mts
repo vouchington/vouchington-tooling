@@ -116,7 +116,12 @@ export function createProtocolCallbackValueResolver(checker: ts.TypeChecker) {
     if (ts.isExpression(node)) node = unwrapExpression(node)
     if (seen.has(node)) return undefined
     seen.add(node)
-    if (isProtocolCallbackFunction(node) || ts.isObjectLiteralExpression(node)) return { node, env }
+    if (
+      isProtocolCallbackFunction(node) ||
+      ts.isObjectLiteralExpression(node) ||
+      ts.isArrayLiteralExpression(node)
+    )
+      return { node, env }
     if (ts.isIdentifier(node)) {
       const target = symbol(node)
       return target ? declaration(target, env, seen) : undefined

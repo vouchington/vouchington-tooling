@@ -481,8 +481,9 @@ payloads from the frames actually written by a route, including callbacks passed
 factory. SSE responses keep a string body schema and describe each payload under the media
 type's `x-sse-events` map. Callback arguments require a concrete helper invocation path; ignored,
 declaration-only, deferred, or rewritten callbacks fail closed. Callback options passed to a callee
-without a concrete implementation also fail closed. Factory callbacks must execute from the returned request handler; registration-time invocations do not
-prove a request emission. Compiler-resolved platform timers
+without a concrete implementation also fail closed. Opaque callback escape checks include array and
+tuple containers, nested object properties, and literal array spreads. Factory callbacks must execute
+from the returned request handler; registration-time invocations do not prove a request emission. Compiler-resolved platform timers
 and Promise executors supply invocation paths using the caller Program's actual standard-library
 identities; shadowed, custom, or reassigned platform APIs do not. Mutation checks recognize Node's
 compiler-declared `global` as well as `globalThis`. Fluent route registrations retain their method. Stable named
@@ -499,9 +500,11 @@ selected SSE rows, including when only one protocol variant was requested. Objec
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
 are matched to the original stream, including proven helper-parameter forwarding, overloaded helper
 implementations, and literal bracket
-methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
+methods. Compiler-resolved `Reflect.apply` calls use their actual receiver and payload.
+Unsupported computed methods on that receiver fail closed. Byte-bearing
 stream `end` calls and streams used as pipe destinations are raw emissions; empty terminal cleanup
-is preserved. Binding a selected stream's `write` or `end` method fails closed because the bound
+is preserved. Replacing a selected stream's `write` implementation invalidates its frame evidence.
+Binding a selected stream's `write` or `end` method fails closed because the bound
 method can escape the proven emission path. A callback that captures
 the route's stream or HTTP context and escapes to a callee without a concrete implementation can
 write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
@@ -518,6 +521,7 @@ aliases are followed, assigned mutable context aliases and object-literal contex
 and helper parameters must resolve to the registered caller's unchanged response context.
 Helper-owned contracts also account for response emissions in their proven caller scopes.
 Indirect response `call`, `apply`, and `bind` forms fail closed, including borrowed context receivers.
+SSE frames and branded content variants reject body-forbidden 1xx, 204, 205, and 304 statuses.
 Literal bracket response methods have the same emission checks as property methods. Unrelated raw emissions
 remain unavailable. Separate branded response branches are checked together, and the nearest
 proven status setter for each body must belong to that response. Observed content and bodyless

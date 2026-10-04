@@ -42,6 +42,10 @@ export function callbackOptionsEscape(
     if (!resolved || seen.has(resolved.node)) return false
     seen.add(resolved.node)
     if (resolved.node === fn) return true
+    if (ts.isArrayLiteralExpression(resolved.node))
+      return resolved.node.elements.some((element) =>
+        contains(ts.isSpreadElement(element) ? element.expression : element, resolved.env, seen),
+      )
     if (!ts.isObjectLiteralExpression(resolved.node)) return false
     return resolved.node.properties.some(
       (member) =>

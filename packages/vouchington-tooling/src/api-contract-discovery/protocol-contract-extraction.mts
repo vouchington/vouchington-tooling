@@ -4,6 +4,7 @@ import type { DiscoverApiResponseContractsOptions } from './response-contract-le
 import { propertyType, stringLiterals, typeVariants } from './protocol-marker-analysis.mts'
 import { noContentContract } from './response-contract-registration.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
+import { statusForbidsBody } from './protocol-body-status.mts'
 
 export function extractSseEvents(
   type: ts.Type,
@@ -74,6 +75,7 @@ export function extractHttpVariants(
           },
         ]
       if (kinds[0] !== 'content') throw new Error('HTTP response body kind is invalid')
+      if (statusForbidsBody(value)) throw new Error(`HTTP status ${value} forbids response content`)
       const contract = concretePayload(
         propertyType(variant, 'body', checker),
         checker,
