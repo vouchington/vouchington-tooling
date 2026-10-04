@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import { sameWriteReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
 import { writeAccess } from './protocol-sse-write-resolution.mts'
 
@@ -28,13 +29,17 @@ export function mutationAffectsSelectedStream(
   frameReceivers: readonly WriteReceiver[],
   checker: ts.TypeChecker,
   isSameRoute: (node: ts.Node) => boolean,
+  isInvokedHelper: (node: ts.Node) => boolean,
   resolveActual: (expression: ts.Expression) => readonly (WriteReceiver | undefined)[] | undefined,
   resolveFrame: (receiver: WriteReceiver) => readonly (WriteReceiver | undefined)[],
 ): boolean {
   const framed = frameReceivers.flatMap(resolveFrame)
   return mutations.some(({ node, receiver }) => {
     if (
-      (!isSourceLevelMutation(node) && !executableProtocolPath(node, checker)) ||
+      (!isSourceLevelMutation(node) &&
+        !executableProtocolPath(node, checker) &&
+        !opaqueProtocolCallbackPath(node, checker) &&
+        !isInvokedHelper(node)) ||
       !isSameRoute(node)
     )
       return false
