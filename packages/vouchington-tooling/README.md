@@ -509,6 +509,8 @@ Helper-owned contracts also account for response emissions in their proven calle
 Feasible assignments or deletions of response methods through canonical context aliases invalidate
 that dispatch evidence; dead, ignored, or unrelated method mutations preserve the contract.
 Indirect response `call`, `apply`, and `bind` forms fail closed, including borrowed context receivers.
+Compiler-resolved standard `Reflect.apply` uses its target and actual receiver to reject unrepresented
+HTTP emissions; project implementations, unrelated contexts, and non-executed calls are preserved.
 SSE frames and branded content variants reject body-forbidden 1xx, 204, 205, and 304 statuses.
 Literal bracket response methods have the same emission checks as property methods. Unrelated raw emissions
 remain unavailable. Separate branded response branches are checked together, and the nearest

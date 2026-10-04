@@ -45,6 +45,14 @@ function standardDeclaration(
   )
 }
 
+/** Shares actual compiler-library identity with other standard API guards. */
+export function standardCompilerDeclaration(
+  declaration: ts.Declaration,
+  checker: ts.TypeChecker,
+): boolean {
+  return standardDeclaration(declaration, false, checker)
+}
+
 function platformSymbol(
   expression: ts.Expression,
   checker: ts.TypeChecker,
