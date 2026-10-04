@@ -156,7 +156,8 @@ export function parseStructuredRouteFactoryArgs(
     callPattern.lastIndex = 0
     if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
     const slug = getStringLiteralValue(call.arguments[0])
-    if (slug) args.push({ slug })
+    if (!slug) throw new Error(`${file}: configured route factory call needs a string literal slug`)
+    args.push({ slug })
   }
   return args
 }

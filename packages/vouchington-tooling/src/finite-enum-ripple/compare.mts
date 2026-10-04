@@ -1,5 +1,6 @@
 import type { FiniteEnumFiles, ReadTrackedFile, RoutedPage } from './model.mts'
 import { collectCreatePageLiterals } from './create-page-literals.mts'
+import { collectActivePatternCaptures } from './pattern-captures.mts'
 
 export function hasAllFiles(files: FiniteEnumFiles, paths: readonly string[]): boolean {
   return paths.every((file) => files.existingFileSet.has(file))
@@ -49,7 +50,7 @@ export function checkCollectionPagePathLiterals(
   for (const page of pages) {
     if (!routeSlugs.has(page.slug)) continue
     const content = readTracked(page.file)
-    for (const literalPath of [...content.matchAll(pathPattern)].map((item) => item[1])) {
+    for (const literalPath of collectActivePatternCaptures(content, pathPattern)) {
       if (!literalPath || literalPath === page.slug || literalPath.startsWith(`${page.slug}/`))
         continue
       errors.push(
@@ -99,9 +100,8 @@ function collectNavigationPathLiterals(
   pattern: RegExp,
 ): string[] {
   const paths: string[] = []
-  for (const match of content.matchAll(pattern)) {
-    const literalPath = match[1]
-    if (literalPath && !ignoredPaths.has(literalPath)) paths.push(literalPath)
+  for (const literalPath of collectActivePatternCaptures(content, pattern)) {
+    if (!ignoredPaths.has(literalPath)) paths.push(literalPath)
   }
   return paths
 }

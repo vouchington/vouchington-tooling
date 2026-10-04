@@ -208,7 +208,7 @@ describe('finite enum parsers', () => {
     ).toEqual([{ slug: 'alpha' }])
   })
 
-  it('ignores factory calls without configured literal arguments', () => {
+  it('rejects structured factory calls without configured literal arguments', () => {
     expect(
       parseUnionDetailRouteFactoryArgs(
         "pageFactory('entry'); pageFactory(value, 'entry')",
@@ -216,13 +216,13 @@ describe('finite enum parsers', () => {
         /^pageFactory$/,
       ),
     ).toEqual([])
-    expect(
+    expect(() =>
       parseStructuredRouteFactoryArgs(
         "otherFactory('skip'); pageFactory(value)",
         file,
         /^pageFactory$/,
       ),
-    ).toEqual([])
+    ).toThrow('configured route factory call needs a string literal slug')
   })
 
   it('ignores computed structured callees while recognizing a configured factory', () => {

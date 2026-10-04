@@ -461,4 +461,34 @@ describe('checkFiniteEnumRipple', () => {
     files.unionDetailPages = []
     expect(check()).toContainEqual(expect.stringContaining(`::error file=${paths.routes}::`))
   })
+
+  it('ignores inactive route and navigation examples but checks active literals', () => {
+    const { contents, check } = fixture()
+    contents.set(
+      paths.collection,
+      "const note = \"path: '/old'\"; // path: '/old'\nexport default { path: '/alphas' }",
+    )
+    contents.set(paths.component, "const note = \"push('/old')\"; // push('/old')\npush('/alphas')")
+    expect(check()).toEqual([])
+    contents.set(
+      paths.collection,
+      contents.get(paths.collection)!.replace("path: '/alphas'", "path: '/old'"),
+    )
+    contents.set(
+      paths.component,
+      contents.get(paths.component)!.replace("push('/alphas')", "push('/old')"),
+    )
+    expect(check()).toContainEqual(expect.stringContaining('collection path literal "/old"'))
+    expect(check()).toContainEqual(expect.stringContaining('component navigation path "/old"'))
+  })
+
+  it('returns an annotation for a matched factory with a dynamic slug', () => {
+    const { contents, check } = fixture()
+    contents.set(paths.detail, 'const Page = createKindPage(dynamicSlug)')
+    expect(check()).toContainEqual(
+      expect.stringContaining(
+        `::error file=${paths.detail}::${paths.detail}: configured route factory call needs a string literal slug`,
+      ),
+    )
+  })
 })
