@@ -5,6 +5,7 @@ import { resolveSymbol } from './response-contract-symbols.mts'
 import {
   propertyName,
   routeTemplateFromExpression,
+  unwrapTransparentExpression,
   visit,
 } from './response-contract-route-syntax.mts'
 import type {
@@ -89,7 +90,7 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
       !(declaration.parent.flags & ts.NodeFlags.Const)
     )
       return current
-    const initializer = declaration.initializer
+    const initializer = unwrapTransparentExpression(declaration.initializer)
     if (!ts.isIdentifier(initializer)) return current
     const next = checker.getSymbolAtLocation(initializer)
     if (!next) return current

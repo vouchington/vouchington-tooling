@@ -19,6 +19,18 @@ export function propertyName(expression: ts.Expression): string | undefined {
   return ts.isPropertyAccessExpression(expression) ? expression.name.text : undefined
 }
 
+export function unwrapTransparentExpression(expression: ts.Expression): ts.Expression {
+  while (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isTypeAssertionExpression(expression) ||
+    ts.isSatisfiesExpression(expression) ||
+    ts.isNonNullExpression(expression)
+  )
+    expression = expression.expression
+  return expression
+}
+
 export function visit(node: ts.Node, callback: (node: ts.Node) => void): void {
   callback(node)
   node.forEachChild((child) => visit(child, callback))

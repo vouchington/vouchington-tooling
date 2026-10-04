@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { isContextMethod } from './response-contract-route-analysis.mts'
+import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import { responseBodyExpression } from './response-contract-registration.mts'
 
 /**
@@ -63,10 +64,11 @@ function isDynamicStatusStatement(statement: ts.Statement): boolean {
 
 function isErrorObjectJson(call: ts.CallExpression): boolean {
   const body = responseBodyExpression(call)
+  const errorObject = body && unwrapTransparentExpression(body)
   return (
-    !!body &&
-    ts.isObjectLiteralExpression(body) &&
-    body.properties.some((property) => {
+    !!errorObject &&
+    ts.isObjectLiteralExpression(errorObject) &&
+    errorObject.properties.some((property) => {
       if (ts.isSpreadAssignment(property) || !property.name) return false
       if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
         return property.name.text === 'error'
