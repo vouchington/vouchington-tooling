@@ -70,6 +70,14 @@ export function createFactoryProvenance(
       return moduleName !== null && options.modules.has(moduleName)
     }
     if (current?.type === 'CallExpression') {
+      const loader = findVariable(context, unwrap(current.callee as NodeLike) as NodeLike)
+      const definition = loader?.defs.find((entry) => entry.type === 'Variable')
+      if (
+        definition?.parent?.type === 'VariableDeclaration' &&
+        definition.parent.kind !== 'const'
+      ) {
+        return false
+      }
       const moduleName = requiredModuleSpecifier(context, current)
       return moduleName !== null && options.modules.has(moduleName)
     }
@@ -78,9 +86,16 @@ export function createFactoryProvenance(
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
     const declarator = constantDefinition(variable)
-    if (!declarator || (declarator.id as NodeLike).type !== 'Identifier') return false
+    if (!declarator) return false
     active.add(variable)
     try {
+      const defaultSource = namedPatternSource(
+        declarator,
+        String(current.name),
+        new Set(['default']),
+      )
+      if (defaultSource) return isNamespace(defaultSource, active)
+      if ((declarator.id as NodeLike).type !== 'Identifier') return false
       return isNamespace(declarator.init as NodeLike, active)
     } finally {
       active.delete(variable)

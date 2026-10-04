@@ -56,7 +56,12 @@ export function createFactoryExportVisitors(
       const declaration = node(value.declaration)
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
-          if (restricted(node(declarator.id))) report(declarator)
+          const id = node(declarator.id)
+          const bindings =
+            id?.type === 'ObjectPattern'
+              ? (id.properties as NodeLike[]).map((property) => node(property.value))
+              : [id]
+          if (bindings.some(restricted)) report(declarator)
         }
       }
       for (const specifier of specifiers) {

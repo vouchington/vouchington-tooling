@@ -47,6 +47,16 @@ host()`,
     reports: 2,
   },
   {
+    name: 'destructured default namespaces from imports and require',
+    code: `import { createRequire } from 'node:module'
+const { default: compiler } = await import('@compiler/runtime')
+const load = createRequire(import.meta.url)
+const { default: loaded } = load('@compiler/runtime')
+compiler.makeGraph()
+loaded.makeHost()`,
+    reports: 2,
+  },
+  {
     name: 'destructured factory shadowed in a function',
     code: `import * as compiler from '@compiler/runtime'
 const { makeGraph: build } = compiler
@@ -58,7 +68,8 @@ build()`,
     name: 'unrelated destructuring from a configured namespace',
     code: `import * as compiler from '@compiler/runtime'
 const { unrelated } = compiler
-unrelated()`,
+unrelated()
+unrelated.makeGraph()`,
     reports: 0,
   },
   {
@@ -110,6 +121,12 @@ export default compiler`,
     name: 'exported factory variable',
     code: `import * as compiler from '@compiler/runtime'
 export const graph = compiler.makeGraph`,
+    reports: 1,
+  },
+  {
+    name: 'directly exported factory destructuring',
+    code: `import * as compiler from '@compiler/runtime'
+export const { makeGraph: graph, unrelated } = compiler`,
     reports: 1,
   },
   {
@@ -167,6 +184,15 @@ createRequire()('@compiler/runtime').makeGraph()
 import * as compiler from '@compiler/runtime'
 let alias = compiler
 alias.makeGraph()`,
+    reports: 0,
+  },
+  {
+    name: 'reassigned createRequire loader does not certify an alias',
+    code: `import { createRequire } from 'node:module'
+let load = createRequire(import.meta.url)
+load = () => ({ makeGraph() {} })
+const compiler = load('@compiler/runtime')
+compiler.makeGraph()`,
     reports: 0,
   },
   {
