@@ -8,7 +8,7 @@ import {
 } from './protocol-http-method-access.mts'
 
 /** Only the actual compiler-library Reflect.apply signature has this argument layout. */
-export function standardReflectApply(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
+function standardReflectApply(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
   const declaration = checker.getResolvedSignature(call)?.declaration
   if (!declaration || !ts.isFunctionDeclaration(declaration) || declaration.name?.text !== 'apply')
     return false
