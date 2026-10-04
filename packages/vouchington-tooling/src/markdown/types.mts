@@ -4,7 +4,10 @@ import type { Position } from 'unist'
 export type MarkdownNode = Root | RootContent
 
 /** A source range measured in JavaScript string offsets and 1-indexed source coordinates. */
-export type MarkdownSourcePosition = Position
+export type MarkdownSourcePosition = {
+  start: { line: number; column: number; offset: number }
+  end: { line: number; column: number; offset: number }
+}
 
 /** A source-backed Markdown span with no dependency on mdast node types. */
 export type MarkdownSourceSpan = {

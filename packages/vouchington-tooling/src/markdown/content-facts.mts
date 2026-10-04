@@ -1,5 +1,5 @@
 import { parseGfmMarkdown, walkMarkdown } from './ast.mts'
-import type { MarkdownSourceSpan } from './types.mts'
+import type { MarkdownSourcePosition, MarkdownSourceSpan } from './types.mts'
 
 /**
  * Returns source spans for fenced/indented code, inline code, and raw HTML. Offsets are JavaScript
@@ -11,7 +11,7 @@ export function markdownLiteralSpans(markdown: string): MarkdownSourceSpan[] {
     if (node.type !== 'code' && node.type !== 'inlineCode' && node.type !== 'html') return
     spans.push({
       kind: node.type === 'inlineCode' ? 'inline-code' : node.type,
-      position: node.position!,
+      position: node.position! as unknown as MarkdownSourcePosition,
       value: node.value,
     })
   })

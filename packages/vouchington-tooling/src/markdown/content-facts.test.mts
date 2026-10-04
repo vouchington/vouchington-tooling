@@ -47,10 +47,14 @@ describe('Markdown content facts', () => {
 
   it('preserves line and column coordinates for source-backed spans', () => {
     const markdown = '😀\r\n`code`'
-    expect(markdownLiteralSpans(markdown)[0]?.position).toMatchObject({
+    const firstSpan = markdownLiteralSpans(markdown)[0]
+    const position = firstSpan?.position
+    expect(position).toMatchObject({
       start: { offset: 4, line: 2, column: 1 },
       end: { offset: 10, line: 2, column: 7 },
     })
+    const nextOffset: number = firstSpan!.position.start.offset + 1
+    expect(nextOffset).toBe(5)
   })
 
   it('distinguishes inline HTML from block HTML', () => {
@@ -104,6 +108,18 @@ describe('Markdown content facts', () => {
     expect(markdownHtmlFacts(markdown).map(({ commonMarkType }) => commonMarkType)).toEqual([
       2, 3, 4, 5,
     ])
+  })
+
+  it('classifies footnote HTML as a block and search as a type-6 element', () => {
+    const footnote = markdownHtmlFacts('[^1]:\n    <div>\n    body')
+    expect(footnote.find(({ value }) => value.includes('<div>'))).toMatchObject({
+      kind: 'block',
+      commonMarkType: 6,
+    })
+    expect(markdownHtmlBlocks('<search>\nbody')[0]).toMatchObject({
+      kind: 'block',
+      commonMarkType: 6,
+    })
   })
 
   it('keeps quoted and paragraph-interrupting tags inline when CommonMark does', () => {

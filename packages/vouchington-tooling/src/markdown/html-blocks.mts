@@ -1,13 +1,18 @@
 import { parseGfmMarkdown } from './ast.mts'
-import type { MarkdownHtmlBlockType, MarkdownHtmlFact, MarkdownNode } from './types.mts'
+import type {
+  MarkdownHtmlBlockType,
+  MarkdownHtmlFact,
+  MarkdownNode,
+  MarkdownSourcePosition,
+} from './types.mts'
 
-const BLOCK_CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem'])
+const BLOCK_CONTAINERS = new Set(['root', 'blockquote', 'list', 'listItem', 'footnoteDefinition'])
 const TYPE1 = /^ {0,3}<(script|style|pre|textarea)(?:[\s>]|$)/i
 const TYPE6_NAMES =
   'address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|' +
   'dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|' +
   'hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|' +
-  'section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul'
+  'search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul'
 const TYPE6 = new RegExp(`^ {0,3}</?(?:${TYPE6_NAMES})(?:[\\s>]|/>|$)`, 'i')
 
 function htmlType(value: string): MarkdownHtmlBlockType {
@@ -30,7 +35,7 @@ export function markdownHtmlFacts(markdown: string): MarkdownHtmlFact[] {
       facts.push({
         kind,
         commonMarkType: kind === 'block' ? htmlType(node.value) : null,
-        position: node.position!,
+        position: node.position! as unknown as MarkdownSourcePosition,
         value: node.value,
       })
     }
