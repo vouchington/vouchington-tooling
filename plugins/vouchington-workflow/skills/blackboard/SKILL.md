@@ -75,8 +75,8 @@ For session-only or snapshot operations not exposed by this CLI, use the upstrea
 A sandboxed fallback may only write the outbox: the machine's harness sandbox can withhold
 `AGENT_BLACKBOARD_TOKEN`, so it cannot deliver or read back. If delivery or readback needs the
 credentials and the sandbox withholds them, run that one command unsandboxed through the harness's
-normal approval path (Claude `dangerouslyDisableSandbox`, Codex escalation, or the Cursor/Grok
-equivalent), with each such run approved individually. Never read, print, copy, or export the token
+normal approval path for running one command outside the sandbox, with each such run approved
+individually. Never read, print, copy, or export the token
 to work around the sandbox. If approval is denied, leave the record pending in the outbox, report
 `pendingCount`, and tell the human.
 Return to MCP when available and journal recovery. Never silently downgrade envelope validation,
