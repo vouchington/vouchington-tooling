@@ -550,9 +550,11 @@ for minimizing summaries and excluding raw logs, transcripts, environment dumps,
 secrets. A bound violation fails visibly without clipping findings.
 
 `writeFeedback({identity, envelope, mode, ...})` accepts an exact caller-owned session identity and
-never manufactures native agent identities. Interactive mode requires an absolute private outbox
-directory. The writer persists before transport with atomic rename, file/directory fsync, a stable
-record path, and owner-only permissions. The outbox holds at most 128 records and 2 MB. Saturation,
+never manufactures native agent identities. Interactive mode requires an absolute outbox
+directory. Ancestor ownership and permissions are not checked; existing directory and record modes
+are accepted. New directories and files default to `0700` and `0600`. The outbox itself must be a
+real directory, and records must be regular files. The writer persists before transport with atomic
+rename, file/directory fsync, and a stable record path. The outbox holds at most 128 records and 2 MB. Saturation,
 corruption, or persistence failure blocks capture and preserves unsent records. Delivered records
 are removed only after matching readback. Pending state includes count and a safe diagnostic;
 interactive CLI exit zero means durable retention, and callers must inspect the printed status to

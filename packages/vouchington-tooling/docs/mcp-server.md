@@ -26,6 +26,17 @@ worktree at call time (`createRequire` on `<worktree>/package.json`), never from
 The connection comes from `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the server's
 environment. The server never searches for, prints, or mints them.
 
+## Workflow plugin
+
+The `vouchington-workflow` plugin bundles the server registration for portable, Codex, and Claude
+hosts. It launches `pnpm exec vouchington mcp` in the consuming worktree, using the packages installed
+above and credentials from the host environment. No additional manual MCP registration is needed.
+Repositories already registering this server should disable one registration to avoid duplicate tools.
+
+If MCP is unavailable, use `vouchington agent-blackboard journal append|entries|flush` as described
+in the blackboard skill. Record the fallback and delivery status in the journal and tell the human.
+A missing MCP connection does not waive persistence or readback requirements.
+
 ## Launch
 
 ```bash

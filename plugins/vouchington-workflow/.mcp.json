@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vouchington-tooling": {
+      "command": "pnpm",
+      "args": ["exec", "vouchington", "mcp"],
+      "env": {
+        "AGENT_BLACKBOARD_URL": "${AGENT_BLACKBOARD_URL}",
+        "AGENT_BLACKBOARD_TOKEN": "${AGENT_BLACKBOARD_TOKEN}"
+      }
+    }
+  }
+}

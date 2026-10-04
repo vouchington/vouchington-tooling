@@ -35,9 +35,42 @@ launch worktree by default). Writing or retrying an entry needs no provider skil
 `--file` flag, or replay command.
 Search for `journal_append` (by bare name, so every prefix matches) before concluding the server is
 unavailable; a deferred harness lists the tool only on request. If the search finds no such tool
-because the server is not registered, not connected, or not approved, stop and report that the
-journal server is unavailable, and name any per-user approval the harness still needs to load
-it (the consumer wrapper documents it). Do not fall back to a CLI command.
+because the server is not registered or not connected, use the supported CLI fallback below.
+Tell the human that MCP is unavailable and which CLI is being used. Record the fallback reason,
+entrypoint, affected operations, and observed delivery status in the caller's journal before
+continuing primary work. Do not treat a permission denial as tool unavailability or bypass a host
+approval requirement through the CLI. If neither path persists the note, stop and report the blocker.
+
+## CLI fallback
+
+Use the repository's installed `vouchington agent-blackboard` CLI (normally
+`pnpm exec vouchington agent-blackboard`). In this tooling repository, run
+`node packages/vouchington-tooling/src/cli/index.mts agent-blackboard` from the worktree root.
+`journal append` invokes the same validated writer as MCP, ensures the exact session identity,
+patches its repository union, and verifies delivery. Use a temporary `0600` markdown input file,
+remove it after the call, and inspect the JSON result: exit zero can mean retained pending feedback.
+The input file is transport to the supported writer, never a replacement journal.
+
+```bash
+pnpm exec vouchington agent-blackboard journal append \
+  --session-id SESSION --agent AGENT --version VERSION \
+  --mode interactive --source-event-id EVENT --work-outcome unknown \
+  --repository owner/name --coverage-status not-assessed --dropped-count 0 \
+  --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
+pnpm exec vouchington agent-blackboard journal entries --session-id SESSION
+pnpm exec vouchington agent-blackboard journal flush \
+  --outbox-directory "$PWD/.local/blackboard-outbox"
+```
+
+Pass `--parent-session-id` for a child, repeat `--repository` for additional repositories, and use
+explicit coverage sources when assessed. Omit `--timestamp` so the writer owns time. Autonomous
+mode omits `--outbox-directory` and still requires fresh online admission plus readback.
+For session-only or snapshot operations not exposed by this CLI, use the upstream
+`agent-blackboard` CLI under its skill's operation contract; preserve exact identities and tags.
+Return to MCP when available and journal recovery. Never silently downgrade envelope validation,
+retention, or delivery checks because the transport changed.
+
+## Journaling policy
 
 1. Capture consequential observations before filing an issue: failed or recovered checks, denied or
    approved permissions, repeated fixes, scope changes, first-party tool behavior, and architectural
@@ -65,7 +98,7 @@ it (the consumer wrapper documents it). Do not fall back to a CLI command.
    `journal_append` reports it as pending. Report `pendingCount` (this session's unsent records),
    and `worktreePendingCount` when other sessions' records are also unsent, from `journal_append`
    or `outbox_status`. Deliver with `outbox_flush` once the provider is reachable, and continue
-   primary work only after persistence succeeds. A full, unsafe, or unwritable outbox blocks
+   primary work only after persistence succeeds. A full, corrupt, or unwritable outbox blocks
    capture; never evict or silently discard an unsent record.
 5. Autonomous runners require online `session_ensure`, a fresh admission `journal_append`, and
    readback before launching an attempt. Give each attempt's admission entry a `sourceEventId`

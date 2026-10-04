@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "vouchington-tooling": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["exec", "vouchington", "mcp"],
+      "env": {
+        "AGENT_BLACKBOARD_URL": "${AGENT_BLACKBOARD_URL}",
+        "AGENT_BLACKBOARD_TOKEN": "${AGENT_BLACKBOARD_TOKEN}"
+      }
+    }
+  }
+}

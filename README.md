@@ -52,10 +52,15 @@ generic skills remain host-neutral and read the consuming repository's local ins
 
 This repository adopts Agent Blackboard for durable agent-session notes. The `vouchington-workflow`
 journaling skills call the tools of the [`vouchington mcp` server](packages/vouchington-tooling/docs/mcp-server.md),
-so a repository that adopts them registers that server and installs its packages. This repository's
+and bundles its stdio registration. Install the server packages in each consuming repository
+(`pnpm add -D vouchington-tooling agent-blackboard @modelcontextprotocol/sdk zod`) and provide
+`AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the host environment. The plugin launches
+`pnpm exec vouchington mcp` from the consuming worktree; enabling skills alone no longer leaves the
+server unregistered. Avoid duplicate server registrations when adopting the plugin. This repository's
 checked-in Codex and Claude configuration runs its own server from source, approves all of its
 tools, and disables the upstream `agent-blackboard` plugin. Credential-management commands remain
-CLI-only.
+CLI-only. When MCP is unavailable, the journaling skill permits the supported CLI fallback and
+requires both a journal entry and a human-facing notice.
 
 ### Install (opt-in)
 
@@ -393,7 +398,7 @@ node packages/vouchington-tooling/dist/cli/index.mjs --help
 ```
 
 Validated journal and retrospective feedback uses the existing `agent-blackboard` subpath. Explicit
-interactive mode persists sanitized pending records in a bounded private outbox; autonomous mode
+interactive mode persists sanitized pending records in a bounded outbox; autonomous mode
 requires fresh online admission and acknowledged terminal readback. Work outcome, evidence coverage,
 and delivery remain separate. See the [feedback contract](packages/vouchington-tooling/README.md#validated-feedback-and-delivery)
 for current APIs, privacy bounds, stable event replay, and the breaking journal writer adoption.
