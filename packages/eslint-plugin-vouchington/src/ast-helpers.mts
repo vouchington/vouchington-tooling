@@ -11,12 +11,14 @@ type ScopeLike = {
 }
 
 export type VariableLike = {
+  isValueVariable?: boolean
   name: string
   defs: DefinitionLike[]
   references: ReferenceLike[]
 }
 
 type DefinitionLike = {
+  isVariableDefinition?: boolean
   type: string
   node: NodeLike
   parent?: NodeLike | null
@@ -57,14 +59,30 @@ export function unwrap(node: NodeLike | null | undefined): NodeLike | null | und
   return current
 }
 
-export function findVariable(context: RuleContextLike, identifier: NodeLike): VariableLike | null {
+export function findVariable(
+  context: RuleContextLike,
+  identifier: NodeLike,
+  valueOnly = false,
+): VariableLike | null {
   if (typeof identifier.name !== 'string') return null
   let scope: ScopeLike | null = context.sourceCode.getScope(identifier)
   while (scope) {
     const variable =
       (typeof scope.set?.get === 'function' && scope.set.get(identifier.name)) ||
       scope.variables?.find((candidate) => candidate.name === identifier.name)
-    if (variable) return variable
+    if (
+      variable &&
+      (!valueOnly ||
+        (variable.isValueVariable !== false &&
+          (!variable.defs.length ||
+            variable.defs.some(
+              (definition) =>
+                definition.isVariableDefinition !== false &&
+                !definition.node.declare &&
+                !definition.parent?.declare,
+            ))))
+    )
+      return variable
     scope = scope.upper
   }
   return null
@@ -85,7 +103,10 @@ export function patternPropertyName(
   property: NodeLike | null | undefined,
 ): string | number | boolean | bigint | null {
   if (!property) return null
-  if (!property.computed && (property.key as NodeLike | undefined)?.type === 'Identifier') {
+  if (
+    !property.computed &&
+    ['Identifier', 'PrivateIdentifier'].includes((property.key as NodeLike | undefined)?.type ?? '')
+  ) {
     const name = (property.key as NodeLike).name
     return typeof name === 'string' ? name : null
   }
@@ -106,7 +127,9 @@ export function normalizeFilename(context: { filename: string; cwd?: string }): 
   return cwd && filename.startsWith(`${cwd}/`) ? filename.slice(cwd.length + 1) : filename
 }
 
-function staticPropertyName(node: NodeLike | undefined): string | number | boolean | bigint | null {
+export function staticPropertyName(
+  node: NodeLike | null | undefined,
+): string | number | boolean | bigint | null {
   const value = unwrap(node)
   if (value?.type === 'Literal') return literalName(value.value)
   if (

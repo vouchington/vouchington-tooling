@@ -9,6 +9,7 @@ describe('eslint-plugin-vouchington', () => {
       'postgres-cursor-call-contract',
       'banned-member-read',
       'factory-owner-location',
+      'serial-cursor-drains',
     ])
     expect(plugin.rules['postgres-cursor-call-contract']).toEqual(
       expect.objectContaining({ create: expect.any(Function) }),
@@ -16,7 +17,7 @@ describe('eslint-plugin-vouchington', () => {
     expect(RULE_ROUTING).toEqual([
       'Generic rules belong in eslint-plugin-no-mistakes.',
       'Vouchington convention rules with no product nouns belong here.',
-      'Single-repo product coupling stays in the product monorepo.',
+      'Product-specific paths and identifiers stay in consumer configuration.',
     ])
   })
 

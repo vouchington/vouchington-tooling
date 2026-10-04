@@ -85,6 +85,31 @@ describe('findVariable', () => {
   })
 })
 
+it('resolves runtime bindings past type-only namespaces while preserving value shadows', () => {
+  const typeOnly: VariableLike = {
+    name: 'Promise',
+    isValueVariable: false,
+    defs: [],
+    references: [],
+  }
+  const runtime: VariableLike = { name: 'Promise', isValueVariable: true, defs: [], references: [] }
+  const context: RuleContextLike = {
+    filename: 'src/example.mts',
+    options: [],
+    report: () => {},
+    sourceCode: {
+      getScope: () => ({ variables: [typeOnly], upper: { variables: [runtime], upper: null } }),
+    },
+  }
+  expect(findVariable(context, identifier('Promise'))).toBe(typeOnly)
+  expect(findVariable(context, identifier('Promise'), true)).toBe(runtime)
+  const onlyTypes: RuleContextLike = {
+    ...context,
+    sourceCode: { getScope: () => ({ variables: [typeOnly], upper: null }) },
+  }
+  expect(findVariable(onlyTypes, identifier('Promise'), true)).toBeNull()
+})
+
 describe('propertyName', () => {
   it('reads static member names and ignores dynamic ones', () => {
     expect(propertyName(identifier('x'))).toBeNull()
@@ -195,6 +220,7 @@ describe('normalizeFilename', () => {
 describe('patternPropertyName and memberIsRead', () => {
   it('reads object-pattern keys and treats assignment/delete as non-reads', () => {
     expect(patternPropertyName(null)).toBeNull()
+    expect(patternPropertyName({ type: 'Property' })).toBeNull()
     expect(
       patternPropertyName({
         type: 'Property',
@@ -241,4 +267,28 @@ describe('patternPropertyName and memberIsRead', () => {
       }),
     ).toBe(false)
   })
+})
+
+it('ignores erased ambient definitions while retaining outer runtime bindings', () => {
+  const runtime: VariableLike = { name: 'Promise', defs: [], references: [] }
+  for (const definition of [
+    {
+      type: 'Variable',
+      node: { type: 'VariableDeclarator' },
+      parent: { type: 'VariableDeclaration', declare: true },
+    },
+    { type: 'ClassName', node: { type: 'ClassDeclaration', declare: true } },
+  ]) {
+    const ambient: VariableLike = { name: 'Promise', defs: [definition], references: [] }
+    const context: RuleContextLike = {
+      filename: 'src/example.mts',
+      options: [],
+      report: () => {},
+      sourceCode: {
+        getScope: () => ({ variables: [ambient], upper: { variables: [runtime], upper: null } }),
+      },
+    }
+    expect(findVariable(context, { type: 'Identifier', name: 'Promise' }, true)).toBe(runtime)
+    expect(findVariable(context, { type: 'Identifier', name: 'Promise' })).toBe(ambient)
+  }
 })

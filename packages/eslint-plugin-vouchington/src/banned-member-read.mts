@@ -1,4 +1,10 @@
 import {
+  MEMBER_EXCEPTION_SCHEMA,
+  resolveMemberReadExceptions,
+  type MemberReadException,
+} from './member-read-exception-options.mts'
+import { isMemberReadException } from './member-read-exceptions.mts'
+import {
   memberIsRead,
   patternPropertyName,
   propertyName,
@@ -14,6 +20,7 @@ import {
 
 export type BannedMemberOptions = FileMatchOptions & {
   members: ReadonlySet<string>
+  exceptions: readonly MemberReadException[]
 }
 
 export function resolveBannedMemberOptions(raw: unknown): BannedMemberOptions | null {
@@ -24,7 +31,9 @@ export function resolveBannedMemberOptions(raw: unknown): BannedMemberOptions | 
   if (!members?.length) return null
   const files = resolveFileMatchOptions(record)
   if (!files) return null
-  return { members: new Set(members), ...files }
+  const exceptions = resolveMemberReadExceptions(record.exceptions)
+  if (!exceptions) return null
+  return { members: new Set(members), exceptions, ...files }
 }
 
 export function createBannedMemberReadRule() {
@@ -38,6 +47,7 @@ export function createBannedMemberReadRule() {
           additionalProperties: false,
           properties: {
             members: { type: 'array', items: { type: 'string' } },
+            exceptions: MEMBER_EXCEPTION_SCHEMA,
             include: { type: 'array', items: { type: 'string' } },
             exclude: { type: 'array', items: { type: 'string' } },
             includeFiles: { type: 'array', items: { type: 'string' } },
@@ -54,7 +64,12 @@ export function createBannedMemberReadRule() {
       return {
         MemberExpression(node: NodeLike) {
           const name = propertyName(node)
-          if (typeof name === 'string' && options.members.has(name) && memberIsRead(node)) {
+          if (
+            typeof name === 'string' &&
+            options.members.has(name) &&
+            memberIsRead(node) &&
+            !isMemberReadException(context, node, options.exceptions)
+          ) {
             context.report({ node, messageId: 'bannedRead' })
           }
         },
