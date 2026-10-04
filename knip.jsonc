@@ -59,6 +59,8 @@
         "src/compiler-build/index.mts!",
         "src/github-projects/index.mts!",
         "src/markdown/index.mts!",
+        "src/basic-auth-doc-sync/index.mts!",
+        "src/basic-auth-doc-sync/runbook.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

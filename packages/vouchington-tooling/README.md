@@ -681,3 +681,10 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 `Status: none observed` or `Status: events observed`, each followed by
 `(journal entries only; no friction log observed)`; a truncated scan reports
 `unavailable (journal scan incomplete)` with the entries read so far.
+
+## Basic Auth exemption facts
+
+`vouchington-tooling/basic-auth-doc-sync` extracts literal exemption collections from
+TypeScript and route rows from Markdown. Callers configure declaration names and
+runbook headings, then compare the returned data using their own route policy.
+See the [API contract](docs/basic-auth-doc-sync.md).
