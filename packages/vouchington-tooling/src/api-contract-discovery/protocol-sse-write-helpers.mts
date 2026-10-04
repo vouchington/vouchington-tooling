@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
+import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
@@ -8,7 +9,11 @@ import {
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
-import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import {
+  expressionReceiver,
+  sameWriteReceiver,
+  type WriteReceiver,
+} from './protocol-write-receiver.mts'
 
 export function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
@@ -32,6 +37,37 @@ function implementationDeclaration(
   return undefined
 }
 
+function implementationCall(call: ts.CallExpression, checker: ts.TypeChecker) {
+  return (
+    implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) ??
+    createProtocolCallbackValueResolver(checker).resolve(call.expression, new Map())?.node
+  )
+}
+
+export function opaqueCallReceivesSelectedStream(
+  call: ts.CallExpression,
+  selectedReceivers: readonly WriteReceiver[],
+  binding: RouteBinding,
+  calls: readonly ts.CallExpression[],
+  checker: ts.TypeChecker,
+  bindings: HandlerBindings,
+): boolean {
+  const implementation = implementationCall(call, checker)
+  if (implementation && ts.isFunctionLike(implementation) && 'body' in implementation) return false
+  const framed = selectedReceivers.flatMap((receiver) =>
+    actualReceivers(receiver, binding, calls, checker, bindings),
+  )
+  return call.arguments.some((argument) => {
+    const receiver = expressionReceiver(argument, checker)
+    if (!receiver) return false
+    return actualReceivers(receiver, binding, calls, checker, bindings).some(
+      (value) =>
+        value === undefined ||
+        framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
+    )
+  })
+}
+
 export function helperBindings(
   node: ts.Node,
   calls: readonly ts.CallExpression[],
@@ -41,10 +77,7 @@ export function helperBindings(
   const fn = enclosingFunction(node)
   if (!fn || fn.asteriskToken) return []
   return calls.flatMap((call) => {
-    if (
-      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
-      !executableProtocolPath(call, checker)
-    )
+    if (implementationCall(call, checker) !== fn || !executableProtocolPath(call, checker))
       return []
     const binding = enclosingRouteBinding(call, checker, bindings, false)
     return binding ? [binding] : []
@@ -74,10 +107,7 @@ export function actualReceivers(
   if (active.has(receiver.root)) return [undefined]
   const index = runtimeParameters(fn).indexOf(declaration)
   const actuals = calls.flatMap((call) => {
-    if (
-      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
-      !executableProtocolPath(call, checker)
-    )
+    if (implementationCall(call, checker) !== fn || !executableProtocolPath(call, checker))
       return []
     const callBinding = enclosingRouteBinding(call, checker, bindings, false)
     if (!callBinding || routeKey(callBinding) !== routeKey(binding)) return []
