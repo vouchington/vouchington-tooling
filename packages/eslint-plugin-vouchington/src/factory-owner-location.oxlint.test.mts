@@ -40,11 +40,22 @@ nested()
 import { default as defaultAlias } from '@compiler/runtime'
 defaultAlias.makeGraph()
 new (0, makeGraph)()
+Reflect.apply(makeGraph<string>, null, [])
+const specialized = makeGraph<string>
+specialized()
+export default makeGraph<string>
+globalThis.Reflect.apply(makeGraph, null, [])
+globalThis.Reflect.construct(makeGraph, [])
+function shadowGlobal(globalThis) { globalThis.Reflect.apply(makeGraph, null, []) }
 `,
     )
     writeFileSync(
       join(root, 'src/ts-export.ts'),
       `import * as compiler from '@compiler/runtime'\nexport = compiler\n`,
+    )
+    writeFileSync(
+      join(root, 'src/ts-import-equals.ts'),
+      `export import compiler = require('@compiler/runtime')\n`,
     )
     writeFileSync(
       join(root, 'src/owner.mts'),
@@ -85,12 +96,14 @@ new (0, makeGraph)()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 16 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 22 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
         ({ filename }) =>
-          filename.endsWith('src/check.mts') || filename.endsWith('src/ts-export.ts'),
+          filename.endsWith('src/check.mts') ||
+          filename.endsWith('src/ts-export.ts') ||
+          filename.endsWith('src/ts-import-equals.ts'),
       ),
     ).toBe(true)
   } finally {

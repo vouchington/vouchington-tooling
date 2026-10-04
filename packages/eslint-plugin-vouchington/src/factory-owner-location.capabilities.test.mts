@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { NodeLike, RuleContextLike } from './ast-helpers.mts'
 import { createFactoryExportVisitors } from './factory-owner-exports.mts'
 import { createFactoryInvocationVisitors } from './factory-owner-invocation.mts'
+import { createFactoryProvenance } from './factory-owner-provenance.mts'
 import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
 
 const OPTIONS = {
@@ -155,6 +156,14 @@ makeGraph\`source\`
 Reflect.apply(makeGraph, null, [])
 Reflect.construct(makeGraph, [])`,
     reports: 4,
+  },
+  {
+    name: 'global-qualified Reflect calls retain direct factory provenance',
+    code: `import { makeGraph } from '@compiler/runtime'
+globalThis.Reflect.apply(makeGraph, null, [])
+globalThis.Reflect.construct(makeGraph, [])
+function shadow(globalThis) { globalThis.Reflect.apply(makeGraph, null, []) }`,
+    reports: 2,
   },
   {
     name: 'final sequence operands retain direct factory and namespace provenance',
@@ -399,6 +408,72 @@ import('@compiler/runtime').then(() => {})`
       visitors.TSExportAssignment?.({
         type: 'TSExportAssignment',
         expression: { type: 'Identifier', name },
+      } as NodeLike)
+    }
+    expect(reports).toEqual(['constructionOwner'])
+  })
+
+  it('follows a configured factory through a TypeScript instantiation expression', () => {
+    const declaration: NodeLike = {
+      type: 'ImportDeclaration',
+      source: { type: 'Literal', value: '@compiler/runtime' },
+    }
+    const specifier: NodeLike = {
+      type: 'ImportSpecifier',
+      imported: { type: 'Identifier', name: 'makeGraph' },
+    }
+    const variable = {
+      name: 'makeGraph',
+      defs: [{ type: 'ImportBinding', node: specifier, parent: declaration }],
+      references: [],
+    }
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report: () => {},
+      sourceCode: {
+        getScope: () => ({
+          set: { get: (name: string) => (name === 'makeGraph' ? variable : undefined) },
+          upper: null,
+        }),
+      },
+    }
+    const provenance = createFactoryProvenance(context, {
+      modules: new Set(['@compiler/runtime']),
+      factories: new Set(['makeGraph']),
+    })
+    expect(
+      provenance.isFactory({
+        type: 'TSInstantiationExpression',
+        expression: { type: 'Identifier', name: 'makeGraph' },
+      }),
+    ).toBe(true)
+  })
+
+  it('reports direct TypeScript import-equals exports only for configured modules', () => {
+    const reports: string[] = []
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report: ({ messageId }) => reports.push(messageId),
+      sourceCode: { getScope: () => ({ upper: null }) },
+    }
+    const visitors = createFactoryExportVisitors(
+      context,
+      { modules: new Set(['@compiler/runtime']), factories: new Set(['makeGraph']) },
+      { isFactory: () => false, isNamespace: () => false },
+    )
+    for (const moduleName of ['@domain/runtime', '@compiler/runtime']) {
+      visitors.ExportNamedDeclaration?.({
+        type: 'ExportNamedDeclaration',
+        specifiers: [],
+        declaration: {
+          type: 'TSImportEqualsDeclaration',
+          moduleReference: {
+            type: 'TSExternalModuleReference',
+            expression: { type: 'Literal', value: moduleName },
+          },
+        },
       } as NodeLike)
     }
     expect(reports).toEqual(['constructionOwner'])

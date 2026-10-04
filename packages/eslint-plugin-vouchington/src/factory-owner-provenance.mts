@@ -84,6 +84,8 @@ export function createFactoryProvenance(
     active = new Set<VariableLike>(),
   ): boolean {
     const current = unwrap(value)
+    if (current?.type === 'TSInstantiationExpression')
+      return isFactory(current.expression as NodeLike, active)
     if (current?.type === 'SequenceExpression')
       return isFactory((current.expressions as NodeLike[]).at(-1), active)
     if (current?.type === 'MemberExpression') {

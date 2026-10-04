@@ -8,7 +8,7 @@ import {
 
 function isUnshadowedGlobal(
   context: RuleContextLike,
-  value: NodeLike | undefined,
+  value: NodeLike | null | undefined,
   name: string,
 ): boolean {
   return (
@@ -26,7 +26,13 @@ function directReflectFactory(
 ): boolean {
   const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
-  if (!isUnshadowedGlobal(context, member.object as NodeLike, 'Reflect')) return false
+  const object = unwrap(member.object as NodeLike)
+  const reflectGlobal =
+    isUnshadowedGlobal(context, object, 'Reflect') ||
+    (object?.type === 'MemberExpression' &&
+      propertyName(object) === 'Reflect' &&
+      isUnshadowedGlobal(context, object.object as NodeLike, 'globalThis'))
+  if (!reflectGlobal) return false
   const method = propertyName(member)
   return (method === 'apply' || method === 'construct') && isFactory(args[0])
 }

@@ -66,6 +66,11 @@ export function createFactoryExportVisitors(
         return
       }
       const declaration = node(value.declaration)
+      if (declaration?.type === 'TSImportEqualsDeclaration') {
+        const moduleReference = node(declaration.moduleReference)
+        const moduleName = name(node(moduleReference?.expression))
+        if (moduleName !== null && options.modules.has(moduleName)) report(declaration)
+      }
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
           const id = node(declarator.id)
