@@ -140,6 +140,10 @@ after launch are accepted and removed ones are refused. Rejected: a subdirectory
 relative or nonexistent path, and a directory that is not in a git worktree. Git runs without
 `GIT_*` variables, so `GIT_DIR` cannot redirect the check.
 
+`worktree` only chooses where the outbox lives. It is not a trust boundary for loading code: the
+server never imports modules from it, and a tool that needs to must first get a repository allowlist
+from the machine registration.
+
 When `worktree` is omitted, the launch directory's worktree top level is used if the launch
 directory is inside one, and it is validated like any explicit path. If the server was launched
 outside a git worktree, the call fails with a tool error asking for an explicit `worktree`.
