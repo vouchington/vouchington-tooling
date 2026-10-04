@@ -29,7 +29,8 @@ environment. The server never searches for, prints, or mints them.
 ## CLI fallback
 
 If MCP is unavailable, use `vouchington agent-blackboard journal append|entries|flush|status` as described
-in the blackboard skill. Record the fallback and delivery status in the journal and tell the human.
+in the blackboard skill. Record the fallback and delivery status in the journal and tell the human. The CLI resolves its
+client from its own installation, so install `agent-blackboard` alongside that trusted CLI.
 A missing MCP connection does not waive persistence or readback requirements.
 
 ## Launch

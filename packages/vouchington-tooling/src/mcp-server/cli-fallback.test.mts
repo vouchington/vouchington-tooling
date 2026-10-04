@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it } from 'vitest'
@@ -73,3 +73,26 @@ it('writes CLI fallback journal entries into the outbox the MCP server reads', a
     { type: 'text', text: expect.stringContaining('"pendingCount": 1') },
   ])
 }, 30_000)
+
+it('loads the CLI client from its installation instead of the consumer worktree', async () => {
+  const packageDirectory = join(fixture().main, 'node_modules', 'agent-blackboard')
+  const marker = join(fixture().main, 'consumer-client-executed')
+  await mkdir(packageDirectory, { recursive: true })
+  await writeFile(
+    join(packageDirectory, 'package.json'),
+    '{"type":"module","exports":"./index.mjs"}',
+  )
+  await writeFile(
+    join(packageDirectory, 'index.mjs'),
+    `import { writeFileSync } from 'node:fs';
+     writeFileSync(${JSON.stringify(marker)}, 'consumer client executed');
+     export class Sessions { async list() { return [] } }`,
+  )
+  await expect(
+    promisify(execFile)(process.execPath, [cli, 'agent-blackboard', 'probe'], {
+      cwd: fixture().main,
+      env: { ...env, AGENT_BLACKBOARD_URL: 'invalid-url', AGENT_BLACKBOARD_TOKEN: 'fixture-token' },
+    }),
+  ).rejects.toMatchObject({ code: 2 })
+  await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
+})

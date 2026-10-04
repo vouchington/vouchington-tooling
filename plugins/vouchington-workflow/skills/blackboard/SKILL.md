@@ -46,7 +46,8 @@ approval requirement through the CLI. If neither path persists the note, stop an
 Use a trusted machine-installed `vouchington` executable at a verified absolute path outside the
 consumer worktree. Resolve its symlinks and verify the installation's source and version before
 using credentials or requesting an unsandboxed run; its runtime dependencies must also belong to
-that trusted installation. Do not resolve the executable through the consumer's `node_modules/.bin`,
+that trusted installation. The CLI resolves its client relative to its own installation; installing
+`agent-blackboard` only in the consumer worktree is insufficient for CLI fallback. Do not resolve the executable through the consumer's `node_modules/.bin`,
 `pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
 path, and bind any approval request to the same executable and arguments. If no trusted CLI is
 available, report the blocker; do not escalate a consumer-supplied executable. For local development,

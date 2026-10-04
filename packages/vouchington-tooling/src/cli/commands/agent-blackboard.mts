@@ -4,7 +4,6 @@ import {
   required,
   validatedSessionId,
 } from './agent-blackboard-flags.mts'
-import { join } from 'node:path'
 import {
   appendJournal,
   feedbackOutboxCounts,
@@ -22,6 +21,7 @@ import type {
   SnapshotCounts,
 } from '../../agent-blackboard/snapshot-types.mts'
 
+const dependencies = { resolveFrom: import.meta.url }
 let journalReader = readJournal
 
 export function setJournalReaderForTest(reader?: typeof readJournal): void {
@@ -32,7 +32,7 @@ export async function runAgentBlackboardCommand(args: string[]): Promise<number>
   try {
     const [command, ...rest] = args
     if (command === 'probe' && rest.length === 0) {
-      await probeBlackboard()
+      await probeBlackboard(undefined, dependencies)
       return 0
     }
     if (command === 'journal') return await runJournal(rest)
@@ -90,7 +90,9 @@ async function runJournal(args: string[]): Promise<number> {
       action === 'status' ? required(values, 'session-id') : values['session-id'],
     )
     const result =
-      action === 'flush' ? await flushFeedbackOutbox({ directory }) : { pendingCount: 0 }
+      action === 'flush'
+        ? await flushFeedbackOutbox({ directory, dependencies })
+        : { pendingCount: 0 }
     const counts = sessionId !== undefined ? feedbackOutboxCounts(directory, sessionId) : result
     process.stdout.write(
       `${JSON.stringify({
@@ -107,7 +109,7 @@ async function runJournal(args: string[]): Promise<number> {
     const sessionId = required(values, 'session-id')
     let entries: unknown[]
     try {
-      entries = await journalReader(sessionId)
+      entries = await journalReader(sessionId, undefined, dependencies)
     } catch (error) {
       if (!isNotFound(error)) throw error
       entries = []
@@ -132,6 +134,7 @@ async function runJournal(args: string[]): Promise<number> {
       'outbox-directory',
     ])
     const result = await appendJournal({
+      dependencies,
       mode: required(values, 'mode') as FeedbackMode,
       sourceEventId: required(values, 'source-event-id'),
       workOutcome: required(values, 'work-outcome') as WorkOutcome,
@@ -153,10 +156,7 @@ async function runJournal(args: string[]): Promise<number> {
     const counts =
       values.mode === 'autonomous'
         ? { pendingCount: 0, worktreePendingCount: 0 }
-        : feedbackOutboxCounts(
-            values['outbox-directory'] ?? join(process.cwd(), '.local', 'blackboard-outbox'),
-            required(values, 'session-id'),
-          )
+        : feedbackOutboxCounts(required(values, 'outbox-directory'), required(values, 'session-id'))
     process.stdout.write(`${JSON.stringify({ ...result, ...counts })}\n`)
     return 0
   }

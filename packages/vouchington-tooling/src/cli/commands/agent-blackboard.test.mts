@@ -56,7 +56,10 @@ describe('agent-blackboard CLI', () => {
         '/private/outbox',
       ]),
     ).toBe(0)
-    expect(flushFeedbackOutbox).toHaveBeenCalledWith({ directory: '/private/outbox' })
+    expect(flushFeedbackOutbox).toHaveBeenCalledWith({
+      directory: '/private/outbox',
+      dependencies: { resolveFrom: expect.any(String) },
+    })
     expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('"deliveredCount":1')
     expect(await runAgentBlackboardCommand(['journal', 'flush'])).toBe(2)
     expect(await runAgentBlackboardCommand(['journal', 'flush', '--mode', 'autonomous'])).toBe(2)
@@ -312,6 +315,7 @@ describe('agent-blackboard CLI', () => {
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenCalledWith({
+      dependencies: { resolveFrom: expect.any(String) },
       mode: 'autonomous',
       sourceEventId: 'cli:note',
       workOutcome: 'unknown',
@@ -354,6 +358,7 @@ describe('agent-blackboard CLI', () => {
       ]),
     ).resolves.toBe(0)
     expect(appendJournal).toHaveBeenLastCalledWith({
+      dependencies: { resolveFrom: expect.any(String) },
       mode: 'autonomous',
       sourceEventId: 'cli:note',
       workOutcome: 'unknown',
