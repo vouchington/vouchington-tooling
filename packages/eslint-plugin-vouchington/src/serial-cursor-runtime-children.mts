@@ -29,6 +29,13 @@ const CHILDREN: Readonly<Record<string, readonly string[]>> = {
   ClassBody: ['body'],
   MethodDefinition: ['key'],
   StaticBlock: ['body'],
+  JSXElement: ['openingElement', 'children'],
+  JSXOpeningElement: ['attributes'],
+  JSXAttribute: ['value'],
+  JSXSpreadAttribute: ['argument'],
+  JSXExpressionContainer: ['expression'],
+  JSXSpreadChild: ['expression'],
+  JSXFragment: ['children'],
 }
 
 export function runtimeChildren(node: NodeLike): NodeLike[] {

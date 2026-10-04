@@ -1,4 +1,5 @@
 import { findVariable, unwrap, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
+import { inlineInvocation, type CallArgument } from './serial-cursor-call-arguments.mts'
 import { runtimeChildren } from './serial-cursor-runtime-children.mts'
 
 function bodyMatches(node: NodeLike, matches: (node: NodeLike) => boolean): boolean {
@@ -31,23 +32,28 @@ function bodyMatches(node: NodeLike, matches: (node: NodeLike) => boolean): bool
 
 export function invokedBodyMatches(
   callee: NodeLike | null | undefined,
-  args: readonly NodeLike[],
+  args: readonly CallArgument[],
   matches: (node: NodeLike) => boolean,
   context: RuleContextLike,
+  consumeIterable: boolean,
 ): boolean {
+  const invocation = inlineInvocation(callee, args)
+  callee = invocation.callee
   if (!callee || !['ArrowFunctionExpression', 'FunctionExpression'].includes(callee.type))
     return false
   const parameters = callee.params as NodeLike[]
   return (
-    parameters.some(
-      (parameter, index) =>
-        undefinedArgument(args[index], context) && bodyMatches(parameter, matches),
-    ) ||
-    (!callee.generator && bodyMatches(callee.body as NodeLike, matches))
+    (invocation.args !== null &&
+      parameters.some(
+        (parameter, index) =>
+          undefinedArgument(invocation.args?.[index], context) && bodyMatches(parameter, matches),
+      )) ||
+    ((!callee.generator || (consumeIterable && !callee.async)) &&
+      bodyMatches(callee.body as NodeLike, matches))
   )
 }
 
-function undefinedArgument(argument: NodeLike | undefined, context: RuleContextLike): boolean {
+function undefinedArgument(argument: CallArgument, context: RuleContextLike): boolean {
   const value = unwrap(argument)
   if (!value || (value.type === 'UnaryExpression' && value.operator === 'void')) return true
   return (

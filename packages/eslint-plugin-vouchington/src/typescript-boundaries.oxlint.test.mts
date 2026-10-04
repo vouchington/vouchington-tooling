@@ -8,7 +8,7 @@ it('preserves asserted bindings and separates type-only from runtime shadowing i
   const root = mkdtempSync(join(tmpdir(), 'typescript-rule-boundaries-'))
   try {
     writeFileSync(
-      join(root, 'selected.mts'),
+      join(root, 'selected.tsx'),
       `
 import { CacheClient } from '@store/cache'
 const CACHE_GROUP = 'cache:group' as const
@@ -36,6 +36,15 @@ checked.invalidate();
     Promise.all(jobs = rows.map(drain))
     Promise.all(((jobs = rows.map(drain)) => jobs)())
     Promise.all(((jobs = rows.map(drain)) => jobs)(void 0))
+    Promise.all(((jobs = rows.map(drain)) => jobs)(...[]))
+    Promise.all(((jobs = rows.map(drain)) => jobs)(...[undefined]))
+    Promise.all((function () { return rows.map(drain) }).call(null))
+    Promise.all((function () { return rows.map(drain) }).apply(null, []))
+    Promise.all((function* () { yield rows.map(drain) })())
+    Promise.all([<Widget jobs={rows.map(drain)} />])
+    Promise.all([<Widget>{rows.map(drain)}</Widget>])
+    Promise.all([<Widget {...{ jobs: rows.map(drain) }} />])
+    Promise.all([<>{rows.map(drain)}</>])
     Promise.all(((jobs = rows.map(drain)) => jobs)(undefined))
     Promise.all((() => { class Batch { static jobs = rows.map(drain) }; return Batch.jobs })())
     Promise.all(([jobs = rows.map(drain)] = []))
@@ -88,16 +97,16 @@ checked.invalidate();
         rules: {
           'vouchington/serial-cursor-drains': [
             'error',
-            { functions: ['writeRows'], includeFiles: ['selected.mts'] },
+            { functions: ['writeRows'], includeFiles: ['selected.tsx'] },
           ],
           'vouchington/banned-member-read': [
             'error',
             {
               members: ['invalidate'],
-              includeFiles: ['selected.mts'],
+              includeFiles: ['selected.tsx'],
               exceptions: [
                 {
-                  file: 'selected.mts',
+                  file: 'selected.tsx',
                   member: 'invalidate',
                   module: '@store/cache',
                   imported: 'CacheClient',
@@ -106,7 +115,7 @@ checked.invalidate();
                   prefix: 'validation',
                 },
                 {
-                  file: 'selected.mts',
+                  file: 'selected.tsx',
                   member: 'invalidate',
                   module: '@store/cache',
                   imported: 'CacheClient',
@@ -122,14 +131,14 @@ checked.invalidate();
     )
     const result = spawnSync(
       resolve('node_modules/.bin/oxlint'),
-      ['-c', '.oxlintrc.json', '--format', 'json', 'selected.mts'],
+      ['-c', '.oxlintrc.json', '--format', 'json', 'selected.tsx'],
       { cwd: root, encoding: 'utf8' },
     )
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(1)
     const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 20 }, () => 'vouchington(serial-cursor-drains)'),
+      Array.from({ length: 29 }, () => 'vouchington(serial-cursor-drains)'),
     )
   } finally {
     rmSync(root, { force: true, recursive: true })
