@@ -20,19 +20,39 @@ async function canonical(path: string): Promise<string | undefined> {
   }
 }
 
+/** git's two "no worktree here" outcomes: outside any repository, and inside a `.git` directory. */
+function isNotAGitRepository(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { stderr, message } = error as { stderr?: unknown; message?: unknown }
+  return [stderr, message].some(
+    (text) =>
+      typeof text === 'string' && /not a git repository|must be run in a work tree/i.test(text),
+  )
+}
+
 /**
- * The worktree root containing `cwd`, or undefined when `cwd` is not inside one. The server may
- * be launched from anywhere, so this never fails.
+ * The worktree root containing `cwd`, or undefined when git reports `cwd` is not inside one (so
+ * the server may be launched from anywhere). Any other git failure, such as a missing git binary
+ * or an unsafe repository, is thrown with the cause rather than reported as "outside a worktree".
  */
 export async function launchWorktreeRoot(
   cwd: string,
   runGit: RunTextCommand,
 ): Promise<string | undefined> {
+  let output: string
   try {
-    return await realpath((await runGit(['-C', cwd, 'rev-parse', '--show-toplevel'])).trim())
-  } catch {
-    return undefined
+    output = await runGit(['-C', cwd, 'rev-parse', '--show-toplevel'])
+  } catch (error) {
+    if (isNotAGitRepository(error)) return undefined
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `git could not determine the worktree of ${cwd}: ${reason}. Check that git is installed and ` +
+        'on PATH, that the directory exists, and that the repository is readable by this user ' +
+        '(see safe.directory).',
+      { cause: error },
+    )
   }
+  return realpath(output.trim())
 }
 
 /**

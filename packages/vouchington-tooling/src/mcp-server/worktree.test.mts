@@ -28,9 +28,6 @@ describe('launchWorktreeRoot', () => {
 
   it('is undefined, not an error, when the launch directory is not inside a git worktree', async () => {
     await expect(launchWorktreeRoot(fixture.root, runIsolatedGit)).resolves.toBeUndefined()
-    await expect(
-      launchWorktreeRoot(join(fixture.root, 'missing'), runIsolatedGit),
-    ).resolves.toBeUndefined()
   })
 
   it('ignores GIT_DIR from the environment', async () => {
@@ -43,9 +40,39 @@ describe('launchWorktreeRoot', () => {
     }
   })
 
-  it('is undefined when the git runner fails with a non-Error', async () => {
-    const failing = vi.fn().mockRejectedValue('spawn refused')
-    await expect(launchWorktreeRoot(fixture.main, failing)).resolves.toBeUndefined()
+  it('is undefined when git reports the directory is not a git repository', async () => {
+    const outside = vi.fn().mockRejectedValue(
+      Object.assign(new Error('Command failed'), {
+        stderr: 'fatal: not a git repository (or any of the parent directories): .git',
+      }),
+    )
+    await expect(launchWorktreeRoot(fixture.main, outside)).resolves.toBeUndefined()
+    const byMessage = vi.fn().mockRejectedValue(new Error('fatal: Not a git repository'))
+    await expect(launchWorktreeRoot(fixture.main, byMessage)).resolves.toBeUndefined()
+  })
+
+  it('throws an actionable error, keeping the cause, for any other git failure', async () => {
+    const unsafe = Object.assign(new Error('Command failed'), {
+      stderr: "fatal: detected dubious ownership in repository at '/x'",
+    })
+    await expect(
+      launchWorktreeRoot(fixture.main, vi.fn().mockRejectedValue(unsafe)),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('git could not determine the worktree'),
+      cause: unsafe,
+    })
+    await expect(
+      launchWorktreeRoot(fixture.main, vi.fn().mockRejectedValue('spawn refused')),
+    ).rejects.toThrow('spawn refused')
+    await expect(launchWorktreeRoot(fixture.main, vi.fn().mockRejectedValue(null))).rejects.toThrow(
+      'safe.directory',
+    )
+  })
+
+  it('throws for a directory that does not exist, instead of treating it as outside', async () => {
+    await expect(launchWorktreeRoot(join(fixture.root, 'missing'), runIsolatedGit)).rejects.toThrow(
+      'git could not determine the worktree',
+    )
   })
 })
 
@@ -70,6 +97,13 @@ describe('resolveWorktree', () => {
   it('accepts the worktree of an unrelated repository, whatever the launch worktree', async () => {
     await expect(resolve(fixture.outside)).resolves.toBe(fixture.outside)
     await expect(resolve(fixture.outside, undefined)).resolves.toBe(fixture.outside)
+  })
+
+  it('propagates a git failure that is not "not a git repository" instead of rejecting the path', async () => {
+    const broken = vi.fn().mockRejectedValue(new Error('git: command not found'))
+    await expect(
+      resolveWorktree({ launchRoot: fixture.main, requested: fixture.main, runGit: broken }),
+    ).rejects.toThrow('git could not determine the worktree')
   })
 
   it('accepts a symlink to a worktree and returns its real path', async () => {

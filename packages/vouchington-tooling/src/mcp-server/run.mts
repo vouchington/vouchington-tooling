@@ -33,6 +33,7 @@ export async function runMcpServer(options: RunMcpServerOptions): Promise<void> 
     launchRoot,
     env: options.env,
     runGit,
+    ...(options.resolveFrom === undefined ? {} : { resolveFrom: options.resolveFrom }),
     ...(options.blackboard === undefined ? {} : { blackboard: options.blackboard }),
   }
   const server = createMcpServer(sdk, environment, options.version)

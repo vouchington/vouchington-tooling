@@ -11,19 +11,29 @@ are later phases.
 
 ## Install
 
-Install the server once per machine, not per repository. It needs these packages installed next to
-`vouchington-tooling`. `agent-blackboard` and `@modelcontextprotocol/sdk` are optional peer
-dependencies, so nothing else in the CLI requires them:
+Install the server once per machine, in its own dedicated directory, not in a project or a
+worktree: `pnpm add` installs into the directory it runs in. The server needs these packages
+installed next to `vouchington-tooling`. `agent-blackboard` and `@modelcontextprotocol/sdk` are
+optional peer dependencies, so nothing else in the CLI requires them. Pin exact versions; replace
+the placeholders with the current releases:
 
 ```bash
-pnpm add -D vouchington-tooling agent-blackboard@^0.6.0
-pnpm add -D @modelcontextprotocol/sdk zod
+mkdir -p ~/.local/share/vouchington-mcp
+cd ~/.local/share/vouchington-mcp
+pnpm init
+pnpm add --save-exact vouchington-tooling@<version> agent-blackboard@<version>
+pnpm add --save-exact @modelcontextprotocol/sdk@<version> zod@<version>
 ```
+
+Launch the server by the absolute path into that directory, for example
+`/abs/node ~/.local/share/vouchington-mcp/node_modules/vouchington-tooling/bin/vouchington-mcp.mjs`
+with `~` expanded to an absolute path (see [Launch](#launch)).
 
 `zod` is required by the SDK. Both `agent-blackboard` and the SDK are resolved from the server's own
 install, relative to this package's module, never from the worktree a tool call names, so
 repositories do not need to depend on `agent-blackboard`. When either is missing, `vouchington mcp`
-writes a message naming the package to stderr and exits with status 1.
+writes a message naming the package and the install directory to add it in to stderr and exits with
+status 1.
 
 The connection comes from `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the server's
 environment. The server never searches for, prints, or mints them.
