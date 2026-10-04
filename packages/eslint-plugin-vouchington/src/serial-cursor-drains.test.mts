@@ -51,6 +51,7 @@ describe('serial-cursor-drains', () => {
     `const Promise = custom; async function writeRows() { Promise.all(rows.map(drain)) }`,
     `async function writeRows() { return rows.map(drain) }`,
     `Promise.all(rows.map(drain))`,
+    `const { writeRows } = async () => Promise.all(rows.map(drain))`,
     `export default function () { Promise.all(rows.map(drain)) }`,
     `async function writeRows() { function nested() { Promise.all(rows.map(drain)) } }`,
   ])('allows serial, unrelated and shadowed cases: %s', async (code) => {

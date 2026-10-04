@@ -91,6 +91,7 @@ const INSTANCE_OPTIONS = {
 describe('const-instance prefix exceptions', () => {
   it.each([
     { options: `{ prefix: 'validation' }`, allowed: true },
+    { options: `{ prefix: 'validation', null: 0 }`, allowed: true },
     { options: `{ prefix: 'other' }`, allowed: false },
     { options: `{ prefix: 'validation', prefix: 'other' }`, allowed: false },
     { options: `{ prefix: 'other', prefix: 'validation' }`, allowed: true },

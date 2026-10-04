@@ -1,3 +1,4 @@
+import { nodePosition } from './node-position.mts'
 import { canonicalConstructor, constantArgument } from './member-read-exception-bindings.mts'
 import {
   findVariable,
@@ -29,11 +30,6 @@ function effectivePrefix(object: NodeLike | null | undefined, prefix: string): b
   return matches
 }
 
-function position(node: NodeLike, end: boolean): number {
-  const range = node.range as number[] | undefined
-  return range?.[end ? 1 : 0] ?? Number(node[end ? 'end' : 'start'])
-}
-
 function constantInstance(
   context: RuleContextLike,
   identifier: NodeLike | null | undefined,
@@ -60,7 +56,7 @@ function constantInstance(
           (reference) =>
             reference.identifier !== declaration.id &&
             reference.isWrite() &&
-            position(reference.identifier, false) > position(declaration, true),
+            nodePosition(reference.identifier, false) > nodePosition(declaration, true),
         )
       )
     }),

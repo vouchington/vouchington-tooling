@@ -48,7 +48,7 @@ function enclosingFunctionName(node: NodeLike): string | null {
       current.parent?.type === 'VariableDeclarator'
     ) {
       const id = current.parent.id as NodeLike | undefined
-      if (id?.type === 'Identifier' && typeof id.name === 'string') return id.name
+      if (id?.type === 'Identifier') return id.name as string
     }
     current = current.parent
   }
