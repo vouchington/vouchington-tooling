@@ -144,10 +144,14 @@ async function runJournal(args: string[]): Promise<number> {
       ...('timestamp' in values ? { timestamp: values.timestamp } : {}),
       parentSessionId: values['parent-session-id'] ?? null,
     })
-    const counts = feedbackOutboxCounts(
-      values['outbox-directory'] ?? join(process.cwd(), '.local', 'blackboard-outbox'),
-      required(values, 'session-id'),
-    )
+    // Autonomous mode has no outbox, so its receipt must not depend on one.
+    const counts =
+      values.mode === 'autonomous'
+        ? { pendingCount: 0, worktreePendingCount: 0 }
+        : feedbackOutboxCounts(
+            values['outbox-directory'] ?? join(process.cwd(), '.local', 'blackboard-outbox'),
+            required(values, 'session-id'),
+          )
     process.stdout.write(`${JSON.stringify({ ...result, ...counts })}\n`)
     return 0
   }

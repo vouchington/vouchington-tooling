@@ -276,6 +276,7 @@ describe('agent-blackboard CLI', () => {
         verified: true,
       },
     })
+    vi.mocked(feedbackOutboxCounts).mockClear()
     await expect(runAgentBlackboardCommand(['probe'])).resolves.toBe(0)
     expect(probeBlackboard).toHaveBeenCalledOnce()
     await expect(
@@ -324,7 +325,10 @@ describe('agent-blackboard CLI', () => {
     expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({
       status: 'delivered',
       sourceEventId: 'cli:note',
+      pendingCount: 0,
+      worktreePendingCount: 0,
     })
+    expect(feedbackOutboxCounts).not.toHaveBeenCalled()
     await expect(
       runAgentBlackboardCommand([
         'journal',
