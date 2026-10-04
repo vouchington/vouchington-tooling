@@ -1,5 +1,5 @@
 import type { FiniteEnumFiles, FiniteEnumRippleConfig, ReadTrackedFile } from './model.mts'
-import { hasConstObjectDeclaration } from './ast.mts'
+import { hasConfiguredObjectDeclaration } from './ast.mts'
 import { checkUnionFactories } from './union-factory-check.mts'
 import {
   checkCollectionPagePathLiterals,
@@ -69,7 +69,9 @@ export function checkUnionTypes(
     expectedValues: [...slugToType.keys()],
   })
 
-  if (hasConstObjectDeclaration(routeConfigContent, config.routeConfigObject, routeConfigsPath)) {
+  if (
+    hasConfiguredObjectDeclaration(routeConfigContent, config.routeConfigObject, routeConfigsPath)
+  ) {
     const routeConfigs = parseUnionRouteConfigEntries(
       routeConfigContent,
       routeConfigsPath,
@@ -124,7 +126,7 @@ export function checkUnionTypes(
     for (const routeConfig of typedRouteConfigs) {
       const expectedType = slugToType.get(routeConfig.singularPath)
       if (
-        expectedType &&
+        expectedType !== undefined &&
         routeConfig.unionTypes.length === 1 &&
         routeConfig.unionTypes[0] === expectedType
       ) {

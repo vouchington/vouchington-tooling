@@ -61,7 +61,7 @@ export function parseStructuredTypeEntries(
       throw new Error(`${file}: ${name} contains an uninspectable spread`)
     if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
-    if (!value) continue
+    if (value === undefined) continue
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body)) continue
     const names = new Set<string>()

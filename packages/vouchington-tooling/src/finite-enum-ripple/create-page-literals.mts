@@ -13,6 +13,20 @@ export function collectCreatePageLiterals(
   const names = new Set(properties)
   const values: string[] = []
   const visit = (node: ts.Node): void => {
+    if (ts.isObjectLiteralExpression(node) || ts.isJsxAttributes(node)) {
+      let configuredBeforeSpread = false
+      for (const member of node.properties) {
+        if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
+          if (configuredBeforeSpread)
+            throw new Error(`${file}: create page type can be overridden by a trailing spread`)
+        } else if (
+          (ts.isPropertyAssignment(member) && names.has(getPropertyNameText(member.name) ?? '')) ||
+          (ts.isJsxAttribute(member) && ts.isIdentifier(member.name) && names.has(member.name.text))
+        ) {
+          configuredBeforeSpread = true
+        }
+      }
+    }
     if (ts.isPropertyAssignment(node) && getPropertyNameText(node.name)) {
       const name = getPropertyNameText(node.name)!
       const value = getStringLiteralValue(node.initializer)

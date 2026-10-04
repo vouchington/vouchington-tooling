@@ -276,10 +276,12 @@ describe('checkFiniteEnumRipple', () => {
     )
   })
 
-  it('skips component files without a matching configured route', () => {
+  it('reports component files without a matching configured route', () => {
     const { files, check } = fixture()
     files.structuredComponentFiles.push({ file: 'ui/other/nav.tsx', slug: 'other' })
-    expect(check()).toEqual([])
+    expect(check()).toContainEqual(
+      expect.stringContaining('component has no matching route config'),
+    )
   })
 
   it('skips record checks when a required tracked declaration is missing', () => {

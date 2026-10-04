@@ -1,16 +1,16 @@
 import type { FiniteEnumFiles, FiniteEnumRippleConfig, ReadTrackedFile } from './model.mts'
 import type { StructuredTypeEntry } from './parsers.mts'
-import { hasConstObjectDeclaration } from './ast.mts'
+import { hasConfiguredObjectDeclaration } from './ast.mts'
 import { parseStructuredRouteConfigEntries } from './parsers.mts'
 import {
   checkCollectionPagePathLiterals,
-  checkStructuredCollectionComponentPathLiterals,
   compareSets,
   finiteEnumError,
   hasAllFiles,
   routePageSlugs,
   uniqueSorted,
 } from './compare.mts'
+import { checkStructuredCollectionComponentPathLiterals } from './component-paths.mts'
 
 export function checkStructuredRouteConfigs(
   errors: string[],
@@ -24,7 +24,9 @@ export function checkStructuredRouteConfigs(
   const backendStructuredsPath = config.backendPath
   if (hasAllFiles(files, [routeConfigsPath])) {
     const routeConfigContent = readTracked(routeConfigsPath)
-    if (hasConstObjectDeclaration(routeConfigContent, config.routeConfigObject, routeConfigsPath)) {
+    if (
+      hasConfiguredObjectDeclaration(routeConfigContent, config.routeConfigObject, routeConfigsPath)
+    ) {
       const routeConfigs = parseStructuredRouteConfigEntries(
         routeConfigContent,
         routeConfigsPath,
@@ -92,7 +94,14 @@ export function checkStructuredRouteConfigs(
         label: `${config.collectionLabel} route config values`,
         actualLabel: `${routeConfigsPath} ${config.routeConfigObject}`,
         actualFile: routeConfigsPath,
-        actualValues: enumRouteConfigs.flatMap((routeConfig) => routeConfig.structuredTypes),
+        actualValues: typedRouteConfigs.flatMap((routeConfig) =>
+          routeConfig.structuredTypes.length > 0
+            ? routeConfig.structuredTypes
+            : routeConfig.inferredStructuredType &&
+                (routeConfig.routeExempt || config.routeConfigExceptions.includes(routeConfig.key))
+              ? [routeConfig.inferredStructuredType]
+              : [],
+        ),
         expectedLabel: backendStructuredsPath,
         expectedFile: backendStructuredsPath,
         expectedValues: backendEntries

@@ -25,8 +25,19 @@ export function findConstObjectLiteral(
   return initializer
 }
 
-export function hasConstObjectDeclaration(content: string, name: string, file: string): boolean {
-  return !!findConstVariableDeclaration(createSourceFile(content, file), name)
+export function hasConfiguredObjectDeclaration(
+  content: string,
+  name: string,
+  file: string,
+): boolean {
+  const sourceFile = createSourceFile(content, file)
+  return sourceFile.statements.some(
+    (statement) =>
+      ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some(
+        (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
+      ),
+  )
 }
 
 export function findTypeAliasDeclaration(

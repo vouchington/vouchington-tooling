@@ -10,6 +10,10 @@ import { collectActivePatternCaptures } from './pattern-captures.mts'
 import { collectCreatePageLiterals } from './create-page-literals.mts'
 import { checkUnionCreatePageTypes } from './compare.mts'
 import { getStringProperty } from './parser-support.mts'
+import { hasConfiguredObjectDeclaration } from './ast.mts'
+import { checkUnionTypes } from './union-types.mts'
+import { checkStructuredRouteConfigs } from './structured-route-check.mts'
+import type { FiniteEnumFiles, FiniteEnumRippleConfig } from './model.mts'
 
 const file = 'fixture/routes.ts'
 
@@ -50,6 +54,101 @@ it('accepts an empty string constituent in a finite union', () => {
   ])
 })
 
+it('accepts an empty union value mapped through a single-type route', () => {
+  const contents = new Map([
+    ['types.ts', "type Kind = ''"],
+    [
+      'routes.ts',
+      "const slugs = { root: '' }; const routes = { roots: { singular: 'root', plural: 'roots', kinds: [''] } }",
+    ],
+  ])
+  const files: FiniteEnumFiles = {
+    existingFileSet: new Set(contents.keys()),
+    unionCollectionPages: [],
+    unionCreatePages: [],
+    unionDetailPages: [],
+    structuredCollectionPages: [],
+    structuredComponentFiles: [],
+    structuredDetailPages: [],
+  }
+  const config: NonNullable<FiniteEnumRippleConfig['union']> = {
+    typesPath: 'types.ts',
+    routeConfigsPath: 'routes.ts',
+    typeAlias: 'Kind',
+    slugMapObject: 'slugs',
+    routeConfigObject: 'routes',
+    typeArrayProperty: 'kinds',
+    pluralPathProperty: 'plural',
+    singularPathProperty: 'singular',
+    factoryCallPattern: /^createPage$/,
+    internalTypes: [],
+    routeConfigExceptions: [],
+    routeLabels: {
+      detailTop: 'top',
+      detail: 'detail',
+      collectionTop: 'top collection',
+      collection: 'collection',
+      factory: 'factory',
+    },
+    collectionLabel: 'kind',
+    createPageTypeProperties: ['action'],
+    collectionPathLiteralPattern: /path:\s*'\/([^']+)'/g,
+  }
+  const errors: string[] = []
+  checkUnionTypes(errors, files, (path) => contents.get(path)!, config)
+  expect(errors.join('\n')).not.toContain('maps singular')
+})
+
+it('counts an inferred exempt structured route as a present declaration value', () => {
+  const routeContent =
+    "const routes = { roots: { singular: 'root', plural: 'roots', special: true } }"
+  const files: FiniteEnumFiles = {
+    existingFileSet: new Set(['routes.ts', 'page.ts']),
+    structuredDetailPages: [],
+    structuredCollectionPages: [{ file: 'page.ts', slug: 'roots', isTopLevel: true }],
+    structuredComponentFiles: [],
+    unionDetailPages: [],
+    unionCollectionPages: [],
+    unionCreatePages: [],
+  }
+  const config: NonNullable<FiniteEnumRippleConfig['structured']> = {
+    backendPath: 'types.ts',
+    webPath: 'web.ts',
+    routeConfigsPath: 'routes.ts',
+    typeObject: 'kinds',
+    routeConfigObject: 'routes',
+    typeArrayProperty: 'kinds',
+    pluralPathProperty: 'plural',
+    singularPathProperty: 'singular',
+    routeExemptionProperty: 'special',
+    slugProperty: 'slug',
+    slugPluralProperty: 'slugs',
+    factoryCallPattern: /^factory$/,
+    routeConfigExceptions: [],
+    collectionRouteExclusions: [],
+    routeLabels: {
+      detailTop: 'top',
+      detail: 'detail',
+      collectionTop: 'top collection',
+      collection: 'collection',
+    },
+    collectionLabel: 'kind',
+    ignoredNavigationPaths: [],
+    collectionPathLiteralPattern: /path:\s*'\/([^']+)'/g,
+    navigationPathLiteralPattern: /push\('\/([^']+)'\)/g,
+  }
+  const errors: string[] = []
+  checkStructuredRouteConfigs(
+    errors,
+    files,
+    (path) => (path === 'routes.ts' ? routeContent : "const page = { path: '/roots' }"),
+    config,
+    [{ value: 'alpha', slug: 'root', slugPlural: 'roots' }],
+    new Map([['alpha', 'root']]),
+  )
+  expect(errors).toEqual([])
+})
+
 it('rejects overriding members inside structured slug bodies', () => {
   const parse = (body: string) =>
     parseStructuredTypeEntries(`const kinds = { alpha: ${body} }`, file, 'kinds', 'slug', 'slugs')
@@ -62,6 +161,23 @@ it('rejects overriding members inside structured slug bodies', () => {
   expect(() => parse("{ slug: 'alpha', slugs: 'alphas', [dynamic]: 'other' }")).toThrow(
     'uninspectable or duplicate key',
   )
+})
+
+it('preserves an empty structured key and detects mutable configured declarations', () => {
+  expect(
+    parseStructuredTypeEntries(
+      "const kinds = { '': { slug: 'root', slugs: 'roots' } }",
+      file,
+      'kinds',
+      'slug',
+      'slugs',
+    ),
+  ).toEqual([{ value: '', slug: 'root', slugPlural: 'roots' }])
+  expect(hasConfiguredObjectDeclaration('let routes = {}', 'routes', file)).toBe(true)
+  expect(() =>
+    parseUnionRouteConfigEntries('let routes = {}', file, 'routes', 'kinds', 'plural', 'singular'),
+  ).toThrow('could not find routes')
+  expect(hasConfiguredObjectDeclaration('const other = {}', 'routes', file)).toBe(false)
 })
 
 it('rejects route members that cannot be fully inspected', () => {
@@ -141,6 +257,31 @@ it('rejects selected create pages with no literal or with dynamic configured val
       'create page action must be a string literal',
     )
   }
+})
+
+it('rejects object and JSX spreads after a configured create-page type', () => {
+  expect(() =>
+    collectCreatePageLiterals("const fields = { action: 'entry', ...dynamicProps }", 'page.ts', [
+      'action',
+    ]),
+  ).toThrow('overridden by a trailing spread')
+  expect(() =>
+    collectCreatePageLiterals(
+      "const view = <Form action='entry' {...dynamicProps} />",
+      'page.tsx',
+      ['action'],
+    ),
+  ).toThrow('overridden by a trailing spread')
+  expect(
+    collectCreatePageLiterals("const fields = { ...defaults, action: 'entry' }", 'page.ts', [
+      'action',
+    ]),
+  ).toEqual(['entry'])
+  expect(
+    collectCreatePageLiterals("const view = <Form {...defaults} action='entry' />", 'page.tsx', [
+      'action',
+    ]),
+  ).toEqual(['entry'])
 })
 
 it('retains empty create-page values in objects, JSX, and assignments', () => {
