@@ -4,6 +4,7 @@ import {
   mutableExportInitializer,
   patternSelectsFactory,
 } from './factory-owner-export-pattern.mts'
+import { patternDefaultValues } from './factory-owner-provenance-binding.mts'
 import type { FactoryProvenanceOptions } from './factory-owner-provenance.mts'
 
 function node(value: unknown): NodeLike | undefined {
@@ -78,6 +79,7 @@ export function createFactoryExportVisitors(
           const initializer = node(declarator.init)
           if (
             bindings.some(restricted) ||
+            (id ? patternDefaultValues(id).some(restricted) : false) ||
             (id?.type === 'Identifier' && restricted(initializer)) ||
             (id &&
               patternSelectsFactory(id, options.factories) &&

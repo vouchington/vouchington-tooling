@@ -1,6 +1,7 @@
 import {
   findVariable,
   patternPropertyName,
+  staticPropertyName,
   unwrap,
   type NodeLike,
   type RuleContextLike,
@@ -8,7 +9,8 @@ import {
 } from './ast-helpers.mts'
 
 function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
-  return value?.type === 'Literal' && typeof value.value === 'string' ? value.value : null
+  const name = staticPropertyName(value)
+  return typeof name === 'string' ? name : null
 }
 
 export function constantDefinition(variable: VariableLike | null): NodeLike | null {
@@ -60,10 +62,26 @@ export function patternDefaultValue(pattern: NodeLike, localName: string): NodeL
     if (value.type === 'AssignmentPattern' && (value.left as NodeLike).name === localName) {
       return value.right as NodeLike
     }
-    const nested = patternDefaultValue(value, localName)
+    const nested = patternDefaultValue(
+      value.type === 'AssignmentPattern' ? (value.left as NodeLike) : value,
+      localName,
+    )
     if (nested) return nested
   }
   return null
+}
+
+export function patternDefaultValues(pattern: NodeLike): NodeLike[] {
+  if (pattern.type === 'AssignmentPattern') {
+    return [pattern.right as NodeLike, ...patternDefaultValues(pattern.left as NodeLike)]
+  }
+  if (pattern.type !== 'ObjectPattern' && pattern.type !== 'ArrayPattern') return []
+  const entries = (
+    pattern.type === 'ObjectPattern' ? pattern.properties : pattern.elements
+  ) as Array<NodeLike | null>
+  return entries.flatMap((entry) =>
+    entry ? patternDefaultValues((entry.value ?? entry.argument ?? entry) as NodeLike) : [],
+  )
 }
 
 function patternHasBinding(

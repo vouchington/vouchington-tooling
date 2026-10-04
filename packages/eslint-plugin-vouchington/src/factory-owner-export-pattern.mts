@@ -20,10 +20,12 @@ export function patternSelectsFactory(pattern: NodeLike, factories: ReadonlySet<
     if (property.type !== 'Property') return false
     const name = patternPropertyName(property)
     if (name === null) return false
-    if (factories.has(String(name))) return true
-    if (name !== 'default') return false
     const value = property.value as NodeLike
     const selected = value.type === 'AssignmentPattern' ? (value.left as NodeLike) : value
+    if (factories.has(String(name))) {
+      return selected.type !== 'ObjectPattern' && selected.type !== 'ArrayPattern'
+    }
+    if (name !== 'default') return false
     return selected.type === 'ObjectPattern' ? patternSelectsFactory(selected, factories) : true
   })
 }

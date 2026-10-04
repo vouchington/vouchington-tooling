@@ -75,6 +75,8 @@ export function createFactoryProvenance(
         new Set(['default']),
       )
       if (defaultSource) return isNamespace(defaultSource, active)
+      const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
+      if (defaultValue) return isNamespace(defaultValue, active)
       if ((declarator.id as NodeLike).type !== 'Identifier') return false
       return isNamespace(declarator.init as NodeLike, active)
     } finally {

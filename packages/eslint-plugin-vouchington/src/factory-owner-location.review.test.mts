@@ -88,6 +88,20 @@ export const { absent = makeGraph } = {}`),
     ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
   })
 
+  it('follows nested, namespace, and mutable export defaults without nested false positives', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+import { makeGraph } from '@compiler/runtime'
+const { missing = runtime } = {}
+missing.makeGraph()
+const { nested: { deep = makeGraph } = {} } = {}
+deep()
+export let { mutable = makeGraph } = {}
+export let [arrayDefault = makeGraph, , plain] = []
+export const { makeGraph: { name } } = runtime`),
+    ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner', 'constructionOwner'])
+  })
+
   it('stops at cyclic destructuring defaults', async () => {
     expect(
       await diagnostics(`const { missing = missing } = {}
