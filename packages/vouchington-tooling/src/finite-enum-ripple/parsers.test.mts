@@ -174,7 +174,7 @@ describe('finite enum parsers', () => {
 
   it('rejects structured spreads and skips other unsupported members', () => {
     const source =
-      "const kinds = { [dynamic]: { slug: 'x', slugs: 'xs' }, scalar: 1, alpha: { ...extra, slug: 'alpha', slugs: 'alphas' } }"
+      "const kinds = { [dynamic]: { slug: 'x', slugs: 'xs' }, scalar: 1, alpha: { slug: 'alpha', slugs: 'alphas' } }"
     expect(parseStructuredTypeEntries(source, file, 'kinds', 'slug', 'slugs')).toEqual([
       { value: 'alpha', slug: 'alpha', slugPlural: 'alphas' },
     ])
@@ -248,7 +248,7 @@ describe('finite enum parsers', () => {
 
   it('skips unrelated declarations and unmatched structured factory calls', () => {
     const source =
-      "type Other = 1; let kinds = {}; const kinds = { alpha: { ...extra, slug: 'alpha', slugs: 'alphas' } }"
+      "type Other = 1; let kinds = {}; const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' } }"
     expect(parseStructuredTypeEntries(source, file, 'kinds', 'slug', 'slugs')).toHaveLength(1)
     expect(
       parseStructuredRouteFactoryArgs(

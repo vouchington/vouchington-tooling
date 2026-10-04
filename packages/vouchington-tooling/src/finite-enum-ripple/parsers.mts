@@ -64,6 +64,15 @@ export function parseStructuredTypeEntries(
     if (!value) continue
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body)) continue
+    const names = new Set<string>()
+    for (const member of body.properties) {
+      if (!ts.isPropertyAssignment(member))
+        throw new Error(`${file}: ${name}.${value} contains an uninspectable member`)
+      const memberName = getPropertyNameText(member.name)
+      if (!memberName || names.has(memberName))
+        throw new Error(`${file}: ${name}.${value} contains an uninspectable or duplicate key`)
+      names.add(memberName)
+    }
     const slug = getStringProperty(body, slugProperty)
     const slugPlural = getStringProperty(body, slugPluralProperty)
     if (!slug) throw new Error(`${file}: ${name}.${value} is missing ${slugProperty}`)
@@ -144,7 +153,7 @@ export function parseUnionDetailRouteFactoryArgs(
     if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
     const unionType = getStringLiteralValue(call.arguments[0])
     const slug = getStringLiteralValue(call.arguments[1])
-    if (!unionType || !slug)
+    if (unionType === undefined || slug === undefined)
       throw new Error(`${file}: configured route factory call needs literal type and slug`)
     args.push({ unionType, slug })
   }

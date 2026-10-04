@@ -31,11 +31,12 @@ export function checkUnionCreatePageTypes(
       continue
     }
     const content = readTracked(page.file)
-    for (const actualType of collectCreatePageLiterals(
-      content,
-      page.file,
-      createPageTypeProperties,
-    )) {
+    const actualTypes = collectCreatePageLiterals(content, page.file, createPageTypeProperties)
+    if (actualTypes.length === 0)
+      errors.push(
+        finiteEnumError(page.file, `${label} create page has no inspectable type literal`),
+      )
+    for (const actualType of actualTypes) {
       if (actualType === expectedType) continue
       errors.push(
         finiteEnumError(

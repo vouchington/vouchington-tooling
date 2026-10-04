@@ -1,10 +1,30 @@
 import { expect, it } from 'vitest'
-import { parseUnionRouteConfigEntries, parseUnionTypeUnion } from './parsers.mts'
+import ts from '@typescript/typescript6'
+import {
+  parseStructuredTypeEntries,
+  parseUnionDetailRouteFactoryArgs,
+  parseUnionRouteConfigEntries,
+  parseUnionTypeUnion,
+} from './parsers.mts'
 import { collectActivePatternCaptures } from './pattern-captures.mts'
 import { collectCreatePageLiterals } from './create-page-literals.mts'
 import { checkUnionCreatePageTypes } from './compare.mts'
+import { getStringProperty } from './parser-support.mts'
 
 const file = 'fixture/routes.ts'
+
+it('reads a named property safely from a standalone object with other member forms', () => {
+  const source = ts.createSourceFile(
+    file,
+    "const value = { ...base, slug: 'entry' }",
+    ts.ScriptTarget.Latest,
+    true,
+  )
+  const declaration = source.statements[0] as ts.VariableStatement
+  const object = declaration.declarationList.declarations[0]!
+    .initializer as ts.ObjectLiteralExpression
+  expect(getStringProperty(object, 'slug')).toBe('entry')
+})
 
 it('keeps executable backtick route literals while ignoring embedded examples', () => {
   const source = 'const example = "path: `/old`"; const route = { path: `/right` }'
@@ -25,6 +45,23 @@ it('rescans interpolated template tails before later active route literals', () 
 
 it('accepts an empty string constituent in a finite union', () => {
   expect(parseUnionTypeUnion("type Kind = '' | 'entry'", file, 'Kind')).toEqual(['', 'entry'])
+  expect(parseUnionDetailRouteFactoryArgs("createPage('', 'root')", file, /^createPage$/)).toEqual([
+    { unionType: '', slug: 'root' },
+  ])
+})
+
+it('rejects overriding members inside structured slug bodies', () => {
+  const parse = (body: string) =>
+    parseStructuredTypeEntries(`const kinds = { alpha: ${body} }`, file, 'kinds', 'slug', 'slugs')
+  expect(() => parse("{ slug: 'alpha', slugs: 'alphas', ...overrides }")).toThrow(
+    'contains an uninspectable member',
+  )
+  expect(() => parse("{ slug: 'alpha', slugs: 'alphas', slug: 'other' }")).toThrow(
+    'uninspectable or duplicate key',
+  )
+  expect(() => parse("{ slug: 'alpha', slugs: 'alphas', [dynamic]: 'other' }")).toThrow(
+    'uninspectable or duplicate key',
+  )
 })
 
 it('rejects route members that cannot be fully inspected', () => {
@@ -62,7 +99,7 @@ it('rejects route members that cannot be fully inspected', () => {
 it('collects literal element-access assignments but not dynamic property names', () => {
   expect(
     collectCreatePageLiterals(
-      "form['action'] = 'other'; form[key] = 'ignored'; form['action'] = dynamic; ({ other } = 'skip')",
+      "form['action'] = 'other'; form[key] = 'ignored'; ({ other } = 'skip')",
       'page.tsx',
       ['action'],
     ),
@@ -80,6 +117,30 @@ it('reports a selected create page without a matching single-type route', () => 
     'record',
   )
   expect(errors.join('\n')).toContain('no matching single-type route config for "drafts"')
+})
+
+it('rejects selected create pages with no literal or with dynamic configured values', () => {
+  const errors: string[] = []
+  const routes = [{ pluralPath: 'entries', unionTypes: ['entry'] }]
+  const pages = [{ file: 'page.tsx', slug: 'entries', isTopLevel: true }]
+  checkUnionCreatePageTypes(
+    errors,
+    routes,
+    pages,
+    () => 'const fields = { other: 1 }',
+    ['action'],
+    'record',
+  )
+  expect(errors.join('\n')).toContain('no inspectable type literal')
+  for (const source of [
+    'const fields = { action: selectedType }',
+    'const view = <Form action={selectedType} />',
+    'form.action = selectedType',
+  ]) {
+    expect(() => collectCreatePageLiterals(source, 'page.tsx', ['action'])).toThrow(
+      'create page action must be a string literal',
+    )
+  }
 })
 
 it('retains empty create-page values in objects, JSX, and assignments', () => {

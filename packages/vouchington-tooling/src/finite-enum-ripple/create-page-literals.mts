@@ -16,13 +16,17 @@ export function collectCreatePageLiterals(
     if (ts.isPropertyAssignment(node) && getPropertyNameText(node.name)) {
       const name = getPropertyNameText(node.name)!
       const value = getStringLiteralValue(node.initializer)
+      if (names.has(name) && value === undefined)
+        throw new Error(`${file}: create page ${name} must be a string literal`)
       if (names.has(name) && value !== undefined) values.push(value)
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && names.has(node.name.text)) {
       const value =
         node.initializer && ts.isJsxExpression(node.initializer)
           ? getStringLiteralValue(node.initializer.expression)
           : getStringLiteralValue(node.initializer)
-      if (value !== undefined) values.push(value)
+      if (value === undefined)
+        throw new Error(`${file}: create page ${node.name.text} must be a string literal`)
+      values.push(value)
     } else if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken
@@ -35,6 +39,8 @@ export function collectCreatePageLiterals(
             ? getStringLiteralValue(node.left.argumentExpression)
             : undefined
       const value = getStringLiteralValue(node.right)
+      if (name && names.has(name) && value === undefined)
+        throw new Error(`${file}: create page ${name} must be a string literal`)
       if (name && names.has(name) && value !== undefined) values.push(value)
     }
     ts.forEachChild(node, visit)
