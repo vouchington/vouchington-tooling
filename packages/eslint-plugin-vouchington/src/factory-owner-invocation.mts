@@ -6,12 +6,6 @@ import {
   type RuleContextLike,
 } from './ast-helpers.mts'
 
-function node(value: unknown): NodeLike | undefined {
-  return value !== null && typeof value === 'object' && 'type' in value
-    ? (value as NodeLike)
-    : undefined
-}
-
 function isUnshadowedGlobal(
   context: RuleContextLike,
   value: NodeLike | undefined,
@@ -32,7 +26,7 @@ function directReflectFactory(
 ): boolean {
   const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
-  if (!isUnshadowedGlobal(context, node(member.object), 'Reflect')) return false
+  if (!isUnshadowedGlobal(context, member.object as NodeLike, 'Reflect')) return false
   const method = propertyName(member)
   return (method === 'apply' || method === 'construct') && isFactory(args[0])
 }
@@ -45,18 +39,18 @@ export function createFactoryInvocationVisitors(
     context.report({ node: value, messageId: 'constructionOwner' })
   return {
     CallExpression(value) {
-      const callee = node(value.callee)
+      const callee = value.callee as NodeLike
       const args = value.arguments as NodeLike[]
       if (isFactory(callee) || directReflectFactory(context, callee, args, isFactory)) report(value)
     },
     NewExpression(value) {
-      if (isFactory(node(value.callee))) report(value)
+      if (isFactory(value.callee as NodeLike)) report(value)
     },
     TaggedTemplateExpression(value) {
-      if (isFactory(node(value.tag))) report(value)
+      if (isFactory(value.tag as NodeLike)) report(value)
     },
     Decorator(value) {
-      if (isFactory(node(value.expression))) report(value)
+      if (isFactory(value.expression as NodeLike)) report(value)
     },
   }
 }

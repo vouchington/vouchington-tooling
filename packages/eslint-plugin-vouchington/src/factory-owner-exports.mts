@@ -27,7 +27,10 @@ export function createFactoryExportVisitors(
     provenance.isFactory(value) || provenance.isNamespace(value)
   return {
     ExportAllDeclaration(value) {
-      if (value.exportKind !== 'type' && options.modules.has(name(node(value.source)) ?? '')) {
+      if (
+        value.exportKind !== 'type' &&
+        options.modules.has(String((value.source as NodeLike).value))
+      ) {
         report(value)
       }
     },

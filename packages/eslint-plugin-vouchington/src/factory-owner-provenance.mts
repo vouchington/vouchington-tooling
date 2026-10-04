@@ -18,12 +18,6 @@ export type FactoryProvenanceOptions = {
   factories: ReadonlySet<string>
 }
 
-function node(value: unknown): NodeLike | undefined {
-  return value !== null && typeof value === 'object' && 'type' in value
-    ? (value as NodeLike)
-    : undefined
-}
-
 function staticModuleSpecifier(value: NodeLike | undefined): string | null {
   return value?.type === 'Literal' && typeof value.value === 'string' ? value.value : null
 }
@@ -41,11 +35,11 @@ function namedPatternSource(
   localName: string,
   names: ReadonlySet<string>,
 ): NodeLike | null {
-  const pattern = node(declarator.id)
+  const pattern = declarator.id as NodeLike
   if (pattern?.type !== 'ObjectPattern') return null
   const properties = pattern.properties as NodeLike[]
   return properties.some((property) => {
-    const local = node(property.value)
+    const local = property.value as NodeLike
     return (
       property.type === 'Property' &&
       local?.type === 'Identifier' &&
@@ -53,7 +47,7 @@ function namedPatternSource(
       names.has(String(patternPropertyName(property)))
     )
   })
-    ? (node(declarator.init) ?? null)
+    ? (declarator.init as NodeLike)
     : null
 }
 
@@ -69,9 +63,10 @@ export function createFactoryProvenance(
     active = new Set<VariableLike>(),
   ): boolean {
     const current = unwrap(value)
-    if (current?.type === 'AwaitExpression') return isNamespace(node(current.argument), active)
+    if (current?.type === 'AwaitExpression')
+      return isNamespace(current.argument as NodeLike, active)
     if (current?.type === 'ImportExpression') {
-      const moduleName = staticModuleSpecifier(node(current.source))
+      const moduleName = staticModuleSpecifier(current.source as NodeLike)
       return moduleName !== null && options.modules.has(moduleName)
     }
     if (current?.type === 'CallExpression') {
@@ -83,10 +78,10 @@ export function createFactoryProvenance(
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
     const declarator = constantDefinition(variable)
-    if (!declarator || node(declarator.id)?.type !== 'Identifier') return false
+    if (!declarator || (declarator.id as NodeLike).type !== 'Identifier') return false
     active.add(variable)
     try {
-      return isNamespace(node(declarator.init), active)
+      return isNamespace(declarator.init as NodeLike, active)
     } finally {
       active.delete(variable)
     }
@@ -99,7 +94,8 @@ export function createFactoryProvenance(
     const current = unwrap(value)
     if (current?.type === 'MemberExpression') {
       return (
-        options.factories.has(String(propertyName(current))) && isNamespace(node(current.object))
+        options.factories.has(String(propertyName(current))) &&
+        isNamespace(current.object as NodeLike)
       )
     }
     if (current?.type !== 'Identifier') return false
@@ -113,10 +109,10 @@ export function createFactoryProvenance(
     if (!declarator) return false
     const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
     if (patternSource) return isNamespace(patternSource)
-    if (node(declarator.id)?.type !== 'Identifier') return false
+    if ((declarator.id as NodeLike).type !== 'Identifier') return false
     active.add(variable)
     try {
-      return isFactory(node(declarator.init), active)
+      return isFactory(declarator.init as NodeLike, active)
     } finally {
       active.delete(variable)
     }

@@ -80,6 +80,14 @@ Reflect.construct(makeGraph, [])`,
     reports: 4,
   },
   {
+    name: 'unrelated new and tagged calls',
+    code: `import { makeGraph } from '@compiler/runtime'
+const unrelated = () => 1
+new unrelated()
+unrelated\`source\``,
+    reports: 0,
+  },
+  {
     name: 'direct reexports',
     code: `export { makeGraph as graph, makeHost } from '@compiler/runtime'
 export * from '@compiler/runtime'`,
