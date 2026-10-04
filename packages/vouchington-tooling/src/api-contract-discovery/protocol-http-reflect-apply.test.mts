@@ -27,6 +27,9 @@ const invalid = {
     `${dispatch}const emit=sink.pipeline;Reflect.apply(emit,ctx,[raw])`,
   ),
   'aliased-target': route(`${dispatch}const emit=ctx.pipeline;Reflect.apply(emit,ctx,[raw])`),
+  'aliased-standard': route(
+    `${dispatch}const reflect=Reflect.apply;reflect(ctx.pipeline,ctx,[raw])`,
+  ),
   'literal-brackets': route(`${dispatch}Reflect['apply'](ctx['pipeline'],ctx,[raw])`),
   'called-callback': route(`${dispatch}invoke(()=>Reflect.apply(ctx.pipeline,ctx,[raw]))`),
   'unknown-payload': route(`${dispatch}Reflect.apply(ctx.pipeline,ctx,sink.arguments)`),
@@ -35,6 +38,16 @@ const valid = {
   direct: route(dispatch),
   'other-receiver': route(`${dispatch}Reflect.apply(sink.pipeline,sink,[raw])`),
   'nonresponse-function': route(`${dispatch}Reflect.apply(()=>{},ctx,[])`),
+  'other-standard-apply': route(`${dispatch}Function.apply(null,[])`),
+  'typed-project-expression': route(
+    `${dispatch}((()=>undefined as never) as typeof Reflect.apply)(ctx.pipeline,ctx,[raw])`,
+  ),
+  'typed-project-function':
+    route(`${dispatch}const invoke:typeof Reflect.apply=()=>undefined as never;
+    invoke(ctx.pipeline,ctx,[raw])`),
+  'typed-project-method':
+    route(`${dispatch}const invoke:{apply:typeof Reflect.apply}={apply:()=>undefined as never};
+    invoke.apply(ctx.pipeline,ctx,[raw])`),
   'nonresponse-target': route(`${dispatch}Reflect.apply(sink.run,ctx.params,[raw])`),
   'context-data-method': route(`${dispatch}Reflect.apply(ctx.query.run,ctx.query,[raw])`),
   dead: route(`${dispatch}if(false)Reflect.apply(ctx.pipeline,ctx,[raw])`),

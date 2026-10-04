@@ -1,14 +1,22 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { standardCompilerDeclaration } from './protocol-platform-callbacks.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
+import { unwrapExpression } from './protocol-marker-analysis.mts'
 import {
   contextResponseMethod,
   httpContextReceiver,
   methodAccess,
 } from './protocol-http-method-access.mts'
 
-/** Only the actual compiler-library Reflect.apply signature has this argument layout. */
+/** Both the actual invoked value and signature must belong to the compiler library. */
 function standardReflectApply(call: ts.CallExpression, checker: ts.TypeChecker): boolean {
+  const access = methodAccess(unwrapExpression(call.expression))
+  const receiver = expressionReceiver(access?.receiver ?? call.expression, checker)
+  if (!receiver) return false
+  const path = [...receiver.path, ...(access ? [access.name] : [])]
+  if (path.join('.') !== 'apply') return false
+  if (!receiver.root.declarations?.every((value) => standardCompilerDeclaration(value, checker)))
+    return false
   const declaration = checker.getResolvedSignature(call)?.declaration
   if (!declaration || !ts.isFunctionDeclaration(declaration) || declaration.name?.text !== 'apply')
     return false
