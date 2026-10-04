@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import { sameWriteReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
@@ -36,6 +37,7 @@ export function mutationAffectsSelectedStream(
   const framed = frameReceivers.flatMap(resolveFrame)
   return mutations.some(({ node, receiver }) => {
     if (
+      !potentiallyExecuted(node) ||
       (!isSourceLevelMutation(node) &&
         !executableProtocolPath(node, checker) &&
         !opaqueProtocolCallbackPath(node, checker) &&

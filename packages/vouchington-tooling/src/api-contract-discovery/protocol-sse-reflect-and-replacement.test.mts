@@ -30,6 +30,8 @@ const sources = {
   'called-helper-suffix': `${preamble}function replace(){stream.write=(_value:string)=>{}};app.route('/events').get(()=>{replace();${frame}${frame}})`,
   'called-helper-parameter-replacement': `${preamble}function replace(target:typeof stream){target.write=(_value:string)=>{}};app.route('/events').get(()=>{replace(stream);${frame}})`,
   'named-handler-called-helper': `${preamble}function replace(){stream.write=(_value:string)=>{}};function handle(){replace();${frame}};app.route('/events').get(handle)`,
+  'called-helper-dead-branch': `${preamble}function replace(){if(false){stream.write=(_value:string)=>{}}};app.route('/events').get(()=>{replace();${frame}})`,
+  'called-helper-after-return': `${preamble}function replace(){return;stream.write=(_value:string)=>{}};app.route('/events').get(()=>{replace();${frame}})`,
   'opaque-callback-replacement': route(`opaque(()=>{stream.write=(_value:string)=>{}});${frame}`),
   'opaque-callback-suffix': route(
     `opaque(()=>{stream.write=(_value:string)=>{}});${frame}${frame}`,
@@ -114,6 +116,8 @@ it.each([
   'dead-replacement',
   'unrelated-delete',
   'uncalled-source-replacement',
+  'called-helper-dead-branch',
+  'called-helper-after-return',
   'called-helper-other-stream-replacement',
   'ignored-callback-replacement',
 ] as const)('preserves the selected frame in %s', (name) => {
