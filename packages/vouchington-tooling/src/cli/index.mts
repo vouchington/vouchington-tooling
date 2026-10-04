@@ -2,7 +2,6 @@
 import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { runAgentHarnessConfigCli } from '../agent-harness-config/cli.mts'
 import { runPostReviewCli } from '../gha-post-review/cli.mts'
 import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
@@ -100,8 +99,6 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runRunnerPortPolicy(parsed)
     case 'with-host-lock':
       return runWithHostLock(parsed.args)
-    case 'agent-harness-config':
-      return runAgentHarnessConfigCli(parsed.args)
     case 'gha-runtime-audit':
       return runGhaRuntimeAudit(parsed)
     case 'script': {

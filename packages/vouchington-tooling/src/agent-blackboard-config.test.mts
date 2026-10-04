@@ -58,6 +58,19 @@ describe('vouchington-tooling MCP repository configuration', () => {
     )
   })
 
+  it('leaves machine policy to vouchington-machines', () => {
+    const settings = JSON.parse(readFileSync('.claude/settings.json', 'utf8'))
+    for (const key of ['sandbox', 'model', 'effortLevel', 'useAutoModeDuringPlan']) {
+      expect(settings).not.toHaveProperty(key)
+    }
+    expect(settings.permissions).not.toHaveProperty('defaultMode')
+    const config = readFileSync('.codex/config.toml', 'utf8')
+    expect(config).not.toMatch(
+      /^(?:sandbox_mode|approval_policy|approvals_reviewer|model|model_reasoning_effort)\s*=/mu,
+    )
+    expect(config).not.toContain('[sandbox_workspace_write]')
+  })
+
   it('keeps the integration development-only in the published package', () => {
     const packageJson = readJson('packages/vouchington-tooling/package.json') as Record<
       string,

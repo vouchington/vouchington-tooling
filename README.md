@@ -184,7 +184,6 @@ vouchington --version
 vouchington runner-port-policy
 vouchington runner-port-policy --reserved 2200
 vouchington with-host-lock --name expensive-build --timeout-seconds 60 -- make build
-vouchington agent-harness-config check --global
 vouchington gha-runtime-audit --pr-workflow CI --push-workflow '/^Main CI \\(.+\\)$/'
 vouchington ast-grep-pack
 vouchington gha-output name
@@ -268,6 +267,9 @@ present. A present artifact whose download fails is a hard failure: the helper s
 one, prints `download failed artifact=<name> exit=<n>`, exits non-zero (a downloader exit of 3 is
 reported as 1 so it cannot be mistaken for absence), and writes no `availability` output.
 
+Machine-wide agent settings now belong to [vouchington-machines](https://github.com/vouchington/vouchington-machines/blob/main/docs/agent-config.md).
+Use its `configure-agents.sh` and `diagnose-agents.sh`; see [the migration note](docs/agent-config.md).
+
 ## Packages
 
 ### `vouchington-tooling`
@@ -279,7 +281,6 @@ import { isRunnerReservedPort, runnerPortPolicy } from 'vouchington-tooling/runn
 import { initSqlAst, extractCreateTableMetadata } from 'vouchington-tooling/sql-ast'
 import { splitSqlStatements } from 'vouchington-tooling/sql-scanner'
 import { auditCiJobRuntime } from 'vouchington-tooling/gha-runtime-audit'
-import { applyHarnessConfig, dumpHarnessPolicy } from 'vouchington-tooling/agent-harness-config'
 import { writeVitestBlobManifest } from 'vouchington-tooling/vitest-blob-manifest'
 import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
 import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'

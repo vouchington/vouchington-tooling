@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { HARNESS_IDS, inspectHarnessEnvironment, selectHarnessSession } from './index.mts'
-import { HARNESS_IDS as configHarnessIds } from '../agent-harness-config/index.mts'
 
 describe('agent harness identity', () => {
   it('inspects every simultaneous harness signal without choosing one', () => {
@@ -59,10 +58,6 @@ describe('agent harness identity', () => {
       sessionId: 'cursor-session',
     })
     expect(selectHarnessSession(environment, ['claude'])).toBeUndefined()
-  })
-
-  it('keeps the config harness identifier export compatible', () => {
-    expect(configHarnessIds).toBe(HARNESS_IDS)
   })
 
   it('publishes the root and dedicated subpath contracts', async () => {

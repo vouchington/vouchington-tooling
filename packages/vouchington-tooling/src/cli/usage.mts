@@ -3,7 +3,6 @@ export const USAGE = `Usage: vouchington <command> [options]
 Commands:
   runner-port-policy   Print or validate a runner port policy
   with-host-lock       Run a command under a host-wide lock
-  agent-harness-config          Apply classifier-auto + sandbox keys to agent harnesses
   gha-runtime-audit             Audit successful GitHub Actions job runtimes
   require-up-to-date            Require HEAD to include a fetched remote branch
   gitleaks-directory-scan       Scan a directory with Gitleaks
@@ -65,10 +64,6 @@ with-host-lock
   [--failure-diagnostics <absolute-script>]
   [--on-acquire-timeout fail|run-unlocked]
   -- <command> [args...]
-
-agent-harness-config dump
-agent-harness-config check|apply [--global] [--repo PATH]... [--harness claude|codex|grok|cursor]...
-  [--home PATH]
 
 gha-runtime-audit
   [--repository owner/name]   Default GITHUB_REPOSITORY
