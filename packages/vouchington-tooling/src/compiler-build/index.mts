@@ -10,3 +10,10 @@ export {
   type SettlementCallbacks,
   type SettlementConfirmation,
 } from './settlement.mts'
+export { createCompilerProgramCache } from './program.mts'
+export type {
+  CompilerProgramCache,
+  CompilerProgramCacheOptions,
+  CompilerProgramGeneration,
+  CompilerProgramSnapshot,
+} from './program-types.mts'
