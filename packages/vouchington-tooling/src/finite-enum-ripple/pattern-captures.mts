@@ -28,7 +28,9 @@ export function collectActivePatternCaptures(
       inactive.push({
         start: scanner.getTokenPos(),
         end: scanner.getTextPos(),
-        literal: kind === ts.SyntaxKind.StringLiteral,
+        literal:
+          kind === ts.SyntaxKind.StringLiteral ||
+          kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral,
       })
   }
   if (file.endsWith('.tsx') || file.endsWith('.jsx')) {

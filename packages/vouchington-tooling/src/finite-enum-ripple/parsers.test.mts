@@ -203,7 +203,7 @@ describe('finite enum parsers', () => {
       ),
     ).toThrow('missing slug')
     const routes =
-      "const kindRoutes = { ...extra, [dynamic]: {}, scalar: 1, alpha: { ...extra, singular: 'alpha', plural: 'alphas', kinds: ['alpha'], special: true } }"
+      "const kindRoutes = { alpha: { ...extra, singular: 'alpha', plural: 'alphas', kinds: ['alpha'], special: true } }"
     expect(
       parseStructuredRouteConfigEntries(
         routes,
@@ -225,7 +225,7 @@ describe('finite enum parsers', () => {
         'plural',
         'singular',
       ),
-    ).toThrow('could not parse kindRoutes entries')
+    ).toThrow('uninspectable route member')
   })
 
   it('rejects uninspectable configured route type arrays', () => {

@@ -21,11 +21,13 @@ export function parseRouteConfigEntries(
     singularPath: string
   }[] = []
   for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
+    if (!ts.isPropertyAssignment(property))
+      throw new Error(`${file}: ${name} contains an uninspectable route member`)
     const key = getPropertyNameText(property.name)
-    if (!key) continue
+    if (!key) throw new Error(`${file}: ${name} contains an uninspectable route key`)
     const body = unwrapExpression(property.initializer)
-    if (!ts.isObjectLiteralExpression(body)) continue
+    if (!ts.isObjectLiteralExpression(body))
+      throw new Error(`${file}: ${name}.${key} must be an object literal`)
     const pluralPath = getStringProperty(body, pluralPathProperty)
     const singularPath = getStringProperty(body, singularPathProperty)
     if (!pluralPath) throw new Error(`${file}: ${name}.${key} is missing ${pluralPathProperty}`)
@@ -58,7 +60,7 @@ export function collectStringLiteralsFromType(type: ts.TypeNode): string[] {
   if (ts.isUnionTypeNode(node))
     return node.types.flatMap((item) => collectStringLiteralsFromType(item))
   const value = ts.isLiteralTypeNode(node) ? getStringLiteralValue(node.literal) : undefined
-  if (!value) throw new Error('union contains a non-string literal constituent')
+  if (value === undefined) throw new Error('union contains a non-string literal constituent')
   return [value]
 }
 

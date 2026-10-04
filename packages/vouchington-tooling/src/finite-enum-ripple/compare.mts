@@ -21,7 +21,15 @@ export function checkUnionCreatePageTypes(
   )
   for (const page of pages) {
     const expectedType = typeByPluralPath.get(page.slug)
-    if (!expectedType) continue
+    if (expectedType === undefined) {
+      errors.push(
+        finiteEnumError(
+          page.file,
+          `${label} create page has no matching single-type route config for "${page.slug}"`,
+        ),
+      )
+      continue
+    }
     const content = readTracked(page.file)
     for (const actualType of collectCreatePageLiterals(
       content,

@@ -32,7 +32,7 @@ it('recognizes active object, JSX, and assignment literals only', () => {
     'ui/entries/create/page.tsx',
     ['action', 'type'],
   )
-  expect(values).toEqual(['entry', 'entry', 'entry', 'entry'])
+  expect(values).toEqual(['entry', 'entry', 'entry', 'entry', 'skip'])
 })
 
 it('inspects a literal inside a JSX expression attribute', () => {

@@ -29,7 +29,9 @@ export function collectCreatePageLiterals(
         ? node.left.text
         : ts.isPropertyAccessExpression(node.left)
           ? node.left.name.text
-          : undefined
+          : ts.isElementAccessExpression(node.left)
+            ? getStringLiteralValue(node.left.argumentExpression)
+            : undefined
       const value = getStringLiteralValue(node.right)
       if (name && names.has(name) && value) values.push(value)
     }
