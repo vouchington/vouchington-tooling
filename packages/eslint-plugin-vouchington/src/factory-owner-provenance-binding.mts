@@ -1,6 +1,13 @@
-import { patternPropertyName, type NodeLike, type VariableLike } from './ast-helpers.mts'
+import {
+  findVariable,
+  patternPropertyName,
+  unwrap,
+  type NodeLike,
+  type RuleContextLike,
+  type VariableLike,
+} from './ast-helpers.mts'
 
-export function staticModuleSpecifier(value: NodeLike | undefined): string | null {
+function staticModuleSpecifier(value: NodeLike | undefined): string | null {
   return value?.type === 'Literal' && typeof value.value === 'string' ? value.value : null
 }
 
@@ -10,6 +17,26 @@ export function constantDefinition(variable: VariableLike | null): NodeLike | nu
   return definition.parent?.type === 'VariableDeclaration' && definition.parent.kind === 'const'
     ? definition.node
     : null
+}
+
+export function awaitedModuleSpecifier(
+  context: RuleContextLike,
+  value: NodeLike | null | undefined,
+  active = new Set<VariableLike>(),
+): string | null {
+  const current = unwrap(value)
+  if (current?.type === 'ImportExpression') return staticModuleSpecifier(current.source as NodeLike)
+  if (current?.type !== 'Identifier') return null
+  const variable = findVariable(context, current)
+  if (!variable || active.has(variable)) return null
+  const declaration = constantDefinition(variable)
+  if ((declaration?.id as NodeLike | undefined)?.type !== 'Identifier') return null
+  active.add(variable)
+  try {
+    return awaitedModuleSpecifier(context, declaration?.init as NodeLike, active)
+  } finally {
+    active.delete(variable)
+  }
 }
 
 export function namedPatternSource(

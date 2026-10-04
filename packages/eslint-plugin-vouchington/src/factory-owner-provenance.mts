@@ -7,9 +7,9 @@ import {
   type VariableLike,
 } from './ast-helpers.mts'
 import {
+  awaitedModuleSpecifier,
   constantDefinition,
   namedPatternSource,
-  staticModuleSpecifier,
 } from './factory-owner-provenance-binding.mts'
 import {
   isNamedImport,
@@ -36,9 +36,8 @@ export function createFactoryProvenance(
     const current = unwrap(value)
     if (current?.type === 'AwaitExpression') {
       const argument = unwrap(current.argument as NodeLike)
-      if (argument?.type !== 'ImportExpression') return isNamespace(argument, active)
-      const moduleName = staticModuleSpecifier(argument.source as NodeLike)
-      return moduleName !== null && options.modules.has(moduleName)
+      const moduleName = awaitedModuleSpecifier(context, argument)
+      return moduleName !== null ? options.modules.has(moduleName) : isNamespace(argument, active)
     }
     if (current?.type === 'MemberExpression') {
       return propertyName(current) === 'default' && isNamespace(current.object as NodeLike, active)
@@ -47,8 +46,10 @@ export function createFactoryProvenance(
       const loader = findVariable(context, unwrap(current.callee as NodeLike) as NodeLike)
       const definition = loader?.defs.find((entry) => entry.type === 'Variable')
       if (
-        definition?.parent?.type === 'VariableDeclaration' &&
-        definition.parent.kind !== 'const'
+        definition &&
+        loader?.references.some(
+          (reference) => reference.identifier !== definition.node.id && reference.isWrite(),
+        )
       ) {
         return false
       }

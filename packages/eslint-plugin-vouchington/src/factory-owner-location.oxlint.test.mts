@@ -23,6 +23,7 @@ Reflect.apply(makeGraph, null, [])
 export type { makeGraph } from '@compiler/runtime'
 export { makeGraph as graph } from '@compiler/runtime'
 import * as runtime from '@compiler/runtime'
+import { createRequire } from 'node:module'
 const { makeGraph: defaulted = fallback } = runtime
 defaulted()
 runtime.default.makeGraph();
@@ -30,6 +31,10 @@ runtime.default.makeGraph();
 export const pending = import('@compiler/runtime')
 const promise = import('@compiler/runtime')
 promise.makeGraph()
+const awaited = await promise
+awaited.makeGraph()
+let load = createRequire(import.meta.url)
+load('@compiler/runtime').makeGraph()
 `,
     )
     writeFileSync(
@@ -71,7 +76,7 @@ promise.makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 10 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 12 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(diagnostics.every(({ filename }) => filename.endsWith('src/check.mts'))).toBe(true)
   } finally {

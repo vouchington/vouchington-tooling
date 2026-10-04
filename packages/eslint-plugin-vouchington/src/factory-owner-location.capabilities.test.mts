@@ -84,6 +84,23 @@ import('@compiler/runtime').makeHost()`,
     reports: 0,
   },
   {
+    name: 'awaited constant import promises restore namespace provenance',
+    code: `const pending = import('@compiler/runtime')
+const alias = pending
+const runtime = await alias
+runtime.makeGraph()
+export default await pending`,
+    reports: 2,
+  },
+  {
+    name: 'reassigned import promises cannot certify awaited namespaces',
+    code: `let pending = import('@compiler/runtime')
+pending = Promise.resolve({ makeGraph() {} })
+const runtime = await pending
+runtime.makeGraph()`,
+    reports: 0,
+  },
+  {
     name: 'destructured factory shadowed in a function',
     code: `import * as compiler from '@compiler/runtime'
 const { makeGraph: build } = compiler
@@ -231,11 +248,26 @@ compiler.makeGraph()`,
     reports: 0,
   },
   {
+    name: 'unreassigned mutable createRequire loader retains provenance',
+    code: `import { createRequire } from 'node:module'
+let load = createRequire(import.meta.url)
+load('@compiler/runtime').makeGraph()`,
+    reports: 1,
+  },
+  {
     name: 'cyclic constant aliases',
     code: `const first = second
 const second = first
 first()
 first.makeGraph()`,
+    reports: 0,
+  },
+  {
+    name: 'cyclic awaited import aliases cannot certify a namespace',
+    code: `const first = second
+const second = first
+const runtime = await first
+runtime.makeGraph()`,
     reports: 0,
   },
 ]
