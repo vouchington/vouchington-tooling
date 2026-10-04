@@ -1,7 +1,9 @@
 import type { FiniteEnumFiles, FiniteEnumRippleConfig, ReadTrackedFile } from './model.mts'
+import { hasConstObjectDeclaration } from './ast.mts'
+import { checkUnionFactories } from './union-factory-check.mts'
 import {
   checkCollectionPagePathLiterals,
-  checkPostCreatePageTypes,
+  checkUnionCreatePageTypes,
   compareSets,
   finiteEnumError,
   hasAllFiles,
@@ -9,53 +11,66 @@ import {
   uniqueSorted,
 } from './compare.mts'
 import {
-  parsePostDetailRouteFactoryArgs,
-  parsePostRouteConfigEntries,
-  parsePostSlugToType,
-  parsePostTypeUnion,
+  parseUnionRouteConfigEntries,
+  parseUnionSlugToType,
+  parseUnionTypeUnion,
 } from './parsers.mts'
 
-export function checkPostTypes(
+export function checkUnionTypes(
   errors: string[],
   files: FiniteEnumFiles,
   readTracked: ReadTrackedFile,
-  config: NonNullable<FiniteEnumRippleConfig['post']>,
+  config: NonNullable<FiniteEnumRippleConfig['union']>,
 ): void {
-  const postTypesPath = config.typesPath
+  const unionTypesPath = config.typesPath
   const routeConfigsPath = config.routeConfigsPath
-  if (!hasAllFiles(files, [postTypesPath, routeConfigsPath])) return
+  if (!hasAllFiles(files, [unionTypesPath, routeConfigsPath])) return
 
-  const postTypes = parsePostTypeUnion(readTracked(postTypesPath), postTypesPath, config.typeAlias)
-  const publicPostTypes = postTypes.filter((value) => !config.internalTypes.includes(value))
+  const unionTypes = parseUnionTypeUnion(
+    readTracked(unionTypesPath),
+    unionTypesPath,
+    config.typeAlias,
+  )
+  const publicUnionTypes = unionTypes.filter((value) => !config.internalTypes.includes(value))
   const routeConfigContent = readTracked(routeConfigsPath)
-  const slugToType = parsePostSlugToType(routeConfigContent, routeConfigsPath, config.slugMapObject)
-  const topRouteSlugs = routePageSlugs(files.postDetailPages, true)
-  const routeSlugs = routePageSlugs(files.postDetailPages)
+  const slugToType = parseUnionSlugToType(
+    routeConfigContent,
+    routeConfigsPath,
+    config.slugMapObject,
+  )
+  const topRouteSlugs = routePageSlugs(files.unionDetailPages, true)
+  const routeSlugs = routePageSlugs(files.unionDetailPages)
 
   compareSets(errors, {
     label: `${config.collectionLabel} route config values`,
     actualLabel: `${routeConfigsPath} ${config.slugMapObject}`,
+    actualFile: routeConfigsPath,
     actualValues: [...slugToType.values()],
-    expectedLabel: `${postTypesPath} public ${config.typeAlias} values`,
-    expectedValues: publicPostTypes,
+    expectedLabel: `${unionTypesPath} public ${config.typeAlias} values`,
+    expectedFile: unionTypesPath,
+    expectedValues: publicUnionTypes,
   })
   compareSets(errors, {
     label: `${config.collectionLabel} route directories`,
     actualLabel: config.routeLabels.detailTop,
+    actualFile: files.unionDetailPages[0]?.file ?? routeConfigsPath,
     actualValues: topRouteSlugs,
     expectedLabel: `${routeConfigsPath} ${config.slugMapObject} slugs`,
+    expectedFile: routeConfigsPath,
     expectedValues: [...slugToType.keys()],
   })
   compareSets(errors, {
     label: `${config.collectionLabel} routed pages`,
     actualLabel: config.routeLabels.detail,
+    actualFile: files.unionDetailPages[0]?.file ?? routeConfigsPath,
     actualValues: routeSlugs,
     expectedLabel: `${routeConfigsPath} ${config.slugMapObject} slugs`,
+    expectedFile: routeConfigsPath,
     expectedValues: [...slugToType.keys()],
   })
 
-  if (routeConfigContent.includes(config.routeConfigObject)) {
-    const routeConfigs = parsePostRouteConfigEntries(
+  if (hasConstObjectDeclaration(routeConfigContent, config.routeConfigObject, routeConfigsPath)) {
+    const routeConfigs = parseUnionRouteConfigEntries(
       routeConfigContent,
       routeConfigsPath,
       config.routeConfigObject,
@@ -63,10 +78,12 @@ export function checkPostTypes(
       config.pluralPathProperty,
       config.singularPathProperty,
     )
-    const typedRouteConfigs = routeConfigs.filter((routeConfig) => routeConfig.postTypes.length > 0)
+    const typedRouteConfigs = routeConfigs.filter(
+      (routeConfig) => routeConfig.unionTypes.length > 0,
+    )
     for (const routeConfig of routeConfigs) {
       if (
-        routeConfig.postTypes.length > 0 ||
+        routeConfig.unionTypes.length > 0 ||
         config.routeConfigExceptions.includes(routeConfig.key)
       )
         continue
@@ -89,57 +106,65 @@ export function checkPostTypes(
     compareSets(errors, {
       label: `${config.collectionLabel} collection route config values`,
       actualLabel: `${routeConfigsPath} ${config.routeConfigObject}`,
-      actualValues: typedRouteConfigs.flatMap((routeConfig) => routeConfig.postTypes),
-      expectedLabel: `${postTypesPath} public ${config.typeAlias} values`,
-      expectedValues: publicPostTypes,
+      actualFile: routeConfigsPath,
+      actualValues: typedRouteConfigs.flatMap((routeConfig) => routeConfig.unionTypes),
+      expectedLabel: `${unionTypesPath} public ${config.typeAlias} values`,
+      expectedFile: unionTypesPath,
+      expectedValues: publicUnionTypes,
     })
     compareSets(errors, {
       label: `${config.collectionLabel} collection route config singular paths`,
       actualLabel: `${routeConfigsPath} ${config.routeConfigObject}`,
+      actualFile: routeConfigsPath,
       actualValues: typedRouteConfigs.map((routeConfig) => routeConfig.singularPath),
       expectedLabel: `${routeConfigsPath} ${config.slugMapObject} slugs`,
+      expectedFile: routeConfigsPath,
       expectedValues: [...slugToType.keys()],
     })
     for (const routeConfig of typedRouteConfigs) {
       const expectedType = slugToType.get(routeConfig.singularPath)
       if (
         expectedType &&
-        routeConfig.postTypes.length === 1 &&
-        routeConfig.postTypes[0] === expectedType
+        routeConfig.unionTypes.length === 1 &&
+        routeConfig.unionTypes[0] === expectedType
       ) {
         continue
       }
       errors.push(
         finiteEnumError(
           routeConfigsPath,
-          `${config.routeConfigObject}.${routeConfig.key} maps ${config.singularPathProperty} "${routeConfig.singularPath}" to [${routeConfig.postTypes.join(', ')}] but ${config.slugMapObject} expects "${expectedType ?? 'missing'}"`,
+          `${config.routeConfigObject}.${routeConfig.key} maps ${config.singularPathProperty} "${routeConfig.singularPath}" to [${routeConfig.unionTypes.join(', ')}] but ${config.slugMapObject} expects "${expectedType ?? 'missing'}"`,
         ),
       )
     }
     compareSets(errors, {
       label: `${config.collectionLabel} top-level collection route directories`,
       actualLabel: config.routeLabels.collectionTop,
-      actualValues: routePageSlugs(files.postCollectionPages, true),
+      actualFile: files.unionCollectionPages[0]?.file ?? routeConfigsPath,
+      actualValues: routePageSlugs(files.unionCollectionPages, true),
       expectedLabel: `${routeConfigsPath} ${config.routeConfigObject} ${config.pluralPathProperty}`,
+      expectedFile: routeConfigsPath,
       expectedValues: routeConfigs.map((routeConfig) => routeConfig.pluralPath),
     })
     compareSets(errors, {
       label: `${config.collectionLabel} collection routed pages`,
       actualLabel: config.routeLabels.collection,
-      actualValues: uniqueSorted(files.postCollectionPages.map((page) => page.slug)),
+      actualFile: files.unionCollectionPages[0]?.file ?? routeConfigsPath,
+      actualValues: uniqueSorted(files.unionCollectionPages.map((page) => page.slug)),
       expectedLabel: `${routeConfigsPath} ${config.routeConfigObject} ${config.pluralPathProperty}`,
+      expectedFile: routeConfigsPath,
       expectedValues: routeConfigs.map((routeConfig) => routeConfig.pluralPath),
     })
-    checkPostCreatePageTypes(
+    checkUnionCreatePageTypes(
       errors,
       typedRouteConfigs,
-      files.postCreatePages,
+      files.unionCreatePages,
       readTracked,
       config.createPageTypeProperties,
       config.collectionLabel,
     )
     checkCollectionPagePathLiterals(
-      files.postCollectionPages,
+      files.unionCollectionPages,
       errors,
       config.collectionLabel,
       new Set(typedRouteConfigs.map((routeConfig) => routeConfig.pluralPath)),
@@ -148,39 +173,5 @@ export function checkPostTypes(
     )
   }
 
-  const detailFactoryArgs = files.postDetailPages.flatMap((page) =>
-    parsePostDetailRouteFactoryArgs(
-      readTracked(page.file),
-      page.file,
-      config.factoryCallPattern,
-    ).map((args) => ({
-      ...args,
-      file: page.file,
-      routeSlug: page.slug,
-    })),
-  )
-  compareSets(errors, {
-    label: `${config.collectionLabel} route factory slugs`,
-    actualLabel: config.routeLabels.factory,
-    actualValues: uniqueSorted(detailFactoryArgs.map((args) => args.slug)),
-    expectedLabel: config.routeLabels.detail,
-    expectedValues: routeSlugs,
-  })
-  compareSets(errors, {
-    label: `${config.collectionLabel} route factory values`,
-    actualLabel: config.routeLabels.factory,
-    actualValues: uniqueSorted(detailFactoryArgs.map((args) => args.postType)),
-    expectedLabel: `${routeConfigsPath} ${config.slugMapObject} values`,
-    expectedValues: [...slugToType.values()],
-  })
-  for (const args of detailFactoryArgs) {
-    const expectedType = slugToType.get(args.routeSlug)
-    if (args.slug === args.routeSlug && expectedType === args.postType) continue
-    errors.push(
-      finiteEnumError(
-        args.file,
-        `${config.collectionLabel} route factory args mismatch; route directory is "${args.routeSlug}" and expected type is "${expectedType ?? 'missing'}" but factory uses "${args.postType}", "${args.slug}"`,
-      ),
-    )
-  }
+  checkUnionFactories(errors, files.unionDetailPages, readTracked, config, slugToType, routeSlugs)
 }

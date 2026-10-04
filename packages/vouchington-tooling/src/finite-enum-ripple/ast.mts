@@ -25,6 +25,10 @@ export function findConstObjectLiteral(
   return initializer
 }
 
+export function hasConstObjectDeclaration(content: string, name: string, file: string): boolean {
+  return !!findConstVariableDeclaration(createSourceFile(content, file), name)
+}
+
 export function findTypeAliasDeclaration(
   content: string,
   name: string,

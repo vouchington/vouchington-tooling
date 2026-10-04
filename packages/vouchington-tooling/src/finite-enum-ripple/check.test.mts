@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { SharedContext } from '../shared-context/index.mts'
+import { compareSets } from './compare.mts'
+import { collectCreatePageLiterals } from './create-page-literals.mts'
 import {
   checkFiniteEnumRipple,
   type FiniteEnumFiles,
@@ -40,17 +42,17 @@ function fixture() {
     [paths.component, "push('/alphas')"],
     [paths.recordDetail, "const Page = createRecordPage('entry', 'entry')"],
     [paths.recordCollection, "export default { path: '/entries' }"],
-    [paths.recordCreate, "const form = { action: 'entry', postType: 'entry' }"],
+    [paths.recordCreate, "const form = { action: 'entry', unionType: 'entry' }"],
   ])
   const pages = (file: string, slug: string) => [{ file, slug, isTopLevel: true }]
   const files: FiniteEnumFiles = {
     existingFileSet: new Set(contents.keys()),
-    topicDetailPages: pages(paths.detail, 'alpha'),
-    topicCollectionPages: pages(paths.collection, 'alphas'),
-    topicComponentFiles: [{ file: paths.component, slug: 'alphas' }],
-    postDetailPages: pages(paths.recordDetail, 'entry'),
-    postCollectionPages: pages(paths.recordCollection, 'entries'),
-    postCreatePages: pages(paths.recordCreate, 'entries'),
+    structuredDetailPages: pages(paths.detail, 'alpha'),
+    structuredCollectionPages: pages(paths.collection, 'alphas'),
+    structuredComponentFiles: [{ file: paths.component, slug: 'alphas' }],
+    unionDetailPages: pages(paths.recordDetail, 'entry'),
+    unionCollectionPages: pages(paths.recordCollection, 'entries'),
+    unionCreatePages: pages(paths.recordCreate, 'entries'),
   }
   const ctx: SharedContext = {
     repoRoot: '/synthetic',
@@ -61,14 +63,14 @@ function fixture() {
   }
   const config: FiniteEnumRippleConfig = {
     files,
-    topic: {
+    structured: {
       backendPath: paths.source,
       webPath: paths.client,
       routeConfigsPath: paths.routes,
       typeObject: 'kinds',
       routeConfigObject: 'kindRoutes',
       typeArrayProperty: 'kinds',
-      spendingCategoryProperty: 'special',
+      routeExemptionProperty: 'special',
       slugProperty: 'slug',
       slugPluralProperty: 'slugs',
       pluralPathProperty: 'plural',
@@ -86,7 +88,7 @@ function fixture() {
         collection: 'kind collections',
       },
     },
-    post: {
+    union: {
       typesPath: paths.union,
       routeConfigsPath: paths.routes,
       typeAlias: 'RecordKind',
@@ -99,7 +101,7 @@ function fixture() {
       internalTypes: ['internal'],
       routeConfigExceptions: [],
       collectionLabel: 'record',
-      createPageTypeProperties: ['action', 'postType'],
+      createPageTypeProperties: ['action', 'unionType'],
       collectionPathLiteralPattern: /\bpath:\s*['"]\/([^'"]*)['"]/g,
       routeLabels: {
         detailTop: 'top record pages',
@@ -129,7 +131,7 @@ describe('checkFiniteEnumRipple', () => {
 
   it('checks top-level and nested routed pages separately', () => {
     const { files, check } = fixture()
-    files.topicDetailPages = [{ file: paths.detail, slug: 'alpha', isTopLevel: false }]
+    files.structuredDetailPages = [{ file: paths.detail, slug: 'alpha', isTopLevel: false }]
     expect(check()).toContainEqual(expect.stringContaining('kind route directories mismatch'))
     expect(check()).not.toContainEqual(expect.stringContaining('kind routed pages mismatch'))
   })
@@ -168,7 +170,11 @@ describe('checkFiniteEnumRipple', () => {
   it('rejects malformed configured declarations', () => {
     const { contents, check } = fixture()
     contents.set(paths.source, "export const kinds = { alpha: { slug: 'alpha'")
-    expect(check()).toContain(`${paths.source}: could not find end of kinds`)
+    expect(check()).toContainEqual(
+      expect.stringContaining(
+        `::error file=${paths.source}::${paths.source}: could not find end of kinds`,
+      ),
+    )
   })
 
   it('reports configured collection literals, component paths and duplicate values', () => {
@@ -219,7 +225,11 @@ describe('checkFiniteEnumRipple', () => {
   it('reports malformed second-family declarations without throwing', () => {
     const { contents, check } = fixture()
     contents.set(paths.union, 'type Wrong = 1')
-    expect(check()).toContain(`${paths.union}: could not parse RecordKind union`)
+    expect(check()).toContainEqual(
+      expect.stringContaining(
+        `::error file=${paths.union}::${paths.union}: could not parse RecordKind union`,
+      ),
+    )
   })
 
   it('reads selected tracked files from repoRoot when a shared reader is absent', () => {
@@ -241,17 +251,27 @@ describe('checkFiniteEnumRipple', () => {
 
   it('reports selected files that are not tracked or cannot be read', () => {
     const { files, ctx, check } = fixture()
-    files.topicDetailPages.push({ file: 'ui/missing/page.tsx', slug: 'alpha', isTopLevel: false })
-    expect(check()).toContain('Not tracked: ui/missing/page.tsx')
-    files.topicDetailPages.pop()
+    files.structuredDetailPages.push({
+      file: 'ui/missing/page.tsx',
+      slug: 'alpha',
+      isTopLevel: false,
+    })
+    expect(check()).toContainEqual(
+      expect.stringContaining('::error file=ui/missing/page.tsx::ui/missing/page.tsx: Not tracked'),
+    )
+    files.structuredDetailPages.pop()
     ctx.readTrackedFile = (file) =>
       file === paths.source ? null : (fixture().contents.get(file) ?? null)
-    expect(check()).toContain(`Cannot read tracked file: ${paths.source}`)
+    expect(check()).toContainEqual(
+      expect.stringContaining(
+        `::error file=${paths.source}::${paths.source}: Cannot read tracked file`,
+      ),
+    )
   })
 
   it('skips component files without a matching configured route', () => {
     const { files, check } = fixture()
-    files.topicComponentFiles.push({ file: 'ui/other/nav.tsx', slug: 'other' })
+    files.structuredComponentFiles.push({ file: 'ui/other/nav.tsx', slug: 'other' })
     expect(check()).toEqual([])
   })
 
@@ -267,8 +287,8 @@ describe('checkFiniteEnumRipple', () => {
     const { contents, config, check } = fixture()
     contents.set(paths.collection, "export default { href: '/wrong' }")
     contents.set(paths.component, "navigate('/wrong')")
-    config.topic!.collectionPathLiteralPattern = /\bhref:\s*['"]\/([^'"]*)['"]/g
-    config.topic!.navigationPathLiteralPattern = /\bnavigate\(\s*['"]\/([^'"]+)/g
+    config.structured!.collectionPathLiteralPattern = /\bhref:\s*['"]\/([^'"]*)['"]/g
+    config.structured!.navigationPathLiteralPattern = /\bnavigate\(\s*['"]\/([^'"]+)/g
     config.diagnosticSuffix = ' Follow local guide.'
     expect(check()).toContainEqual(expect.stringContaining('kind collection path literal "/wrong"'))
     expect(check()).toContainEqual(
@@ -279,13 +299,13 @@ describe('checkFiniteEnumRipple', () => {
 
   it('accepts either optional family and reports non-Error provider failures', () => {
     const { ctx, config, check } = fixture()
-    delete config.topic
+    delete config.structured
     expect(check()).toEqual([])
     ctx.readTrackedFile = () => {
       throw 'provider unavailable'
     }
-    expect(check()).toContain('provider unavailable')
-    delete config.post
+    expect(check()).toContainEqual(expect.stringContaining('provider unavailable'))
+    delete config.union
     expect(check()).toEqual([])
   })
 
@@ -297,13 +317,13 @@ describe('checkFiniteEnumRipple', () => {
     expect(check()).toEqual([])
     files.existingFileSet = new Set(contents.keys())
     contents.set(paths.routes, contents.get(paths.routes)!.replace('kindRoutes', 'otherRoutes'))
-    files.topicDetailPages.push({ file: paths.detail, slug: 'extra', isTopLevel: true })
+    files.structuredDetailPages.push({ file: paths.detail, slug: 'extra', isTopLevel: true })
     expect(check()).toContainEqual(expect.stringContaining('kind route directories mismatch'))
   })
 
   it('reports unknown configured kinds, multi-kind create routes, and missing mapped record type', () => {
     const { contents, files, check } = fixture()
-    files.postDetailPages[0]!.slug = 'unknown'
+    files.unionDetailPages[0]!.slug = 'unknown'
     contents.set(
       paths.routes,
       contents
@@ -320,16 +340,125 @@ describe('checkFiniteEnumRipple', () => {
   it('filters consumer-ignored navigation paths', () => {
     const { contents, config, check } = fixture()
     contents.set(paths.component, "push('/ignored')")
-    config.topic!.ignoredNavigationPaths = ['ignored']
+    config.structured!.ignoredNavigationPaths = ['ignored']
     expect(check()).toEqual([])
   })
 
   it('returns non-Error source-reader failures as diagnostics', () => {
     const { ctx, config, check } = fixture()
-    delete config.post
+    delete config.union
     ctx.readTrackedFile = () => {
       throw 'source unavailable'
     }
-    expect(check()).toContain('source unavailable')
+    expect(check()).toContainEqual(expect.stringContaining('source unavailable'))
+  })
+
+  it('reports backend-only and web-only members', () => {
+    const { contents, check } = fixture()
+    contents.set(paths.client, "export const kinds = { beta: { slug: 'beta', slugs: 'betas' } }")
+    expect(check()).toContainEqual(expect.stringContaining('missing from ui/kinds.ts kinds: alpha'))
+    expect(check()).toContainEqual(expect.stringContaining('stale in ui/kinds.ts kinds: beta'))
+  })
+
+  it('ignores route declaration names in comments when the declaration is absent', () => {
+    const { contents, check } = fixture()
+    contents.set(
+      paths.routes,
+      contents
+        .get(paths.routes)!
+        .replace('kindRoutes', 'otherKindRoutes')
+        .replace('recordRoutes', 'otherRecordRoutes') +
+        '\n// kindRoutes and recordRoutes are examples',
+    )
+    expect(check()).toEqual([])
+  })
+
+  it('does not treat commented or quoted create-page examples as active values', () => {
+    const { contents, check } = fixture()
+    contents.set(
+      paths.recordCreate,
+      [
+        "const form = { action: 'entry' }",
+        "// action: 'old'",
+        'const example = "unionType: \'old\'"',
+      ].join('\n'),
+    )
+    expect(check()).toEqual([])
+    contents.set(paths.recordCreate, "const form = { action: 'old' }")
+    expect(check()).toContainEqual(expect.stringContaining('create page literal uses "old"'))
+  })
+
+  it('reports an unsupported mixed union as a diagnostic', () => {
+    const { contents, check } = fixture()
+    contents.set(paths.union, "type RecordKind = 'entry' | ExternalKinds | 'internal'")
+    expect(check()).toContainEqual(
+      expect.stringContaining('union contains a non-string literal constituent'),
+    )
+  })
+
+  it('annotates a real selected file and escapes workflow-command delimiters', () => {
+    const { contents, files, config, check } = fixture()
+    const client = 'ui/kinds,%.ts'
+    contents.set(client, "export const kinds = { beta: { slug: 'beta', slugs: 'betas' } }")
+    files.existingFileSet = new Set([...files.existingFileSet, client])
+    config.structured!.webPath = client
+    config.diagnosticSuffix = ' Guidance 100%\nnext line'
+    const errors = check()
+    expect(errors).toContainEqual(expect.stringContaining('::error file=ui/kinds%2C%25.ts::'))
+    expect(errors.every((error) => error.endsWith(' Guidance 100%25%0Anext line'))).toBe(true)
+    files.structuredDetailPages = []
+    expect(check()).toContainEqual(expect.stringContaining(`::error file=${paths.source}::`))
+  })
+
+  it('blames only the route config for duplicate route values', () => {
+    const { contents, check } = fixture()
+    contents.set(
+      paths.routes,
+      contents.get(paths.routes)!.replace("kinds: ['alpha']", "kinds: ['alpha', 'alpha']"),
+    )
+    const duplicates = check().filter((error) => error.includes('route config values duplicate'))
+    expect(duplicates).toHaveLength(1)
+    expect(duplicates[0]).toContain('duplicate in actual values: alpha')
+  })
+
+  it('blames a real source file for expected duplicates', () => {
+    const errors: string[] = []
+    compareSets(errors, {
+      label: 'kind values',
+      actualLabel: 'browser kinds',
+      actualFile: paths.client,
+      actualValues: ['alpha'],
+      expectedLabel: 'source kinds',
+      expectedFile: paths.source,
+      expectedValues: ['alpha', 'alpha'],
+    })
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        `::error file=${paths.source}::${paths.source}: kind values duplicate in expected values: alpha`,
+      ),
+    )
+  })
+
+  it('recognizes active object, JSX, and assignment literals only', () => {
+    const values = collectCreatePageLiterals(
+      [
+        "const fields = { action: 'entry', other: 'skip', action: dynamic }",
+        "const view = <Form action='entry' other='skip' postType={dynamic} />",
+        "action = 'entry'; form.action = 'entry'; form['action'] = 'skip'",
+        "// action: 'old'",
+        'const example = "action: \'old\'"',
+      ].join('\n'),
+      paths.recordCreate,
+      ['action', 'postType'],
+    )
+    expect(values).toEqual(['entry', 'entry', 'entry', 'entry'])
+  })
+
+  it('uses declaration paths when routed-page lists are empty', () => {
+    const { files, check } = fixture()
+    files.structuredCollectionPages = []
+    files.unionCollectionPages = []
+    files.unionDetailPages = []
+    expect(check()).toContainEqual(expect.stringContaining(`::error file=${paths.routes}::`))
   })
 })

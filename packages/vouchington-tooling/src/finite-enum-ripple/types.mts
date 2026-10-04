@@ -1,28 +1,28 @@
 import type { FiniteEnumFiles, FiniteEnumRippleConfig, ReadTrackedFile } from './model.mts'
-import { parseTopicRouteFactoryArgs, parseTopicTypeEntries } from './parsers.mts'
+import { parseStructuredRouteFactoryArgs, parseStructuredTypeEntries } from './parsers.mts'
 import { compareSets, finiteEnumError, hasAllFiles, routePageSlugs } from './compare.mts'
-import { checkTopicRouteConfigs } from './topic-route-check.mts'
+import { checkStructuredRouteConfigs } from './structured-route-check.mts'
 
-export function checkTopicTypes(
+export function checkStructuredTypes(
   errors: string[],
   files: FiniteEnumFiles,
   readTracked: ReadTrackedFile,
-  config: NonNullable<FiniteEnumRippleConfig['topic']>,
+  config: NonNullable<FiniteEnumRippleConfig['structured']>,
 ): void {
-  const backendTopicsPath = config.backendPath
-  const webTopicsPath = config.webPath
-  if (!hasAllFiles(files, [backendTopicsPath, webTopicsPath])) return
+  const backendStructuredsPath = config.backendPath
+  const webStructuredsPath = config.webPath
+  if (!hasAllFiles(files, [backendStructuredsPath, webStructuredsPath])) return
 
-  const backendEntries = parseTopicTypeEntries(
-    readTracked(backendTopicsPath),
-    backendTopicsPath,
+  const backendEntries = parseStructuredTypeEntries(
+    readTracked(backendStructuredsPath),
+    backendStructuredsPath,
     config.typeObject,
     config.slugProperty,
     config.slugPluralProperty,
   )
-  const webEntries = parseTopicTypeEntries(
-    readTracked(webTopicsPath),
-    webTopicsPath,
+  const webEntries = parseStructuredTypeEntries(
+    readTracked(webStructuredsPath),
+    webStructuredsPath,
     config.typeObject,
     config.slugProperty,
     config.slugPluralProperty,
@@ -32,13 +32,22 @@ export function checkTopicTypes(
   const backendSlugPluralByValue = new Map(
     backendEntries.map((entry) => [entry.value, entry.slugPlural]),
   )
+  compareSets(errors, {
+    label: `${config.collectionLabel} values`,
+    actualLabel: `${webStructuredsPath} ${config.typeObject}`,
+    actualFile: webStructuredsPath,
+    actualValues: webEntries.map((entry) => entry.value),
+    expectedLabel: `${backendStructuredsPath} ${config.typeObject}`,
+    expectedFile: backendStructuredsPath,
+    expectedValues: backendEntries.map((entry) => entry.value),
+  })
   for (const webEntry of webEntries) {
     const backendSlug = backendSlugByValue.get(webEntry.value)
     if (backendSlug && backendSlug !== webEntry.slug) {
       errors.push(
         finiteEnumError(
-          webTopicsPath,
-          `${config.typeObject}.${webEntry.value}.${config.slugProperty} is "${webEntry.slug}" but ${backendTopicsPath} uses "${backendSlug}"`,
+          webStructuredsPath,
+          `${config.typeObject}.${webEntry.value}.${config.slugProperty} is "${webEntry.slug}" but ${backendStructuredsPath} uses "${backendSlug}"`,
         ),
       )
     }
@@ -46,34 +55,45 @@ export function checkTopicTypes(
     if (backendSlugPlural && backendSlugPlural !== webEntry.slugPlural) {
       errors.push(
         finiteEnumError(
-          webTopicsPath,
-          `${config.typeObject}.${webEntry.value}.${config.slugPluralProperty} is "${webEntry.slugPlural}" but ${backendTopicsPath} uses "${backendSlugPlural}"`,
+          webStructuredsPath,
+          `${config.typeObject}.${webEntry.value}.${config.slugPluralProperty} is "${webEntry.slugPlural}" but ${backendStructuredsPath} uses "${backendSlugPlural}"`,
         ),
       )
     }
   }
 
-  const topRouteSlugs = routePageSlugs(files.topicDetailPages, true)
-  const routeSlugs = routePageSlugs(files.topicDetailPages)
+  const topRouteSlugs = routePageSlugs(files.structuredDetailPages, true)
+  const routeSlugs = routePageSlugs(files.structuredDetailPages)
   compareSets(errors, {
     label: `${config.collectionLabel} route directories`,
     actualLabel: config.routeLabels.detailTop,
+    actualFile: files.structuredDetailPages[0]?.file ?? backendStructuredsPath,
     actualValues: topRouteSlugs,
-    expectedLabel: `${backendTopicsPath} ${config.typeObject} slugs`,
+    expectedLabel: `${backendStructuredsPath} ${config.typeObject} slugs`,
+    expectedFile: backendStructuredsPath,
     expectedValues: backendEntries.map((entry) => entry.slug),
   })
   compareSets(errors, {
     label: `${config.collectionLabel} routed pages`,
     actualLabel: config.routeLabels.detail,
+    actualFile: files.structuredDetailPages[0]?.file ?? backendStructuredsPath,
     actualValues: routeSlugs,
-    expectedLabel: `${backendTopicsPath} ${config.typeObject} slugs`,
+    expectedLabel: `${backendStructuredsPath} ${config.typeObject} slugs`,
+    expectedFile: backendStructuredsPath,
     expectedValues: backendEntries.map((entry) => entry.slug),
   })
 
-  checkTopicRouteConfigs(errors, files, readTracked, config, backendEntries, backendSlugByValue)
+  checkStructuredRouteConfigs(
+    errors,
+    files,
+    readTracked,
+    config,
+    backendEntries,
+    backendSlugByValue,
+  )
 
-  for (const page of files.topicDetailPages) {
-    for (const args of parseTopicRouteFactoryArgs(
+  for (const page of files.structuredDetailPages) {
+    for (const args of parseStructuredRouteFactoryArgs(
       readTracked(page.file),
       page.file,
       config.factoryCallPattern,

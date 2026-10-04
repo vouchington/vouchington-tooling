@@ -1,12 +1,13 @@
 import type { FiniteEnumFiles, ReadTrackedFile, RoutedPage } from './model.mts'
+import { collectCreatePageLiterals } from './create-page-literals.mts'
 
 export function hasAllFiles(files: FiniteEnumFiles, paths: readonly string[]): boolean {
   return paths.every((file) => files.existingFileSet.has(file))
 }
 
-export function checkPostCreatePageTypes(
+export function checkUnionCreatePageTypes(
   errors: string[],
-  routeConfigs: { pluralPath: string; postTypes: string[] }[],
+  routeConfigs: { pluralPath: string; unionTypes: string[] }[],
   pages: readonly RoutedPage[],
   readTracked: ReadTrackedFile,
   createPageTypeProperties: readonly string[],
@@ -14,14 +15,18 @@ export function checkPostCreatePageTypes(
 ): void {
   const typeByPluralPath = new Map(
     routeConfigs.flatMap((config) =>
-      config.postTypes.length === 1 ? [[config.pluralPath, config.postTypes[0]] as const] : [],
+      config.unionTypes.length === 1 ? [[config.pluralPath, config.unionTypes[0]] as const] : [],
     ),
   )
   for (const page of pages) {
     const expectedType = typeByPluralPath.get(page.slug)
     if (!expectedType) continue
     const content = readTracked(page.file)
-    for (const actualType of collectPostCreateTypeLiterals(content, createPageTypeProperties)) {
+    for (const actualType of collectCreatePageLiterals(
+      content,
+      page.file,
+      createPageTypeProperties,
+    )) {
       if (actualType === expectedType) continue
       errors.push(
         finiteEnumError(
@@ -31,15 +36,6 @@ export function checkPostCreatePageTypes(
       )
     }
   }
-}
-
-function collectPostCreateTypeLiterals(content: string, properties: readonly string[]): string[] {
-  return properties.flatMap((property) => {
-    const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return [
-      ...content.matchAll(new RegExp(`\\b${escaped}\\s*(?:=|:)\\s*['"]([^'"]+)['"]`, 'g')),
-    ].map((item) => item[1]!)
-  })
 }
 
 export function checkCollectionPagePathLiterals(
@@ -66,7 +62,7 @@ export function checkCollectionPagePathLiterals(
   }
 }
 
-export function checkTopicCollectionComponentPathLiterals(
+export function checkStructuredCollectionComponentPathLiterals(
   errors: string[],
   routeConfigs: { pluralPath: string; singularPath: string }[],
   componentFiles: readonly { file: string; slug: string }[],
@@ -115,15 +111,17 @@ export function compareSets(
   options: {
     label: string
     actualLabel: string
+    actualFile: string
     actualValues: readonly string[]
     expectedLabel: string
+    expectedFile: string
     expectedValues: readonly string[]
   },
 ): void {
   for (const duplicate of duplicateValues(options.actualValues)) {
     errors.push(
       finiteEnumError(
-        options.actualLabel,
+        options.actualFile,
         `${options.label} duplicate in actual values: ${duplicate}`,
       ),
     )
@@ -131,7 +129,7 @@ export function compareSets(
   for (const duplicate of duplicateValues(options.expectedValues)) {
     errors.push(
       finiteEnumError(
-        options.expectedLabel,
+        options.expectedFile,
         `${options.label} duplicate in expected values: ${duplicate}`,
       ),
     )
@@ -149,7 +147,7 @@ export function compareSets(
     extra.length > 0 ? `stale in ${options.actualLabel}: ${extra.join(', ')}` : '',
     `expected from ${options.expectedLabel}: ${expected.join(', ')}`,
   ].filter(Boolean)
-  errors.push(finiteEnumError(options.actualLabel, parts.join('; ')))
+  errors.push(finiteEnumError(options.actualFile, parts.join('; ')))
 }
 
 export function uniqueSorted(values: readonly string[]): string[] {
@@ -175,5 +173,16 @@ function duplicateValues(values: readonly string[]): string[] {
 }
 
 export function finiteEnumError(file: string, message: string): string {
-  return `::error file=${file}::${file}: ${message}.`
+  const escapeProperty = (value: string) =>
+    value
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A')
+      .replaceAll(':', '%3A')
+      .replaceAll(',', '%2C')
+  return `::error file=${escapeProperty(file)}::${escapeWorkflowData(`${file}: ${message}.`)}`
+}
+
+export function escapeWorkflowData(value: string): string {
+  return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
 }

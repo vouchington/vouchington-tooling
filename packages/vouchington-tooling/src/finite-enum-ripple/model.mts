@@ -8,12 +8,12 @@ export interface RoutedPage {
 
 export interface FiniteEnumFiles {
   existingFileSet: ReadonlySet<string>
-  postCollectionPages: RoutedPage[]
-  postCreatePages: RoutedPage[]
-  postDetailPages: RoutedPage[]
-  topicCollectionPages: RoutedPage[]
-  topicComponentFiles: { file: string; slug: string }[]
-  topicDetailPages: RoutedPage[]
+  unionCollectionPages: RoutedPage[]
+  unionCreatePages: RoutedPage[]
+  unionDetailPages: RoutedPage[]
+  structuredCollectionPages: RoutedPage[]
+  structuredComponentFiles: { file: string; slug: string }[]
+  structuredDetailPages: RoutedPage[]
 }
 
 /** Selection and diagnostics are supplied by the consumer, never inferred from its layout. */
@@ -21,7 +21,7 @@ export interface FiniteEnumRippleConfig {
   files: FiniteEnumFiles
   /** Appended to every diagnostic; use for a consumer-owned policy guide. */
   diagnosticSuffix?: string
-  topic?: {
+  structured?: {
     backendPath: string
     webPath: string
     routeConfigsPath: string
@@ -30,7 +30,7 @@ export interface FiniteEnumRippleConfig {
     typeArrayProperty: string
     pluralPathProperty: string
     singularPathProperty: string
-    spendingCategoryProperty: string
+    routeExemptionProperty: string
     slugProperty: string
     slugPluralProperty: string
     factoryCallPattern: RegExp
@@ -41,7 +41,7 @@ export interface FiniteEnumRippleConfig {
     collectionPathLiteralPattern: RegExp
     navigationPathLiteralPattern: RegExp
   }
-  post?: {
+  union?: {
     typesPath: string
     routeConfigsPath: string
     typeAlias: string

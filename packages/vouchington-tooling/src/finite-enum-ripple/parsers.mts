@@ -17,45 +17,45 @@ import {
   parseStringArray,
 } from './parser-support.mts'
 
-export interface TopicTypeEntry {
+export interface StructuredTypeEntry {
   value: string
   slug: string
   slugPlural: string
 }
 
-export interface PostRouteConfigEntry {
+export interface UnionRouteConfigEntry {
   key: string
-  postTypes: string[]
+  unionTypes: string[]
   pluralPath: string
   singularPath: string
 }
 
-export interface TopicRouteConfigEntry {
+export interface StructuredRouteConfigEntry {
   key: string
-  topicTypes: string[]
+  structuredTypes: string[]
   pluralPath: string
   singularPath: string
-  spendingCategory: boolean
+  routeExempt: boolean
 }
 
-export interface PostDetailRouteFactoryArgs {
-  postType: string
+export interface UnionDetailRouteFactoryArgs {
+  unionType: string
   slug: string
 }
 
-export interface TopicRouteFactoryArgs {
+export interface StructuredRouteFactoryArgs {
   slug: string
 }
 
-export function parseTopicTypeEntries(
+export function parseStructuredTypeEntries(
   content: string,
   file: string,
   name: string,
   slugProperty: string,
   slugPluralProperty: string,
-): TopicTypeEntry[] {
+): StructuredTypeEntry[] {
   const object = findConstObjectLiteral(content, name, file)
-  const entries: TopicTypeEntry[] = []
+  const entries: StructuredTypeEntry[] = []
   for (const property of object.properties) {
     if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
@@ -72,7 +72,7 @@ export function parseTopicTypeEntries(
   return entries
 }
 
-export function parsePostSlugToType(
+export function parseUnionSlugToType(
   content: string,
   file: string,
   name: string,
@@ -91,69 +91,67 @@ export function parsePostSlugToType(
   return entries
 }
 
-export function parsePostTypeUnion(content: string, file: string, name: string): string[] {
+export function parseUnionTypeUnion(content: string, file: string, name: string): string[] {
   const typeAlias = findTypeAliasDeclaration(content, name, file)
-  const values = collectStringLiteralsFromType(typeAlias.type)
-  if (values.length === 0) throw new Error(`${file}: ${name} union has no values`)
-  return values
+  return collectStringLiteralsFromType(typeAlias.type)
 }
 
-export function parsePostRouteConfigEntries(
+export function parseUnionRouteConfigEntries(
   content: string,
   file: string,
   name: string,
   typeProperty: string,
   pluralPathProperty: string,
   singularPathProperty: string,
-): PostRouteConfigEntry[] {
+): UnionRouteConfigEntry[] {
   return parseRouteConfigEntries(content, name, file, pluralPathProperty, singularPathProperty).map(
     (entry) => ({
       ...entry,
-      postTypes: parseStringArray(entry.body, typeProperty),
+      unionTypes: parseStringArray(entry.body, typeProperty),
     }),
   )
 }
 
-export function parseTopicRouteConfigEntries(
+export function parseStructuredRouteConfigEntries(
   content: string,
   file: string,
   name: string,
   typeProperty: string,
-  categoryProperty: string,
+  exemptionProperty: string,
   pluralPathProperty: string,
   singularPathProperty: string,
-): TopicRouteConfigEntry[] {
+): StructuredRouteConfigEntry[] {
   return parseRouteConfigEntries(content, name, file, pluralPathProperty, singularPathProperty).map(
     (entry) => ({
       ...entry,
-      topicTypes: parseStringArray(entry.body, typeProperty),
-      spendingCategory: hasTrueProperty(entry.body, categoryProperty),
+      structuredTypes: parseStringArray(entry.body, typeProperty),
+      routeExempt: hasTrueProperty(entry.body, exemptionProperty),
     }),
   )
 }
 
-export function parsePostDetailRouteFactoryArgs(
+export function parseUnionDetailRouteFactoryArgs(
   content: string,
   file: string,
   callPattern: RegExp,
-): PostDetailRouteFactoryArgs[] {
-  const args: PostDetailRouteFactoryArgs[] = []
+): UnionDetailRouteFactoryArgs[] {
+  const args: UnionDetailRouteFactoryArgs[] = []
   for (const call of collectCallExpressions(content, file)) {
     callPattern.lastIndex = 0
     if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
-    const postType = getStringLiteralValue(call.arguments[0])
+    const unionType = getStringLiteralValue(call.arguments[0])
     const slug = getStringLiteralValue(call.arguments[1])
-    if (postType && slug) args.push({ postType, slug })
+    if (unionType && slug) args.push({ unionType, slug })
   }
   return args
 }
 
-export function parseTopicRouteFactoryArgs(
+export function parseStructuredRouteFactoryArgs(
   content: string,
   file: string,
   callPattern: RegExp,
-): TopicRouteFactoryArgs[] {
-  const args: TopicRouteFactoryArgs[] = []
+): StructuredRouteFactoryArgs[] {
+  const args: StructuredRouteFactoryArgs[] = []
   for (const call of collectCallExpressions(content, file)) {
     callPattern.lastIndex = 0
     if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue

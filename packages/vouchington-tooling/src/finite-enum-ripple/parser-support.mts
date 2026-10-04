@@ -50,7 +50,8 @@ export function collectStringLiteralsFromType(type: ts.TypeNode): string[] {
   if (ts.isUnionTypeNode(node))
     return node.types.flatMap((item) => collectStringLiteralsFromType(item))
   const value = ts.isLiteralTypeNode(node) ? getStringLiteralValue(node.literal) : undefined
-  return value ? [value] : []
+  if (!value) throw new Error('union contains a non-string literal constituent')
+  return [value]
 }
 
 function getPropertyValue(
