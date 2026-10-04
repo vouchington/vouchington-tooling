@@ -35,6 +35,10 @@ checked.invalidate();
     Promise.all((() => rows.map(drain))())
     Promise.all(jobs = rows.map(drain))
     Promise.all(((jobs = rows.map(drain)) => jobs)())
+    Promise.all(((jobs = rows.map(drain)) => jobs)(void 0))
+    Promise.all(((jobs = rows.map(drain)) => jobs)(undefined))
+    Promise.all((() => { class Batch { static jobs = rows.map(drain) }; return Batch.jobs })())
+    Promise.all(([jobs = rows.map(drain)] = []))
     Promise.all([], rows.map(drain))
     class Later { jobs = Promise.all(rows.map(drain)); static jobs = Promise.all(rows.map(drain)) }
     Promise.all([() => rows.map(drain)])
@@ -125,7 +129,7 @@ checked.invalidate();
     expect(result.status).toBe(1)
     const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 16 }, () => 'vouchington(serial-cursor-drains)'),
+      Array.from({ length: 20 }, () => 'vouchington(serial-cursor-drains)'),
     )
   } finally {
     rmSync(root, { force: true, recursive: true })

@@ -1,17 +1,20 @@
-import { type NodeLike } from './ast-helpers.mts'
+import { findVariable, unwrap, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
+import { runtimeChildren } from './serial-cursor-runtime-children.mts'
 
 function bodyMatches(node: NodeLike, matches: (node: NodeLike) => boolean): boolean {
-  if (
-    [
-      'FunctionDeclaration',
-      'FunctionExpression',
-      'ArrowFunctionExpression',
-      'ClassDeclaration',
-      'ClassExpression',
-    ].includes(node.type)
-  )
+  if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type))
     return false
   if (matches(node)) return true
+  if (
+    [
+      'ClassDeclaration',
+      'ClassExpression',
+      'ClassBody',
+      'PropertyDefinition',
+      'MethodDefinition',
+    ].includes(node.type)
+  )
+    return runtimeChildren(node).some((child) => bodyMatches(child, matches))
   return Object.entries(node).some(([key, value]) => {
     if (key === 'parent') return false
     const children: unknown[] = Array.isArray(value) ? value : [value]
@@ -30,17 +33,26 @@ export function invokedBodyMatches(
   callee: NodeLike | null | undefined,
   args: readonly NodeLike[],
   matches: (node: NodeLike) => boolean,
+  context: RuleContextLike,
 ): boolean {
-  if (
-    !callee ||
-    !['ArrowFunctionExpression', 'FunctionExpression'].includes(callee.type) ||
-    callee.generator
-  )
+  if (!callee || !['ArrowFunctionExpression', 'FunctionExpression'].includes(callee.type))
     return false
   const parameters = callee.params as NodeLike[]
   return (
     parameters.some(
-      (parameter, index) => index >= args.length && bodyMatches(parameter, matches),
-    ) || bodyMatches(callee.body as NodeLike, matches)
+      (parameter, index) =>
+        undefinedArgument(args[index], context) && bodyMatches(parameter, matches),
+    ) ||
+    (!callee.generator && bodyMatches(callee.body as NodeLike, matches))
+  )
+}
+
+function undefinedArgument(argument: NodeLike | undefined, context: RuleContextLike): boolean {
+  const value = unwrap(argument)
+  if (!value || (value.type === 'UnaryExpression' && value.operator === 'void')) return true
+  return (
+    value.type === 'Identifier' &&
+    value.name === 'undefined' &&
+    !findVariable(context, value, true)?.defs.length
   )
 }

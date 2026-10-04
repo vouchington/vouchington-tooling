@@ -124,7 +124,9 @@ export function createSerialCursorDrainsRule() {
           )
             return
           const args = node.arguments as NodeLike[]
-          if (args.some((argument) => eagerIteration(argument, options.iterationMethods))) {
+          if (
+            args.some((argument) => eagerIteration(argument, options.iterationMethods, context))
+          ) {
             context.report({ messageId: 'serial', node })
           }
         },

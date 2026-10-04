@@ -49,7 +49,13 @@ it.each(['writeRows', 'other'])(
 )
 
 it('accepts absent expression input at the visitor boundary', () => {
+  const context: RuleContextLike = {
+    filename: 'selected.mts',
+    options: [],
+    report: () => {},
+    sourceCode: { getScope: () => ({ variables: [], upper: null }) },
+  }
   const methods = new Set(['map'])
-  expect(eagerIteration(null, methods)).toBe(false)
-  expect(eagerIteration(undefined, methods)).toBe(false)
+  expect(eagerIteration(null, methods, context)).toBe(false)
+  expect(eagerIteration(undefined, methods, context)).toBe(false)
 })

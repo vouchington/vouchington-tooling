@@ -1,10 +1,11 @@
 import { invokedBodyMatches } from './serial-cursor-immediate.mts'
 import { runtimeChildren } from './serial-cursor-runtime-children.mts'
-import { propertyName, unwrap, type NodeLike } from './ast-helpers.mts'
+import { propertyName, unwrap, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
 
 export function eagerIteration(
   node: NodeLike | null | undefined,
   methods: ReadonlySet<string>,
+  context: RuleContextLike,
 ): boolean {
   const expression = unwrap(node)
   if (!expression) return false
@@ -27,9 +28,10 @@ export function eagerIteration(
             ...((expression.quasi as NodeLike).expressions as NodeLike[]),
           ]
         : (expression.arguments as NodeLike[]),
-      (child) => eagerIteration(child, methods),
+      (child) => eagerIteration(child, methods, context),
+      context,
     )
   )
     return true
-  return runtimeChildren(expression).some((child) => eagerIteration(child, methods))
+  return runtimeChildren(expression).some((child) => eagerIteration(child, methods, context))
 }

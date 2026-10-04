@@ -11,6 +11,10 @@ const CHILDREN: Readonly<Record<string, readonly string[]>> = {
   LogicalExpression: ['left', 'right'],
   ConditionalExpression: ['test', 'consequent', 'alternate'],
   ArrayExpression: ['elements'],
+  ArrayPattern: ['elements'],
+  ObjectPattern: ['properties'],
+  AssignmentPattern: ['left', 'right'],
+  RestElement: ['argument'],
   SequenceExpression: ['expressions'],
   ObjectExpression: ['properties'],
   Property: ['key', 'value'],
@@ -20,10 +24,21 @@ const CHILDREN: Readonly<Record<string, readonly string[]>> = {
   TemplateLiteral: ['expressions'],
   TaggedTemplateExpression: ['tag', 'quasi'],
   ImportExpression: ['source', 'options'],
+  ClassDeclaration: ['superClass', 'body'],
+  ClassExpression: ['superClass', 'body'],
+  ClassBody: ['body'],
+  MethodDefinition: ['key'],
+  StaticBlock: ['body'],
 }
 
 export function runtimeChildren(node: NodeLike): NodeLike[] {
-  return (CHILDREN[node.type] ?? []).flatMap((field) => {
+  const fields =
+    node.type === 'PropertyDefinition'
+      ? node.static
+        ? ['key', 'value']
+        : ['key']
+      : (CHILDREN[node.type] ?? [])
+  return fields.flatMap((field) => {
     const value = node[field] as NodeLike | null | undefined | (NodeLike | null)[]
     const children = Array.isArray(value) ? value : [value]
     return children.filter((child): child is NodeLike => Boolean(child))
