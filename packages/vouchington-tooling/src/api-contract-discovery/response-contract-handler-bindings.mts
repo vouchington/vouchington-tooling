@@ -21,6 +21,7 @@ export function collectHandlerBindings(
   ambiguousBindings?: AmbiguousHandlerBindings,
 ): HandlerBindings {
   const bindingsBySymbol = new Map<ts.Symbol, RouteBinding[]>()
+  const attributionBindingsBySymbol = new Map<ts.Symbol, RouteBinding[]>()
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
       if (!ts.isCallExpression(node)) return
@@ -34,6 +35,12 @@ export function collectHandlerBindings(
         const candidates = bindingsBySymbol.get(resolved) ?? []
         candidates.push(binding)
         bindingsBySymbol.set(resolved, candidates)
+        if (ambiguousBindings) {
+          const attributionSymbol = resolveHandlerSymbol(symbol, checker)
+          const attributionCandidates = attributionBindingsBySymbol.get(attributionSymbol) ?? []
+          attributionCandidates.push(binding)
+          attributionBindingsBySymbol.set(attributionSymbol, attributionCandidates)
+        }
       }
     })
   }
@@ -47,16 +54,43 @@ export function collectHandlerBindings(
     )
     if (unambiguous) {
       bindings.set(symbol, first!)
-    } else if (ambiguousBindings) {
-      ambiguousBindings.set(
-        symbol,
-        [
-          ...new Set(candidates.map(({ method, routeTemplate }) => `${method}:${routeTemplate}`)),
-        ].toSorted(),
+    }
+  }
+  if (ambiguousBindings) {
+    for (const [symbol, candidates] of attributionBindingsBySymbol) {
+      const [first] = candidates
+      const unambiguous = candidates.every(
+        (candidate) =>
+          candidate.method === first!.method && candidate.routeTemplate === first!.routeTemplate,
       )
+      if (!unambiguous) {
+        ambiguousBindings.set(
+          symbol,
+          [
+            ...new Set(candidates.map(({ method, routeTemplate }) => `${method}:${routeTemplate}`)),
+          ].toSorted(),
+        )
+      }
     }
   }
   return bindings
+}
+
+function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
+  const seen = new Set<ts.Symbol>()
+  let current = resolveSymbol(symbol, checker)
+  while (!seen.has(current)) {
+    seen.add(current)
+    const declaration = current.valueDeclaration
+    if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+      return current
+    const initializer = declaration.initializer
+    if (!ts.isIdentifier(initializer)) return current
+    const next = checker.getSymbolAtLocation(initializer)
+    if (!next) return current
+    current = resolveSymbol(next, checker)
+  }
+  return current
 }
 
 function handlerArgumentSymbols(node: ts.CallExpression, checker: ts.TypeChecker): ts.Symbol[] {

@@ -67,9 +67,14 @@ function isErrorObjectJson(call: ts.CallExpression): boolean {
     !!body &&
     ts.isObjectLiteralExpression(body) &&
     body.properties.some((property) => {
-      if (ts.isSpreadAssignment(property) || !property.name || !ts.isIdentifier(property.name))
-        return false
-      return property.name.text === 'error'
+      if (ts.isSpreadAssignment(property) || !property.name) return false
+      if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+        return property.name.text === 'error'
+      return (
+        ts.isComputedPropertyName(property.name) &&
+        ts.isStringLiteral(property.name.expression) &&
+        property.name.expression.text === 'error'
+      )
     })
   )
 }

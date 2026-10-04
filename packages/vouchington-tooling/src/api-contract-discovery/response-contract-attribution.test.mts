@@ -64,6 +64,44 @@ const sources = {
     app.route('/api/v1/items').post((ctx: any) => sendError(ctx, { status: 409 }))
     app.route('/api/v1/widgets').post((ctx: any) => sendError(ctx, { status: 409 }))
   `,
+  'shared-dynamic-quoted-error': `
+    declare const app: any
+    function sendError(ctx: any, error: any) {
+      ctx.setStatus(error.status)
+      ctx.json({ 'error': error.message })
+    }
+    app.route('/api/v1/items').post((ctx: any) => sendError(ctx, { status: 409 }))
+    app.route('/api/v1/widgets').post((ctx: any) => sendError(ctx, { status: 409 }))
+  `,
+  'shared-dynamic-computed-error': `
+    declare const app: any
+    function sendError(ctx: any, error: any) {
+      ctx.setStatus(error.status)
+      ctx.json({ ['error']: error.message })
+    }
+    app.route('/api/v1/items').post((ctx: any) => sendError(ctx, { status: 409 }))
+    app.route('/api/v1/widgets').post((ctx: any) => sendError(ctx, { status: 409 }))
+  `,
+  'shared-local-alias': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    const alias = send
+    app.route('/api/v1/items').post(send)
+    app.route('/api/v1/widgets').post(alias)
+  `,
+  'cyclic-local-aliases': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    var first: any = second
+    var second: any = first
+    app.route('/api/v1/items').post(first)
+    app.route('/api/v1/widgets').post(second)
+  `,
+  'unresolved-local-alias': `
+    declare const app: any
+    var alias: any = missingHandler
+    app.route('/api/v1/items').post(alias)
+  `,
   'shared-dynamic-success': `
     declare const app: any
     function sendItem(ctx: any, created: any) {
@@ -271,6 +309,52 @@ describe('implicit response attribution facts', () => {
       discover(sourceId, facts)
       expect(facts).toEqual([])
     }
+  })
+
+  it('excludes dynamic error payloads with quoted and computed error keys', () => {
+    for (const sourceId of [
+      'shared-dynamic-quoted-error',
+      'shared-dynamic-computed-error',
+    ] as const) {
+      const facts: AmbiguousAttributionFact[] = []
+      discover(sourceId, facts)
+      expect(facts).toEqual([])
+    }
+  })
+
+  it('groups direct and local-alias registrations under the same shared handler', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    const normal = discover('shared-local-alias')
+    const withFacts = discover('shared-local-alias', facts)
+    expect(withFacts).toEqual(normal)
+    expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+      {
+        label: 'ctx.json()',
+        routes: ['POST:/api/v1/items', 'POST:/api/v1/widgets'],
+      },
+    ])
+  })
+
+  it('stops resolving malformed cyclic local handler aliases', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    expect(() => discover('cyclic-local-aliases', facts)).not.toThrow()
+    expect(facts).toEqual([])
+  })
+
+  it('fails closed when a local handler alias has no checker symbol', () => {
+    const source = matrix.program.getSourceFile('/virtual/unresolved-local-alias.ts')!
+    let unresolved: ts.Identifier | undefined
+    visit(source, (node) => {
+      if (ts.isIdentifier(node) && node.text === 'missingHandler') unresolved = node
+    })
+    expect(matrix.program.getTypeChecker().getSymbolAtLocation(unresolved!)).toBeUndefined()
+    const facts: AmbiguousAttributionFact[] = []
+    expect(
+      discoverApiResponseContracts(matrix.program, [source], undefined, {
+        onAmbiguousAttribution: (fact) => facts.push(fact),
+      }),
+    ).toEqual({})
+    expect(facts).toEqual([])
   })
 
   it('reports success emitters with dynamic statuses', () => {

@@ -23,9 +23,9 @@ export function ambiguousRoutesForCall(
     const symbol = functionSymbol(current, checker)
     if (symbol) {
       const resolved = resolveSymbol(symbol, checker)
-      if (handlerBindings.has(resolved)) return undefined
       const routes = ambiguousBindings.get(resolved)
       if (routes) return executableProtocolPath(node, checker, current) ? routes : undefined
+      if (handlerBindings.has(resolved)) return undefined
     }
     current = current.parent
   }
