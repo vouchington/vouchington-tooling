@@ -31,6 +31,9 @@ const sources = {
   'implemented-stream-argument': route(
     `function ignore(destination:typeof stream){}ignore(stream)`,
   ),
+  'implemented-typed-arrow-stream-argument': route(
+    `const ignore:(destination:typeof stream)=>void=()=>{};ignore(stream)`,
+  ),
   'other-stream-argument': route(`opaqueWriter(other)`),
   alias: route(`const callback=()=>stream.write('raw');opaque(callback)`),
   options: route(`opaque({emit:()=>stream.write('raw')})`),
@@ -171,6 +174,7 @@ it.each([
   'different',
   'cleanup',
   'implemented-stream-argument',
+  'implemented-typed-arrow-stream-argument',
   'other-stream-argument',
   'node-pipeline-dead',
   'node-pipeline-other-destination',

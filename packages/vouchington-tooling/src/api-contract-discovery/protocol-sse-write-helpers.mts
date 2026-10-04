@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
+import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
@@ -36,6 +37,13 @@ function implementationDeclaration(
   return undefined
 }
 
+function implementationCall(call: ts.CallExpression, checker: ts.TypeChecker) {
+  return (
+    implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) ??
+    createProtocolCallbackValueResolver(checker).resolve(call.expression, new Map())?.node
+  )
+}
+
 export function opaqueCallReceivesSelectedStream(
   call: ts.CallExpression,
   selectedReceivers: readonly WriteReceiver[],
@@ -44,8 +52,8 @@ export function opaqueCallReceivesSelectedStream(
   checker: ts.TypeChecker,
   bindings: HandlerBindings,
 ): boolean {
-  if (implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker))
-    return false
+  const implementation = implementationCall(call, checker)
+  if (implementation && ts.isFunctionLike(implementation) && 'body' in implementation) return false
   const framed = selectedReceivers.flatMap((receiver) =>
     actualReceivers(receiver, binding, calls, checker, bindings),
   )
@@ -69,10 +77,7 @@ export function helperBindings(
   const fn = enclosingFunction(node)
   if (!fn || fn.asteriskToken) return []
   return calls.flatMap((call) => {
-    if (
-      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
-      !executableProtocolPath(call, checker)
-    )
+    if (implementationCall(call, checker) !== fn || !executableProtocolPath(call, checker))
       return []
     const binding = enclosingRouteBinding(call, checker, bindings, false)
     return binding ? [binding] : []
@@ -102,10 +107,7 @@ export function actualReceivers(
   if (active.has(receiver.root)) return [undefined]
   const index = runtimeParameters(fn).indexOf(declaration)
   const actuals = calls.flatMap((call) => {
-    if (
-      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
-      !executableProtocolPath(call, checker)
-    )
+    if (implementationCall(call, checker) !== fn || !executableProtocolPath(call, checker))
       return []
     const callBinding = enclosingRouteBinding(call, checker, bindings, false)
     if (!callBinding || routeKey(callBinding) !== routeKey(binding)) return []
