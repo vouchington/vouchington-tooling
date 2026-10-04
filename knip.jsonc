@@ -62,6 +62,7 @@
         "src/markdown/index.mts!",
         "src/basic-auth-doc-sync/index.mts!",
         "src/basic-auth-doc-sync/runbook.mts!",
+        "src/post-publication-inventory/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

@@ -721,3 +721,18 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 TypeScript and route rows from Markdown. Callers configure declaration names and
 runbook headings, then compare the returned data using their own route policy.
 See the [API contract](docs/basic-auth-doc-sync.md).
+
+## Publication writer inventory facts
+
+`vouchington-tooling/post-publication-inventory` exports
+`analyzePostPublicationWriterSource(source, fileName, options)`. It returns five booleans for an
+approved capture-helper call, a capture opt-out, writes through a configured entity table,
+generated relation writes, and eligibility-table writes. Consumers supply every module, symbol,
+property, receiver, and table name through `PostPublicationWriterSourceOptions` and retain their
+inventory schema, tracked files, exceptions, and diagnostics.
+
+This preserves source-inventory heuristics, rather than proving runtime execution or SQL safety.
+Capture imports/calls are name-based and order-independent; relation-variable appends are
+order-sensitive. DML recognition examines literal/template text. Static table matching lowercases
+the extracted name; dynamic literal table matching preserves case. Malformed TypeScript uses the
+compiler's recovery tree. An argument-free append returns no relation fact.

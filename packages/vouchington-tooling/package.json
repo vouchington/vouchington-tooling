@@ -346,6 +346,11 @@
       "types": "./dist/finite-enum-ripple/index.d.mts",
       "import": "./dist/finite-enum-ripple/index.mjs",
       "default": "./dist/finite-enum-ripple/index.mjs"
+    },
+    "./post-publication-inventory": {
+      "types": "./dist/post-publication-inventory/index.d.mts",
+      "import": "./dist/post-publication-inventory/index.mjs",
+      "default": "./dist/post-publication-inventory/index.mjs"
     }
   },
   "publishConfig": {
