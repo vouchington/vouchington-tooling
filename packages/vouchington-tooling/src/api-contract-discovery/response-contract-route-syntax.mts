@@ -1,0 +1,25 @@
+import ts from '../contract-schema/typescript-api.mts'
+
+export function routeTemplateFromExpression(expression: ts.Expression): string | undefined {
+  if (!ts.isPropertyAccessExpression(expression)) return undefined
+  return findRouteCall(expression.expression)
+}
+
+function findRouteCall(expression: ts.Expression): string | undefined {
+  if (!ts.isCallExpression(expression)) return undefined
+  if (!ts.isPropertyAccessExpression(expression.expression)) return undefined
+  if (expression.expression.name.text === 'route') {
+    const route = expression.arguments[0]
+    return route && ts.isStringLiteral(route) ? route.text : undefined
+  }
+  return findRouteCall(expression.expression.expression)
+}
+
+export function propertyName(expression: ts.Expression): string | undefined {
+  return ts.isPropertyAccessExpression(expression) ? expression.name.text : undefined
+}
+
+export function visit(node: ts.Node, callback: (node: ts.Node) => void): void {
+  callback(node)
+  node.forEachChild((child) => visit(child, callback))
+}

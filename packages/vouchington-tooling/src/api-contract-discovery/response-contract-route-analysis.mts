@@ -1,6 +1,14 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { propertyName, routeTemplateFromExpression } from './response-contract-route-syntax.mts'
+
+export { collectHandlerBindings } from './response-contract-handler-bindings.mts'
+export {
+  propertyName,
+  routeTemplateFromExpression,
+  visit,
+} from './response-contract-route-syntax.mts'
 
 export {
   isContextMethod,
@@ -84,109 +92,6 @@ export function enclosingRouteBinding(
   return undefined
 }
 
-export function collectHandlerBindings(
-  sourceFiles: readonly ts.SourceFile[],
-  checker: ts.TypeChecker,
-  ambiguousBindings?: AmbiguousHandlerBindings,
-): HandlerBindings {
-  const bindingsBySymbol = new Map<ts.Symbol, RouteBinding[]>()
-  for (const sourceFile of sourceFiles) {
-    visit(sourceFile, (node) => {
-      if (!ts.isCallExpression(node)) return
-      const method = propertyName(node.expression)?.toUpperCase()
-      if (!method || !HTTP_METHODS.has(method)) return
-      const routeTemplate = routeTemplateFromExpression(node.expression)
-      if (!routeTemplate) return
-      const binding = { method, routeTemplate }
-      for (const symbol of handlerArgumentSymbols(node, checker)) {
-        const resolved = resolveSymbol(symbol, checker)
-        const candidates = bindingsBySymbol.get(resolved) ?? []
-        candidates.push(binding)
-        bindingsBySymbol.set(resolved, candidates)
-      }
-    })
-  }
-
-  const bindings: HandlerBindings = new Map()
-  for (const [symbol, candidates] of bindingsBySymbol) {
-    const [first] = candidates
-    const unambiguous = candidates.every(
-      (candidate) =>
-        candidate.method === first!.method && candidate.routeTemplate === first!.routeTemplate,
-    )
-    // A symbol bound to more than one distinct route (a genuinely shared handler function) can't
-    // be attributed to either one — recording an arbitrary winner would misdocument whichever
-    // route lost.
-    if (unambiguous) {
-      bindings.set(symbol, first!)
-    } else if (ambiguousBindings) {
-      ambiguousBindings.set(
-        symbol,
-        [
-          ...new Set(candidates.map(({ method, routeTemplate }) => `${method}:${routeTemplate}`)),
-        ].toSorted(),
-      )
-    }
-  }
-  return bindings
-}
-
-/**
- * Symbols a route registration call directly implicates: identifiers passed by reference
- * (`app.route(...).post(handleThing)`), and — for an inline handler argument — every plain named
- * function it calls directly, e.g. `app.route(...).post(async ctx => { await handleThing(ctx) })`.
- * `enclosingRouteBinding`'s lexical walk can't see through the latter case on its own, since
- * `handleThing`'s body isn't lexically nested inside the route registration at all; recording its
- * symbol here lets the same `handlerBindings` lookup resolve it.
- */
-function handlerArgumentSymbols(node: ts.CallExpression, checker: ts.TypeChecker): ts.Symbol[] {
-  const symbols: ts.Symbol[] = []
-  for (const argument of node.arguments) {
-    if (ts.isIdentifier(argument)) {
-      const symbol = checker.getSymbolAtLocation(argument)
-      if (symbol) symbols.push(symbol)
-      continue
-    }
-    if (isFunctionLike(argument)) {
-      visit(argument, (child) => {
-        if (
-          !ts.isCallExpression(child) ||
-          !ts.isIdentifier(child.expression) ||
-          !executableProtocolPath(child, checker)
-        )
-          return
-        const symbol = checker.getSymbolAtLocation(child.expression)
-        if (symbol) symbols.push(symbol)
-      })
-    }
-  }
-  return symbols
-}
-
-export function routeTemplateFromExpression(expression: ts.Expression): string | undefined {
-  if (!ts.isPropertyAccessExpression(expression)) return undefined
-  return findRouteCall(expression.expression)
-}
-
-function findRouteCall(expression: ts.Expression): string | undefined {
-  if (!ts.isCallExpression(expression)) return undefined
-  if (!ts.isPropertyAccessExpression(expression.expression)) return undefined
-  if (expression.expression.name.text === 'route') {
-    const route = expression.arguments[0]
-    return route && ts.isStringLiteral(route) ? route.text : undefined
-  }
-  return findRouteCall(expression.expression.expression)
-}
-
-export function propertyName(expression: ts.Expression): string | undefined {
-  return ts.isPropertyAccessExpression(expression) ? expression.name.text : undefined
-}
-
 function isFunctionLike(node: ts.Node): node is ts.ArrowFunction | ts.FunctionExpression {
   return ts.isArrowFunction(node) || ts.isFunctionExpression(node)
-}
-
-export function visit(node: ts.Node, callback: (node: ts.Node) => void): void {
-  callback(node)
-  node.forEachChild((child) => visit(child, callback))
 }

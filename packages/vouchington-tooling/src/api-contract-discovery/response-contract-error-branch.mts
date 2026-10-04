@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { isContextMethod } from './response-contract-route-analysis.mts'
+import { responseBodyExpression } from './response-contract-registration.mts'
 
 /**
  * Detects a hand-rolled early-return error guard: `ctx.setStatus(NNN >= 400)` followed by a
@@ -61,8 +62,7 @@ function isDynamicStatusStatement(statement: ts.Statement): boolean {
 }
 
 function isErrorObjectJson(call: ts.CallExpression): boolean {
-  if (!isContextMethod(call.expression, 'json')) return false
-  const body = call.arguments[0]
+  const body = responseBodyExpression(call)
   return (
     !!body &&
     ts.isObjectLiteralExpression(body) &&

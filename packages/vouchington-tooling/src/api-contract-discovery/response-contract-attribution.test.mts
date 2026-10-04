@@ -53,12 +53,13 @@ const sources = {
     app.route('/api/v1/widgets').post((ctx: any) => { sendConflict(ctx); ctx.json({ id: 'one' }) })
   `,
   'shared-dynamic-error': `
-    declare const app: any
+    declare const app: any, streamJsonObject: any
     function sendError(ctx: any, error: any) {
       const status = error.status
       ctx.log('sending an error')
       ctx.setStatus(status)
       ctx.json({ ...error, error: error.message })
+      ctx.pipeline(streamJsonObject({ ...error, error: error.message }))
     }
     app.route('/api/v1/items').post((ctx: any) => sendError(ctx, { status: 409 }))
     app.route('/api/v1/widgets').post((ctx: any) => sendError(ctx, { status: 409 }))
@@ -112,6 +113,25 @@ const sources = {
     }
     app.route('/api/v1/items').post((ctx: any) => sendError(ctx))
     app.route('/api/v1/widgets').post((ctx: any) => sendError(ctx))
+  `,
+  'shared-unreachable': `
+    declare const app: any
+    function sendUnused(ctx: any) {
+      if (false) ctx.json({ dead: true })
+      return
+      ctx.response.xml('<dead/>')
+      function neverCalled(inner: any) { inner.json({ dead: true }) }
+    }
+    app.route('/api/v1/items').post(sendUnused)
+    app.route('/api/v1/widgets').post(sendUnused)
+  `,
+  'nested-route-handler': `
+    declare const app: any
+    function sendShared(ctx: any) { ctx.json({ shared: true }) }
+    app.route('/api/v1/outer').post((ctx: any) => {
+      app.route('/api/v1/inner').get((inner: any) => sendShared(inner))
+    })
+    app.route('/api/v1/other').post(sendShared)
   `,
   'shared-xml': `
     declare const app: any
@@ -212,6 +232,32 @@ describe('implicit response attribution facts', () => {
     const facts: AmbiguousAttributionFact[] = []
     discover('unscoped-call', facts)
     expect(facts).toEqual([])
+  })
+
+  it('excludes dead calls after terminators and in never-invoked functions', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('shared-unreachable', facts)
+    expect(facts).toEqual([])
+  })
+
+  it('does not attribute a nested route handler to its enclosing route', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('nested-route-handler', facts)
+    expect(facts.map(({ routes }) => routes)).toEqual([['GET:/api/v1/inner', 'POST:/api/v1/other']])
+  })
+
+  it('filters facts to requested routes without losing the full ambiguous route set', () => {
+    const sourceFile = matrix.sourceFile('shared-json')
+    const facts: AmbiguousAttributionFact[] = []
+    discoverApiResponseContracts(matrix.program, [sourceFile], new Set(['POST:/api/v1/other']), {
+      onAmbiguousAttribution: (fact) => facts.push(fact),
+    })
+    expect(facts).toEqual([])
+
+    discoverApiResponseContracts(matrix.program, [sourceFile], new Set(['POST:/api/v1/items']), {
+      onAmbiguousAttribution: (fact) => facts.push(fact),
+    })
+    expect(facts[0]?.routes).toEqual(['POST:/api/v1/items', 'POST:/api/v1/widgets'])
   })
 
   it('does not report status-only or error-branch helper calls', () => {

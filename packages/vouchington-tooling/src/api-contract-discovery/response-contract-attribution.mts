@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 
+import { executableProtocolPath } from './protocol-execution-path.mts'
 import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import {
   propertyName,
@@ -24,7 +25,7 @@ export function ambiguousRoutesForCall(
       const resolved = resolveSymbol(symbol, checker)
       if (handlerBindings.has(resolved)) return undefined
       const routes = ambiguousBindings.get(resolved)
-      if (routes) return routes
+      if (routes) return executableProtocolPath(node, checker, current) ? routes : undefined
     }
     current = current.parent
   }

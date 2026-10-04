@@ -6,6 +6,7 @@ import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 import { discoverImplicitContract } from './response-contract-implicit.mts'
 import { ambiguousRoutesForCall } from './response-contract-attribution.mts'
 import { implicitResponseCallLabel } from './response-contract-call-classification.mts'
+import { collectHandlerBindings } from './response-contract-handler-bindings.mts'
 import {
   registerRouteContract,
   type DiscoverApiResponseContractsOptions,
@@ -18,9 +19,9 @@ import {
   sourceLocation,
 } from './response-contract-registration.mts'
 import {
-  collectHandlerBindings,
   enclosingRouteBinding,
   isContextMethod,
+  requestedKeyForBinding,
   responseMarker,
   type AmbiguousHandlerBindings,
   visit,
@@ -114,7 +115,19 @@ export function discoverApiResponseContracts(
         const routes = attributionLabel
           ? ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)
           : undefined
-        if (attributionLabel && routes) {
+        const requestedRoute =
+          !requestedKeys ||
+          routes?.some((route) => {
+            const separator = route.indexOf(':')
+            return (
+              separator > 0 &&
+              requestedKeyForBinding(
+                { method: route.slice(0, separator), routeTemplate: route.slice(separator + 1) },
+                requestedKeys,
+              ) !== undefined
+            )
+          })
+        if (attributionLabel && routes && requestedRoute) {
           const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
           options.onAmbiguousAttribution({
             sourceLocation: `${sourceLocation(sourceFile, node)}:${position.line + 1}:${position.character + 1}`,
