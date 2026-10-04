@@ -59,7 +59,8 @@ export function collectActivePatternCaptures(
     }
     visit(source)
   }
-  return [...content.matchAll(pattern)].flatMap((match) => {
+  const globalPattern = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`)
+  return [...content.matchAll(globalPattern)].flatMap((match) => {
     if (
       inactive.some(
         ({ start, end, literal }) =>
