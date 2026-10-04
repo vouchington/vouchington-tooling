@@ -484,7 +484,8 @@ declaration-only, deferred, or rewritten callbacks fail closed. Callback options
 without a concrete implementation also fail closed. Factory callbacks must execute from the returned request handler; registration-time invocations do not
 prove a request emission. Compiler-resolved platform timers
 and Promise executors supply invocation paths using the caller Program's actual standard-library
-identities; shadowed, custom, or reassigned platform APIs do not. Fluent route registrations retain their method. Stable named
+identities; shadowed, custom, or reassigned platform APIs do not. Mutation checks recognize Node's
+compiler-declared `global` as well as `globalThis`. Fluent route registrations retain their method. Stable named
 handlers and called local helpers are followed within their declaring source file. Ordinary response,
 request, query, and header markers also require callback invocation before route attribution.
 Broad names, unknown root payloads, executable unmarked frames through stream aliases, and
@@ -496,7 +497,8 @@ Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assu
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
 selected SSE rows, including when only one protocol variant was requested. Object-literal wrapper
 receivers fail closed for marked frames because their properties can mutate; raw wrapper writes
-are matched to the original stream, including proven helper-parameter forwarding and literal bracket
+are matched to the original stream, including proven helper-parameter forwarding, overloaded helper
+implementations, and literal bracket
 methods. Unsupported computed methods on that receiver fail closed. Byte-bearing
 stream `end` calls and streams used as pipe destinations are raw emissions; empty terminal cleanup
 is preserved. Binding a selected stream's `write` or `end` method fails closed because the bound
@@ -514,6 +516,8 @@ the marked variable's status and body emissions without reading or replacing res
 A status setter must dominate each body emission, including separate branches; constant context
 aliases are followed, assigned mutable context aliases and object-literal context wrappers fail closed,
 and helper parameters must resolve to the registered caller's unchanged response context.
+Helper-owned contracts also account for response emissions in their proven caller scopes.
+Indirect response `call`, `apply`, and `bind` forms fail closed, including borrowed context receivers.
 Literal bracket response methods have the same emission checks as property methods. Unrelated raw emissions
 remain unavailable. Separate branded response branches are checked together, and the nearest
 proven status setter for each body must belong to that response. Observed content and bodyless

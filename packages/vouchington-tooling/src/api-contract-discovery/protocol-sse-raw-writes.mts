@@ -76,6 +76,24 @@ function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
 }
 
+function implementationDeclaration(
+  declaration: ts.Signature['declaration'],
+  checker: ts.TypeChecker,
+): ts.FunctionLikeDeclaration | undefined {
+  if (!declaration) return undefined
+  if (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) return declaration
+  if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) {
+    if (declaration.body) return declaration
+    const symbol = declaration.name && checker.getSymbolAtLocation(declaration.name)
+    return symbol?.declarations?.find(
+      (candidate): candidate is ts.FunctionLikeDeclaration =>
+        (ts.isFunctionDeclaration(candidate) || ts.isMethodDeclaration(candidate)) &&
+        !!candidate.body,
+    )
+  }
+  return undefined
+}
+
 function helperBindings(
   node: ts.Node,
   calls: readonly ts.CallExpression[],
@@ -86,7 +104,7 @@ function helperBindings(
   if (!fn || fn.asteriskToken) return []
   return calls.flatMap((call) => {
     if (
-      checker.getResolvedSignature(call)?.declaration !== fn ||
+      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
       !executableProtocolPath(call, checker)
     )
       return []
@@ -119,7 +137,7 @@ function actualReceivers(
   const index = runtimeParameters(fn).indexOf(declaration)
   const actuals = calls.flatMap((call) => {
     if (
-      checker.getResolvedSignature(call)?.declaration !== fn ||
+      implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) !== fn ||
       !executableProtocolPath(call, checker)
     )
       return []

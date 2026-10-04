@@ -50,6 +50,20 @@ export function globalTarget(
   if (!symbol || seen.has(symbol)) return undefined
   seen.add(symbol)
   if (value.text === 'globalThis') return symbol.declarations?.length ? undefined : value
+  if (
+    symbol.name === 'global' &&
+    symbol.declarations?.some((declaration) => {
+      const source = declaration.getSourceFile()
+      return (
+        ts.isVariableDeclaration(declaration) &&
+        source.isDeclarationFile &&
+        resolvePath(source.fileName)
+          .replaceAll('\\', '/')
+          .endsWith('/node_modules/@types/node/globals.d.ts')
+      )
+    })
+  )
+    return value
   const declaration = symbol.valueDeclaration
   return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
     ? globalTarget(declaration.initializer, checker, seen)

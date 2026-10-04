@@ -1,8 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
-import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
-import { registeredHandler } from './protocol-callback-registration.mts'
-import { executableProtocolPath } from './protocol-execution-path.mts'
+import { httpContextInvocations } from './protocol-http-context-callers.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
@@ -21,36 +18,7 @@ export function httpHandlerContext(
       ? checker.getSymbolAtLocation(parameter.name)
       : undefined
   if (!context || hasBindingWrite(parameter!, checker)) return undefined
-  const resolver = createProtocolCallbackValueResolver(checker)
-  const calls: ts.CallExpression[] = []
-  function visit(node: ts.Node) {
-    if (ts.isCallExpression(node) && executableProtocolPath(node, checker)) calls.push(node)
-    ts.forEachChild(node, visit)
-  }
-  visit(fn.getSourceFile())
-  const registered = calls.some(
-    (call) =>
-      registeredHandler(call) &&
-      call.arguments.some((argument) => resolver.resolve(argument, new Map())?.node === fn),
-  )
-  const callers = calls.filter((call) => {
-    if (resolver.resolve(call.expression, new Map())?.node === fn) return true
-    const owner = enclosingFunction(call)
-    if (!owner) return false
-    return calls.some((invocation) => {
-      const target = resolver.resolve(invocation.expression, new Map())
-      if (target?.node !== owner) return false
-      const env = callbackArgumentBindings(
-        owner,
-        invocation,
-        new Map(),
-        target.env,
-        checker,
-        resolver,
-      )
-      return !!env && resolver.resolve(call.expression, env)?.node === fn
-    })
-  })
+  const { registered, callers } = httpContextInvocations(fn, checker)
   const next = new Set(active).add(fn)
   const valid =
     (registered || callers.length > 0) &&
@@ -104,4 +72,50 @@ function bracketResponseReceiver(expression: ts.Expression, checker: ts.TypeChec
   if (!access || access.name !== 'response') return undefined
   const receiver = expressionReceiver(access.receiver, checker)
   return receiver && { ...receiver, path: [...receiver.path, 'response'] }
+}
+
+/** Follow only caller contexts already admitted by the actual-argument proof. */
+export function httpContextScopes(fn: ts.FunctionLikeDeclaration, checker: ts.TypeChecker) {
+  const scopes = new Map<ts.FunctionLikeDeclaration, ts.Symbol>()
+  const pending = [fn]
+  const seen = new Set<ts.FunctionLikeDeclaration>()
+  while (pending.length) {
+    const current = pending.pop()!
+    if (seen.has(current)) continue
+    seen.add(current)
+    const context = httpHandlerContext(current, checker)
+    if (!context) continue
+    scopes.set(current, context)
+    for (const call of httpContextInvocations(current, checker).callers) {
+      // Admission above proves every caller's parameter-owned context.
+      const receiver = expressionReceiver(call.arguments[0]!, checker)!
+      pending.push(enclosingFunction(receiver.root.valueDeclaration!)!)
+    }
+  }
+  return scopes
+}
+
+/** Indirect methods cannot prove the declared status or body, including borrowed this receivers. */
+export function indirectHttpResponseMethod(
+  call: ts.CallExpression,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+) {
+  const outer = methodAccess(call.expression)
+  if (!outer || !['call', 'apply', 'bind'].includes(outer.name)) return undefined
+  const direct = contextResponseMethod(outer.receiver, context, checker, true)
+  if (direct) return direct
+  const method = expressionReceiver(outer.receiver, checker)
+  if (method?.root === context)
+    return method.path[0] === 'response' ? method.path.slice(0, 2).join('.') : method.path[0]
+  const receiver = call.arguments[0] && expressionReceiver(call.arguments[0], checker)
+  if (receiver?.root !== context) return undefined
+  const target = methodAccess(outer.receiver)
+  const name = target?.name ?? method?.path.at(-1)
+  if (!name) return undefined
+  return receiver.path.length === 0
+    ? name
+    : receiver.path.length === 1 && receiver.path[0] === 'response'
+      ? `response.${name}`
+      : undefined
 }

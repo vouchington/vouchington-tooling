@@ -31,6 +31,7 @@ import {
   supportedResponseContext,
 } from './protocol-http-association.mts'
 import { contextResponseMethod } from './protocol-http-context.mts'
+import { taintRouteKeys, markRouteTaint, isSseSetter } from './protocol-http-implicit-taint.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 export function discoverImplicitContract(
@@ -46,7 +47,8 @@ export function discoverImplicitContract(
   const binding = enclosingRouteBinding(call, checker, handlerBindings, !opaqueResponse)
   if (!binding) return
   const key = requestedKeyForBinding(binding, requestedKeys)
-  if (!key) return
+  const taintKeys = taintRouteKeys(contracts, binding, key)
+  if (!taintKeys.length) return
 
   const context = supportedResponseContext(call, checker)
   const bracketResponse =
@@ -56,26 +58,24 @@ export function discoverImplicitContract(
         ts.isElementAccessExpression(call.expression.expression))) &&
     contextResponseMethod(call.expression, context, checker)
   const mutableResponse = unsupportedContextResponse(call, checker)
-  const sseSetter =
-    bracketResponse === 'setStatus' &&
-    [...contracts.values()].some(
-      (row) =>
-        row.method === binding.method &&
-        row.routeTemplate === binding.routeTemplate &&
-        !row.unavailableReason &&
-        !!row.sseEvents?.length,
-    )
+  const sseSetter = isSseSetter(contracts, binding, bracketResponse || undefined)
   if (
     opaqueResponse ||
     mutableResponse ||
     (bracketResponse && !sseSetter && !containsResponseMarker(call))
   ) {
-    markBufferedRouteUnavailable(contracts, key, binding, sourceLocation(sourceFile, call))
-    if (mutableResponse)
-      contracts.get(key)!.unavailableReason =
-        'route emits a response through a mutable context wrapper whose status or body is not statically determinable'
+    markRouteTaint(
+      contracts,
+      taintKeys,
+      binding,
+      sourceLocation(sourceFile, call),
+      !!mutableResponse &&
+        !!context &&
+        !!contextResponseMethod(call.expression, context, checker, true),
+    )
     return
   }
+  if (!key) return
 
   const body = responseBodyExpression(call)
   if (body) {
