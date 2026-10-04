@@ -25,6 +25,6 @@ export function collectActivePatternCaptures(content: string, pattern: RegExp): 
   }
   return [...content.matchAll(pattern)].flatMap((match) => {
     if (inactive.some(({ start, end }) => match.index >= start && match.index < end)) return []
-    return match[1] ? [match[1]] : []
+    return match[1] === undefined ? [] : [match[1]]
   })
 }

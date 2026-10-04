@@ -16,8 +16,11 @@ export function collectCreatePageLiterals(
       const value = getStringLiteralValue(node.initializer)
       if (names.has(name) && value) values.push(value)
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && names.has(node.name.text)) {
-      if (node.initializer && ts.isStringLiteral(node.initializer))
-        values.push(node.initializer.text)
+      const value =
+        node.initializer && ts.isJsxExpression(node.initializer)
+          ? getStringLiteralValue(node.initializer.expression)
+          : getStringLiteralValue(node.initializer)
+      if (value) values.push(value)
     } else if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken

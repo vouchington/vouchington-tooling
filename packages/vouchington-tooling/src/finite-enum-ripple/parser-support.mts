@@ -36,12 +36,20 @@ export function parseRouteConfigEntries(
   return entries
 }
 
-export function parseStringArray(content: ts.ObjectLiteralExpression, property: string): string[] {
+export function parseStringArray(
+  content: ts.ObjectLiteralExpression,
+  property: string,
+  file: string,
+): string[] {
   const array = getPropertyValue(content, property)
-  if (!array || !ts.isArrayLiteralExpression(array)) return []
-  return array.elements.flatMap((element) => {
+  if (!array) return []
+  if (!ts.isArrayLiteralExpression(array))
+    throw new Error(`${file}: ${property} must be a literal string array`)
+  return array.elements.map((element) => {
     const value = getStringLiteralValue(element)
-    return value ? [value] : []
+    if (value === undefined)
+      throw new Error(`${file}: ${property} contains a non-string literal element`)
+    return value
   })
 }
 

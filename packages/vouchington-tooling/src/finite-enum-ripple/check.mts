@@ -18,7 +18,11 @@ export function checkFiniteEnumRipple(
       if (content === null) throw new Error(`Cannot read tracked file: ${file}`)
       return content
     }
-    return readFileSync(join(ctx.repoRoot, file), 'utf8')
+    try {
+      return readFileSync(join(ctx.repoRoot, file), 'utf8')
+    } catch (cause) {
+      throw new Error(`${file}: ${String(cause)}`)
+    }
   }
   if (config.structured) {
     try {

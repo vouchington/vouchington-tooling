@@ -51,8 +51,7 @@ export function checkCollectionPagePathLiterals(
     if (!routeSlugs.has(page.slug)) continue
     const content = readTracked(page.file)
     for (const literalPath of collectActivePatternCaptures(content, pathPattern)) {
-      if (!literalPath || literalPath === page.slug || literalPath.startsWith(`${page.slug}/`))
-        continue
+      if (literalPath === page.slug || literalPath.startsWith(`${page.slug}/`)) continue
       errors.push(
         finiteEnumError(
           page.file,

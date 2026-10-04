@@ -7,4 +7,5 @@ it('requires a capture from a caller pattern', () => {
   ).toEqual(['/entry'])
   expect(collectActivePatternCaptures("path: '/entry'", /path:\s*'([^']+)'?/g)).toEqual(['/entry'])
   expect(collectActivePatternCaptures("path: '/entry'", /path:\s*'(optional)?/g)).toEqual([])
+  expect(collectActivePatternCaptures("path: '/'", /path:\s*'\/([^']*)'/g)).toEqual([''])
 })

@@ -107,7 +107,7 @@ export function parseUnionRouteConfigEntries(
   return parseRouteConfigEntries(content, name, file, pluralPathProperty, singularPathProperty).map(
     (entry) => ({
       ...entry,
-      unionTypes: parseStringArray(entry.body, typeProperty),
+      unionTypes: parseStringArray(entry.body, typeProperty, file),
     }),
   )
 }
@@ -124,7 +124,7 @@ export function parseStructuredRouteConfigEntries(
   return parseRouteConfigEntries(content, name, file, pluralPathProperty, singularPathProperty).map(
     (entry) => ({
       ...entry,
-      structuredTypes: parseStringArray(entry.body, typeProperty),
+      structuredTypes: parseStringArray(entry.body, typeProperty, file),
       routeExempt: hasTrueProperty(entry.body, exemptionProperty),
     }),
   )

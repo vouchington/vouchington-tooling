@@ -170,7 +170,7 @@ describe('finite enum parsers', () => {
       ),
     ).toThrow('missing slug')
     const routes =
-      "const kindRoutes = { ...extra, [dynamic]: {}, scalar: 1, alpha: { ...extra, singular: 'alpha', plural: 'alphas', kinds: [false, 'alpha'], special: true } }"
+      "const kindRoutes = { ...extra, [dynamic]: {}, scalar: 1, alpha: { ...extra, singular: 'alpha', plural: 'alphas', kinds: ['alpha'], special: true } }"
     expect(
       parseStructuredRouteConfigEntries(
         routes,
@@ -193,6 +193,24 @@ describe('finite enum parsers', () => {
         'singular',
       ),
     ).toThrow('could not parse kindRoutes entries')
+  })
+
+  it('rejects uninspectable configured route type arrays', () => {
+    const source =
+      "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry', dynamic] } }"
+    expect(() =>
+      parseUnionRouteConfigEntries(source, file, 'routes', 'kinds', 'plural', 'singular'),
+    ).toThrow('kinds contains a non-string literal element')
+    expect(() =>
+      parseUnionRouteConfigEntries(
+        source.replace("['entry', dynamic]", 'dynamic'),
+        file,
+        'routes',
+        'kinds',
+        'plural',
+        'singular',
+      ),
+    ).toThrow('kinds must be a literal string array')
   })
 
   it('skips unrelated declarations and unmatched structured factory calls', () => {

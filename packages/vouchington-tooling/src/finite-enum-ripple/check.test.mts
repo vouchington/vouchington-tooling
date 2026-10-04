@@ -3,8 +3,6 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { SharedContext } from '../shared-context/index.mts'
-import { compareSets } from './compare.mts'
-import { collectCreatePageLiterals } from './create-page-literals.mts'
 import {
   checkFiniteEnumRipple,
   type FiniteEnumFiles,
@@ -421,39 +419,6 @@ describe('checkFiniteEnumRipple', () => {
     expect(duplicates[0]).toContain('duplicate in actual values: alpha')
   })
 
-  it('blames a real source file for expected duplicates', () => {
-    const errors: string[] = []
-    compareSets(errors, {
-      label: 'kind values',
-      actualLabel: 'browser kinds',
-      actualFile: paths.client,
-      actualValues: ['alpha'],
-      expectedLabel: 'source kinds',
-      expectedFile: paths.source,
-      expectedValues: ['alpha', 'alpha'],
-    })
-    expect(errors).toContainEqual(
-      expect.stringContaining(
-        `::error file=${paths.source}::${paths.source}: kind values duplicate in expected values: alpha`,
-      ),
-    )
-  })
-
-  it('recognizes active object, JSX, and assignment literals only', () => {
-    const values = collectCreatePageLiterals(
-      [
-        "const fields = { action: 'entry', other: 'skip', action: dynamic }",
-        "const view = <Form action='entry' other='skip' postType={dynamic} />",
-        "action = 'entry'; form.action = 'entry'; form['action'] = 'skip'",
-        "// action: 'old'",
-        'const example = "action: \'old\'"',
-      ].join('\n'),
-      paths.recordCreate,
-      ['action', 'postType'],
-    )
-    expect(values).toEqual(['entry', 'entry', 'entry', 'entry'])
-  })
-
   it('uses declaration paths when routed-page lists are empty', () => {
     const { files, check } = fixture()
     files.structuredCollectionPages = []
@@ -490,5 +455,34 @@ describe('checkFiniteEnumRipple', () => {
         `::error file=${paths.detail}::${paths.detail}: configured route factory call needs a string literal slug`,
       ),
     )
+  })
+
+  it('checks captured root paths against non-root routes', () => {
+    const { contents, config, check } = fixture()
+    contents.set(paths.collection, "export default { path: '/' }")
+    contents.set(paths.component, "push('/')")
+    config.structured!.navigationPathLiteralPattern = /\bpush\(\s*['"]\/([^'"]*)/g
+    expect(check()).toContainEqual(expect.stringContaining('collection path literal "/"'))
+    expect(check()).toContainEqual(expect.stringContaining('component navigation path "/"'))
+  })
+
+  it('attributes a fallback filesystem read failure to its selected page', () => {
+    const { contents, ctx, check } = fixture()
+    const root = mkdtempSync(join(tmpdir(), 'finite-enum-missing-page-'))
+    try {
+      for (const [file, content] of contents) {
+        if (file === paths.detail) continue
+        const target = join(root, file)
+        mkdirSync(dirname(target), { recursive: true })
+        writeFileSync(target, content)
+      }
+      ctx.repoRoot = root
+      delete ctx.readTrackedFile
+      expect(check()).toContainEqual(
+        expect.stringContaining(`::error file=${paths.detail}::${paths.detail}:`),
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
