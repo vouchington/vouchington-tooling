@@ -4,10 +4,18 @@ import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-set
 
 const route = (body: string) => `declare const app:any;declare function opaque(value:unknown):void;
  declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
- class Stream{write(_value:string):void{}}const stream=new Stream();const other=new Stream();
+ class Stream{write(_value:string):void{}cleanup():void{}}const stream=new Stream();const other=new Stream();
  declare function opaqueResult(value:Stream):Stream;
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
+  callbackblock: route('opaque([{callback:function(){return stream}}])'),
+  elementmethod: route('(stream as Stream & {raw():void})["raw"]()'),
+  concretecleanup: route('stream.cleanup()'),
+  deadmethod: route('if(false)(stream as Stream & {raw():void}).raw()'),
+  wrapper: route('opaque({callback:()=>stream})'),
+  wrapperother: route('opaque({callback:()=>other})'),
+  method: route('(stream as Stream & {raw():void}).raw()'),
+  methodother: route('(other as Stream & {raw():void}).raw()'),
   captured: route('function capture(){return stream}opaque(capture())'),
   closure: route('function wrap(value:Stream){return ()=>value}opaque(wrap(stream))'),
   cycle: route('function repeat(value:Stream):Stream{return repeat(value)}opaque(repeat(stream))'),
@@ -44,6 +52,10 @@ const row = (name: keyof typeof sources) =>
     onRouteError: () => {},
   })['GET:/events']
 it.each([
+  'callbackblock',
+  'elementmethod',
+  'wrapper',
+  'method',
   'identity',
   'container',
   'alias',
@@ -61,7 +73,17 @@ it.each([
 ] as const)('rejects selected capability in %s', (name) =>
   expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
-it.each(['omitted', 'scalar', 'separate', 'fresh', 'loopother', 'deadloop'] as const)(
-  'preserves independent behavior in %s',
-  (name) => expect(row(name)?.unavailableReason).toBeUndefined(),
+it.each([
+  'concretecleanup',
+  'deadmethod',
+  'wrapperother',
+  'methodother',
+  'omitted',
+  'scalar',
+  'separate',
+  'fresh',
+  'loopother',
+  'deadloop',
+] as const)('preserves independent behavior in %s', (name) =>
+  expect(row(name)?.unavailableReason).toBeUndefined(),
 )

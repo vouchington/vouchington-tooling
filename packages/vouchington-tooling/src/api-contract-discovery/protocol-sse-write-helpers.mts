@@ -6,6 +6,7 @@ import { createSseCallbackOrigins } from './protocol-sse-callback-origins.mts'
 import {
   implementationDeclaration,
   selectedReturnedSseCapability,
+  selectedOpaqueSseReceiver,
 } from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
@@ -41,6 +42,12 @@ export function opaqueCallReceivesSelectedStream(
   const framed = selectedReceivers.flatMap((frame) =>
     actualReceivers(frame, binding, checker, lookup).map((value) => value ?? frame),
   )
+  if (
+    selectedOpaqueSseReceiver(call, checker, framed, (receiver) =>
+      actualReceivers(receiver, binding, checker, lookup),
+    )
+  )
+    return true
   return (
     call.arguments?.some((argument) =>
       someSseArgumentValue(argument, checker, (leaf) => {
@@ -52,7 +59,9 @@ export function opaqueCallReceivesSelectedStream(
         )
           return true
         if (
-          ts.isCallExpression(leaf) &&
+          (ts.isCallExpression(leaf) ||
+            ts.isArrowFunction(leaf) ||
+            ts.isFunctionExpression(leaf)) &&
           selectedReturnedSseCapability(
             leaf,
             checker,

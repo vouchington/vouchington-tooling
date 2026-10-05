@@ -10,7 +10,7 @@ import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 
 /** Concrete helper results retain caller-bound selected arguments and constant local aliases. */
 function returnedSseCapability(
-  call: ts.CallExpression,
+  call: ts.Expression,
   checker: ts.TypeChecker,
   implementation: (call: ts.CallExpression) => ts.Node | undefined,
   selected: (value: ts.Expression) => boolean,
@@ -72,7 +72,7 @@ function returnedSseCapability(
 }
 
 export function selectedReturnedSseCapability(
-  call: ts.CallExpression,
+  call: ts.Expression,
   checker: ts.TypeChecker,
   implementation: (call: ts.CallExpression) => ts.Node | undefined,
   framed: readonly (WriteReceiver | undefined)[],
@@ -107,4 +107,25 @@ export function implementationDeclaration(
     )
   }
   return undefined
+}
+
+/** An unknown member implementation receives its actual receiver as this. */
+export function selectedOpaqueSseReceiver(
+  call: ts.CallExpression | ts.NewExpression,
+  checker: ts.TypeChecker,
+  framed: readonly (WriteReceiver | undefined)[],
+  resolve: (receiver: WriteReceiver) => readonly (WriteReceiver | undefined)[],
+): boolean {
+  const target = ts.isCallExpression(call) && call.expression
+  if (!target || !(ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)))
+    return false
+  const receiver = expressionReceiver(target.expression, checker)
+  return (
+    !!receiver &&
+    resolve(receiver).some(
+      (actual) =>
+        actual !== undefined &&
+        framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+    )
+  )
 }
