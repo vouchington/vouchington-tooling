@@ -74,6 +74,11 @@ const sources = {
     const onAbort=()=>{};opaque(onAbort);
     const {stream}=startSSE();${frame('stream')}`),
   'global-owner-scope': `${preamble}opaque(prior)`,
+  'future-owner-array-container': `${preamble}
+    function retain(box:readonly (()=>Stream)[]){return box[0]!}
+    app.route('/events').get(()=>{let sse:Owner|undefined;
+      const box=[()=>sse!.stream];const alias=box;
+      const callback=retain(alias);opaque(callback);sse=startSSE();${frame('sse.stream')}})`,
   'future-owner-constructor': route(`
     let sse:Owner|undefined;class Accessor{peek(){return sse!.stream}}
     opaque(Accessor);sse=startSSE();${frame('sse.stream')}`),
@@ -88,7 +93,9 @@ const sources = {
   'external-cleanup-before-owner': `${preamble}
     declare const subscription:{close():Promise<void>};
     app.route('/events').get(()=>{let sse:Owner|undefined;
-      function closeSubscription(){void Promise.resolve(subscription.close())}
+      let closePromise:Promise<void>|undefined;const pending=false;
+      function closeSubscription(){if(pending)return;
+        closePromise=Promise.resolve(subscription.close())}
       opaque(closeSubscription);sse=startSSE();${frame('sse.stream')}})`,
   'generator-unused-control': route(`
     function* unused(){yield prior}
@@ -117,6 +124,7 @@ it.each([
   'hoisted-nested-assignment',
   'future-owner-parameter-callback',
   'future-owner-constructor',
+  'future-owner-array-container',
 ] as const)('rejects an opaque stream escape through %s', (name) => {
   expect(() => discover(name)).toThrow('unmarked frame')
 })

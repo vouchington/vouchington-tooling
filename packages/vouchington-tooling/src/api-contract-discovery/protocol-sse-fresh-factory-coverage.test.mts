@@ -9,6 +9,7 @@ import { factoryCreatesFreshSelectedStream } from './protocol-sse-fresh-factory.
 let fixtureRoot: string
 let program: ts.Program
 let consumer: ts.SourceFile
+let capturingConsumer: ts.SourceFile
 
 function callNamed(name: string): ts.CallExpression {
   const declaration = consumer.statements
@@ -27,11 +28,13 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
       node: join(fixtureRoot, 'node-factory.ts'),
       legacy: join(fixtureRoot, 'legacy-factory.ts'),
       consumer: join(fixtureRoot, 'consumer.ts'),
+      capturing: join(fixtureRoot, 'capturing-consumer.ts'),
     }
     writeFileSync(
       files.node,
       `import {PassThrough} from 'node:stream';
-       export function createNode(){const stream=new PassThrough();return {stream}}`,
+       export function createNode():{stream:PassThrough}{const stream=new PassThrough();return {stream}}
+       export function expose<T>(box:{read:()=>T}){return box.read}`,
     )
     writeFileSync(
       files.legacy,
@@ -49,6 +52,16 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
          const {stream}=importedNode();
          stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))});`,
     )
+    writeFileSync(
+      files.capturing,
+      `import {createNode,expose} from './node-factory.js';
+       declare const app:any;declare function opaque(value:unknown):void;
+       declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
+       app.route('/events').get(()=>{let holder:ReturnType<typeof createNode>|undefined;
+         const box={read:()=>holder!.stream};const callback=expose(box);opaque(callback);
+         holder=createNode();
+         holder.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))});`,
+    )
     const options: ts.CompilerOptions = {
       module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -64,10 +77,17 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
     const source = program.getSourceFile(files.consumer)
     if (!source) throw new Error('Missing consumer source')
     consumer = source
+    capturingConsumer = program.getSourceFile(files.capturing)!
   })
 
   afterAll(() => {
     if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+  })
+
+  it('rejects a callback returned by an imported factory from a local capturing object', () => {
+    expect(() => discoverApiResponseContracts(program, [capturingConsumer])).toThrow(
+      'unmarked frame',
+    )
   })
 
   it('keeps a pre-allocation value produced through a real imported alias independent', () => {
