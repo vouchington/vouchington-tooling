@@ -680,14 +680,18 @@ and array arguments with the selected caller bindings. A missing own callback is
 only when the complete Program preserves the global object prototype capability; prototype writes
 or exposure to another call make that callback unavailable. Internal proofs without a Program source
 list cannot establish this absence. Explicit own callbacks retain their concrete implementation.
-Namespace identities follow actual imports and awaited literal dynamic imports through const aliases;
+Namespace identities follow actual imports, awaited literal dynamic imports through const aliases,
+and the first fulfillment parameter of an inline literal-import promise callback;
 asserted module types and pending import promises cannot substitute for executable provenance.
 Loop assignment targets, class field initializers, and tagged-template substitutions preserve mutable
 callback capabilities. Concrete omitted-argument defaults retain their forwarded parameter proof.
 Inherited Object prototype methods stay unknown; constructors receiving the selected context cannot
 prove bounded status or body behavior. The discovery-owned consumer index is lazy and includes
 TypeScript import-equals edges. Implemented callback bodies remain unavailable when they emit an otherwise
-uncollected response body or mutate a canonical response method.
+uncollected response body or status, expose a context through a literal argument, retain a mutable
+context alias, or mutate a canonical response method. Conditions are inspected even when their
+resolved return value skips a branch. Prototype capabilities reached through `getPrototypeOf`,
+`__proto__`, or `constructor.prototype` also invalidate missing-own-property proofs.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
 uniquely bound helper pipelines must match every executable invocation on the selected route.

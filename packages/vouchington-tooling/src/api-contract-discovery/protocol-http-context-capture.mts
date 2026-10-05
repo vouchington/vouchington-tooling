@@ -20,7 +20,8 @@ export function createContextCapture(
     function visit(node: ts.Node) {
       if (ts.isExpression(node)) node = unwrapExpression(node)
       if (ts.isExpression(node) && roots.primitiveValue(node)) return
-      if (ts.isObjectLiteralExpression(node)) {
+      if (ts.isSpreadElement(node)) visit(node.expression)
+      else if (ts.isObjectLiteralExpression(node)) {
         for (const member of node.properties) {
           if (ts.isPropertyAssignment(member)) visit(member.initializer)
           if (ts.isSpreadAssignment(member)) visit(member.expression)
