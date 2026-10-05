@@ -4,6 +4,7 @@ import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { statusDominatesEmission } from './protocol-status-dominance.mts'
 import type { RouteBinding } from './response-contract-route-analysis.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
+import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 export type PendingHttp = {
   call: ts.CallExpression
@@ -19,6 +20,7 @@ export function registerHttpProtocols(
   contracts: Map<string, BackendResponseContract>,
   checker: ts.TypeChecker,
   reject: (response: PendingHttp, error: unknown) => void,
+  httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): Set<ts.CallExpression> {
   const covered = new Set<ts.CallExpression>()
   const groups = new Map<ts.Node | undefined, PendingHttp[]>()
@@ -35,7 +37,7 @@ export function registerHttpProtocols(
       const associations = new Map(
         group.map((response) => [
           response,
-          associateHttpResponse(response.call, response.symbol, checker, siblings),
+          associateHttpResponse(response.call, response.symbol, checker, siblings, httpValues),
         ]),
       )
       const allStatuses = new Set(

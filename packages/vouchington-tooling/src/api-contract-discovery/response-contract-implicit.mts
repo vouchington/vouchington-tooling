@@ -33,6 +33,7 @@ import {
 import { contextResponseMethod } from './protocol-http-context.mts'
 import { taintRouteKeys, markRouteTaint, isSseSetter } from './protocol-http-implicit-taint.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
+import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 export function discoverImplicitContract(
   call: ts.CallExpression,
@@ -43,8 +44,9 @@ export function discoverImplicitContract(
   callLabel: ImplicitResponseCallLabel | undefined,
   requestedKeys: ReadonlySet<string> | undefined,
   options: DiscoverApiResponseContractsOptions | undefined,
+  httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): void {
-  const opaqueResponse = opaqueHttpResponse(call, checker)
+  const opaqueResponse = opaqueHttpResponse(call, checker, undefined, httpValues)
   const binding = enclosingRouteBinding(call, checker, handlerBindings, !opaqueResponse)
   if (!binding) return
   const key = requestedKeyForBinding(binding, requestedKeys)

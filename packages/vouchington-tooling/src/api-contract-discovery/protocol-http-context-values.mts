@@ -12,16 +12,23 @@ import { createContextValueStability } from './protocol-http-context-value-stabi
 
 import type { ContextValues } from './protocol-http-context-value-types.mts'
 import { contextProperty } from './protocol-http-context-properties.mts'
+import { createContextReceiverGuard } from './protocol-http-context-receiver.mts'
 /** All possible concrete values must be retained; null denotes a proven absent value. */
-export function createHttpContextValueResolver(checker: ts.TypeChecker) {
+export function createHttpContextValueResolver(
+  checker: ts.TypeChecker,
+  programSources?: readonly ts.SourceFile[],
+) {
   const callbacks = createProtocolCallbackValueResolver(checker)
-  const stable = createContextValueStability(checker)
+  const stable = createContextValueStability(checker, programSources)
+  const receivers = createContextReceiverGuard(checker, resolve)
   function declaration(
     target: ts.Symbol,
     env: CallbackBindings,
     seen: Set<ts.Node>,
   ): ContextValues {
     if (!stable(target)) return undefined
+    if (!receivers.checking(target, env) && !stable.receivers(target, env, receivers.safe))
+      return undefined
     const bound = env.get(target)
     if (bound) return resolve(bound.node, bound.env, seen)
     const node =

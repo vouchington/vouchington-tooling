@@ -5,10 +5,32 @@ import { unwrapExpression } from './protocol-marker-analysis.mts'
 export function createContextValueRoots(checker: ts.TypeChecker) {
   function root(node: ts.Expression, seen = new Set<ts.Symbol>()): ts.Symbol | undefined {
     node = unwrapExpression(node)
-    while (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-      node = unwrapExpression(node.expression)
+    while (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const owner = unwrapExpression(node.expression)
+      const binding = ts.isIdentifier(owner) && checker.getSymbolAtLocation(owner)
+      const module =
+        binding &&
+        (binding.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(binding) : binding)
+      const key = ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : node.argumentExpression && ts.isStringLiteral(node.argumentExpression)
+          ? node.argumentExpression.text
+          : undefined
+      if (module && module.flags & ts.SymbolFlags.Module && key) {
+        const member = checker.getExportsOfModule(module).find((item) => item.name === key)
+        return (
+          member &&
+          (member.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(member) : member)
+        )
+      }
+      node = owner
+    }
     if (!ts.isIdentifier(node)) return undefined
-    const found = checker.getSymbolAtLocation(node)
+    const binding = checker.getSymbolAtLocation(node)
+    const found =
+      binding?.flags && binding.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(binding)
+        : binding
     const value = found && !seen.has(found) ? found.valueDeclaration : undefined
     const next = new Set(seen)
     if (found) next.add(found)
@@ -36,7 +58,11 @@ export function createContextValueRoots(checker: ts.TypeChecker) {
   function selected(node: ts.Expression, key: string, seen: Set<ts.Symbol>): ts.Symbol | undefined {
     node = unwrapExpression(node)
     if (ts.isIdentifier(node)) {
-      const symbol = checker.getSymbolAtLocation(node)
+      const binding = checker.getSymbolAtLocation(node)
+      const symbol =
+        binding?.flags && binding.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(binding)
+          : binding
       const declaration = symbol?.valueDeclaration
       if (
         !symbol ||

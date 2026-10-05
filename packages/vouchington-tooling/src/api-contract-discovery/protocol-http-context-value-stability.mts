@@ -1,9 +1,12 @@
+import { createContextReceiverChecks } from './protocol-http-context-receiver-checks.mts'
+import { contextWriteTargets } from './protocol-http-context-write-targets.mts'
 import ts from '../contract-schema/typescript-api.mts'
-import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
-import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { contextForwardedTarget } from './protocol-http-context-forwarded-target.mts'
+import { createContextConsumerSources } from './protocol-http-context-consumer-sources.mts'
 
 type Facts = {
   writes: ts.Expression[]
@@ -11,11 +14,39 @@ type Facts = {
   wrappers: ReturnType<typeof createLiteralWrapperIndex>
 }
 /** One proof indexes source mutations once; aliases and forwarded parameters retain their roots. */
-export function createContextValueStability(checker: ts.TypeChecker) {
+export function createContextValueStability(
+  checker: ts.TypeChecker,
+  programSources?: readonly ts.SourceFile[],
+) {
   const roots = createContextValueRoots(checker)
   const { root, primitiveMember } = roots
   const cache = new Map<ts.Symbol, boolean>()
   const sources = new Map<ts.SourceFile, Facts>()
+  const consumerSources = createContextConsumerSources(checker, programSources)
+  function capturedContainer(
+    symbol: ts.Symbol,
+    owner?: ts.Node,
+    seen = new Set<ts.Symbol>(),
+  ): boolean {
+    if (seen.has(symbol)) return true
+    const declaration = symbol.valueDeclaration
+    const value =
+      declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+        ? unwrapExpression(declaration.initializer)
+        : declaration
+    if (!value || isProtocolCallbackFunction(value)) return false
+    if (owner && declaration && enclosingFunction(declaration) === owner) {
+      if (ts.isParameter(declaration)) return false
+      return [...facts(declaration.getSourceFile()).wrappers.capture(value)].some((captured) =>
+        capturedContainer(captured, owner, new Set(seen).add(symbol)),
+      )
+    }
+    const name =
+      declaration && (ts.isVariableDeclaration(declaration) || ts.isParameter(declaration))
+        ? declaration.name
+        : undefined
+    return !(name && ts.isIdentifier(name) && roots.primitiveValue(name))
+  }
   function facts(source: ts.SourceFile): Facts {
     const hit = sources.get(source)
     if (hit) return hit
@@ -37,7 +68,7 @@ export function createContextValueStability(checker: ts.TypeChecker) {
                 node.operator === ts.SyntaxKind.MinusMinusToken)
             ? node.operand
             : undefined
-      if (write) result.writes.push(write)
+      if (write) result.writes.push(...contextWriteTargets(write))
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) result.calls.push(node)
       ts.forEachChild(node, visit)
     }
@@ -51,65 +82,93 @@ export function createContextValueStability(checker: ts.TypeChecker) {
     const declaration = symbol.valueDeclaration
     if (!declaration || active.has(symbol)) return false
     const next = new Set(active).add(symbol)
-    const data = facts(declaration.getSourceFile())
-    let safe =
-      !data.wrappers.returnedParameters.has(symbol) &&
-      !data.writes.some((expression) => root(expression) === symbol)
+    const allData = consumerSources(declaration.getSourceFile()).map(facts)
     const value =
       ts.isVariableDeclaration(declaration) && declaration.initializer
         ? unwrapExpression(declaration.initializer)
         : declaration
+    const declarationData = facts(declaration.getSourceFile())
+    const captures = declarationData.wrappers.capture(value)
     const immutableFunction =
-      isProtocolCallbackFunction(value) && data.wrappers.capture(value).size === 0
-    if (!immutableFunction) {
-      if (data.wrappers.stored.has(symbol)) safe = false
-      for (const wrapper of data.wrappers.parents.get(symbol) ?? [])
-        if (!stable(wrapper, next)) safe = false
-    }
-    // Function bodies are immutable, but foreign callers may receive their returned containers.
-    for (const call of immutableFunction ? [] : data.calls) {
-      if (!safe) break
-      for (const [index, argument] of (call.arguments ?? []).entries()) {
-        if (
-          (root(argument) !== symbol && !data.wrappers.capture(argument).has(symbol)) ||
-          primitiveMember(argument)
+      isProtocolCallbackFunction(value) &&
+      ![...captures].some((captured) => capturedContainer(captured, value))
+    const module = checker.getSymbolAtLocation(declaration.getSourceFile())
+    let safe =
+      !!programSources ||
+      immutableFunction ||
+      !module ||
+      !checker
+        .getExportsOfModule(module)
+        .some(
+          (item) =>
+            (item.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(item) : item) === symbol,
         )
-          continue
+    for (const data of allData) {
+      if (
+        data.wrappers.returnedParameters.has(symbol) ||
+        data.writes.some((expression) => root(expression) === symbol)
+      )
+        safe = false
+      if (!immutableFunction) {
+        if (data.wrappers.stored.has(symbol)) safe = false
+        for (const wrapper of data.wrappers.parents.get(symbol) ?? [])
+          if (!stable(wrapper, next)) safe = false
+      }
+      // Function bodies are immutable, but foreign callers may receive their returned containers.
+      for (const call of immutableFunction ? [] : data.calls) {
+        if (!safe) break
         if (
-          ts.isPropertyAccessExpression(call.expression) &&
-          [
-            'assign',
-            'set',
-            'defineProperty',
-            'defineProperties',
-            'deleteProperty',
-            'setPrototypeOf',
-          ].includes(call.expression.name.text)
-        ) {
+          isProtocolCallbackFunction(value) &&
+          root(call.expression) === symbol &&
+          [...captures].some((captured) => capturedContainer(captured, value))
+        )
           safe = false
-          continue
+        for (const [index, argument] of (call.arguments ?? []).entries()) {
+          if (
+            (root(argument) !== symbol && !data.wrappers.capture(argument).has(symbol)) ||
+            primitiveMember(argument)
+          )
+            continue
+          if (
+            ts.isPropertyAccessExpression(call.expression) &&
+            [
+              'assign',
+              'set',
+              'defineProperty',
+              'defineProperties',
+              'deleteProperty',
+              'setPrototypeOf',
+            ].includes(call.expression.name.text)
+          ) {
+            safe = false
+            continue
+          }
+          const target = contextForwardedTarget(checker, call, index)
+          if (!target || !stable(target.binding, next)) safe = false
         }
-        const implementation = checker.getResolvedSignature(call)?.declaration
-        const parameter =
-          implementation &&
-          isProtocolCallbackFunction(implementation) &&
-          runtimeParameters(implementation)[index]
-        const binding =
-          parameter &&
-          ts.isIdentifier(parameter.name) &&
-          checker.getSymbolAtLocation(parameter.name)
-        if (
-          !implementation ||
-          !('body' in implementation) ||
-          !implementation.body ||
-          !binding ||
-          !stable(binding, next)
-        )
-          safe = false
       }
     }
     cache.set(symbol, safe)
     return safe
   }
-  return stable
+  const receivers = createContextReceiverChecks(
+    checker,
+    roots,
+    (symbol) => consumerSources(symbol.valueDeclaration!.getSourceFile()).map(facts),
+    stable,
+    (symbol) => {
+      const declaration = symbol.valueDeclaration!
+      const value =
+        ts.isVariableDeclaration(declaration) && declaration.initializer
+          ? unwrapExpression(declaration.initializer)
+          : declaration
+      return (
+        isProtocolCallbackFunction(value) &&
+        ![...facts(declaration.getSourceFile()).wrappers.capture(value)].some((captured) =>
+          capturedContainer(captured, value),
+        )
+      )
+    },
+  )
+  return Object.assign(stable, { receivers })
 }

@@ -11,6 +11,7 @@ import { createHttpContextValueResolver } from './protocol-http-context-values.m
 import type { CallbackBindings } from './protocol-callback-values.mts'
 import { standardReflectApply } from './protocol-http-reflect.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
+import { receiverUsesThis } from './protocol-http-context-receiver.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
 export function opaqueHttpContextArgument(
@@ -127,6 +128,12 @@ function calleeEscapes(
   values: ReturnType<typeof createHttpContextValueResolver>,
 ): boolean {
   if (active.has(fn)) return true
+  if (
+    ts.isPropertyAccessExpression(call.expression) ||
+    ts.isElementAccessExpression(call.expression)
+  ) {
+    if (!ts.isArrowFunction(fn) && receiverUsesThis(fn.body!)) return true
+  }
   const resolver = values.callbacks
   const env = callbackArgumentBindings(fn, call, callerEnv, captured, checker, resolver)
   if (!env) return true
