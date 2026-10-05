@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
+import { contextLiteralBinding } from './protocol-http-context-literal-captures.mts'
 import { unsupportedBoundContextNode } from './protocol-http-context-bound-nodes.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
 
@@ -86,6 +87,10 @@ const controls = {
   objectShorthand: 'const {ctx:saved}={ctx};opaque(saved)',
   arrayRest: 'const [...saved]=[ctx];opaque(saved)',
   arrayHole: 'const [saved]=[,];opaque(saved)',
+  formalIndependent:
+    'function consume({saved}:{saved:unknown}){opaque(saved)};consume({saved:{independent:true}})',
+  cyclicIndependent:
+    'var [first]=[second] as [unknown];var [second]=[first] as [unknown];opaque(first)',
   objectOpaque: 'declareObject(ctx)',
   methodIndependent: 'const {action:saved}={action(){ctx.assert(true)}};opaque(saved)',
   methodLeak: 'const {action:saved}={action(){ctx.json({bad:true})}};opaque(saved)',
@@ -121,6 +126,8 @@ it.each([
   'objectOpaque',
   'methodIndependent',
   'arrayHole',
+  'formalIndependent',
+  'cyclicIndependent',
   'arrayUnused',
   'arrayIgnored',
   'arrayDead',
@@ -150,4 +157,20 @@ it.each(['tag', 'ctx.json'])('keeps the default tag guard precise for %s', (targ
   expect(unsupportedBoundContextNode(tagged!, context!, checker, handler!)).toBe(
     target === 'ctx.json',
   )
+})
+
+it('leaves a destructured formal origin unavailable to the literal declaration proof', () => {
+  const program = checkedProgram({
+    'route.ts': `declare function opaque(value:unknown):void;
+    function consume({saved}:{saved:unknown}){opaque(saved)};export {};`,
+  })
+  const source = program.getSourceFile('/virtual/route.ts')!
+  let argument: ts.Expression | undefined
+  function visit(node: ts.Node): void {
+    if (ts.isCallExpression(node)) argument = node.arguments[0]
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  expect(argument).toBeDefined()
+  expect(contextLiteralBinding(argument!, program.getTypeChecker())).toBeUndefined()
 })
