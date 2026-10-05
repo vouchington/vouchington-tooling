@@ -1,5 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
@@ -8,6 +9,7 @@ import { COLD_VIRTUAL_PROGRAM_TIMEOUT_MS } from './test-setup.test-helpers.mts'
 const preamble = `declare const app:any;class Stream{write(value:string):void{}}
   const stream=new Stream();const other=new Stream();
   declare function opaque(value:unknown):void;
+  declare function opaqueTag(strings:TemplateStringsArray,...values:unknown[]):string;
   declare class Sink{constructor(value?:unknown)}
   declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;`
 const route = (body: string) => `${preamble}app.route('/events').get(()=>{
@@ -15,6 +17,13 @@ const route = (body: string) => `${preamble}app.route('/events').get(()=>{
 })`
 const sources = {
   object: route('opaque({stream})'),
+  tag: route('opaqueTag`value:${stream}`'),
+  'tag-capture': route('opaqueTag`value:${()=>stream}`'),
+  'tag-empty': route('opaqueTag`value`'),
+  'tag-independent-capture': route('opaqueTag`value:${()=>other}`'),
+  'tag-container': route('opaqueTag`value:${{stream}}`'),
+  'tag-other': route('opaqueTag`value:${other}`'),
+  'tag-dead': route('if(false)opaqueTag`value:${stream}`'),
   array: route('opaque([stream])'),
   'object-spread': route('opaque({...{stream}})'),
   'array-spread': route('opaque([...[stream]])'),
@@ -40,7 +49,7 @@ let program: ts.Program
 let root: string
 let files: Record<keyof typeof sources, string>
 beforeAll(() => {
-  root = mkdtempSync(join(process.cwd(), 'packages/vouchington-tooling/.sse-escape-fixtures-'))
+  root = mkdtempSync(join(tmpdir(), 'sse-escape-fixtures-'))
   files = Object.fromEntries(
     Object.entries(sources).map(([name, source]) => {
       const file = join(root, `${name}.ts`)
@@ -70,6 +79,9 @@ const discover = (name: keyof typeof sources, includeForeign = false) =>
   )['GET:/events']
 
 it.each([
+  'tag',
+  'tag-container',
+  'tag-capture',
   'object',
   'array',
   'object-spread',
@@ -85,6 +97,10 @@ it.each([
   expect(discover(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
 it.each([
+  'tag-other',
+  'tag-empty',
+  'tag-independent-capture',
+  'tag-dead',
   'object-other',
   'array-other',
   'constructor-other',

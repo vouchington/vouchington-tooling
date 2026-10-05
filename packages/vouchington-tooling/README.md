@@ -711,6 +711,9 @@ their proof, and primitive member captures remain ordinary values.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
 uniquely bound helper pipelines must match every executable invocation on the selected route.
+A factory pipeline must execute unconditionally before any path returns its selected stream.
+Tagged-template substitutions, including literal containers and callable captures, retain selected
+stream capabilities and make an unproved tag unavailable.
 The current pipeline proof requires a concrete factory-returned stream property; stream identities
 that cannot pass the existing raw-write validation remain unavailable.
 Feasible assignments or deletions of response methods through canonical context aliases invalidate

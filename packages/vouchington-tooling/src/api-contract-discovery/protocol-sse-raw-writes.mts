@@ -1,10 +1,11 @@
+import { collectSseInvocations } from './protocol-sse-invocations.mts'
+import { selectedSseTagReceiver } from './protocol-sse-tag-arguments.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import {
   enclosingRouteBinding,
-  visit,
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
@@ -17,8 +18,6 @@ import { sseWriteInvocation } from './protocol-sse-write-access.mts'
 import {
   isSourceLevelMutation,
   mutationAffectsSelectedStream,
-  sseWriteMutation,
-  type SseWriteMutation,
 } from './protocol-sse-write-mutations.mts'
 import {
   actualReceivers,
@@ -38,21 +37,14 @@ export function rejectRawSseWrites(
   framedWrites: ReadonlySet<ts.CallExpression>,
   routes: ReadonlyMap<string, SseRouteWrites>,
   reject: (
-    node: ts.CallExpression | ts.NewExpression,
+    node: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression,
     binding: RouteBinding,
     keys: readonly string[],
   ) => void,
 ): void {
   if (routes.size === 0) return
 
-  const invocations: (ts.CallExpression | ts.NewExpression)[] = []
-  const mutations: SseWriteMutation[] = []
-  for (const file of files)
-    visit(file, (node) => {
-      if (ts.isCallExpression(node) || ts.isNewExpression(node)) invocations.push(node)
-      const mutation = sseWriteMutation(node)
-      if (mutation) mutations.push(mutation)
-    })
+  const { invocations, mutations } = collectSseInvocations(files)
   const calls = invocations.filter(ts.isCallExpression)
   const lookup = createSseWriteLookup(calls, checker, bindings, files)
   for (const node of invocations) {
@@ -104,6 +96,15 @@ export function rejectRawSseWrites(
     for (const candidate of candidates) {
       const route = routes.get(routeKey(candidate))
       if (!route) continue
+      if (ts.isTaggedTemplateExpression(node)) {
+        if (
+          selectedSseTagReceiver(node, checker, route.receivers, (receiver) =>
+            actualReceivers(receiver, candidate, checker, lookup),
+          )
+        )
+          reject(node, candidate, route.keys)
+        continue
+      }
       const receiver = access?.receiver && expressionReceiver(access.receiver, checker)
       const actual = receiver ? actualReceivers(receiver, candidate, checker, lookup) : []
       const framed = route.receivers.flatMap((value) =>
