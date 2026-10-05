@@ -37,10 +37,16 @@ const sources = {
   union:
     sse(`const event: {event:'done';data:{}} | {event:'progress';data:{count:number}} = ctx.query.done
     ? {event:'done',data:{}} : {event:'progress',data:{count:1}}
-    stream.write(apiSseFrame('GET:/events',event))`),
+    stream.write(apiSseFrame('GET:/events',event))`).replace(
+      /declare (function apiSseFrame[^\n]+)/,
+      "$1 {return 'data: {}\\n\\n'}",
+    ),
   factory: `${preamble}
     function factory<T>(options:{value:T;emit:(stream:{write(frame:string):void},event:{event:'snapshot';data:T}|{event:'error';data:{message:string}})=>void}):(ctx:any)=>void {return ctx=>options.emit(stream,{event:'snapshot',data:options.value})}
-    app.route('/events').get(factory({value:{count:1},emit:(stream,event)=>stream.write(apiSseFrame('GET:/events',event))}))`,
+    app.route('/events').get(factory({value:{count:1},emit:(stream,event)=>stream.write(apiSseFrame('GET:/events',event))}))`.replace(
+    /declare (function apiSseFrame[^\n]+)/,
+    "$1 {return 'data: {}\\n\\n'}",
+  ),
   nested: sse(
     `stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
   ),

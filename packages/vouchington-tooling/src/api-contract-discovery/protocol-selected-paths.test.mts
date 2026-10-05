@@ -18,7 +18,7 @@ const sources = {
     class Promise{constructor(executor:()=>void){}}app.route('/events').get((ctx:any)=>new Promise(()=>stream.write(apiSseFrame('GET:/events',{event:'never',data:{ok:true}}))))`,
   'timer-frame': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
     app.route('/events').get((ctx:any)=>setInterval(async()=>stream.write(apiSseFrame('GET:/events',{event:'stats',data:{ok:true}})),2000))`,
-  'promise-timer-helper': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
+  'promise-timer-helper': `declare const app:any;class Stream{write(frame:string):void{}}const stream=new Stream();declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
     function pipe(options:{emit:()=>void}){const {emit}=options;return new Promise<void>(resolve=>{function flush(){emit()}setInterval(flush,2000)})}
     app.route('/events').get((ctx:any)=>pipe({emit:()=>stream.write(apiSseFrame('GET:/events',{event:'progress',data:{ok:true}}))}))`,
   'promise-created': `declare const app:any;declare const stream:{write(frame:string):void};declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;
