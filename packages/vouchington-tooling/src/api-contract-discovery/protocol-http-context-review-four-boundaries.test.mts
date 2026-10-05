@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
+import { contextImportBindingMember } from './protocol-http-context-module-origin.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
 
@@ -89,6 +90,38 @@ describe('HTTP context proof follows module bindings and callback aliases', () =
     })
   })
 
+  it('rejects a destructured dynamic-import write through an exported alias', () => {
+    expectUnknown({
+      'options.ts': `const internal={assertAccess:(ctx:any)=>ctx.assert(true)};
+        export {internal as options};`,
+      'consumer.ts': `declare const opaque:(ctx:any)=>void;
+        import('./options.js').then(({options})=>{options.assertAccess=opaque});export {};`,
+      'route.ts': `import {options as importedOptions} from './options.js';
+        ${route('', 'importedOptions')}`,
+    })
+  })
+
+  it('does not infer a module export from a numeric destructuring key', () => {
+    const program = checkedProgram({
+      'options.ts': `export const options={assertAccess:(ctx:any)=>ctx.assert(true)};`,
+      'consumer.ts': `import('./options.js').then(({0: selected}:any)=>{
+        void selected});export {};`,
+    })
+    const source = program.getSourceFile('/virtual/consumer.ts')
+    if (!source) throw new Error('Missing numeric-key consumer source')
+    let selected: ts.BindingElement | undefined
+    function visit(node: ts.Node): void {
+      if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) selected = node
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+    if (!selected) throw new Error('Missing numeric-key binding')
+    const checker = program.getTypeChecker()
+    const binding = checker.getSymbolAtLocation(selected.name)
+    expect(binding).toBeDefined()
+    expect(contextImportBindingMember(checker, binding)).toBeUndefined()
+  })
+
   it('rejects an opaque escape of Reflect.getPrototypeOf capability', () => {
     expectUnknown({
       'route.ts': route(`opaque(Reflect.getPrototypeOf({}));const options:Options={};`),
@@ -146,6 +179,14 @@ describe('HTTP context proof follows module bindings and callback aliases', () =
     expectUnknown({
       'route.ts': route(`const options={assertAccess:(ctx:Context)=>{
         opaque(()=>ctx)}};`),
+    })
+  })
+
+  it('rejects a captured context callback passed through a rest parameter', () => {
+    expectUnknown({
+      'route.ts': route(`function consume(...callbacks:(()=>void)[]){callbacks[0]!()}
+        const options={assertAccess:(ctx:Context)=>{
+          consume(()=>{ctx.json({bad:true})})}};`),
     })
   })
 
