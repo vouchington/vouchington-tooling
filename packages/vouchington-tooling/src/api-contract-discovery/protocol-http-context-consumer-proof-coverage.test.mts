@@ -8,6 +8,7 @@ import { opaqueHttpContextArgument } from './protocol-http-context-escapes.mts'
 import { contextWriteTargets } from './protocol-http-context-write-targets.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
+import { contextForwardedTarget } from './protocol-http-context-forwarded-target.mts'
 
 const files = {
   'exported.ts': `export const options={assertAccess:(ctx:any)=>ctx.assert(true)};`,
@@ -45,6 +46,18 @@ const files = {
   'spread-forward.ts': `function forward(value:any,...other:any[]){}
     const rest:any[]=[];const options={callback:(ctx:any)=>ctx.assert(true)};
     forward(options,...rest);const result=options.callback;export {};`,
+  'alias-roots.ts': `import * as barrel from './barrel.js';
+    import {options as importedOptions} from './exported.js';
+    const fromModule=barrel['options'];const fromProperty=importedOptions.assertAccess;
+    export {fromModule,fromProperty};`,
+  'barrel.ts': `export {options} from './exported.js';`,
+  'export-alias.ts': `const options={callback:(ctx:any)=>ctx.assert(true)};
+    export {options as alias};`,
+  'destructured-capture.ts': `const original={selected:{value:1}};
+    const {selected}=original;export function expose(){return selected}`,
+  'class-capture.ts': `class External{};export function expose(){return External}`,
+  'non-writable-members.ts': `const object={get value(){return 1},method(){return 2}};
+    export {object};`,
 } as const
 type FileName = keyof typeof files
 let program: ts.Program
@@ -103,7 +116,8 @@ describe('HTTP consumer proof covers exported and destructured bindings', () => 
       if(pick)return local;return local}external(expose);
       function named(){return 1}
       function exposeFunction(){return named}external(exposeFunction);
-      const callback=callback;callback;`
+      const callback=callback;callback;
+      with(scope){function forward(value){return value}forward(item)}`
     const jsOptions: ts.CompilerOptions = {
       allowJs: true,
       checkJs: false,
@@ -275,5 +289,59 @@ describe('HTTP consumer proof covers exported and destructured bindings', () => 
         new Map(),
       ),
     ).toBeUndefined()
+  })
+
+  it('resolves string-key namespace exports and selected imported aliases to their source object', () => {
+    const checker = program.getTypeChecker()
+    const declarations = source('alias-roots.ts')
+      .statements.filter(ts.isVariableStatement)
+      .flatMap((statement) => [...statement.declarationList.declarations])
+    const moduleAccess = declarations[0]?.initializer
+    const selectedAccess = declarations[1]?.name
+    const exported = source('exported.ts').statements.find(ts.isVariableStatement)?.declarationList
+      .declarations[0]?.name
+    if (!moduleAccess || !selectedAccess || !ts.isIdentifier(selectedAccess) || !exported)
+      throw new Error('Missing imported alias fixture')
+    const symbol = checker.getSymbolAtLocation(exported)
+    if (!symbol) throw new Error('Missing exported options symbol')
+    const roots = createContextValueRoots(checker)
+    expect(roots.root(moduleAccess)).toBe(symbol)
+    expect(roots.root(selectedAccess)).toBe(symbol)
+  })
+
+  it('treats an aliased export and foreign destructured or class captures conservatively', () => {
+    const checker = program.getTypeChecker()
+    const alias = source('export-alias.ts').statements.find(ts.isVariableStatement)?.declarationList
+      .declarations[0]?.name
+    const expose = source('destructured-capture.ts').statements.find(ts.isFunctionDeclaration)?.name
+    const classExpose = source('class-capture.ts').statements.find(ts.isFunctionDeclaration)?.name
+    if (!alias || !expose || !classExpose) throw new Error('Missing alias or capture fixture')
+    const aliasSymbol = checker.getSymbolAtLocation(alias)
+    const exposeSymbol = checker.getSymbolAtLocation(expose)
+    const classExposeSymbol = checker.getSymbolAtLocation(classExpose)
+    if (!aliasSymbol || !exposeSymbol || !classExposeSymbol)
+      throw new Error('Missing alias or capture symbol')
+    const stability = createContextValueStability(checker)
+    expect(stability(aliasSymbol)).toBe(false)
+    expect(stability(exposeSymbol)).toBe(false)
+    expect(stability(classExposeSymbol)).toBe(false)
+  })
+
+  it('ignores accessor and method members when identifying destructuring write targets', () => {
+    const declaration = source('non-writable-members.ts').statements.find(ts.isVariableStatement)
+      ?.declarationList.declarations[0]
+    if (!declaration?.initializer) throw new Error('Missing object fixture')
+    expect(contextWriteTargets(declaration.initializer)).toEqual([])
+  })
+
+  it('does not forward a callback through a function declared in an unchecked with scope', () => {
+    let forwarded: ts.CallExpression | undefined
+    function visit(node: ts.Node) {
+      if (ts.isCallExpression(node) && node.expression.getText() === 'forward') forwarded = node
+      ts.forEachChild(node, visit)
+    }
+    visit(uncheckedSource)
+    if (!forwarded) throw new Error('Missing unchecked forwarding call')
+    expect(contextForwardedTarget(uncheckedProgram.getTypeChecker(), forwarded, 0)).toBeUndefined()
   })
 })
