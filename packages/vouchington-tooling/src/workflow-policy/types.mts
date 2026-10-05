@@ -10,7 +10,7 @@ export interface WorkflowStep {
   secretReferences?: readonly string[]
 }
 
-export interface WorkflowConcurrency {
+interface WorkflowConcurrency {
   effective: {
     group: string
     cancelInProgress: boolean | string
@@ -62,20 +62,4 @@ export interface WorkflowTopologyIndex {
     name: string
     match?: string
   }[]
-}
-
-export type EdgeRule = readonly [from: string, to: string]
-export type StepSelector = { id?: string; uses?: string; name?: string }
-export type WorkflowTopologyPolicy = {
-  jobInventory: Readonly<Record<string, readonly string[]>>
-  requiredJobs: readonly string[]
-  forbiddenJobs: readonly string[]
-  requiredDirectEdges: readonly EdgeRule[]
-  forbiddenDirectEdges: readonly EdgeRule[]
-  requiredTransitiveEdges: readonly EdgeRule[]
-  forbiddenTransitiveEdges: readonly EdgeRule[]
-  requiredArtifactEdges: readonly { from: string; to: string; name: string; match?: string }[]
-  exactFanIns: Readonly<Record<string, readonly string[]>>
-  exactCallerJobs: Readonly<Record<string, readonly string[]>>
-  stepOrders: readonly { jobId: string; steps: readonly StepSelector[] }[]
 }

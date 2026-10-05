@@ -722,8 +722,9 @@ opaque escapes, while primitive context members preserve ordinary value semantic
 wrapper preserves the underlying factory value and existing provenance checks.
 Destructured literal-import fulfillment parameters retain their actual exported mutation roots.
 `Reflect.getPrototypeOf` exposes the same prototype capability as `Object.getPrototypeOf`.
-Rest and executable `arguments` context aliases remain unavailable. Literal callbacks capturing a
-context escape through opaque consumers; concrete callees that ignore that supplied callback retain
+Rest and executable `arguments` context aliases remain unavailable. Zero-argument literal callbacks
+retain the existing branch-aware proof of their captured context. Returned context capabilities and
+unaccounted emissions remain unavailable; concrete callees that ignore a supplied callback retain
 their proof, and primitive member captures remain ordinary values.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
