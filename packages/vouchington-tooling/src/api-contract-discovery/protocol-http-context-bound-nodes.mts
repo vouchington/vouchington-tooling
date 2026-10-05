@@ -25,7 +25,7 @@ export function unsupportedBoundContextNode(
   capturedTag: (tag: ts.TaggedTemplateExpression) => boolean = () => false,
 ): boolean {
   const returned =
-    ts.isReturnStatement(node) || ts.isYieldExpression(node)
+    ts.isReturnStatement(node) || ts.isYieldExpression(node) || ts.isThrowStatement(node)
       ? node.expression
       : ts.isArrowFunction(handler) && handler.body === node && ts.isExpression(node)
         ? node

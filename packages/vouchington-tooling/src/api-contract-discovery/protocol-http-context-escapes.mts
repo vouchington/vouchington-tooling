@@ -1,8 +1,12 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { httpHandlerContext, httpContextArgument } from './protocol-http-context.mts'
+import {
+  httpHandlerContext,
+  httpContextArgument,
+  wrappedHttpContextArgument,
+} from './protocol-http-context.mts'
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
-import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import { createHttpContextValueResolver } from './protocol-http-context-values.mts'
@@ -34,8 +38,14 @@ export function opaqueHttpContextArgument(
   root = call,
 ): boolean {
   const arguments_ = createContextForwardedArguments(checker)(call)
+  const invoked = unwrapExpression(call.expression)
+  const receiver =
+    ts.isPropertyAccessExpression(invoked) || ts.isElementAccessExpression(invoked)
+      ? invoked.expression
+      : undefined
   const matches = (symbol: ts.Symbol) =>
-    arguments_.some((argument) => httpContextArgument(argument, symbol, checker))
+    arguments_.some((argument) => httpContextArgument(argument, symbol, checker)) ||
+    (!!receiver && wrappedHttpContextArgument(receiver, symbol, checker))
   if (
     !(
       executableProtocolPath(call, checker, boundHandler) ||
