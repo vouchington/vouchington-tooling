@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { yieldsBoundHttpContext } from './protocol-http-context-bound-nodes.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
@@ -25,7 +26,16 @@ export function opaqueWrappedHttpContextArgument(
   if (call.arguments.some((argument) => wrappedHttpContextArgument(argument, context, checker)))
     return true
   function captures(argument: ts.Expression): boolean {
-    const fn = unwrapExpression(argument)
+    const value = unwrapExpression(argument)
+    if (ts.isCallExpression(value)) {
+      const generator = resolver.resolve(value.expression, env)?.node
+      return (
+        !!generator &&
+        isProtocolCallbackFunction(generator) &&
+        yieldsBoundHttpContext(generator, context, checker)
+      )
+    }
+    const fn = resolver.resolve(argument, env)?.node ?? value
     if (!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
     let found = false
     function visit(node: ts.Node) {

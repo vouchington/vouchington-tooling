@@ -28,6 +28,18 @@ export function createContextValueStability(
   const requiredModule = createContextRequiredModule(checker, programSources, compilerOptions)
   const roots = createContextValueRoots(checker, requiredModule)
   const { root, primitiveMember } = roots
+  function primitiveDataMember(expression: ts.Expression): boolean {
+    const value = unwrapExpression(expression)
+    const member = ts.isPropertyAccessExpression(value)
+      ? checker.getSymbolAtLocation(value.name)
+      : ts.isElementAccessExpression(value) && ts.isStringLiteral(value.argumentExpression)
+        ? checker.getPropertyOfType(
+            checker.getTypeAtLocation(value.expression),
+            value.argumentExpression.text,
+          )
+        : undefined
+    return primitiveMember(value) && !member?.declarations?.some(ts.isGetAccessorDeclaration)
+  }
   const cache = new Map<ts.Symbol, boolean>()
   const sources = new Map<ts.SourceFile, Facts>()
   const consumerSources = createContextConsumerSources(checker, programSources, requiredModule)
@@ -135,7 +147,7 @@ export function createContextValueStability(
           if (!argument) continue
           if (
             !roots.referencesContainer(argument, symbol, module, data.wrappers.capture(argument)) ||
-            primitiveMember(argument)
+            primitiveDataMember(argument)
           )
             continue
           if (
