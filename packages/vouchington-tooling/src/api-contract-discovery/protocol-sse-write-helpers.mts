@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import {
   createProtocolCallbackValueResolver,
@@ -43,37 +44,43 @@ function implementationDeclaration(
 type SseWriteLookup = ReturnType<typeof createSseWriteLookup>
 
 export function opaqueCallReceivesSelectedStream(
-  call: ts.CallExpression,
+  call: ts.CallExpression | ts.NewExpression,
   selectedReceivers: readonly WriteReceiver[],
   binding: RouteBinding,
   checker: ts.TypeChecker,
   lookup: SseWriteLookup,
 ): boolean {
-  const implementation = lookup.implementationCall(call)
+  const implementation = ts.isCallExpression(call) && lookup.implementationCall(call)
   if (implementation && ts.isFunctionLike(implementation) && 'body' in implementation) return false
   const framed = selectedReceivers.flatMap((receiver) =>
     actualReceivers(receiver, binding, checker, lookup),
   )
-  return call.arguments.some((argument) => {
-    const receiver = expressionReceiver(argument, checker)
-    if (!receiver) return false
-    return actualReceivers(receiver, binding, checker, lookup).some(
-      (value) =>
-        value === undefined ||
-        framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
-    )
-  })
+  return (
+    call.arguments?.some((argument) =>
+      someSseArgumentValue(argument, checker, (value) => {
+        const receiver = expressionReceiver(value, checker)
+        if (!receiver) return false
+        return actualReceivers(receiver, binding, checker, lookup).some(
+          (value) =>
+            value === undefined ||
+            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
+        )
+      }),
+    ) ?? false
+  )
 }
 
 export function createSseWriteLookup(
   calls: readonly ts.CallExpression[],
   checker: ts.TypeChecker,
   bindings: HandlerBindings,
+  files: readonly ts.SourceFile[] = calls.map((call) => call.getSourceFile()),
 ): {
   implementationCall: (call: ts.CallExpression) => ts.Node | undefined
   callsFor: (fn: ts.FunctionLikeDeclaration, binding: RouteBinding) => ts.CallExpression[]
   helperBindings: (node: ts.Node) => RouteBinding[]
 } {
+  const indexedSources = new Set(files)
   const callbackValues = createProtocolCallbackValueResolver(checker)
   const implementations = new Map<ts.CallExpression, ts.Node | undefined>()
   const callers = new Map<
@@ -87,8 +94,12 @@ export function createSseWriteLookup(
     const implementation =
       implementationDeclaration(checker.getResolvedSignature(call)?.declaration, checker) ??
       callbackValues.resolve(call.expression, new Map())?.node
-    implementations.set(call, implementation)
-    return implementation
+    const indexed =
+      implementation && indexedSources.has(implementation.getSourceFile())
+        ? implementation
+        : undefined
+    implementations.set(call, indexed)
+    return indexed
   }
 
   function indexCallers(): void {
