@@ -20,7 +20,16 @@ export function unsupportedBoundContextNode(
   checker: ts.TypeChecker,
   handler: ts.FunctionLikeDeclaration,
 ): boolean {
+  const returned = ts.isReturnStatement(node)
+    ? node.expression
+    : ts.isArrowFunction(handler) && handler.body === node && ts.isExpression(node)
+      ? node
+      : undefined
   return (
+    (!!returned &&
+      executableProtocolPath(node, checker, handler) &&
+      (httpContextArgument(returned, context, checker) ||
+        wrappedHttpContextArgument(returned, context, checker))) ||
     unsupportedContextAssignment(node, context, checker) ||
     (ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context, checker)) ||
     mutatesHttpResponseMethod(node, context, checker, handler) ||

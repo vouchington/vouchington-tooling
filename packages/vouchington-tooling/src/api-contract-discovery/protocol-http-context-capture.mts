@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import type { createContextValueRoots } from './protocol-http-context-value-roots.mts'
@@ -16,11 +17,32 @@ export function createContextCapture(
     const result = new Set<ts.Symbol>()
     function returned(fn: ts.FunctionLikeDeclaration) {
       for (const value of returnedExpressions(fn)) if (value) visit(value)
+      function yielded(node: ts.Node): void {
+        if (isProtocolCallbackFunction(node) && node !== fn) return
+        if (ts.isYieldExpression(node) && node.expression && potentiallyExecuted(node))
+          visit(node.expression)
+        node.forEachChild(yielded)
+      }
+      if (fn.asteriskToken && fn.body) yielded(fn.body)
     }
     function visit(node: ts.Node) {
       if (ts.isExpression(node)) node = unwrapExpression(node)
       if (ts.isExpression(node) && roots.primitiveValue(node)) return
-      if (ts.isSpreadElement(node)) visit(node.expression)
+      if (ts.isConditionalExpression(node)) {
+        for (const branch of [node.whenTrue, node.whenFalse])
+          if (potentiallyExecuted(branch)) visit(branch)
+      } else if (
+        ts.isBinaryExpression(node) &&
+        [
+          ts.SyntaxKind.QuestionQuestionToken,
+          ts.SyntaxKind.BarBarToken,
+          ts.SyntaxKind.AmpersandAmpersandToken,
+          ts.SyntaxKind.CommaToken,
+        ].includes(node.operatorToken.kind)
+      ) {
+        if (node.operatorToken.kind !== ts.SyntaxKind.CommaToken) visit(node.left)
+        if (potentiallyExecuted(node.right)) visit(node.right)
+      } else if (ts.isSpreadElement(node)) visit(node.expression)
       else if (ts.isObjectLiteralExpression(node)) {
         for (const member of node.properties) {
           if (ts.isPropertyAssignment(member)) visit(member.initializer)
