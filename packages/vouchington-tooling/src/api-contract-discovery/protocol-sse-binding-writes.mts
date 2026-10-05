@@ -4,8 +4,15 @@ export function symbolBindingWritten(
   source: ts.SourceFile,
   symbol: ts.Symbol,
   checker: ts.TypeChecker,
+  includeMembers = false,
 ): boolean {
   const references = (node: ts.Node): boolean => {
+    if (!includeMembers && ts.isComputedPropertyName(node)) return false
+    if (
+      !includeMembers &&
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
+    )
+      return false
     if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === symbol) return true
     return node.getChildren().some(references)
   }

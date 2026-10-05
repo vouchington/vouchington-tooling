@@ -11,7 +11,7 @@ export function independentArgumentOrigin(actual: WriteReceiver, checker: ts.Typ
   if (declaration && ts.isFunctionDeclaration(declaration) && declaration.body)
     return (
       !declaration.asteriskToken &&
-      !symbolBindingWritten(declaration.getSourceFile(), actual.root, checker) &&
+      !symbolBindingWritten(declaration.getSourceFile(), actual.root, checker, true) &&
       returnedExpressions(declaration).every((value) => value === undefined)
     )
   if (
@@ -20,7 +20,7 @@ export function independentArgumentOrigin(actual: WriteReceiver, checker: ts.Typ
     !ts.isVariableDeclarationList(declaration.parent) ||
     !(declaration.parent.flags & ts.NodeFlags.Const) ||
     !declaration.initializer ||
-    symbolBindingWritten(declaration.getSourceFile(), actual.root, checker)
+    symbolBindingWritten(declaration.getSourceFile(), actual.root, checker, true)
   )
     return false
   const initializer = unwrapExpression(declaration.initializer)
