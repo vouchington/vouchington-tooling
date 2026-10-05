@@ -57,6 +57,8 @@ makeGraph.call(null)
 makeGraph.apply(null, [])
 makeGraph.call<null, [], unknown>(null)
 Reflect.apply<null, [], unknown>(makeGraph, null, [])
+new runtime[null]()
+runtime[null]\`source\`
 ;(await makeGraph)()
 const awaitedFactory = await makeGraph
 awaitedFactory()
@@ -109,6 +111,13 @@ export = graph
 `,
     )
     writeFileSync(
+      join(root, 'src/ts-instantiated-export.ts'),
+      `import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export default graph<unknown>
+`,
+    )
+    writeFileSync(
       join(root, 'src/ts-qualified.ts'),
       `import * as runtime from '@compiler/runtime'
 export import graph = runtime.makeGraph
@@ -141,7 +150,7 @@ compiler.makeGraph()
             'error',
             {
               modules: ['@compiler/runtime'],
-              factories: ['makeGraph'],
+              factories: ['makeGraph', 'null'],
               owners: ['src/owner.mts'],
               include: ['src/**/*.mts', 'src/**/*.ts'],
             },
@@ -160,7 +169,7 @@ compiler.makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 50 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 53 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
@@ -171,6 +180,7 @@ compiler.makeGraph()
           filename.endsWith('src/ts-import-equals.ts') ||
           filename.endsWith('src/ts-import-binding.ts') ||
           filename.endsWith('src/ts-mutable-export.ts') ||
+          filename.endsWith('src/ts-instantiated-export.ts') ||
           filename.endsWith('src/ts-qualified.ts'),
       ),
     ).toBe(true)

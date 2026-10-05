@@ -254,6 +254,13 @@ describe('patternPropertyName and memberIsRead', () => {
       property: { type: 'Identifier', name: 'invalidate' },
     }
     expect(memberIsRead(member)).toBe(true)
+    expect(
+      propertyName({
+        type: 'MemberExpression',
+        computed: true,
+        property: { type: 'Literal', value: null },
+      }),
+    ).toBe('null')
     const assigned: NodeLike = {
       type: 'MemberExpression',
       property: { type: 'Identifier', name: 'invalidate' },

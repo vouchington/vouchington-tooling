@@ -24,7 +24,7 @@ function directReflectFactory(
   args: readonly NodeLike[],
   isFactory: (value: NodeLike | null | undefined) => boolean,
 ): boolean {
-  const member = callTarget(callee)
+  const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
   const object = finalSequenceValue(member.object as NodeLike)
   const reflectGlobal =
@@ -44,18 +44,11 @@ function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null
     : current
 }
 
-function callTarget(value: NodeLike): NodeLike {
-  const current = unwrap(value) as NodeLike
-  return current.type === 'TSInstantiationExpression'
-    ? callTarget(current.expression as NodeLike)
-    : current
-}
-
 function directFactoryMember(
   callee: NodeLike,
   isFactory: (value: NodeLike | null | undefined) => boolean,
 ): boolean {
-  const member = callTarget(callee)
+  const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
   const method = propertyName(member)
   return (method === 'call' || method === 'apply') && isFactory(member.object as NodeLike)

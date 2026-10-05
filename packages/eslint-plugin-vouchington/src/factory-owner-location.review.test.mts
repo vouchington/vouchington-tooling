@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
+import { createFactoryExportVisitors } from './factory-owner-exports.mts'
 import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
 import { createFactoryInvocationVisitors } from './factory-owner-invocation.mts'
 import { createFactoryProvenance } from './factory-owner-provenance.mts'
@@ -17,6 +18,52 @@ async function diagnostics(source: string): Promise<string[]> {
 }
 
 describe('factory-owner-location direct syntax', () => {
+  it('normalizes an instantiated mutable expression export', () => {
+    const reports: string[] = []
+    const variable: VariableLike = {
+      name: 'graph',
+      defs: [
+        {
+          type: 'Variable',
+          node: {
+            type: 'VariableDeclarator',
+            id: { type: 'Identifier', name: 'graph' },
+            init: { type: 'Identifier', name: 'makeGraph' },
+          },
+          parent: { type: 'VariableDeclaration', kind: 'let' },
+        },
+      ],
+      references: [],
+    }
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report: ({ messageId }) => reports.push(messageId),
+      sourceCode: {
+        getScope: () => ({
+          set: { get: (name) => (name === 'graph' ? variable : undefined) },
+          upper: null,
+        }),
+      },
+    }
+    const visitors = createFactoryExportVisitors(
+      context,
+      { modules: new Set(), factories: new Set(['makeGraph']) },
+      {
+        isFactory: (value) => value?.type === 'Identifier' && value.name === 'makeGraph',
+        isNamespace: () => false,
+      },
+    )
+    visitors.ExportDefaultDeclaration?.({
+      type: 'ExportDefaultDeclaration',
+      declaration: {
+        type: 'TSInstantiationExpression',
+        expression: { type: 'Identifier', name: 'graph' },
+      },
+    })
+    expect(reports).toEqual(['constructionOwner'])
+  })
+
   it('normalizes TypeScript instantiation around indirect invocation members', () => {
     const reports: string[] = []
     const context: RuleContextLike = {

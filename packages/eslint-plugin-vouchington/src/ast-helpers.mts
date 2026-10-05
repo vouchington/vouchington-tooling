@@ -49,6 +49,7 @@ const WRAPPERS = new Set([
   'TSSatisfiesExpression',
   'TSTypeAssertion',
   'TSNonNullExpression',
+  'TSInstantiationExpression',
 ])
 
 export function unwrap(node: NodeLike | null | undefined): NodeLike | null | undefined {
@@ -110,9 +111,7 @@ export function patternPropertyName(
     const name = (property.key as NodeLike).name
     return typeof name === 'string' ? name : null
   }
-  const key = property.key as NodeLike | undefined
-  if (property.computed && key?.type === 'Literal' && key.value === null) return 'null'
-  return staticPropertyName(key)
+  return staticPropertyName(property.key as NodeLike | undefined)
 }
 
 export function memberIsRead(node: NodeLike): boolean {
@@ -147,6 +146,7 @@ export function staticPropertyName(
 }
 
 function literalName(value: unknown): string | number | boolean | bigint | null {
+  if (value === null) return 'null'
   if (
     typeof value === 'string' ||
     typeof value === 'number' ||
