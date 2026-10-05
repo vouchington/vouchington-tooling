@@ -362,7 +362,6 @@ it('rejects selected create pages with no literal or with dynamic configured val
     ]),
   ).toThrow('overridden by a trailing computed property')
 })
-
 it('rejects object and JSX spreads after a configured create-page type', () => {
   expect(() =>
     collectCreatePageLiterals("const fields = { action: 'entry', ...dynamicProps }", 'page.ts', [
@@ -457,7 +456,6 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
     ),
   ).toEqual(['entry'])
 })
-
 it('preserves the legacy exclusion for configured create-page methods and accessors', () => {
   expect(
     collectCreatePageLiterals(
@@ -468,12 +466,11 @@ it('preserves the legacy exclusion for configured create-page methods and access
   ).toEqual([])
 })
 it('fails closed on compound writes to configured create-page properties', () => {
+  const source = (mutation: string) => `const form = { action: 'entry' }; ${mutation}`
   for (const mutation of ["form.action += 'entry'", "form['action'] += 'entry'"])
-    expect(() =>
-      collectCreatePageLiterals(`const form = { action: 'entry' }; ${mutation}`, 'page.tsx', [
-        'action',
-      ]),
-    ).toThrow('compound assignment')
+    expect(() => collectCreatePageLiterals(source(mutation), 'page.tsx', ['action'])).toThrow(
+      'compound assignment',
+    )
 })
 it('retains empty create-page values in objects, JSX, and assignments', () => {
   expect(
@@ -497,7 +494,6 @@ it('retains empty create-page values in objects, JSX, and assignments', () => {
     ]),
   ).toEqual(['', ''])
 })
-
 it('parses non-JSX create pages as TypeScript after angle-bracket assertions', () => {
   const source = "const cast = <string>input; const fields = { action: 'wrong' }"
   expect(collectCreatePageLiterals(source, 'page.mts', ['action'])).toEqual(['wrong'])
