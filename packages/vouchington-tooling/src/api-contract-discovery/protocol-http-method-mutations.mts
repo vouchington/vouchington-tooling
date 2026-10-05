@@ -18,6 +18,7 @@ export function mutatesHttpResponseMethod(
   node: ts.Node,
   context: ts.Symbol,
   checker: ts.TypeChecker,
+  boundHandler?: ts.Node,
 ): boolean {
   let target: ts.Expression | undefined
   if (
@@ -40,5 +41,7 @@ export function mutatesHttpResponseMethod(
     )
   )
     return false
-  return executableProtocolPath(node, checker) || opaqueProtocolCallbackPath(node, checker)
+  return (
+    executableProtocolPath(node, checker, boundHandler) || opaqueProtocolCallbackPath(node, checker)
+  )
 }

@@ -21,6 +21,7 @@ import type { BackendResponseContract } from './response-contract-types.mts'
 import { rejectRawSseWrites, type SseRouteWrites } from './protocol-sse-raw-writes.mts'
 import { sseEmission } from './protocol-sse-emission.mts'
 import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
+import { createSseAccountedPipeline } from './protocol-sse-accounted-pipeline.mts'
 
 export function discoverProtocolContracts(
   sourceFiles: readonly ts.SourceFile[],
@@ -162,9 +163,16 @@ export function discoverProtocolContracts(
       }
     },
   )
+  if (httpValues)
+    httpValues.accountedSse = createSseAccountedPipeline(
+      calls,
+      checker,
+      bindings,
+      sseBindings,
+      contracts,
+    )
   return covered
 }
-
 function unavailable(
   contracts: Map<string, BackendResponseContract>,
   key: string,
@@ -185,7 +193,6 @@ function unavailable(
     options,
   )
 }
-
 function reserveKey(allocated: Map<string, undefined>, key: string): string {
   const row = nextProtocolKey(allocated, key)
   allocated.set(row, undefined)

@@ -271,13 +271,17 @@ beforeAll(() => {
 function discover(
   sourceId: keyof typeof sources,
   requestedKeys?: ReadonlySet<string>,
+  lenient = false,
 ): { contracts: Record<string, BackendResponseContract>; facts: AmbiguousAttributionFact[] } {
   const facts: AmbiguousAttributionFact[] = []
   const contracts = discoverApiResponseContracts(
     matrix.program,
     [matrix.sourceFile(sourceId)],
     requestedKeys,
-    { onAmbiguousAttribution: (fact) => facts.push(fact) },
+    {
+      onAmbiguousAttribution: (fact) => facts.push(fact),
+      ...(lenient ? { onRouteError: () => {} } : {}),
+    },
   )
   return { contracts, facts }
 }
@@ -391,11 +395,18 @@ it('unwraps computed error keys before applying the dynamic-error exclusion', ()
 })
 
 it('keeps protocol-suffixed requested routes eligible for attribution facts', () => {
+  expect(() =>
+    discover('protocol-variant-and-ambiguous-helper', new Set(['POST:/rpc#protocol-2'])),
+  ).toThrow('HTTP response context escapes through an opaque argument')
   const { contracts, facts } = discover(
     'protocol-variant-and-ambiguous-helper',
     new Set(['POST:/rpc#protocol-2']),
+    true,
   )
-  expect(Object.keys(contracts)).toContain('POST:/rpc#protocol-2')
+  expect(contracts['POST:/rpc#protocol-2']).toMatchObject({
+    schema: { root: { type: 'unknown' } },
+    unavailableReason: 'HTTP response context escapes through an opaque argument',
+  })
   expect(facts.map(({ routes }) => routes)).toEqual([['POST:/other', 'POST:/rpc']])
 })
 
