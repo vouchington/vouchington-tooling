@@ -26,7 +26,7 @@ export function extractQueryParameterDescriptor(
   ) {
     return descriptor
   }
-  if ('default' in descriptor) {
+  if (type.getProperty('default')) {
     failure(sourceFile, node, parameterName)('required cannot be combined with default')
   }
   return { ...descriptor, required: true }

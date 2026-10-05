@@ -44,6 +44,7 @@ const descriptors = {
   requiredBoolean: `{ kind: 'string'; required: boolean }`,
   requiredOptional: `{ kind: 'string'; required?: true }`,
   requiredDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; required: true }`,
+  requiredStringDefault: `{ kind: 'string'; default: 'x'; required: true }`,
   requiredItems: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } }`,
   requiredCsv: `{ kind: 'csv-array'; style: 'form'; explode: false; required: true; items: { kind: 'string' } }`,
   unionDescription: `{ kind: 'string'; description: 'x'; a: 1 } | { kind: 'string'; description: 'x'; b: 1 }`,
@@ -139,6 +140,7 @@ describe('query descriptor compiler boundaries', () => {
     ['requiredBoolean', 'required must be the literal true'],
     ['requiredOptional', 'required must be literal when present'],
     ['requiredDefault', 'required cannot be combined with default'],
+    ['requiredStringDefault', 'required cannot be combined with default'],
     ['requiredItems', 'array items cannot be required'],
   ] as const)('rejects %s', (name, reason) => {
     expect(() => extract(name)).toThrow(reason)
