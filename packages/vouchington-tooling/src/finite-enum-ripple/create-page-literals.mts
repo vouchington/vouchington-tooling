@@ -3,6 +3,7 @@ import { getStringLiteralValue, unwrapExpression } from './ast.mts'
 import { jsxRuntimeStringValue } from './create-page-jsx.mts'
 import {
   getConfiguredPropertyName,
+  isConfiguredPropertyName,
   spreadMayOverrideConfiguredProperty,
 } from './create-page-properties.mts'
 
@@ -45,7 +46,7 @@ export function collectCreatePageLiterals(
           if (ts.isObjectLiteralExpression(expression)) {
             for (const later of node.properties.slice(index + 1)) {
               const name = getConfiguredPropertyName(later, names)
-              if (name && names.has(name)) overridden.add(name)
+              if (isConfiguredPropertyName(name, names)) overridden.add(name)
             }
           }
           visit(expression, overridden)
@@ -57,7 +58,7 @@ export function collectCreatePageLiterals(
     }
     if (ts.isPropertyAssignment(node)) {
       const name = getConfiguredPropertyName(node, names)
-      if (name && !ignoredProperties.has(name)) {
+      if (isConfiguredPropertyName(name, names) && !ignoredProperties.has(name)) {
         const value = getStringLiteralValue(node.initializer)
         if (value === undefined)
           throw new Error(`${file}: create page ${name} must be a string literal`)
@@ -90,9 +91,9 @@ export function collectCreatePageLiterals(
             ? getStringLiteralValue(left.argumentExpression)
             : undefined
       const value = getStringLiteralValue(node.right)
-      if (name && names.has(name) && value === undefined)
+      if (isConfiguredPropertyName(name, names) && value === undefined)
         throw new Error(`${file}: create page ${name} must be a string literal`)
-      if (name && names.has(name) && value !== undefined) values.push(value)
+      if (isConfiguredPropertyName(name, names) && value !== undefined) values.push(value)
     }
     ts.forEachChild(node, (child) => visit(child))
   }

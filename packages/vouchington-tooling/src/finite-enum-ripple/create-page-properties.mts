@@ -12,7 +12,14 @@ export function getConfiguredPropertyName(
       name = getStringLiteralValue(node.name.expression)
   } else if (ts.isShorthandPropertyAssignment(node)) name = node.name.text
   else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) name = node.name.text
-  return name && names.has(name) ? name : undefined
+  return name !== undefined && names.has(name) ? name : undefined
+}
+
+export function isConfiguredPropertyName(
+  name: string | undefined,
+  names: ReadonlySet<string>,
+): name is string {
+  return name !== undefined && names.has(name)
 }
 
 export function spreadMayOverrideConfiguredProperty(

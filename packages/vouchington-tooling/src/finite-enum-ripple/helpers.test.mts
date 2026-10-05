@@ -44,3 +44,13 @@ it('inspects a literal inside a JSX expression attribute', () => {
     ),
   ).toEqual(['other'])
 })
+
+it('preserves an explicitly configured empty property name', () => {
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { '': 'wrong', action: 'entry' }",
+      'ui/create/page.tsx',
+      ['', 'action'],
+    ),
+  ).toEqual(['wrong', 'entry'])
+})
