@@ -21,9 +21,7 @@ export function extractQueryParameterDescriptor(
   parameterName: string,
 ): QueryParameterContract {
   const descriptor = extractDescriptorShape(type, checker, sourceFile, node, parameterName)
-  if (
-    !optionalTrueLiteral(type, 'required', checker, node, failure(sourceFile, node, parameterName))
-  ) {
+  if (!optionalTrueLiteral(type, 'required', checker, failure(sourceFile, node, parameterName))) {
     return descriptor
   }
   if (type.getProperty('default')) {

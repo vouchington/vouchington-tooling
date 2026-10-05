@@ -78,7 +78,6 @@ export function optionalTrueLiteral(
   type: ts.Type,
   name: string,
   checker: ts.TypeChecker,
-  node: ts.Node,
   fail: (detail: string) => never,
 ): boolean {
   const property = type.getProperty(name)
@@ -89,8 +88,7 @@ export function optionalTrueLiteral(
     return false
   }
   if (property.flags & ts.SymbolFlags.Optional) return fail(`${name} must be literal when present`)
-  const location = property.valueDeclaration ?? property.declarations?.[0] ?? node
-  const value = checker.getTypeOfSymbolAtLocation(property, location)
+  const value = requiredPropertyType(type, name, checker, fail)
   const isTrue = value.flags & ts.TypeFlags.BooleanLiteral && checker.typeToString(value) === 'true'
   return isTrue ? true : fail(`${name} must be the literal true`)
 }
