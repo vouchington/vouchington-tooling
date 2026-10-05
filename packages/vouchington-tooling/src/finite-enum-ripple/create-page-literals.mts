@@ -35,6 +35,12 @@ export function collectCreatePageLiterals(
         if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
           if (configuredBeforeSpread && spreadMayOverrideConfiguredProperty(member, names))
             throw new Error(`${file}: create page type can be overridden by a trailing spread`)
+        } else if (
+          ts.isPropertyAssignment(member) &&
+          getConfiguredPropertyName(member, names) === '__proto__' &&
+          !ts.isComputedPropertyName(member.name)
+        ) {
+          throw new Error(`${file}: create page __proto__ prototype setter is uninspectable`)
         } else if (getConfiguredPropertyName(member, names) !== undefined) {
           configuredBeforeSpread = true
         } else if (
@@ -90,6 +96,14 @@ export function collectCreatePageLiterals(
       if (value === undefined)
         throw new Error(`${file}: create page ${node.name.text} must be a string literal`)
       values.push(value)
+    } else if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken ||
+        node.operator === ts.SyntaxKind.MinusMinusToken)
+    ) {
+      const name = assignedPropertyName(node.operand)
+      if (isConfiguredPropertyName(name, names))
+        throw new Error(`${file}: unary update to create page ${name} is uninspectable`)
     } else if (ts.isBinaryExpression(node)) {
       const name = assignedPropertyName(node.left)
       if (
