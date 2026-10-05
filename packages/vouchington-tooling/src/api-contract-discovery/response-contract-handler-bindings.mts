@@ -1,7 +1,10 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
-import { findMutatedProperties } from './response-contract-property-mutations.mts'
+import {
+  findMutatedBindings,
+  findMutatedProperties,
+} from './response-contract-property-mutations.mts'
 import { handlerArgumentSymbols } from './response-contract-handler-calls.mts'
 import {
   propertyName,
@@ -27,6 +30,7 @@ export function collectHandlerBindings(
   const mutatedProperties = ambiguousBindings
     ? findMutatedProperties(sourceFiles, checker)
     : undefined
+  const mutatedBindings = ambiguousBindings ? findMutatedBindings(sourceFiles, checker) : undefined
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
       if (!ts.isCallExpression(node)) return
@@ -49,6 +53,7 @@ export function collectHandlerBindings(
             resolveHandlerSymbol(symbol, checker),
             checker,
           )
+          if (mutatedBindings?.has(resolvedAttributionSymbol)) continue
           const attributionCandidates =
             attributionBindingsBySymbol.get(resolvedAttributionSymbol) ?? []
           attributionCandidates.push(binding)

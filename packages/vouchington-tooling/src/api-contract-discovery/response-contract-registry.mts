@@ -41,7 +41,9 @@ export function discoverApiResponseContracts(
   registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendResponseContract>()
-  const ambiguousBindings: AmbiguousHandlerBindings = new Map()
+  const ambiguousBindings: AmbiguousHandlerBindings | undefined = options?.onAmbiguousAttribution
+    ? new Map()
+    : undefined
   const handlerBindings = collectHandlerBindings(sourceFiles, checker, ambiguousBindings)
   const protocolContracts = new Map<string, BackendResponseContract>()
   const protocolEmissions = discoverProtocolContracts(
@@ -113,7 +115,8 @@ export function discoverApiResponseContracts(
       if (options?.onAmbiguousAttribution) {
         const attributionLabel = implicitResponseCallLabel(node, true)
         const routes = attributionLabel
-          ? ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)
+          ? ambiguousBindings &&
+            ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)
           : undefined
         const requestedRoute =
           !requestedKeys ||

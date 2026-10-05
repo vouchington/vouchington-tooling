@@ -33,3 +33,34 @@ export function findMutatedProperties(
   }
   return mutated
 }
+
+/** Direct identifier writes are excluded from handler attribution; indirect writes are unproven. */
+export function findMutatedBindings(
+  sourceFiles: readonly ts.SourceFile[],
+  checker: ts.TypeChecker,
+): Set<ts.Symbol> {
+  const mutated = new Set<ts.Symbol>()
+  for (const sourceFile of sourceFiles) {
+    visit(sourceFile, (node) => {
+      let identifier: ts.Identifier | undefined
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+        ts.isIdentifier(node.left)
+      )
+        identifier = node.left
+      else if (
+        (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken ||
+          node.operator === ts.SyntaxKind.MinusMinusToken) &&
+        ts.isIdentifier(node.operand)
+      )
+        identifier = node.operand
+      if (!identifier) return
+      const symbol = checker.getSymbolAtLocation(identifier)
+      if (symbol) mutated.add(attributionSymbol(resolveSymbol(symbol, checker), checker))
+    })
+  }
+  return mutated
+}

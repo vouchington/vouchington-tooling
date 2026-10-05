@@ -106,6 +106,19 @@ const sources = {
     app.route('/api/v1/a').post(sendA)
     app.route('/api/v1/b').post(alias)
   `,
+  'reassigned-handler-bindings': `
+    declare const app: any
+    function replacement(ctx: any) { ctx.json({ replacement: true }) }
+    let direct = (ctx: any) => ctx.json({ original: true })
+    let aliased = (ctx: any) => ctx.json({ original: true })
+    const alias = aliased
+    app.route('/api/v1/items').post(direct)
+    direct = replacement
+    app.route('/api/v1/widgets').post(direct)
+    app.route('/api/v1/aliased-items').post(alias)
+    aliased = replacement
+    app.route('/api/v1/aliased-widgets').post(alias)
+  `,
   'unresolved-local-alias': `
     declare const app: any
     const alias: any = missingHandler
@@ -358,6 +371,12 @@ describe('implicit response attribution facts', () => {
   it('does not follow mutable handler aliases after reassignment', () => {
     const facts: AmbiguousAttributionFact[] = []
     discover('reassigned-local-alias', facts)
+    expect(facts).toEqual([])
+  })
+
+  it('fails closed when a registered handler binding or its immutable alias is reassigned', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('reassigned-handler-bindings', facts)
     expect(facts).toEqual([])
   })
 

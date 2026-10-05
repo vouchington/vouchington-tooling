@@ -138,6 +138,29 @@ const sources = {
     app.route('/api/v1/mutated-a').post(handlers.send)
     app.route('/api/v1/mutated-b').post(handlers.send)
   `,
+  'updated-property-handler': `
+    declare const app: any
+    const handlers: any = { send(ctx: any) { ctx.json({ shared: true }) } }
+    handlers.send++
+    app.route('/api/v1/mutated-a').post(handlers.send)
+    app.route('/api/v1/mutated-b').post(handlers.send)
+  `,
+  'updated-identifier-handler': `
+    declare const app: any
+    let send: any = (ctx: any) => ctx.json({ shared: true })
+    ++send
+    send--
+    app.route('/api/v1/mutated-a').post(send)
+    app.route('/api/v1/mutated-b').post(send)
+  `,
+  'unresolved-update': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    // @ts-expect-error The unresolved update must not mutate another handler's binding.
+    missing++
+    app.route('/api/v1/shared-a').post(send)
+    app.route('/api/v1/shared-b').post(send)
+  `,
   'wrapped-initializer-and-class-field': `
     declare const app: any
     type Handler = (ctx: any) => void
@@ -328,6 +351,23 @@ describe('transparent response-attribution expressions', () => {
     const facts: AmbiguousAttributionFact[] = []
     discover('mutated-shorthand-handler', facts)
     expect(facts).toEqual([])
+  })
+
+  it.each(['updated-property-handler', 'updated-identifier-handler'] as const)(
+    'fails closed for incremented handler bindings (%s)',
+    (sourceId) => {
+      const facts: AmbiguousAttributionFact[] = []
+      discover(sourceId, facts)
+      expect(facts).toEqual([])
+    },
+  )
+
+  it('ignores updates without a checker symbol while preserving known attribution', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('unresolved-update', facts)
+    expect(facts.map(({ routes }) => routes)).toEqual([
+      ['POST:/api/v1/shared-a', 'POST:/api/v1/shared-b'],
+    ])
   })
 
   it('attributes wrapped variable and class-field arrow initializers', () => {
