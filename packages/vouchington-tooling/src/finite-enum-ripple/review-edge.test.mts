@@ -378,6 +378,20 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
   ).toEqual(['entry'])
   expect(
     collectCreatePageLiterals(
+      "const fields = { action: 'entry', ...{ ...{ label: 'new' } } }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['entry'])
+  expect(() =>
+    collectCreatePageLiterals(
+      "const fields = { action: 'entry', ...{ ...{ action: 'wrong' } } }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toThrow('overridden by a trailing spread')
+  expect(
+    collectCreatePageLiterals(
       "const view = <Form action='entry' {...{ label: 'new' }} />",
       'page.tsx',
       ['action'],
@@ -453,7 +467,14 @@ it('preserves the legacy exclusion for configured create-page methods and access
     ),
   ).toEqual([])
 })
-
+it('fails closed on compound writes to configured create-page properties', () => {
+  for (const mutation of ["form.action += 'entry'", "form['action'] += 'entry'"])
+    expect(() =>
+      collectCreatePageLiterals(`const form = { action: 'entry' }; ${mutation}`, 'page.tsx', [
+        'action',
+      ]),
+    ).toThrow('compound assignment')
+})
 it('retains empty create-page values in objects, JSX, and assignments', () => {
   expect(
     collectCreatePageLiterals(

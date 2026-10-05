@@ -26,10 +26,14 @@ export function spreadMayOverrideConfiguredProperty(
   member: ts.SpreadAssignment | ts.JsxSpreadAttribute,
   names: ReadonlySet<string>,
 ): boolean {
-  const expression = unwrapExpression(member.expression)
+  return expressionMayOverride(unwrapExpression(member.expression), names)
+}
+
+function expressionMayOverride(expression: ts.Expression, names: ReadonlySet<string>): boolean {
   if (!ts.isObjectLiteralExpression(expression)) return true
   return expression.properties.some((property) => {
-    if (ts.isSpreadAssignment(property)) return true
+    if (ts.isSpreadAssignment(property))
+      return expressionMayOverride(unwrapExpression(property.expression), names)
     if (ts.isComputedPropertyName(property.name)) {
       const name = getStringLiteralValue(property.name.expression)
       return name === undefined || names.has(name)

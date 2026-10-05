@@ -61,6 +61,8 @@ export function parseStructuredTypeEntries(
       throw new Error(`${file}: ${name} contains an uninspectable spread`)
     if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
+    if (value === '__proto__' && !ts.isComputedPropertyName(property.name))
+      throw new Error(`${file}: ${name} contains unsupported __proto__ prototype setter`)
     if (value === undefined) continue
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body))

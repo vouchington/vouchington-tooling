@@ -158,6 +158,18 @@ describe('finite enum parsers', () => {
     ).toEqual([{ slug: 'alpha' }])
   })
 
+  it('rejects structured prototype-setter entries', () => {
+    expect(() =>
+      parseStructuredTypeEntries(
+        "const kinds = { __proto__: { slug: 'entry', slugs: 'entries' } }",
+        file,
+        'kinds',
+        'slug',
+        'slugs',
+      ),
+    ).toThrow(/unsupported __proto__ prototype setter/)
+  })
+
   it('reports missing configured route properties and unsupported union values', () => {
     expect(() =>
       parseUnionRouteConfigEntries(

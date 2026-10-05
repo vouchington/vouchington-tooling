@@ -18,6 +18,16 @@ export function collectCreatePageLiterals(
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, scriptKind)
   const names = new Set(properties)
   const values: string[] = []
+  const assignedPropertyName = (target: ts.Expression): string | undefined => {
+    const left = unwrapExpression(target)
+    return ts.isIdentifier(left)
+      ? left.text
+      : ts.isPropertyAccessExpression(left)
+        ? left.name.text
+        : ts.isElementAccessExpression(left)
+          ? getStringLiteralValue(left.argumentExpression)
+          : undefined
+  }
   const visit = (node: ts.Node, ignoredProperties: ReadonlySet<string> = new Set()): void => {
     if (ts.isObjectLiteralExpression(node) || ts.isJsxAttributes(node)) {
       let configuredBeforeSpread = false
@@ -78,18 +88,18 @@ export function collectCreatePageLiterals(
       if (value === undefined)
         throw new Error(`${file}: create page ${node.name.text} must be a string literal`)
       values.push(value)
-    } else if (
-      ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-    ) {
-      const left = unwrapExpression(node.left)
-      const name = ts.isIdentifier(left)
-        ? left.text
-        : ts.isPropertyAccessExpression(left)
-          ? left.name.text
-          : ts.isElementAccessExpression(left)
-            ? getStringLiteralValue(left.argumentExpression)
-            : undefined
+    } else if (ts.isBinaryExpression(node)) {
+      const name = assignedPropertyName(node.left)
+      if (
+        node.operatorToken.kind >= ts.SyntaxKind.FirstCompoundAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastCompoundAssignment &&
+        isConfiguredPropertyName(name, names)
+      )
+        throw new Error(`${file}: compound assignment to create page ${name} is uninspectable`)
+      if (node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+        ts.forEachChild(node, (child) => visit(child))
+        return
+      }
       const value = getStringLiteralValue(node.right)
       if (isConfiguredPropertyName(name, names) && value === undefined)
         throw new Error(`${file}: create page ${name} must be a string literal`)
