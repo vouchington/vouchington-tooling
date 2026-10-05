@@ -2,6 +2,7 @@ import { createSseTagCallers } from './protocol-sse-tag-callers.mts'
 import {
   implementationDeclaration,
   selectedReturnedSseCapability,
+  selectedOpaqueSseReceiver,
 } from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
@@ -42,24 +43,18 @@ export function opaqueCallReceivesSelectedStream(
   const framed = selectedReceivers.flatMap((receiver) =>
     actualReceivers(receiver, binding, checker, lookup),
   )
-  const target = ts.isCallExpression(call) && call.expression
-  if (target && (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target))) {
-    const receiver = expressionReceiver(target.expression, checker)
-    if (
-      receiver &&
-      actualReceivers(receiver, binding, checker, lookup).some(
-        (actual) =>
-          actual !== undefined &&
-          framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
-      )
+  if (
+    selectedOpaqueSseReceiver(call, checker, framed, (receiver) =>
+      actualReceivers(receiver, binding, checker, lookup),
     )
-      return true
-  }
+  )
+    return true
   return (
     call.arguments?.some((argument) =>
       someSseArgumentValue(argument, checker, (value) => {
         if (
           (ts.isCallExpression(value) ||
+            ts.isIdentifier(value) ||
             ts.isArrowFunction(value) ||
             ts.isFunctionExpression(value)) &&
           selectedReturnedSseCapability(

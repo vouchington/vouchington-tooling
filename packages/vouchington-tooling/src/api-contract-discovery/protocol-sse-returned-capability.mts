@@ -108,3 +108,26 @@ export function implementationDeclaration(
   }
   return undefined
 }
+
+/** An unknown member implementation receives its actual receiver as this. */
+export function selectedOpaqueSseReceiver(
+  call: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression,
+  checker: ts.TypeChecker,
+  framed: readonly (WriteReceiver | undefined)[],
+  resolve: (receiver: WriteReceiver) => readonly (WriteReceiver | undefined)[],
+): boolean {
+  const target = ts.isTaggedTemplateExpression(call)
+    ? call.tag
+    : ts.isCallExpression(call) && call.expression
+  if (!target || !(ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)))
+    return false
+  const receiver = expressionReceiver(target.expression, checker)
+  return (
+    !!receiver &&
+    resolve(receiver).some(
+      (actual) =>
+        actual !== undefined &&
+        framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+    )
+  )
+}

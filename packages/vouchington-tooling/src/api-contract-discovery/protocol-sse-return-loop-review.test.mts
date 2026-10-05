@@ -4,10 +4,17 @@ import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-set
 
 const route = (body: string) => `declare const app:any;declare function opaque(value:unknown):void;
  declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
- class Stream{write(_value:string):void{}cleanup():void{}}const stream=new Stream();const other=new Stream();
+ class Stream{write(_value:string):void{}cleanup(_strings?:TemplateStringsArray):void{}}const stream=new Stream();const other=new Stream();
  declare function opaqueResult(value:Stream):Stream;
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
+  callbackalias: route('const callback=()=>stream;opaque(callback)'),
+  callbackother: route('const callback=()=>other;opaque(callback)'),
+  tagreceiver: route('(stream as Stream & {raw(strings:TemplateStringsArray):void}).raw`value`'),
+  tagreceiverother: route(
+    '(other as Stream & {raw(strings:TemplateStringsArray):void}).raw`value`',
+  ),
+  tagcleanup: route('stream.cleanup`value`'),
   tagambient: route('external`value`').replace(
     'app.route',
     'declare function external(strings:TemplateStringsArray):void;app.route',
@@ -72,6 +79,8 @@ const row = (name: keyof typeof sources) =>
     onRouteError: () => {},
   })['GET:/events']
 it.each([
+  'callbackalias',
+  'tagreceiver',
   'tagraw',
   'callbackblock',
   'elementmethod',
@@ -95,6 +104,9 @@ it.each([
   expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
 it.each([
+  'callbackother',
+  'tagreceiverother',
+  'tagcleanup',
   'tagambient',
   'taggenerator',
   'tagoutside',
