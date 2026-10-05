@@ -3,6 +3,7 @@ import {
   httpHandlerContext,
   httpContextScopes,
   indirectHttpResponseMethod,
+  opaqueHttpContextConstruction,
 } from './protocol-http-context.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { httpEmissionKind, contextResponseMethod } from './protocol-http-emission.mts'
@@ -44,16 +45,17 @@ export function associateHttpResponse(
       if (mutatedHttpResponse(node, response, checker))
         throw new Error('HTTP branded response body or status is mutated')
       if (
-        ts.isCallExpression(node) &&
-        opaqueHttpContextArgument(
-          node,
-          checker,
-          context,
-          undefined,
-          undefined,
-          undefined,
-          httpValues,
-        )
+        opaqueHttpContextConstruction(node, checker, context) ||
+        (ts.isCallExpression(node) &&
+          opaqueHttpContextArgument(
+            node,
+            checker,
+            context,
+            undefined,
+            undefined,
+            undefined,
+            httpValues,
+          ))
       )
         throw new Error('HTTP response context escapes through an opaque argument')
       if (mutatesHttpResponseMethod(node, context, checker))

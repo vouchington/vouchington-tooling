@@ -7,26 +7,35 @@ export function createContextConsumerSources(
 ) {
   const consumers = new Map<ts.SourceFile, Set<ts.SourceFile>>()
   const cache = new Map<ts.SourceFile, readonly ts.SourceFile[]>()
-  for (const source of sources ?? []) {
-    function index(node: ts.Node) {
-      const specifier =
-        ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
-          ? node.moduleSpecifier
-          : ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
-            ? node.arguments[0]
-            : undefined
-      const module = specifier && checker.getSymbolAtLocation(specifier)
-      for (const declaration of module?.declarations ?? []) {
-        if (!ts.isSourceFile(declaration)) continue
-        const rows = consumers.get(declaration) ?? new Set<ts.SourceFile>()
-        rows.add(source)
-        consumers.set(declaration, rows)
+  let indexed = false
+  function ensureIndex() {
+    if (indexed) return
+    indexed = true
+    for (const source of sources ?? []) {
+      function index(node: ts.Node) {
+        const specifier =
+          ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
+            ? node.moduleSpecifier
+            : ts.isImportEqualsDeclaration(node) &&
+                ts.isExternalModuleReference(node.moduleReference)
+              ? node.moduleReference.expression
+              : ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
+                ? node.arguments[0]
+                : undefined
+        const module = specifier && checker.getSymbolAtLocation(specifier)
+        for (const declaration of module?.declarations ?? []) {
+          if (!ts.isSourceFile(declaration)) continue
+          const rows = consumers.get(declaration) ?? new Set<ts.SourceFile>()
+          rows.add(source)
+          consumers.set(declaration, rows)
+        }
+        ts.forEachChild(node, index)
       }
-      ts.forEachChild(node, index)
+      index(source)
     }
-    index(source)
   }
   return (source: ts.SourceFile): readonly ts.SourceFile[] => {
+    ensureIndex()
     const hit = cache.get(source)
     if (hit) return hit
     const result = new Set<ts.SourceFile>()

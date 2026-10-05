@@ -15,7 +15,7 @@ import type { CallbackBindings } from './protocol-callback-values.mts'
 import { standardReflectApply } from './protocol-http-reflect.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import { receiverUsesThis } from './protocol-http-context-receiver.mts'
-import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
+import { unsupportedBoundContextNode } from './protocol-http-context-bound-nodes.mts'
 import { createContextAccountedEmissionProof } from './protocol-http-context-accounted-emissions.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
@@ -170,7 +170,7 @@ function calleeEscapes(
     ts.forEachChild(node, visitBound)
   }
   const inspect = (node: ts.Node): void => {
-    if (contexts.some((symbol) => mutatesHttpResponseMethod(node, symbol, checker, fn)))
+    if (contexts.some((symbol) => unsupportedBoundContextNode(node, symbol, checker, fn)))
       escaped = true
     if (
       ts.isCallExpression(node) &&

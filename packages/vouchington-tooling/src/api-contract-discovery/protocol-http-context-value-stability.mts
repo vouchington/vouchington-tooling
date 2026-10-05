@@ -6,7 +6,10 @@ import { contextFunctionOwns } from './protocol-http-context-capture.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
-import { contextForwardedTarget } from './protocol-http-context-forwarded-target.mts'
+import {
+  createContextForwardedArguments,
+  contextForwardedTarget,
+} from './protocol-http-context-forwarded-target.mts'
 import { createContextConsumerSources } from './protocol-http-context-consumer-sources.mts'
 
 type Facts = {
@@ -25,6 +28,7 @@ export function createContextValueStability(
   const cache = new Map<ts.Symbol, boolean>()
   const sources = new Map<ts.SourceFile, Facts>()
   const consumerSources = createContextConsumerSources(checker, programSources)
+  const forwardedArguments = createContextForwardedArguments(checker)
   function capturedContainer(
     symbol: ts.Symbol,
     owner?: ts.Node,
@@ -120,7 +124,8 @@ export function createContextValueStability(
           [...captures].some((captured) => capturedContainer(captured, value))
         )
           safe = false
-        for (const [index, argument] of (call.arguments ?? []).entries()) {
+        for (const [index, argument] of forwardedArguments(call).entries()) {
+          if (!argument) continue
           if (
             (root(argument) !== symbol && !data.wrappers.capture(argument).has(symbol)) ||
             primitiveMember(argument)
