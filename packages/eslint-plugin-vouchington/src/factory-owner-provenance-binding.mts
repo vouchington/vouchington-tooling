@@ -7,6 +7,7 @@ import {
   type RuleContextLike,
   type VariableLike,
 } from './ast-helpers.mts'
+import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 
 function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
   const name = staticPropertyName(value)
@@ -35,10 +36,16 @@ export function awaitedModuleSpecifier(
   const variable = findVariable(context, current)
   if (!variable || active.has(variable)) return null
   const declaration = constantDefinition(variable)
-  if ((declaration?.id as NodeLike | undefined)?.type !== 'Identifier') return null
+  if (!declaration) return null
+  const id = declaration.id as NodeLike
+  const source =
+    id.type === 'Identifier'
+      ? (declaration.init as NodeLike)
+      : patternDefaultValue(id, String(current.name))
+  if (!source) return null
   active.add(variable)
   try {
-    return awaitedModuleSpecifier(context, declaration?.init as NodeLike, active)
+    return awaitedModuleSpecifier(context, source, active)
   } finally {
     active.delete(variable)
   }

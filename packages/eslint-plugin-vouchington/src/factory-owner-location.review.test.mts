@@ -60,6 +60,12 @@ describe('factory-owner-location direct syntax', () => {
       'constructionOwner',
     ])
     expect(await diagnostics(`(await (import('@compiler/runtime'), 0)).makeGraph()`)).toEqual([])
+    expect(
+      await diagnostics(`const { promise = import('@compiler/runtime') } = {}
+;(await promise).makeGraph()
+export default await promise`),
+    ).toEqual(['constructionOwner', 'constructionOwner'])
+    expect(await diagnostics(`const { promise } = {}; (await promise).makeGraph()`)).toEqual([])
   })
 
   it('recognizes calls through factory call and apply members', async () => {
