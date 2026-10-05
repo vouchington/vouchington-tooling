@@ -592,8 +592,9 @@ expression text, and only the property names and exported comparison types the c
 Facts include the displayed type, whether it is `any`, requested property displays, and requested
 assignability booleans. `defaultTypeParameterIndex` selects an exported generic default;
 direct defaults and direct references to preceding defaults are supported. Dependent composite
-defaults and defaulted generic assignability targets fail with an instruction to export and select
-a named instantiated type, keeping every reported fact compiler-backed.
+defaults, generic type declarations, and defaulted call or construct signatures used as
+assignability targets fail with an instruction to export and select a named instantiated type,
+keeping every reported fact compiler-backed.
 `rowSource: 'typeArgument'` selects a call's explicit type argument, while
 `rowSource: 'awaitedRows'` selects `Awaited<ReturnType>.rows[number]`.
 Call results are source ordered and include one-based line and column. An absent call returns an

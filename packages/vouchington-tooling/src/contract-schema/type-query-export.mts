@@ -50,22 +50,22 @@ export function exportedAssignableType(
 ): ts.Type {
   const sourceFile = sourceFileForQuery(program, selector.fileName)
   const symbol = exportedSymbol(checker, sourceFile, selector.exportName)
-  const defaultedDeclaration = symbol.declarations?.find((declaration) =>
-    (
-      declaration as ts.Declaration & {
-        typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>
-      }
-    ).typeParameters?.some((parameter) => parameter.default),
+  const genericDeclaration = symbol.declarations?.find(
+    (declaration) =>
+      (
+        declaration as ts.Declaration & {
+          typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>
+        }
+      ).typeParameters?.length,
   )
   const type = exportedType(program, checker, selector)
-  const defaultedSignature = type
-    .getCallSignatures()
-    .some((signature) =>
+  const defaultedSignature = [...type.getCallSignatures(), ...type.getConstructSignatures()].some(
+    (signature) =>
       signature.getDeclaration()?.typeParameters?.some((parameter) => parameter.default),
-    )
-  if (defaultedDeclaration || defaultedSignature) {
+  )
+  if (genericDeclaration || defaultedSignature) {
     throw new Error(
-      `Assignable target "${selector.exportName}" in "${selector.fileName}" has defaulted type parameters; export and select a named instantiated type instead`,
+      `Assignable target "${selector.exportName}" in "${selector.fileName}" has generic or defaulted type parameters; export and select a named instantiated type instead`,
     )
   }
   return type
@@ -89,9 +89,10 @@ export function exportedDefaultType(
         ).typeParameters,
     )
     .find((parameters) => parameters?.[parameterIndex]?.default)
-  const signatureParameters = exportedType(program, checker, selector)
-    .getCallSignatures()[0]
-    ?.getDeclaration()?.typeParameters
+  const type = exportedType(program, checker, selector)
+  const signatureParameters = [...type.getCallSignatures(), ...type.getConstructSignatures()]
+    .map((signature) => signature.getDeclaration()?.typeParameters)
+    .find((candidate) => candidate?.[parameterIndex]?.default)
   const parameters = directParameters ?? signatureParameters
   const defaultNode = parameters?.[parameterIndex]?.default
   if (!defaultNode) {
