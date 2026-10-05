@@ -55,6 +55,14 @@ const sources = {
   'optional-null-owner': `declare const choose:boolean;
     const callback=(ctx:any)=>ctx.assert(true);
     const options=choose?null:{callback};const result=options?.callback;`,
+  'named-shorthand': `function callback(ctx:any){ctx.assert(true)}
+    const bag={callback};const alias=bag.callback;const result=alias;`,
+  'string-key-miss': `const callback=(ctx:any)=>ctx.assert(true);
+    const options={'other':callback} as {callback?:typeof callback};
+    const result=options.callback;`,
+  'new-without-arguments': `const callback=(ctx:any)=>ctx.assert(true);
+    const options={callback};class Control{}new Control;
+    const result=options.callback;`,
 } as const
 
 type Case = keyof typeof sources
@@ -69,7 +77,10 @@ function uncheckedProgram() {
     function inspect({item:fromParameter}){return fromParameter.callback}
     const bag={missingShorthand};
     const alias=bag.missingShorthand;
-    missingGlobal;fromUnknown;fromArray;bag.missingShorthand;alias;`
+    const outer={selected:unknownHolder.member};
+    const fromOuter=outer.selected;
+    with(opaqueScope){const wrapper={options}}
+    missingGlobal;fromUnknown;fromArray;bag.missingShorthand;alias;fromOuter;options.callback;`
   const options: ts.CompilerOptions = {
     allowJs: true,
     checkJs: false,
@@ -203,6 +214,38 @@ describe('HTTP context proof follows real TypeScript bindings and object values'
       ts.SyntaxKind.ArrowFunction,
     ])
   })
+
+  it('resolves a named function through a shorthand property and declaration', () => {
+    const checker = matrix.program.getTypeChecker()
+    const declaration = matrix
+      .sourceFile('named-shorthand')
+      .statements.find(ts.isFunctionDeclaration)
+    if (!declaration) throw new Error('Missing named function declaration')
+    expect(createContextValueRoots(checker).root(initializer('named-shorthand'))).toBe(
+      checker.getSymbolAtLocation(declaration.name!),
+    )
+    expect(
+      createHttpContextValueResolver(checker)
+        .resolve(declaration, new Map())
+        ?.map((value) => value?.node.kind),
+    ).toEqual([ts.SyntaxKind.FunctionDeclaration])
+  })
+
+  it('treats an unrelated string key as an absent callback', () => {
+    const checker = matrix.program.getTypeChecker()
+    expect(
+      createHttpContextValueResolver(checker).resolve(initializer('string-key-miss'), new Map()),
+    ).toEqual([null])
+  })
+
+  it('retains a callback alongside a constructor call without arguments', () => {
+    const checker = matrix.program.getTypeChecker()
+    const values = createHttpContextValueResolver(checker).resolve(
+      initializer('new-without-arguments'),
+      new Map(),
+    )
+    expect(values?.map((value) => value?.node.kind)).toEqual([ts.SyntaxKind.ArrowFunction])
+  })
 })
 
 describe('HTTP context proof treats unresolved unchecked JavaScript as unknown', () => {
@@ -258,5 +301,16 @@ describe('HTTP context proof treats unresolved unchecked JavaScript as unknown',
     expect(
       createHttpContextValueResolver(checker).resolve(expressions[3]!, new Map()),
     ).toBeUndefined()
+  })
+
+  it('keeps an unresolved member inside an object rooted at that object', () => {
+    const checker = program.getTypeChecker()
+    expect(createContextValueRoots(checker).root(expressions[5]!)?.name).toBe('outer')
+  })
+
+  it('retains a stable callback when a wrapper is declared inside a dynamic with block', () => {
+    const checker = program.getTypeChecker()
+    const values = createHttpContextValueResolver(checker).resolve(expressions[6]!, new Map())
+    expect(values?.map((value) => value?.node.kind)).toEqual([ts.SyntaxKind.ArrowFunction])
   })
 })
