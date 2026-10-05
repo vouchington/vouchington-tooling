@@ -1,5 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import type { createContextValueRoots } from './protocol-http-context-value-roots.mts'
@@ -53,4 +53,11 @@ export function createContextCapture(
     return result
   }
   return capture
+}
+
+/** Descendant function locals belong to their enclosing factory, preserving capture provenance. */
+export function contextFunctionOwns(declaration: ts.Node, owner: ts.Node): boolean {
+  for (let scope = enclosingFunction(declaration); scope; scope = enclosingFunction(scope))
+    if (scope === owner) return true
+  return false
 }
