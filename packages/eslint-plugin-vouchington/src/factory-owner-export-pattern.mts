@@ -4,6 +4,8 @@ import {
   type NodeLike,
   type RuleContextLike,
 } from './ast-helpers.mts'
+import { namedPatternSource } from './factory-owner-provenance-binding.mts'
+import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 
 export function bindingNodes(value: NodeLike): NodeLike[] {
   if (value.type === 'AssignmentPattern') return bindingNodes(value.left as NodeLike)
@@ -26,13 +28,16 @@ export function patternSelectsFactory(pattern: NodeLike, factories: ReadonlySet<
       return selected.type !== 'ObjectPattern' && selected.type !== 'ArrayPattern'
     }
     if (name !== 'default') return false
-    return selected.type === 'ObjectPattern' ? patternSelectsFactory(selected, factories) : true
+    return selected.type === 'ObjectPattern'
+      ? patternSelectsFactory(selected, factories)
+      : selected.type !== 'ArrayPattern'
   })
 }
 
 export function mutableExportInitializer(
   context: RuleContextLike,
   binding: NodeLike,
+  factories: ReadonlySet<string>,
 ): NodeLike | undefined {
   const definition = findVariable(context, binding)?.defs.find(
     (entry) => entry.type === 'Variable' && entry.node.type === 'VariableDeclarator',
@@ -41,7 +46,12 @@ export function mutableExportInitializer(
     return undefined
   }
   const declarator = definition.node
-  return (declarator.id as NodeLike).type === 'Identifier'
-    ? (declarator.init as NodeLike | undefined)
-    : undefined
+  if ((declarator.id as NodeLike).type === 'Identifier') {
+    return declarator.init as NodeLike | undefined
+  }
+  return (
+    patternDefaultValue(declarator.id as NodeLike, String(binding.name)) ??
+    namedPatternSource(declarator, String(binding.name), factories) ??
+    undefined
+  )
 }

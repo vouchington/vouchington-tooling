@@ -39,6 +39,7 @@ const awaited = await promise
 awaited.makeGraph()
 let load = createRequire(import.meta.url)
 load('@compiler/runtime').makeGraph()
+load(\`@compiler/runtime\`).makeGraph()
 const { default: { makeGraph: nested } } = await import('@compiler/runtime')
 nested()
 import { default as defaultAlias } from '@compiler/runtime'
@@ -77,7 +78,9 @@ export const { default: { version } } = runtime
     )
     writeFileSync(
       join(root, 'src/ts-import-equals.ts'),
-      `export import compiler = require('@compiler/runtime')\n`,
+      `export import compiler = require('@compiler/runtime')
+export import type runtimeType = require('@compiler/runtime')
+`,
     )
     writeFileSync(
       join(root, 'src/ts-import-binding.ts'),
@@ -99,6 +102,8 @@ export = compiler
       `import * as runtime from '@compiler/runtime'
 export import graph = runtime.makeGraph
 graph()
+export import compiler = runtime
+compiler.makeGraph()
 `,
     )
     writeFileSync(
@@ -144,7 +149,7 @@ graph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 42 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 45 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

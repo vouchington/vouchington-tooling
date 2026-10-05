@@ -1,6 +1,7 @@
 import {
   findVariable,
   propertyName,
+  staticPropertyName,
   unwrap,
   type NodeLike,
   type RuleContextLike,
@@ -50,12 +51,24 @@ export function isNamedImport(
   return hasImport(context, unwrap(node), modules, new Set(['ImportSpecifier']), imported)
 }
 
-export function isDefaultImport(
+function isDefaultImport(
   context: RuleContextLike,
   node: NodeLike | null | undefined,
   modules: ReadonlySet<string>,
 ): boolean {
   return hasImport(context, unwrap(node), modules, new Set(['ImportDefaultSpecifier']))
+}
+
+export function isConfiguredFactoryImport(
+  context: RuleContextLike,
+  node: NodeLike,
+  modules: ReadonlySet<string>,
+  factories: ReadonlySet<string>,
+): boolean {
+  return (
+    [...factories].some((name) => isNamedImport(context, node, modules, name)) ||
+    (factories.has('default') && isDefaultImport(context, node, modules))
+  )
 }
 
 export function isNamespaceImport(
@@ -137,9 +150,10 @@ export function requiredModuleSpecifier(
   if (call?.type !== 'CallExpression') return null
   const callee = unwrap(call.callee as NodeLike)
   const argument = unwrap((call.arguments as NodeLike[] | undefined)?.[0])
-  if (argument?.type !== 'Literal' || typeof argument.value !== 'string') return null
+  const moduleName = staticPropertyName(argument)
+  if (typeof moduleName !== 'string') return null
   if (isCreateRequireCall(context, callee) || isCreateRequireBinding(context, callee)) {
-    return argument.value
+    return moduleName
   }
   return null
 }

@@ -111,6 +111,24 @@ first()`),
     ).toEqual([])
   })
 
+  it('follows array defaults and split mutable destructuring exports', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+import { makeGraph } from '@compiler/runtime'
+const [, arrayFactory = makeGraph] = []
+arrayFactory()
+let { makeGraph: split } = runtime
+export { split }
+let { absent = makeGraph } = {}
+export { absent }
+let { unrelated: plain } = runtime
+export { plain }
+export let { nested: { version } = runtime } = {}
+export let { nested: { name } = makeGraph } = {}
+export let { default: [arrayPlain] } = runtime`),
+    ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
+  })
+
   it('checks split mutable exports from their scoped initializer', async () => {
     expect(
       await diagnostics(`import { makeGraph } from '@compiler/runtime'
@@ -186,6 +204,19 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
         references: [],
       })
     }
+    variables.set('compiler', {
+      name: 'compiler',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: { type: 'Identifier', name: 'runtime' },
+          },
+        },
+      ],
+      references: [],
+    })
     const context: RuleContextLike = {
       filename: 'src/check.ts',
       options: [],
@@ -203,5 +234,6 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
     })
     expect(provenance.isFactory({ type: 'Identifier', name: 'graph' })).toBe(true)
     expect(provenance.isFactory({ type: 'Identifier', name: 'unrelated' })).toBe(false)
+    expect(provenance.isNamespace({ type: 'Identifier', name: 'compiler' })).toBe(true)
   })
 })

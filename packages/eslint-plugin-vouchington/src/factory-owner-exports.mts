@@ -4,7 +4,7 @@ import {
   mutableExportInitializer,
   patternSelectsFactory,
 } from './factory-owner-export-pattern.mts'
-import { patternDefaultValues } from './factory-owner-provenance-binding.mts'
+import { patternDefaultValues } from './factory-owner-pattern-default.mts'
 import type { FactoryProvenanceOptions } from './factory-owner-provenance.mts'
 
 function node(value: unknown): NodeLike | undefined {
@@ -67,15 +67,17 @@ export function createFactoryExportVisitors(
         const moduleReference = node(declaration.moduleReference)
         const moduleName = name(node(moduleReference?.expression))
         if (
-          (moduleName !== null && options.modules.has(moduleName)) ||
-          provenance.isFactory(node(declaration.id))
+          !declaration.isTypeOnly &&
+          ((moduleName !== null && options.modules.has(moduleName)) ||
+            provenance.isFactory(node(declaration.id)))
         )
           report(declaration)
       }
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
           const id = node(declarator.id)
-          const bindings = id?.type === 'ObjectPattern' ? bindingNodes(id) : [id]
+          const bindings =
+            id?.type === 'ObjectPattern' || id?.type === 'ArrayPattern' ? bindingNodes(id) : [id]
           const initializer = node(declarator.init)
           if (
             bindings.some(restricted) ||
@@ -93,7 +95,8 @@ export function createFactoryExportVisitors(
         if (
           specifier.exportKind !== 'type' &&
           (restricted(local) ||
-            (local?.type === 'Identifier' && restricted(mutableExportInitializer(context, local))))
+            (local?.type === 'Identifier' &&
+              restricted(mutableExportInitializer(context, local, options.factories))))
         )
           report(specifier)
       }

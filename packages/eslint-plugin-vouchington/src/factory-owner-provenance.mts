@@ -10,12 +10,13 @@ import {
   awaitedModuleSpecifier,
   constantDefinition,
   namedPatternSource,
-  patternDefaultValue,
 } from './factory-owner-provenance-binding.mts'
+import { patternDefaultValue } from './factory-owner-pattern-default.mts'
+import { withActiveVariable } from './factory-owner-recursion.mts'
+import { isFactoryMember } from './factory-owner-member.mts'
 import {
-  isNamedImport,
+  isConfiguredFactoryImport,
   isNamespaceImport,
-  isDefaultImport,
   requiredModuleSpecifier,
 } from './factory-owner-require.mts'
 import { isQualifiedImportFactory } from './factory-owner-qualified-import.mts'
@@ -65,10 +66,15 @@ export function createFactoryProvenance(
     if (isNamespaceImport(context, current, options.modules)) return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
+    const importAlias = variable.defs.find(
+      (entry) => entry.node.type === 'TSImportEqualsDeclaration',
+    )?.node.moduleReference as NodeLike | undefined
+    if (importAlias?.type === 'Identifier') {
+      return withActiveVariable(variable, active, () => isNamespace(importAlias, active))
+    }
     const declarator = constantDefinition(variable)
     if (!declarator) return false
-    active.add(variable)
-    try {
+    return withActiveVariable(variable, active, () => {
       const defaultSource = namedPatternSource(
         declarator,
         String(current.name),
@@ -79,9 +85,7 @@ export function createFactoryProvenance(
       if (defaultValue) return isNamespace(defaultValue, active)
       if ((declarator.id as NodeLike).type !== 'Identifier') return false
       return isNamespace(declarator.init as NodeLike, active)
-    } finally {
-      active.delete(variable)
-    }
+    })
   }
 
   function isFactory(
@@ -95,20 +99,10 @@ export function createFactoryProvenance(
       return isFactory((current.expressions as NodeLike[]).at(-1), active)
     if (current?.type === 'AwaitExpression') return isFactory(current.argument as NodeLike, active)
     if (current?.type === 'MemberExpression') {
-      const name = propertyName(current)
-      return (
-        name !== null &&
-        options.factories.has(String(name)) &&
-        isNamespace(current.object as NodeLike)
-      )
+      return isFactoryMember(current, options.factories, (value) => isNamespace(value))
     }
     if (current?.type !== 'Identifier') return false
-    if (
-      [...options.factories].some((name) => isNamedImport(context, current, options.modules, name))
-    )
-      return true
-    if (options.factories.has('default') && isDefaultImport(context, current, options.modules))
-      return true
+    if (isConfiguredFactoryImport(context, current, options.modules, options.factories)) return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
     if (
@@ -117,17 +111,14 @@ export function createFactoryProvenance(
       return true
     const declarator = constantDefinition(variable)
     if (!declarator) return false
-    active.add(variable)
-    try {
+    return withActiveVariable(variable, active, () => {
       const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
       if (defaultValue && isFactory(defaultValue, active)) return true
       const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
       if (patternSource) return isNamespace(patternSource)
       if ((declarator.id as NodeLike).type !== 'Identifier') return false
       return isFactory(declarator.init as NodeLike, active)
-    } finally {
-      active.delete(variable)
-    }
+    })
   }
 
   return { isFactory, isNamespace }
