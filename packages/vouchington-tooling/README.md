@@ -643,6 +643,10 @@ Broad names, unknown root payloads, executable unmarked frames through stream al
 conditional or mutable-context status changes fail closed. Called SSE helpers inherit the proven
 request context and its status at the invocation; mutually exclusive complete status branches retain
 their separate responses. Explicit SSE statuses must be integers from 100 through 599.
+Named Node PassThrough allocation proof is unavailable when a required stream constructor export
+is replaced and canonical builtin ESM synchronization can update that binding. The actual Program's
+cached export facts preserve metadata-only and unsynchronized writes; unknown module names or export
+keys remain conservative.
 Temporal exclusion requires a fresh Node PassThrough or a local, constructorless class without
 heritage, ambient declarations, or decorators. The owner allocation must occur later in the same
 function outside loops. Arguments that capture the owner or reference local callables or locally
