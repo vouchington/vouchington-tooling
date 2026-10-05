@@ -50,7 +50,7 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
       skipLibCheck: true,
       strict: true,
       target: ts.ScriptTarget.ESNext,
-      typeRoots: [join(process.cwd(), 'node_modules/@types')],
+      typeRoots: [join(dirname(fileURLToPath(import.meta.url)), '../../../../node_modules/@types')],
       types: ['node'],
     }
     program = ts.createProgram(Object.values(files), options)
