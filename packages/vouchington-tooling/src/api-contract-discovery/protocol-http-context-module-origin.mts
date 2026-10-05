@@ -6,6 +6,7 @@ export function contextModuleOrigin(
   checker: ts.TypeChecker,
   binding: ts.Symbol | undefined,
   seen = new Set<ts.Symbol>(),
+  requiredModule?: (value: ts.Expression) => ts.Symbol | undefined,
 ): ts.Symbol | undefined {
   if (!binding || seen.has(binding)) return undefined
   const symbol = binding.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(binding) : binding
@@ -46,8 +47,9 @@ export function contextModuleOrigin(
       checker,
       checker.getSymbolAtLocation(value),
       new Set(seen).add(binding),
+      requiredModule,
     )
-  if (!ts.isAwaitExpression(value)) return undefined
+  if (!ts.isAwaitExpression(value)) return requiredModule?.(value)
   value = unwrapTransparentExpression(value.expression)
   return ts.isCallExpression(value) &&
     value.expression.kind === ts.SyntaxKind.ImportKeyword &&
