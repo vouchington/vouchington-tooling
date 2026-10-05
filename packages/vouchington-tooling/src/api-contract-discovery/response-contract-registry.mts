@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
+import { registerSseNodeConstructorContext } from './protocol-sse-node-constructor.mts'
 import { protocolBindingRequested, requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 import { discoverImplicitContract } from './response-contract-implicit.mts'
@@ -39,6 +40,7 @@ export function discoverApiResponseContracts(
   options?: DiscoverApiResponseContractsOptions,
 ): Record<string, BackendResponseContract> {
   registerPlatformCompilerLibraries(program)
+  registerSseNodeConstructorContext(program)
   const checker = program.getTypeChecker()
   const httpValues = createProgramHttpContextValueResolver(program)
   const contracts = new Map<string, BackendResponseContract>()

@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { symbolBindingWritten } from './protocol-sse-binding-writes.mts'
+import { nodePassThroughUnmodified } from './protocol-sse-node-constructor.mts'
 
 function trustedFactoryBinding(
   call: ts.CallExpression,
@@ -86,7 +87,8 @@ function freshConstructor(value: ts.NewExpression, checker: ts.TypeChecker): boo
       (declaration.propertyName?.text ?? declaration.name.text) === 'PassThrough' &&
       !!source &&
       ts.isStringLiteral(source) &&
-      (source.text === 'node:stream' || source.text === 'stream')
+      (source.text === 'node:stream' || source.text === 'stream') &&
+      nodePassThroughUnmodified(value.getSourceFile(), checker)
     )
   }
   if (!declaration || (!ts.isClassDeclaration(declaration) && !ts.isClassExpression(declaration)))
