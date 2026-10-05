@@ -21,7 +21,7 @@ export function opaqueWrappedHttpContextArgument(
   checker: ts.TypeChecker,
   resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
   env: CallbackBindings,
-  safeCapture: (fn: ts.ArrowFunction | ts.FunctionExpression) => boolean,
+  safeCapture: (fn: ts.FunctionLikeDeclaration) => boolean,
 ): boolean {
   if (call.arguments.some((argument) => wrappedHttpContextArgument(argument, context, checker)))
     return true
@@ -36,7 +36,7 @@ export function opaqueWrappedHttpContextArgument(
       )
     }
     const fn = resolver.resolve(argument, env)?.node ?? value
-    if (!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return false
+    if (!isProtocolCallbackFunction(fn) || !fn.body) return false
     let found = false
     function visit(node: ts.Node) {
       if (ts.isExpression(node)) {

@@ -8,6 +8,7 @@ import {
 import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { contextEffectiveArguments } from './protocol-http-context-forwarded-target.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
@@ -117,8 +118,9 @@ export function boundHttpContexts(
   checker: ts.TypeChecker,
 ): ts.Symbol[] | undefined {
   const contexts = [context]
+  const arguments_ = contextEffectiveArguments(fn, call, checker)
   for (const [index, parameter] of runtimeParameters(fn).entries()) {
-    const argument = call.arguments[index]
+    const argument = arguments_[index]
     if (!argument || !httpContextArgument(argument, context, checker)) continue
     if (!ts.isIdentifier(parameter.name) || parameter.dotDotDotToken) return undefined
     contexts.push(checker.getSymbolAtLocation(parameter.name)!)
