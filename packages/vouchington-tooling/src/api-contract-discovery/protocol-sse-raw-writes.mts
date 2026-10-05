@@ -22,7 +22,7 @@ import {
 } from './protocol-sse-write-mutations.mts'
 import {
   actualReceivers,
-  helperBindings,
+  createSseWriteLookup,
   opaqueCallReceivesSelectedStream,
   routeKey,
 } from './protocol-sse-write-helpers.mts'
@@ -39,6 +39,8 @@ export function rejectRawSseWrites(
   routes: ReadonlyMap<string, SseRouteWrites>,
   reject: (node: ts.CallExpression, binding: RouteBinding, keys: readonly string[]) => void,
 ): void {
+  if (routes.size === 0) return
+
   const calls: ts.CallExpression[] = []
   const mutations: SseWriteMutation[] = []
   for (const file of files)
@@ -47,6 +49,7 @@ export function rejectRawSseWrites(
       const mutation = sseWriteMutation(node)
       if (mutation) mutations.push(mutation)
     })
+  const lookup = createSseWriteLookup(calls, checker, bindings)
   for (const node of calls) {
     if (framedWrites.has(node)) {
       const binding = enclosingRouteBinding(node, checker, bindings, false)
@@ -70,16 +73,16 @@ export function rejectRawSseWrites(
               opaqueProtocolCallbackPath(mutationNode, checker)
             )
               return true
-            return helperBindings(mutationNode, calls, checker, bindings).some(
-              (helper) => routeKey(helper) === routeKey(binding),
-            )
+            return lookup
+              .helperBindings(mutationNode)
+              .some((helper) => routeKey(helper) === routeKey(binding))
           },
-          (mutationNode) => helperBindings(mutationNode, calls, checker, bindings).length > 0,
+          (mutationNode) => lookup.helperBindings(mutationNode).length > 0,
           (expression) => {
             const receiver = expressionReceiver(expression, checker)
-            return receiver && actualReceivers(receiver, binding, calls, checker, bindings)
+            return receiver && actualReceivers(receiver, binding, checker, lookup)
           },
-          (receiver) => actualReceivers(receiver, binding, calls, checker, bindings),
+          (receiver) => actualReceivers(receiver, binding, checker, lookup),
         )
       )
         reject(node, binding, route.keys)
@@ -89,7 +92,7 @@ export function rejectRawSseWrites(
     if (!potentiallyExecuted(node)) continue
     const proven =
       executableProtocolPath(node, checker) || opaqueProtocolCallbackPath(node, checker)
-    const helpers = helperBindings(node, calls, checker, bindings)
+    const helpers = lookup.helperBindings(node)
     if (!proven && !helpers.length) continue
     const binding = proven ? enclosingRouteBinding(node, checker, bindings, false) : undefined
     const candidates = binding ? [binding] : helpers
@@ -97,14 +100,14 @@ export function rejectRawSseWrites(
       const route = routes.get(routeKey(candidate))
       if (!route) continue
       const receiver = access?.receiver && expressionReceiver(access.receiver, checker)
-      const actual = receiver ? actualReceivers(receiver, candidate, calls, checker, bindings) : []
+      const actual = receiver ? actualReceivers(receiver, candidate, checker, lookup) : []
       const framed = route.receivers.flatMap((value) =>
-        actualReceivers(value, candidate, calls, checker, bindings),
+        actualReceivers(value, candidate, checker, lookup),
       )
       const bound = writeAccess(node.expression)
       const boundReceiver = bound?.method === 'bind' && expressionReceiver(bound.receiver, checker)
       const boundActual = boundReceiver
-        ? actualReceivers(boundReceiver, candidate, calls, checker, bindings)
+        ? actualReceivers(boundReceiver, candidate, checker, lookup)
         : []
       const accessTargetsSelected =
         (access?.method === 'write' || access?.method === 'end') &&
@@ -129,7 +132,7 @@ export function rejectRawSseWrites(
       if (
         !accessTargetsSelected &&
         !bindsSelectedMember &&
-        opaqueCallReceivesSelectedStream(node, route.receivers, candidate, calls, checker, bindings)
+        opaqueCallReceivesSelectedStream(node, route.receivers, candidate, checker, lookup)
       ) {
         reject(node, candidate, route.keys)
         continue

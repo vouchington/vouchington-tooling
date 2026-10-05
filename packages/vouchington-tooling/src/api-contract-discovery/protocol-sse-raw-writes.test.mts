@@ -1,5 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
+import ts from '../contract-schema/typescript-api.mts'
+import { rejectRawSseWrites, type SseRouteWrites } from './protocol-sse-raw-writes.mts'
+import { visit, type RouteBinding } from './response-contract-route-analysis.mts'
+import { createSseWriteLookup } from './protocol-sse-write-helpers.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app:any;declare const stream:{write(value:string):void};
@@ -25,6 +29,8 @@ const sources = {
   'consumed-callback': route(
     `${frame}function consume(callback:()=>void){callback()}consume(()=>stream.write('raw'))`,
   ),
+  large: `function helper(){${Array.from({ length: 96 }, (_, index) => `noise(${index})`).join(';')}}
+    ${route(`${frame}helper();stream.write('raw')`)};declare function noise(value:number):void`,
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
 const discover = (name: keyof typeof sources, keys?: readonly string[], lenient = false) =>
@@ -38,6 +44,57 @@ const discover = (name: keyof typeof sources, keys?: readonly string[], lenient 
 describe('SSE raw-write execution and selected failures', () => {
   beforeAll(() => {
     matrix = buildVirtualProgramMatrix(import.meta, sources)
+  })
+  it('skips source traversal when the discovery has no selected SSE routes', () => {
+    const files = new Proxy([] as ts.SourceFile[], {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator) throw new Error('unexpected source traversal')
+        return Reflect.get(target, property, receiver)
+      },
+    })
+
+    expect(() =>
+      rejectRawSseWrites(
+        files,
+        matrix.program.getTypeChecker(),
+        new Map<ts.Symbol, RouteBinding>(),
+        new Set<ts.CallExpression>(),
+        new Map<string, SseRouteWrites>(),
+        () => {},
+      ),
+    ).not.toThrow()
+  })
+  it('indexes executable callers with one resolved-signature lookup per call', () => {
+    const calls: ts.CallExpression[] = []
+    visit(matrix.sourceFile('large'), (node) => {
+      if (ts.isCallExpression(node)) calls.push(node)
+    })
+    const checker = matrix.program.getTypeChecker()
+    let signatureLookups = 0
+    const observedChecker = new Proxy(checker, {
+      get(target, property) {
+        const value = Reflect.get(target, property, target)
+        if (property === 'getResolvedSignature')
+          return (...args: Parameters<typeof checker.getResolvedSignature>) => {
+            signatureLookups += 1
+            return checker.getResolvedSignature(...args)
+          }
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    }) as ts.TypeChecker
+    const lookup = createSseWriteLookup(calls, observedChecker, new Map())
+    const noiseCall = calls.find(
+      (call) => ts.isIdentifier(call.expression) && call.expression.text === 'noise',
+    )!
+
+    expect(lookup.helperBindings(noiseCall)).toEqual([{ method: 'GET', routeTemplate: '/events' }])
+    expect(signatureLookups).toBe(calls.length)
+    lookup.helperBindings(noiseCall)
+    expect(signatureLookups).toBe(calls.length)
+
+    const nextDiscovery = createSseWriteLookup(calls, observedChecker, new Map())
+    nextDiscovery.helperBindings(noiseCall)
+    expect(signatureLookups).toBe(calls.length * 2)
   })
   it.each(['raw', 'siblings'] as const)('invalidates every selected emitted row in %s', (name) => {
     const keys = name === 'raw' ? ['GET:/events'] : ['GET:/events', 'GET:/events#protocol-2']
@@ -72,4 +129,7 @@ describe('SSE raw-write execution and selected failures', () => {
       expect(contracts['GET:/events']?.unavailableReason).toContain('unmarked frame')
     },
   )
+  it('still rejects raw bytes on the selected SSE route in a large source', () => {
+    expect(() => discover('large')).toThrow('unmarked frame')
+  })
 })
