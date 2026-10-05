@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { contextEffectiveArguments } from './protocol-http-context-forwarded-target.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import type {
   CallbackBindings,
@@ -15,15 +16,17 @@ export function callbackArgumentBindings(
   resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
 ): Map<ts.Symbol, { node: ts.Node; env: CallbackBindings }> | undefined {
   const next = new Map(captured)
+  const arguments_ = contextEffectiveArguments(fn, call, checker)
   for (const [index, parameter] of runtimeParameters(fn).entries()) {
-    const argument = call.arguments?.[index]
+    const argument = arguments_[index]
     if (!argument) continue
     if (ts.isSpreadElement(argument)) return undefined
+    const argumentEnv = argument === parameter.initializer ? new Map(next) : env
     if (ts.isIdentifier(parameter.name)) {
-      next.set(checker.getSymbolAtLocation(parameter.name)!, { node: argument, env })
+      next.set(checker.getSymbolAtLocation(parameter.name)!, { node: argument, env: argumentEnv })
     } else {
       if (!ts.isObjectBindingPattern(parameter.name)) return undefined
-      const value = resolver.resolve(argument, env)
+      const value = resolver.resolve(argument, argumentEnv)
       for (const element of parameter.name.elements) {
         const key = element.propertyName ?? element.name
         if (

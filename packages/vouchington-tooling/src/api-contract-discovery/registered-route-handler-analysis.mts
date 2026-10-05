@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { returnedExpressions, returnsOnEveryPath } from './registered-route-factory-returns.mts'
+import { contextEffectiveArguments } from './protocol-http-context-forwarded-target.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
@@ -75,8 +76,9 @@ export function handlerNodes(
       )
         return []
       const bindings = new Map(parameterBindings)
+      const arguments_ = contextEffectiveArguments(implementation, argument, checker)
       runtimeParameters(implementation).forEach((parameter, index) => {
-        const callArgument = argument.arguments[index]
+        const callArgument = arguments_[index]
         const symbol = checker.getSymbolAtLocation(parameter.name)
         if (callArgument && symbol) bindings.set(symbol, callArgument)
       })

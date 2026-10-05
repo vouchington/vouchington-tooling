@@ -6,6 +6,8 @@ import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { contextResponseMethod, methodAccess } from './protocol-http-method-access.mts'
 import { reflectHttpResponseMethod } from './protocol-http-reflect.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
+import { contextResultBranches } from './protocol-http-context-result-branches.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 export { contextResponseMethod } from './protocol-http-method-access.mts'
 
@@ -96,7 +98,9 @@ export function httpContextArgument(
   expression: ts.Expression,
   context: ts.Symbol,
   checker: ts.TypeChecker,
-) {
+): boolean {
+  const branches = contextResultBranches(unwrapExpression(expression))
+  if (branches.length) return branches.some((value) => httpContextArgument(value, context, checker))
   const receiver = expressionReceiver(expression, checker)
   return (
     (receiver?.root === context &&
@@ -131,6 +135,9 @@ export function wrappedHttpContextArgument(
   checker: ts.TypeChecker,
 ): boolean {
   const value = unwrapExpression(expression)
+  const branches = contextResultBranches(value)
+  if (branches.length)
+    return branches.some((branch) => wrappedHttpContextArgument(branch, context, checker))
   if (ts.isSpreadElement(value))
     return (
       httpContextArgument(value.expression, context, checker) ||
@@ -139,7 +146,7 @@ export function wrappedHttpContextArgument(
   if (!(ts.isObjectLiteralExpression(value) || ts.isArrayLiteralExpression(value))) return false
   let found = false
   function visit(node: ts.Node) {
-    if (ts.isFunctionLike(node)) return
+    if (ts.isFunctionLike(node) || !potentiallyExecuted(node)) return
     if (ts.isShorthandPropertyAssignment(node)) {
       if (checker.getShorthandAssignmentValueSymbol(node) === context) found = true
     } else if (ts.isExpression(node) && httpContextArgument(node, context, checker)) {

@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
@@ -56,7 +57,7 @@ let root: string
 let program: ts.Program
 let files: Record<keyof typeof sources, string>
 beforeAll(() => {
-  root = mkdtempSync(join(process.cwd(), 'packages/vouchington-tooling/.http-review-results-'))
+  root = mkdtempSync(join(tmpdir(), 'http-review-results-'))
   files = Object.fromEntries(
     Object.entries(sources).map(([name, text]) => {
       const file = join(root, `${name}.ts`)
