@@ -11,6 +11,7 @@ import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 
 /** Source mutations and constructor escapes invalidate the same caller-bound context proof. */
@@ -20,11 +21,12 @@ export function unsupportedBoundContextNode(
   checker: ts.TypeChecker,
   handler: ts.FunctionLikeDeclaration,
 ): boolean {
-  const returned = ts.isReturnStatement(node)
-    ? node.expression
-    : ts.isArrowFunction(handler) && handler.body === node && ts.isExpression(node)
-      ? node
-      : undefined
+  const returned =
+    ts.isReturnStatement(node) || ts.isYieldExpression(node)
+      ? node.expression
+      : ts.isArrowFunction(handler) && handler.body === node && ts.isExpression(node)
+        ? node
+        : undefined
   const invoked = ts.isCallExpression(node)
     ? unwrapExpression(node.expression)
     : ts.isTaggedTemplateExpression(node)
@@ -122,4 +124,23 @@ export function boundHttpContexts(
     contexts.push(checker.getSymbolAtLocation(parameter.name)!)
   }
   return contexts
+}
+
+/** An actual generator invocation retains the capabilities its iterator can yield. */
+export function yieldsBoundHttpContext(
+  fn: ts.FunctionLikeDeclaration,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+): boolean {
+  let found = false
+  function visit(node: ts.Node): void {
+    if (ts.isFunctionLike(node)) return
+    if (ts.isYieldExpression(node) && node.expression && potentiallyExecuted(node))
+      found ||=
+        httpContextArgument(node.expression, context, checker) ||
+        wrappedHttpContextArgument(node.expression, context, checker)
+    ts.forEachChild(node, visit)
+  }
+  if (fn.asteriskToken && fn.body) visit(fn.body)
+  return found
 }
