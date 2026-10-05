@@ -44,4 +44,21 @@ it('preserves literal-focused route patterns but ignores examples inside string 
   expect(collectActivePatternCaptures(content, /['"]\/([^'"]*)['"]/g, 'page.tsx')).toEqual([
     'right',
   ])
+  expect(
+    collectActivePatternCaptures(
+      "const path = '/wrong'; const example = \"path: '/old'\"",
+      /\/([^'"]*)/g,
+      'page.ts',
+    ),
+  ).toEqual(['wrong'])
+})
+
+it('preserves configured-pattern matches inside type-level route declarations', () => {
+  const content = `type Legacy = { path: '/old' }; interface Example { path: '/also-old' }
+    const route = { path: '/right' }`
+  expect(collectActivePatternCaptures(content, /\bpath:\s*['"]\/([^'"]*)/g, 'page.ts')).toEqual([
+    'old',
+    'also-old',
+    'right',
+  ])
 })

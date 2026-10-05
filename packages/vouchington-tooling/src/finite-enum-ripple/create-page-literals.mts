@@ -1,6 +1,9 @@
 import ts from '@typescript/typescript6'
 import { getStringLiteralValue, unwrapExpression } from './ast.mts'
-import { getConfiguredPropertyName } from './create-page-properties.mts'
+import {
+  getConfiguredPropertyName,
+  spreadMayOverrideConfiguredProperty,
+} from './create-page-properties.mts'
 
 /** Inspect syntax nodes so comments and strings containing example code are ignored. */
 export function collectCreatePageLiterals(
@@ -18,7 +21,7 @@ export function collectCreatePageLiterals(
       let configuredBeforeSpread = false
       for (const member of node.properties) {
         if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
-          if (configuredBeforeSpread)
+          if (configuredBeforeSpread && spreadMayOverrideConfiguredProperty(member, names))
             throw new Error(`${file}: create page type can be overridden by a trailing spread`)
         } else if (getConfiguredPropertyName(member, names) !== undefined) {
           configuredBeforeSpread = true
@@ -75,12 +78,13 @@ export function collectCreatePageLiterals(
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken
     ) {
-      const name = ts.isIdentifier(node.left)
-        ? node.left.text
-        : ts.isPropertyAccessExpression(node.left)
-          ? node.left.name.text
-          : ts.isElementAccessExpression(node.left)
-            ? getStringLiteralValue(node.left.argumentExpression)
+      const left = unwrapExpression(node.left)
+      const name = ts.isIdentifier(left)
+        ? left.text
+        : ts.isPropertyAccessExpression(left)
+          ? left.name.text
+          : ts.isElementAccessExpression(left)
+            ? getStringLiteralValue(left.argumentExpression)
             : undefined
       const value = getStringLiteralValue(node.right)
       if (name && names.has(name) && value === undefined)

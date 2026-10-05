@@ -70,7 +70,15 @@ export function collectActivePatternCaptures(
     if (
       inactive.some(
         ({ start, end, literal }) =>
-          match.index >= start && match.index < end && !(literal && match.index === start),
+          match.index >= start &&
+          match.index < end &&
+          !(literal && match.index === start) &&
+          !(
+            literal &&
+            match.index === start + 1 &&
+            content[match.index] === '/' &&
+            match.index + match[0].length === end - 1
+          ),
       )
     )
       return []

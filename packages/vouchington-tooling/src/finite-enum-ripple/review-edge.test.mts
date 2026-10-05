@@ -314,6 +314,9 @@ it('collects literal element-access assignments but not dynamic property names',
       ['action'],
     ),
   ).toEqual(['other'])
+  expect(collectCreatePageLiterals("(form.action) = 'other'", 'page.tsx', ['action'])).toEqual([
+    'other',
+  ])
 })
 
 it('reports a selected create page without a matching single-type route', () => {
@@ -365,6 +368,41 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
       'action',
     ]),
   ).toThrow('overridden by a trailing spread')
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { action: 'entry', ...{ label: 'new' } }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['entry'])
+  expect(
+    collectCreatePageLiterals(
+      "const view = <Form action='entry' {...{ label: 'new' }} />",
+      'page.tsx',
+      ['action'],
+    ),
+  ).toEqual(['entry'])
+  for (const spread of ["{ action: 'wrong' }", '{ [selected]: value }', '{ ...defaults }']) {
+    expect(() =>
+      collectCreatePageLiterals(`const fields = { action: 'entry', ...${spread} }`, 'page.ts', [
+        'action',
+      ]),
+    ).toThrow('overridden by a trailing spread')
+  }
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { action: 'entry', ...{ ['label']: 'new' } }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['entry'])
+  expect(() =>
+    collectCreatePageLiterals(
+      "const fields = { action: 'entry', ...{ ['action']: 'wrong' } }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toThrow('overridden by a trailing spread')
   expect(() =>
     collectCreatePageLiterals(
       "const view = <Form action='entry' {...dynamicProps} />",
@@ -396,6 +434,23 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
       ['action'],
     ),
   ).toEqual(['wrong', 'entry'])
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { ...{ label: 'first' }, label: 'second', action: 'entry' }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['entry'])
+})
+
+it('preserves the legacy exclusion for configured create-page methods and accessors', () => {
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { action() { return 'entry' }, get type() { return 'entry' } }",
+      'page.ts',
+      ['action', 'type'],
+    ),
+  ).toEqual([])
 })
 
 it('retains empty create-page values in objects, JSX, and assignments', () => {
