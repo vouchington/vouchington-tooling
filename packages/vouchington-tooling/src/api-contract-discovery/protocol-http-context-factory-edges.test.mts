@@ -10,6 +10,18 @@ const preamble = `declare const app:any;declare const choose:boolean;
 const route = (declarations: string, call = 'handler(ctx)') =>
   `${preamble}${declarations}app.route('/vote').put((ctx:any)=>{apiNoContent('PUT:/vote');${call}})`
 const valid = {
+  'overloaded-named': route(
+    'function handler(ctx:any):void;function handler(ctx:any){ctx.setStatus(204)}',
+  ),
+  'overloaded-factory': route(
+    'function make():((ctx:any)=>void);function make(){return (ctx:any)=>ctx.setStatus(204)}const handler=make();',
+  ),
+  'registered-named': route(
+    "function handler(ctx:any){ctx.setStatus(204)}app.route('/other').put(handler);",
+  ),
+  'registered-arrow': route(
+    "const handler=(ctx:any)=>ctx.setStatus(204);app.route('/other').put(handler);",
+  ),
   shorthand: route(
     'const assertAccess=(ctx:any)=>ctx.assert(true);const handler=factory({assertAccess});',
   ),
@@ -21,6 +33,9 @@ const valid = {
     function make(options:{id:string|number}){return (ctx:any)=>{inspect(options.id);ctx.setStatus(204)}}const handler=make({id:choose?'vote':1});`),
 }
 const invalid = {
+  'overloaded-opaque': route(
+    'function handler(ctx:any):void;function handler(ctx:any){opaque(ctx)}',
+  ),
   'else-escape': route(
     `function make(options:Options){return (ctx:any)=>{if(options.assertAccess)options.assertAccess(ctx);else opaque(ctx)}}const handler=make({});`,
   ),
@@ -59,6 +74,9 @@ const invalid = {
   ),
   'missing-alias': route(
     'const bag:any={options:{assertAccess:(ctx:any)=>ctx.assert(true)}};const {missing:alias}=bag;alias.assertAccess=opaque;const handler=factory(bag.options);',
+  ),
+  'function-property-alias': route(
+    'function bag(){}const container=bag as any;const {options:alias}=container;alias.assertAccess=opaque;const handler=factory(container.options);',
   ),
   'self-result': route('function make():any{return handler}const handler=make();'),
   deleted: route(
