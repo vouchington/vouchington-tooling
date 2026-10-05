@@ -2,19 +2,30 @@ import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
+import { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 
-type Facts = { writes: ts.Expression[]; calls: (ts.CallExpression | ts.NewExpression)[] }
+type Facts = {
+  writes: ts.Expression[]
+  calls: (ts.CallExpression | ts.NewExpression)[]
+  wrappers: ReturnType<typeof createLiteralWrapperIndex>
+}
 /** One proof indexes source mutations once; aliases and forwarded parameters retain their roots. */
 export function createContextValueStability(checker: ts.TypeChecker) {
-  const { root, primitiveMember } = createContextValueRoots(checker)
+  const roots = createContextValueRoots(checker)
+  const { root, primitiveMember } = roots
   const cache = new Map<ts.Symbol, boolean>()
   const sources = new Map<ts.SourceFile, Facts>()
   function facts(source: ts.SourceFile): Facts {
     const hit = sources.get(source)
     if (hit) return hit
-    const result: Facts = { writes: [], calls: [] }
+    const result: Facts = {
+      writes: [],
+      calls: [],
+      wrappers: createLiteralWrapperIndex(checker, roots),
+    }
     function visit(node: ts.Node) {
+      result.wrappers.record(node)
       const write = ts.isDeleteExpression(node)
         ? node.expression
         : ts.isBinaryExpression(node) &&
@@ -41,16 +52,29 @@ export function createContextValueStability(checker: ts.TypeChecker) {
     if (!declaration || active.has(symbol)) return false
     const next = new Set(active).add(symbol)
     const data = facts(declaration.getSourceFile())
-    let safe = !data.writes.some((expression) => root(expression) === symbol)
+    let safe =
+      !data.wrappers.returnedParameters.has(symbol) &&
+      !data.writes.some((expression) => root(expression) === symbol)
     const value =
       ts.isVariableDeclaration(declaration) && declaration.initializer
         ? unwrapExpression(declaration.initializer)
         : declaration
-    // A foreign recipient cannot change a function's body; binding writes still invalidate it.
-    for (const call of isProtocolCallbackFunction(value) ? [] : data.calls) {
+    const immutableFunction =
+      isProtocolCallbackFunction(value) && data.wrappers.capture(value).size === 0
+    if (!immutableFunction) {
+      if (data.wrappers.stored.has(symbol)) safe = false
+      for (const wrapper of data.wrappers.parents.get(symbol) ?? [])
+        if (!stable(wrapper, next)) safe = false
+    }
+    // Function bodies are immutable, but foreign callers may receive their returned containers.
+    for (const call of immutableFunction ? [] : data.calls) {
       if (!safe) break
       for (const [index, argument] of (call.arguments ?? []).entries()) {
-        if (root(argument) !== symbol || primitiveMember(argument)) continue
+        if (
+          (root(argument) !== symbol && !data.wrappers.capture(argument).has(symbol)) ||
+          primitiveMember(argument)
+        )
+          continue
         if (
           ts.isPropertyAccessExpression(call.expression) &&
           [

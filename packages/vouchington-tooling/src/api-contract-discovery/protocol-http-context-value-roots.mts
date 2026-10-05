@@ -82,6 +82,9 @@ export function createContextValueRoots(checker: ts.TypeChecker) {
   function primitiveMember(node: ts.Expression): boolean {
     node = unwrapExpression(node)
     if (!(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))) return false
+    return primitiveValue(node)
+  }
+  function primitiveValue(node: ts.Expression): boolean {
     const primitive = (type: ts.Type): boolean =>
       type.isUnion()
         ? type.types.every(primitive)
@@ -98,5 +101,5 @@ export function createContextValueRoots(checker: ts.TypeChecker) {
           )
     return primitive(checker.getTypeAtLocation(node))
   }
-  return { root, primitiveMember }
+  return { root, primitiveMember, primitiveValue }
 }

@@ -10,6 +10,12 @@ const preamble = `declare const app:any;declare const choose:boolean;
 const route = (declarations: string, call = 'handler(ctx)') =>
   `${preamble}${declarations}app.route('/vote').put((ctx:any)=>{apiNoContent('PUT:/vote');${call}})`
 const valid = {
+  'self-returning-function': route(
+    'const recursive=():any=>recursive;const handler=factory({assertAccess:(ctx:any)=>ctx.assert(true)});',
+  ),
+  'immutable-wrapper': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={nested:[{options}]};const alias=bag;const handler=factory(options);',
+  ),
   'overloaded-named': route(
     'function handler(ctx:any):void;function handler(ctx:any){ctx.setStatus(204)}',
   ),
@@ -33,6 +39,45 @@ const valid = {
     function make(options:{id:string|number}){return (ctx:any)=>{inspect(options.id);ctx.setStatus(204)}}const handler=make({id:choose?'vote':1});`),
 }
 const invalid = {
+  'helper-return-wrapper-escape': route(
+    'function identity<T>(value:T){return value}const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={options:identity(options)};opaque(bag);const handler=factory(options);',
+  ),
+  'wrapper-member-mutation': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={options};bag.options.assertAccess=opaque;const handler=factory(options);',
+  ),
+  'wrapper-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={options};opaque(bag);const handler=factory(options);',
+  ),
+  'getter-wrapper-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={get options(){return options}};opaque(bag);const handler=factory(options);',
+  ),
+  'method-wrapper-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={options(){return options}};opaque(bag);const handler=factory(options);',
+  ),
+  'arrow-wrapper-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};opaque({options:()=>options});const handler=factory(options);',
+  ),
+  'returned-function-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const expose=()=>options;opaque(expose);const handler=factory(options);',
+  ),
+  'inline-object-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};opaque({options});const handler=factory(options);',
+  ),
+  'inline-array-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};opaque([options]);const handler=factory(options);',
+  ),
+  'nested-wrapper-mutation': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={nested:[{options}]};bag.nested[0]!.options.assertAccess=opaque;const handler=factory(options);',
+  ),
+  'wrapper-alias-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag=[options];const alias=bag;opaque(alias);const handler=factory(options);',
+  ),
+  'array-binding-mutation': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag=[options];const [alias]=bag;alias!.assertAccess=opaque;const handler=factory(options);',
+  ),
+  'stored-wrapper': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag:any={};bag.options=options;opaque(bag);const handler=factory(options);',
+  ),
   'overloaded-opaque': route(
     'function handler(ctx:any):void;function handler(ctx:any){opaque(ctx)}',
   ),
