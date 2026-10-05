@@ -6,14 +6,16 @@ import {
 } from './protocol-callback-values.mts'
 import { contextForwardedTarget } from './protocol-http-context-forwarded-target.mts'
 import type { createContextValueRoots } from './protocol-http-context-value-roots.mts'
+import type { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
 
 /** Receiver obligations use the selected caller bindings and are never cached across callers. */
 export function createContextReceiverChecks(
   checker: ts.TypeChecker,
   roots: ReturnType<typeof createContextValueRoots>,
-  dataForSymbol: (
-    symbol: ts.Symbol,
-  ) => readonly { calls: readonly (ts.CallExpression | ts.NewExpression)[] }[],
+  dataForSymbol: (symbol: ts.Symbol) => readonly {
+    calls: readonly (ts.CallExpression | ts.NewExpression)[]
+    wrappers: ReturnType<typeof createLiteralWrapperIndex>
+  }[],
   stable: (symbol: ts.Symbol) => boolean,
   immutableFunction: (symbol: ts.Symbol) => boolean,
 ) {
@@ -23,10 +25,13 @@ export function createContextReceiverChecks(
     ts.CallExpression | ts.NewExpression,
     {
       receiver: ts.Symbol | undefined
-      arguments: { index: number; symbol: ts.Symbol | undefined; primitive: boolean }[]
+      arguments: { index: number; symbols: ReadonlySet<ts.Symbol>; primitive: boolean }[]
     }
   >()
-  function origins(call: ts.CallExpression | ts.NewExpression) {
+  function origins(
+    call: ts.CallExpression | ts.NewExpression,
+    capture: ReturnType<typeof createLiteralWrapperIndex>['capture'],
+  ) {
     const hit = calls.get(call)
     if (hit) return hit
     const expression = call.expression
@@ -38,7 +43,10 @@ export function createContextReceiverChecks(
           : undefined,
       arguments: [...(call.arguments ?? [])].map((argument, index) => ({
         index,
-        symbol: root(argument),
+        symbols: new Set([
+          ...capture(argument),
+          ...[root(argument)].filter((symbol): symbol is ts.Symbol => !!symbol),
+        ]),
         primitive: primitiveMember(argument),
       })),
     }
@@ -56,11 +64,11 @@ export function createContextReceiverChecks(
     const next = new Set(active).add(symbol)
     for (const data of dataForSymbol(symbol)) {
       for (const call of data.calls) {
-        const origin = origins(call)
+        const origin = origins(call, data.wrappers.capture)
         if (ts.isCallExpression(call) && origin.receiver === symbol && !inspect(call, env))
           return false
-        for (const { index, symbol: argument, primitive } of origin.arguments) {
-          if (argument !== symbol || primitive) continue
+        for (const { index, symbols, primitive } of origin.arguments) {
+          if (!symbols.has(symbol) || primitive) continue
           // The same static call and argument root already passed stable(symbol).
           const { implementation, binding } = contextForwardedTarget(checker, call, index)!
           const bindings = callbackArgumentBindings(

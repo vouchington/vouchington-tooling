@@ -172,16 +172,22 @@ describe('HTTP context proof follows real TypeScript bindings and object values'
 
   it('distinguishes a missing property from an object with an unsafe prototype', () => {
     const checker = matrix.program.getTypeChecker()
-    const resolver = createHttpContextValueResolver(checker)
+    const resolver = createHttpContextValueResolver(checker, matrix.program.getSourceFiles())
     expect(resolver.resolve(initializer('absent-property'), new Map())).toEqual([null])
     expect(resolver.resolve(initializer('proto-property'), new Map())).toBeUndefined()
+    expect(
+      createHttpContextValueResolver(checker).resolve(initializer('absent-property'), new Map()),
+    ).toBeUndefined()
   })
 
   it.each(['spread-override', 'spread-fallback'] as const)(
     'retains a concrete callback after %s',
     (name) => {
       const checker = matrix.program.getTypeChecker()
-      const values = createHttpContextValueResolver(checker).resolve(initializer(name), new Map())
+      const values = createHttpContextValueResolver(
+        checker,
+        matrix.program.getSourceFiles(),
+      ).resolve(initializer(name), new Map())
       expect(values?.map((value) => value?.node.kind)).toEqual([ts.SyntaxKind.ArrowFunction])
     },
   )
@@ -234,7 +240,10 @@ describe('HTTP context proof follows real TypeScript bindings and object values'
   it('treats an unrelated string key as an absent callback', () => {
     const checker = matrix.program.getTypeChecker()
     expect(
-      createHttpContextValueResolver(checker).resolve(initializer('string-key-miss'), new Map()),
+      createHttpContextValueResolver(checker, matrix.program.getSourceFiles()).resolve(
+        initializer('string-key-miss'),
+        new Map(),
+      ),
     ).toEqual([null])
   })
 

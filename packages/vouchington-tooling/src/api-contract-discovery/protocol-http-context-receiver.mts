@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { isProtocolCallbackFunction, type CallbackBindings } from './protocol-callback-values.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import type { ContextValues } from './protocol-http-context-value-types.mts'
+import { createContextCapture } from './protocol-http-context-capture.mts'
 
 export function receiverUsesThis(node: ts.Node): boolean {
   let found = false
@@ -18,7 +19,9 @@ export function createContextReceiverGuard(
   checker: ts.TypeChecker,
   resolve: (node: ts.Node, env: CallbackBindings) => ContextValues,
 ) {
-  const { root } = createContextValueRoots(checker)
+  const roots = createContextValueRoots(checker)
+  const { root } = roots
+  const capture = createContextCapture(checker, roots)
   const active: (readonly [ts.Symbol, CallbackBindings])[][] = []
   function checking(symbol: ts.Symbol, env: CallbackBindings): boolean {
     return active.some((frame) =>
@@ -31,9 +34,15 @@ export function createContextReceiverGuard(
       return false
     const owners: [ts.Symbol, CallbackBindings][] = []
     function owner(node: ts.Node, bindings: CallbackBindings) {
-      const symbol = ts.isExpression(node) ? root(node) : undefined
-      if (!symbol || owners.some(([target, scope]) => target === symbol && scope === bindings))
+      if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
+        for (const symbol of capture(node)) record(symbol, bindings)
         return
+      }
+      const symbol = ts.isExpression(node) ? root(node) : undefined
+      if (symbol) record(symbol, bindings)
+    }
+    function record(symbol: ts.Symbol, bindings: CallbackBindings) {
+      if (owners.some(([target, scope]) => target === symbol && scope === bindings)) return
       owners.push([symbol, bindings])
       const bound = bindings.get(symbol)
       if (bound) owner(bound.node, bound.env)
