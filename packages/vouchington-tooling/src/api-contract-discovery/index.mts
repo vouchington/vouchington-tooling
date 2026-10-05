@@ -48,3 +48,16 @@ export type {
   DiscoverApiResponseContractsOptions,
 } from './response-contract-lenient.mts'
 export type { DiscoverApiRequestContractsOptions } from './request-contract-lenient.mts'
+export { discoverRequestValidationFacts } from './request-validation-facts.mts'
+export type { RequestValidationFactsInput } from './request-validation-facts.mts'
+export type {
+  Carrier,
+  CarrierRead,
+  ExecutedCallbackConfig,
+  FactoryConfig,
+  FactorySite,
+  RouteValidationFacts,
+  ValidatorConfig,
+  ValidatorSite,
+  ValidatorSiteCarrier,
+} from './request-validation-types.mts'

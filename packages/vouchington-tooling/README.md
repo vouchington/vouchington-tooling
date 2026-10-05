@@ -500,6 +500,62 @@ otherwise `required: false`. `required` must be the literal `true`; `false`, `bo
 non-literal values fail as a malformed query parameter, as do `required` together with `default` and
 `required` on `csv-array` `items`.
 
+`discoverRequestValidationFacts({ program, sourceFiles, validators, factories, executedCallbacks })`
+reports, per registered route (`METHOD:/template`), the route `kind` and `source`, every configured
+validator call its handlers reach (`validatorSites`), every configured handler-factory call
+(`factorySites`), and the raw request carriers the handlers read (`carrierReads`). It reports
+facts only; which routes must validate and what counts as covered stay with the caller.
+
+```ts
+import { discoverRequestValidationFacts } from 'vouchington-tooling/api-contract-discovery'
+
+const facts = discoverRequestValidationFacts({
+  program,
+  sourceFiles,
+  validators: [
+    {
+      module: 'lib/validation.ts', // resolved declaration path suffix, or a package specifier
+      exportName: 'validateInput',
+      operationArgument: 1,
+      carriers: { kind: 'input-object', argument: 2 }, // or { kind: 'fixed', carriers, optionCarriers }
+    },
+  ],
+  factories: [
+    {
+      module: 'lib/factory.ts',
+      exportName: 'createThingHandler',
+      optionsArgument: 0,
+      operationProperty: 'operation',
+      carriers: ['path', 'body'],
+    },
+  ],
+  executedCallbacks: [
+    {
+      module: 'lib/admit.ts',
+      exportName: 'admitWork',
+      argument: 0,
+      properties: ['beforeCapacity'],
+    },
+  ],
+})
+```
+
+A call matches only when its callee resolves, through aliases, re-exports and path mappings, to the
+configured export of a declaration file matching `module`; import specifier text and same-named
+local functions never match. Operation keys resolve through literals, `const`s (including imported
+ones), `as const`, `satisfies`, helper parameters bound to static arguments, and, for factories, the
+option property including spread `const` objects; anything else gives `operation: null` with
+`unresolvedReason`. Each validated carrier reports `origins`, the request carriers (`path`, `query`,
+`body`, `header`) its value derives from, traced through calls, followed helper returns, branches,
+logical operands, spreads and earlier assignments; `unresolved` is set when part of the value
+depends on an unbound parameter. Fixed-carrier validators report the carrier itself as its origin.
+`conditional` is true under `if`/ternary branches, the right of `&&`/`||`/`??`, `switch` cases,
+loop bodies, `catch` and `finally`. Handlers are walked into function declarations and `const`
+function expressions in `sourceFiles`; callbacks are followed only when the callee runs them, and
+inline callback properties of an `executedCallbacks` host are walked as executed. Configured
+validator and factory implementations are never entered. Factory calls are found in the route
+registration arguments and in handler bodies, not inside helper functions that build a handler.
+
 Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
 `apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
 `app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,
