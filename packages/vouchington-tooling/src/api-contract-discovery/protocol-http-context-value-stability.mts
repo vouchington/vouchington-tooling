@@ -113,7 +113,7 @@ export function createContextValueStability(
     for (const data of allData) {
       if (
         data.wrappers.returnedParameters.has(symbol) ||
-        data.writes.some((expression) => root(expression) === symbol)
+        data.writes.some((expression) => roots.referencesContainer(expression, symbol, module))
       )
         safe = false
       if (!immutableFunction) {
@@ -134,7 +134,7 @@ export function createContextValueStability(
         for (const [index, argument] of forwardedArguments(call).entries()) {
           if (!argument) continue
           if (
-            (root(argument) !== symbol && !data.wrappers.capture(argument).has(symbol)) ||
+            !roots.referencesContainer(argument, symbol, module, data.wrappers.capture(argument)) ||
             primitiveMember(argument)
           )
             continue
