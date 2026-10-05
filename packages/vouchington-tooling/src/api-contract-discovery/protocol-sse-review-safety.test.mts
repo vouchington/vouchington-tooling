@@ -1,4 +1,7 @@
 import { beforeAll, expect, it } from 'vitest'
+import ts from '../contract-schema/typescript-api.mts'
+import { argumentMayReachFutureOwner } from './protocol-sse-future-owner.mts'
+import { expressionReceiver } from './protocol-write-receiver.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
@@ -70,6 +73,23 @@ const sources = {
   'empty-arrow-before-destructure': route(`
     const onAbort=()=>{};opaque(onAbort);
     const {stream}=startSSE();${frame('stream')}`),
+  'global-owner-scope': `${preamble}opaque(prior)`,
+  'future-owner-constructor': route(`
+    let sse:Owner|undefined;class Accessor{peek(){return sse!.stream}}
+    opaque(Accessor);sse=startSSE();${frame('sse.stream')}`),
+  'external-validator-result': `${preamble}
+    declare function validateId():string;
+    app.route('/events').get(()=>{const id=validateId();opaque(id);
+      const {stream}=startSSE();${frame('stream')}})`,
+  'external-data-result': `${preamble}
+    declare function readUser():Promise<{id:string}>;
+    app.route('/events').get(async()=>{const user=await readUser();opaque(user.id);
+      let sse:Owner|undefined;sse=startSSE();${frame('sse.stream')}})`,
+  'external-cleanup-before-owner': `${preamble}
+    declare const subscription:{close():Promise<void>};
+    app.route('/events').get(()=>{let sse:Owner|undefined;
+      function closeSubscription(){void Promise.resolve(subscription.close())}
+      opaque(closeSubscription);sse=startSSE();${frame('sse.stream')}})`,
   'generator-unused-control': route(`
     function* unused(){yield prior}
     const {stream}=startSSE();${frame('stream')}`),
@@ -96,6 +116,7 @@ it.each([
   'future-owner-function-alias',
   'hoisted-nested-assignment',
   'future-owner-parameter-callback',
+  'future-owner-constructor',
 ] as const)('rejects an opaque stream escape through %s', (name) => {
   expect(() => discover(name)).toThrow('unmarked frame')
 })
@@ -105,6 +126,21 @@ it.each([
   'empty-handler-before-owner',
   'empty-arrow-before-destructure',
   'generator-unused-control',
+  'external-validator-result',
+  'external-data-result',
+  'external-cleanup-before-owner',
 ] as const)('keeps a marked frame for %s', (name) => {
   expect(discover(name)['GET:/events']?.unavailableReason).toBeUndefined()
+})
+
+it('keeps an owner without a known function scope unknown', () => {
+  const source = matrix.sourceFile('global-owner-scope')
+  const statement = source.statements.find(
+    (node): node is ts.ExpressionStatement =>
+      ts.isExpressionStatement(node) && ts.isCallExpression(node.expression),
+  )!
+  const call = statement.expression as ts.CallExpression
+  const checker = matrix.program.getTypeChecker()
+  const receiver = expressionReceiver(call.arguments[0]!, checker)!
+  expect(argumentMayReachFutureOwner(receiver, receiver, checker)).toBe(true)
 })

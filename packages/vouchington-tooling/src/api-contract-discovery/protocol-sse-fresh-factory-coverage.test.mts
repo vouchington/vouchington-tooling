@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
+import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { factoryCreatesFreshSelectedStream } from './protocol-sse-fresh-factory.mts'
 
 let fixtureRoot: string
@@ -41,7 +42,12 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
       files.consumer,
       `import {createNode as importedNode} from './node-factory.js';
        import {createLegacy as importedLegacy} from './legacy-factory.js';
-       const nodeResult=importedNode();const legacyResult=importedLegacy();`,
+       const nodeResult=importedNode();const legacyResult=importedLegacy();
+       declare const app:any;declare function opaque(value:unknown):void;
+       declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
+       app.route('/events').get(()=>{const before=importedNode();opaque(before.stream);
+         const {stream}=importedNode();
+         stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))});`,
     )
     const options: ts.CompilerOptions = {
       module: ts.ModuleKind.ESNext,
@@ -62,6 +68,12 @@ describe('SSE fresh factory proof follows real imported bindings', () => {
 
   afterAll(() => {
     if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+  })
+
+  it('keeps a pre-allocation value produced through a real imported alias independent', () => {
+    expect(
+      discoverApiResponseContracts(program, [consumer])['GET:/events']?.unavailableReason,
+    ).toBeUndefined()
   })
 
   it.each(['nodeResult', 'legacyResult'])('accepts fresh stream from %s', (name) => {

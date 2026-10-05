@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { enclosingFunction } from './protocol-marker-analysis.mts'
 import type { WriteReceiver } from './protocol-write-receiver.mts'
 
 /** Temporal allocation does not prevent a retained callback from reading the owner later. */
@@ -7,6 +8,9 @@ export function argumentMayReachFutureOwner(
   selected: WriteReceiver,
   checker: ts.TypeChecker,
 ): boolean {
+  const selectedDeclaration = selected.root.valueDeclaration
+  const owner = selectedDeclaration && enclosingFunction(selectedDeclaration)
+  if (!owner) return true
   const declaration = actual.root.valueDeclaration
   const scope =
     declaration && ts.isFunctionDeclaration(declaration)
@@ -16,14 +20,23 @@ export function argumentMayReachFutureOwner(
         : undefined
   if (!scope) {
     const type = declaration && checker.getTypeOfSymbolAtLocation(actual.root, declaration)
-    return !!type && type.getCallSignatures().length > 0
+    return (
+      !!type && (type.getCallSignatures().length > 0 || type.getConstructSignatures().length > 0)
+    )
   }
   const mayReachOwner = (node: ts.Node): boolean => {
     if (ts.isIdentifier(node)) {
       if (checker.getSymbolAtLocation(node) === selected.root) return true
-      // A referenced callable can capture the owner indirectly. Do not chase its body or aliases.
+      // Local callables can capture this binding; imported/global functions cannot capture it.
       const type = checker.getTypeAtLocation(node)
-      if (type.getCallSignatures().length || type.getConstructSignatures().length) return true
+      if (type.getCallSignatures().length || type.getConstructSignatures().length) {
+        const symbol = checker.getSymbolAtLocation(node)
+        const resolved =
+          symbol &&
+          (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol)
+        const callable = resolved?.valueDeclaration
+        if (!callable || enclosingFunction(callable) === owner) return true
+      }
     }
     return node.forEachChild(mayReachOwner) === true
   }
