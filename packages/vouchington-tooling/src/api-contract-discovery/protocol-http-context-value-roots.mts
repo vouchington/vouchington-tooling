@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import {
   contextImportBindingMember,
+  contextImportArgumentsModule,
   contextModuleOrigin,
 } from './protocol-http-context-module-origin.mts'
 
@@ -15,7 +16,9 @@ export function createContextValueRoots(
     while (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const owner = unwrapExpression(node.expression)
       const binding = ts.isIdentifier(owner) ? checker.getSymbolAtLocation(owner) : undefined
-      const module = contextModuleOrigin(checker, binding, new Set(), requiredModule)
+      const module =
+        contextImportArgumentsModule(checker, owner) ??
+        contextModuleOrigin(checker, binding, new Set(), requiredModule)
       const key = ts.isPropertyAccessExpression(node)
         ? node.name.text
         : node.argumentExpression && ts.isStringLiteral(node.argumentExpression)
@@ -64,6 +67,13 @@ export function createContextValueRoots(
   }
   function selected(node: ts.Expression, key: string, seen: Set<ts.Symbol>): ts.Symbol | undefined {
     node = unwrapExpression(node)
+    const module = requiredModule?.(node)
+    if (module) {
+      const member = checker.getExportsOfModule(module).find((item) => item.name === key)
+      return (
+        member && (member.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(member) : member)
+      )
+    }
     if (ts.isIdentifier(node)) {
       const binding = checker.getSymbolAtLocation(node)
       const symbol =
