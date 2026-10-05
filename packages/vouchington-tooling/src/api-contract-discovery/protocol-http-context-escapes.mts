@@ -1,9 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import {
-  httpHandlerContext,
-  httpContextArgument,
-  wrappedHttpContextArgument,
-} from './protocol-http-context.mts'
+import { httpHandlerContext, httpContextArgument } from './protocol-http-context.mts'
 import { httpContextInvocations } from './protocol-http-context-callers.mts'
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -21,6 +17,7 @@ import {
 } from './protocol-http-context-bound-nodes.mts'
 import { createContextAccountedEmissionProof } from './protocol-http-context-accounted-emissions.mts'
 import { contextCallbackExecutionRoots } from './protocol-http-context-parameter-initializers.mts'
+import { opaqueWrappedHttpContextArgument } from './protocol-http-context-callable-captures.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
 export function opaqueHttpContextArgument(
@@ -42,10 +39,7 @@ export function opaqueHttpContextArgument(
     )
   )
     return false
-  if (
-    context &&
-    call.arguments.some((argument) => wrappedHttpContextArgument(argument, context, checker))
-  )
+  if (context && opaqueWrappedHttpContextArgument(call, context, checker, proof.callbacks, env))
     return true
   if (context && !matches(context)) return false
   if (context) return !implementedCallee(call, context, checker, active, env, proof, root)

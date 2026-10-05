@@ -13,25 +13,8 @@ export function contextModuleOrigin(
   if (symbol.flags & ts.SymbolFlags.Module) return symbol
   const declaration = symbol.valueDeclaration
   if (declaration && ts.isParameter(declaration) && ts.isIdentifier(declaration.name)) {
-    const fn = declaration.parent
-    const call = fn.parent
-    if (
-      (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
-      ts.isCallExpression(call) &&
-      call.arguments[0] === fn &&
-      fn.parameters[0] === declaration &&
-      ts.isPropertyAccessExpression(call.expression) &&
-      call.expression.name.text === 'then'
-    ) {
-      const imported = unwrapTransparentExpression(call.expression.expression)
-      if (
-        ts.isCallExpression(imported) &&
-        imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
-        imported.arguments[0] &&
-        ts.isStringLiteral(imported.arguments[0])
-      )
-        return checker.getSymbolAtLocation(imported.arguments[0])
-    }
+    const imported = fulfillmentModule(checker, declaration)
+    if (imported) return imported
   }
   if (
     !declaration ||
@@ -56,5 +39,48 @@ export function contextModuleOrigin(
     value.arguments[0] &&
     ts.isStringLiteral(value.arguments[0])
     ? checker.getSymbolAtLocation(value.arguments[0])
+    : undefined
+}
+
+/** Destructured fulfillment bindings retain the actual module export, rather than a local root. */
+export function contextImportBindingMember(checker: ts.TypeChecker, binding?: ts.Symbol) {
+  const declaration = binding?.valueDeclaration
+  if (
+    !declaration ||
+    !ts.isBindingElement(declaration) ||
+    declaration.dotDotDotToken ||
+    !ts.isObjectBindingPattern(declaration.parent)
+  )
+    return undefined
+  const parameter = declaration.parent.parent
+  const key = declaration.propertyName ?? declaration.name
+  if (!ts.isParameter(parameter) || !(ts.isIdentifier(key) || ts.isStringLiteral(key)))
+    return undefined
+  const module = fulfillmentModule(checker, parameter)
+  const member =
+    module && checker.getExportsOfModule(module).find((value) => value.name === key.text)
+  return member && (member.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(member) : member)
+}
+
+function fulfillmentModule(checker: ts.TypeChecker, parameter: ts.ParameterDeclaration) {
+  const fn = parameter.parent
+  const call = fn.parent
+  if (
+    !(
+      (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
+      ts.isCallExpression(call) &&
+      call.arguments[0] === fn &&
+      fn.parameters[0] === parameter &&
+      ts.isPropertyAccessExpression(call.expression) &&
+      call.expression.name.text === 'then'
+    )
+  )
+    return undefined
+  const imported = unwrapTransparentExpression(call.expression.expression)
+  return ts.isCallExpression(imported) &&
+    imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    imported.arguments[0] &&
+    ts.isStringLiteral(imported.arguments[0])
+    ? checker.getSymbolAtLocation(imported.arguments[0])
     : undefined
 }

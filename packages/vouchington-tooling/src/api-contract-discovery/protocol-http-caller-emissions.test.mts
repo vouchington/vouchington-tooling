@@ -104,14 +104,18 @@ describe('HTTP contracts include actual caller emissions and indirect methods', 
     expect(() => discover('foreign-helper')).toThrow('handler context')
   })
   it('preserves nested mutable-wrapper unavailability for every selected protocol row', () => {
-    for (const keys of [undefined, ['POST:/rpc#protocol-2'], ['POST:/rpc', 'POST:/rpc#protocol-2']])
-      for (const lenient of [false, true]) {
-        const rows = discover('suffix-wrapper', keys, lenient)
-        for (const key of keys ?? ['POST:/rpc', 'POST:/rpc#protocol-2'])
-          expect(rows[key]?.unavailableReason).toBe(
-            'route emits a response through a mutable context wrapper whose status or body is not statically determinable',
-          )
+    for (const keys of [
+      undefined,
+      ['POST:/rpc#protocol-2'],
+      ['POST:/rpc', 'POST:/rpc#protocol-2'],
+    ]) {
+      expect(() => discover('suffix-wrapper', keys)).toThrow('opaque argument')
+      const rows = discover('suffix-wrapper', keys, true)
+      for (const key of keys ?? ['POST:/rpc', 'POST:/rpc#protocol-2']) {
+        expect(rows[key]?.statusKnowledge).toBe('unknown')
+        expect(rows[key]?.unavailableReason).toBeTruthy()
       }
+    }
   })
   it.each(Object.keys(invalid) as (keyof typeof invalid)[])(
     'rejects unaccounted emission %s',

@@ -42,7 +42,11 @@ export function createContextPrototypeProof(
     if (
       ts.isPropertyAccessExpression(node.expression) &&
       node.expression.name.text === 'getPrototypeOf' &&
-      globalObject(roots.root(node.expression))
+      (globalObject(roots.root(node.expression.expression)) ||
+        (roots.root(node.expression.expression)?.name === 'Reflect' &&
+          !!roots
+            .root(node.expression.expression)
+            ?.declarations?.some((declaration) => declaration.getSourceFile().isDeclarationFile)))
     )
       return true
     const target = callbacks.resolve(node.expression, new Map())?.node
