@@ -25,6 +25,8 @@ export type {
   TypeFacts,
   TypeFactsRequest,
   ExportedTypeSelector,
+  TypeScriptApi,
+  TypeScriptProgram,
 } from './type-query.mts'
 export { getCallRowTypeFacts } from './type-query-call.mts'
 export type { CallRowTypeFacts, CallRowTypeFactsRequest } from './type-query-call.mts'

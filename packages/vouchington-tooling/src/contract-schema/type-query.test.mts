@@ -17,6 +17,7 @@ export type AnyRow = any
 export interface ProtoRow { '__proto__': string }
 export interface Executor { <T = Projected>(): Promise<{ rows: T[] }> }
 export type Box<T = Projected> = { value: T }
+export class ClassBox<T = Projected> { value!: T }
 export type DependentBox<T = Projected, U = T> = { value: U }
 export type CompositeDependentBox<T = Projected, U = { row: T }> = { value: U }
 export type UnionDependentBox<T = Projected, U = T | null> = { value: U }
@@ -27,6 +28,15 @@ export type DefaultedTarget<T = Projected> = { value: T }
 export type RequiredTarget<T> = { value: T }
 export type InstantiatedTarget = DefaultedTarget
 export interface ConstructExecutor { new <T = Projected>(): { value: T } }
+export declare function genericIdentity<T>(value: T): T
+export declare function genericDefaultIdentity<T = Projected>(value?: T): T
+export interface OuterRequired<T> { <U = Projected>(): U }
+export interface RequiredThenDefaulted {
+  <T extends string>(): T
+  <T = Projected>(): T
+}
+export function overloaded<T>(): T
+export function overloaded<T = Projected>(): T { throw new Error('not called') }
 namespace Types { export interface External { id: string } }
 export type QualifiedBox<U = Types.External> = { value: U }
 export declare function read<T = Projected>(): Promise<{ rows: T[] }>
@@ -58,6 +68,7 @@ describe('type-query exported facts', () => {
   it('resolves exported aliases with requested properties and assignability', () => {
     expect(
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         propertyNames: ['title', 'id', 'id'],
@@ -69,13 +80,16 @@ describe('type-query exported facts', () => {
       properties: { id: 'string', title: undefined },
       assignableTo: { entity: false, row: true },
     })
-    expect(getExportedTypeFacts({ program, fileName: contracts, exportName: 'AnyRow' }).isAny).toBe(
-      true,
-    )
     expect(
-      getExportedTypeFacts({ program, fileName: contracts, exportName: 'read' }).display,
+      getExportedTypeFacts({ typescript: ts, program, fileName: contracts, exportName: 'AnyRow' })
+        .isAny,
+    ).toBe(true)
+    expect(
+      getExportedTypeFacts({ typescript: ts, program, fileName: contracts, exportName: 'read' })
+        .display,
     ).toContain('Promise<{ rows: T[]; }>')
     const protoFacts = getExportedTypeFacts({
+      typescript: ts,
       program,
       fileName: contracts,
       exportName: 'ProtoRow',
@@ -89,9 +103,10 @@ describe('type-query exported facts', () => {
   })
 
   it('reads default type parameters from callable exports and call signatures', () => {
-    for (const exportName of ['Executor', 'Box', 'read', 'ConstructExecutor']) {
+    for (const exportName of ['Executor', 'Box', 'ClassBox', 'read', 'ConstructExecutor']) {
       expect(
         getExportedTypeFacts({
+          typescript: ts,
           program,
           fileName: contracts,
           exportName,
@@ -107,6 +122,7 @@ describe('type-query exported facts', () => {
     }
     expect(
       getExportedTypeFacts({
+        typescript: ts,
         program,
         fileName: contracts,
         exportName: 'DependentBox',
@@ -121,6 +137,7 @@ describe('type-query exported facts', () => {
     })
     expect(
       getExportedTypeFacts({
+        typescript: ts,
         program,
         fileName: contracts,
         exportName: 'QualifiedBox',
@@ -139,6 +156,7 @@ describe('type-query exported facts', () => {
     ]) {
       expect(() =>
         getExportedTypeFacts({
+          typescript: ts,
           program,
           fileName: contracts,
           exportName,
@@ -149,6 +167,7 @@ describe('type-query exported facts', () => {
     }
     expect(
       getExportedTypeFacts({
+        typescript: ts,
         program,
         fileName: contracts,
         exportName: 'IndependentCompositeBox',
@@ -158,6 +177,7 @@ describe('type-query exported facts', () => {
     ).toEqual({ row: 'Projected[]' })
     expect(() =>
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         assignableTo: {
@@ -167,6 +187,7 @@ describe('type-query exported facts', () => {
     ).toThrow(/Assignable target "DefaultedTarget".*named instantiated type/)
     expect(() =>
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         assignableTo: { target: { fileName: contracts, exportName: 'Executor' } },
@@ -174,6 +195,7 @@ describe('type-query exported facts', () => {
     ).toThrow(/Assignable target "Executor".*named instantiated type/)
     expect(() =>
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         assignableTo: { target: { fileName: contracts, exportName: 'RequiredTarget' } },
@@ -181,13 +203,23 @@ describe('type-query exported facts', () => {
     ).toThrow(/Assignable target "RequiredTarget".*named instantiated type/)
     expect(() =>
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         assignableTo: { target: { fileName: contracts, exportName: 'ConstructExecutor' } },
       }),
     ).toThrow(/Assignable target "ConstructExecutor".*named instantiated type/)
+    expect(() =>
+      getExportedTypeFacts({
+        typescript: ts,
+        program,
+        ...rowAlias,
+        assignableTo: { target: { fileName: contracts, exportName: 'ClassBox' } },
+      }),
+    ).toThrow(/Assignable target "ClassBox".*named instantiated type/)
     expect(
       getExportedTypeFacts({
+        typescript: ts,
         program,
         ...rowAlias,
         assignableTo: {
@@ -195,6 +227,40 @@ describe('type-query exported facts', () => {
         },
       }).assignableTo,
     ).toEqual({ target: false })
+    expect(
+      getExportedTypeFacts({
+        typescript: ts,
+        program,
+        ...rowAlias,
+        assignableTo: {
+          target: { fileName: contracts, exportName: 'genericDefaultIdentity' },
+        },
+      }).assignableTo,
+    ).toEqual({ target: false })
+    expect(
+      getExportedTypeFacts({
+        typescript: ts,
+        program,
+        ...rowAlias,
+        assignableTo: {
+          target: { fileName: contracts, exportName: 'genericIdentity' },
+        },
+      }).assignableTo,
+    ).toEqual({ target: false })
+  })
+
+  it('does not borrow nested or implementation-only generic defaults', () => {
+    for (const exportName of ['OuterRequired', 'RequiredThenDefaulted', 'overloaded']) {
+      expect(() =>
+        getExportedTypeFacts({
+          typescript: ts,
+          program,
+          fileName: contracts,
+          exportName,
+          defaultTypeParameterIndex: 0,
+        }),
+      ).toThrow(/Missing default for type parameter 0/)
+    }
   })
 
   it('follows a reexport to its declared type in a second real source file', () => {
@@ -213,6 +279,7 @@ describe('type-query exported facts', () => {
       expect(linkedProgram.getSemanticDiagnostics()).toEqual([])
       expect(
         getExportedTypeFacts({
+          typescript: ts,
           program: linkedProgram,
           fileName: reexported,
           exportName: 'PublicValue',
@@ -228,6 +295,7 @@ describe('type-query exported facts', () => {
       })
       expect(() =>
         getExportedTypeFacts({
+          typescript: ts,
           program: brokenProgram,
           fileName: reexported,
           exportName: 'Broken',
@@ -240,13 +308,19 @@ describe('type-query exported facts', () => {
 
   it('reports missing source, export, and selected generic default precisely', () => {
     expect(() =>
-      getExportedTypeFacts({ program, fileName: '/virtual/missing.ts', exportName: 'Entity' }),
+      getExportedTypeFacts({
+        typescript: ts,
+        program,
+        fileName: '/virtual/missing.ts',
+        exportName: 'Entity',
+      }),
     ).toThrow(/source file .* is not in the program/)
     expect(() =>
-      getExportedTypeFacts({ program, fileName: contracts, exportName: 'Missing' }),
+      getExportedTypeFacts({ typescript: ts, program, fileName: contracts, exportName: 'Missing' }),
     ).toThrow(/Missing export "Missing"/)
     expect(() =>
       getExportedTypeFacts({
+        typescript: ts,
         program,
         fileName: contracts,
         exportName: 'noDefault',
@@ -259,6 +333,7 @@ describe('type-query exported facts', () => {
 describe('type-query call rows', () => {
   it('returns source-ordered explicit type argument facts and selector filtering', () => {
     const request = {
+      typescript: ts,
       program,
       fileName: calls,
       calleeText: 'read',
@@ -291,6 +366,7 @@ describe('type-query call rows', () => {
 
   it('extracts awaited rows[number] and direct type arguments from selected calls', () => {
     const request = {
+      typescript: ts,
       program,
       fileName: calls,
       calleeText: 'write',
@@ -313,6 +389,7 @@ describe('type-query call rows', () => {
     for (const calleeText of ['readAny', 'readAnyRows']) {
       expect(
         getCallRowTypeFacts({
+          typescript: ts,
           program,
           fileName: calls,
           calleeText,
@@ -328,6 +405,7 @@ describe('type-query call rows', () => {
     for (const calleeText of ['readNever', 'readDirectNever', 'readPromiseNever']) {
       expect(
         getCallRowTypeFacts({
+          typescript: ts,
           program,
           fileName: calls,
           calleeText,
@@ -340,6 +418,7 @@ describe('type-query call rows', () => {
   it('reports missing selected row type arguments and awaited rows', () => {
     expect(() =>
       getCallRowTypeFacts({
+        typescript: ts,
         program,
         fileName: calls,
         calleeText: 'scalar',
@@ -348,6 +427,7 @@ describe('type-query call rows', () => {
     ).toThrow(/Missing row type argument for call "scalar"/)
     expect(() =>
       getCallRowTypeFacts({
+        typescript: ts,
         program,
         fileName: calls,
         calleeText: 'scalar',
@@ -359,6 +439,7 @@ describe('type-query call rows', () => {
   it('uses a configured non-first type argument as the row', () => {
     expect(
       getCallRowTypeFacts({
+        typescript: ts,
         program,
         fileName: calls,
         calleeText: 'pair',
@@ -369,6 +450,7 @@ describe('type-query call rows', () => {
     ).toMatchObject([{ line: 12, properties: { id: 'string' } }])
     expect(() =>
       getCallRowTypeFacts({
+        typescript: ts,
         program,
         fileName: calls,
         calleeText: 'pair',

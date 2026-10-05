@@ -1,4 +1,4 @@
-import ts from './typescript-api.mts'
+import type ts from './typescript-api.mts'
 
 import {
   exportedAssignableType,
@@ -7,8 +7,15 @@ import {
   sourceFileForQuery,
   type ExportedTypeSelector,
 } from './type-query-export.mts'
+import {
+  programForQuery,
+  validateTypeScriptApi,
+  type TypeScriptApi,
+  type TypeScriptProgram,
+} from './type-query-api.mts'
 
 export type { ExportedTypeSelector } from './type-query-export.mts'
+export type { TypeScriptApi, TypeScriptProgram } from './type-query-api.mts'
 
 export interface TypeFactsRequest {
   readonly propertyNames?: readonly string[]
@@ -23,11 +30,13 @@ export interface TypeFacts {
 }
 
 export interface ExportedTypeFactsRequest extends ExportedTypeSelector, TypeFactsRequest {
-  readonly program: ts.Program
+  readonly program: TypeScriptProgram
+  readonly typescript: TypeScriptApi
   readonly defaultTypeParameterIndex?: number
 }
 
 export function factsForType(
+  typescript: TypeScriptApi,
   program: ts.Program,
   checker: ts.TypeChecker,
   type: ts.Type,
@@ -50,24 +59,35 @@ export function factsForType(
         ([label, target]) =>
           [
             label,
-            checker.isTypeAssignableTo(type, exportedAssignableType(program, checker, target)),
+            checker.isTypeAssignableTo(
+              type,
+              exportedAssignableType(typescript, program, checker, target),
+            ),
           ] as const,
       ),
   )
   return {
     display: checker.typeToString(type),
-    isAny: Boolean(type.flags & ts.TypeFlags.Any),
+    isAny: Boolean(type.flags & typescript.TypeFlags.Any),
     properties,
     assignableTo,
   }
 }
 
 export function getExportedTypeFacts(request: ExportedTypeFactsRequest): TypeFacts {
-  const checker = request.program.getTypeChecker()
-  const sourceFile = sourceFileForQuery(request.program, request.fileName)
+  const program = programForQuery(request.program)
+  const checker = program.getTypeChecker()
+  const sourceFile = sourceFileForQuery(program, request.fileName)
+  validateTypeScriptApi(request.typescript, request.program, sourceFile)
   const type =
     request.defaultTypeParameterIndex === undefined
-      ? exportedType(request.program, checker, request)
-      : exportedDefaultType(request.program, checker, request, request.defaultTypeParameterIndex)
-  return factsForType(request.program, checker, type, sourceFile, request)
+      ? exportedType(request.typescript, program, checker, request)
+      : exportedDefaultType(
+          request.typescript,
+          program,
+          checker,
+          request,
+          request.defaultTypeParameterIndex,
+        )
+  return factsForType(request.typescript, program, checker, type, sourceFile, request)
 }
