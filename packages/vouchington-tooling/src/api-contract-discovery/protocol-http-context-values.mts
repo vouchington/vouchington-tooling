@@ -93,6 +93,7 @@ export function createHttpContextValueResolver(
     if (ts.isExpression(node)) node = unwrapExpression(node)
     if (seen.has(node)) return undefined
     const next = new Set(seen).add(node)
+    if (ts.isSatisfiesExpression(node)) return resolve(node.expression, env, next)
     if (node.kind === ts.SyntaxKind.NullKeyword) return [null]
     if (
       isProtocolCallbackFunction(node) ||

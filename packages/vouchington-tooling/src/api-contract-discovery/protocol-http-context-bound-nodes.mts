@@ -3,6 +3,7 @@ import {
   httpHandlerContext,
   contextResponseMethod,
   httpContextArgument,
+  wrappedHttpContextArgument,
 } from './protocol-http-context.mts'
 import { unsupportedContextAlias, unsupportedContextAssignment } from './protocol-context-alias.mts'
 import ts from '../contract-schema/typescript-api.mts'
@@ -10,6 +11,7 @@ import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 
 /** Source mutations and constructor escapes invalidate the same caller-bound context proof. */
 export function unsupportedBoundContextNode(
@@ -22,7 +24,15 @@ export function unsupportedBoundContextNode(
     unsupportedContextAssignment(node, context, checker) ||
     (ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context, checker)) ||
     mutatesHttpResponseMethod(node, context, checker, handler) ||
-    opaqueHttpContextConstruction(node, checker, context, handler)
+    opaqueHttpContextConstruction(node, checker, context, handler) ||
+    (ts.isTaggedTemplateExpression(node) &&
+      ts.isTemplateExpression(node.template) &&
+      executableProtocolPath(node, checker, handler) &&
+      node.template.templateSpans.some(
+        (span) =>
+          httpContextArgument(span.expression, context, checker) ||
+          wrappedHttpContextArgument(span.expression, context, checker),
+      ))
   )
 }
 
