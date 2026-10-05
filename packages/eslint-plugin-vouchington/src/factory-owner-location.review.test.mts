@@ -129,6 +129,31 @@ export let { default: [arrayPlain] } = runtime`),
     ).toEqual(['constructionOwner', 'constructionOwner', 'constructionOwner'])
   })
 
+  it('follows nested namespace defaults and fallback after an unrelated default source', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+const { outer: { nested: { makeGraph } = runtime } } = { outer: {} }
+makeGraph()
+const unrelated = {}
+const { default: compiler = runtime } = unrelated
+compiler.makeGraph()`),
+    ).toEqual(['constructionOwner', 'constructionOwner'])
+  })
+
+  it('distinguishes bare and namespace star exports for a default-only factory', async () => {
+    expect(
+      messageIds(
+        await lintRule(
+          'factory-owner-location',
+          `export * from '@compiler/runtime'
+export * as runtime from '@compiler/runtime'`,
+          { ...OPTIONS, factories: ['default'] },
+          'src/check.js',
+        ),
+      ),
+    ).toEqual(['constructionOwner'])
+  })
+
   it('checks split mutable exports from their scoped initializer', async () => {
     expect(
       await diagnostics(`import { makeGraph } from '@compiler/runtime'

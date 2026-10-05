@@ -9,11 +9,13 @@ import {
 import {
   awaitedModuleSpecifier,
   constantDefinition,
+  namedPatternDefaultSource,
   namedPatternSource,
 } from './factory-owner-provenance-binding.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 import { withActiveVariable } from './factory-owner-recursion.mts'
 import { isFactoryMember } from './factory-owner-member.mts'
+import { isNamespacePatternBinding } from './factory-owner-namespace-pattern.mts'
 import {
   isConfiguredFactoryImport,
   isNamespaceImport,
@@ -74,18 +76,11 @@ export function createFactoryProvenance(
     }
     const declarator = constantDefinition(variable)
     if (!declarator) return false
-    return withActiveVariable(variable, active, () => {
-      const defaultSource = namedPatternSource(
-        declarator,
-        String(current.name),
-        new Set(['default']),
-      )
-      if (defaultSource) return isNamespace(defaultSource, active)
-      const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
-      if (defaultValue) return isNamespace(defaultValue, active)
-      if ((declarator.id as NodeLike).type !== 'Identifier') return false
-      return isNamespace(declarator.init as NodeLike, active)
-    })
+    return withActiveVariable(variable, active, () =>
+      isNamespacePatternBinding(declarator, String(current.name), (value) =>
+        isNamespace(value, active),
+      ),
+    )
   }
 
   function isFactory(
@@ -114,6 +109,12 @@ export function createFactoryProvenance(
     return withActiveVariable(variable, active, () => {
       const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
       if (defaultValue && isFactory(defaultValue, active)) return true
+      const defaultNamespace = namedPatternDefaultSource(
+        declarator.id as NodeLike,
+        String(current.name),
+        options.factories,
+      )
+      if (defaultNamespace && isNamespace(defaultNamespace)) return true
       const patternSource = namedPatternSource(declarator, String(current.name), options.factories)
       if (patternSource) return isNamespace(patternSource)
       if ((declarator.id as NodeLike).type !== 'Identifier') return false

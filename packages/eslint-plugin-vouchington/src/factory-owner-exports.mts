@@ -35,7 +35,8 @@ export function createFactoryExportVisitors(
     ExportAllDeclaration(value) {
       if (
         value.exportKind !== 'type' &&
-        options.modules.has(String((value.source as NodeLike).value))
+        options.modules.has(String((value.source as NodeLike).value)) &&
+        (value.exported || [...options.factories].some((name) => name !== 'default'))
       ) {
         report(value)
       }
