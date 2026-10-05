@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
@@ -54,7 +55,7 @@ let root: string
 let program: ts.Program
 const routes = new Map<string, string>()
 beforeAll(() => {
-  root = mkdtempSync(join(process.cwd(), 'packages/vouchington-tooling/.http-invocation-review-'))
+  root = mkdtempSync(join(tmpdir(), 'http-invocation-review-'))
   const files: string[] = []
   function source(name: string, text: string): string {
     const file = join(root, `${name}.ts`)
