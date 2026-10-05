@@ -1,3 +1,4 @@
+import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
@@ -130,4 +131,14 @@ export function selectedOpaqueSseReceiver(
         framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
     )
   )
+}
+
+/** Only stable actual callable aliases participate in the callable return proof. */
+export function sseCallableAlias(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+): ts.FunctionLikeDeclaration | undefined {
+  return ts.isIdentifier(expression)
+    ? createProtocolCallbackValueResolver(checker).resolve(expression, new Map())?.node
+    : undefined
 }

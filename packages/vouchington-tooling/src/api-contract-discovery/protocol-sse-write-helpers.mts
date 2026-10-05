@@ -3,6 +3,7 @@ import {
   implementationDeclaration,
   selectedReturnedSseCapability,
   selectedOpaqueSseReceiver,
+  sseCallableAlias,
 } from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
@@ -54,7 +55,7 @@ export function opaqueCallReceivesSelectedStream(
       someSseArgumentValue(argument, checker, (value) => {
         if (
           (ts.isCallExpression(value) ||
-            ts.isIdentifier(value) ||
+            sseCallableAlias(value, checker) ||
             ts.isArrowFunction(value) ||
             ts.isFunctionExpression(value)) &&
           selectedReturnedSseCapability(
