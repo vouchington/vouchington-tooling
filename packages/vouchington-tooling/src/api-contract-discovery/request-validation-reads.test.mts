@@ -45,6 +45,14 @@ const handlers: Record<string, string> = {
   request: `ctx.request.query.cursor
     const { request } = ctx
     request.headers.accept`,
+  whole: `consume(ctx.query)
+    const copy = { ...ctx.params }
+    const alias = ctx.query
+    consume({ alias })
+    consume((alias as any)!)
+    const wrapped = (ctx.query as any)!.limit
+    void [copy, wrapped]
+    return ctx.headers`,
   'in-validator': `validateInput(ctx, ${KEY}, { query: ctx.query.limit, body: await ctx.request.json() })`,
   'validator-only': validate,
   'unrelated-object': 'unrelated.query.limit; unrelated.request.json(); other.get(1)',
@@ -63,6 +71,7 @@ const files = {
     declare const other: any
     declare const items: number[]
     const LITERAL_KEY = 'fixed'
+    declare function consume(value: unknown): void
     function readLimit(ctx: any) { return ctx.query.limit }
     function readKey(query: any) { return query.cursor }
     ${Object.entries(handlers)
@@ -75,7 +84,7 @@ const files = {
 
 let facts: ReturnType<typeof discover>
 const reads = (route: string) =>
-  facts[`GET:/api/${route}`]!.carrierReads.map(({ carrier, key }) => [carrier, key])
+  facts[`GET:/api/${route}`]!.carrierReads.map(({ carrier, key, access }) => [carrier, key, access])
 
 describe('request validation carrier reads', () => {
   beforeAll(() => {
@@ -84,59 +93,74 @@ describe('request validation carrier reads', () => {
   }, COLD_VIRTUAL_PROGRAM_TIMEOUT_MS)
 
   it('reports a query read in a helper with its key', () => {
-    expect(reads('helper')).toEqual([['query', 'limit']])
-    expect(facts['GET:/api/helper']!.carrierReads[0]!.source).toBe('/virtual/routes/reads.ts:9')
+    expect(reads('helper')).toEqual([['query', 'limit', 'key']])
+    expect(facts['GET:/api/helper']!.carrierReads[0]!.source).toBe('/virtual/routes/reads.ts:10')
   })
 
   it('reports query, params and destructured reads with static keys or null', () => {
     expect(reads('query-forms')).toEqual([
-      ['query', 'limit'],
-      ['query', 'page'],
-      ['query', null],
-      ['query', 'fixed'],
+      ['query', 'limit', 'key'],
+      ['query', 'page', 'key'],
+      ['query', null, 'computed'],
+      ['query', 'fixed', 'key'],
     ])
     expect(reads('destructured')).toEqual([
-      ['query', 'a'],
-      ['query', 'b'],
-      ['query', 'c'],
-      ['query', null],
+      ['query', 'a', 'key'],
+      ['query', 'b', 'key'],
+      ['query', 'c', 'key'],
+      ['query', null, 'whole'],
     ])
     expect(reads('params')).toEqual([
-      ['path', 'id'],
-      ['path', 'slug'],
+      ['path', 'id', 'key'],
+      ['path', 'slug', 'key'],
     ])
   })
 
   it('reports body and header reads', () => {
     expect(reads('bodies')).toEqual([
-      ['body', null],
-      ['body', null],
+      ['body', null, 'whole'],
+      ['body', null, 'whole'],
     ])
     expect(reads('headers')).toEqual([
-      ['header', 'x-a'],
-      ['header', null],
-      ['header', 'x-b'],
-      ['header', 'accept'],
+      ['header', 'x-a', 'key'],
+      ['header', null, 'computed'],
+      ['header', 'x-b', 'key'],
+      ['header', 'accept', 'key'],
     ])
   })
 
   it('reports computed destructuring and singular header members', () => {
     expect(reads('computed-keys')).toEqual([
-      ['query', null],
-      ['header', 'accept'],
+      ['query', null, 'computed'],
+      ['query', null, 'whole'],
+      ['header', 'accept', 'key'],
+    ])
+  })
+
+  it('reports whole-carrier value uses with a null key', () => {
+    expect(reads('whole')).toEqual([
+      ['query', null, 'whole'],
+      ['path', null, 'whole'],
+      ['query', null, 'whole'],
+      ['query', null, 'whole'],
+      ['query', 'limit', 'key'],
+      ['header', null, 'whole'],
     ])
   })
 
   it('follows const aliases, destructured members and bound parameters', () => {
     expect(reads('aliases')).toEqual([
-      ['query', 'limit'],
-      ['query', 'page'],
-      ['path', 'id'],
+      ['query', 'limit', 'key'],
+      ['query', 'page', 'key'],
+      ['path', 'id', 'key'],
     ])
-    expect(reads('bound')).toEqual([['query', 'cursor']])
+    expect(reads('bound')).toEqual([
+      ['query', 'cursor', 'key'],
+      ['query', null, 'whole'],
+    ])
     expect(reads('request')).toEqual([
-      ['query', 'cursor'],
-      ['header', 'accept'],
+      ['query', 'cursor', 'key'],
+      ['header', 'accept', 'key'],
     ])
   })
 
@@ -158,7 +182,7 @@ describe('request validation carrier reads', () => {
     expect(facts['GET:/api/no-content']!.kind).toBe('fixed-no-content')
     expect(facts['GET:/api/helper']).toMatchObject({
       kind: 'ordinary',
-      source: '/virtual/routes/reads.ts:11',
+      source: '/virtual/routes/reads.ts:12',
     })
   })
 })

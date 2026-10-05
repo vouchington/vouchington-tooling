@@ -15,10 +15,13 @@ export function handlerNodes(
   active = new Set<ts.Node>(),
   staticProof = false,
   proofs?: HandlerProof[],
+  /** Ignore `let`, `var` and reassigned bindings; always on under `staticProof`. */
+  stableBindings = staticProof,
 ): ts.Node[] {
+  const again = (node: ts.Expression, bindings = parameterBindings, seen = active, sink = proofs) =>
+    handlerNodes(node, checker, bindings, seen, staticProof, sink, stableBindings)
   const unwrapped = unwrapHandlerExpression(argument)
-  if (unwrapped !== argument)
-    return handlerNodes(unwrapped, checker, parameterBindings, active, staticProof, proofs)
+  if (unwrapped !== argument) return again(unwrapped)
   let bound = argument
   const boundIdentifiers = new Set<ts.Node>()
   while (ts.isIdentifier(bound)) {
@@ -29,8 +32,7 @@ export function handlerNodes(
     boundIdentifiers.add(bound)
     bound = nextArgument
   }
-  if (bound !== argument)
-    return handlerNodes(bound, checker, parameterBindings, active, staticProof, proofs)
+  if (bound !== argument) return again(bound)
   if (active.has(argument)) return []
   const next = new Set(active).add(argument)
   if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) {
@@ -39,57 +41,69 @@ export function handlerNodes(
   }
   if (ts.isCallExpression(argument)) {
     const resolvedProofs: HandlerProof[] = []
-    const groups = callableImplementations(argument.expression, checker, staticProof).map(
-      (implementation) => {
-        if (
-          staticProof &&
-          (implementation.asteriskToken ||
-            implementation.modifiers?.some(
-              (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
-            ) ||
-            runtimeParameters(implementation).some((parameter) =>
-              hasBindingWrite(parameter, checker),
-            ))
-        )
-          return []
-        const bindings = new Map(parameterBindings)
-        runtimeParameters(implementation).forEach((parameter, index) => {
-          const callArgument = argument.arguments[index]
-          const symbol = checker.getSymbolAtLocation(parameter.name)
-          if (callArgument && symbol) bindings.set(symbol, callArgument)
-        })
-        const returned = returnedExpressions(implementation)
-        if (
-          staticProof &&
-          (!returnsOnEveryPath(implementation.body!) || returned.some((value) => !value))
-        )
-          return []
-        const results = returned.map((value) =>
-          value ? handlerNodes(value, checker, bindings, next, staticProof, resolvedProofs) : [],
-        )
-        return staticProof && results.some((result) => !result.some(ts.isFunctionLike))
-          ? []
-          : results.flat()
-      },
-    )
+    const groups = callableImplementations(
+      argument.expression,
+      checker,
+      staticProof,
+      stableBindings,
+    ).map((implementation) => {
+      if (
+        staticProof &&
+        (implementation.asteriskToken ||
+          implementation.modifiers?.some(
+            (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
+          ) ||
+          runtimeParameters(implementation).some((parameter) =>
+            hasBindingWrite(parameter, checker),
+          ))
+      )
+        return []
+      const bindings = new Map(parameterBindings)
+      runtimeParameters(implementation).forEach((parameter, index) => {
+        const callArgument = argument.arguments[index]
+        const symbol = checker.getSymbolAtLocation(parameter.name)
+        if (callArgument && symbol) bindings.set(symbol, callArgument)
+      })
+      const returned = returnedExpressions(implementation)
+      if (
+        staticProof &&
+        (!returnsOnEveryPath(implementation.body!) || returned.some((value) => !value))
+      )
+        return []
+      const results = returned.map((value) =>
+        value ? again(value, bindings, next, resolvedProofs) : [],
+      )
+      return staticProof && results.some((result) => !result.some(ts.isFunctionLike))
+        ? []
+        : results.flat()
+    })
     if (staticProof && groups.some((group) => group.length === 0)) return []
     proofs?.push(...resolvedProofs)
     return groups.flat()
   }
-  return declarationImplementations(argument, checker, next, staticProof, parameterBindings, proofs)
+  return declarationImplementations(
+    argument,
+    checker,
+    next,
+    staticProof,
+    parameterBindings,
+    proofs,
+    stableBindings,
+  )
 }
 
 function callableImplementations(
   node: ts.Node,
   checker: ts.TypeChecker,
   staticProof = false,
+  stableBindings = staticProof,
 ): ts.FunctionLikeDeclaration[] {
   const symbol = checker.getSymbolAtLocation(node)
   if (!symbol) return []
   const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
   const implementations: ts.FunctionLikeDeclaration[] = []
   for (const declaration of resolved.declarations ?? []) {
-    if (staticProof && !hasStableBinding(declaration, checker)) continue
+    if (stableBindings && !hasStableBinding(declaration, checker)) continue
     if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
       const initializer = unwrapHandlerExpression(declaration.initializer)
       if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
@@ -113,12 +127,13 @@ function declarationImplementations(
   staticProof: boolean,
   parameterBindings: Map<ts.Symbol, ts.Expression>,
   proofs?: HandlerProof[],
+  stableBindings = staticProof,
 ): ts.Node[] {
   const symbol = checker.getSymbolAtLocation(node)
   if (!symbol) return []
   const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
   return (resolved.declarations ?? []).flatMap((declaration) => {
-    if (staticProof && !hasStableBinding(declaration, checker)) return []
+    if (stableBindings && !hasStableBinding(declaration, checker)) return []
     if (
       ts.isFunctionDeclaration(declaration) ||
       (!staticProof && ts.isMethodDeclaration(declaration))
@@ -136,6 +151,7 @@ function declarationImplementations(
           active,
           staticProof,
           proofs,
+          stableBindings,
         ),
       ]
     return []

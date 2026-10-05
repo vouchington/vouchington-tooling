@@ -1,8 +1,12 @@
 import ts from '../contract-schema/typescript-api.mts'
 import type { HandlerProof } from './registered-route-handler-analysis.mts'
-import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { handlerBindings } from './request-validation-handler-state.mts'
 import { httpContextInvocations } from './protocol-http-context-callers.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
+import {
+  executedCallbackFunctions,
+  invokedUnconditionally,
+} from './request-validation-callbacks.mts'
 import { isConditionalPosition } from './request-validation-conditional.mts'
 import {
   followedImplementations,
@@ -10,8 +14,8 @@ import {
   type Scope,
 } from './request-validation-follow.mts'
 import { findConfig } from './request-validation-match.mts'
-import { resolveKey, type KeyBindings } from './request-validation-keys.mts'
-import type { Bound, RootBindings } from './request-validation-origin.mts'
+import type { KeyBindings } from './request-validation-keys.mts'
+import type { RootBindings } from './request-validation-origin.mts'
 import { rawReadsAt } from './request-validation-reads.mts'
 import { factorySite, sourceOf, validatorSite } from './request-validation-sites.mts'
 import { createStateKey } from './request-validation-state-key.mts'
@@ -25,7 +29,6 @@ import type {
   ValidatorConfig,
   ValidatorSite,
 } from './request-validation-types.mts'
-
 import { returnedValues } from './request-validation-trace-helpers.mts'
 
 type State = { keys: KeyBindings; roots: RootBindings; conditional: boolean }
@@ -37,7 +40,6 @@ type RouteFacts = {
 }
 
 const emptyState: State = { keys: new Map(), roots: new Map(), conditional: false }
-
 export type WalkerConfig = {
   checker: ts.TypeChecker
   sourceFiles: ReadonlySet<ts.SourceFile>
@@ -76,6 +78,13 @@ export function createRouteWalker(config: WalkerConfig) {
     return item
   }
   const stateKey = createStateKey()
+  const inputs = new Set<ts.Node>()
+  const pendingReads: { node: ts.Node; read: CarrierRead }[] = []
+  const isInput = (node: ts.Node) => {
+    for (let current: ts.Node | undefined = node; current; current = current.parent)
+      if (inputs.has(current)) return true
+    return false
+  }
 
   function walkFunction(fn: ts.FunctionLikeDeclaration, state: State) {
     const seen = visited.get(fn) ?? new Set<string>()
@@ -85,69 +94,62 @@ export function createRouteWalker(config: WalkerConfig) {
     walk(fn.body!, state)
   }
 
-  /** Returns true when the call is a configured validator or factory, whose body is not entered. */
-  function visitConfigured(call: ts.CallExpression, state: State): boolean {
-    const scope = scopeOf(state)
+  /** Records a configured validator call; its input arguments are not raw reads. */
+  function reportValidator(call: ts.CallExpression, state: State) {
     const validator = findConfig(call.expression, validators, checker)
-    if (validator) {
-      const site = validatorSite(
-        call,
-        validator,
-        scope,
-        state.conditional || isConditionalPosition(call),
-      )
-      const { conditional, ...identity } = site
-      // A site reached both conditionally and unconditionally is unconditional.
-      report('validator', facts.validatorSites, site, identity).conditional &&= conditional
-      return true
-    }
-    const factory = findConfig(call.expression, factories, checker)
-    if (factory) report('factory', facts.factorySites, factorySite(call, factory, scope))
-    return !!factory
+    if (!validator) return false
+    const { site, inputNodes } = validatorSite(
+      call,
+      validator,
+      scopeOf(state),
+      state.conditional || isConditionalPosition(call),
+    )
+    inputNodes.forEach((node) => inputs.add(node))
+    const { conditional, ...identity } = site
+    // A site reached both conditionally and unconditionally is unconditional.
+    report('validator', facts.validatorSites, site, identity).conditional &&= conditional
+    return true
   }
 
-  function walkExecutedCallbacks(call: ts.CallExpression, state: State) {
-    const host = findConfig(call.expression, executedCallbacks, checker)
-    const argument = host && call.arguments[host.argument]
-    const object = argument && unwrapTransparentExpression(argument)
-    if (!host || !object || !ts.isObjectLiteralExpression(object)) return
-    for (const property of object.properties) {
-      const name = property.name && ts.isIdentifier(property.name) ? property.name.text : undefined
-      const callback = inlineFunction(
-        ts.isPropertyAssignment(property) ? property.initializer : property,
-      )
-      if (name && host.properties.includes(name) && callback)
-        walkFunction(callback, {
-          ...state,
-          conditional: state.conditional || isConditionalPosition(call),
-        })
-    }
+  /** Records a configured factory call whose returned handler is a registration-time value. */
+  function reportFactory(call: ts.CallExpression, state: State) {
+    const factory = findConfig(call.expression, factories, checker)
+    if (!factory) return false
+    report('factory', facts.factorySites, factorySite(call, factory, scopeOf(state)))
+    return true
   }
 
   function visitCall(call: ts.CallExpression, state: State) {
     const conditional = state.conditional || isConditionalPosition(call)
     const callee = inlineFunction(unwrapTransparentExpression(call.expression))
+    const runners = new Set<ts.Node>(callee ? [callee] : [])
     if (callee) walkFunction(callee, { ...state, conditional })
     for (const implementation of followedImplementations(call, scopeOf(state))) {
       const { keys, roots } = bindArguments(implementation, call, scopeOf(state))
+      runners.add(implementation)
       walkFunction(implementation, { keys, roots, conditional })
     }
-    walkExecutedCallbacks(call, state)
+    // Listed callbacks of a configured host take only the call's own condition.
+    for (const callback of executedCallbackFunctions(call, executedCallbacks, checker))
+      walkFunction(callback, { ...state, conditional })
     for (const argument of call.arguments) {
       const callback = unwrapTransparentExpression(argument)
-      if (
-        (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) &&
-        httpContextInvocations(callback, checker).callers.length > 0
-      )
-        walkFunction(callback, { ...state, conditional })
+      if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) continue
+      const { callers } = httpContextInvocations(callback, checker)
+      // A helper that runs the callback under its own condition makes the sites conditional.
+      if (callers.length > 0)
+        walkFunction(callback, {
+          ...state,
+          conditional: conditional || !invokedUnconditionally(callers, runners),
+        })
     }
   }
 
   function walk(node: ts.Node, state: State) {
     if (!potentiallyExecuted(node)) return
-    if (ts.isCallExpression(node) && visitConfigured(node, state)) return
+    if (ts.isCallExpression(node)) reportValidator(node, state)
     for (const read of rawReadsAt(node, scopeOf(state)))
-      report('read', facts.carrierReads, { ...read, source: sourceOf(node) })
+      pendingReads.push({ node, read: { ...read, source: sourceOf(node) } })
     if (ts.isCallExpression(node)) visitCall(node, state)
     ts.forEachChild(node, (child) => {
       if (!ts.isFunctionLike(child)) walk(child, state)
@@ -157,7 +159,8 @@ export function createRouteWalker(config: WalkerConfig) {
   /** Finds configured calls in registration-time expressions, without entering handlers. */
   const scanning = new Set<ts.Node>()
   function scanRegistration(node: ts.Node, state: State = emptyState) {
-    if (ts.isFunctionLike(node) || (ts.isCallExpression(node) && visitConfigured(node, state)))
+    if (ts.isFunctionLike(node)) return
+    if (ts.isCallExpression(node) && !reportValidator(node, state) && reportFactory(node, state))
       return
     if (ts.isCallExpression(node))
       // A helper that builds the handler: follow its returned values with bound arguments.
@@ -172,21 +175,16 @@ export function createRouteWalker(config: WalkerConfig) {
   }
 
   return {
-    facts,
+    /** The collected facts; reads that only build a validator's input are left out. */
+    get facts(): RouteFacts {
+      for (const { node, read } of pendingReads)
+        if (!isInput(node)) report('read', facts.carrierReads, read)
+      pendingReads.length = 0
+      return facts
+    },
     scanRegistration,
     walkHandler(proof: HandlerProof) {
-      const keys = new Map<ts.Symbol, string>()
-      for (const [symbol, expression] of proof.bindings) {
-        const key = resolveKey(expression, checker, new Map())
-        if (key !== undefined) keys.set(symbol, key)
-      }
-      const context = runtimeParameters(proof.node)[0]?.name
-      const symbol =
-        context && ts.isIdentifier(context) ? checker.getSymbolAtLocation(context) : undefined
-      const roots = new Map<ts.Symbol, Bound>(
-        symbol ? [[symbol, { kind: 'context', origins: [] }]] : [],
-      )
-      walkFunction(proof.node, { keys, roots, conditional: false })
+      walkFunction(proof.node, { ...handlerBindings(proof, checker), conditional: false })
     },
   }
 }

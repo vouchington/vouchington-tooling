@@ -66,7 +66,7 @@ export function discoverRequestValidationFacts(
     })
     for (const argument of registration.arguments.filter((item) => !ts.isStringLiteral(item))) {
       const proofs: HandlerProof[] = []
-      const nodes = handlerNodes(argument, checker, new Map(), new Set(), false, proofs)
+      const nodes = handlerNodes(argument, checker, new Map(), new Set(), false, proofs, true)
       walker.scanRegistration(argument)
       for (const declaration of nodes.filter(ts.isVariableDeclaration))
         walker.scanRegistration(declaration)

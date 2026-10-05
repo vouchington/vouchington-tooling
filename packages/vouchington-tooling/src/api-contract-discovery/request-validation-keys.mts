@@ -8,6 +8,10 @@ export type KeyBindings = ReadonlyMap<ts.Symbol, string>
 const isConst = (declaration: ts.VariableDeclaration) =>
   !!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)
 
+/** A property name written as an identifier or string literal; computed names are `undefined`. */
+export const propertyNameText = (name: ts.PropertyName | undefined) =>
+  name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : undefined
+
 /** The variable symbol an identifier reads, including a shorthand property's value. */
 export function identifierSymbol(
   identifier: ts.Identifier,
@@ -24,7 +28,8 @@ function constInitializer(
   checker: ts.TypeChecker,
 ): ts.Expression | undefined {
   const symbol = identifierSymbol(identifier, checker)
-  const declaration = resolveSymbol(symbol!, checker).declarations?.find(ts.isVariableDeclaration)
+  const declaration =
+    symbol && resolveSymbol(symbol, checker).declarations?.find(ts.isVariableDeclaration)
   return declaration?.initializer && isConst(declaration) ? declaration.initializer : undefined
 }
 
@@ -80,8 +85,7 @@ function lookupProperty(
       if (found !== ABSENT) return found
     } else if (
       (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
-      (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
-      property.name.text === name
+      propertyNameText(property.name) === name
     )
       return resolveKey(
         ts.isPropertyAssignment(property) ? property.initializer : property.name,

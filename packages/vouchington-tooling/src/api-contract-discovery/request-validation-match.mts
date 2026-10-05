@@ -15,7 +15,8 @@ export function calleeSymbol(
   return symbol && resolveSymbol(symbol, checker)
 }
 
-const stripExtension = (path: string) => path.replace(/\.[cm]?[jt]sx?$/, '')
+const stripExtension = (path: string) =>
+  path.replace(/\.d\.[cm]?ts$/, '').replace(/\.[cm]?[jt]sx?$/, '')
 
 function moduleMatches(fileName: string, module: string): boolean {
   const path = fileName.replaceAll('\\', '/')

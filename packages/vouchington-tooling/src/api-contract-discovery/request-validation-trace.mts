@@ -4,7 +4,7 @@ import {
   type Followable,
   type Scope,
 } from './request-validation-follow.mts'
-import { priorWrites, returnedValues } from './request-validation-trace-helpers.mts'
+import { reachingWrites, returnedValues } from './request-validation-trace-helpers.mts'
 import { identifierSymbol, resolveKey } from './request-validation-keys.mts'
 import { isBodyRead, isHeaderGet, rootKind, type Bound } from './request-validation-origin.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -13,7 +13,7 @@ import type { Carrier } from './request-validation-types.mts'
 /** The request carriers a value derives from, and why part of it could not be traced. */
 export type Trace = { origins: Set<Carrier>; unresolved?: string | undefined }
 
-type Visit = { trace: Trace; symbols: Set<ts.Symbol>; functions: Set<ts.Node> }
+type Visit = { trace: Trace; seen: Set<ts.Node>; functions: Set<ts.Node> }
 
 /** Binds a followed function's parameters to what the call passes, with their origins. */
 export function bindArguments(fn: Followable, call: ts.CallExpression, scope: Scope): Scope {
@@ -42,10 +42,18 @@ export function bindArguments(fn: Followable, call: ts.CallExpression, scope: Sc
 }
 
 function visitIdentifier(identifier: ts.Identifier, scope: Scope, visit: Visit) {
-  const { trace, symbols } = visit
+  const { seen } = visit
   const symbol = identifierSymbol(identifier, scope.checker)
-  if (!symbol || symbols.has(symbol)) return
-  symbols.add(symbol)
+  if (!symbol || seen.has(identifier)) return
+  seen.add(identifier)
+  const { writes, initializer } = reachingWrites(identifier, symbol, scope.checker)
+  if (initializer) visitDeclared(identifier, symbol, scope, visit)
+  for (const write of writes) visitValue(write, scope, visit)
+}
+
+/** The value a binding starts with: a call-site binding, a parameter, or its initializer. */
+function visitDeclared(identifier: ts.Identifier, symbol: ts.Symbol, scope: Scope, visit: Visit) {
+  const { trace } = visit
   const bound = scope.roots.get(symbol)
   if (bound) {
     bound.origins.forEach((origin) => trace.origins.add(origin))
@@ -62,8 +70,6 @@ function visitIdentifier(identifier: ts.Identifier, scope: Scope, visit: Visit) 
     if (ts.isVariableDeclaration(owner) && owner.initializer)
       visitValue(owner.initializer, scope, visit)
   }
-  for (const write of priorWrites(identifier, symbol, scope.checker))
-    visitValue(write, scope, visit)
 }
 
 function visitCall(call: ts.CallExpression, scope: Scope, visit: Visit) {
@@ -71,7 +77,7 @@ function visitCall(call: ts.CallExpression, scope: Scope, visit: Visit) {
     if (visit.functions.has(fn)) continue
     const next = {
       ...visit,
-      symbols: new Set<ts.Symbol>(),
+      seen: new Set<ts.Node>(),
       functions: new Set(visit.functions).add(fn),
     }
     const bound = bindArguments(fn, call, scope)
@@ -103,6 +109,6 @@ function visitValue(node: ts.Node, scope: Scope, visit: Visit): void {
 /** Unions the request origins found anywhere in a value expression. */
 export function traceValue(node: ts.Node, scope: Scope): Trace {
   const trace: Trace = { origins: new Set() }
-  visitValue(node, scope, { trace, symbols: new Set(), functions: new Set() })
+  visitValue(node, scope, { trace, seen: new Set(), functions: new Set() })
   return trace
 }

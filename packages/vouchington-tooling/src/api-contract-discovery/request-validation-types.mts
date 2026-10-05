@@ -49,6 +49,11 @@ export type ValidatorSite = {
   operation: string | null
   unresolvedReason?: string
   carriers: ValidatorSiteCarrier[]
+  /**
+   * Set when the input object cannot be fully resolved (a non-literal input, an unresolvable
+   * spread or a computed property name), so `carriers` may be incomplete.
+   */
+  unresolvedCarriers?: string
   conditional: boolean
 }
 
@@ -60,7 +65,18 @@ export type FactorySite = {
   carriers: Carrier[]
 }
 
-export type CarrierRead = { carrier: Carrier; key: string | null; source: string }
+/**
+ * `key` for a static key, `computed` for a non-static key (`key: null`), `whole` for the carrier
+ * used as a value or a body read (`key: null`).
+ */
+type CarrierReadAccess = 'key' | 'computed' | 'whole'
+
+export type CarrierRead = {
+  carrier: Carrier
+  key: string | null
+  access: CarrierReadAccess
+  source: string
+}
 
 export type RouteValidationFacts = {
   kind: RegisteredRoute['kind']

@@ -26,6 +26,9 @@ const handlers: Record<string, string> = {
     await admitWork()
     await admitWork({ ...options })
     await admitWork({ [key]: () => { ${validate} } })`,
+  quoted: `await admitWork({ 'beforeCapacity': async () => { ${validate} }, 'other': () => { ${validate} } })`,
+  // The configured implementation runs `execute` under a condition; it is never entered.
+  gated: `await admitWork({ execute: async () => { ${validate} } })`,
   unconfigured: `await unconfigured({ beforeCapacity: async () => { ${validate} } })`,
   local: `await local({ beforeCapacity: async () => { ${validate} } })`,
 }
@@ -35,7 +38,7 @@ const files = {
   'lib/admit.ts': `
     export async function admitWork(options?: any): Promise<void> {
       await options?.beforeCapacity?.()
-      await options?.execute?.()
+      if (options?.gate) await options?.execute?.()
     }
     export async function unconfigured(options?: any): Promise<void> {
       await options?.beforeCapacity?.()
@@ -80,6 +83,11 @@ describe('request validation executed callbacks', () => {
       { carrier: 'query', key: 'limit' },
     ])
     expect(sites('method')).toMatchObject([{ conditional: false }])
+  })
+
+  it('matches quoted property names and ignores how the host invokes the callback', () => {
+    expect(sites('quoted')).toMatchObject([{ operation: 'GET:/api/items', conditional: false }])
+    expect(sites('gated')).toMatchObject([{ operation: 'GET:/api/items', conditional: false }])
   })
 
   it('applies conditions from the call and from inside the callback', () => {

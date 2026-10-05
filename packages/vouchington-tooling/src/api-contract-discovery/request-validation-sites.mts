@@ -1,9 +1,13 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { resolveKey, resolveObject, resolveOptionString } from './request-validation-keys.mts'
-import type { Scope } from './request-validation-follow.mts'
-import { traceValue } from './request-validation-trace.mts'
 import {
-  CARRIERS,
+  propertyNameText,
+  resolveKey,
+  resolveObject,
+  resolveOptionString,
+} from './request-validation-keys.mts'
+import type { Scope } from './request-validation-follow.mts'
+import { resolveInput, type InputResolution } from './request-validation-input.mts'
+import {
   type Carrier,
   type FactoryConfig,
   type FactorySite,
@@ -16,36 +20,12 @@ export function sourceOf(node: ts.Node): string {
   return `${file.fileName}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
 }
 
-const propertyKey = (name: ts.PropertyName) =>
-  ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined
-
-function inputObjectCarriers(
-  input: ts.Expression | undefined,
-  scope: Scope,
-): ValidatorSite['carriers'] {
-  const object = resolveObject(input, scope.checker)
-  const carriers: ValidatorSite['carriers'] = []
-  for (const property of object?.properties ?? []) {
-    if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) continue
-    const carrier = CARRIERS.find((candidate) => candidate === propertyKey(property.name))
-    if (!carrier || carriers.some((item) => item.carrier === carrier)) continue
-    const value = ts.isPropertyAssignment(property) ? property.initializer : property.name
-    const { origins, unresolved } = traceValue(value, scope)
-    carriers.push({
-      carrier,
-      origins: CARRIERS.filter((candidate) => origins.has(candidate)),
-      ...(unresolved && { unresolved }),
-    })
-  }
-  return carriers
-}
-
 /** True when the options object at the argument literally sets `property: true`. */
 function optionIsTrue(options: ts.Expression | undefined, property: string, scope: Scope) {
   return !!resolveObject(options, scope.checker)?.properties.some(
     (item) =>
       ts.isPropertyAssignment(item) &&
-      propertyKey(item.name) === property &&
+      propertyNameText(item.name) === property &&
       item.initializer.kind === ts.SyntaxKind.TrueKeyword,
   )
 }
@@ -66,24 +46,29 @@ export function validatorSite(
   config: ValidatorConfig,
   scope: Scope,
   conditional: boolean,
-): ValidatorSite {
+): { site: ValidatorSite; inputNodes: ts.Node[] } {
   const argument = call.arguments[config.operationArgument]
   const operation = resolveKey(argument, scope.checker, scope.keys) ?? null
-  const carriers =
+  const input: InputResolution =
     config.carriers.kind === 'input-object'
-      ? inputObjectCarriers(call.arguments[config.carriers.argument], scope)
-      : fixedCarriers(config.carriers, call, scope).map((carrier) => ({
-          carrier,
-          origins: [carrier],
-        }))
-  return {
+      ? resolveInput(call.arguments[config.carriers.argument], scope)
+      : {
+          carriers: fixedCarriers(config.carriers, call, scope).map((carrier) => ({
+            carrier,
+            origins: [carrier],
+          })),
+          nodes: [],
+        }
+  const site: ValidatorSite = {
     exportName: config.exportName,
     source: sourceOf(call),
     operation,
     ...(operation === null && { unresolvedReason: unresolved(argument) }),
-    carriers,
+    carriers: input.carriers,
+    ...(input.unresolved && { unresolvedCarriers: input.unresolved }),
     conditional,
   }
+  return { site, inputNodes: input.nodes }
 }
 
 export function factorySite(
