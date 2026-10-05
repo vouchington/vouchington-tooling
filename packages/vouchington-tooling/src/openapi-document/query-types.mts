@@ -1,4 +1,4 @@
-export type OpenApiQueryParameter =
+export type OpenApiQueryParameterShape =
   | { kind: 'string'; format?: 'uuid' | 'uri'; description?: string }
   | { kind: 'uuid-or-uri'; description?: string }
   | { kind: 'boolean'; description?: string }
@@ -14,10 +14,13 @@ export type OpenApiQueryParameter =
   | { kind: 'enum'; values: readonly string[]; default?: string; description?: string }
   | {
       kind: 'csv-array'
-      items: OpenApiQueryParameter
+      items: OpenApiQueryParameterShape
       style: 'form'
       explode: false
       description?: string
     }
+
+/** Top-level parameters may be `required: true`; array `items` never are. */
+export type OpenApiQueryParameter = OpenApiQueryParameterShape & { required?: true }
 
 export type OpenApiQueryContract = Readonly<Record<string, OpenApiQueryParameter>>

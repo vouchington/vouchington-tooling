@@ -493,6 +493,13 @@ analyzed. Named helper calls are not followed transitively: for example, an
 emission inside `emit(ctx)` is not attributed when a registered `shared(ctx)` handler calls
 `emit(ctx)`. The callback does not change the discovered contract result.
 
+Query contracts (`apiQuery`) carry requiredness. A top-level parameter descriptor type may include
+`required: true` (inline or through an intersection such as `{ readonly required: true }`); the
+extracted descriptor then has `required: true` and the OpenAPI parameter emits `required: true`,
+otherwise `required: false`. `required` must be the literal `true`; `false`, `boolean`, optional, or
+non-literal values fail as a malformed query parameter, as do `required` together with `default` and
+`required` on `csv-array` `items`.
+
 Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
 `apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
 `app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,

@@ -1,5 +1,9 @@
 import type { OpenApiParameter, OpenApiSchema } from './openapi-types.mts'
-import type { OpenApiQueryContract, OpenApiQueryParameter } from './query-types.mts'
+import type {
+  OpenApiQueryContract,
+  OpenApiQueryParameter,
+  OpenApiQueryParameterShape,
+} from './query-types.mts'
 
 export function queryParameters(contract: OpenApiQueryContract | undefined): OpenApiParameter[] {
   if (!contract) return []
@@ -12,7 +16,7 @@ function queryParameter(name: string, descriptor: OpenApiQueryParameter): OpenAp
   return {
     name,
     in: 'query',
-    required: false,
+    required: descriptor.required === true,
     ...(descriptor.description ? { description: descriptor.description } : {}),
     ...(descriptor.kind === 'csv-array'
       ? { style: descriptor.style, explode: descriptor.explode }
@@ -21,7 +25,7 @@ function queryParameter(name: string, descriptor: OpenApiQueryParameter): OpenAp
   }
 }
 
-function querySchema(descriptor: OpenApiQueryParameter): OpenApiSchema {
+function querySchema(descriptor: OpenApiQueryParameterShape): OpenApiSchema {
   switch (descriptor.kind) {
     case 'string':
       return { type: 'string', ...(descriptor.format ? { format: descriptor.format } : {}) }

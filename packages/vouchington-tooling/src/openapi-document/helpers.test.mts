@@ -37,6 +37,18 @@ describe('queryParameters', () => {
     expect(parameters).toHaveLength(10)
     expect(queryParameters(undefined)).toEqual([])
   })
+
+  it('emits required only for descriptors marked required', () => {
+    expect(
+      queryParameters({
+        a: { kind: 'string', required: true },
+        b: { kind: 'string' },
+      }),
+    ).toEqual([
+      { name: 'a', in: 'query', required: true, schema: { type: 'string' } },
+      { name: 'b', in: 'query', required: false, schema: { type: 'string' } },
+    ])
+  })
 })
 
 describe('buildOperationRequestBody', () => {

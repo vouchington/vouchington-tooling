@@ -38,6 +38,14 @@ const descriptors = {
   mappedKind: `{ [Key in 'kind']: 'string' }`,
   mappedDescription: `{ kind: 'string' } & { [Key in 'description']: 'Mapped description' }`,
   mappedDefault: `{ kind: 'integer'; minimum: 0; maximum: 10 } & { [Key in 'default']: 2 }`,
+  requiredIntersection: `{ kind: 'string' } & { readonly required: true }`,
+  requiredEnum: `{ kind: 'enum'; values: readonly ['a', 'b']; required: true }`,
+  requiredFalse: `{ kind: 'string'; required: false }`,
+  requiredBoolean: `{ kind: 'string'; required: boolean }`,
+  requiredOptional: `{ kind: 'string'; required?: true }`,
+  requiredDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; required: true }`,
+  requiredItems: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } }`,
+  requiredCsv: `{ kind: 'csv-array'; style: 'form'; explode: false; required: true; items: { kind: 'string' } }`,
   unionDescription: `{ kind: 'string'; description: 'x'; a: 1 } | { kind: 'string'; description: 'x'; b: 1 }`,
   unionDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; a: 1 } | { kind: 'integer'; minimum: 0; maximum: 10; default: 2; b: 1 }`,
 } as const
@@ -89,6 +97,18 @@ describe('query descriptor compiler boundaries', () => {
     ],
     ['mappedDescription', { kind: 'string', description: 'Mapped description' }],
     ['mappedDefault', { kind: 'integer', minimum: 0, maximum: 10, default: 2 }],
+    ['requiredIntersection', { kind: 'string', required: true }],
+    ['requiredEnum', { kind: 'enum', values: ['a', 'b'], required: true }],
+    [
+      'requiredCsv',
+      {
+        kind: 'csv-array',
+        style: 'form',
+        explode: false,
+        required: true,
+        items: { kind: 'string' },
+      },
+    ],
     ['unionDescription', { kind: 'string', description: 'x' }],
     ['unionDefault', { kind: 'integer', minimum: 0, maximum: 10, default: 2 }],
   ] as const)('extracts %s', (name, expected) => {
@@ -115,6 +135,11 @@ describe('query descriptor compiler boundaries', () => {
     ['badItems', 'array items must be string or enum'],
     ['unknown', 'unsupported kind'],
     ['mappedKind', 'requires declared kind'],
+    ['requiredFalse', 'required must be the literal true'],
+    ['requiredBoolean', 'required must be the literal true'],
+    ['requiredOptional', 'required must be literal when present'],
+    ['requiredDefault', 'required cannot be combined with default'],
+    ['requiredItems', 'array items cannot be required'],
   ] as const)('rejects %s', (name, reason) => {
     expect(() => extract(name)).toThrow(reason)
   })
