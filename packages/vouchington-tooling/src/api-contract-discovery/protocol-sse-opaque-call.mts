@@ -1,4 +1,7 @@
-import { containsSelectedSseOrigin } from './protocol-sse-selected-origin.mts'
+import {
+  containsSelectedSseOrigin,
+  selectedSseOriginUnexposed,
+} from './protocol-sse-selected-origin.mts'
 import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { callbackCapturesSelectedReceiver } from './protocol-sse-callback-capture.mts'
 import { actualReceivers } from './protocol-sse-actual-receivers.mts'
@@ -59,7 +62,7 @@ export function opaqueCallReceivesSelectedStream(
           )
         )
           return true
-        if (callback) return false
+        if (callback && selectedSseOriginUnexposed(framed, checker)) return false
         const receiver = expressionReceiver(leaf, checker)
 
         if (!receiver) return false

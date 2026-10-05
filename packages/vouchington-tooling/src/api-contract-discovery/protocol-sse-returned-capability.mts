@@ -60,6 +60,10 @@ function returnedSseCapability(
         const symbol = checker.getSymbolAtLocation(value)
         if (symbol && bindings.has(symbol)) return bindings.get(symbol)!
         const declaration = symbol?.valueDeclaration
+        if (declaration && ts.isFunctionDeclaration(declaration) && declaration.body)
+          return returnedExpressions(declaration).some(
+            (returned) => !!returned && contains(returned, bindings),
+          )
         if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer)
           return contains(declaration.initializer, bindings)
       }
