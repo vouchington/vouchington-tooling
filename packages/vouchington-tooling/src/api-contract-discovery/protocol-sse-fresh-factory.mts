@@ -15,6 +15,8 @@ function trustedFactoryBinding(
   return declaration &&
     ts.isFunctionDeclaration(declaration) &&
     declaration.body &&
+    !declaration.asteriskToken &&
+    !(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Async) &&
     !symbolBindingWritten(declaration.getSourceFile(), target, checker)
     ? declaration
     : undefined

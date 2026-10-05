@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { symbolBindingWritten } from './protocol-sse-binding-writes.mts'
 import type { WriteReceiver } from './protocol-write-receiver.mts'
 
 /** Temporal allocation does not prevent a retained callback from reading the owner later. */
@@ -13,6 +14,9 @@ export function argumentMayReachFutureOwner(
   const owner = selectedDeclaration && enclosingFunction(selectedDeclaration)
   if (!owner) return true
   const declaration = actual.root.valueDeclaration
+  // Retained mutable bindings can acquire this invocation's stream or an earlier one.
+  if (declaration && symbolBindingWritten(declaration.getSourceFile(), actual.root, checker, true))
+    return true
   const scope =
     declaration && ts.isFunctionDeclaration(declaration)
       ? declaration.body
