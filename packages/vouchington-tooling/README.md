@@ -16,7 +16,8 @@ declaration name, route label, factory pattern, and exception.
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
-# optional, if you import vouchington-tooling/contract-schema or finite-enum-ripple
+# optional, if you import vouchington-tooling/contract-schema, finite-enum-ripple,
+# or post-publication-inventory
 # (classic compiler API; typescript@7's package root is version-only)
 npm install @typescript/typescript6
 # optional, only if you use the Vitest reporter export
