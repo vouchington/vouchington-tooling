@@ -1,6 +1,6 @@
 import { createSseTagCallers } from './protocol-sse-tag-callers.mts'
 import { createSseCallbackOrigins } from './protocol-sse-callback-origins.mts'
-import { implementationDeclaration } from './protocol-sse-returned-capability.mts'
+import { implementationDeclaration } from './protocol-sse-implementation.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import {
   createProtocolCallbackValueResolver,

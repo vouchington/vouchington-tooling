@@ -3,7 +3,7 @@ import {
   createProtocolCallbackValueResolver,
   isProtocolCallbackFunction,
 } from './protocol-callback-values.mts'
-import { implementationDeclaration } from './protocol-sse-returned-capability.mts'
+import { implementationDeclaration } from './protocol-sse-implementation.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import {
   enclosingRouteBinding,
