@@ -44,7 +44,9 @@ function rowType(
   if (result && result.flags & (typescript.TypeFlags.Any | typescript.TypeFlags.Never))
     return { type: result, at: call }
   const rowsProperty = result && checker.getPropertyOfType(result, 'rows')
-  const rows = rowsProperty && checker.getTypeOfSymbolAtLocation(rowsProperty, call)
+  const rows = rowsProperty
+    ? checker.getTypeOfSymbolAtLocation(rowsProperty, call)
+    : result && checker.getIndexTypeOfType(result, typescript.IndexKind.String)
   if (rows && rows.flags & (typescript.TypeFlags.Any | typescript.TypeFlags.Never)) {
     return { type: rows, at: call }
   }

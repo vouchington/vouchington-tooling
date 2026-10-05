@@ -46,8 +46,17 @@ export function factsForType(
   const properties = Object.fromEntries(
     [...new Set(request.propertyNames ?? [])].sort().map((name) => {
       const property = checker.getPropertyOfType(type, name)
-      const display = property
-        ? checker.typeToString(checker.getTypeOfSymbolAtLocation(property, at))
+      const numericName = Number(name)
+      const numericKey = name.trim() !== '' && String(numericName) === name
+      const propertyType = property
+        ? checker.getTypeOfSymbolAtLocation(property, at)
+        : (checker.getIndexTypeOfType(
+            type,
+            numericKey ? typescript.IndexKind.Number : typescript.IndexKind.String,
+          ) ??
+          (numericKey ? checker.getIndexTypeOfType(type, typescript.IndexKind.String) : undefined))
+      const display = propertyType
+        ? checker.typeToString(propertyType, undefined, typescript.TypeFormatFlags.NoTruncation)
         : undefined
       return [name, display] as const
     }),
@@ -67,7 +76,7 @@ export function factsForType(
       ),
   )
   return {
-    display: checker.typeToString(type),
+    display: checker.typeToString(type, undefined, typescript.TypeFormatFlags.NoTruncation),
     isAny: Boolean(type.flags & typescript.TypeFlags.Any),
     properties,
     assignableTo,

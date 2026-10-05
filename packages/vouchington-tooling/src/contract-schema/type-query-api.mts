@@ -9,10 +9,11 @@ type ForEachChild = {
 }['visit']
 
 export interface TypeScriptApi {
-  readonly IndexKind: { readonly Number: number }
+  readonly IndexKind: { readonly Number: number; readonly String: number }
   readonly SymbolFlags: { readonly Alias: number; readonly Type: number; readonly Value: number }
   readonly SyntaxKind: { readonly SourceFile: number }
   readonly TypeFlags: { readonly Any: number; readonly Never: number }
+  readonly TypeFormatFlags: { readonly NoTruncation: ts.TypeFormatFlags.NoTruncation }
   readonly forEachChild: ForEachChild
   readonly isClassDeclaration: NodePredicate<ts.ClassDeclaration>
   readonly isCallExpression: NodePredicate<ts.CallExpression>
