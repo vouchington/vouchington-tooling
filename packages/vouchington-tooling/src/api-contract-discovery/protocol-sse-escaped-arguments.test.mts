@@ -80,7 +80,6 @@ it.each([
   'constructor',
   'constructor-object',
   'imported',
-  'imported-ignore',
 ] as const)('rejects the selected stream escape in %s', (name) =>
   expect(discover(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
@@ -90,6 +89,7 @@ it.each([
   'constructor-other',
   'dead-constructor',
   'local-ignore',
+  'imported-ignore',
   'literal-method',
   'omitted-array',
   'constructor-empty',

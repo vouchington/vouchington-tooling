@@ -48,8 +48,10 @@ const sources = {
     "$1 {return 'data: {}\\n\\n'}",
   ),
   nested: sse(
-    `stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
-  ),
+    `class NestedStream {write(_frame:string):void {}}
+      const stream=new NestedStream();
+      stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
+  ).replace(/declare (function apiSseFrame[^\n]+)/, "$1 {return 'data: {}\\n\\n'}"),
   'broad-name': sse(
     `stream.write(apiSseFrame('GET:/events',{event:'progress' as string,data:{count:1}}))`,
   ),

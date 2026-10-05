@@ -1,10 +1,10 @@
+import { collectSseInvocations } from './protocol-sse-invocations.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import {
   enclosingRouteBinding,
-  visit,
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
@@ -17,8 +17,6 @@ import { sseWriteInvocation } from './protocol-sse-write-access.mts'
 import {
   isSourceLevelMutation,
   mutationAffectsSelectedStream,
-  sseWriteMutation,
-  type SseWriteMutation,
 } from './protocol-sse-write-mutations.mts'
 import {
   actualReceivers,
@@ -26,6 +24,7 @@ import {
   opaqueCallReceivesSelectedStream,
   routeKey,
 } from './protocol-sse-write-helpers.mts'
+import { importedSseCallSafe } from './protocol-sse-imported-call.mts'
 import { writeAccess } from './protocol-sse-write-resolution.mts'
 
 export type SseRouteWrites = { receivers: WriteReceiver[]; keys: string[] }
@@ -45,16 +44,11 @@ export function rejectRawSseWrites(
 ): void {
   if (routes.size === 0) return
 
-  const invocations: (ts.CallExpression | ts.NewExpression)[] = []
-  const mutations: SseWriteMutation[] = []
-  for (const file of files)
-    visit(file, (node) => {
-      if (ts.isCallExpression(node) || ts.isNewExpression(node)) invocations.push(node)
-      const mutation = sseWriteMutation(node)
-      if (mutation) mutations.push(mutation)
-    })
+  const { invocations, mutations } = collectSseInvocations(files)
   const calls = invocations.filter(ts.isCallExpression)
   const lookup = createSseWriteLookup(calls, checker, bindings, files)
+  for (const call of lookup.reachableCalls())
+    if (!invocations.includes(call)) invocations.push(call)
   for (const node of invocations) {
     if (ts.isCallExpression(node) && framedWrites.has(node)) {
       const binding = enclosingRouteBinding(node, checker, bindings, false)
@@ -137,7 +131,11 @@ export function rejectRawSseWrites(
       if (
         !accessTargetsSelected &&
         !bindsSelectedMember &&
-        opaqueCallReceivesSelectedStream(node, route.receivers, candidate, checker, lookup)
+        opaqueCallReceivesSelectedStream(node, route.receivers, candidate, checker, lookup) &&
+        !(
+          ts.isCallExpression(node) &&
+          importedSseCallSafe(node, route.receivers, candidate, checker, lookup, framedWrites)
+        )
       ) {
         reject(node, candidate, route.keys)
         continue

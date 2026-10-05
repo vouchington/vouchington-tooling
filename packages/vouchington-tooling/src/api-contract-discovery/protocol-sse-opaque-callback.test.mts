@@ -144,6 +144,7 @@ it.each([
   'opaque-bound-argument',
   'node-pipeline',
   'node-pipeline-suffix',
+  'generator',
 ] as const)('rejects opaque raw emission in %s', (name) => {
   expect(() => discover(name)).toThrow('unmarked frame')
   const contracts = discover(name, undefined, true)
@@ -170,7 +171,6 @@ it.each([
   'outer-unused',
   'ignored',
   'ignored-options',
-  'generator',
   'different',
   'cleanup',
   'implemented-stream-argument',

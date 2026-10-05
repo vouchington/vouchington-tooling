@@ -678,7 +678,12 @@ the route's stream or HTTP context and escapes to a callee without a concrete im
 write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
 dead branches, and implemented helpers that ignore their callback preserve the proven contracts.
 Literal object/array arguments and constructor arguments retain selected-stream capabilities.
-A concrete helper body outside the indexed source set is opaque to raw-write validation.
+Concrete imported helpers are checked through their reached implementation with caller-bound
+selected-stream arguments, returned properties, and captured receivers. Stable registered factory
+handlers preserve the actual invocation supplying an inline callback's stream parameter.
+Unproven bodies, receiver alternatives, mutations, and observable selected-stream exports fail closed.
+A proven fresh stream with no unaccounted exposure does not taint unrelated data-producing calls;
+canonical frame and pipeline evidence remains tied to the selected route and exact invocation.
 Cataloged SSE routes with only extracted non-SSE variants retain an unavailable event-stream
 possibility alongside those responses until the extracted variants describe the stream.
 

@@ -49,7 +49,7 @@ export function createSseAccountedPipeline(
       invocations.length > 0 &&
       invocations.every(
         (selected) =>
-          lookup.implementationCall(selected) === fn &&
+          lookup.actualImplementationCall(selected) === fn &&
           route.receivers.some((frame) => {
             return factoryPipeline(frame, selected, fn, stream, checker)
           }),

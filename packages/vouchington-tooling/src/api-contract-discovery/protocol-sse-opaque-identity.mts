@@ -1,3 +1,4 @@
+import { predatesSelectedSseAllocation } from './protocol-sse-temporal-origin.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import {
@@ -74,6 +75,7 @@ export function opaqueArgumentExcludesSelectedStream(
   return selected.every((frame) => {
     if (sameWriteReceiver(frame, actual)) return false
     if (argumentMayContainSelectedSource(actual, frame, checker)) return false
+    if (predatesSelectedSseAllocation(actual, frame, checker)) return true
     if (ownerAssignedOnlyAfter(call, frame, checker))
       return !argumentMayReachFutureOwner(actual, frame, checker)
     if (
