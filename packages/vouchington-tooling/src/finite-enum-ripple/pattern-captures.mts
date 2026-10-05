@@ -6,14 +6,9 @@ export function collectActivePatternCaptures(
   pattern: RegExp,
   file: string,
 ): string[] {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.Standard,
-    content,
-  )
-  const inactive: { start: number; end: number; literal: boolean }[] = []
   const astInactive: { start: number; end: number }[] = []
+  const astLiterals: { start: number; end: number }[] = []
+  const commentRanges = new Map<string, { start: number; end: number }>()
   const source = ts.createSourceFile(
     file,
     content,
@@ -24,46 +19,29 @@ export function collectActivePatternCaptures(
   const collectAstInactive = (node: ts.Node): void => {
     if (ts.isJsxText(node) || ts.isRegularExpressionLiteral(node))
       astInactive.push({ start: node.getStart(source), end: node.end })
+    else if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+      astLiterals.push({ start: node.getStart(source), end: node.end })
+    else if (
+      node.kind === ts.SyntaxKind.TemplateHead ||
+      node.kind === ts.SyntaxKind.TemplateMiddle ||
+      node.kind === ts.SyntaxKind.TemplateTail
+    )
+      astInactive.push({ start: node.getStart(source), end: node.end })
+    for (const range of [
+      ...(ts.getLeadingCommentRanges(content, node.getFullStart()) ?? []),
+      ...(ts.getTrailingCommentRanges(content, node.end) ?? []),
+    ])
+      commentRanges.set(`${range.pos}:${range.end}`, { start: range.pos, end: range.end })
     ts.forEachChild(node, collectAstInactive)
   }
   collectAstInactive(source)
-  const inactiveKinds = new Set([
-    ts.SyntaxKind.SingleLineCommentTrivia,
-    ts.SyntaxKind.MultiLineCommentTrivia,
-    ts.SyntaxKind.StringLiteral,
-    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-    ts.SyntaxKind.TemplateHead,
-    ts.SyntaxKind.TemplateMiddle,
-    ts.SyntaxKind.TemplateTail,
-    ts.SyntaxKind.RegularExpressionLiteral,
-  ])
-  const templateBraceDepth: number[] = []
-  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
-    if (kind === ts.SyntaxKind.TemplateHead) templateBraceDepth.push(0)
-    else if (kind === ts.SyntaxKind.OpenBraceToken && templateBraceDepth.length) {
-      templateBraceDepth[templateBraceDepth.length - 1]!++
-    } else if (kind === ts.SyntaxKind.CloseBraceToken && templateBraceDepth.length) {
-      const depth = templateBraceDepth.length - 1
-      if (templateBraceDepth[depth] === 0) {
-        kind = scanner.reScanTemplateToken(false)
-        if (kind === ts.SyntaxKind.TemplateTail) templateBraceDepth.pop()
-      } else templateBraceDepth[depth]!--
-    }
-    if (
-      inactiveKinds.has(kind) &&
-      !astInactive.some(
-        ({ start, end }) => scanner.getTokenPos() < end && scanner.getTextPos() > start,
-      )
-    )
-      inactive.push({
-        start: scanner.getTokenPos(),
-        end: scanner.getTextPos(),
-        literal:
-          kind === ts.SyntaxKind.StringLiteral ||
-          kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-      })
-  }
-  inactive.push(...astInactive.map(({ start, end }) => ({ start, end, literal: false })))
+  const inactive = [
+    ...[...commentRanges.values()]
+      .filter(({ start, end }) => !astInactive.some((span) => start < span.end && end > span.start))
+      .map(({ start, end }) => ({ start, end, literal: false })),
+    ...astInactive.map(({ start, end }) => ({ start, end, literal: false })),
+    ...astLiterals.map(({ start, end }) => ({ start, end, literal: true })),
+  ]
   const flags = pattern.global ? pattern.flags : `${pattern.flags}g`
   const globalPattern = new RegExp(pattern.source, flags)
   return [...content.matchAll(globalPattern)].flatMap((match) => {

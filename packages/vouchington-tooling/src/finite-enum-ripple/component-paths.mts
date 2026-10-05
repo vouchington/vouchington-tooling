@@ -27,8 +27,11 @@ export function checkStructuredCollectionComponentPathLiterals(
       ignoredNavigationPaths,
       navigationPattern,
     )) {
-      const firstSegment = literalPath.split('/')[0]
-      if (firstSegment === config.pluralPath || firstSegment === config.singularPath) continue
+      if (
+        matchesConfiguredPath(literalPath, config.pluralPath) ||
+        matchesConfiguredPath(literalPath, config.singularPath)
+      )
+        continue
       errors.push(
         finiteEnumError(
           file,
@@ -37,6 +40,10 @@ export function checkStructuredCollectionComponentPathLiterals(
       )
     }
   }
+}
+
+function matchesConfiguredPath(literalPath: string, configuredPath: string): boolean {
+  return literalPath === configuredPath || literalPath.startsWith(`${configuredPath}/`)
 }
 
 function collectNavigationPathLiterals(

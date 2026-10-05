@@ -62,3 +62,38 @@ it('preserves configured-pattern matches inside type-level route declarations', 
     'right',
   ])
 })
+
+it('keeps AST string ranges inactive after JSX and regex scanner overlap', () => {
+  const pattern = /\bpath:\s*['"]\/([^'"]*)/g
+  expect(
+    collectActivePatternCaptures(
+      `<p>don't</p>; const example = "path: '/entries'"; const route = { path: '/wrong' }`,
+      pattern,
+      'page.tsx',
+    ),
+  ).toEqual(['wrong'])
+  expect(
+    collectActivePatternCaptures(
+      `<p>// still JSX text</p>; const route = { path: '/right' }`,
+      pattern,
+      'page.tsx',
+    ),
+  ).toEqual(['right'])
+  expect(
+    collectActivePatternCaptures(`<p>// path: '/jsx'</p>; // path: '/wrong'`, pattern, 'page.tsx'),
+  ).toEqual([])
+  expect(
+    collectActivePatternCaptures(
+      `<p>quoted path: '/jsx'</p>; // path: '/wrong'`,
+      pattern,
+      'page.tsx',
+    ),
+  ).toEqual([])
+  expect(
+    collectActivePatternCaptures(
+      `const matcher = /"'/; const example = "path: '/entries'"; const route = { path: '/wrong' }`,
+      pattern,
+      'page.ts',
+    ),
+  ).toEqual(['wrong'])
+})

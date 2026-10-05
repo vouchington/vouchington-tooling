@@ -137,6 +137,27 @@ describe('finite enum parsers', () => {
     )
   })
 
+  it('rejects prototype-setter slug keys and preserves caller regex state', () => {
+    expect(() =>
+      parseUnionSlugToType("const recordSlugs = { __proto__: 'entry' }", file, 'recordSlugs'),
+    ).toThrow(/unsupported __proto__ prototype setter/)
+
+    const unionPattern = /^pageFactory$/g
+    unionPattern.lastIndex = 4
+    const unionSource = "pageFactory('entry', 'entry'); pageFactory('other', 'other')"
+    expect(parseUnionDetailRouteFactoryArgs(unionSource, file, unionPattern)).toEqual([
+      { unionType: 'entry', slug: 'entry' },
+      { unionType: 'other', slug: 'other' },
+    ])
+    expect(parseUnionDetailRouteFactoryArgs(unionSource, file, unionPattern)).toHaveLength(2)
+    expect(unionPattern.lastIndex).toBe(4)
+
+    const structuredPattern = Object.freeze(/^pageFactory$/g)
+    expect(
+      parseStructuredRouteFactoryArgs("pageFactory('alpha')", file, structuredPattern),
+    ).toEqual([{ slug: 'alpha' }])
+  })
+
   it('reports missing configured route properties and unsupported union values', () => {
     expect(() =>
       parseUnionRouteConfigEntries(

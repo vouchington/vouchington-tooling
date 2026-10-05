@@ -1,5 +1,6 @@
 import ts from '@typescript/typescript6'
 import { getStringLiteralValue, unwrapExpression } from './ast.mts'
+import { jsxRuntimeStringValue } from './create-page-jsx.mts'
 import {
   getConfiguredPropertyName,
   spreadMayOverrideConfiguredProperty,
@@ -70,7 +71,9 @@ export function collectCreatePageLiterals(
       const value =
         node.initializer && ts.isJsxExpression(node.initializer)
           ? getStringLiteralValue(node.initializer.expression)
-          : getStringLiteralValue(node.initializer)
+          : node.initializer && ts.isStringLiteral(node.initializer)
+            ? jsxRuntimeStringValue(node.initializer, source, file)
+            : getStringLiteralValue(node.initializer)
       if (value === undefined)
         throw new Error(`${file}: create page ${node.name.text} must be a string literal`)
       values.push(value)

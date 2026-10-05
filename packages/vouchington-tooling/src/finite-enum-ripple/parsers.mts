@@ -96,6 +96,8 @@ export function parseUnionSlugToType(
       throw new Error(`${file}: ${name} contains an uninspectable member`)
     const key = getPropertyNameText(property.name)
     if (!key) throw new Error(`${file}: ${name} contains an uninspectable key`)
+    if (key === '__proto__' && !ts.isComputedPropertyName(property.name))
+      throw new Error(`${file}: ${name} contains unsupported __proto__ prototype setter`)
     const value = getStringLiteralValue(property.initializer)
     if (value === undefined) throw new Error(`${file}: ${name}.${key} must be a string literal`)
     entries.set(key, value)
@@ -149,9 +151,10 @@ export function parseUnionDetailRouteFactoryArgs(
   callPattern: RegExp,
 ): UnionDetailRouteFactoryArgs[] {
   const args: UnionDetailRouteFactoryArgs[] = []
+  const matcher = new RegExp(callPattern.source, callPattern.flags)
   for (const call of collectCallExpressions(content, file)) {
-    callPattern.lastIndex = 0
-    if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
+    matcher.lastIndex = 0
+    if (!matcher.test(getCallExpressionName(call.expression) ?? '')) continue
     const unionType = getStringLiteralValue(call.arguments[0])
     const slug = getStringLiteralValue(call.arguments[1])
     if (unionType === undefined || slug === undefined)
@@ -167,9 +170,10 @@ export function parseStructuredRouteFactoryArgs(
   callPattern: RegExp,
 ): StructuredRouteFactoryArgs[] {
   const args: StructuredRouteFactoryArgs[] = []
+  const matcher = new RegExp(callPattern.source, callPattern.flags)
   for (const call of collectCallExpressions(content, file)) {
-    callPattern.lastIndex = 0
-    if (!callPattern.test(getCallExpressionName(call.expression) ?? '')) continue
+    matcher.lastIndex = 0
+    if (!matcher.test(getCallExpressionName(call.expression) ?? '')) continue
     const slug = getStringLiteralValue(call.arguments[0])
     if (!slug) throw new Error(`${file}: configured route factory call needs a string literal slug`)
     args.push({ slug })

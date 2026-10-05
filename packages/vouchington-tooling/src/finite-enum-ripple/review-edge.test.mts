@@ -349,6 +349,7 @@ it('rejects selected create pages with no literal or with dynamic configured val
     'const fields = { action: selectedType }',
     "const action = choose(); const fields = { action, other: 'entry' }",
     'const view = <Form action={selectedType} />',
+    'const view = <Form action />',
     'form.action = selectedType',
   ]) {
     expect(() => collectCreatePageLiterals(source, 'page.tsx', ['action'])).toThrow(
