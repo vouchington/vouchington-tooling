@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
+import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { symbolBindingWritten } from './protocol-sse-binding-writes.mts'
 import type { WriteReceiver } from './protocol-write-receiver.mts'
 
@@ -32,11 +33,10 @@ export function independentArgumentOrigin(actual: WriteReceiver, checker: ts.Typ
   if (ts.isStringLiteral(initializer) || ts.isNumericLiteral(initializer)) return true
   if (!ts.isCallExpression(initializer) || !ts.isIdentifier(initializer.expression)) return false
   if (initializer.expression.text !== 'setInterval') return false
-  const timerSymbol = checker.getSymbolAtLocation(initializer.expression)
-  if (!timerSymbol || symbolBindingWritten(initializer.getSourceFile(), timerSymbol, checker))
-    return false
-  const declarationFile = checker.getResolvedSignature(initializer)?.declaration?.getSourceFile()
-  if (!declarationFile?.isDeclarationFile) return false
-  const file = declarationFile.fileName.replaceAll('\\', '/')
-  return /\/(?:@types\/node\/(?:web-globals\/)?timers|lib\.dom)\.d\.ts$/.test(file)
+  const symbol = checker.getSymbolAtLocation(initializer.expression)
+  return (
+    symbol !== undefined &&
+    !symbolBindingWritten(initializer.getSourceFile(), symbol, checker, true) &&
+    platformCallbackArgument(initializer, checker) !== undefined
+  )
 }
