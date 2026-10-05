@@ -1,7 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { factoryCreatesFreshSelectedStream } from './protocol-sse-fresh-factory.mts'
-import type { WriteReceiver } from './protocol-write-receiver.mts'
+import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
 
 function hasRepeatingAncestor(node: ts.Node, owner: ts.Node): boolean {
   for (let parent = node.parent; parent && parent !== owner; parent = parent.parent)
@@ -69,7 +69,8 @@ export function ownerHasFreshAllocation(
   let assignment: ts.BinaryExpression | undefined
   let invalidWrite = false
   const writesOwner = (node: ts.Node): boolean => {
-    if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === receiver.root) return true
+    if (ts.isIdentifier(node) && expressionReceiver(node, checker)?.root === receiver.root)
+      return true
     return node.getChildren().some(writesOwner)
   }
   const inspect = (node: ts.Node): void => {
