@@ -61,6 +61,8 @@ export function collectCreatePageLiterals(
           }
           visit(expression, overridden)
         } else {
+          const name = getConfiguredPropertyName(member, names)
+          if (isConfiguredPropertyName(name, names) && ignoredProperties.has(name)) continue
           visit(member, ignoredProperties)
         }
       }

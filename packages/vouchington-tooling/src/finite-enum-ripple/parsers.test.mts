@@ -83,6 +83,42 @@ describe('finite enum parsers', () => {
     expect(parseUnionTypeUnion(source, file, 'RecordKind')).toEqual(['entry', 'internal'])
   })
 
+  it('rejects prototype setters in structured and union route maps', () => {
+    for (const key of ['__proto__', "'__proto__'"]) {
+      const routes = `const routes = { ${key}: { singular: '__proto__', plural: '__proto__', kinds: ['__proto__'] } }`
+      expect(() =>
+        parseUnionRouteConfigEntries(routes, file, 'routes', 'kinds', 'plural', 'singular'),
+      ).toThrow('unsupported __proto__ prototype setter')
+      expect(() =>
+        parseStructuredRouteConfigEntries(
+          routes,
+          file,
+          'routes',
+          'kinds',
+          'special',
+          'plural',
+          'singular',
+        ),
+      ).toThrow('unsupported __proto__ prototype setter')
+    }
+    const computed =
+      "const routes = { ['__proto__']: { singular: 'entry', plural: 'entries', kinds: ['entry'] } }"
+    expect(
+      parseUnionRouteConfigEntries(computed, file, 'routes', 'kinds', 'plural', 'singular'),
+    ).toHaveLength(1)
+    expect(
+      parseStructuredRouteConfigEntries(
+        computed,
+        file,
+        'routes',
+        'kinds',
+        'special',
+        'plural',
+        'singular',
+      ),
+    ).toHaveLength(1)
+  })
+
   it('accepts imported factory aliases and ignores unrelated calls', () => {
     const source = [
       "import { createRecordPage as pageFactory } from './factories'",

@@ -242,7 +242,6 @@ it('counts an inferred exempt structured route as a present declaration value', 
   )
   expect(errors).toEqual([])
 })
-
 it('rejects overriding members inside structured slug bodies', () => {
   const parse = (body: string) =>
     parseStructuredTypeEntries(`const kinds = { alpha: ${body} }`, file, 'kinds', 'slug', 'slugs')
@@ -256,7 +255,6 @@ it('rejects overriding members inside structured slug bodies', () => {
     'uninspectable or duplicate key',
   )
 })
-
 it('preserves an empty structured key and detects mutable configured declarations', () => {
   expect(
     parseStructuredTypeEntries(
@@ -273,7 +271,6 @@ it('preserves an empty structured key and detects mutable configured declaration
   ).toThrow('could not find routes')
   expect(hasConfiguredObjectDeclaration('const other = {}', 'routes', file)).toBe(false)
 })
-
 it('rejects route members that cannot be fully inspected', () => {
   const parse = (source: string) =>
     parseUnionRouteConfigEntries(source, file, 'routes', 'kinds', 'plural', 'singular')
@@ -305,7 +302,6 @@ it('rejects route members that cannot be fully inspected', () => {
     ),
   ).toThrow('uninspectable or duplicate key')
 })
-
 it('collects literal element-access assignments but not dynamic property names', () => {
   expect(
     collectCreatePageLiterals(
@@ -318,7 +314,6 @@ it('collects literal element-access assignments but not dynamic property names',
     'other',
   ])
 })
-
 it('reports a selected create page without a matching single-type route', () => {
   const errors: string[] = []
   checkUnionCreatePageTypes(
@@ -331,7 +326,6 @@ it('reports a selected create page without a matching single-type route', () => 
   )
   expect(errors.join('\n')).toContain('no matching single-type route config for "drafts"')
 })
-
 it('rejects selected create pages with no literal or with dynamic configured values', () => {
   const errors: string[] = []
   const routes = [{ pluralPath: 'entries', unionTypes: ['entry'] }]
@@ -455,6 +449,11 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
       ['action'],
     ),
   ).toEqual(['entry'])
+  const source = "const fields={...{action:{action:'unreachable'},unionType:'type'},action:'entry'}"
+  expect(collectCreatePageLiterals(source, 'page.ts', ['action', 'unionType'])).toEqual([
+    'type',
+    'entry',
+  ])
 })
 it('preserves the legacy exclusion for configured create-page methods and accessors', () => {
   expect(
@@ -495,6 +494,7 @@ it('retains empty create-page values in objects, JSX, and assignments', () => {
   ).toEqual(['', ''])
 })
 it('parses non-JSX create pages as TypeScript after angle-bracket assertions', () => {
-  const source = "const cast = <string>input; const fields = { action: 'wrong' }"
+  const source =
+    "const cast = <string>input; const total = 1 + 2; const fields = { action: 'wrong' }"
   expect(collectCreatePageLiterals(source, 'page.mts', ['action'])).toEqual(['wrong'])
 })

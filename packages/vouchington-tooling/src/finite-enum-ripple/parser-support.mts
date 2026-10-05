@@ -23,8 +23,12 @@ export function parseRouteConfigEntries(
   for (const property of object.properties) {
     if (!ts.isPropertyAssignment(property))
       throw new Error(`${file}: ${name} contains an uninspectable route member`)
-    const key = getPropertyNameText(property.name)
+    const key = ts.isComputedPropertyName(property.name)
+      ? getStringLiteralValue(property.name.expression)
+      : getPropertyNameText(property.name)
     if (!key) throw new Error(`${file}: ${name} contains an uninspectable route key`)
+    if (key === '__proto__' && !ts.isComputedPropertyName(property.name))
+      throw new Error(`${file}: ${name} contains unsupported __proto__ prototype setter`)
     const body = unwrapExpression(property.initializer)
     if (!ts.isObjectLiteralExpression(body))
       throw new Error(`${file}: ${name}.${key} must be an object literal`)
