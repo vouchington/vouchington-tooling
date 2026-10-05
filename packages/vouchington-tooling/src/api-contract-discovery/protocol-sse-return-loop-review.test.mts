@@ -8,6 +8,26 @@ const route = (body: string) => `declare const app:any;declare function opaque(v
  declare function opaqueResult(value:Stream):Stream;
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
+  tagambient: route('external`value`').replace(
+    'app.route',
+    'declare function external(strings:TemplateStringsArray):void;app.route',
+  ),
+  taggenerator: route(
+    "function* emit(_strings:TemplateStringsArray){stream.write('raw')}emit`value`",
+  ),
+  tagoutside: route('').replace(
+    'app.route',
+    "function emit(_strings:TemplateStringsArray){other.write('raw')}emit`value`;app.route",
+  ),
+  tagtwice: route(
+    "function emit(_strings:TemplateStringsArray){other.write('raw')}emit`one`;emit`two`",
+  ),
+  tagraw: route("function emit(_strings:TemplateStringsArray){stream.write('raw')}emit`value`"),
+  tagsafe: route("function emit(_strings:TemplateStringsArray){other.write('raw')}emit`value`"),
+  tagunused: route("function emit(_strings:TemplateStringsArray){stream.write('raw')}"),
+  tagdead: route(
+    "function emit(_strings:TemplateStringsArray){stream.write('raw')}if(false)emit`value`",
+  ),
   callbackblock: route('opaque([{callback:function(){return stream}}])'),
   elementmethod: route('(stream as Stream & {raw():void})["raw"]()'),
   concretecleanup: route('stream.cleanup()'),
@@ -52,6 +72,7 @@ const row = (name: keyof typeof sources) =>
     onRouteError: () => {},
   })['GET:/events']
 it.each([
+  'tagraw',
   'callbackblock',
   'elementmethod',
   'wrapper',
@@ -74,6 +95,13 @@ it.each([
   expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
 it.each([
+  'tagambient',
+  'taggenerator',
+  'tagoutside',
+  'tagtwice',
+  'tagsafe',
+  'tagunused',
+  'tagdead',
   'concretecleanup',
   'deadmethod',
   'wrapperother',
