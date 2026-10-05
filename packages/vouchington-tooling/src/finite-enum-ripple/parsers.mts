@@ -16,6 +16,7 @@ import {
   parseRouteConfigEntries,
   parseStringArray,
 } from './parser-support.mts'
+import { hasPostDeclarationSlugMapMutation } from './slug-map-mutations.mts'
 
 export interface StructuredTypeEntry {
   value: string
@@ -92,6 +93,8 @@ export function parseUnionSlugToType(
   name: string,
 ): Map<string, string> {
   const object = findConstObjectLiteral(content, name, file)
+  if (hasPostDeclarationSlugMapMutation(content, file, name, object.end))
+    throw new Error(`${file}: ${name} has a post-declaration property mutation`)
   const entries = new Map<string, string>()
   for (const property of object.properties) {
     if (!ts.isPropertyAssignment(property))

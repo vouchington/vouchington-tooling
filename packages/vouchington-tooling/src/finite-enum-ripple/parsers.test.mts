@@ -173,6 +173,27 @@ describe('finite enum parsers', () => {
     )
   })
 
+  it('rejects direct writes to the configured slug map but ignores shadowed locals', () => {
+    for (const write of [
+      "recordSlugs.entry = 'other'",
+      "recordSlugs[dynamic] = 'other'",
+      'delete recordSlugs.entry',
+      'recordSlugs.entry++',
+      '++recordSlugs.entry',
+    ]) {
+      expect(() =>
+        parseUnionSlugToType(
+          `const recordSlugs = { entry: 'entry' }; ${write}`,
+          file,
+          'recordSlugs',
+        ),
+      ).toThrow('post-declaration property mutation')
+    }
+    const shadowed =
+      "const recordSlugs = { entry: 'entry' }; function update() { const recordSlugs = {}; recordSlugs.entry = 'other' }"
+    expect([...parseUnionSlugToType(shadowed, file, 'recordSlugs')]).toEqual([['entry', 'entry']])
+  })
+
   it('rejects prototype-setter slug keys and preserves caller regex state', () => {
     expect(() =>
       parseUnionSlugToType("const recordSlugs = { __proto__: 'entry' }", file, 'recordSlugs'),

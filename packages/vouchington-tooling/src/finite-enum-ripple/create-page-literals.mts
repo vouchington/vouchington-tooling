@@ -59,7 +59,11 @@ export function collectCreatePageLiterals(
     ) {
       const name = assignedPropertyName(node.operand)
       if (isConfiguredPropertyName(name, names))
-        throw new Error(`${file}: unary update to create page ${name} is uninspectable`)
+        throw new Error(`${file}: unary mutation of create page ${name} is uninspectable`)
+    } else if (ts.isDeleteExpression(node)) {
+      const name = assignedPropertyName(node.expression)
+      if (isConfiguredPropertyName(name, names))
+        throw new Error(`${file}: deletion of create page ${name} is uninspectable`)
     } else if (ts.isBinaryExpression(node)) {
       const name = assignedPropertyName(node.left)
       if (

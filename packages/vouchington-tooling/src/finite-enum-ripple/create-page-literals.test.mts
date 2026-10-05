@@ -15,14 +15,21 @@ describe('create-page literal extraction', () => {
     ).toEqual(['entry'])
   })
 
-  it('rejects prefix and postfix updates of configured properties', () => {
+  it('rejects updates and deletion of configured properties', () => {
     for (const update of ['form.action++', 'form.action--', '++form.action', "--form['action']"]) {
       expect(() =>
         collectCreatePageLiterals(`const form: any = { action: 'entry' }; ${update}`, 'page.ts', [
           'action',
         ]),
-      ).toThrow('unary update')
+      ).toThrow('unary mutation')
     }
+    expect(() =>
+      collectCreatePageLiterals(
+        "const form: any = { action: 'entry' }; delete form.action",
+        'page.ts',
+        ['action'],
+      ),
+    ).toThrow('deletion')
     expect(
       collectCreatePageLiterals("form.unrelated++; const fields = { action: 'entry' }", 'page.ts', [
         'action',
