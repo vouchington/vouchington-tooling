@@ -7,7 +7,12 @@ export interface ReaderSqlTemplateOptions {
   readonly placeholderPrefix: string
 }
 
-export function simpleName(node: ts.Node): string | undefined {
+export function identifierName(node: ts.Node): string | undefined {
+  node = unparenthesized(node)
+  return ts.isIdentifier(node) ? node.text : undefined
+}
+
+export function staticPropertyName(node: ts.Node): string | undefined {
   node = unparenthesized(node)
   return ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : undefined
 }
@@ -24,7 +29,7 @@ export function staticSqlTemplateText(
   if (!node) return undefined
   node = unparenthesized(node)
   if (ts.isTaggedTemplateExpression(node)) {
-    if (simpleName(node.tag) !== options.templateTag) return undefined
+    if (identifierName(node.tag) !== options.templateTag) return undefined
     node = node.template
   }
   if (ts.isNoSubstitutionTemplateLiteral(node)) return rawQuasi(node)

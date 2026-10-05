@@ -1,7 +1,8 @@
 import ts from '../../contract-schema/typescript-api.mts'
 import { terminalSqlExecutorBindings } from './sql-executors.mts'
 import {
-  simpleName,
+  identifierName,
+  staticPropertyName,
   staticSqlTemplateText,
   unparenthesized,
   walk,
@@ -33,7 +34,7 @@ export function extractStaticSqlTemplateQuasis(
   const direct: string[] = []
   walk(ast, (node) => {
     if (!ts.isVariableDeclaration(node)) return
-    const binding = simpleName(node.name)
+    const binding = identifierName(node.name)
     const text = staticSqlTemplateText(node.initializer, options)
     if (binding && text) statements.set(binding, { text, offset: node.getStart(ast) })
   })
@@ -43,12 +44,12 @@ export function extractStaticSqlTemplateQuasis(
       node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
     ) {
       for (const declaration of node.declarationList.declarations) {
-        const binding = simpleName(declaration.name)
+        const binding = identifierName(declaration.name)
         if (binding) consumed.add(binding)
       }
     }
     if (ts.isReturnStatement(node) && node.expression) {
-      const binding = simpleName(node.expression)
+      const binding = identifierName(node.expression)
       if (binding) consumed.add(binding)
       const text = staticSqlTemplateText(node.expression, options)
       if (text) direct.push(text)
@@ -58,7 +59,7 @@ export function extractStaticSqlTemplateQuasis(
     const callee = unparenthesized(node.expression)
     if (!ts.isIdentifier(callee) || !executors.has(callee.text)) return
     for (const argument of node.arguments) {
-      const binding = simpleName(argument)
+      const binding = identifierName(argument)
       if (binding) consumed.add(binding)
       const text = staticSqlTemplateText(argument, options)
       if (text) direct.push(text)
@@ -70,9 +71,9 @@ export function extractStaticSqlTemplateQuasis(
     if (!ts.isPropertyAccessExpression(callee) && !ts.isElementAccessExpression(callee)) return
     const method = ts.isPropertyAccessExpression(callee)
       ? callee.name.text
-      : simpleName(callee.argumentExpression)
+      : staticPropertyName(callee.argumentExpression)
     if (method !== options.appendMethod) return
-    const receiver = simpleName(callee.expression)
+    const receiver = identifierName(callee.expression)
     const statement = receiver ? statements.get(receiver) : undefined
     const appended = staticSqlTemplateText(node.arguments[0], options)
     if (statement && appended && node.getStart(ast) > statement.offset) statement.text += appended

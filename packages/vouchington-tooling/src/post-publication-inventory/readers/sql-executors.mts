@@ -1,6 +1,6 @@
 import ts from '../../contract-schema/typescript-api.mts'
 import {
-  simpleName,
+  identifierName,
   unparenthesized,
   walk,
   type ReaderSqlTemplateOptions,
@@ -25,8 +25,8 @@ export function terminalSqlExecutorBindings(
     if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return
     const initializer = node.initializer && unparenthesized(node.initializer)
     if (!initializer || !ts.isConditionalExpression(initializer)) return
-    const consequent = simpleName(initializer.whenTrue)
-    const alternate = simpleName(initializer.whenFalse)
+    const consequent = identifierName(initializer.whenTrue)
+    const alternate = identifierName(initializer.whenFalse)
     if ((consequent && bindings.has(consequent)) || (alternate && bindings.has(alternate)))
       bindings.add(node.name.text)
   })

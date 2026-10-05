@@ -60,6 +60,7 @@ describe('reader SQL source fragments', () => {
         statement['extend'](\` ORDER BY record_id\`);
         statement.extend();
         statement.extend('NOT A TEMPLATE');
+        statement[123](queryText\`NOT A STATIC METHOD\`);
         statement.other(queryText\`IGNORED\`);
         unknown.extend(queryText\`UNKNOWN\`);
         getStatement().extend(queryText\`NOT A SIMPLE RECEIVER\`);
@@ -100,6 +101,22 @@ describe('reader SQL source fragments', () => {
         missing(queryText\`SELECT ignored\`);
       `),
     ).toEqual(['SELECT first', 'SELECT second'])
+  })
+
+  it('does not treat ordinary strings as binding references', () => {
+    expect(
+      extract(`
+        import { fetchRows } from 'fixture-db';
+        const fromArgument = queryText\`SELECT ARGUMENT\`;
+        fetchRows('fromArgument');
+        const fromReturn = queryText\`SELECT RETURN\`;
+        function returnString() { return 'fromReturn'; }
+        const fake = flag ? 'fetchRows' : unrelated;
+        fake(queryText\`SELECT ALIAS\`);
+        export const appended = queryText\`SELECT APPEND\`;
+        'appended'.extend(queryText\` UNRELATED\`);
+      `),
+    ).toEqual(['SELECT APPEND'])
   })
 
   it('preserves name-based heuristics rather than claiming scope or execution proof', () => {

@@ -26,6 +26,9 @@ are transparent, matching the source parser's previous representation.
 Explicit `return` statements, exported variable declarations, and direct executor arguments
 are collected. Export-list specifiers and expression-bodied arrow returns are outside this
 source-fact collector's current heuristic.
+Binding references in returns, executor arguments, conditional executor aliases, and append
+receivers require identifiers; ordinary string values cannot consume a same-named binding.
+Static string computed method names remain supported for configured append calls.
 Only bare templates and templates with the configured simple tag are accepted. Raw quasi
 text is retained, and each interpolation becomes the configured prefix plus a one-based
 index. Direct fragments precede consumed variable bindings; repeated references do not
