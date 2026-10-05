@@ -651,6 +651,9 @@ callbacks are never independent origins.
 Metadata/member writes preserve callable binding capabilities. Timer exclusions require canonical,
 unmodified platform proof; reflective replacement remains unknown. Opaque receiver identity requires
 bounded fresh allocations, while unknown aliases remain unavailable.
+Passed bindings and containers must remain unmodified for temporal exclusion; saved streams from
+prior handler invocations remain unknown. Async or generator declarations cannot prove the object
+returned by a synchronous factory invocation.
 Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
 Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assuming status 200.
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
