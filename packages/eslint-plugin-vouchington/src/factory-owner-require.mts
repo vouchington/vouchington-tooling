@@ -6,9 +6,19 @@ import {
   type NodeLike,
   type RuleContextLike,
 } from './ast-helpers.mts'
+import { isQualifiedCreateRequireAlias } from './factory-owner-create-require-alias.mts'
 
 export function isValueImportEquals(declaration: NodeLike): boolean {
   return declaration.importKind !== 'type' && !declaration.isTypeOnly
+}
+
+export function normalizeRequireLoader(node: NodeLike | null | undefined): NodeLike | undefined {
+  const current = unwrap(node) ?? undefined
+  if (current?.type === 'AwaitExpression')
+    return normalizeRequireLoader(current.argument as NodeLike)
+  if (current?.type === 'SequenceExpression')
+    return normalizeRequireLoader((current.expressions as NodeLike[]).at(-1))
+  return current
 }
 
 const NODE_MODULE_SPECIFIERS = new Set(['module', 'node:module'])
@@ -114,18 +124,20 @@ function isCreateRequireCall(context: RuleContextLike, node: NodeLike | null | u
     return isCreateRequireCall(context, call.argument as NodeLike)
   }
   if (call?.type !== 'CallExpression') return false
-  const rawCallee = unwrap(call.callee as NodeLike)
-  const callee =
-    rawCallee?.type === 'SequenceExpression'
-      ? unwrap((rawCallee.expressions as NodeLike[]).at(-1))
-      : rawCallee
+  const callee = normalizeRequireLoader(call.callee as NodeLike)
   if (callee?.type === 'Identifier') {
-    return hasImport(
-      context,
-      callee,
-      NODE_MODULE_SPECIFIERS,
-      new Set(['ImportSpecifier']),
-      'createRequire',
+    if (
+      hasImport(
+        context,
+        callee,
+        NODE_MODULE_SPECIFIERS,
+        new Set(['ImportSpecifier']),
+        'createRequire',
+      )
+    )
+      return true
+    return isQualifiedCreateRequireAlias(context, callee, isValueImportEquals, (namespace) =>
+      isNamespaceImport(context, namespace, NODE_MODULE_SPECIFIERS),
     )
   }
   return (
@@ -159,11 +171,7 @@ export function requiredModuleSpecifier(
 ): string | null {
   const call = unwrap(node)
   if (call?.type !== 'CallExpression') return null
-  const rawCallee = unwrap(call.callee as NodeLike)
-  const callee =
-    rawCallee?.type === 'SequenceExpression'
-      ? unwrap((rawCallee.expressions as NodeLike[]).at(-1))
-      : rawCallee
+  const callee = normalizeRequireLoader(call.callee as NodeLike)
   const argument = unwrap((call.arguments as NodeLike[] | undefined)?.[0])
   const moduleName =
     argument?.type === 'Literal' && typeof argument.value !== 'string'

@@ -19,6 +19,7 @@ import { isNamespacePatternBinding } from './factory-owner-namespace-pattern.mts
 import {
   isConfiguredFactoryImport,
   isNamespaceImport,
+  normalizeRequireLoader,
   requiredModuleSpecifier,
   isValueImportEquals,
 } from './factory-owner-require.mts'
@@ -55,11 +56,7 @@ export function createFactoryProvenance(
       return propertyName(current) === 'default' && isNamespace(current.object as NodeLike, active)
     }
     if (current?.type === 'CallExpression') {
-      const rawCallee = unwrap(current.callee as NodeLike) as NodeLike
-      const callee =
-        rawCallee.type === 'SequenceExpression'
-          ? (unwrap((rawCallee.expressions as NodeLike[]).at(-1)) as NodeLike)
-          : rawCallee
+      const callee = normalizeRequireLoader(current.callee as NodeLike) as NodeLike
       const loader = findVariable(context, callee)
       const definition = loader?.defs.find((entry) => entry.type === 'Variable')
       if (

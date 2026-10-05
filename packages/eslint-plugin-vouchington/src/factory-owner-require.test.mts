@@ -4,6 +4,7 @@ import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
 import {
   isNamedImport,
   isNamespaceImport,
+  normalizeRequireLoader,
   requiredModuleSpecifier,
 } from './factory-owner-require.mts'
 
@@ -161,5 +162,67 @@ describe('factory-owner-require', () => {
         new Set(['@compiler/runtime']),
       ),
     ).toBe(false)
+  })
+
+  it('resolves a qualified createRequire import-equals alias', () => {
+    const nodeModule: VariableLike = {
+      name: 'nodeModule',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: {
+              type: 'TSExternalModuleReference',
+              expression: { type: 'Literal', value: 'node:module' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const loadFactory: VariableLike = {
+      name: 'loadFactory',
+      defs: [
+        { type: 'ImportBinding', node: { type: 'Identifier' } },
+        { type: 'ImportBinding', node: { type: 'TSImportEqualsDeclaration', importKind: 'type' } },
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: {
+              type: 'TSQualifiedName',
+              left: { type: 'Identifier', name: 'nodeModule' },
+              right: { type: 'Identifier', name: 'createRequire' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const variables = new Map([
+      ['nodeModule', nodeModule],
+      ['loadFactory', loadFactory],
+    ])
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report() {},
+      sourceCode: {
+        getScope: () => ({ set: { get: (name) => variables.get(name) }, upper: null }),
+      },
+    }
+    expect(normalizeRequireLoader(undefined)).toBeUndefined()
+    expect(
+      requiredModuleSpecifier(context, {
+        type: 'CallExpression',
+        callee: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'loadFactory' },
+          arguments: [],
+        },
+        arguments: [{ type: 'Literal', value: '@compiler/runtime' }],
+      }),
+    ).toBe('@compiler/runtime')
   })
 })

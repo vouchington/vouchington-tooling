@@ -130,6 +130,9 @@ export import exposed = runtime.default
 import nestedGraph = runtime.default.makeGraph
 nestedGraph()
 export import exportedGraph = runtime.default.makeGraph
+import nodeModule = require('node:module')
+import loadFactory = nodeModule.createRequire
+loadFactory(import.meta.url)('@compiler/runtime').makeGraph()
 `,
     )
     writeFileSync(
@@ -175,7 +178,7 @@ export import exportedGraph = runtime.default.makeGraph
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 56 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 57 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

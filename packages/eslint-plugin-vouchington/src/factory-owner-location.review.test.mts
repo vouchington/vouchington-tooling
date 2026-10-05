@@ -283,6 +283,11 @@ const load = await createRequire(import.meta.url)
 load('@compiler/runtime').makeGraph()
 ;(await createRequire(import.meta.url))('@compiler/runtime').makeGraph()`),
     ).toEqual(['constructionOwner', 'constructionOwner'])
+    expect(
+      await diagnostics(`import { createRequire } from 'node:module'
+const load = createRequire(import.meta.url)
+;(await load)('@compiler/runtime').makeGraph()`),
+    ).toEqual(['constructionOwner'])
   })
 
   it('does not coerce createRequire module identifiers to property keys', async () => {
