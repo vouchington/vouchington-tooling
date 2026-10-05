@@ -35,7 +35,11 @@ function patternEntrySource(
   const current = unwrap(source)
   if (pattern.type === 'ArrayPattern') {
     if (current?.type !== 'ArrayExpression') return undefined
-    return ((current.elements as Array<NodeLike | null>)[index] ?? null) as NodeLike | null
+    const elements = current.elements as Array<NodeLike | null>
+    if (elements.slice(0, index + 1).some((element) => element?.type === 'SpreadElement')) {
+      return undefined
+    }
+    return (elements[index] ?? null) as NodeLike | null
   }
   if (current?.type !== 'ObjectExpression') return undefined
   const name = patternPropertyName(entry)
@@ -43,7 +47,11 @@ function patternEntrySource(
     if (candidate.type !== 'Property') return undefined
     const candidateName = patternPropertyName(candidate)
     if (candidateName === null) return undefined
-    if (candidateName === name) return candidate.value as NodeLike
+    if (candidateName === name) {
+      return ['get', 'set'].includes(String(candidate.kind))
+        ? undefined
+        : (candidate.value as NodeLike)
+    }
   }
   return null
 }

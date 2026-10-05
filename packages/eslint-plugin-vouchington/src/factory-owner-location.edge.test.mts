@@ -341,6 +341,10 @@ const { spread = makeGraph } = { spread: () => 1, ...override }
 spread()
 const { computed = makeGraph } = { computed: () => 1, [key]: value }
 computed()
+const { getter = makeGraph } = { get getter() { return undefined } }
+getter()
+const { setter = makeGraph } = { set setter(value) {} }
+setter()
 const { text = makeGraph } = { text: 'known' }
 text()
 const { template = makeGraph } = { template: \`known\` }
@@ -365,6 +369,10 @@ const [arrayMissing = makeGraph] = []
 arrayMissing()
 const [unknownArray = makeGraph] = sourceArray
 unknownArray()
+const [, afterSpread = makeGraph] = [...sourceArray, () => 1]
+afterSpread()
+const [beforeSpread = makeGraph] = [() => 1, ...sourceArray]
+beforeSpread()
 const { nested: { plain }, later = makeGraph } = { nested: {} }
 later()
 const { possible = makeGraph } = source
@@ -372,5 +380,5 @@ possible()`,
     OPTIONS,
     'src/check.js',
   )
-  expect(messageIds(result)).toEqual(Array(10).fill('constructionOwner'))
+  expect(messageIds(result)).toEqual(Array(13).fill('constructionOwner'))
 })
