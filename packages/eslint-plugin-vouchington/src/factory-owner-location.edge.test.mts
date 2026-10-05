@@ -115,6 +115,13 @@ Reflect.construct(makeGraph)
 Reflect.construct(makeGraph, [])
 Reflect.construct(makeGraph, 1)
 Reflect.construct(makeGraph, [], () => {})
+Reflect.construct(makeGraph, [], null)
+Reflect.construct(makeGraph, [], 0)
+Reflect.construct(makeGraph, [], async function () {})
+Reflect.construct(makeGraph, [], function* () {})
+Reflect.construct(makeGraph, [], function () {})
+Reflect.construct(makeGraph, [], class {})
+Reflect.construct(makeGraph, [], NewTarget)
 function shadow(undefined, NaN, Infinity) {
   Reflect.apply(makeGraph, null, undefined)
   Reflect.construct(makeGraph, NaN)
@@ -124,6 +131,9 @@ function shadow(undefined, NaN, Infinity) {
     'src/check.js',
   )
   expect(messageIds(result)).toEqual([
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',

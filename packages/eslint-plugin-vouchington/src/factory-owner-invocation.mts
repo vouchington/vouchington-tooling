@@ -39,7 +39,7 @@ function directReflectFactory(
   return Boolean(
     argumentList &&
     !isStaticPrimitive(context, argumentList) &&
-    !isKnownNonConstructor(newTarget) &&
+    !isKnownNonConstructor(context, newTarget) &&
     isFactory(args[0]),
   )
 }
@@ -56,9 +56,14 @@ function isStaticPrimitive(context: RuleContextLike, value: NodeLike): boolean {
   )
 }
 
-function isKnownNonConstructor(value: NodeLike | undefined): boolean {
+function isKnownNonConstructor(context: RuleContextLike, value: NodeLike | undefined): boolean {
   const current = unwrap(value)
-  return current?.type === 'ArrowFunctionExpression'
+  return Boolean(
+    current &&
+    (isStaticPrimitive(context, current) ||
+      current.type === 'ArrowFunctionExpression' ||
+      (current.type === 'FunctionExpression' && (current.async || current.generator))),
+  )
 }
 
 function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null | undefined {
