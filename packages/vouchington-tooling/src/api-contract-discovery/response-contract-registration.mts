@@ -7,12 +7,19 @@ import type {
   ExtractContractSchemaOptions,
 } from '../contract-schema/index.mts'
 import { isContextMethod, responseMarker, visit } from './response-contract-route-analysis.mts'
+import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
-export function responseBodyExpression(call: ts.CallExpression): ts.Expression | undefined {
+export function responseBodyExpression(
+  call: ts.CallExpression,
+  unwrapPipelineArguments = false,
+): ts.Expression | undefined {
   if (isContextMethod(call.expression, 'json')) return call.arguments[0]
   if (!isContextMethod(call.expression, 'pipeline')) return undefined
-  const pipelineBody = call.arguments[0]
+  const originalBody = call.arguments[0]
+  const pipelineBody =
+    originalBody &&
+    (unwrapPipelineArguments ? unwrapTransparentExpression(originalBody) : originalBody)
   if (
     !pipelineBody ||
     !ts.isCallExpression(pipelineBody) ||
@@ -21,7 +28,8 @@ export function responseBodyExpression(call: ts.CallExpression): ts.Expression |
   ) {
     return undefined
   }
-  return pipelineBody.arguments[0]
+  const body = pipelineBody.arguments[0]
+  return body && (unwrapPipelineArguments ? unwrapTransparentExpression(body) : body)
 }
 
 export function containsResponseMarker(node: ts.Node): boolean {

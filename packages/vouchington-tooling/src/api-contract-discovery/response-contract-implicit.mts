@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { extractContractSchema } from '../contract-schema/index.mts'
+import { isInErrorBranch } from './response-contract-error-branch.mts'
 import {
   containsResponseMarker,
   noContentContract,
@@ -8,8 +9,9 @@ import {
   responseBodyExpression,
   sourceLocation,
 } from './response-contract-registration.mts'
-import { isInErrorBranch } from './response-contract-error-branch.mts'
-import { isXmlResponseCall, streamingTextMediaType } from './response-contract-media.mts'
+import { streamingTextMediaType } from './response-contract-media.mts'
+import { nextImplicitVariantKey } from './response-contract-implicit-variants.mts'
+import type { ImplicitResponseCallLabel } from './response-contract-call-classification.mts'
 import {
   markBufferedRouteUnavailable,
   registerRouteContract,
@@ -18,8 +20,6 @@ import {
 import {
   enclosingRouteBinding,
   isContextMethod,
-  isContextResponseBufferCall,
-  isContextResponseEmptyCall,
   requestedKeyForBinding,
   responseMarker,
   type HandlerBindings,
@@ -40,6 +40,7 @@ export function discoverImplicitContract(
   sourceFile: ts.SourceFile,
   contracts: Map<string, BackendResponseContract>,
   handlerBindings: HandlerBindings,
+  callLabel: ImplicitResponseCallLabel | undefined,
   requestedKeys: ReadonlySet<string> | undefined,
   options: DiscoverApiResponseContractsOptions | undefined,
 ): void {
@@ -113,10 +114,9 @@ export function discoverImplicitContract(
     return
   }
 
-  if (isXmlResponseCall(call)) {
+  if (callLabel === 'ctx.response.xml()') {
     if (requestedKeys && contracts.has(key)) return
-    const body = call.arguments[0]
-    if (!body) return
+    const body = call.arguments[0]!
     const location = sourceLocation(sourceFile, call)
     registerRouteContract(
       contracts,
@@ -159,8 +159,8 @@ export function discoverImplicitContract(
 
   // Empty branches must not hide any unmarked buffer or pipeline body.
   if (
-    isContextResponseBufferCall(call.expression) ||
-    (isContextMethod(call.expression, 'pipeline') && !body && !containsResponseMarker(call))
+    callLabel === 'ctx.response.buffer()' ||
+    (callLabel === 'ctx.pipeline()' && !body && !containsResponseMarker(call))
   ) {
     markBufferedRouteUnavailable(contracts, key, binding, sourceLocation(sourceFile, call))
     return
@@ -173,7 +173,7 @@ export function discoverImplicitContract(
       call.arguments[0] &&
       ts.isNumericLiteral(call.arguments[0]) &&
       (call.arguments[0].text === '204' || call.arguments[0].text === '205')) ||
-    isContextResponseEmptyCall(call.expression)
+    callLabel === 'ctx.response.empty()'
   if (isExplicitNoContentCall) {
     registerContract(contracts, contracts.has(key) ? nextImplicitVariantKey(contracts, key) : key, {
       ...noContentContract(sourceLocation(sourceFile, call)),
@@ -187,14 +187,4 @@ export function discoverImplicitContract(
         : {}),
     })
   }
-}
-
-/** Picks the next deterministic registration key for another implicit response variant. */
-function nextImplicitVariantKey(
-  contracts: Map<string, BackendResponseContract>,
-  key: string,
-): string {
-  let suffix = 2
-  while (contracts.has(`${key}#implicit-${suffix}`)) suffix++
-  return `${key}#implicit-${suffix}`
 }

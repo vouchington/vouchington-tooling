@@ -1,11 +1,16 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
-import { requestedProtocolKey } from './protocol-requested-keys.mts'
+import { protocolBindingRequested, requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
+import { ambiguousRoutesForCall } from './response-contract-attribution.mts'
+import { sortAttributionFacts } from './response-contract-attribution-facts.mts'
+import { implicitResponseCallLabel } from './response-contract-call-classification.mts'
+import { collectHandlerBindings } from './response-contract-handler-bindings.mts'
 import {
   registerRouteContract,
+  type AmbiguousAttributionFact,
   type DiscoverApiResponseContractsOptions,
 } from './response-contract-lenient.mts'
 import {
@@ -16,10 +21,10 @@ import {
   sourceLocation,
 } from './response-contract-registration.mts'
 import {
-  collectHandlerBindings,
   enclosingRouteBinding,
   isContextMethod,
   responseMarker,
+  type AmbiguousHandlerBindings,
   visit,
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
@@ -37,7 +42,11 @@ export function discoverApiResponseContracts(
   registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
   const contracts = new Map<string, BackendResponseContract>()
-  const handlerBindings = collectHandlerBindings(sourceFiles, checker)
+  const ambiguousBindings: AmbiguousHandlerBindings | undefined = options?.onAmbiguousAttribution
+    ? new Map()
+    : undefined
+  const handlerBindings = collectHandlerBindings(sourceFiles, checker, ambiguousBindings)
+  const attributionFacts: AmbiguousAttributionFact[] = []
   const protocolContracts = new Map<string, BackendResponseContract>()
   const protocolEmissions = discoverProtocolContracts(
     sourceFiles,
@@ -103,27 +112,56 @@ export function discoverApiResponseContracts(
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
-      if (
-        !ts.isCallExpression(node) ||
-        responseMarker(node.expression) ||
-        protocolEmissions.has(node)
-      )
-        return
+      if (!ts.isCallExpression(node)) return
+      const callLabel = implicitResponseCallLabel(node)
+      if (options?.onAmbiguousAttribution) {
+        const attributionLabel = implicitResponseCallLabel(node, true, checker)
+        const routes = attributionLabel
+          ? ambiguousBindings &&
+            ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)
+          : undefined
+        const requestedRoute =
+          !requestedKeys ||
+          routes?.some((route) => {
+            const separator = route.indexOf(':')
+            return (
+              separator > 0 &&
+              protocolBindingRequested(
+                { method: route.slice(0, separator), routeTemplate: route.slice(separator + 1) },
+                requestedKeys,
+              )
+            )
+          })
+        if (attributionLabel && routes && requestedRoute) {
+          const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+          attributionFacts.push({
+            sourceLocation: `${sourceLocation(sourceFile, node)}:${position.line + 1}:${position.character + 1}`,
+            label: attributionLabel,
+            routes: [...routes],
+          })
+        }
+      }
+      if (responseMarker(node.expression) || protocolEmissions.has(node)) return
       discoverImplicitContract(
         node,
         checker,
         sourceFile,
         contracts,
         handlerBindings,
+        callLabel,
         requestedKeys,
         options,
       )
     })
   }
 
-  return Object.fromEntries(
+  const result = Object.fromEntries(
     [...contracts.entries()].toSorted(([left], [right]) => left.localeCompare(right)),
   )
+  if (options?.onAmbiguousAttribution) {
+    for (const fact of sortAttributionFacts(attributionFacts)) options.onAmbiguousAttribution(fact)
+  }
+  return result
 }
 
 function rawResponseMediaType(

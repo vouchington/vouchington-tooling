@@ -479,6 +479,20 @@ aliases; `options.onRouteError` enables lenient response and request extraction.
 does not cache programs or depend on the caller's repository layout. OpenAPI document assembly
 remains a separate `openapi-document` call.
 
+`options.onAmbiguousAttribution` optionally emits facts for response calls lexically inside handler
+functions registered to multiple routes, plus inline response calls within those handlers. Facts
+are delivered after discovery succeeds, ordered by normalized source location; each callback gets
+its own copy of the sorted route list. It recognizes direct property handlers on `const`
+object-literal receivers, shorthand properties, immutable aliases, and inline handlers. Mutable
+receivers whose properties may be reassigned, variable receivers without object-literal initializers,
+and non-identifier receiver expressions fail closed for attribution.
+Direct identifier assignment, identifier writes through array/object destructuring or loop targets,
+identifier updates, and dot-property assignment or updates make that binding ineligible for attribution.
+Computed receiver-property writes, `delete`, runtime reflection, and other indirect mutation are not
+analyzed. Named helper calls are not followed transitively: for example, an
+emission inside `emit(ctx)` is not attributed when a registered `shared(ctx)` handler calls
+`emit(ctx)`. The callback does not change the discovered contract result.
+
 Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
 `apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
 `app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,

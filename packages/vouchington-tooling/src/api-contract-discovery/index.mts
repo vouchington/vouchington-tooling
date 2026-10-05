@@ -43,6 +43,7 @@ export type { BackendQueryContract, BackendQueryContractRegistry } from './query
 export type { HeaderContract, HeaderContractRegistry } from './header-contract-types.mts'
 export type { RegisteredRoute } from './registered-route-catalog.mts'
 export type {
+  AmbiguousAttributionFact,
   RouteDiscoveryError,
   DiscoverApiResponseContractsOptions,
 } from './response-contract-lenient.mts'
