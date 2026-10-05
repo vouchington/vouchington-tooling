@@ -5,8 +5,13 @@ import { resolveSymbol } from './response-contract-symbols.mts'
 const MUTATORS = new Set(['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf'])
 const UPDATES = new Set([ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken])
 
-/** Property-write start positions per symbol, per function (or source file), memoized by node. */
-const writesByScope = new WeakMap<ts.Node, Map<ts.Symbol, number[]>>()
+type Writes = Map<ts.Symbol, number[]>
+
+/**
+ * Property-write start positions per symbol, per function (or source file). Symbols belong to one
+ * checker, so the memo is keyed by checker and never leaks between programs.
+ */
+const writesByChecker = new WeakMap<ts.TypeChecker, WeakMap<ts.Node, Writes>>()
 
 const isMember = (
   node: ts.Node,
@@ -48,9 +53,11 @@ function mutatedObject(node: ts.Node): ts.Identifier | undefined {
 }
 
 function propertyWrites(scope: ts.Node, checker: ts.TypeChecker) {
-  const cached = writesByScope.get(scope)
+  const scopes = writesByChecker.get(checker) ?? new WeakMap<ts.Node, Writes>()
+  writesByChecker.set(checker, scopes)
+  const cached = scopes.get(scope)
   if (cached) return cached
-  const found = new Map<ts.Symbol, number[]>()
+  const found: Writes = new Map()
   const scan = (node: ts.Node): void => {
     if (node !== scope && ts.isFunctionLike(node)) return
     const object = mutatedObject(node)
@@ -59,7 +66,7 @@ function propertyWrites(scope: ts.Node, checker: ts.TypeChecker) {
     ts.forEachChild(node, scan)
   }
   scan(scope)
-  writesByScope.set(scope, found)
+  scopes.set(scope, found)
   return found
 }
 

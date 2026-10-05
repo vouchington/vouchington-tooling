@@ -18,12 +18,12 @@ export function calleeSymbol(
 const stripExtension = (path: string) =>
   path.replace(/\.d\.[cm]?ts$/, '').replace(/\.[cm]?[jt]sx?$/, '')
 
+/** Compares extension-less paths, so `.ts`, `.js`, `.mts` and `.d.ts` spellings all agree. */
 function moduleMatches(fileName: string, module: string): boolean {
   const path = fileName.replaceAll('\\', '/')
-  const wanted = module.replace(/^\.?\//, '')
   return (
     path.includes(`/node_modules/${module}/`) ||
-    [path, stripExtension(path)].some((candidate) => candidate.endsWith(`/${wanted}`))
+    stripExtension(path).endsWith(`/${stripExtension(module.replace(/^\.?\//, ''))}`)
   )
 }
 

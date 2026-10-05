@@ -26,11 +26,11 @@ function bindContext(
   }
 }
 
-/** Static keys bound by the proof, and the handler's own context parameter as the root. */
+/** Static keys bound by the proof (each resolved against the earlier ones), and the handler's own context parameter as the root. */
 export function handlerBindings(proof: HandlerProof, checker: ts.TypeChecker) {
   const keys = new Map<ts.Symbol, string>()
   for (const [symbol, expression] of proof.bindings) {
-    const key = resolveKey(expression, checker, new Map())
+    const key = resolveKey(expression, checker, keys)
     if (key !== undefined) keys.set(symbol, key)
   }
   const roots = new Map<ts.Symbol, Bound>()

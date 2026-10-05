@@ -542,7 +542,9 @@ const facts = discoverRequestValidationFacts({
 
 A call matches only when its callee resolves, through aliases, re-exports and path mappings, to the
 configured export of a declaration file matching `module` (`.d.ts`, `.d.mts` and `.d.cts` suffixes
-are ignored when comparing); import specifier text and same-named local functions never match.
+are ignored when comparing, and the configured `module` may be written with or without a `.ts`,
+`.mts`, `.cts`, `.js`, `.mjs` or `.cjs` extension, so `lib/validation.js` matches `lib/validation.ts`
+and `lib/validation.d.ts`); import specifier text and same-named local functions never match.
 Operation keys resolve through literals, `const`s (including imported ones), `as const`,
 `satisfies`, helper parameters bound to static arguments, and, for factories, the option property
 including spread `const` objects; anything else, including a name with no symbol, gives
@@ -576,7 +578,9 @@ loop bodies, `catch` and `finally`. Handlers are walked into function declaratio
 function expressions in `sourceFiles`, and only through bindings that are never reassigned (`let`
 and reassigned bindings are not trusted as handlers). A callback passed to a followed helper is
 followed only when the helper runs it, and is conditional unless it is invoked directly from the
-helper's own body outside any condition. Inline callback properties of an `executedCallbacks` host,
+helper's own body outside any condition. Known limit: the invocations of an inline callback are
+found only in the callback's own source file, so a callback passed to a helper declared in another
+file (`withTx(ctx, async () => { validateInput(...) })`) is not walked. Inline callback properties of an `executedCallbacks` host,
 written as identifiers or string literals, are walked as executed and take only the condition of
 the call to the configured host, never how its implementation invokes them. Configured validator
 and factory implementations are never entered, but their callee and arguments are still walked for
