@@ -11,7 +11,7 @@ import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 
 function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
   const name = staticPropertyName(value)
-  return typeof name === 'string' ? name : null
+  return name === null ? null : String(name)
 }
 
 export function constantDefinition(variable: VariableLike | null): NodeLike | null {

@@ -2,6 +2,14 @@ import { expect, it } from 'vitest'
 
 import type { RuleContextLike, VariableLike } from './ast-helpers.mts'
 import { createFactoryExportVisitors } from './factory-owner-exports.mts'
+import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
+
+const OPTIONS = {
+  modules: ['1'],
+  factories: ['makeGraph'],
+  owners: ['src/owner.js'],
+  include: ['**/*.js'],
+}
 
 it('normalizes an instantiated mutable expression export', () => {
   const reports: string[] = []
@@ -47,4 +55,27 @@ it('normalizes an instantiated mutable expression export', () => {
     },
   })
   expect(reports).toEqual(['constructionOwner'])
+})
+
+it('coerces primitive literal dynamic import specifiers', async () => {
+  for (const [specifier, moduleName] of [
+    ['1', '1'],
+    ['true', 'true'],
+    ['null', 'null'],
+  ] as const) {
+    const result = await lintRule(
+      'factory-owner-location',
+      `(await import(${specifier})).makeGraph()`,
+      { ...OPTIONS, modules: [moduleName] },
+      'src/check.js',
+    )
+    expect(messageIds(result)).toEqual(['constructionOwner'])
+  }
+  for (const source of [
+    `const specifier = '1'; (await import(specifier)).makeGraph()`,
+    `(await import({})).makeGraph()`,
+  ]) {
+    const result = await lintRule('factory-owner-location', source, OPTIONS, 'src/check.js')
+    expect(messageIds(result)).toEqual([])
+  }
 })
