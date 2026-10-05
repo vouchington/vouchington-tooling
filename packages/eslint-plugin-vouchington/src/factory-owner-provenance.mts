@@ -13,6 +13,7 @@ import {
   namedPatternSource,
 } from './factory-owner-provenance-binding.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
+import { valueImportEqualsSource } from './factory-owner-import-equals-source.mts'
 import { withActiveVariable } from './factory-owner-recursion.mts'
 import { isFactoryMember } from './factory-owner-member.mts'
 import { isNamespacePatternBinding } from './factory-owner-namespace-pattern.mts'
@@ -21,25 +22,16 @@ import {
   isNamespaceImport,
   normalizeRequireLoader,
   requiredModuleSpecifier,
-  isValueImportEquals,
 } from './factory-owner-require.mts'
 import {
   isQualifiedImportFactory,
   qualifiedImportNamespaceSource,
 } from './factory-owner-qualified-import.mts'
+import { hasExternalWrite } from './factory-owner-variable.mts'
 
 export type FactoryProvenanceOptions = {
   modules: ReadonlySet<string>
   factories: ReadonlySet<string>
-}
-
-function isWithin(node: NodeLike, ancestor: NodeLike): boolean {
-  let current: NodeLike | null | undefined = node
-  while (current) {
-    if (current === ancestor) return true
-    current = current.parent
-  }
-  return false
 }
 
 export function createFactoryProvenance(
@@ -68,13 +60,7 @@ export function createFactoryProvenance(
       const callee = normalizeRequireLoader(current.callee as NodeLike) as NodeLike
       const loader = findVariable(context, callee)
       const definition = loader?.defs.find((entry) => entry.type === 'Variable')
-      if (
-        definition &&
-        loader?.references.some(
-          (reference) =>
-            !isWithin(reference.identifier, definition.node.id as NodeLike) && reference.isWrite(),
-        )
-      ) {
+      if (loader && definition && hasExternalWrite(loader, definition.node.id as NodeLike)) {
         return false
       }
       const moduleName = requiredModuleSpecifier(context, current)
@@ -84,10 +70,7 @@ export function createFactoryProvenance(
     if (isNamespaceImport(context, current, options.modules)) return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
-    const importDeclaration = variable.defs.find(
-      (entry) => entry.node.type === 'TSImportEqualsDeclaration' && isValueImportEquals(entry.node),
-    )?.node
-    const importAlias = importDeclaration?.moduleReference as NodeLike | undefined
+    const importAlias = valueImportEqualsSource(variable)
     if (importAlias?.type === 'Identifier') {
       return withActiveVariable(variable, active, () => isNamespace(importAlias, active))
     }
@@ -119,6 +102,10 @@ export function createFactoryProvenance(
     if (isConfiguredFactoryImport(context, current, options.modules, options.factories)) return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
+    const importAlias = valueImportEqualsSource(variable)
+    if (importAlias?.type === 'Identifier') {
+      return withActiveVariable(variable, active, () => isFactory(importAlias, active))
+    }
     if (
       isQualifiedImportFactory(context, current, options.factories, (value) => isNamespace(value))
     )

@@ -34,9 +34,17 @@ function directReflectFactory(
       isUnshadowedGlobal(context, finalSequenceValue(object.object as NodeLike), 'globalThis'))
   if (!reflectGlobal) return false
   const method = propertyName(member)
-  const hasRequiredArguments =
-    (method === 'apply' && args.length >= 3) || (method === 'construct' && args.length >= 2)
-  return hasRequiredArguments && isFactory(args[0])
+  const argumentList = method === 'apply' ? args[2] : method === 'construct' ? args[1] : undefined
+  return Boolean(argumentList && !isStaticPrimitive(argumentList) && isFactory(args[0]))
+}
+
+function isStaticPrimitive(value: NodeLike): boolean {
+  const current = unwrap(value)
+  return Boolean(
+    (current?.type === 'Literal' && !current.regex) ||
+    current?.type === 'TemplateLiteral' ||
+    current?.type === 'UnaryExpression',
+  )
 }
 
 function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null | undefined {

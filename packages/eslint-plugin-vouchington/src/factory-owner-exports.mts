@@ -81,16 +81,6 @@ export function createFactoryExportVisitors(
         return
       }
       const declaration = node(value.declaration)
-      if (declaration?.type === 'TSImportEqualsDeclaration') {
-        const moduleReference = node(declaration.moduleReference)
-        const moduleName = name(node(moduleReference?.expression))
-        if (
-          isValueImportEquals(declaration) &&
-          ((moduleName !== null && options.modules.has(moduleName)) ||
-            restricted(node(declaration.id)))
-        )
-          report(declaration)
-      }
       if (declaration?.type === 'VariableDeclaration') {
         for (const declarator of declaration.declarations as NodeLike[]) {
           const id = node(declarator.id)
@@ -126,6 +116,18 @@ export function createFactoryExportVisitors(
               restricted(mutableExportInitializer(context, local, options.factories))))
         )
           report(specifier)
+      }
+      const importEquals = node(value.declaration)
+      if (importEquals?.type === 'TSImportEqualsDeclaration') {
+        const moduleReference = node(importEquals.moduleReference)
+        const moduleName = name(node(moduleReference?.expression))
+        if (
+          isValueImportEquals(importEquals) &&
+          ((moduleName !== null && options.modules.has(moduleName)) ||
+            restricted(node(importEquals.id)) ||
+            restricted(moduleReference))
+        )
+          report(importEquals)
       }
     },
   }

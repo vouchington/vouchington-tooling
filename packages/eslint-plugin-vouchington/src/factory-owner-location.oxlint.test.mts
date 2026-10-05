@@ -76,6 +76,8 @@ let split = makeGraph
 export { split }
 export const { default: { makeGraph: nestedDefault } } = runtime
 export const { default: { version } } = runtime
+const { outer: { nested: { makeGraph: deepDefault } = runtime } = {} } = {}
+deepDefault()
 `,
     )
     writeFileSync(
@@ -108,6 +110,14 @@ export = compiler
       `import { makeGraph } from '@compiler/runtime'
 let graph = makeGraph
 export = graph
+`,
+    )
+    writeFileSync(
+      join(root, 'src/ts-reassigned-export.ts'),
+      `import { makeGraph } from '@compiler/runtime'
+let replaced = makeGraph
+replaced = () => 1
+export default replaced
 `,
     )
     writeFileSync(
@@ -178,7 +188,7 @@ loadFactory(import.meta.url)('@compiler/runtime').makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 57 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 58 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
@@ -190,6 +200,7 @@ loadFactory(import.meta.url)('@compiler/runtime').makeGraph()
           filename.endsWith('src/ts-import-binding.ts') ||
           filename.endsWith('src/ts-mutable-export.ts') ||
           filename.endsWith('src/ts-instantiated-export.ts') ||
+          filename.endsWith('src/ts-reassigned-export.ts') ||
           filename.endsWith('src/ts-qualified.ts'),
       ),
     ).toBe(true)

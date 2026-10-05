@@ -82,7 +82,8 @@ export function namedPatternDefaultSource(
         return value.right as NodeLike
       }
     }
-    const source = value ? namedPatternDefaultSource(value, localName, names) : null
+    const nested = value?.type === 'AssignmentPattern' ? (value.left as NodeLike) : value
+    const source = nested ? namedPatternDefaultSource(nested, localName, names) : null
     if (source) return source
   }
   return null
