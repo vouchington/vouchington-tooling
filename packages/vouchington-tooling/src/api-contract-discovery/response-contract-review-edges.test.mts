@@ -30,6 +30,15 @@ const sources = {
     ;[...send] = [replacement]
     app.route('/b').post(send)
   `,
+  'loop-target-assignment': `
+    declare const app: any
+    const replacement = (ctx: any) => ctx.json({ replacement: true })
+    let send: any = (ctx: any) => ctx.json({ original: true })
+    app.route('/a').post(send)
+    for (send of [replacement]) {}
+    for (send in { replacement }) {}
+    app.route('/b').post(send)
+  `,
   'object-assignment': `
     declare const app: any
     function replacement(ctx: any) { ctx.json({ replacement: true }) }
@@ -56,10 +65,62 @@ const sources = {
     ;({ ...send } = { send: replacement })
     app.route('/b').post(send)
   `,
+  'parenthesized-property-assignment': `
+    declare const app: any
+    function replacement(ctx: any) { ctx.json({ replacement: true }) }
+    const handlers = { send(ctx: any) { ctx.json({ original: true }) } }
+    app.route('/a').post(handlers.send)
+    ;(handlers.send) = replacement
+    app.route('/b').post(handlers.send)
+  `,
   'typed-property-handler': `
     declare const app: any
     type Handlers = { send(ctx: any): void }
     const handlers: Handlers = { send(ctx) { ctx.json({ shared: true }) } }
+    app.route('/a').post(handlers.send)
+    app.route('/b').post(handlers.send)
+  `,
+  'reassigned-mutable-property-receiver': `
+    declare const app: any
+    type Handlers = { send(ctx: any): void }
+    let handlers: Handlers = { send(ctx) { ctx.json({ original: true }) } }
+    app.route('/a').post(handlers.send)
+    handlers = { send(ctx) { ctx.json({ replacement: true }) } }
+    app.route('/b').post(handlers.send)
+  `,
+  'property-handler-alias': `
+    declare const app: any
+    type Handlers = { send(ctx: any): void }
+    const handlers: Handlers = { send(ctx) { ctx.json({ shared: true }) } }
+    const alias = handlers.send
+    app.route('/a').post(handlers.send)
+    app.route('/b').post(alias)
+  `,
+  'computed-property-handler': `
+    declare const app: any
+    type Handlers = { send(ctx: any): void }
+    const handlers: Handlers = { ['send'](ctx) { ctx.json({ shared: true }) } }
+    app.route('/a').post(handlers.send)
+    app.route('/b').post(handlers.send)
+  `,
+  'dynamic-computed-property-handler': `
+    declare const app: any
+    declare const handlerName: string
+    type Handlers = {
+      send?(ctx: any): void
+      [key: string]: ((ctx: any) => void) | undefined
+    }
+    const handlers: Handlers = { [handlerName](ctx) { ctx.json({ shared: true }) } }
+    app.route('/a').post(handlers.send)
+    app.route('/b').post(handlers.send)
+  `,
+  'bigint-property-handler': `
+    declare const app: any
+    type Handlers = {
+      send?(ctx: any): void
+      [key: string]: ((ctx: any) => void) | undefined
+    }
+    const handlers: Handlers = { 1n(ctx) { ctx.json({ shared: true }) } }
     app.route('/a').post(handlers.send)
     app.route('/b').post(handlers.send)
   `,
@@ -176,12 +237,15 @@ function discover(
   return { contracts, facts }
 }
 
-it.each(['array-assignment', 'object-assignment', 'object-rest-assignment'] as const)(
-  'excludes handler bindings written by %s',
-  (sourceId) => {
-    expect(discover(sourceId).facts).toEqual([])
-  },
-)
+it.each([
+  'array-assignment',
+  'loop-target-assignment',
+  'object-assignment',
+  'object-rest-assignment',
+  'parenthesized-property-assignment',
+] as const)('excludes handler bindings written by %s', (sourceId) => {
+  expect(discover(sourceId).facts).toEqual([])
+})
 
 it('does not treat a nested property assignment target as a reassigned local binding', () => {
   const { facts } = discover('property-target-assignment')
@@ -195,6 +259,28 @@ it('resolves a contextually typed object handler to its implementation', () => {
   expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
     { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
   ])
+})
+
+it('fails closed when a mutable property receiver is reassigned', () => {
+  expect(discover('reassigned-mutable-property-receiver').facts).toEqual([])
+})
+
+it.each(['property-handler-alias', 'computed-property-handler'] as const)(
+  'resolves %s to its object-literal implementation',
+  (sourceId) => {
+    const { facts } = discover(sourceId)
+    expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+      { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
+    ])
+  },
+)
+
+it('keeps a dynamic object property name on the contextual symbol fallback', () => {
+  expect(discover('dynamic-computed-property-handler').facts).toEqual([])
+})
+
+it('keeps a bigint object property name on the contextual symbol fallback', () => {
+  expect(discover('bigint-property-handler').facts).toEqual([])
 })
 
 it.each(['spread-property-handler', 'optional-property-handler'] as const)(

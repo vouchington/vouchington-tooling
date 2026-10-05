@@ -12,6 +12,7 @@ import {
   unwrapTransparentExpression,
   visit,
 } from './response-contract-route-syntax.mts'
+import { propertyImplementationSymbol } from './response-contract-symbols.mts'
 import type {
   AmbiguousHandlerBindings,
   HandlerBindings,
@@ -114,8 +115,11 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
     )
       return current
     const initializer = unwrapTransparentExpression(declaration.initializer)
-    if (!ts.isIdentifier(initializer)) return current
-    const next = checker.getSymbolAtLocation(initializer)
+    const next = ts.isIdentifier(initializer)
+      ? checker.getSymbolAtLocation(initializer)
+      : ts.isPropertyAccessExpression(initializer)
+        ? propertyImplementationSymbol(initializer, checker)
+        : undefined
     if (!next) return current
     current = resolveSymbol(next, checker)
   }

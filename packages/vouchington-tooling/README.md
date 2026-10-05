@@ -476,9 +476,11 @@ remains a separate `openapi-document` call.
 
 `options.onAmbiguousAttribution` optionally emits facts for response calls lexically inside handler
 functions registered to multiple routes, plus inline response calls within those handlers. It
-recognizes direct property handlers, shorthand properties, immutable aliases, and inline handlers.
-Direct identifier assignment, identifier writes through array/object destructuring, identifier
-updates, and dot-property assignment or updates make that binding ineligible for attribution.
+recognizes direct property handlers on `const` object-literal receivers, shorthand properties,
+immutable aliases, and inline handlers. Mutable receivers whose properties may be reassigned fail
+closed for attribution.
+Direct identifier assignment, identifier writes through array/object destructuring or loop targets,
+identifier updates, and dot-property assignment or updates make that binding ineligible for attribution.
 Computed receiver-property writes, `delete`, runtime reflection, and other indirect mutation are not
 analyzed. Named helper calls are not followed transitively: for example, an
 emission inside `emit(ctx)` is not attributed when a registered `shared(ctx)` handler calls

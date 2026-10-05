@@ -20,9 +20,9 @@ export function findMutatedProperties(
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
         node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
-        ts.isPropertyAccessExpression(node.left)
+        ts.isPropertyAccessExpression(unwrapTransparentExpression(node.left))
       )
-        access = node.left
+        access = unwrapTransparentExpression(node.left) as ts.PropertyAccessExpression
       else if (
         (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
         (node.operator === ts.SyntaxKind.PlusPlusToken ||
@@ -57,6 +57,12 @@ export function findMutatedBindings(
         isAssignmentTarget(node.left)
       )
         identifiers = assignmentTargetIdentifiers(node.left)
+      else if (
+        (ts.isForInStatement(node) || ts.isForOfStatement(node)) &&
+        !ts.isVariableDeclarationList(node.initializer) &&
+        isAssignmentTarget(node.initializer)
+      )
+        identifiers = assignmentTargetIdentifiers(node.initializer)
       else if (
         (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
         (node.operator === ts.SyntaxKind.PlusPlusToken ||

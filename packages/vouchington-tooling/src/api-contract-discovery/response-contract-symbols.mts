@@ -119,15 +119,30 @@ export function propertyImplementationSymbol(
   if (!contextual || !ts.isIdentifier(receiver)) return contextual
   const receiverSymbol = checker.getSymbolAtLocation(receiver)
   const declaration = receiverSymbol?.valueDeclaration
-  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
-    return contextual
+  if (!declaration || !ts.isVariableDeclaration(declaration)) return contextual
+  if (
+    !declaration.initializer ||
+    !ts.isVariableDeclarationList(declaration.parent) ||
+    !(declaration.parent.flags & ts.NodeFlags.Const)
+  )
+    return undefined
   const initializer = unwrapTransparentExpression(declaration.initializer)
   if (!ts.isObjectLiteralExpression(initializer)) return contextual
   if (initializer.properties.some(ts.isSpreadAssignment)) return contextual
-  const implementation = initializer.properties.find((property) => {
+  const implementation = initializer.properties.findLast((property) => {
     // Every non-spread object-literal member has a name; spread members were excluded above.
     const name = property.name!
-    return (ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === access.name.text
+    return objectLiteralPropertyName(name) === access.name.text
   })
   return (implementation?.name && checker.getSymbolAtLocation(implementation.name)) || contextual
+}
+
+function objectLiteralPropertyName(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
+    return name.text
+  if (!ts.isComputedPropertyName(name)) return undefined
+  const expression = unwrapTransparentExpression(name.expression)
+  return ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)
+    ? expression.text
+    : undefined
 }
