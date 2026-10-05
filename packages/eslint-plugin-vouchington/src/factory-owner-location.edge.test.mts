@@ -285,3 +285,24 @@ arrayLoad('1').makeGraph()`,
   )
   expect(messageIds(result)).toEqual(['constructionOwner', 'constructionOwner'])
 })
+
+it('rejects statically invalid createRequire bases', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { createRequire } from 'node:module'
+createRequire()('1').makeGraph()
+createRequire(null)('1').makeGraph()
+createRequire(1)('1').makeGraph()
+createRequire('relative')('1').makeGraph()
+createRequire('/workspace/file.js')('1').makeGraph()
+createRequire('file:///workspace/file.js')('1').makeGraph()
+createRequire(base)('1').makeGraph()`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual([
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+  ])
+})

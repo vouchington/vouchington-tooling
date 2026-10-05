@@ -8,6 +8,7 @@ import {
 } from './ast-helpers.mts'
 import { isQualifiedCreateRequireAlias } from './factory-owner-create-require-alias.mts'
 import { requireBindingSource } from './factory-owner-require-binding.mts'
+import { isPossibleRequireBase } from './factory-owner-require-base.mts'
 
 export function isValueImportEquals(declaration: NodeLike): boolean {
   return declaration.importKind !== 'type' && !declaration.isTypeOnly
@@ -125,6 +126,7 @@ function isCreateRequireCall(context: RuleContextLike, node: NodeLike | null | u
     return isCreateRequireCall(context, call.argument as NodeLike)
   }
   if (call?.type !== 'CallExpression') return false
+  if (!isPossibleRequireBase((call.arguments as NodeLike[] | undefined)?.[0])) return false
   const callee = normalizeRequireLoader(call.callee as NodeLike)
   if (callee?.type === 'Identifier') {
     if (

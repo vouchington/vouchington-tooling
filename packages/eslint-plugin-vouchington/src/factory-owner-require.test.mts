@@ -203,6 +203,26 @@ describe('factory-owner-require', () => {
     const variables = new Map([
       ['nodeModule', nodeModule],
       ['loadFactory', loadFactory],
+      [
+        'otherFactory',
+        {
+          name: 'otherFactory',
+          defs: [
+            {
+              type: 'ImportBinding',
+              node: {
+                type: 'TSImportEqualsDeclaration',
+                moduleReference: {
+                  type: 'TSQualifiedName',
+                  left: { type: 'Identifier', name: 'nodeModule' },
+                  right: { type: 'Identifier', name: 'other' },
+                },
+              },
+            },
+          ],
+          references: [],
+        } satisfies VariableLike,
+      ],
     ])
     const context: RuleContextLike = {
       filename: 'src/check.ts',
@@ -219,10 +239,21 @@ describe('factory-owner-require', () => {
         callee: {
           type: 'CallExpression',
           callee: { type: 'Identifier', name: 'loadFactory' },
-          arguments: [],
+          arguments: [{ type: 'Literal', value: '/workspace/file.js' }],
         },
         arguments: [{ type: 'Literal', value: '@compiler/runtime' }],
       }),
     ).toBe('@compiler/runtime')
+    expect(
+      requiredModuleSpecifier(context, {
+        type: 'CallExpression',
+        callee: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'otherFactory' },
+          arguments: [{ type: 'Literal', value: '/workspace/file.js' }],
+        },
+        arguments: [{ type: 'Literal', value: '@compiler/runtime' }],
+      }),
+    ).toBeNull()
   })
 })
