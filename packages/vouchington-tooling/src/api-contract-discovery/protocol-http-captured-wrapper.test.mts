@@ -75,16 +75,21 @@ describe('captured HTTP context wrappers follow supported executable ancestors',
     matrix = buildVirtualProgramMatrix(import.meta, sources)
   })
   it.each(Object.keys(emissions))('retains captured wrapper %s in both modes', (name) => {
-    for (const key of [name, 'ordinary-' + name])
-      for (const lenient of [false, true]) {
+    for (const key of [name, 'ordinary-' + name]) {
+      const opaque = !key.startsWith('ordinary-') && !['empty', 'promise'].includes(name)
+      if (opaque) expect(() => discover(key)).toThrow('opaque argument')
+      for (const lenient of opaque ? [true] : [false, true]) {
         const rows = discover(key, lenient)
         expect(
           buildOpenApiDocument({ title: 'Captured wrapper', responseContracts: rows })[
             'x-unavailable-routes'
           ],
         ).toEqual(['POST:/rpc'])
-        expect(rows['POST:/rpc']?.unavailableReason).toBe(reason)
+        expect(rows['POST:/rpc']?.statusKnowledge).toBe('unknown')
+        if (opaque) expect(rows['POST:/rpc']?.unavailableReason).toBeTruthy()
+        else expect(rows['POST:/rpc']?.unavailableReason).toBe(reason)
       }
+    }
   })
   it.each(Object.keys(controls))('preserves unrelated or unexecuted wrapper %s', (name) => {
     for (const key of [name, 'ordinary-' + name])

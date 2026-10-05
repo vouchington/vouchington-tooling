@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { returnedExpressions } from './registered-route-factory-returns.mts'
 import {
   httpContextArgument,
   contextResponseMethod,
@@ -19,6 +20,7 @@ export function opaqueWrappedHttpContextArgument(
   checker: ts.TypeChecker,
   resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
   env: CallbackBindings,
+  safeCapture: (fn: ts.ArrowFunction | ts.FunctionExpression) => boolean,
 ): boolean {
   if (call.arguments.some((argument) => wrappedHttpContextArgument(argument, context, checker)))
     return true
@@ -40,7 +42,15 @@ export function opaqueWrappedHttpContextArgument(
       ts.forEachChild(node, visit)
     }
     visit(fn.body)
-    return found
+    if (!found) return false
+    const returned = returnedExpressions(fn).some(
+      (value) =>
+        !!value &&
+        (httpContextArgument(value, context, checker) ||
+          wrappedHttpContextArgument(value, context, checker) ||
+          !!contextResponseMethod(value, context, checker, true)),
+    )
+    return returned || runtimeParameters(fn).length > 0 || !safeCapture(fn)
   }
   const indices = call.arguments.flatMap((argument, index) => (captures(argument) ? [index] : []))
   if (!indices.length) return false

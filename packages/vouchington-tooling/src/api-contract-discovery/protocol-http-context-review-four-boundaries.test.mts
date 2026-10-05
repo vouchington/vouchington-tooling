@@ -129,6 +129,26 @@ describe('HTTP context proof follows module bindings and callback aliases', () =
     })
   })
 
+  it('keeps an async callback forwarded through a concrete storage helper at 204', () => {
+    expectNoContent({
+      'route.ts': route(`declare const storage:{
+        run<T>(origin:string,callback:()=>Promise<T>):Promise<T>};
+        function runWithContext<T>(origin:string,callback:()=>Promise<T>):Promise<T>{
+          return storage.run(origin,callback)}
+        function concreteRead(ctx:Context){ctx.assert(true);return ctx.params.id}
+        const options={assertAccess:(ctx:Context)=>{
+          void runWithContext('origin',async()=>{
+            ctx.assert(true);return concreteRead(ctx)})}};`),
+    })
+  })
+
+  it('rejects an opaque zero-argument callback that returns the context', () => {
+    expectUnknown({
+      'route.ts': route(`const options={assertAccess:(ctx:Context)=>{
+        opaque(()=>ctx)}};`),
+    })
+  })
+
   it('keeps a closure that reads only a primitive context member', () => {
     expectNoContent({
       'route.ts': route(`const options={assertAccess:(ctx:Context)=>{

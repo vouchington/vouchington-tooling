@@ -78,11 +78,14 @@ describe('HTTP response methods remain unchanged before branded dispatch', () =>
         ['POST:/rpc#protocol-2'],
         ['POST:/rpc', 'POST:/rpc#protocol-2'],
       ]) {
-        expect(() => discover(name, keys)).toThrow('context method is mutated')
+        const reason = ['timer', 'opaque'].includes(name)
+          ? 'opaque argument'
+          : 'context method is mutated'
+        expect(() => discover(name, keys)).toThrow(reason)
         const { rows, errors } = discover(name, keys, true)
         for (const key of keys ?? ['POST:/rpc', 'POST:/rpc#protocol-2'])
           expect(rows[key]?.unavailableReason).toBeTruthy()
-        expect(errors.some((reason) => reason.includes('context method is mutated'))).toBe(true)
+        expect(errors.some((error) => error.includes(reason))).toBe(true)
         if (keys) expect(Object.keys(rows)).toEqual(keys)
       }
     },
