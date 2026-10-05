@@ -1,3 +1,4 @@
+import { createSseTagCallers } from './protocol-sse-tag-callers.mts'
 import { containsSelectedSseOrigin } from './protocol-sse-selected-origin.mts'
 import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { callbackCapturesSelectedReceiver } from './protocol-sse-callback-capture.mts'
@@ -99,6 +100,7 @@ export function createSseWriteLookup(
   checker: ts.TypeChecker,
   bindings: HandlerBindings,
   files: readonly ts.SourceFile[] = calls.map((call) => call.getSourceFile()),
+  tags: readonly ts.TaggedTemplateExpression[] = [],
 ): {
   implementationCall: (call: ts.CallExpression) => ts.Node | undefined
   actualImplementationCall: (call: ts.CallExpression, binding?: RouteBinding) => ts.Node | undefined
@@ -106,6 +108,7 @@ export function createSseWriteLookup(
   helperBindings: (node: ts.Node) => RouteBinding[]
   reachableCalls: () => readonly ts.CallExpression[]
 } {
+  const tagCallers = createSseTagCallers(tags, checker, bindings, files)
   const indexedSources = new Set(files)
   const callbackValues = createProtocolCallbackValueResolver(checker)
   const implementations = new Map<ts.CallExpression, ts.Node | undefined>()
@@ -170,7 +173,7 @@ export function createSseWriteLookup(
     const fn = enclosingFunction(node)
     if (!fn || fn.asteriskToken) return []
     indexCallers()
-    return callers.get(fn)?.map(({ binding }) => binding) ?? []
+    return [...(callers.get(fn)?.map(({ binding }) => binding) ?? []), ...tagCallers(fn)]
   }
 
   return {

@@ -47,7 +47,13 @@ export function rejectRawSseWrites(
 
   const { invocations, mutations } = collectSseInvocations(files)
   const calls = invocations.filter(ts.isCallExpression)
-  const lookup = createSseWriteLookup(calls, checker, bindings, files)
+  const lookup = createSseWriteLookup(
+    calls,
+    checker,
+    bindings,
+    files,
+    invocations.filter(ts.isTaggedTemplateExpression),
+  )
   for (const call of lookup.reachableCalls())
     if (!invocations.includes(call)) invocations.push(call)
   for (const node of invocations) {
