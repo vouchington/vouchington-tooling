@@ -37,12 +37,10 @@ export function hasPostDeclarationConfiguredObjectMutation(
   const configuredName = findDeclaration(source)!
   const configuredSymbol = checker.getSymbolAtLocation(configuredName)!
   const targetsConfiguredMap = (target: ts.Expression): boolean => {
-    const expression = unwrapExpression(target)
-    const root =
-      ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)
-        ? unwrapExpression(expression.expression)
-        : undefined
-    return !!root && ts.isIdentifier(root) && checker.getSymbolAtLocation(root) === configuredSymbol
+    let root = unwrapExpression(target)
+    while (ts.isPropertyAccessExpression(root) || ts.isElementAccessExpression(root))
+      root = unwrapExpression(root.expression)
+    return ts.isIdentifier(root) && checker.getSymbolAtLocation(root) === configuredSymbol
   }
   let mutated = false
   const inspect = (node: ts.Node): void => {

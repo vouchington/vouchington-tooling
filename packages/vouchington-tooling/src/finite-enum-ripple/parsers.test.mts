@@ -197,8 +197,11 @@ describe('finite enum parsers', () => {
   it('rejects direct mutations of configured route and structured maps', () => {
     for (const mutation of [
       "routes.entries = { singular: 'wrong', plural: 'entries', kinds: ['entry'] }",
+      "routes.entries.singular = 'wrong'",
       'delete routes.entries',
+      'delete routes.entries.singular',
       'routes.entries++',
+      'routes.entries.singular++',
     ]) {
       const source =
         "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'] } }; " +
@@ -220,8 +223,11 @@ describe('finite enum parsers', () => {
     }
     for (const mutation of [
       "kinds.alpha = { slug: 'wrong', slugs: 'alphas' }",
+      "kinds.alpha.slug = 'wrong'",
       'delete kinds.alpha',
+      'delete kinds.alpha.slug',
       'kinds.alpha++',
+      'kinds.alpha.slug++',
     ]) {
       expect(() =>
         parseStructuredTypeEntries(
@@ -243,6 +249,21 @@ describe('finite enum parsers', () => {
     expect(parseStructuredTypeEntries(shadowedKinds, file, 'kinds', 'slug', 'slugs')).toEqual([
       { value: 'alpha', slug: 'alpha', slugPlural: 'alphas' },
     ])
+    const shadowedNestedWrites =
+      "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'] } }; const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' } }; function update() { const routes = { entries: { singular: 'other' } }; const kinds = { alpha: { slug: 'other' } }; routes.entries.singular = 'changed'; kinds.alpha.slug = 'changed' }"
+    expect(
+      parseUnionRouteConfigEntries(
+        shadowedNestedWrites,
+        file,
+        'routes',
+        'kinds',
+        'plural',
+        'singular',
+      ),
+    ).toHaveLength(1)
+    expect(
+      parseStructuredTypeEntries(shadowedNestedWrites, file, 'kinds', 'slug', 'slugs'),
+    ).toEqual([{ value: 'alpha', slug: 'alpha', slugPlural: 'alphas' }])
   })
 
   it('rejects prototype-setter slug keys and preserves caller regex state', () => {
