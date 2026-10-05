@@ -12,7 +12,7 @@ import {
   type VirtualProgramMatrix,
 } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;class Stream{write(value:string):void{}}
+const preamble = `declare const app:any;class Stream{destroyed=false;writableEnded=false;write(value:string):void{};end(value?:string):void{}}
   declare function opaque(value:unknown):void;
   declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;`
 const route = (body: string) => `${preamble}app.route('/events').get(()=>{
@@ -20,6 +20,18 @@ const route = (body: string) => `${preamble}app.route('/events').get(()=>{
   stream.write(apiSseFrame('GET:/events',{event:'done',data:{}}))
 })`
 const sources = {
+  cleanup: route(
+    'function stopStream(){if(!stream.destroyed&&!stream.writableEnded)stream.end()}opaque(stopStream)',
+  ),
+  'cleanup-alias': route(
+    'const selected=stream;const stopStream=()=>{if(!selected.destroyed)selected.end(undefined)};opaque(stopStream)',
+  ),
+  'raw-cleanup': route(
+    "function stopStream(){if(!stream.destroyed)stream.end('raw')}opaque(stopStream)",
+  ),
+  'member-export': route(
+    'const expose=(box:{value?:unknown})=>{box.value=stream.end};opaque(expose)',
+  ),
   sideeffect: route('const expose=(box:{value?:Stream})=>{box.value=stream};opaque(expose)'),
   alias: route(
     'const selected=stream;const expose=(box:{value?:Stream})=>{box.value=selected};opaque(expose)',
@@ -116,13 +128,15 @@ const discover = (name: keyof typeof sources) =>
   discoverApiResponseContracts(matrix.program, [matrix.sourceFile(name)], undefined, {
     onRouteError: () => {},
   })['GET:/events']
-it.each(['sideeffect', 'alias', 'named', 'shorthand'] as const)(
+it.each(['sideeffect', 'alias', 'named', 'shorthand', 'raw-cleanup', 'member-export'] as const)(
   'rejects captured stream export in %s',
   (name) => {
     expect(discover(name)?.unavailableReason).toBe('SSE route writes an unmarked frame')
   },
 )
 it.each([
+  'cleanup',
+  'cleanup-alias',
   'separate',
   'empty',
   'primitive',

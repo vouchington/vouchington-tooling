@@ -1,5 +1,10 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
+import { sseWriteInvocation } from './protocol-sse-write-access.mts'
+import {
+  expressionReceiver,
+  sameWriteReceiver,
+  type WriteReceiver,
+} from './protocol-write-receiver.mts'
 
 /** A void callback can still export its captured owner through an argument or side effect. */
 export function callbackCapturesSelectedReceiver(
@@ -8,7 +13,11 @@ export function callbackCapturesSelectedReceiver(
   checker: ts.TypeChecker,
 ): boolean {
   const captures = (node: ts.Node): boolean => {
-    if (ts.isIdentifier(node) && expressionReceiver(node, checker)?.root === selected.root)
+    if (
+      ts.isIdentifier(node) &&
+      expressionReceiver(node, checker)?.root === selected.root &&
+      !nonExportingReceiverReference(node, selected, checker)
+    )
       return true
     if (ts.isShorthandPropertyAssignment(node)) {
       const symbol = checker.getShorthandAssignmentValueSymbol(node)
@@ -24,4 +33,26 @@ export function callbackCapturesSelectedReceiver(
     return node.forEachChild(captures) === true
   }
   return callback.body !== undefined && captures(callback.body)
+}
+
+/** Reading a receiver's truthiness or ending it without bytes does not pass it onward. */
+function nonExportingReceiverReference(
+  node: ts.Identifier,
+  selected: WriteReceiver,
+  checker: ts.TypeChecker,
+): boolean {
+  let value: ts.Expression = node
+  while (ts.isPropertyAccessExpression(value.parent) && value.parent.expression === value)
+    value = value.parent
+  if (!ts.isPropertyAccessExpression(value)) return false
+  const parent = value.parent
+  if (ts.isPrefixUnaryExpression(parent) && parent.operator === ts.SyntaxKind.ExclamationToken)
+    return sameWriteReceiver(selected, expressionReceiver(value.expression, checker))
+  if (!ts.isCallExpression(parent) || parent.expression !== value) return false
+  const invocation = sseWriteInvocation(parent, checker)
+  return (
+    invocation?.method === 'end' &&
+    !invocation.rawBytes &&
+    sameWriteReceiver(selected, expressionReceiver(value.expression, checker))
+  )
 }
