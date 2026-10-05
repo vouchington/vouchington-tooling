@@ -42,6 +42,25 @@ export function hasPostDeclarationConfiguredObjectMutation(
       root = unwrapExpression(root.expression)
     return ts.isIdentifier(root) && checker.getSymbolAtLocation(root) === configuredSymbol
   }
+  const destructuringTargetMutatesConfiguredMap = (target: ts.Expression): boolean => {
+    const expression = unwrapExpression(target)
+    if (targetsConfiguredMap(expression)) return true
+    if (ts.isObjectLiteralExpression(expression))
+      return expression.properties.some((property) =>
+        ts.isPropertyAssignment(property)
+          ? destructuringTargetMutatesConfiguredMap(property.initializer)
+          : ts.isShorthandPropertyAssignment(property)
+            ? checker.getSymbolAtLocation(property.name) === configuredSymbol
+            : ts.isSpreadAssignment(property) &&
+              destructuringTargetMutatesConfiguredMap(property.expression),
+      )
+    if (ts.isArrayLiteralExpression(expression))
+      return expression.elements.some(
+        (element) =>
+          !ts.isOmittedExpression(element) && destructuringTargetMutatesConfiguredMap(element),
+      )
+    return false
+  }
   let mutated = false
   const inspect = (node: ts.Node): void => {
     if (mutated || node.end <= objectEnd) return
@@ -50,7 +69,7 @@ export function hasPostDeclarationConfiguredObjectMutation(
       (node.operatorToken.kind === ts.SyntaxKind.EqualsToken ||
         (node.operatorToken.kind >= ts.SyntaxKind.FirstCompoundAssignment &&
           node.operatorToken.kind <= ts.SyntaxKind.LastCompoundAssignment)) &&
-      targetsConfiguredMap(node.left)
+      destructuringTargetMutatesConfiguredMap(node.left)
     ) {
       mutated = true
       return

@@ -12,6 +12,8 @@ Route scans ignore comments, JSX text, regular-expression literals, and embedded
 
 Create-page values follow the legacy static heuristic: object property assignments, shorthand properties, JSX attributes, and direct assignments are inspected. Static JSX string attributes use TypeScript's JSX emit semantics, including entity decoding. Configured method and accessor members are excluded, and dynamic values fail closed. Union slug maps reject ordinary `__proto__` object-literal entries because JavaScript treats them as prototype setters rather than own data properties. Configured const object maps reject direct property-access-chain writes, deletions, and unary updates after their initializer; symbol identity keeps unrelated shadowed locals out of that check. This bounded scan does not follow aliases or mutation methods.
 
+Structured declaration entries require explicit object-literal property assignments; shorthand entries fail closed because their runtime values cannot be established from the configured literal alone. Method and accessor members remain outside this extracted declaration contract.
+
 The checker returns GitHub annotation strings for semantic mismatches. A missing required declaration file skips that family's comparison, as in the original guard. An invalid present declaration ends that family's comparison and returns a diagnostic naming the configured file and declaration; the other family still runs. Consumer adapters can append the returned diagnostics to their own policy result and set `diagnosticSuffix` to add a local checklist link or other guidance.
 
 Install `@typescript/typescript6` when importing this subpath. It uses the classic TypeScript compiler API; the root `typescript@7` package does not expose that API.

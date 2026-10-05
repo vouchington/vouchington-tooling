@@ -62,6 +62,8 @@ export function parseStructuredTypeEntries(
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property))
       throw new Error(`${file}: ${name} contains an uninspectable spread`)
+    if (ts.isShorthandPropertyAssignment(property))
+      throw new Error(`${file}: ${name}.${property.name.text} must be an object literal`)
     if (!ts.isPropertyAssignment(property)) continue
     const value = getPropertyNameText(property.name)
     if (value === '__proto__' && !ts.isComputedPropertyName(property.name))
