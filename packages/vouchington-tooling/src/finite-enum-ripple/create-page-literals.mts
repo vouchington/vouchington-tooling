@@ -1,11 +1,8 @@
 import ts from '@typescript/typescript6'
 import { getStringLiteralValue, unwrapExpression } from './ast.mts'
 import { jsxRuntimeStringValue } from './create-page-jsx.mts'
-import {
-  getConfiguredPropertyName,
-  isConfiguredPropertyName,
-  spreadMayOverrideConfiguredProperty,
-} from './create-page-properties.mts'
+import { getConfiguredPropertyName, isConfiguredPropertyName } from './create-page-properties.mts'
+import { visitCreatePageObject } from './create-page-object-visitor.mts'
 
 /** Inspect syntax nodes so comments and strings containing example code are ignored. */
 export function collectCreatePageLiterals(
@@ -30,48 +27,7 @@ export function collectCreatePageLiterals(
   }
   const visit = (node: ts.Node, ignoredProperties: ReadonlySet<string> = new Set()): void => {
     if (ts.isObjectLiteralExpression(node) || ts.isJsxAttributes(node)) {
-      let configuredBeforeSpread = false
-      for (const member of node.properties) {
-        if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
-          if (configuredBeforeSpread && spreadMayOverrideConfiguredProperty(member, names))
-            throw new Error(`${file}: create page type can be overridden by a trailing spread`)
-        } else if (
-          ts.isPropertyAssignment(member) &&
-          getConfiguredPropertyName(member, names) === '__proto__' &&
-          !ts.isComputedPropertyName(member.name)
-        ) {
-          throw new Error(`${file}: create page __proto__ prototype setter is uninspectable`)
-        } else if (getConfiguredPropertyName(member, names) !== undefined) {
-          configuredBeforeSpread = true
-        } else if (
-          ts.isPropertyAssignment(member) &&
-          ts.isComputedPropertyName(member.name) &&
-          getStringLiteralValue(member.name.expression) === undefined &&
-          configuredBeforeSpread
-        ) {
-          throw new Error(
-            `${file}: create page type can be overridden by a trailing computed property`,
-          )
-        }
-      }
-      for (let index = 0; index < node.properties.length; index += 1) {
-        const member = node.properties[index]!
-        if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
-          const overridden = new Set<string>()
-          const expression = unwrapExpression(member.expression)
-          if (ts.isObjectLiteralExpression(expression)) {
-            for (const later of node.properties.slice(index + 1)) {
-              const name = getConfiguredPropertyName(later, names)
-              if (isConfiguredPropertyName(name, names)) overridden.add(name)
-            }
-          }
-          visit(expression, overridden)
-        } else {
-          const name = getConfiguredPropertyName(member, names)
-          if (isConfiguredPropertyName(name, names) && ignoredProperties.has(name)) continue
-          visit(member, ignoredProperties)
-        }
-      }
+      visitCreatePageObject(node, names, ignoredProperties, file, visit)
       return
     }
     if (ts.isPropertyAssignment(node)) {
