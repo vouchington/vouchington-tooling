@@ -1,6 +1,6 @@
+import { implementationDeclaration } from './protocol-sse-implementation.mts'
 import { createSseTagCallers } from './protocol-sse-tag-callers.mts'
 import {
-  implementationDeclaration,
   selectedReturnedSseCapability,
   selectedOpaqueSseReceiver,
   sseCallableAlias,
