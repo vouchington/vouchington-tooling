@@ -82,15 +82,19 @@ export function optionalTrueLiteral(
 ): boolean {
   const property = type.getProperty(name)
   if (!property) {
-    if (type.isUnion() && type.types.some((member) => member.getProperty(name))) {
-      return fail(`${name} must be present on every union member`)
-    }
+    if (declaresProperty(type, name)) return fail(`${name} must be present on every union member`)
     return false
   }
   if (property.flags & ts.SymbolFlags.Optional) return fail(`${name} must be literal when present`)
   const value = requiredPropertyType(type, name, checker, fail)
   const isTrue = value.flags & ts.TypeFlags.BooleanLiteral && checker.typeToString(value) === 'true'
   return isTrue ? true : fail(`${name} must be the literal true`)
+}
+
+/** True when the type, or any member of a union type, declares the property. */
+export function declaresProperty(type: ts.Type, name: string): boolean {
+  if (type.getProperty(name)) return true
+  return type.isUnion() && type.types.some((member) => member.getProperty(name) !== undefined)
 }
 
 export function stringTuple(

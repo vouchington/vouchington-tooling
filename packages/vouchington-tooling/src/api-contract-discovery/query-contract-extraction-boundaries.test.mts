@@ -48,6 +48,8 @@ const descriptors = {
   requiredItems: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } }`,
   requiredCsv: `{ kind: 'csv-array'; style: 'form'; explode: false; required: true; items: { kind: 'string' } }`,
   requiredPartialUnion: `{ kind: 'string'; required: true } | { kind: 'string' }`,
+  requiredPartialDefaultUnion: `{ kind: 'string'; required: true; default: 'x' } | { kind: 'string'; required: true }`,
+  requiredPartialItemsUnion: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } | { kind: 'string' } }`,
   requiredUnion: `{ kind: 'string'; required: true; a: 1 } | { kind: 'string'; required: true; b: 1 }`,
   unionDescription: `{ kind: 'string'; description: 'x'; a: 1 } | { kind: 'string'; description: 'x'; b: 1 }`,
   unionDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; a: 1 } | { kind: 'integer'; minimum: 0; maximum: 10; default: 2; b: 1 }`,
@@ -146,6 +148,8 @@ describe('query descriptor compiler boundaries', () => {
     ['requiredStringDefault', 'required cannot be combined with default'],
     ['requiredItems', 'array items cannot be required'],
     ['requiredPartialUnion', 'required must be present on every union member'],
+    ['requiredPartialDefaultUnion', 'required cannot be combined with default'],
+    ['requiredPartialItemsUnion', 'array items cannot be required'],
   ] as const)('rejects %s', (name, reason) => {
     expect(() => extract(name)).toThrow(reason)
   })

@@ -4,6 +4,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { contractError } from './response-contract-registration.mts'
 import {
   optionalNumberLiteral,
+  declaresProperty,
   optionalTrueLiteral,
   optionalStringLiteral,
   requiredBooleanLiteral,
@@ -24,7 +25,7 @@ export function extractQueryParameterDescriptor(
   if (!optionalTrueLiteral(type, 'required', checker, failure(sourceFile, node, parameterName))) {
     return descriptor
   }
-  if (type.getProperty('default')) {
+  if (declaresProperty(type, 'default')) {
     failure(sourceFile, node, parameterName)('required cannot be combined with default')
   }
   return { ...descriptor, required: true }
@@ -97,7 +98,7 @@ function extractDescriptorShape(
     if (requiredBooleanLiteral(type, 'explode', checker, fail) !== false)
       fail('explode must be false')
     const itemType = requiredPropertyType(type, 'items', checker, fail)
-    if (itemType.getProperty('required')) fail('array items cannot be required')
+    if (declaresProperty(itemType, 'required')) fail('array items cannot be required')
     const items = extractDescriptorShape(itemType, checker, sourceFile, node, `${parameterName}[]`)
     if (items.kind === 'string' || items.kind === 'enum') {
       return { kind, items, style: 'form', explode: false, ...options }
