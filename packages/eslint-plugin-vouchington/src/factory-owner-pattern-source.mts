@@ -4,6 +4,7 @@ export function patternDefaultCanApply(
   pattern: NodeLike,
   localName: string,
   source: NodeLike | null | undefined,
+  definitelyPresent?: (value: NodeLike) => boolean,
 ): boolean {
   if (pattern.type !== 'ObjectPattern' && pattern.type !== 'ArrayPattern') return false
   const entries = (
@@ -14,12 +15,13 @@ export function patternDefaultCanApply(
     const value = (entry.value ?? entry) as NodeLike
     const entrySource = patternEntrySource(pattern, entry, index, source)
     if (value.type === 'AssignmentPattern' && (value.left as NodeLike).name === localName) {
-      return !isDefinitelyPresent(entrySource)
+      return !isDefinitelyPresent(entrySource, definitelyPresent)
     }
     const nested = patternDefaultCanApply(
       value.type === 'AssignmentPattern' ? (value.left as NodeLike) : value,
       localName,
       entrySource,
+      definitelyPresent,
     )
     if (nested) return true
   }
@@ -56,7 +58,10 @@ function patternEntrySource(
   return null
 }
 
-function isDefinitelyPresent(value: NodeLike | null | undefined): boolean {
+function isDefinitelyPresent(
+  value: NodeLike | null | undefined,
+  additional?: (value: NodeLike) => boolean,
+): boolean {
   const current = unwrap(value)
   if (!current) return false
   if (current.type === 'Identifier' && current.name === 'undefined') return false
@@ -69,6 +74,7 @@ function isDefinitelyPresent(value: NodeLike | null | undefined): boolean {
       'ClassExpression',
       'FunctionExpression',
       'ObjectExpression',
-    ].includes(current.type)
+    ].includes(current.type) ||
+    Boolean(additional?.(current))
   )
 }

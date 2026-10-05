@@ -9,7 +9,7 @@ import {
   namedPatternSource,
 } from './factory-owner-provenance-binding.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
-import { hasExternalWrite } from './factory-owner-variable.mts'
+import { hasExternalWrite, hasExternalWriteBefore } from './factory-owner-variable.mts'
 
 export function bindingNodes(value: NodeLike): NodeLike[] {
   if (value.type === 'AssignmentPattern') return bindingNodes(value.left as NodeLike)
@@ -44,6 +44,7 @@ export function mutableExportInitializer(
   context: RuleContextLike,
   binding: NodeLike,
   factories: ReadonlySet<string>,
+  boundary?: NodeLike,
 ): NodeLike | undefined {
   const variable = findVariable(context, binding)
   const definition = variable?.defs.find(
@@ -53,7 +54,13 @@ export function mutableExportInitializer(
     return undefined
   }
   const declarator = definition.node
-  if (variable && hasExternalWrite(variable, declarator.id as NodeLike)) return undefined
+  if (
+    variable &&
+    (boundary
+      ? hasExternalWriteBefore(variable, declarator.id as NodeLike, boundary)
+      : hasExternalWrite(variable, declarator.id as NodeLike))
+  )
+    return undefined
   if ((declarator.id as NodeLike).type === 'Identifier') {
     return declarator.init as NodeLike | undefined
   }

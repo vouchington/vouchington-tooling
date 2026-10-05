@@ -8,6 +8,8 @@ import {
   type VariableLike,
 } from './ast-helpers.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
+import { patternDefaultCanApply } from './factory-owner-pattern-source.mts'
+import { isUnshadowedPromiseResolve } from './factory-owner-promise.mts'
 
 function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
   const current = unwrap(value)
@@ -48,7 +50,11 @@ export function awaitedModuleSpecifier(
   const source =
     id.type === 'Identifier'
       ? (declaration.init as NodeLike)
-      : patternDefaultValue(id, String(current.name))
+      : patternDefaultCanApply(id, String(current.name), declaration.init as NodeLike, (value) =>
+            isUnshadowedPromiseResolve(context, value),
+          )
+        ? patternDefaultValue(id, String(current.name))
+        : null
   if (!source) return null
   active.add(variable)
   try {

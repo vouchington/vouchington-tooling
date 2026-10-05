@@ -1,5 +1,6 @@
 import { findVariable, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
+import { patternDefaultCanApply } from './factory-owner-pattern-source.mts'
 
 export function requireBindingSource(
   context: RuleContextLike,
@@ -12,5 +13,7 @@ export function requireBindingSource(
   const id = declarator.id as NodeLike
   return id.type === 'Identifier'
     ? (declarator.init as NodeLike)
-    : patternDefaultValue(id, String(identifier.name))
+    : patternDefaultCanApply(id, String(identifier.name), declarator.init as NodeLike)
+      ? patternDefaultValue(id, String(identifier.name))
+      : null
 }

@@ -9,7 +9,14 @@ export function isStaticMethod(value: NodeLike): boolean {
     if (property.type !== 'Property') return false
     const candidateName = patternPropertyName(property)
     if (candidateName === null) return false
-    if (candidateName === name) return Boolean(property.method)
+    if (candidateName === name) {
+      const selected = unwrap(property.value as NodeLike)
+      return Boolean(
+        property.method ||
+        selected?.type === 'ArrowFunctionExpression' ||
+        (selected?.type === 'FunctionExpression' && (selected.async || selected.generator)),
+      )
+    }
   }
   return false
 }

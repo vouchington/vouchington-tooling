@@ -40,12 +40,12 @@ export function createFactoryExportVisitors(
       ? finalExpression((current.expressions as NodeLike[]).at(-1) as NodeLike)
       : current
   }
-  const restrictedExpression = (value: NodeLike) => {
+  const restrictedExpression = (value: NodeLike, boundary: NodeLike) => {
     const current = finalExpression(value)
     return (
       restricted(value) ||
       (current?.type === 'Identifier' &&
-        restricted(mutableExportInitializer(context, current, options.factories)))
+        restricted(mutableExportInitializer(context, current, options.factories, boundary)))
     )
   }
   return {
@@ -59,10 +59,10 @@ export function createFactoryExportVisitors(
       }
     },
     ExportDefaultDeclaration(value) {
-      if (restrictedExpression(node(value.declaration) as NodeLike)) report(value)
+      if (restrictedExpression(node(value.declaration) as NodeLike, value)) report(value)
     },
     TSExportAssignment(value) {
-      if (restrictedExpression(node(value.expression) as NodeLike)) report(value)
+      if (restrictedExpression(node(value.expression) as NodeLike, value)) report(value)
     },
     ExportNamedDeclaration(value) {
       if (value.exportKind === 'type') return

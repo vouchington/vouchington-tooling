@@ -131,6 +131,7 @@ Reflect.construct(makeGraph, [], ({ ctor() {}, ctor: function () {} }).ctor)
 Reflect.construct(makeGraph, [], ({ ctor: function () {}, ctor() {} }).ctor)
 Reflect.construct(makeGraph, [], ({ ctor() {}, ...override }).ctor)
 Reflect.construct(makeGraph, [], ({ ctor() {}, [key]: value }).ctor)
+Reflect.construct(makeGraph, [], ({ ctor: () => {} }).ctor)
 Reflect.construct(makeGraph, [], function () {})
 Reflect.construct(makeGraph, [], class {})
 Reflect.construct(makeGraph, [], NewTarget)
@@ -315,11 +316,16 @@ createRequire('relative')('1').makeGraph()
 createRequire('/workspace/file.js')('1').makeGraph()
 createRequire('file:///workspace/file.js')('1').makeGraph()
 createRequire(\`/workspace/\${file}\`)('1').makeGraph()
-createRequire(base)('1').makeGraph()`,
+createRequire(base)('1').makeGraph()
+const { load = createRequire(import.meta.url) } = { load: () => fake }
+load('1').makeGraph()
+const { possible = createRequire(import.meta.url) } = source
+possible('1').makeGraph()`,
     OPTIONS,
     'src/check.js',
   )
   expect(messageIds(result)).toEqual([
+    'constructionOwner',
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',
@@ -381,4 +387,41 @@ possible()`,
     'src/check.js',
   )
   expect(messageIds(result)).toEqual(Array(13).fill('constructionOwner'))
+})
+
+it('checks source-aware awaited import defaults', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `const { promise = import('1') } = { promise: Promise.resolve(other) }
+;(await promise).makeGraph()
+async function run(Promise) {
+const { identifier = import('1') } = { identifier: other }
+;(await identifier).makeGraph()
+const { called = import('1') } = { called: other() }
+;(await called).makeGraph()
+const { member = import('1') } = { member: Other.resolve(other) }
+;(await member).makeGraph()
+const { shadowed = import('1') } = { shadowed: Promise.resolve(other) }
+;(await shadowed).makeGraph()
+}`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual(Array(4).fill('constructionOwner'))
+})
+
+it('captures mutable expression exports before later writes', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { makeGraph } from '1'
+let before = makeGraph
+export default before
+before = () => 1
+let after = makeGraph
+after = () => 1
+export { after as captured }`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual(['constructionOwner'])
 })
