@@ -39,6 +39,9 @@ const valid = {
     function make(options:{id:string|number}){return (ctx:any)=>{inspect(options.id);ctx.setStatus(204)}}const handler=make({id:choose?'vote':1});`),
 }
 const invalid = {
+  'assigned-wrapper-escape': route(
+    'const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag=Object.assign({}, {options});opaque(bag);const handler=factory(options);',
+  ),
   'helper-return-wrapper-escape': route(
     'function identity<T>(value:T){return value}const options={assertAccess:(ctx:any)=>ctx.assert(true)};const bag={options:identity(options)};opaque(bag);const handler=factory(options);',
   ),
