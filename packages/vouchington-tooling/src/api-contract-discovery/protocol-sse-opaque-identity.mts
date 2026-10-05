@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { ownerAssignedOnlyAfter } from './protocol-sse-owner-allocation.mts'
+import { argumentMayReachFutureOwner } from './protocol-sse-future-owner.mts'
 import { independentArgumentOrigin } from './protocol-sse-independent-origin.mts'
 import {
   expressionReceiver,
@@ -67,7 +68,8 @@ export function opaqueArgumentExcludesSelectedStream(
   return selected.every((frame) => {
     if (sameWriteReceiver(frame, actual)) return false
     if (argumentMayContainSelectedSource(actual, frame, checker)) return false
-    if (ownerAssignedOnlyAfter(call, frame, checker)) return true
+    if (ownerAssignedOnlyAfter(call, frame, checker))
+      return !argumentMayReachFutureOwner(actual, frame, checker)
     if (
       frame.root === actual.root ||
       (actual.root.valueDeclaration && ts.isBindingElement(actual.root.valueDeclaration))

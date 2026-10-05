@@ -96,6 +96,7 @@ export function ownerAssignedOnlyAfter(
   return (
     !invalidWrite &&
     assignment !== undefined &&
+    enclosingFunction(assignment) === owner &&
     assignment.getStart() > call.getEnd() &&
     !hasRepeatingAncestor(assignment, owner) &&
     receiver.path.length === 1 &&

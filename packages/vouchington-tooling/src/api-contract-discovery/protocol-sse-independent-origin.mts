@@ -10,6 +10,7 @@ export function independentArgumentOrigin(actual: WriteReceiver, checker: ts.Typ
   const declaration = actual.root.valueDeclaration
   if (declaration && ts.isFunctionDeclaration(declaration) && declaration.body)
     return (
+      !declaration.asteriskToken &&
       !symbolBindingWritten(declaration.getSourceFile(), actual.root, checker) &&
       returnedExpressions(declaration).every((value) => value === undefined)
     )
@@ -24,7 +25,10 @@ export function independentArgumentOrigin(actual: WriteReceiver, checker: ts.Typ
     return false
   const initializer = unwrapExpression(declaration.initializer)
   if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
-    return returnedExpressions(initializer).every((value) => value === undefined)
+    return (
+      !(ts.isFunctionExpression(initializer) && initializer.asteriskToken) &&
+      returnedExpressions(initializer).every((value) => value === undefined)
+    )
   if (ts.isStringLiteral(initializer) || ts.isNumericLiteral(initializer)) return true
   if (!ts.isCallExpression(initializer) || !ts.isIdentifier(initializer.expression)) return false
   if (initializer.expression.text !== 'setInterval') return false
