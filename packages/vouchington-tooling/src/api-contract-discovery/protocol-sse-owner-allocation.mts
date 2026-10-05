@@ -83,6 +83,13 @@ export function ownerAssignedOnlyAfter(
     }
     if ((ts.isForOfStatement(node) || ts.isForInStatement(node)) && writesOwner(node.initializer))
       invalidWrite = true
+    if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken ||
+        node.operator === ts.SyntaxKind.MinusMinusToken) &&
+      writesOwner(node.operand)
+    )
+      invalidWrite = true
     node.forEachChild(inspect)
   }
   inspect(owner)

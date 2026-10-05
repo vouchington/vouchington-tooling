@@ -20,6 +20,13 @@ export function symbolBindingWritten(
       written = true
     if ((ts.isForOfStatement(node) || ts.isForInStatement(node)) && references(node.initializer))
       written = true
+    if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      (node.operator === ts.SyntaxKind.PlusPlusToken ||
+        node.operator === ts.SyntaxKind.MinusMinusToken) &&
+      references(node.operand)
+    )
+      written = true
     if (!written) node.forEachChild(visit)
   }
   visit(source)

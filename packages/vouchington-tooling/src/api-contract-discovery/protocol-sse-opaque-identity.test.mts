@@ -40,6 +40,22 @@ const frame = (stream: string) =>
   `${stream}.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))`
 const route = (body: string) => `${preamble}app.route('/events').get(()=>{${body}})`
 const sources = {
+  'incremented-owner': route(`
+    (Number.prototype as any).stream=prior;let sse:any;opaque(prior);
+    sse=startSSE();sse++;${frame('sse.stream')}`),
+  'decremented-owner': route(`
+    (Number.prototype as any).stream=prior;let sse:any;opaque(prior);
+    sse=startSSE();--sse;${frame('sse.stream')}`),
+  'incremented-factory': route(`
+    (replaceableSSE as any)++;opaque(prior);
+    const {stream}=replaceableSSE();${frame('stream')}`),
+  'decremented-factory': route(`
+    --(replaceableSSE as any);opaque(prior);
+    const {stream}=replaceableSSE();${frame('stream')}`),
+  'logical-owner-control': route(`
+    let sse:Owner|undefined;opaque(prior);sse=startSSE();!sse;${frame('sse.stream')}`),
+  'logical-factory-control': route(`
+    !replaceableSSE;opaque(prior);const {stream}=replaceableSSE();${frame('stream')}`),
   'mq-control-calls': route(`
     const {stream,lifecycleSignal}=startSSE();
     function onError(_error:Error){}stream.on('error',onError);
@@ -217,6 +233,8 @@ it('does not treat a property of an independent object as its own allocation', (
 })
 
 it.each([
+  'logical-owner-control',
+  'logical-factory-control',
   'mq-control-calls',
   'single-assignment-before-stream',
   'const-destructure-after-validation',
@@ -429,6 +447,10 @@ it.each([
 
 it.each([
   'selected-direct',
+  'incremented-owner',
+  'decremented-owner',
+  'incremented-factory',
+  'decremented-factory',
   'selected-const-alias',
   'selected-cast-alias',
   'selected-assigned-cast-alias',
