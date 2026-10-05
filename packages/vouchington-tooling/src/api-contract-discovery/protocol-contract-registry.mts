@@ -20,6 +20,7 @@ import {
 import type { BackendResponseContract } from './response-contract-types.mts'
 import { rejectRawSseWrites, type SseRouteWrites } from './protocol-sse-raw-writes.mts'
 import { sseEmission } from './protocol-sse-emission.mts'
+import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 export function discoverProtocolContracts(
   sourceFiles: readonly ts.SourceFile[],
@@ -28,6 +29,7 @@ export function discoverProtocolContracts(
   contracts: Map<string, BackendResponseContract>,
   options: DiscoverApiResponseContractsOptions | undefined,
   requestedKeys?: ReadonlySet<string>,
+  httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): Set<ts.CallExpression> {
   if (requestedKeys?.size === 0) return new Set()
   const calls: ts.CallExpression[] = []
@@ -130,10 +132,16 @@ export function discoverProtocolContracts(
           unavailable(contracts, key, binding, location, error, options)
       }
     })
-  const covered = registerHttpProtocols(pending, contracts, checker, (response, error) => {
-    for (const key of response.keys)
-      unavailable(contracts, key, response.binding, response.variants[0]!.source, error, options)
-  })
+  const covered = registerHttpProtocols(
+    pending,
+    contracts,
+    checker,
+    (response, error) => {
+      for (const key of response.keys)
+        unavailable(contracts, key, response.binding, response.variants[0]!.source, error, options)
+    },
+    httpValues,
+  )
   rejectRawSseWrites(
     sourceFiles,
     checker,

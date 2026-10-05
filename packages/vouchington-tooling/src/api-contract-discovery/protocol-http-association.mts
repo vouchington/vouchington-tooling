@@ -16,6 +16,7 @@ import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import { opaqueHttpContextArgument } from './protocol-http-context-escapes.mts'
 import { mutatedHttpResponse } from './protocol-http-response-mutations.mts'
+import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 const responseMethods = new Set([
   'setStatus',
@@ -30,6 +31,7 @@ export function associateHttpResponse(
   response: ts.Symbol,
   checker: ts.TypeChecker,
   siblings?: ReadonlySet<ts.Symbol>,
+  httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): Map<ts.CallExpression, 'content' | 'none' | 'status'> {
   const handler = enclosingFunction(call)
   const handlerContext = handler && httpHandlerContext(handler, checker)
@@ -41,7 +43,18 @@ export function associateHttpResponse(
     visit(scope, (node) => {
       if (mutatedHttpResponse(node, response, checker))
         throw new Error('HTTP branded response body or status is mutated')
-      if (ts.isCallExpression(node) && opaqueHttpContextArgument(node, checker, context))
+      if (
+        ts.isCallExpression(node) &&
+        opaqueHttpContextArgument(
+          node,
+          checker,
+          context,
+          undefined,
+          undefined,
+          undefined,
+          httpValues,
+        )
+      )
         throw new Error('HTTP response context escapes through an opaque argument')
       if (mutatesHttpResponseMethod(node, context, checker))
         throw new Error('HTTP response context method is mutated')
@@ -51,7 +64,7 @@ export function associateHttpResponse(
         responseMethods.has(indirectHttpResponseMethod(node, context, checker) ?? '')
       )
         throw new Error('HTTP response has an unsupported indirect status or body emission')
-      if (ts.isCallExpression(node) && opaqueHttpResponse(node, checker, context))
+      if (ts.isCallExpression(node) && opaqueHttpResponse(node, checker, context, httpValues))
         throw new Error('HTTP response context escapes through an opaque callback')
       if (
         ts.isBinaryExpression(node) &&
@@ -100,8 +113,12 @@ export function opaqueHttpResponse(
   call: ts.CallExpression,
   checker: ts.TypeChecker,
   context?: ts.Symbol,
+  httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): boolean {
-  if (opaqueHttpContextArgument(call, checker, context)) return true
+  if (
+    opaqueHttpContextArgument(call, checker, context, undefined, undefined, undefined, httpValues)
+  )
+    return true
   if (context)
     return (
       responseMethods.has(

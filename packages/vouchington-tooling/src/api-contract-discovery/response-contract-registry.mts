@@ -29,6 +29,7 @@ import {
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
+import { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 export type { BackendResponseContract } from './response-contract-types.mts'
 export type { DiscoverApiResponseContractsOptions } from './response-contract-lenient.mts'
@@ -41,6 +42,7 @@ export function discoverApiResponseContracts(
 ): Record<string, BackendResponseContract> {
   registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
+  const httpValues = createHttpContextValueResolver(checker, program.getSourceFiles())
   const contracts = new Map<string, BackendResponseContract>()
   const ambiguousBindings: AmbiguousHandlerBindings | undefined = options?.onAmbiguousAttribution
     ? new Map()
@@ -55,6 +57,7 @@ export function discoverApiResponseContracts(
     protocolContracts,
     options,
     requestedKeys,
+    httpValues,
   )
   for (const [key, contract] of protocolContracts) {
     const requestedKey = requestedProtocolKey(key, contract, requestedKeys)
@@ -151,6 +154,7 @@ export function discoverApiResponseContracts(
         callLabel,
         requestedKeys,
         options,
+        httpValues,
       )
     })
   }
