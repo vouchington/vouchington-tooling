@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
+import { unsupportedBoundContextNode } from './protocol-http-context-bound-nodes.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
 
 function checkedProgram(files: Record<string, string>): ts.Program {
@@ -85,6 +86,9 @@ const controls = {
   objectShorthand: 'const {ctx:saved}={ctx};opaque(saved)',
   arrayRest: 'const [...saved]=[ctx];opaque(saved)',
   arrayHole: 'const [saved]=[,];opaque(saved)',
+  objectOpaque: 'declareObject(ctx)',
+  methodIndependent: 'const {action:saved}={action(){ctx.assert(true)}};opaque(saved)',
+  methodLeak: 'const {action:saved}={action(){ctx.json({bad:true})}};opaque(saved)',
   arrayIndependent: 'const [saved]=[{independent:true}];opaque(saved)',
   arrayUnused: 'const [saved]=[ctx];ctx.assert(true)',
   arrayIgnored: 'function ignore(_value:unknown){};const [saved]=[ctx];ignore(saved)',
@@ -92,7 +96,7 @@ const controls = {
 } as const
 function fixture(name: keyof typeof controls) {
   return {
-    'route.ts': `declare function opaqueTag(strings:TemplateStringsArray,...values:unknown[]):void;${route(`const options={assertAccess:(ctx:Context)=>{${controls[name]}}};`)}`,
+    'route.ts': `declare const source:{value:unknown};function declareObject(_ctx:unknown){const {value:saved}=source;opaque(saved)};declare function opaqueTag(strings:TemplateStringsArray,...values:unknown[]):void;${route(`const options={assertAccess:(ctx:Context)=>{${controls[name]}}};`)}`,
   }
 }
 it.each([
@@ -104,6 +108,7 @@ it.each([
   'objectAlias',
   'objectShorthand',
   'arrayRest',
+  'methodLeak',
 ] as const)('rejects selected captured context in %s', (name) => expectUnknown(fixture(name)))
 it.each([
   'tagIgnored',
@@ -113,6 +118,8 @@ it.each([
   'classUnused',
   'classDead',
   'arrayIndependent',
+  'objectOpaque',
+  'methodIndependent',
   'arrayHole',
   'arrayUnused',
   'arrayIgnored',
@@ -120,3 +127,27 @@ it.each([
 ] as const)('retains independent or unused captures in %s', (name) =>
   expectNoContent(fixture(name)),
 )
+
+it.each(['tag', 'ctx.json'])('keeps the default tag guard precise for %s', (target) => {
+  const program = checkedProgram({
+    'route.ts': `declare const app:any;
+ declare function tag(strings:TemplateStringsArray):void;
+ app.route('/vote').put((ctx:any)=>{${target}\`body\`});export {};`,
+  })
+  const source = program.getSourceFile('/virtual/route.ts')!
+  let handler: ts.ArrowFunction | undefined
+  let tagged: ts.TaggedTemplateExpression | undefined
+  function visit(node: ts.Node): void {
+    if (ts.isArrowFunction(node)) handler = node
+    if (ts.isTaggedTemplateExpression(node)) tagged = node
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  const checker = program.getTypeChecker()
+  const context = handler && checker.getSymbolAtLocation(handler.parameters[0]!.name)
+  expect(context).toBeDefined()
+  expect(tagged).toBeDefined()
+  expect(unsupportedBoundContextNode(tagged!, context!, checker, handler!)).toBe(
+    target === 'ctx.json',
+  )
+})
