@@ -58,14 +58,17 @@ describe('reader SQL source fragments', () => {
         export const statement = queryText\`SELECT * FROM records\`;
         statement.extend(queryText\` WHERE active\`);
         statement['extend'](\` ORDER BY record_id\`);
+        statement[\`extend\`](\` LIMIT 1\`);
         statement.extend();
         statement.extend('NOT A TEMPLATE');
+        statement[extend](queryText\`NOT A STATIC METHOD\`);
+        statement[\`ex\${tend}\`](queryText\`NOT A STATIC TEMPLATE METHOD\`);
         statement[123](queryText\`NOT A STATIC METHOD\`);
         statement.other(queryText\`IGNORED\`);
         unknown.extend(queryText\`UNKNOWN\`);
         getStatement().extend(queryText\`NOT A SIMPLE RECEIVER\`);
       `),
-    ).toEqual(['SELECT * FROM records WHERE active ORDER BY record_id'])
+    ).toEqual(['SELECT * FROM records WHERE active ORDER BY record_id LIMIT 1'])
   })
 
   it('ignores unrelated tags, calls, import sources and namespace or default executors', () => {
@@ -83,6 +86,22 @@ describe('reader SQL source fragments', () => {
         call();
       `),
     ).toEqual([])
+  })
+
+  it('ignores type-only executor imports while retaining runtime aliases', () => {
+    expect(
+      extract(`
+        import { fetchRows as fetch, type execute as TypeExecute } from 'fixture-db';
+        import type { fetchRows as TypeFetch } from 'fixture-db';
+        function run(fetchRows, execute) {
+          fetchRows(queryText\`SELECT TYPE IMPORT SHADOW\`);
+          execute(queryText\`SELECT TYPE IMPORT CLAUSE\`);
+          fetch(queryText\`SELECT RUNTIME ALIAS\`);
+          TypeExecute(queryText\`SELECT TYPE SPECIFIER\`);
+          TypeFetch(queryText\`SELECT TYPE CLAUSE\`);
+        }
+      `),
+    ).toEqual(['SELECT RUNTIME ALIAS'])
   })
 
   it('discovers conditional executor aliases in source order using either branch', () => {

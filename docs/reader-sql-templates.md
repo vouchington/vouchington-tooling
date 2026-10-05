@@ -16,9 +16,10 @@ const fragments = extractStaticSqlTemplateQuasis(content, {
 })
 ```
 
-All identifiers are caller-supplied. Named executor imports, including aliases, are
-recognized only from configured modules. Conditional aliases are collected in traversal
-order when either branch names a known executor. Namespace/default imports are excluded.
+All identifiers are caller-supplied. Named runtime executor imports, including aliases,
+are recognized only from configured modules. Type-only imports and type-only named
+specifiers are excluded. Conditional aliases are collected in traversal order when either
+branch names a known executor. Namespace/default imports are excluded.
 The analysis remains name-based: it does not prove binding identity or exclude shadowed
 calls and does not follow arbitrary alias chains or unwrap assertions. Parentheses
 are transparent, matching the source parser's previous representation.
@@ -28,7 +29,9 @@ are collected. Export-list specifiers and expression-bodied arrow returns are ou
 source-fact collector's current heuristic.
 Binding references in returns, executor arguments, conditional executor aliases, and append
 receivers require identifiers; ordinary string values cannot consume a same-named binding.
-Static string computed method names remain supported for configured append calls.
+Static string and no-substitution template computed method names remain supported for
+configured append calls. Computed names that depend on identifiers or template
+interpolations are ignored.
 Only bare templates and templates with the configured simple tag are accepted. Raw quasi
 text is retained, and each interpolation becomes the configured prefix plus a one-based
 index. Direct fragments precede consumed variable bindings; repeated references do not
@@ -42,6 +45,9 @@ consequents, callbacks precede chained call receivers, and function/loop bodies 
 their headers, preserving the current inventory analyzer's collection order. These facts
 are an approximation of source structure, not execution or control-flow proof.
 
-The existing compiler peer parses the source, with syntax diagnostics rejected before
-facts are collected. No PostgreSQL parser is used. This API does not replace SQL AST
+The existing compiler peer parses the source, and diagnostics returned by TypeScript's
+`transpileModule` are rejected before facts are collected. This is not full TypeScript
+grammar or semantic validation: source-file forms accepted by the parser may still be
+collected even when a complete compilation would report contextual grammar errors or
+unresolved names. No PostgreSQL parser is used. This API does not replace SQL AST
 protection, boundary/dataflow analysis, or reader-discovery policy.

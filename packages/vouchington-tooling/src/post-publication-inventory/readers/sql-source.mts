@@ -2,7 +2,7 @@ import ts from '../../contract-schema/typescript-api.mts'
 import { terminalSqlExecutorBindings } from './sql-executors.mts'
 import {
   identifierName,
-  staticPropertyName,
+  staticComputedPropertyName,
   staticSqlTemplateText,
   unparenthesized,
   walk,
@@ -71,7 +71,9 @@ export function extractStaticSqlTemplateQuasis(
     if (!ts.isPropertyAccessExpression(callee) && !ts.isElementAccessExpression(callee)) return
     const method = ts.isPropertyAccessExpression(callee)
       ? callee.name.text
-      : staticPropertyName(callee.argumentExpression)
+      : callee.argumentExpression
+        ? staticComputedPropertyName(callee.argumentExpression)
+        : undefined
     if (method !== options.appendMethod) return
     const receiver = identifierName(callee.expression)
     const statement = receiver ? statements.get(receiver) : undefined

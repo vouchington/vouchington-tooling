@@ -12,9 +12,11 @@ export function identifierName(node: ts.Node): string | undefined {
   return ts.isIdentifier(node) ? node.text : undefined
 }
 
-export function staticPropertyName(node: ts.Node): string | undefined {
+export function staticComputedPropertyName(node: ts.Node): string | undefined {
   node = unparenthesized(node)
-  return ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : undefined
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+    ? node.text
+    : undefined
 }
 
 export function unparenthesized(node: ts.Node): ts.Node {

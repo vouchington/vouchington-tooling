@@ -14,10 +14,12 @@ export function terminalSqlExecutorBindings(
   walk(ast, (node) => {
     if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
     const names = options.executorImports.get(node.moduleSpecifier.text)
-    const specifiers = node.importClause?.namedBindings
+    const importClause = node.importClause
+    const specifiers = importClause?.namedBindings
+    if (importClause?.isTypeOnly) return
     if (!names || !specifiers || !ts.isNamedImports(specifiers)) return
     for (const specifier of specifiers.elements) {
-      if (names.has((specifier.propertyName ?? specifier.name).text))
+      if (!specifier.isTypeOnly && names.has((specifier.propertyName ?? specifier.name).text))
         bindings.add(specifier.name.text)
     }
   })
