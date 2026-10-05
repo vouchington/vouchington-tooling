@@ -1,33 +1,24 @@
 # Workflow and compiler primitives
 
-`workflow-policy` evaluates parsed GitHub Actions topology against policy supplied by the
-consumer. It has no workflow inventory or secret names of its own. Supply a topology and an index
-with the structural methods described by `WorkflowTopologyIndex`; a parser may expose additional
-fields. `evaluateGraphPolicy` checks inventory, job and edge presence, artifact flow, fan-in,
-reusable callers, and step order. `evaluateLockPolicy` takes the consumer's unlocked reasons and
-concurrency intent separately. Its scope classifier recognizes GitHub expression references and
-reports unsupported contexts.
-
-Inventory compares workflow `jobIds` against each corresponding job's `key`; job IDs may use any
-format. Fan-in and caller comparisons ignore ordering of index results.
+`workflow-policy` checks parsed GitHub Actions topology against data supplied by the consumer. It
+has no workflow inventory or secret names of its own. Supply a topology shaped like
+`WorkflowTopology`; a parser may expose additional fields. Topology, job-graph and concurrency
+policy lives in the `no-mistakes` `workflow-topology-policy` rule, not here. This breaking minor removed `evaluateGraphPolicy`, `evaluateLockPolicy`,
+`ConcurrencyPolicy` and `WorkflowTopologyPolicy`; migrate to that rule.
 
 ```ts
 import {
   conditionEntails,
-  evaluateGraphPolicy,
-  evaluateLockPolicy,
   callerCalleePermissionMismatches,
   parseWorkflow,
   unprovisionedSecretsWithoutReadinessStep,
 } from 'vouchington-tooling/workflow-policy'
 
-const diagnostics = evaluateGraphPolicy(topology, index, policy)
-diagnostics.push(...evaluateLockPolicy(topology, unlockedReasons, concurrencyIntent))
-diagnostics.push(
+const diagnostics = [
   ...unprovisionedSecretsWithoutReadinessStep(topology, {
     RELEASE_KEY: { provisioned: false },
   }),
-)
+]
 const documents = Object.fromEntries(
   Object.entries(workflowSources).map(([path, yaml]) => [path, parseWorkflow(yaml)]),
 )
