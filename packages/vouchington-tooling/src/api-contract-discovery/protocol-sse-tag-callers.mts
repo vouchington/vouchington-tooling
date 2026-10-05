@@ -42,3 +42,17 @@ export function createSseTagCallers(
   }
   return (fn) => callers.get(fn) ?? []
 }
+
+/** Concrete indexed tag bodies exclude their receiver only when they never observe this. */
+export function sseTagExcludesReceiver(
+  tag: ts.TaggedTemplateExpression,
+  checker: ts.TypeChecker,
+  files: readonly ts.SourceFile[],
+): boolean {
+  const fn = implementationDeclaration(checker.getResolvedSignature(tag)?.declaration, checker)
+  if (!fn || !('body' in fn) || !fn.body || !files.includes(fn.getSourceFile())) return false
+  function observesThis(node: ts.Node): boolean {
+    return node.kind === ts.SyntaxKind.ThisKeyword || node.forEachChild(observesThis) === true
+  }
+  return !observesThis(fn.body)
+}

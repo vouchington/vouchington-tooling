@@ -1,3 +1,5 @@
+import { sseTagExcludesReceiver } from './protocol-sse-tag-callers.mts'
+import { selectedOpaqueSseReceiver } from './protocol-sse-returned-capability.mts'
 import { collectSseInvocations } from './protocol-sse-invocations.mts'
 import { selectedSseTagReceiver } from './protocol-sse-tag-arguments.mts'
 import ts from '../contract-schema/typescript-api.mts'
@@ -107,6 +109,15 @@ export function rejectRawSseWrites(
       if (!route) continue
       if (ts.isTaggedTemplateExpression(node)) {
         if (
+          (!sseTagExcludesReceiver(node, checker, files) &&
+            selectedOpaqueSseReceiver(
+              node,
+              checker,
+              route.receivers.flatMap((receiver) =>
+                actualReceivers(receiver, candidate, checker, lookup),
+              ),
+              (receiver) => actualReceivers(receiver, candidate, checker, lookup),
+            )) ||
           selectedSseTagReceiver(node, checker, route.receivers, (receiver) =>
             actualReceivers(receiver, candidate, checker, lookup),
           )

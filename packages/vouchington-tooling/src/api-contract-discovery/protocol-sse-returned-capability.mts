@@ -1,3 +1,7 @@
+import {
+  createProtocolCallbackValueResolver,
+  isProtocolCallbackFunction,
+} from './protocol-callback-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
@@ -111,12 +115,14 @@ export function implementationDeclaration(
 
 /** An unknown member implementation receives its actual receiver as this. */
 export function selectedOpaqueSseReceiver(
-  call: ts.CallExpression | ts.NewExpression,
+  call: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression,
   checker: ts.TypeChecker,
   framed: readonly (WriteReceiver | undefined)[],
   resolve: (receiver: WriteReceiver) => readonly (WriteReceiver | undefined)[],
 ): boolean {
-  const target = ts.isCallExpression(call) && call.expression
+  const target = ts.isTaggedTemplateExpression(call)
+    ? call.tag
+    : ts.isCallExpression(call) && call.expression
   if (!target || !(ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)))
     return false
   const receiver = expressionReceiver(target.expression, checker)
@@ -128,4 +134,15 @@ export function selectedOpaqueSseReceiver(
         framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
     )
   )
+}
+
+/** Only stable actual callable aliases participate in the callable return proof. */
+export function sseCallableAlias(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+): ts.FunctionLikeDeclaration | undefined {
+  const fn = ts.isIdentifier(expression)
+    ? createProtocolCallbackValueResolver(checker).resolve(expression, new Map())?.node
+    : undefined
+  return fn && isProtocolCallbackFunction(fn) && fn.body ? fn : undefined
 }
