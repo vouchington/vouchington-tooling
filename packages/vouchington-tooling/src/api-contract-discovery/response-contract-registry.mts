@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
-import { requestedProtocolKey } from './protocol-requested-keys.mts'
+import { protocolBindingRequested, requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
@@ -21,7 +21,6 @@ import {
 import {
   enclosingRouteBinding,
   isContextMethod,
-  requestedKeyForBinding,
   responseMarker,
   type AmbiguousHandlerBindings,
   visit,
@@ -124,10 +123,10 @@ export function discoverApiResponseContracts(
             const separator = route.indexOf(':')
             return (
               separator > 0 &&
-              requestedKeyForBinding(
+              protocolBindingRequested(
                 { method: route.slice(0, separator), routeTemplate: route.slice(separator + 1) },
                 requestedKeys,
-              ) !== undefined
+              )
             )
           })
         if (attributionLabel && routes && requestedRoute) {

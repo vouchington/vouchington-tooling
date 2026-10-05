@@ -1,7 +1,11 @@
 import ts from '../contract-schema/typescript-api.mts'
 
-import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
-import { visit } from './response-contract-route-syntax.mts'
+import {
+  attributionSymbol,
+  propertyImplementationSymbol,
+  resolveSymbol,
+} from './response-contract-symbols.mts'
+import { unwrapTransparentExpression, visit } from './response-contract-route-syntax.mts'
 
 /** Direct syntactic property writes are excluded; indirect mutation is outside this proof. */
 export function findMutatedProperties(
@@ -29,12 +33,15 @@ export function findMutatedProperties(
       if (!access) return
       const symbol = checker.getSymbolAtLocation(access.name)
       if (symbol) mutated.add(attributionSymbol(resolveSymbol(symbol, checker), checker))
+      const implementation = propertyImplementationSymbol(access, checker)
+      if (implementation)
+        mutated.add(attributionSymbol(resolveSymbol(implementation, checker), checker))
     })
   }
   return mutated
 }
 
-/** Direct identifier writes are excluded from handler attribution; indirect writes are unproven. */
+/** Direct identifier and destructuring writes are excluded; indirect writes are unproven. */
 export function findMutatedBindings(
   sourceFiles: readonly ts.SourceFile[],
   checker: ts.TypeChecker,
@@ -42,25 +49,56 @@ export function findMutatedBindings(
   const mutated = new Set<ts.Symbol>()
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
-      let identifier: ts.Identifier | undefined
+      let identifiers: ts.Identifier[] = []
       if (
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
         node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
-        ts.isIdentifier(node.left)
+        isAssignmentTarget(node.left)
       )
-        identifier = node.left
+        identifiers = assignmentTargetIdentifiers(node.left)
       else if (
         (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
         (node.operator === ts.SyntaxKind.PlusPlusToken ||
           node.operator === ts.SyntaxKind.MinusMinusToken) &&
         ts.isIdentifier(node.operand)
       )
-        identifier = node.operand
-      if (!identifier) return
-      const symbol = checker.getSymbolAtLocation(identifier)
-      if (symbol) mutated.add(attributionSymbol(resolveSymbol(symbol, checker), checker))
+        identifiers = [node.operand]
+      for (const identifier of identifiers) {
+        const symbol = checker.getSymbolAtLocation(identifier)
+        if (symbol) mutated.add(attributionSymbol(resolveSymbol(symbol, checker), checker))
+      }
     })
   }
   return mutated
+}
+
+function isAssignmentTarget(expression: ts.Expression): boolean {
+  const target = unwrapTransparentExpression(expression)
+  return (
+    ts.isIdentifier(target) ||
+    ts.isArrayLiteralExpression(target) ||
+    ts.isObjectLiteralExpression(target)
+  )
+}
+
+function assignmentTargetIdentifiers(expression: ts.Expression): ts.Identifier[] {
+  const target = unwrapTransparentExpression(expression)
+  if (ts.isIdentifier(target)) return [target]
+  if (ts.isArrayLiteralExpression(target))
+    return target.elements.flatMap((element) =>
+      ts.isOmittedExpression(element)
+        ? []
+        : assignmentTargetIdentifiers(ts.isSpreadElement(element) ? element.expression : element),
+    )
+  if (!ts.isObjectLiteralExpression(target)) return []
+  const identifiers: ts.Identifier[] = []
+  for (const property of target.properties) {
+    if (ts.isShorthandPropertyAssignment(property)) identifiers.push(property.name)
+    else if (ts.isPropertyAssignment(property))
+      identifiers.push(...assignmentTargetIdentifiers(property.initializer))
+    else if (ts.isSpreadAssignment(property))
+      identifiers.push(...assignmentTargetIdentifiers(property.expression))
+  }
+  return identifiers
 }

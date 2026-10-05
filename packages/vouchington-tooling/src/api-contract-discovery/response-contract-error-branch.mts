@@ -62,9 +62,44 @@ function latestStatusSetter(statement: ts.Statement): StatusSetterStatement | un
   for (let previous = index - 1; previous >= 0; previous--) {
     const candidate = block.statements[previous]!
     if (isStatusSetterStatement(candidate)) return candidate
+    if (mayConditionallySetStatus(candidate)) return undefined
   }
   const enclosing = block.parent
   return ts.isStatement(enclosing) ? latestStatusSetter(enclosing) : undefined
+}
+
+function mayConditionallySetStatus(statement: ts.Statement): boolean {
+  if (
+    !ts.isIfStatement(statement) &&
+    !ts.isSwitchStatement(statement) &&
+    !ts.isTryStatement(statement) &&
+    !ts.isForStatement(statement) &&
+    !ts.isForInStatement(statement) &&
+    !ts.isForOfStatement(statement) &&
+    !ts.isWhileStatement(statement) &&
+    !ts.isDoStatement(statement)
+  )
+    return false
+  let found = false
+  const inspect = (node: ts.Node): void => {
+    if (node !== statement && isNestedFunction(node)) return
+    if (ts.isCallExpression(node) && isContextMethod(node.expression, 'setStatus')) found = true
+    ts.forEachChild(node, inspect)
+  }
+  inspect(statement)
+  return found
+}
+
+function isNestedFunction(node: ts.Node): boolean {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node)
+  )
 }
 
 function isStatusSetterStatement(statement: ts.Statement): statement is StatusSetterStatement {
@@ -87,14 +122,13 @@ function isErrorObjectJson(call: ts.CallExpression): boolean {
     !!errorObject &&
     ts.isObjectLiteralExpression(errorObject) &&
     errorObject.properties.some((property) => {
-      if (ts.isSpreadAssignment(property) || !property.name) return false
-      if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
-        return property.name.text === 'error'
-      return (
-        ts.isComputedPropertyName(property.name) &&
-        ts.isStringLiteral(property.name.expression) &&
-        property.name.expression.text === 'error'
-      )
+      if (ts.isSpreadAssignment(property) || ts.isMethodDeclaration(property)) return false
+      // Every remaining object-literal member has a name; spread members were excluded above.
+      const name = property.name!
+      if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text === 'error'
+      if (!ts.isComputedPropertyName(name)) return false
+      const key = unwrapTransparentExpression(name.expression)
+      return ts.isStringLiteral(key) && key.text === 'error'
     })
   )
 }

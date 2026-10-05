@@ -1,5 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
+import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
+
 export function functionSymbol(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
   if (ts.isFunctionDeclaration(node) && node.name) return checker.getSymbolAtLocation(node.name)
   if (
@@ -106,4 +108,26 @@ export function attributionSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): t
   const name = (resolved.valueDeclaration as ts.NamedDeclaration | undefined)?.name
   if (!name || !ts.isIdentifier(name)) return resolved
   return checker.getSymbolAtLocation(name) ?? resolved
+}
+
+export function propertyImplementationSymbol(
+  access: ts.PropertyAccessExpression,
+  checker: ts.TypeChecker,
+): ts.Symbol | undefined {
+  const contextual = checker.getSymbolAtLocation(access.name)
+  const receiver = unwrapTransparentExpression(access.expression)
+  if (!contextual || !ts.isIdentifier(receiver)) return contextual
+  const receiverSymbol = checker.getSymbolAtLocation(receiver)
+  const declaration = receiverSymbol?.valueDeclaration
+  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+    return contextual
+  const initializer = unwrapTransparentExpression(declaration.initializer)
+  if (!ts.isObjectLiteralExpression(initializer)) return contextual
+  if (initializer.properties.some(ts.isSpreadAssignment)) return contextual
+  const implementation = initializer.properties.find((property) => {
+    // Every non-spread object-literal member has a name; spread members were excluded above.
+    const name = property.name!
+    return (ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === access.name.text
+  })
+  return (implementation?.name && checker.getSymbolAtLocation(implementation.name)) || contextual
 }

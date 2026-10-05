@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { propertyImplementationSymbol } from './response-contract-symbols.mts'
 import {
   propertyName,
   routeTemplateFromExpression,
@@ -25,7 +26,7 @@ export function handlerArgumentSymbols(
       continue
     }
     if (unwrapArguments && ts.isPropertyAccessExpression(argument)) {
-      const symbol = checker.getSymbolAtLocation(argument.name)
+      const symbol = propertyImplementationSymbol(argument, checker)
       if (symbol) symbols.push(symbol)
       continue
     }
@@ -34,13 +35,21 @@ export function handlerArgumentSymbols(
       const callee = unwrapArguments
         ? unwrapTransparentExpression(child.expression)
         : child.expression
-      const symbol = checker.getSymbolAtLocation(
-        ts.isPropertyAccessExpression(callee) ? callee.name : callee,
-      )
+      const symbol = handlerSymbol(callee, checker, unwrapArguments)
       if (symbol) symbols.push(symbol)
     })
   }
   return symbols
+}
+
+function handlerSymbol(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+  resolvePropertyImplementation: boolean,
+): ts.Symbol | undefined {
+  if (resolvePropertyImplementation && ts.isPropertyAccessExpression(expression))
+    return propertyImplementationSymbol(expression, checker)
+  return checker.getSymbolAtLocation(expression)
 }
 
 function visitHandlerCalls(
