@@ -61,6 +61,9 @@ function isKnownNonConstructor(context: RuleContextLike, value: NodeLike | undef
   return Boolean(
     current &&
     (isStaticPrimitive(context, current) ||
+      current.type === 'ObjectExpression' ||
+      current.type === 'ArrayExpression' ||
+      (current.type === 'Literal' && Boolean(current.regex)) ||
       current.type === 'ArrowFunctionExpression' ||
       (current.type === 'FunctionExpression' && (current.async || current.generator))),
   )
