@@ -90,6 +90,16 @@ describe('HTTP context proof follows callback initialization and template evalua
     )
   })
 
+  it('rejects a callback default when a union argument may be undefined', () => {
+    expectUnknown(
+      route(
+        `declare const choose:boolean;
+         const options={assertAccess:(ctx:Context,value:unknown=ctx.json({bad:true}))=>{}};`,
+        'options.assertAccess(ctx, choose ? undefined : true)',
+      ),
+    )
+  })
+
   it('keeps 204 when null bypasses the callback default', () => {
     expectNoContent(
       route(
