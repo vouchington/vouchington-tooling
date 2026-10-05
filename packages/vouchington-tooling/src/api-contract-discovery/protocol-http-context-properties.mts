@@ -11,6 +11,7 @@ export function contextProperty(
     checker: ts.TypeChecker
     resolve: (node: ts.Node, env: CallbackBindings, seen: Set<ts.Node>) => ContextValues
     declaration: (target: ts.Symbol, env: CallbackBindings, seen: Set<ts.Node>) => ContextValues
+    prototypeSafe: () => boolean
   },
   last?: number,
 ): Properties {
@@ -59,5 +60,5 @@ export function contextProperty(
     )
   )
     return undefined
-  return [{ value: null, present: false }]
+  return resolver.prototypeSafe() ? [{ value: null, present: false }] : undefined
 }

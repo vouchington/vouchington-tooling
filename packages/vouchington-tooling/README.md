@@ -674,6 +674,14 @@ and helper parameters must resolve to the registered caller's unchanged response
 Helper-owned contracts also account for response emissions in their proven caller scopes.
 Opaque callees receiving the canonical HTTP context or its response object invalidate its contract;
 implemented helpers and consumed callbacks retain their proven dispatch behavior.
+Factory callback proofs use the actual compiler Program to include static imports, reexports, and
+literal dynamic-import consumers. Receiver obligations follow callback objects inside literal object
+and array arguments with the selected caller bindings. A missing own callback is treated as absent
+only when the complete Program preserves the global object prototype capability; prototype writes
+or exposure to another call make that callback unavailable. Internal proofs without a Program source
+list cannot establish this absence. Explicit own callbacks retain their concrete implementation.
+Namespace identities follow actual imports and awaited literal dynamic imports through const aliases;
+asserted module types and pending import promises cannot substitute for executable provenance.
 Feasible assignments or deletions of response methods through canonical context aliases invalidate
 that dispatch evidence; dead, ignored, or unrelated method mutations preserve the contract.
 Indirect response `call`, `apply`, and `bind` forms fail closed, including borrowed context receivers.
