@@ -648,6 +648,9 @@ heritage, ambient declarations, or decorators. The owner allocation must occur l
 function outside loops. Arguments that capture the owner or reference local callables or locally
 created containers remain unknown, including callbacks retained for later invocation; generator
 callbacks are never independent origins.
+Metadata/member writes preserve callable binding capabilities. Timer exclusions require canonical,
+unmodified platform proof; reflective replacement remains unknown. Opaque receiver identity requires
+bounded fresh allocations, while unknown aliases remain unavailable.
 Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
 Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assuming status 200.
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
