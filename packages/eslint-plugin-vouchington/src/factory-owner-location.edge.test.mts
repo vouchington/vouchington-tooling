@@ -424,4 +424,13 @@ export { after as captured }`,
     'src/check.js',
   )
   expect(messageIds(result)).toEqual(['constructionOwner'])
+  const replaced = await lintRule(
+    'factory-owner-location',
+    `import { makeGraph } from '1'
+let graph = makeGraph
+export default (graph = () => 1, graph)`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(replaced)).toEqual([])
 })
