@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
-import { isNamedImport, requiredModuleSpecifier } from './factory-owner-require.mts'
+import {
+  isNamedImport,
+  isNamespaceImport,
+  normalizeRequireLoader,
+  requiredModuleSpecifier,
+} from './factory-owner-require.mts'
 
 function contextWithImport(imported: NodeLike, source = 'typescript'): RuleContextLike {
   const specifier: NodeLike = {
@@ -104,12 +109,150 @@ describe('factory-owner-require', () => {
 
   it('ignores non-call receivers and non-string require arguments', () => {
     const context = contextWithImport({ type: 'Identifier', name: 'createProgram' })
+    expect(
+      isNamedImport(
+        context,
+        {
+          type: 'MemberExpression',
+          object: { type: 'Identifier', name: 'namespace' },
+          property: { type: 'Identifier', name: 'createProgram' },
+        },
+        new Set(['typescript']),
+        'createProgram',
+      ),
+    ).toBe(false)
     expect(requiredModuleSpecifier(context, { type: 'Identifier', name: 'require' })).toBeNull()
     expect(
       requiredModuleSpecifier(context, {
         type: 'CallExpression',
         callee: { type: 'Identifier', name: 'require' },
         arguments: [{ type: 'Literal', value: 1 }],
+      }),
+    ).toBeNull()
+  })
+
+  it('ignores type-only import-equals namespace bindings', () => {
+    const variable: VariableLike = {
+      name: 'runtime',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            importKind: 'type',
+            moduleReference: {
+              type: 'TSExternalModuleReference',
+              expression: { type: 'Literal', value: '@compiler/runtime' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report() {},
+      sourceCode: { getScope: () => ({ variables: [variable], upper: null }) },
+    }
+    expect(
+      isNamespaceImport(
+        context,
+        { type: 'Identifier', name: 'runtime' },
+        new Set(['@compiler/runtime']),
+      ),
+    ).toBe(false)
+  })
+
+  it('resolves a qualified createRequire import-equals alias', () => {
+    const nodeModule: VariableLike = {
+      name: 'nodeModule',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: {
+              type: 'TSExternalModuleReference',
+              expression: { type: 'Literal', value: 'node:module' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const loadFactory: VariableLike = {
+      name: 'loadFactory',
+      defs: [
+        { type: 'ImportBinding', node: { type: 'Identifier' } },
+        { type: 'ImportBinding', node: { type: 'TSImportEqualsDeclaration', importKind: 'type' } },
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: {
+              type: 'TSQualifiedName',
+              left: { type: 'Identifier', name: 'nodeModule' },
+              right: { type: 'Identifier', name: 'createRequire' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const variables = new Map([
+      ['nodeModule', nodeModule],
+      ['loadFactory', loadFactory],
+      [
+        'otherFactory',
+        {
+          name: 'otherFactory',
+          defs: [
+            {
+              type: 'ImportBinding',
+              node: {
+                type: 'TSImportEqualsDeclaration',
+                moduleReference: {
+                  type: 'TSQualifiedName',
+                  left: { type: 'Identifier', name: 'nodeModule' },
+                  right: { type: 'Identifier', name: 'other' },
+                },
+              },
+            },
+          ],
+          references: [],
+        } satisfies VariableLike,
+      ],
+    ])
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report() {},
+      sourceCode: {
+        getScope: () => ({ set: { get: (name) => variables.get(name) }, upper: null }),
+      },
+    }
+    expect(normalizeRequireLoader(undefined)).toBeUndefined()
+    expect(
+      requiredModuleSpecifier(context, {
+        type: 'CallExpression',
+        callee: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'loadFactory' },
+          arguments: [{ type: 'Literal', value: '/workspace/file.js' }],
+        },
+        arguments: [{ type: 'Literal', value: '@compiler/runtime' }],
+      }),
+    ).toBe('@compiler/runtime')
+    expect(
+      requiredModuleSpecifier(context, {
+        type: 'CallExpression',
+        callee: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'otherFactory' },
+          arguments: [{ type: 'Literal', value: '/workspace/file.js' }],
+        },
+        arguments: [{ type: 'Literal', value: '@compiler/runtime' }],
       }),
     ).toBeNull()
   })

@@ -1,15 +1,7 @@
-import {
-  normalizeFilename,
-  propertyName,
-  unwrap,
-  type NodeLike,
-  type RuleContextLike,
-} from './ast-helpers.mts'
-import {
-  isNamedImport,
-  isNamespaceImport,
-  requiredModuleSpecifier,
-} from './factory-owner-require.mts'
+import { normalizeFilename, type RuleContextLike } from './ast-helpers.mts'
+import { createFactoryExportVisitors } from './factory-owner-exports.mts'
+import { createFactoryInvocationVisitors } from './factory-owner-invocation.mts'
+import { createFactoryProvenance } from './factory-owner-provenance.mts'
 import {
   matchesFileGlobs,
   resolveFileMatchOptions,
@@ -46,25 +38,6 @@ function isOwnerFile(context: RuleContextLike, options: FactoryOwnerOptions): bo
   return options.owners.includes(filename)
 }
 
-function isFactoryCallee(
-  context: RuleContextLike,
-  node: NodeLike | null | undefined,
-  options: FactoryOwnerOptions,
-): boolean {
-  const value = unwrap(node)
-  if (value?.type === 'Identifier') {
-    return [...options.factories].some(
-      (name) => value.name === name && isNamedImport(context, value, options.modules, name),
-    )
-  }
-  if (value?.type !== 'MemberExpression') return false
-  const name = propertyName(value)
-  if (typeof name !== 'string' || !options.factories.has(name)) return false
-  if (isNamespaceImport(context, value.object as NodeLike, options.modules)) return true
-  const required = requiredModuleSpecifier(context, value.object as NodeLike)
-  return required !== null && options.modules.has(required)
-}
-
 export function createFactoryOwnerLocationRule() {
   return {
     meta: {
@@ -93,12 +66,10 @@ export function createFactoryOwnerLocationRule() {
       if (!options || !matchesFileGlobs(context, options) || isOwnerFile(context, options)) {
         return {}
       }
+      const provenance = createFactoryProvenance(context, options)
       return {
-        CallExpression(node: NodeLike) {
-          if (isFactoryCallee(context, node.callee as NodeLike, options)) {
-            context.report({ node, messageId: 'constructionOwner' })
-          }
-        },
+        ...createFactoryInvocationVisitors(context, provenance.isFactory),
+        ...createFactoryExportVisitors(context, options, provenance),
       }
     },
   }

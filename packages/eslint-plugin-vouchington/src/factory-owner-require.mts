@@ -1,10 +1,27 @@
 import {
   findVariable,
   propertyName,
+  staticPropertyName,
   unwrap,
   type NodeLike,
   type RuleContextLike,
 } from './ast-helpers.mts'
+import { isQualifiedCreateRequireAlias } from './factory-owner-create-require-alias.mts'
+import { requireBindingSource } from './factory-owner-require-binding.mts'
+import { isPossibleRequireBase } from './factory-owner-require-base.mts'
+
+export function isValueImportEquals(declaration: NodeLike): boolean {
+  return declaration.importKind !== 'type' && !declaration.isTypeOnly
+}
+
+export function normalizeRequireLoader(node: NodeLike | null | undefined): NodeLike | undefined {
+  const current = unwrap(node) ?? undefined
+  if (current?.type === 'AwaitExpression')
+    return normalizeRequireLoader(current.argument as NodeLike)
+  if (current?.type === 'SequenceExpression')
+    return normalizeRequireLoader((current.expressions as NodeLike[]).at(-1))
+  return current
+}
 
 const NODE_MODULE_SPECIFIERS = new Set(['module', 'node:module'])
 
@@ -50,30 +67,80 @@ export function isNamedImport(
   return hasImport(context, unwrap(node), modules, new Set(['ImportSpecifier']), imported)
 }
 
+function isDefaultImport(
+  context: RuleContextLike,
+  node: NodeLike | null | undefined,
+  modules: ReadonlySet<string>,
+): boolean {
+  return hasImport(context, unwrap(node), modules, new Set(['ImportDefaultSpecifier']))
+}
+
+export function isConfiguredFactoryImport(
+  context: RuleContextLike,
+  node: NodeLike,
+  modules: ReadonlySet<string>,
+  factories: ReadonlySet<string>,
+): boolean {
+  return (
+    [...factories].some((name) => isNamedImport(context, node, modules, name)) ||
+    (factories.has('default') && isDefaultImport(context, node, modules))
+  )
+}
+
 export function isNamespaceImport(
   context: RuleContextLike,
   node: NodeLike | null | undefined,
   modules: ReadonlySet<string>,
 ): boolean {
-  return hasImport(
-    context,
-    unwrap(node),
-    modules,
-    new Set(['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']),
+  const value = unwrap(node)
+  return (
+    hasImport(
+      context,
+      value,
+      modules,
+      new Set(['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']),
+    ) ||
+    hasImport(context, value, modules, new Set(['ImportSpecifier']), 'default') ||
+    (value?.type === 'Identifier' &&
+      Boolean(
+        findVariable(context, value)?.defs.some((definition) => {
+          const declaration = definition.node
+          const reference = declaration?.moduleReference as NodeLike | undefined
+          const specifier = reference?.expression as NodeLike | undefined
+          return (
+            declaration?.type === 'TSImportEqualsDeclaration' &&
+            isValueImportEquals(declaration) &&
+            reference?.type === 'TSExternalModuleReference' &&
+            specifier?.type === 'Literal' &&
+            typeof specifier.value === 'string' &&
+            modules.has(specifier.value)
+          )
+        }),
+      ))
   )
 }
 
 function isCreateRequireCall(context: RuleContextLike, node: NodeLike | null | undefined): boolean {
   const call = unwrap(node)
+  if (call?.type === 'AwaitExpression') {
+    return isCreateRequireCall(context, call.argument as NodeLike)
+  }
   if (call?.type !== 'CallExpression') return false
-  const callee = unwrap(call.callee as NodeLike)
+  if (!isPossibleRequireBase((call.arguments as NodeLike[] | undefined)?.[0])) return false
+  const callee = normalizeRequireLoader(call.callee as NodeLike)
   if (callee?.type === 'Identifier') {
-    return hasImport(
-      context,
-      callee,
-      NODE_MODULE_SPECIFIERS,
-      new Set(['ImportSpecifier']),
-      'createRequire',
+    if (
+      hasImport(
+        context,
+        callee,
+        NODE_MODULE_SPECIFIERS,
+        new Set(['ImportSpecifier']),
+        'createRequire',
+      )
+    )
+      return true
+    return isQualifiedCreateRequireAlias(context, callee, isValueImportEquals, (namespace) =>
+      isNamespaceImport(context, namespace, NODE_MODULE_SPECIFIERS),
     )
   }
   return (
@@ -89,16 +156,7 @@ function isCreateRequireBinding(
 ): boolean {
   const identifier = unwrap(node)
   if (identifier?.type !== 'Identifier') return false
-  return Boolean(
-    findVariable(context, identifier)?.defs?.some((definition) => {
-      const declarator = definition.node
-      return (
-        definition.type === 'Variable' &&
-        declarator.type === 'VariableDeclarator' &&
-        isCreateRequireCall(context, declarator.init as NodeLike)
-      )
-    }),
-  )
+  return isCreateRequireCall(context, requireBindingSource(context, identifier))
 }
 
 export function requiredModuleSpecifier(
@@ -107,11 +165,15 @@ export function requiredModuleSpecifier(
 ): string | null {
   const call = unwrap(node)
   if (call?.type !== 'CallExpression') return null
-  const callee = unwrap(call.callee as NodeLike)
+  const callee = normalizeRequireLoader(call.callee as NodeLike)
   const argument = unwrap((call.arguments as NodeLike[] | undefined)?.[0])
-  if (argument?.type !== 'Literal' || typeof argument.value !== 'string') return null
+  const moduleName =
+    argument?.type === 'Literal' && typeof argument.value !== 'string'
+      ? null
+      : staticPropertyName(argument)
+  if (typeof moduleName !== 'string') return null
   if (isCreateRequireCall(context, callee) || isCreateRequireBinding(context, callee)) {
-    return argument.value
+    return moduleName
   }
   return null
 }

@@ -49,6 +49,7 @@ const WRAPPERS = new Set([
   'TSSatisfiesExpression',
   'TSTypeAssertion',
   'TSNonNullExpression',
+  'TSInstantiationExpression',
 ])
 
 export function unwrap(node: NodeLike | null | undefined): NodeLike | null | undefined {
@@ -145,6 +146,7 @@ export function staticPropertyName(
 }
 
 function literalName(value: unknown): string | number | boolean | bigint | null {
+  if (value === null) return 'null'
   if (
     typeof value === 'string' ||
     typeof value === 'number' ||
