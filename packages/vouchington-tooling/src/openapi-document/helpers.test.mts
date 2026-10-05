@@ -7,6 +7,7 @@ import { createComponentRegistry } from './component-registry.mts'
 import { canonicalContractSchemaNode, hashContractSchema } from './contract-schema-canonical.mts'
 import { responseStatusCodesForContract, routeShape } from './operation-types.mts'
 import { catalogResponse, operationId } from './openapi-route-helpers.mts'
+import type { OpenApiQueryParameter } from './query-types.mts'
 import { objectNode as obj, requiredProperty as prop } from './schema-node-builders.mts'
 
 describe('mergeVariantSchemas', () => {
@@ -17,6 +18,20 @@ describe('mergeVariantSchemas', () => {
     expect(mergeVariantSchemas([{ type: 'string' }, { type: 'number' }])).toEqual({
       anyOf: [{ type: 'string' }, { type: 'number' }],
     })
+  })
+})
+
+describe('OpenApiQueryParameter types', () => {
+  it('rejects a required descriptor as array items', () => {
+    const required: OpenApiQueryParameter = { kind: 'string', required: true }
+    const parameter: OpenApiQueryParameter = {
+      kind: 'csv-array',
+      style: 'form',
+      explode: false,
+      // @ts-expect-error array items can never be required
+      items: required,
+    }
+    expect(parameter.kind).toBe('csv-array')
   })
 })
 

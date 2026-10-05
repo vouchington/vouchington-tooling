@@ -111,3 +111,13 @@ export function stringTuple(
   }
   return values.map((item) => (item as ts.StringLiteralType).value)
 }
+
+/** Fails when the type, or any union/intersection constituent, is conditional or generic. */
+export function rejectUnresolvedType(type: ts.Type, fail: (detail: string) => never): void {
+  if (type.flags & (ts.TypeFlags.Conditional | ts.TypeFlags.Instantiable)) {
+    fail('descriptor must not contain unresolved conditional or generic types')
+  }
+  if (type.isUnionOrIntersection()) {
+    for (const member of type.types) rejectUnresolvedType(member, fail)
+  }
+}

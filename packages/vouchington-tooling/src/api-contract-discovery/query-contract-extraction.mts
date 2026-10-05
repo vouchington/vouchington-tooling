@@ -1,4 +1,5 @@
 import type { QueryParameterContract } from './query-contract-types.mts'
+import type { OpenApiQueryParameterShape } from '../openapi-document/query-types.mts'
 import ts from '../contract-schema/typescript-api.mts'
 
 import { contractError } from './response-contract-registration.mts'
@@ -10,6 +11,7 @@ import {
   requiredBooleanLiteral,
   requiredNumberLiteral,
   requiredPropertyType,
+  rejectUnresolvedType,
   requiredStringLiteral,
   stringTuple,
 } from './query-contract-literals.mts'
@@ -21,6 +23,7 @@ export function extractQueryParameterDescriptor(
   node: ts.Node,
   parameterName: string,
 ): QueryParameterContract {
+  rejectUnresolvedType(type, failure(sourceFile, node, parameterName))
   const descriptor = extractDescriptorShape(type, checker, sourceFile, node, parameterName)
   if (!optionalTrueLiteral(type, 'required', checker, failure(sourceFile, node, parameterName))) {
     return descriptor
@@ -47,7 +50,7 @@ function extractDescriptorShape(
   sourceFile: ts.SourceFile,
   node: ts.Node,
   parameterName: string,
-): QueryParameterContract {
+): OpenApiQueryParameterShape {
   const fail = failure(sourceFile, node, parameterName)
   const kind = requiredStringLiteral(type, 'kind', checker, fail)
   const description = optionalStringLiteral(type, 'description', checker, node, fail)
@@ -98,6 +101,7 @@ function extractDescriptorShape(
     if (requiredBooleanLiteral(type, 'explode', checker, fail) !== false)
       fail('explode must be false')
     const itemType = requiredPropertyType(type, 'items', checker, fail)
+    rejectUnresolvedType(itemType, fail)
     if (declaresProperty(itemType, 'required')) fail('array items cannot be required')
     const items = extractDescriptorShape(itemType, checker, sourceFile, node, `${parameterName}[]`)
     if (items.kind === 'string' || items.kind === 'enum') {

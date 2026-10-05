@@ -14,7 +14,7 @@ export type OpenApiQueryParameterShape =
   | { kind: 'enum'; values: readonly string[]; default?: string; description?: string }
   | {
       kind: 'csv-array'
-      items: OpenApiQueryParameterShape
+      items: OpenApiQueryParameterShape & { required?: never }
       style: 'form'
       explode: false
       description?: string
