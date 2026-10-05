@@ -7,6 +7,10 @@ import {
   type RuleContextLike,
 } from './ast-helpers.mts'
 
+export function isValueImportEquals(declaration: NodeLike): boolean {
+  return declaration.importKind !== 'type' && !declaration.isTypeOnly
+}
+
 const NODE_MODULE_SPECIFIERS = new Set(['module', 'node:module'])
 
 function importedName(specifier: NodeLike | undefined): string | undefined {
@@ -93,7 +97,7 @@ export function isNamespaceImport(
           const specifier = reference?.expression as NodeLike | undefined
           return (
             declaration?.type === 'TSImportEqualsDeclaration' &&
-            !declaration.isTypeOnly &&
+            isValueImportEquals(declaration) &&
             reference?.type === 'TSExternalModuleReference' &&
             specifier?.type === 'Literal' &&
             typeof specifier.value === 'string' &&

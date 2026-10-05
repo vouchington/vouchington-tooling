@@ -476,6 +476,18 @@ import('@compiler/runtime').then(() => {})`
         },
       } as NodeLike)
     }
+    visitors.ExportNamedDeclaration?.({
+      type: 'ExportNamedDeclaration',
+      specifiers: [],
+      declaration: {
+        type: 'TSImportEqualsDeclaration',
+        importKind: 'type',
+        moduleReference: {
+          type: 'TSExternalModuleReference',
+          expression: { type: 'Literal', value: '@compiler/runtime' },
+        },
+      },
+    } as NodeLike)
     expect(reports).toEqual(['constructionOwner'])
   })
 })

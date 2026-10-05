@@ -7,6 +7,7 @@ import {
 import { patternDefaultValues } from './factory-owner-pattern-default.mts'
 import { namedPatternDefaultSource } from './factory-owner-provenance-binding.mts'
 import type { FactoryProvenanceOptions } from './factory-owner-provenance.mts'
+import { isValueImportEquals } from './factory-owner-require.mts'
 
 function node(value: unknown): NodeLike | undefined {
   return value !== null && typeof value === 'object' && 'type' in value
@@ -84,7 +85,7 @@ export function createFactoryExportVisitors(
         const moduleReference = node(declaration.moduleReference)
         const moduleName = name(node(moduleReference?.expression))
         if (
-          !declaration.isTypeOnly &&
+          isValueImportEquals(declaration) &&
           ((moduleName !== null && options.modules.has(moduleName)) ||
             restricted(node(declaration.id)))
         )

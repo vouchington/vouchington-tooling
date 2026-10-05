@@ -169,7 +169,7 @@ compiler.makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 53 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 52 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
-import { isNamedImport, requiredModuleSpecifier } from './factory-owner-require.mts'
+import {
+  isNamedImport,
+  isNamespaceImport,
+  requiredModuleSpecifier,
+} from './factory-owner-require.mts'
 
 function contextWithImport(imported: NodeLike, source = 'typescript'): RuleContextLike {
   const specifier: NodeLike = {
@@ -124,5 +128,38 @@ describe('factory-owner-require', () => {
         arguments: [{ type: 'Literal', value: 1 }],
       }),
     ).toBeNull()
+  })
+
+  it('ignores type-only import-equals namespace bindings', () => {
+    const variable: VariableLike = {
+      name: 'runtime',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            importKind: 'type',
+            moduleReference: {
+              type: 'TSExternalModuleReference',
+              expression: { type: 'Literal', value: '@compiler/runtime' },
+            },
+          },
+        },
+      ],
+      references: [],
+    }
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report() {},
+      sourceCode: { getScope: () => ({ variables: [variable], upper: null }) },
+    }
+    expect(
+      isNamespaceImport(
+        context,
+        { type: 'Identifier', name: 'runtime' },
+        new Set(['@compiler/runtime']),
+      ),
+    ).toBe(false)
   })
 })
