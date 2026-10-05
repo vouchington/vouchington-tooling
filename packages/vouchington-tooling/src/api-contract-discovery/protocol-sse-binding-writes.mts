@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { globalTarget, literalStrings } from './protocol-platform-mutation-targets.mts'
 
 export function symbolBindingWritten(
   source: ts.SourceFile,
@@ -6,13 +7,25 @@ export function symbolBindingWritten(
   checker: ts.TypeChecker,
   includeMembers = false,
 ): boolean {
+  const declaration = symbol.valueDeclaration
+  const globalBinding = declaration && declaration.parent === source && !ts.isExternalModule(source)
   const references = (node: ts.Node): boolean => {
     if (!includeMembers && ts.isComputedPropertyName(node)) return false
-    if (
-      !includeMembers &&
-      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
-    )
-      return false
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const global = globalBinding && globalTarget(node.expression, checker)
+      if (global) {
+        const keys = ts.isPropertyAccessExpression(node)
+          ? [node.name.text]
+          : literalStrings(node.argumentExpression, checker)
+        return (
+          keys === undefined ||
+          keys.some(
+            (key) => checker.getPropertyOfType(checker.getTypeAtLocation(global), key) === symbol,
+          )
+        )
+      }
+      if (!includeMembers) return false
+    }
     if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === symbol) return true
     return node.getChildren().some(references)
   }

@@ -26,6 +26,7 @@ export function ownerHasFreshAllocation(
   const bindingOwner =
     declaration &&
     ts.isBindingElement(declaration) &&
+    ts.isObjectBindingPattern(declaration.parent) &&
     ts.isVariableDeclaration(declaration.parent.parent)
       ? declaration.parent.parent
       : undefined
@@ -72,6 +73,7 @@ export function ownerHasFreshAllocation(
     return node.getChildren().some(writesOwner)
   }
   const inspect = (node: ts.Node): void => {
+    if (ts.isDeleteExpression(node) && writesOwner(node.expression)) invalidWrite = true
     if (ts.isBinaryExpression(node)) {
       const left = node.left
       if (writesOwner(left)) {
