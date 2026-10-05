@@ -1,7 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
-import { symbolBindingWritten } from './protocol-sse-fresh-factory.mts'
+import { symbolBindingWritten } from './protocol-sse-binding-writes.mts'
 import type { WriteReceiver } from './protocol-write-receiver.mts'
 
 /** Recognize only values with a separately allocated origin needed by SSE control calls. */
