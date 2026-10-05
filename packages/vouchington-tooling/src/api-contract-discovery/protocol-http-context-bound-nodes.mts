@@ -24,6 +24,11 @@ export function unsupportedBoundContextNode(
     unsupportedContextAssignment(node, context, checker) ||
     (ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context, checker)) ||
     mutatesHttpResponseMethod(node, context, checker, handler) ||
+    (ts.isIdentifier(node) &&
+      node.text === 'arguments' &&
+      !ts.isArrowFunction(handler) &&
+      enclosingFunction(node) === handler &&
+      executableProtocolPath(node, checker, handler)) ||
     opaqueHttpContextConstruction(node, checker, context, handler) ||
     (ts.isTaggedTemplateExpression(node) &&
       ts.isTemplateExpression(node.template) &&
@@ -91,7 +96,7 @@ export function boundHttpContexts(
   for (const [index, parameter] of runtimeParameters(fn).entries()) {
     const argument = call.arguments[index]
     if (!argument || !httpContextArgument(argument, context, checker)) continue
-    if (!ts.isIdentifier(parameter.name)) return undefined
+    if (!ts.isIdentifier(parameter.name) || parameter.dotDotDotToken) return undefined
     contexts.push(checker.getSymbolAtLocation(parameter.name)!)
   }
   return contexts

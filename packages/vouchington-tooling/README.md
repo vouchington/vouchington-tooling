@@ -659,6 +659,8 @@ method can escape the proven emission path. A callback that captures
 the route's stream or HTTP context and escapes to a callee without a concrete implementation can
 write undocumented bytes, so the affected response contracts fail closed. Uncalled local callbacks,
 dead branches, and implemented helpers that ignore their callback preserve the proven contracts.
+Literal object/array arguments and constructor arguments retain selected-stream capabilities.
+A concrete helper body outside the indexed source set is opaque to raw-write validation.
 Cataloged SSE routes with only extracted non-SSE variants retain an unavailable event-stream
 possibility alongside those responses until the extracted variants describe the stream.
 
@@ -700,6 +702,11 @@ Caller-bound defaults execute before the callback body when an argument is omitt
 undefined; proven provided values bypass those defaults. Context-bearing tagged substitutions remain
 opaque escapes, while primitive context members preserve ordinary value semantics. A local `satisfies`
 wrapper preserves the underlying factory value and existing provenance checks.
+Destructured literal-import fulfillment parameters retain their actual exported mutation roots.
+`Reflect.getPrototypeOf` exposes the same prototype capability as `Object.getPrototypeOf`.
+Rest and executable `arguments` context aliases remain unavailable. Literal callbacks capturing a
+context escape through opaque consumers; concrete callees that ignore that supplied callback retain
+their proof, and primitive member captures remain ordinary values.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
 uniquely bound helper pipelines must match every executable invocation on the selected route.

@@ -1,6 +1,9 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
-import { contextModuleOrigin } from './protocol-http-context-module-origin.mts'
+import {
+  contextImportBindingMember,
+  contextModuleOrigin,
+} from './protocol-http-context-module-origin.mts'
 
 /** Bounded literal aliases retain mutation origins; only primitive members cannot expose parents. */
 export function createContextValueRoots(
@@ -33,6 +36,8 @@ export function createContextValueRoots(
       binding?.flags && binding.flags & ts.SymbolFlags.Alias
         ? checker.getAliasedSymbol(binding)
         : binding
+    const imported = contextImportBindingMember(checker, found)
+    if (imported) return imported
     const value = found && !seen.has(found) ? found.valueDeclaration : undefined
     const next = new Set(seen)
     if (found) next.add(found)
