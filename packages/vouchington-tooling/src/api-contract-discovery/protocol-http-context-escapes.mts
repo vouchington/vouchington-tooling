@@ -39,8 +39,12 @@ export function opaqueHttpContextArgument(
     )
   )
     return false
-  if (context && opaqueWrappedHttpContextArgument(call, context, checker, proof.callbacks, env))
-    return true
+  if (context) {
+    const safeCapture = (fn: ts.FunctionLikeDeclaration) =>
+      !calleeEscapes(fn, call, context, checker, active, env, env, proof, root)
+    if (opaqueWrappedHttpContextArgument(call, context, checker, proof.callbacks, env, safeCapture))
+      return true
+  }
   if (context && !matches(context)) return false
   if (context) return !implementedCallee(call, context, checker, active, env, proof, root)
   for (let owner = enclosingFunction(call); owner; owner = enclosingFunction(owner)) {
