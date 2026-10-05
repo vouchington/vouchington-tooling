@@ -13,6 +13,20 @@ export function collectActivePatternCaptures(
     content,
   )
   const inactive: { start: number; end: number; literal: boolean }[] = []
+  const astInactive: { start: number; end: number }[] = []
+  const source = ts.createSourceFile(
+    file,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  )
+  const collectAstInactive = (node: ts.Node): void => {
+    if (ts.isJsxText(node) || ts.isRegularExpressionLiteral(node))
+      astInactive.push({ start: node.getStart(source), end: node.end })
+    ts.forEachChild(node, collectAstInactive)
+  }
+  collectAstInactive(source)
   const inactiveKinds = new Set([
     ts.SyntaxKind.SingleLineCommentTrivia,
     ts.SyntaxKind.MultiLineCommentTrivia,
@@ -35,7 +49,12 @@ export function collectActivePatternCaptures(
         if (kind === ts.SyntaxKind.TemplateTail) templateBraceDepth.pop()
       } else templateBraceDepth[depth]!--
     }
-    if (inactiveKinds.has(kind))
+    if (
+      inactiveKinds.has(kind) &&
+      !astInactive.some(
+        ({ start, end }) => scanner.getTokenPos() < end && scanner.getTextPos() > start,
+      )
+    )
       inactive.push({
         start: scanner.getTokenPos(),
         end: scanner.getTextPos(),
@@ -44,21 +63,7 @@ export function collectActivePatternCaptures(
           kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral,
       })
   }
-  if (file.endsWith('.tsx') || file.endsWith('.jsx')) {
-    const source = ts.createSourceFile(
-      file,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    )
-    const visit = (node: ts.Node): void => {
-      if (ts.isJsxText(node))
-        inactive.push({ start: node.getStart(source), end: node.end, literal: false })
-      ts.forEachChild(node, visit)
-    }
-    visit(source)
-  }
+  inactive.push(...astInactive.map(({ start, end }) => ({ start, end, literal: false })))
   const globalPattern = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`)
   return [...content.matchAll(globalPattern)].flatMap((match) => {
     if (

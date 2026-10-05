@@ -18,6 +18,9 @@ it('requires a capture from a caller pattern', () => {
   expect(collectActivePatternCaptures("path: '/'", /path:\s*'\/([^']*)'/g, 'source.ts')).toEqual([
     '',
   ])
+  expect(
+    collectActivePatternCaptures("path: '/entry'", /path:\s*'\/([^']+)'/, 'source.ts'),
+  ).toEqual(['entry'])
 })
 
 it('ignores route-like examples rendered as JSX text', () => {

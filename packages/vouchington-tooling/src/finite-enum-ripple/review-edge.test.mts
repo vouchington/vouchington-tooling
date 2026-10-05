@@ -11,6 +11,7 @@ import { collectCreatePageLiterals } from './create-page-literals.mts'
 import { checkUnionCreatePageTypes } from './compare.mts'
 import { getStringProperty } from './parser-support.mts'
 import { hasConfiguredObjectDeclaration } from './ast.mts'
+import { checkFiniteEnumRipple } from './check.mts'
 import { checkUnionTypes } from './union-types.mts'
 import { checkStructuredRouteConfigs } from './structured-route-check.mts'
 import type { FiniteEnumFiles, FiniteEnumRippleConfig } from './model.mts'
@@ -45,6 +46,81 @@ it('rescans interpolated template tails before later active route literals', () 
   const multiple =
     "const note = `prefix ${value} middle ${other} suffix`; const route = { path: '/again' }"
   expect(collectActivePatternCaptures(multiple, /path:\s*'\/([^']+)'/g, file)).toEqual(['again'])
+})
+
+it('maps diagnostics to the longest matching configured path', () => {
+  const backendPath = 'catalog.ts'
+  const webPath = 'catalog.ts:pages/detail.tsx'
+  const contents = new Map([
+    [backendPath, "const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' } }"],
+    [webPath, 'const kinds = { alpha: buildKind() }'],
+  ])
+  const files: FiniteEnumFiles = {
+    existingFileSet: new Set(contents.keys()),
+    unionCollectionPages: [],
+    unionCreatePages: [],
+    unionDetailPages: [],
+    structuredCollectionPages: [],
+    structuredComponentFiles: [],
+    structuredDetailPages: [],
+  }
+  const context = {
+    repoRoot: '/synthetic',
+    isInsideGitRepo: true,
+    trackedFiles: [...contents.keys()],
+    trackedFileSet: files.existingFileSet,
+    readTrackedFile: (file: string) => contents.get(file) ?? null,
+  }
+  const config: FiniteEnumRippleConfig = {
+    files,
+    structured: {
+      backendPath,
+      webPath,
+      routeConfigsPath: 'routes.ts',
+      typeObject: 'kinds',
+      routeConfigObject: 'routes',
+      typeArrayProperty: 'kinds',
+      pluralPathProperty: 'plural',
+      singularPathProperty: 'singular',
+      routeExemptionProperty: 'special',
+      slugProperty: 'slug',
+      slugPluralProperty: 'slugs',
+      factoryCallPattern: /^factory$/,
+      routeConfigExceptions: [],
+      collectionRouteExclusions: [],
+      routeLabels: {
+        detailTop: 'top',
+        detail: 'detail',
+        collectionTop: 'top',
+        collection: 'collection',
+      },
+      collectionLabel: 'kind',
+      ignoredNavigationPaths: [],
+      collectionPathLiteralPattern: /path:\s*'\/([^']*)'/,
+      navigationPathLiteralPattern: /push\('\/([^']*)'/,
+    },
+  }
+  const errors = checkFiniteEnumRipple(context, config)
+  expect(errors).toContainEqual(
+    expect.stringContaining('::error file=catalog.ts%3Apages/detail.tsx::'),
+  )
+})
+
+it('keeps route matches active after JSX apostrophes and regex quotes', () => {
+  expect(
+    collectActivePatternCaptures(
+      "const view = <p>It's here</p> {push('/stale')}",
+      /push\('\/([^']+)'\)/g,
+      'page.tsx',
+    ),
+  ).toEqual(['stale'])
+  expect(
+    collectActivePatternCaptures(
+      "const matcher = /'/; push('/stale')",
+      /push\('\/([^']+)'\)/g,
+      'page.ts',
+    ),
+  ).toEqual(['stale'])
 })
 
 it('accepts an empty string constituent in a finite union', () => {
