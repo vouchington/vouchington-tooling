@@ -5,10 +5,12 @@ import { discoverProtocolContracts } from './protocol-contract-registry.mts'
 
 import { discoverImplicitContract } from './response-contract-implicit.mts'
 import { ambiguousRoutesForCall } from './response-contract-attribution.mts'
+import { sortAttributionFacts } from './response-contract-attribution-facts.mts'
 import { implicitResponseCallLabel } from './response-contract-call-classification.mts'
 import { collectHandlerBindings } from './response-contract-handler-bindings.mts'
 import {
   registerRouteContract,
+  type AmbiguousAttributionFact,
   type DiscoverApiResponseContractsOptions,
 } from './response-contract-lenient.mts'
 import {
@@ -44,6 +46,7 @@ export function discoverApiResponseContracts(
     ? new Map()
     : undefined
   const handlerBindings = collectHandlerBindings(sourceFiles, checker, ambiguousBindings)
+  const attributionFacts: AmbiguousAttributionFact[] = []
   const protocolContracts = new Map<string, BackendResponseContract>()
   const protocolEmissions = discoverProtocolContracts(
     sourceFiles,
@@ -131,10 +134,10 @@ export function discoverApiResponseContracts(
           })
         if (attributionLabel && routes && requestedRoute) {
           const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-          options.onAmbiguousAttribution({
+          attributionFacts.push({
             sourceLocation: `${sourceLocation(sourceFile, node)}:${position.line + 1}:${position.character + 1}`,
             label: attributionLabel,
-            routes,
+            routes: [...routes],
           })
         }
       }
@@ -152,9 +155,13 @@ export function discoverApiResponseContracts(
     })
   }
 
-  return Object.fromEntries(
+  const result = Object.fromEntries(
     [...contracts.entries()].toSorted(([left], [right]) => left.localeCompare(right)),
   )
+  if (options?.onAmbiguousAttribution) {
+    for (const fact of sortAttributionFacts(attributionFacts)) options.onAmbiguousAttribution(fact)
+  }
+  return result
 }
 
 function rawResponseMediaType(

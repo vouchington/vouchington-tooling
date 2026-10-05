@@ -411,8 +411,8 @@ describe('transparent response-attribution expressions', () => {
         onAmbiguousAttribution: (fact) => facts.push(fact),
       })
       expect(facts.map(({ routes }) => routes)).toEqual([
-        ['POST:/api/v1/function-a', 'POST:/api/v1/function-b'],
         ['POST:/api/v1/expression-a', 'POST:/api/v1/expression-b'],
+        ['POST:/api/v1/function-a', 'POST:/api/v1/function-b'],
       ])
     } finally {
       await rm(directory, { recursive: true, force: true })

@@ -1,12 +1,16 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import {
   findMutatedBindings,
   findMutatedProperties,
 } from './response-contract-property-mutations.mts'
-import { handlerArgumentSymbols } from './response-contract-handler-calls.mts'
+import {
+  handlerArgumentSymbols,
+  isMutatedPropertyAccess,
+} from './response-contract-handler-calls.mts'
 import {
   HTTP_METHODS,
   propertyName,
@@ -38,7 +42,6 @@ export function collectHandlerBindings(
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
       if (!ts.isCallExpression(node)) return
-      if (!executableProtocolPath(node, checker)) return
       const method = propertyName(node.expression)?.toUpperCase()
       if (!method || !HTTP_METHODS.has(method)) return
       const routeTemplate = routeTemplateFromExpression(node.expression)
@@ -51,10 +54,12 @@ export function collectHandlerBindings(
         bindingsBySymbol.set(resolved, candidates)
       }
       if (ambiguousBindings) {
+        if (!potentiallyExecuted(node)) return
+        if (!isExportedRouteBuilder(node) && !executableProtocolPath(node, checker)) return
         for (const symbol of handlerArgumentSymbols(node, checker, true, mutatedProperties)) {
           const propertySymbol = attributionSymbol(resolveSymbol(symbol, checker), checker)
           if (mutatedProperties?.has(propertySymbol)) continue
-          const handlerSymbol = resolveHandlerSymbol(symbol, checker)
+          const handlerSymbol = resolveHandlerSymbol(symbol, checker, mutatedProperties)
           const resolvedAttributionSymbol = attributionSymbol(handlerSymbol, checker)
           if (mutatedProperties?.has(resolvedAttributionSymbol)) continue
           if (mutatedBindings?.has(resolvedAttributionSymbol)) continue
@@ -98,7 +103,27 @@ export function collectHandlerBindings(
   return bindings
 }
 
-function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
+function isExportedRouteBuilder(node: ts.Node): boolean {
+  let current = node.parent
+  while (current) {
+    if (ts.isFunctionLike(current))
+      return (
+        ts.isFunctionDeclaration(current) &&
+        !!(
+          ts.getCombinedModifierFlags(current) &
+          (ts.ModifierFlags.Export | ts.ModifierFlags.Default)
+        )
+      )
+    current = current.parent
+  }
+  return false
+}
+
+function resolveHandlerSymbol(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+  mutatedProperties?: ReadonlySet<ts.Symbol>,
+): ts.Symbol {
   const seen = new Set<ts.Symbol>()
   let current = resolveSymbol(symbol, checker)
   while (!seen.has(current)) {
@@ -124,6 +149,11 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
     )
       return current
     const initializer = unwrapTransparentExpression(declaration.initializer)
+    if (
+      ts.isPropertyAccessExpression(initializer) &&
+      isMutatedPropertyAccess(initializer, checker, mutatedProperties)
+    )
+      return current
     const next = ts.isIdentifier(initializer)
       ? checker.getSymbolAtLocation(initializer)
       : ts.isPropertyAccessExpression(initializer)

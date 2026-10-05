@@ -25,6 +25,11 @@ export function handlerArgumentSymbols(
       continue
     }
     if (unwrapArguments && ts.isPropertyAccessExpression(argument)) {
+      const mutatedSymbol = mutatedPropertyAccessSymbol(argument, checker, mutatedProperties)
+      if (mutatedSymbol) {
+        symbols.push(mutatedSymbol)
+        continue
+      }
       const symbol = propertyImplementationSymbol(argument, checker)
       if (symbol) symbols.push(symbol)
       continue
@@ -34,7 +39,11 @@ export function handlerArgumentSymbols(
       const callee = unwrapArguments
         ? unwrapTransparentExpression(child.expression)
         : child.expression
-      if (isMutatedPropertyAccess(callee, checker, mutatedProperties)) return
+      const mutatedSymbol = mutatedPropertyAccessSymbol(callee, checker, mutatedProperties)
+      if (mutatedSymbol) {
+        symbols.push(mutatedSymbol)
+        return
+      }
       const symbol = handlerSymbol(callee, checker, unwrapArguments)
       if (symbol) symbols.push(symbol)
     })
@@ -42,17 +51,25 @@ export function handlerArgumentSymbols(
   return symbols
 }
 
-function isMutatedPropertyAccess(
+export function isMutatedPropertyAccess(
   expression: ts.Expression,
   checker: ts.TypeChecker,
   mutatedProperties: ReadonlySet<ts.Symbol> | undefined,
 ): boolean {
-  if (!mutatedProperties || !ts.isPropertyAccessExpression(expression)) return false
+  return !!mutatedPropertyAccessSymbol(expression, checker, mutatedProperties)
+}
+
+function mutatedPropertyAccessSymbol(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+  mutatedProperties: ReadonlySet<ts.Symbol> | undefined,
+): ts.Symbol | undefined {
+  if (!mutatedProperties || !ts.isPropertyAccessExpression(expression)) return undefined
   const contextual = checker.getSymbolAtLocation(expression.name)
-  return (
-    !!contextual &&
+  return contextual &&
     mutatedProperties.has(attributionSymbol(resolveSymbol(contextual, checker), checker))
-  )
+    ? contextual
+    : undefined
 }
 
 function handlerSymbol(

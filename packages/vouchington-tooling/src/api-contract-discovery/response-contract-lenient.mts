@@ -29,9 +29,11 @@ export type AmbiguousAttributionFact = {
 export type DiscoverApiResponseContractsOptions = ExtractContractSchemaOptions & {
   onRouteError?: (error: RouteDiscoveryError) => void
   /**
-   * Opt in to response-attribution facts during the existing discovery walk. Dynamic error
-   * payloads paired with a non-literal status are excluded from these facts; discovery output
-   * keeps its existing behavior. Consumers choose whether a fact needs a diagnostic or policy.
+   * Opt in to response-attribution facts from the existing discovery pass. Facts are delivered
+   * after discovery succeeds, ordered by normalized source location; each callback receives its
+   * own copy of the sorted route list. Dynamic error payloads paired with a non-literal status are
+   * excluded from these facts; discovery output keeps its existing behavior. Consumers choose
+   * whether a fact needs a diagnostic or policy.
    */
   onAmbiguousAttribution?: (fact: AmbiguousAttributionFact) => void
 }

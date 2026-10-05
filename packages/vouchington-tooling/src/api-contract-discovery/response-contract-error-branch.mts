@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { isContextMethod } from './response-contract-route-analysis.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import { responseBodyExpression } from './response-contract-registration.mts'
 
@@ -62,7 +63,10 @@ function latestStatusSetter(statement: ts.Statement): StatusSetterStatement | un
   const index = block.statements.indexOf(statement)
   for (let previous = index - 1; previous >= 0; previous--) {
     const candidate = block.statements[previous]!
-    if (isStatusSetterStatement(candidate)) return candidate
+    if (isStatusSetterStatement(candidate)) {
+      if (potentiallyExecuted(candidate)) return candidate
+      continue
+    }
     if (mayConditionallySetStatus(candidate)) return undefined
   }
   const enclosing = block.parent
@@ -80,7 +84,12 @@ function mayConditionallySetStatus(statement: ts.Statement): boolean {
   let found = false
   const inspect = (node: ts.Node): void => {
     if (node !== statement && isNestedFunction(node)) return
-    if (ts.isCallExpression(node) && isContextMethod(node.expression, 'setStatus')) found = true
+    if (
+      ts.isCallExpression(node) &&
+      isContextMethod(node.expression, 'setStatus') &&
+      potentiallyExecuted(node)
+    )
+      found = true
     ts.forEachChild(node, inspect)
   }
   inspect(statement)

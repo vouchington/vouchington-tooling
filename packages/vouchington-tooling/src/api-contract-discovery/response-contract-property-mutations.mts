@@ -1,7 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
-import { propertyImplementationSymbol } from './response-contract-object-symbols.mts'
 import { unwrapTransparentExpression, visit } from './response-contract-route-syntax.mts'
 
 /** Direct syntactic property writes are excluded; indirect mutation is outside this proof. */
@@ -30,9 +29,6 @@ export function findMutatedProperties(
       if (!access) return
       const symbol = checker.getSymbolAtLocation(access.name)
       if (symbol) mutated.add(attributionSymbol(resolveSymbol(symbol, checker), checker))
-      const implementation = propertyImplementationSymbol(access, checker)
-      if (implementation)
-        mutated.add(attributionSymbol(resolveSymbol(implementation, checker), checker))
     })
   }
   return mutated

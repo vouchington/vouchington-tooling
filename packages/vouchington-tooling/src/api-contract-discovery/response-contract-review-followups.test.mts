@@ -179,6 +179,73 @@ const sources = {
     app.route('/a').post(send)
     if (false) app.route('/b').post(send)
   `,
+  'exported-route-builder': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    export function registerRoutes() {
+      app.route('/a').post(send)
+      app.route('/b').post(send)
+    }
+  `,
+  'mutated-property-direct-registration': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    const handlers = { handler: send }
+    handlers.handler = (ctx: any) => ctx.json({ replacement: true })
+    const methods = { emit(ctx: any) { ctx.json({ original: true }) } }
+    const { emit: alias } = methods
+    methods.emit = (ctx: any) => ctx.json({ replacement: true })
+    app.route('/a').post(handlers.handler)
+    app.route('/b').post(handlers.handler)
+    app.route('/c').post(send)
+    app.route('/d').post(send)
+    app.route('/e').post(alias)
+    app.route('/f').post(alias)
+  `,
+  'factory-receiver-handler': `
+    declare const app: any
+    class Base {
+      send(ctx: any) { ctx.json({ base: true }) }
+    }
+    class Derived extends Base {
+      send(ctx: any) { ctx.json({ derived: true }) }
+    }
+    declare function make(): Base
+    app.route('/a').post(make().send)
+    app.route('/b').post(make().send)
+  `,
+  'unreachable-status-write': `
+    declare const app: any
+    function send(ctx: any, status: any, message: string) {
+      ctx.setStatus(200)
+      if (false) ctx.setStatus(status)
+      ctx.json({ error: message })
+    }
+    app.route('/a').post((ctx: any) => send(ctx, ctx.query.status, 'a'))
+    app.route('/b').post((ctx: any) => send(ctx, ctx.query.status, 'b'))
+  `,
+  'invalid-marker-after-fact': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    app.route('/a').post(send)
+    app.route('/b').post(send)
+    apiResponse()
+  `,
+  'ordered-source-z': `
+    declare const app: any
+    function send(ctx: any) {
+      ctx.json({ first: true })
+      ctx.json({ second: true })
+    }
+    app.route('/z').post(send)
+    app.route('/zz').post(send)
+  `,
+  'ordered-source-a': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ only: true }) }
+    app.route('/a').post(send)
+    app.route('/aa').post(send)
+  `,
   'literal-error-emitters': `
     declare const app: any
     function send(ctx: any) {
@@ -336,7 +403,76 @@ it('tracks a rest target as a direct handler binding mutation', () => {
 })
 
 it('does not count a statically unreachable route registration as ambiguous', () => {
-  expect(discover('unreachable-route-registration').facts).toEqual([])
+  const withCallback = discover('unreachable-route-registration')
+  expect(withCallback.facts).toEqual([])
+  expect(withCallback.contracts).toEqual(
+    discover('unreachable-route-registration', false).contracts,
+  )
+})
+
+it('preserves default discovery for exported route builders while attributing their handlers', () => {
+  const withCallback = discover('exported-route-builder')
+  expect(withCallback.facts.map(({ routes }) => routes)).toEqual([['POST:/a', 'POST:/b']])
+  expect(withCallback.contracts).toEqual(discover('exported-route-builder', false).contracts)
+})
+
+it('does not let a mutated property suppress direct function registrations', () => {
+  expect(
+    discover('mutated-property-direct-registration').facts.map(({ routes }) => routes),
+  ).toEqual([['POST:/c', 'POST:/d']])
+})
+
+it('fails closed for property handlers read through factory receivers', () => {
+  expect(discover('factory-receiver-handler').facts).toEqual([])
+})
+
+it('ignores dead status setters without changing default discovery', () => {
+  const withCallback = discover('unreachable-status-write')
+  expect(withCallback.facts).toHaveLength(1)
+  expect(withCallback.contracts).toEqual(discover('unreachable-status-write', false).contracts)
+})
+
+it('delivers copied attribution facts in source-location order after successful discovery', () => {
+  const facts: AmbiguousAttributionFact[] = []
+  const handler = matrix.sourceFile('ordered-source-z')
+  const sourceFiles = [handler, matrix.sourceFile('ordered-source-a')]
+  discoverApiResponseContracts(matrix.program, sourceFiles, undefined, {
+    onAmbiguousAttribution: (fact) => {
+      if (
+        fact.sourceLocation.startsWith('/virtual/ordered-source-z.ts:') &&
+        !facts.some(({ sourceLocation }) =>
+          sourceLocation.startsWith('/virtual/ordered-source-z.ts:'),
+        )
+      )
+        (fact.routes as string[]).push('MUTATED')
+      facts.push(fact)
+    },
+  })
+  const firstColumn = handler.text.split('\n')[3]!.indexOf('ctx.json') + 1
+  const secondColumn = handler.text.split('\n')[4]!.indexOf('ctx.json') + 1
+  expect(facts.map(({ sourceLocation }) => sourceLocation)).toEqual([
+    expect.stringMatching(/^\/virtual\/ordered-source-a\.ts:/),
+    `/virtual/ordered-source-z.ts:4:${firstColumn}`,
+    `/virtual/ordered-source-z.ts:5:${secondColumn}`,
+  ])
+  expect(facts.map(({ routes }) => routes)).toEqual([
+    ['POST:/a', 'POST:/aa'],
+    ['POST:/z', 'POST:/zz', 'MUTATED'],
+    ['POST:/z', 'POST:/zz'],
+  ])
+})
+
+it('does not deliver buffered facts when discovery fails', () => {
+  const facts: AmbiguousAttributionFact[] = []
+  expect(() =>
+    discoverApiResponseContracts(
+      matrix.program,
+      [matrix.sourceFile('invalid-marker-after-fact')],
+      undefined,
+      { onAmbiguousAttribution: (fact) => facts.push(fact) },
+    ),
+  ).toThrow()
+  expect(facts).toEqual([])
 })
 
 it('applies literal-error branch exclusion to every emitter without changing default contracts', () => {

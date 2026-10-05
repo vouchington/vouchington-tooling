@@ -8,7 +8,7 @@ export function propertyImplementationSymbol(
 ): ts.Symbol | undefined {
   const contextual = checker.getSymbolAtLocation(access.name)
   const receiver = unwrapTransparentExpression(access.expression)
-  if (!contextual || !ts.isIdentifier(receiver)) return contextual
+  if (!contextual || !ts.isIdentifier(receiver)) return undefined
   const receiverSymbol = checker.getSymbolAtLocation(receiver)
   const declaration = receiverSymbol?.valueDeclaration
   if (!declaration || !ts.isVariableDeclaration(declaration)) return contextual
