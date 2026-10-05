@@ -12,6 +12,7 @@ import { contextEffectiveArguments } from './protocol-http-context-forwarded-tar
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
+import { unsupportedLiteralContextBinding } from './protocol-http-context-literal-captures.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 
@@ -21,6 +22,7 @@ export function unsupportedBoundContextNode(
   context: ts.Symbol,
   checker: ts.TypeChecker,
   handler: ts.FunctionLikeDeclaration,
+  capturedTag: (tag: ts.TaggedTemplateExpression) => boolean = () => false,
 ): boolean {
   const returned =
     ts.isReturnStatement(node) || ts.isYieldExpression(node)
@@ -44,7 +46,15 @@ export function unsupportedBoundContextNode(
       (httpContextArgument(returned, context, checker) ||
         wrappedHttpContextArgument(returned, context, checker))) ||
     unsupportedContextAssignment(node, context, checker) ||
-    (ts.isVariableDeclaration(node) && unsupportedContextAlias(node, context, checker)) ||
+    (ts.isVariableDeclaration(node) &&
+      (unsupportedContextAlias(node, context, checker) ||
+        unsupportedLiteralContextBinding(
+          node,
+          checker,
+          (value) =>
+            httpContextArgument(value, context, checker) ||
+            wrappedHttpContextArgument(value, context, checker),
+        ))) ||
     mutatesHttpResponseMethod(node, context, checker, handler) ||
     (ts.isIdentifier(node) &&
       node.text === 'arguments' &&
@@ -57,6 +67,7 @@ export function unsupportedBoundContextNode(
       (['json', 'pipeline', 'setStatus', 'response.buffer', 'response.empty'].includes(
         contextResponseMethod(node.tag, context, checker, true) ?? '',
       ) ||
+        capturedTag(node) ||
         (ts.isTemplateExpression(node.template) &&
           node.template.templateSpans.some(
             (span) =>
