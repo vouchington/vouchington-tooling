@@ -64,7 +64,7 @@ function argumentMayContainSelectedSource(
 
 /** Preserve unknown aliases unless the selected stream cannot be the passed value. */
 export function opaqueArgumentExcludesSelectedStream(
-  call: ts.CallExpression,
+  call: ts.CallExpression | ts.NewExpression,
   argument: ts.Expression,
   actual: WriteReceiver,
   selected: readonly WriteReceiver[],

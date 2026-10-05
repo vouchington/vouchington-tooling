@@ -20,7 +20,7 @@ function hasRepeatingAncestor(node: ts.Node, owner: ts.Node): boolean {
 export function ownerHasFreshAllocation(
   receiver: WriteReceiver,
   checker: ts.TypeChecker,
-  call?: ts.CallExpression,
+  call?: ts.CallExpression | ts.NewExpression,
 ): boolean {
   const declaration = receiver.root.valueDeclaration
   const bindingOwner =
@@ -117,7 +117,7 @@ export function ownerHasFreshAllocation(
 
 /** Temporal exclusion additionally requires the allocation to occur after this call. */
 export function ownerAssignedOnlyAfter(
-  call: ts.CallExpression,
+  call: ts.CallExpression | ts.NewExpression,
   receiver: WriteReceiver,
   checker: ts.TypeChecker,
 ): boolean {
