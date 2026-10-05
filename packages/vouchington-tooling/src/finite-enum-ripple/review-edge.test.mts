@@ -352,6 +352,11 @@ it('rejects selected create pages with no literal or with dynamic configured val
       'create page action must be a string literal',
     )
   }
+  expect(() =>
+    collectCreatePageLiterals("const fields = { action: 'entry', [selected]: other }", 'page.tsx', [
+      'action',
+    ]),
+  ).toThrow('overridden by a trailing computed property')
 })
 
 it('rejects object and JSX spreads after a configured create-page type', () => {
@@ -401,6 +406,13 @@ it('retains empty create-page values in objects, JSX, and assignments', () => {
       ['action'],
     ),
   ).toEqual(['', '', ''])
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { ['action']: 'wrong', unionType: 'entry' }",
+      'page.ts',
+      ['action', 'unionType'],
+    ),
+  ).toEqual(['wrong', 'entry'])
   expect(
     collectCreatePageLiterals("const view = <Form action='' type={''} />", 'page.tsx', [
       'action',

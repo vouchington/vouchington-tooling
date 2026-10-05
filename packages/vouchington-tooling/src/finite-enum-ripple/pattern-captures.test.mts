@@ -21,6 +21,15 @@ it('requires a capture from a caller pattern', () => {
   expect(
     collectActivePatternCaptures("path: '/entry'", /path:\s*'\/([^']+)'/, 'source.ts'),
   ).toEqual(['entry'])
+  const statefulPattern = /path:\s*'\/([^']+)'/g
+  statefulPattern.lastIndex = 10
+  expect(collectActivePatternCaptures("path: '/entry'", statefulPattern, 'source.ts')).toEqual([
+    'entry',
+  ])
+  expect(collectActivePatternCaptures("path: '/entry'", statefulPattern, 'source.ts')).toEqual([
+    'entry',
+  ])
+  expect(statefulPattern.lastIndex).toBe(10)
 })
 
 it('ignores route-like examples rendered as JSX text', () => {

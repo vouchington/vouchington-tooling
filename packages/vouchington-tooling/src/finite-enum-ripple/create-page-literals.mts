@@ -1,5 +1,5 @@
 import ts from '@typescript/typescript6'
-import { getPropertyNameText, getStringLiteralValue, unwrapExpression } from './ast.mts'
+import { getStringLiteralValue, unwrapExpression } from './ast.mts'
 import { getConfiguredPropertyName } from './create-page-properties.mts'
 
 /** Inspect syntax nodes so comments and strings containing example code are ignored. */
@@ -22,6 +22,15 @@ export function collectCreatePageLiterals(
             throw new Error(`${file}: create page type can be overridden by a trailing spread`)
         } else if (getConfiguredPropertyName(member, names) !== undefined) {
           configuredBeforeSpread = true
+        } else if (
+          ts.isPropertyAssignment(member) &&
+          ts.isComputedPropertyName(member.name) &&
+          getStringLiteralValue(member.name.expression) === undefined &&
+          configuredBeforeSpread
+        ) {
+          throw new Error(
+            `${file}: create page type can be overridden by a trailing computed property`,
+          )
         }
       }
       for (let index = 0; index < node.properties.length; index += 1) {
@@ -42,12 +51,14 @@ export function collectCreatePageLiterals(
       }
       return
     }
-    if (ts.isPropertyAssignment(node) && getPropertyNameText(node.name)) {
-      const name = getPropertyNameText(node.name)!
-      const value = getStringLiteralValue(node.initializer)
-      if (names.has(name) && !ignoredProperties.has(name) && value === undefined)
-        throw new Error(`${file}: create page ${name} must be a string literal`)
-      if (names.has(name) && !ignoredProperties.has(name) && value !== undefined) values.push(value)
+    if (ts.isPropertyAssignment(node)) {
+      const name = getConfiguredPropertyName(node, names)
+      if (name && !ignoredProperties.has(name)) {
+        const value = getStringLiteralValue(node.initializer)
+        if (value === undefined)
+          throw new Error(`${file}: create page ${name} must be a string literal`)
+        values.push(value)
+      }
       ts.forEachChild(node, (child) => visit(child, new Set()))
       return
     } else if (ts.isShorthandPropertyAssignment(node) && names.has(node.name.text)) {

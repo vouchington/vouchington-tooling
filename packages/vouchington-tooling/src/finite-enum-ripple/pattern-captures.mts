@@ -64,7 +64,8 @@ export function collectActivePatternCaptures(
       })
   }
   inactive.push(...astInactive.map(({ start, end }) => ({ start, end, literal: false })))
-  const globalPattern = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`)
+  const flags = pattern.global ? pattern.flags : `${pattern.flags}g`
+  const globalPattern = new RegExp(pattern.source, flags)
   return [...content.matchAll(globalPattern)].flatMap((match) => {
     if (
       inactive.some(
