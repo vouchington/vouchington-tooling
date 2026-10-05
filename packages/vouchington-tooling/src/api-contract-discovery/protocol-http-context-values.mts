@@ -45,7 +45,7 @@ export function createHttpContextValueResolver(checker: ts.TypeChecker) {
     seen: Set<ts.Node>,
   ): ContextValues {
     const rows = nodes.map((node) => resolve(node, env, new Set(seen)))
-    return rows.some((row) => row === undefined) ? undefined : rows.flatMap((row) => row ?? [])
+    return rows.some((row) => row === undefined) ? undefined : rows.flatMap((row) => row!)
   }
   function factory(
     call: ts.CallExpression,
@@ -77,7 +77,7 @@ export function createHttpContextValueResolver(checker: ts.TypeChecker) {
       if (!bindings || values.some((value) => !value)) return undefined
       return combine(values as ts.Expression[], bindings, seen)
     })
-    return rows.some((row) => row === undefined) ? undefined : rows.flatMap((row) => row ?? [])
+    return rows.some((row) => row === undefined) ? undefined : rows.flatMap((row) => row!)
   }
   function resolve(node: ts.Node, env: CallbackBindings, seen = new Set<ts.Node>()): ContextValues {
     if (ts.isExpression(node)) node = unwrapExpression(node)

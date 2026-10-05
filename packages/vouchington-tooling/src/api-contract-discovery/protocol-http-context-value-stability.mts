@@ -86,7 +86,7 @@ export function createContextValueStability(checker: ts.TypeChecker) {
             'setPrototypeOf',
           ].includes(call.expression.name.text)
         ) {
-          if (index === 0) safe = false
+          safe = false
           continue
         }
         const implementation = checker.getResolvedSignature(call)?.declaration
