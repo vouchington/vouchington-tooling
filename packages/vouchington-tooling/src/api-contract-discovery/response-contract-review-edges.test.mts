@@ -202,6 +202,26 @@ const sources = {
     app.route('/a').post((ctx: any) => send(ctx, ctx.query.status, true))
     app.route('/b').post((ctx: any) => send(ctx, ctx.query.status, false))
   `,
+  'short-circuit-status-overwrite': `
+    declare const app: any
+    function send(ctx: any, status: any, recovered: boolean) {
+      ctx.setStatus(status)
+      recovered && ctx.setStatus(200)
+      ctx.json({ error: 'conditional recovery' })
+    }
+    app.route('/a').post((ctx: any) => send(ctx, ctx.query.status, true))
+    app.route('/b').post((ctx: any) => send(ctx, ctx.query.status, false))
+  `,
+  'ternary-status-overwrite': `
+    declare const app: any
+    function send(ctx: any, status: any, recovered: boolean) {
+      ctx.setStatus(status)
+      recovered ? ctx.setStatus(200) : undefined
+      ctx.json({ error: 'conditional recovery' })
+    }
+    app.route('/a').post((ctx: any) => send(ctx, ctx.query.status, true))
+    app.route('/b').post((ctx: any) => send(ctx, ctx.query.status, false))
+  `,
   'nested-callback-status-setter': `
     declare const app: any
     function send(ctx: any, status: any, shouldRecover: boolean) {
@@ -376,6 +396,15 @@ it('does not reuse a dynamic status across a conditional status overwrite', () =
     { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
   ])
 })
+
+it.each(['short-circuit-status-overwrite', 'ternary-status-overwrite'] as const)(
+  'does not reuse a dynamic status across expression-level overwrite in %s',
+  (sourceId) => {
+    expect(discover(sourceId).facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+      { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
+    ])
+  },
+)
 
 it('does not treat a nested callback status setter as an executed conditional overwrite', () => {
   expect(discover('nested-callback-status-setter').facts).toEqual([])

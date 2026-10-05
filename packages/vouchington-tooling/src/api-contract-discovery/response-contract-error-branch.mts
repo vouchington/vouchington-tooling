@@ -77,7 +77,8 @@ function mayConditionallySetStatus(statement: ts.Statement): boolean {
     !ts.isForInStatement(statement) &&
     !ts.isForOfStatement(statement) &&
     !ts.isWhileStatement(statement) &&
-    !ts.isDoStatement(statement)
+    !ts.isDoStatement(statement) &&
+    !ts.isExpressionStatement(statement)
   )
     return false
   let found = false
