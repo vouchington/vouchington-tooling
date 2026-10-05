@@ -474,6 +474,13 @@ aliases; `options.onRouteError` enables lenient response and request extraction.
 does not cache programs or depend on the caller's repository layout. OpenAPI document assembly
 remains a separate `openapi-document` call.
 
+`options.onAmbiguousAttribution` optionally emits facts for response calls reachable from handlers
+registered to multiple routes. It recognizes direct property handlers, shorthand properties,
+immutable aliases, and inline handlers. Dot-property assignment expressions and prefix/postfix
+increment or decrement make that property ineligible for attribution. Computed writes, `delete`,
+runtime reflection, and other indirect mutation are not analyzed. The callback does not change the
+discovered contract result.
+
 Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
 `apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
 `app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,

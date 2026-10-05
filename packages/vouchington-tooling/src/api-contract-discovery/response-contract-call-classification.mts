@@ -8,6 +8,7 @@ import {
   isContextResponseBufferCall,
   isContextResponseEmptyCall,
 } from './response-contract-route-analysis.mts'
+import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 
 export type ImplicitResponseCallLabel =
   | 'ctx.json()'
@@ -24,7 +25,7 @@ export function implicitResponseCallLabel(
     if (!call.arguments[0] || isInErrorBranch(call, excludeDynamicErrorObjects)) return undefined
     return 'ctx.json()'
   }
-  if (isStreamJsonPipeline(call))
+  if (isStreamJsonPipeline(call, excludeDynamicErrorObjects))
     return isInErrorBranch(call, excludeDynamicErrorObjects) ? undefined : 'ctx.pipeline()'
   if (isXmlResponseCall(call)) return call.arguments[0] ? 'ctx.response.xml()' : undefined
   if (isContextResponseBufferCall(call.expression)) return 'ctx.response.buffer()'
@@ -34,9 +35,11 @@ export function implicitResponseCallLabel(
   return undefined
 }
 
-function isStreamJsonPipeline(call: ts.CallExpression): boolean {
+function isStreamJsonPipeline(call: ts.CallExpression, unwrapArguments: boolean): boolean {
   if (!isContextMethod(call.expression, 'pipeline')) return false
-  const pipelineBody = call.arguments[0]
+  const originalBody = call.arguments[0]
+  const pipelineBody =
+    originalBody && (unwrapArguments ? unwrapTransparentExpression(originalBody) : originalBody)
   return (
     !!pipelineBody &&
     ts.isCallExpression(pipelineBody) &&

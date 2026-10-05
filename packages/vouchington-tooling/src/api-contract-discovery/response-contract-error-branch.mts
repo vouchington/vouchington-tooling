@@ -26,7 +26,7 @@ export function isInErrorBranch(
   if (!excludeDynamicErrorObjects) return precededByErrorStatus(statement)
   const latestStatus = latestStatusSetter(statement)
   if (!latestStatus) return false
-  if (isBareErrorStatusStatement(latestStatus)) return true
+  if (isBareErrorStatusStatement(latestStatus, true)) return true
   return isErrorObjectJson(call) && isDynamicStatusStatement(latestStatus)
 }
 
@@ -77,11 +77,11 @@ function isStatusSetterStatement(statement: ts.Statement): statement is StatusSe
 
 function isDynamicStatusStatement(statement: StatusSetterStatement): boolean {
   const status = statement.expression.arguments[0]
-  return !!status && !ts.isNumericLiteral(status)
+  return !!status && !ts.isNumericLiteral(unwrapTransparentExpression(status))
 }
 
 function isErrorObjectJson(call: ts.CallExpression): boolean {
-  const body = responseBodyExpression(call)
+  const body = responseBodyExpression(call, true)
   const errorObject = body && unwrapTransparentExpression(body)
   return (
     !!errorObject &&
@@ -99,13 +99,13 @@ function isErrorObjectJson(call: ts.CallExpression): boolean {
   )
 }
 
-function isBareErrorStatusStatement(statement: ts.Statement): boolean {
+function isBareErrorStatusStatement(statement: ts.Statement, unwrapStatus = false): boolean {
   if (!ts.isExpressionStatement(statement)) return false
   const expression = statement.expression
   if (!ts.isCallExpression(expression) || !isContextMethod(expression.expression, 'setStatus'))
     return false
   const statusArgument = expression.arguments[0]
-  return (
-    !!statusArgument && ts.isNumericLiteral(statusArgument) && Number(statusArgument.text) >= 400
-  )
+  const status =
+    statusArgument && (unwrapStatus ? unwrapTransparentExpression(statusArgument) : statusArgument)
+  return !!status && ts.isNumericLiteral(status) && Number(status.text) >= 400
 }

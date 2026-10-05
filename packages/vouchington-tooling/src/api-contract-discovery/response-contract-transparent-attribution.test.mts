@@ -9,6 +9,7 @@ import {
   COLD_VIRTUAL_PROGRAM_TIMEOUT_MS,
 } from './test-setup.test-helpers.mts'
 import { discoverApiResponseContracts, type AmbiguousAttributionFact } from './index.mts'
+import { isInErrorBranch } from './response-contract-error-branch.mts'
 
 const sources = {
   'dynamic-error': `
@@ -74,6 +75,79 @@ const sources = {
     }
     app.route('/api/v1/items').post((ctx: any) => send(ctx, 409))
     app.route('/api/v1/widgets').post((ctx: any) => send(ctx, 409))
+  `,
+  'wrapped-status-and-stream': `
+    declare const app: any
+    declare function streamJsonObject(body: unknown): unknown
+    function send(ctx: any, status: number) {
+      ctx.setStatus((status as number))
+      ctx.json(({ error: 'dynamic' }))
+      ctx.setStatus((200 as const))
+      ctx.json({ success: true })
+      ctx.setStatus((status as number))
+      ctx.pipeline((streamJsonObject(({ error: 'dynamic' }))))
+    }
+    app.route('/api/v1/items').post((ctx: any) => send(ctx, 409))
+    app.route('/api/v1/widgets').post((ctx: any) => send(ctx, 409))
+  `,
+  'inline-and-property-handlers': `
+    declare const app: any
+    const handlers = { send(ctx: any) { ctx.json({ property: true }) } }
+    function helpers(ctx: any) { ctx.json({ nested: true }) }
+    app.route('/api/v1/inline-a').post(((ctx: any) => helpers(ctx)) satisfies ((ctx: any) => void))
+    app.route('/api/v1/inline-b').post(((ctx: any) => helpers(ctx)) satisfies ((ctx: any) => void))
+    app.route('/api/v1/property-a').post((ctx: any) => handlers.send(ctx))
+    app.route('/api/v1/property-b').post((ctx: any) => handlers.send(ctx))
+    app.route('/api/v1/property-computed').post((ctx: any) => handlers['send'](ctx))
+  `,
+  'wrapped-helper-call': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    app.route('/api/v1/one').post((ctx: any) => ((send))(ctx))
+    app.route('/api/v1/two').post((ctx: any) => ((send))(ctx))
+  `,
+  'legacy-wrapped-error-status': `
+    declare const app: any
+    function send(ctx: any) {
+      ctx.setStatus((400 as const))
+      ctx.json({ error: 'legacy body' })
+    }
+    app.route('/api/v1/one').post((ctx: any) => send(ctx))
+    app.route('/api/v1/two').post((ctx: any) => send(ctx))
+  `,
+  'shorthand-handler': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    const handlers = { send }
+    app.route('/api/v1/short-direct').post(send)
+    app.route('/api/v1/short-a').post(handlers.send)
+    app.route('/api/v1/short-b').post(handlers.send)
+  `,
+  'mutated-property-handler': `
+    declare const app: any
+    const handlers: { send: (ctx: any) => void } = { send: (ctx) => ctx.json({ shared: true }) }
+    handlers.send = (ctx) => ctx.json({ replacement: true })
+    app.route('/api/v1/mutated-a').post(handlers.send)
+    app.route('/api/v1/mutated-b').post(handlers.send)
+  `,
+  'mutated-shorthand-handler': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ original: true }) }
+    const handlers = { send }
+    handlers.send = (ctx: any) => ctx.json({ replacement: true })
+    app.route('/api/v1/mutated-a').post(handlers.send)
+    app.route('/api/v1/mutated-b').post(handlers.send)
+  `,
+  'wrapped-initializer-and-class-field': `
+    declare const app: any
+    type Handler = (ctx: any) => void
+    const send = ((ctx: any) => ctx.json({ shared: true })) satisfies Handler
+    class Controller { send = ((ctx: any) => ctx.response.xml('<shared/>')) satisfies Handler }
+    const controller = new Controller()
+    app.route('/api/v1/initial-a').post(send)
+    app.route('/api/v1/initial-b').post(send)
+    app.route('/api/v1/class-a').post(controller.send)
+    app.route('/api/v1/class-b').post(controller.send)
   `,
   'missing-property-handler': `
     declare const app: any
@@ -168,6 +242,103 @@ describe('transparent response-attribution expressions', () => {
     ])
   })
 
+  it('unwraps numeric statuses and stream bodies while excluding dynamic errors', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    const legacy = discover('wrapped-status-and-stream')
+    expect(discover('wrapped-status-and-stream', facts)).toEqual(legacy)
+    expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+      { label: 'ctx.json()', routes: ['POST:/api/v1/items', 'POST:/api/v1/widgets'] },
+    ])
+  })
+
+  it('attributes wrapped inline handlers and property-access helper calls', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('inline-and-property-handlers', facts)
+    expect(facts.map(({ routes }) => routes)).toEqual([
+      ['POST:/api/v1/property-a', 'POST:/api/v1/property-b'],
+      ['POST:/api/v1/inline-a', 'POST:/api/v1/inline-b'],
+    ])
+  })
+
+  it('preserves legacy handling of parenthesized helper calls', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    expect(discover('wrapped-helper-call')).toEqual({})
+    discover('wrapped-helper-call', facts)
+    expect(facts.map(({ routes }) => routes)).toEqual([['POST:/api/v1/one', 'POST:/api/v1/two']])
+  })
+
+  it('preserves legacy output for transparently wrapped 4xx statuses', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    const legacy = discover('legacy-wrapped-error-status')
+    expect(discover('legacy-wrapped-error-status', facts)).toEqual(legacy)
+    expect(facts).toEqual([])
+    let jsonCall: ts.CallExpression | undefined
+    ts.forEachChild(matrix.sourceFile('legacy-wrapped-error-status'), function find(node) {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'json'
+      )
+        jsonCall = node
+      ts.forEachChild(node, find)
+    })
+    expect(jsonCall).toBeDefined()
+    expect(isInErrorBranch(jsonCall!)).toBe(false)
+    expect(isInErrorBranch(jsonCall!, true)).toBe(true)
+  })
+
+  it('canonicalizes shorthand handler properties to their initializer', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('shorthand-handler', facts)
+    expect(facts.map(({ routes }) => routes)).toEqual([
+      ['POST:/api/v1/short-a', 'POST:/api/v1/short-b', 'POST:/api/v1/short-direct'],
+    ])
+  })
+
+  it('fails closed when a shorthand property has no resolved value symbol', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'response-attribution-shorthand-'))
+    const path = join(directory, 'routes.ts')
+    try {
+      await writeFile(
+        path,
+        `declare const app: any\nconst handlers = { missing }\n` +
+          `app.route('/api/v1/missing-a').post(handlers.missing)\n` +
+          `app.route('/api/v1/missing-b').post(handlers.missing)`,
+      )
+      const program = ts.createProgram([path], { target: ts.ScriptTarget.ESNext, strict: true })
+      const sourceFile = program.getSourceFile(path)
+      expect(sourceFile).toBeDefined()
+      expect(
+        discoverApiResponseContracts(program, [sourceFile!], undefined, {
+          onAmbiguousAttribution: () => {},
+        }),
+      ).toEqual({})
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed for a directly reassigned property handler', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('mutated-property-handler', facts)
+    expect(facts).toEqual([])
+  })
+
+  it('checks shorthand property writes before canonicalizing their value', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('mutated-shorthand-handler', facts)
+    expect(facts).toEqual([])
+  })
+
+  it('attributes wrapped variable and class-field arrow initializers', () => {
+    const facts: AmbiguousAttributionFact[] = []
+    discover('wrapped-initializer-and-class-field', facts)
+    expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+      { label: 'ctx.json()', routes: ['POST:/api/v1/initial-a', 'POST:/api/v1/initial-b'] },
+      { label: 'ctx.response.xml()', routes: ['POST:/api/v1/class-a', 'POST:/api/v1/class-b'] },
+    ])
+  })
+
   it('ignores property handlers the type checker cannot resolve', () => {
     expect(discover('missing-property-handler')).toEqual({})
   })
@@ -207,6 +378,45 @@ describe('transparent response-attribution expressions', () => {
       expect(facts.map(({ routes }) => routes)).toEqual([
         ['POST:/api/v1/function-a', 'POST:/api/v1/function-b'],
         ['POST:/api/v1/expression-a', 'POST:/api/v1/expression-b'],
+      ])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('canonicalizes imported and immutable shorthand values to the same handler', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'response-attribution-shorthand-alias-'))
+    const handlerPath = join(directory, 'handler.ts')
+    const routesPath = join(directory, 'routes.ts')
+    try {
+      await writeFile(handlerPath, `export function send(ctx: any) { ctx.json({ shared: true }) }`)
+      await writeFile(
+        routesPath,
+        `import { send } from './handler.js'\n` +
+          `declare const app: any\n` +
+          `const alias = send\n` +
+          `const handlers = { send }\n` +
+          `const aliasHandlers = { alias }\n` +
+          `app.route('/api/v1/direct').post(send)\n` +
+          `app.route('/api/v1/shorthand').post(handlers.send)\n` +
+          `app.route('/api/v1/alias').post(aliasHandlers.alias)`,
+      )
+      const program = ts.createProgram([handlerPath, routesPath], {
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        target: ts.ScriptTarget.ESNext,
+        strict: true,
+        skipLibCheck: true,
+      })
+      const sourceFiles = [handlerPath, routesPath]
+        .map((filePath) => program.getSourceFile(filePath))
+        .filter((source): source is ts.SourceFile => !!source)
+      const facts: AmbiguousAttributionFact[] = []
+      discoverApiResponseContracts(program, sourceFiles, undefined, {
+        onAmbiguousAttribution: (fact) => facts.push(fact),
+      })
+      expect(facts.map(({ routes }) => routes)).toEqual([
+        ['POST:/api/v1/alias', 'POST:/api/v1/direct', 'POST:/api/v1/shorthand'],
       ])
     } finally {
       await rm(directory, { recursive: true, force: true })
