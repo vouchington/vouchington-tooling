@@ -18,7 +18,7 @@ export type RootBindings = ReadonlyMap<ts.Symbol, Bound>
 const BODY_READERS = new Set(['json', 'text', 'buffer', 'formData', 'arrayBuffer', 'blob'])
 
 /** The carrier object a named member of a context or request object denotes. */
-function memberKind(base: RootKind | undefined, name: string): RootKind | undefined {
+export function memberKind(base: RootKind | undefined, name: string): RootKind | undefined {
   if (base === 'context' && (name === 'request' || name === 'req')) return 'request'
   if ((base === 'context' || base === 'request') && name === 'query') return 'query'
   if (base === 'context' && name === 'params') return 'path'

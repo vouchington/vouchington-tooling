@@ -41,7 +41,9 @@ export function followedImplementations(call: ts.CallExpression, scope: Scope): 
       (ts.isFunctionDeclaration(implementation) ||
         ts.isFunctionExpression(implementation) ||
         ts.isArrowFunction(implementation)) &&
-      implementation.body
+      implementation.body &&
+      // Calling a generator only creates an iterator; its body does not run.
+      !implementation.asteriskToken
       ? [implementation]
       : []
   })

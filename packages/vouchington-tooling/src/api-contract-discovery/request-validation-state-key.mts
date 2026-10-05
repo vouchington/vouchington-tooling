@@ -2,6 +2,21 @@ import type ts from '../contract-schema/typescript-api.mts'
 import type { KeyBindings } from './request-validation-keys.mts'
 import type { RootBindings } from './request-validation-origin.mts'
 
+export type WalkState = {
+  keys: KeyBindings
+  roots: RootBindings
+  conditional: boolean
+  /** The calls this walk was entered through, innermost last; a call may build a validator input. */
+  via: ReadonlySet<ts.Node>
+}
+
+export const emptyState: WalkState = {
+  keys: new Map(),
+  roots: new Map(),
+  conditional: false,
+  via: new Set(),
+}
+
 /** A stable identity for the bindings a function is walked with, used to stop repeat walks. */
 export function createStateKey() {
   const symbolIds = new Map<ts.Symbol, number>()
@@ -18,11 +33,12 @@ export function createStateKey() {
     JSON.stringify(value, (name, item: unknown) =>
       name === 'expression' ? nodeId(item as ts.Node) : item,
     )
-  return (state: { keys: KeyBindings; roots: RootBindings; conditional: boolean }) =>
+  return (state: WalkState) =>
     [
       ...[...state.keys].map(([symbol, value]) => JSON.stringify(['k', symbolId(symbol), value])),
       ...[...state.roots].map(([symbol, value]) => bound(['r', symbolId(symbol), value])),
       JSON.stringify(state.conditional),
+      JSON.stringify([...state.via].map(nodeId).toSorted((left, right) => left! - right!)),
     ]
       .toSorted((left, right) => left.localeCompare(right))
       .join('|')

@@ -3,20 +3,11 @@ import { followedImplementations, type Scope } from './request-validation-follow
 import { reachingWrites, returnedValues } from './request-validation-trace-helpers.mts'
 import { identifierSymbol, resolveKey } from './request-validation-keys.mts'
 import { rootKind, type Bound } from './request-validation-origin.mts'
+import { visitSelected, type Trace, type Visit } from './request-validation-trace-select.mts'
 import { requestOrigin } from './request-validation-request-origin.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
-import type { Carrier } from './request-validation-types.mts'
 
-/** The request carriers a value derives from, and why part of it could not be traced. */
-export type Trace = { origins: Set<Carrier>; unresolved?: string | undefined }
-
-type Visit = {
-  trace: Trace
-  seen: Set<ts.Node>
-  functions: Set<ts.Node>
-  /** Calls whose arguments are being traced, so a value that feeds its own call terminates. */
-  calls: Set<ts.Node>
-}
+export type { Trace }
 
 /** Binds a followed function's parameters to what the call passes, with their origins. */
 export function bindArguments(
@@ -87,8 +78,13 @@ function visitDeclared(identifier: ts.Identifier, symbol: ts.Symbol, scope: Scop
       continue
     }
     const owner = ts.isBindingElement(declaration) ? declaration.parent.parent : declaration
-    if (ts.isVariableDeclaration(owner) && owner.initializer)
-      visitValue(owner.initializer, scope, visit)
+    if (ts.isVariableDeclaration(owner) && owner.initializer) {
+      if (
+        !ts.isBindingElement(declaration) ||
+        !visitSelected(declaration, owner.initializer, scope, visit, { visitValue, bindArguments })
+      )
+        visitValue(owner.initializer, scope, visit)
+    }
     // `for (const [key, value] of Object.entries(x))` derives from the iterated expression.
     else if (ts.isVariableDeclaration(owner) && ts.isForOfStatement(owner.parent.parent))
       visitValue(owner.parent.parent.expression, scope, visit)

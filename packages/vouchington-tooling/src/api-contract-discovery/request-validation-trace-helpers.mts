@@ -68,7 +68,10 @@ export function reachingWrites(
   const scope = owningFunction(use) ?? use.getSourceFile()
   const before = use.getStart()
   const entries = assignmentsTo(scope, symbol, checker, cache).filter(
-    (entry) => entry.start < before && (!entry.direct || entry.node.getEnd() <= before),
+    (entry) =>
+      entry.start < before &&
+      (!entry.direct || entry.node.getEnd() <= before) &&
+      potentiallyExecuted(entry.node),
   )
   const killer = entries.findLast((entry) => entry.direct && !maybeSkipped(entry.node))
   const kept = entries.filter(

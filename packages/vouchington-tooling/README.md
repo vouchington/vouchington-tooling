@@ -552,13 +552,24 @@ helper returns, branches, logical operands, spreads and earlier assignments; `un
 when part of the value depends on an unbound parameter. An unconditional reassignment of the
 identifier itself earlier in the same function body (not inside a branch, loop or `try`) replaces
 the earlier origins, conditional reassignments merge, and property writes such as `x.limit = n`
-always add. Fixed-carrier validators report the carrier itself as their origin.
+always add; an assignment on a statically dead path (`if (false)`) is ignored. A destructured
+local traces only the property or element it binds (`const { chosen } = pair`), resolved through
+object and array literals, `const`s and followed helper returns (also awaited), and falls back to the
+whole initializer when it cannot be selected (rest, computed key, spread, unknown source).
+A destructured handler context parameter (`({ query, params, request }) => ...`) binds each member
+to its carrier. A helper parameter that is reassigned is not trusted as the bound operation key:
+only a lone unconditional reassignment is used, anything else gives `operation: null`.
+Generator functions are not followed, because calling one does not run its body.
+Fixed-carrier validators report the carrier itself as their origin.
 
 An input-object validator's input is resolved through `const` objects and spreads with
 last-write-wins semantics, like the factory option resolver. When it cannot be fully resolved (a
 non-literal input, a spread of something that is not a resolvable `const` object, a cyclic spread,
 or a computed property name), `carriers` lists what was found and the site sets
-`unresolvedCarriers` to the reason, so a consumer must not treat `carriers` as complete.
+`unresolvedCarriers` to the reason, so a consumer must not treat `carriers` as complete. A `const`
+object (input or factory options) with a property write before the use (`o.p = x`, `o[k] = x`,
+`delete o.p`, `o.n++`, `Object.assign(o, ...)`) is unresolvable too, and a factory then reports
+`operation: null`.
 
 `conditional` is true under `if`/ternary branches, the right of `&&`/`||`/`??`, `switch` cases,
 loop bodies, `catch` and `finally`. Handlers are walked into function declarations and `const`
@@ -569,7 +580,10 @@ helper's own body outside any condition. Inline callback properties of an `execu
 written as identifiers or string literals, are walked as executed and take only the condition of
 the call to the configured host, never how its implementation invokes them. Configured validator
 and factory implementations are never entered, but their callee and arguments are still walked for
-nested validator sites and reads; only reads that build a validator's input are left out. Factory
+nested validator sites and reads; only reads that build a validator's input are left out, including
+reads inside a followed helper that only prepares that input. Validators evaluated while a handler is
+built (registration time) are not sites: only the walk of the handler reports validators. A handler a
+helper returns under a runtime branch (`if (flag) return ctx => ...`) reports `conditional: true`. Factory
 sites are reported for factory calls whose returned handler is a registration-time value (a route
 registration argument, a module `const` used as one, or a helper-returned handler); a factory call
 inside a handler body, such as a discarded `createThingHandler(options);`, is not a factory site.

@@ -3,10 +3,14 @@ import { returnedExpressions, returnsOnEveryPath } from './registered-route-fact
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
+import { hasStableBinding, unwrapHandlerExpression } from './registered-route-handler-helpers.mts'
+import { isConditionalPosition } from './request-validation-conditional.mts'
 
 export type HandlerProof = {
   node: ts.FunctionLikeDeclaration
   bindings: Map<ts.Symbol, ts.Expression>
+  /** Set under `executableReturns` when a runtime branch selects the handler. */
+  conditional?: boolean
 }
 
 export function handlerNodes(
@@ -18,7 +22,7 @@ export function handlerNodes(
   proofs?: HandlerProof[],
   /** Ignore `let`, `var` and reassigned bindings; always on under `staticProof`. */
   stableBindings = staticProof,
-  /** Ignore returned values on statically dead paths. */
+  /** Ignore returned values on statically dead paths, and mark runtime-branch ones conditional. */
   executableReturns = false,
 ): ts.Node[] {
   const again = (node: ts.Expression, bindings = parameterBindings, seen = active, sink = proofs) =>
@@ -84,9 +88,14 @@ export function handlerNodes(
         (!returnsOnEveryPath(implementation.body!) || returned.some((value) => !value))
       )
         return []
-      const results = returned.map((value) =>
-        value ? again(value, bindings, next, resolvedProofs) : [],
-      )
+      const results = returned.map((value) => {
+        const selected: HandlerProof[] = []
+        const found = value ? again(value, bindings, next, selected) : []
+        if (executableReturns && value && isConditionalPosition(value))
+          selected.forEach((proof) => (proof.conditional = true))
+        resolvedProofs.push(...selected)
+        return found
+      })
       return staticProof && results.some((result) => !result.some(ts.isFunctionLike))
         ? []
         : results.flat()
@@ -173,24 +182,4 @@ function declarationImplementations(
       ]
     return []
   })
-}
-
-function hasStableBinding(declaration: ts.Declaration, checker: ts.TypeChecker): boolean {
-  if (ts.isVariableDeclaration(declaration))
-    return (
-      ts.isVariableDeclarationList(declaration.parent) &&
-      !!(declaration.parent.flags & ts.NodeFlags.Const)
-    )
-  return !ts.isFunctionDeclaration(declaration) || !hasBindingWrite(declaration, checker)
-}
-
-function unwrapHandlerExpression(node: ts.Expression): ts.Expression {
-  while (
-    ts.isParenthesizedExpression(node) ||
-    ts.isAsExpression(node) ||
-    ts.isTypeAssertionExpression(node) ||
-    ts.isSatisfiesExpression(node)
-  )
-    node = node.expression
-  return node
 }

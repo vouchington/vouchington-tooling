@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import { resolveSymbol } from './response-contract-symbols.mts'
+import { hasPropertyWriteBefore } from './request-validation-mutation.mts'
 import { reachingWrites } from './request-validation-trace-helpers.mts'
 
 /** Static string values bound to helper or factory parameters. */
@@ -34,6 +35,15 @@ function constInitializer(
   return declaration?.initializer && isConst(declaration) ? declaration.initializer : undefined
 }
 
+/** The const initializer an identifier names, unless a property of it is written before the use. */
+export function stableConstInitializer(identifier: ts.Identifier, checker: ts.TypeChecker) {
+  const initializer = constInitializer(identifier, checker)
+  const symbol = identifierSymbol(identifier, checker)!
+  return initializer && !hasPropertyWriteBefore(identifier, symbol, checker)
+    ? initializer
+    : undefined
+}
+
 /** Folds a template literal whose every substitution resolves to a static string. */
 function resolveTemplate(
   template: ts.TemplateExpression,
@@ -50,6 +60,22 @@ function resolveTemplate(
   return text
 }
 
+/** A bound key unless the helper reassigns the parameter: then only a lone reaching write counts. */
+function reassignedKey(
+  identifier: ts.Identifier,
+  symbol: ts.Symbol,
+  bound: string,
+  checker: ts.TypeChecker,
+  bindings: KeyBindings,
+  seen: Set<ts.Node>,
+): string | undefined {
+  const { writes, initializer } = reachingWrites(identifier, symbol, checker)
+  if (writes.length === 0) return bound
+  const [write] = writes
+  if (writes.length > 1 || initializer) return undefined
+  return resolveKey(write, checker, bindings, seen)
+}
+
 /** Resolves string literals, templates, const identifiers and bound parameters, else `undefined`. */
 export function resolveKey(
   expression: ts.Expression | undefined,
@@ -64,7 +90,8 @@ export function resolveKey(
   if (!ts.isIdentifier(value)) return undefined
   const symbol = identifierSymbol(value, checker)
   const bound = symbol && bindings.get(symbol)
-  if (bound !== undefined) return bound
+  if (symbol && bound !== undefined)
+    return reassignedKey(value, symbol, bound, checker, bindings, seen)
   const initializer = constInitializer(value, checker)
   if (!initializer || seen.has(initializer)) return undefined
   return resolveKey(initializer, checker, bindings, new Set(seen).add(initializer))
@@ -93,7 +120,7 @@ export function resolveObject(
   const value = unwrapTransparentExpression(expression)
   if (ts.isObjectLiteralExpression(value)) return value
   if (!ts.isIdentifier(value)) return undefined
-  const next = boundArgument(value, checker, params) ?? constInitializer(value, checker)
+  const next = boundArgument(value, checker, params) ?? stableConstInitializer(value, checker)
   return resolveObject(next, checker, params, new Set(seen).add(expression))
 }
 
