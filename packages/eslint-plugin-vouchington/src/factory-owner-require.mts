@@ -110,6 +110,9 @@ export function isNamespaceImport(
 
 function isCreateRequireCall(context: RuleContextLike, node: NodeLike | null | undefined): boolean {
   const call = unwrap(node)
+  if (call?.type === 'AwaitExpression') {
+    return isCreateRequireCall(context, call.argument as NodeLike)
+  }
   if (call?.type !== 'CallExpression') return false
   const rawCallee = unwrap(call.callee as NodeLike)
   const callee =
@@ -162,7 +165,10 @@ export function requiredModuleSpecifier(
       ? unwrap((rawCallee.expressions as NodeLike[]).at(-1))
       : rawCallee
   const argument = unwrap((call.arguments as NodeLike[] | undefined)?.[0])
-  const moduleName = staticPropertyName(argument)
+  const moduleName =
+    argument?.type === 'Literal' && typeof argument.value !== 'string'
+      ? null
+      : staticPropertyName(argument)
   if (typeof moduleName !== 'string') return null
   if (isCreateRequireCall(context, callee) || isCreateRequireBinding(context, callee)) {
     return moduleName

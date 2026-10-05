@@ -277,6 +277,26 @@ load = () => ({ makeGraph() {} })
       await diagnostics(`import { createRequire } from 'node:module'
 ;(0, createRequire)(import.meta.url)('@compiler/runtime').makeGraph()`),
     ).toEqual(['constructionOwner'])
+    expect(
+      await diagnostics(`import { createRequire } from 'node:module'
+const load = await createRequire(import.meta.url)
+load('@compiler/runtime').makeGraph()
+;(await createRequire(import.meta.url))('@compiler/runtime').makeGraph()`),
+    ).toEqual(['constructionOwner', 'constructionOwner'])
+  })
+
+  it('does not coerce createRequire module identifiers to property keys', async () => {
+    expect(
+      messageIds(
+        await lintRule(
+          'factory-owner-location',
+          `import { createRequire } from 'node:module'
+createRequire(import.meta.url)(null).makeGraph()`,
+          { ...OPTIONS, modules: ['null'] },
+          'src/check.js',
+        ),
+      ),
+    ).toEqual([])
   })
 
   it('preserves nested defaults that select the default namespace', async () => {
