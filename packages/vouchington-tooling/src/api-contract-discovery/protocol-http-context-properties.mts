@@ -60,5 +60,23 @@ export function contextProperty(
     )
   )
     return undefined
+  // Baseline inherited methods are capabilities even when the prototype was never mutated.
+  if (
+    [
+      'constructor',
+      '__defineGetter__',
+      '__defineSetter__',
+      '__lookupGetter__',
+      '__lookupSetter__',
+      '__proto__',
+      'hasOwnProperty',
+      'isPrototypeOf',
+      'propertyIsEnumerable',
+      'toLocaleString',
+      'toString',
+      'valueOf',
+    ].includes(name)
+  )
+    return undefined
   return resolver.prototypeSafe() ? [{ value: null, present: false }] : undefined
 }

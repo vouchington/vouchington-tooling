@@ -6,6 +6,7 @@ import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { contextResponseMethod, methodAccess } from './protocol-http-method-access.mts'
 import { reflectHttpResponseMethod } from './protocol-http-reflect.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 export { contextResponseMethod } from './protocol-http-method-access.mts'
 
 /** A helper parameter is a response context only when every executable caller passes one. */
@@ -102,5 +103,19 @@ export function httpContextArgument(
       (receiver.path.length === 0 ||
         (receiver.path.length === 1 && receiver.path[0] === 'response'))) ||
     contextResponseMethod(unwrapExpression(expression), context, checker, true) === 'response'
+  )
+}
+
+/** Constructors receiving a selected context cannot establish a bounded body/status proof. */
+export function opaqueHttpContextConstruction(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+  context: ts.Symbol,
+  boundHandler?: ts.Node,
+): boolean {
+  return (
+    ts.isNewExpression(node) &&
+    executableProtocolPath(node, checker, boundHandler) &&
+    !!node.arguments?.some((argument) => httpContextArgument(argument, context, checker))
   )
 }

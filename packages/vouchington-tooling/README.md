@@ -683,7 +683,10 @@ list cannot establish this absence. Explicit own callbacks retain their concrete
 Namespace identities follow actual imports and awaited literal dynamic imports through const aliases;
 asserted module types and pending import promises cannot substitute for executable provenance.
 Loop assignment targets, class field initializers, and tagged-template substitutions preserve mutable
-callback capabilities. Implemented callback bodies remain unavailable when they emit an otherwise
+callback capabilities. Concrete omitted-argument defaults retain their forwarded parameter proof.
+Inherited Object prototype methods stay unknown; constructors receiving the selected context cannot
+prove bounded status or body behavior. The discovery-owned consumer index is lazy and includes
+TypeScript import-equals edges. Implemented callback bodies remain unavailable when they emit an otherwise
 uncollected response body or mutate a canonical response method.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
