@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
 import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
+import { createFactoryInvocationVisitors } from './factory-owner-invocation.mts'
 import { createFactoryProvenance } from './factory-owner-provenance.mts'
 
 const OPTIONS = {
@@ -16,6 +17,44 @@ async function diagnostics(source: string): Promise<string[]> {
 }
 
 describe('factory-owner-location direct syntax', () => {
+  it('normalizes TypeScript instantiation around indirect invocation members', () => {
+    const reports: string[] = []
+    const context: RuleContextLike = {
+      filename: 'src/check.ts',
+      options: [],
+      report: ({ messageId }) => reports.push(messageId),
+      sourceCode: { getScope: () => ({ upper: null }) },
+    }
+    const factory = { type: 'Identifier', name: 'makeGraph' } as NodeLike
+    const instantiate = (expression: NodeLike): NodeLike => ({
+      type: 'TSInstantiationExpression',
+      expression,
+    })
+    const visitors = createFactoryInvocationVisitors(
+      context,
+      (value) => value?.type === 'Identifier' && value.name === 'makeGraph',
+    )
+    for (const callee of [
+      {
+        type: 'MemberExpression',
+        object: factory,
+        property: { type: 'Identifier', name: 'call' },
+      },
+      {
+        type: 'MemberExpression',
+        object: { type: 'Identifier', name: 'Reflect' },
+        property: { type: 'Identifier', name: 'apply' },
+      },
+    ] as NodeLike[]) {
+      visitors.CallExpression?.({
+        type: 'CallExpression',
+        callee: instantiate(callee),
+        arguments: callee.object === factory ? [] : [factory],
+      })
+    }
+    expect(reports).toEqual(['constructionOwner', 'constructionOwner'])
+  })
+
   it('follows only the last value of awaited import sequences', async () => {
     expect(await diagnostics(`(await (0, import('@compiler/runtime'))).makeGraph()`)).toEqual([
       'constructionOwner',
@@ -181,6 +220,41 @@ export { unrelated }`),
       await diagnostics(`import { makeGraph } from '@compiler/runtime'
 let graph = makeGraph
 export default graph`),
+    ).toEqual(['constructionOwner'])
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export default (0, graph)`),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('checks namespace defaults for inline and split nested mutable exports', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+export let { nested: { makeGraph: inline } = runtime } = {}
+let { nested: { makeGraph: split } = runtime } = {}
+export { split }`),
+    ).toEqual(['constructionOwner', 'constructionOwner'])
+  })
+
+  it('recurses through a configured default selection', async () => {
+    expect(
+      messageIds(
+        await lintRule(
+          'factory-owner-location',
+          `import * as runtime from '@compiler/runtime'\nexport let { default: { makeGraph } } = runtime`,
+          { ...OPTIONS, factories: ['default', 'makeGraph'] },
+          'src/check.js',
+        ),
+      ),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('follows sequence-wrapped createRequire loaders', async () => {
+    expect(
+      await diagnostics(`import { createRequire } from 'node:module'
+const load = createRequire(import.meta.url)
+;(0, load)('@compiler/runtime').makeGraph()`),
     ).toEqual(['constructionOwner'])
   })
 

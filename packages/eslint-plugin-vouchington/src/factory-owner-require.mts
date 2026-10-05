@@ -148,7 +148,11 @@ export function requiredModuleSpecifier(
 ): string | null {
   const call = unwrap(node)
   if (call?.type !== 'CallExpression') return null
-  const callee = unwrap(call.callee as NodeLike)
+  const rawCallee = unwrap(call.callee as NodeLike)
+  const callee =
+    rawCallee?.type === 'SequenceExpression'
+      ? unwrap((rawCallee.expressions as NodeLike[]).at(-1))
+      : rawCallee
   const argument = unwrap((call.arguments as NodeLike[] | undefined)?.[0])
   const moduleName = staticPropertyName(argument)
   if (typeof moduleName !== 'string') return null

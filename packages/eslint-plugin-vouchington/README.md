@@ -79,7 +79,7 @@ Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `inc
 
 ## `factory-owner-location`
 
-Keep configured factory construction in owner files. Detects named, default, and namespace imports; literal dynamic imports; exact `createRequire(...)(module)` loads from `node:module`; constant namespace/factory aliases and object destructuring; and direct calls, `new`, tagged templates, decorators, `Reflect.apply`, and `Reflect.construct`. It also rejects direct factory and namespace reexports. Scope bindings distinguish these values from unrelated functions with the same names.
+Keep configured factory construction in owner files. Detects named, default, and namespace imports; literal dynamic imports; exact `createRequire(...)(module)` loads from `node:module`; constant namespace/factory aliases and object destructuring; and direct calls, `new`, tagged templates, decorators, `Reflect.apply`, and `Reflect.construct`. It also rejects direct factory and namespace reexports through ESM and TypeScript export declarations. CommonJS assignment exports such as `module.exports = factory` remain outside this direct-provenance subset. Scope bindings distinguish these values from unrelated functions with the same names.
 
 If `modules`, `factories`, or `owners` is missing or empty, the rule loads and reports nothing. Mutable reassignment provenance, values returned through wrappers or containers, `Proxy` and bound-function calls, and virtual-program/test-lifecycle checks remain in the consuming repo pending [issue #376](https://github.com/vouchington/vouchington-tooling/issues/376).
 

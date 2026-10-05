@@ -55,10 +55,14 @@ function shadowGlobal(globalThis) { globalThis.Reflect.apply(makeGraph, null, []
 (await (0, import('@compiler/runtime'))).makeGraph()
 makeGraph.call(null)
 makeGraph.apply(null, [])
+makeGraph.call<null, [], unknown>(null)
+Reflect.apply<null, [], unknown>(makeGraph, null, [])
 ;(await makeGraph)()
 const awaitedFactory = await makeGraph
 awaitedFactory()
 export let mutableFactory = makeGraph
+let assertedMutableFactory = makeGraph
+export default (0, assertedMutableFactory as unknown)
 export var mutableRuntime = runtime
 export let { makeGraph: mutableSelection } = runtime
 export let { unrelated: { makeGraph: unrelatedSelection } } = runtime
@@ -156,7 +160,7 @@ compiler.makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 47 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 50 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

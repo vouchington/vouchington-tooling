@@ -4,7 +4,10 @@ import {
   type NodeLike,
   type RuleContextLike,
 } from './ast-helpers.mts'
-import { namedPatternSource } from './factory-owner-provenance-binding.mts'
+import {
+  namedPatternDefaultSource,
+  namedPatternSource,
+} from './factory-owner-provenance-binding.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 
 export function bindingNodes(value: NodeLike): NodeLike[] {
@@ -24,13 +27,15 @@ export function patternSelectsFactory(pattern: NodeLike, factories: ReadonlySet<
     if (name === null) return false
     const value = property.value as NodeLike
     const selected = value.type === 'AssignmentPattern' ? (value.left as NodeLike) : value
-    if (factories.has(String(name))) {
-      return selected.type !== 'ObjectPattern' && selected.type !== 'ArrayPattern'
-    }
-    if (name !== 'default') return false
-    return selected.type === 'ObjectPattern'
-      ? patternSelectsFactory(selected, factories)
-      : selected.type !== 'ArrayPattern'
+    if (name === 'default')
+      return selected.type === 'ObjectPattern'
+        ? patternSelectsFactory(selected, factories)
+        : selected.type !== 'ArrayPattern'
+    return (
+      factories.has(String(name)) &&
+      selected.type !== 'ObjectPattern' &&
+      selected.type !== 'ArrayPattern'
+    )
   })
 }
 
@@ -51,6 +56,7 @@ export function mutableExportInitializer(
   }
   return (
     patternDefaultValue(declarator.id as NodeLike, String(binding.name)) ??
+    namedPatternDefaultSource(declarator.id as NodeLike, String(binding.name), factories) ??
     namedPatternSource(declarator, String(binding.name), factories) ??
     undefined
   )
