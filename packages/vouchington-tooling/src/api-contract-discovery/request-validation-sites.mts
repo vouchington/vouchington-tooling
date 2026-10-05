@@ -1,14 +1,15 @@
 import ts from '../contract-schema/typescript-api.mts'
 import {
-  propertyNameText,
+  ABSENT,
+  findProperty,
   resolveKey,
   resolveObject,
   resolveOptionString,
 } from './request-validation-keys.mts'
 import type { Scope } from './request-validation-follow.mts'
+import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import { resolveInput, type InputResolution } from './request-validation-input.mts'
 import {
-  type Carrier,
   type FactoryConfig,
   type FactorySite,
   type ValidatorConfig,
@@ -20,25 +21,41 @@ export function sourceOf(node: ts.Node): string {
   return `${file.fileName}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
 }
 
-/** True when the options object at the argument literally sets `property: true`. */
-function optionIsTrue(options: ts.Expression | undefined, property: string, scope: Scope) {
-  return !!resolveObject(options, scope.checker)?.properties.some(
-    (item) =>
-      ts.isPropertyAssignment(item) &&
-      propertyNameText(item.name) === property &&
-      item.initializer.kind === ts.SyntaxKind.TrueKeyword,
-  )
+/** Whether the options object ends with `property: true`, applying spreads in order. */
+function optionEnabled(options: ts.Expression | undefined, property: string, scope: Scope) {
+  if (!options) return { enabled: false }
+  const object = resolveObject(options, scope.checker, scope.roots)
+  if (!object)
+    return {
+      enabled: false,
+      unresolved: `options \`${options.getText()}\` are not statically resolvable`,
+    }
+  const found = findProperty(object, property, scope.checker, scope.roots, new Set([object]))
+  if (found === undefined)
+    return { enabled: false, unresolved: `option "${property}" is not statically resolvable` }
+  return {
+    enabled:
+      found !== ABSENT && unwrapTransparentExpression(found).kind === ts.SyntaxKind.TrueKeyword,
+  }
 }
 
-function fixedCarriers(
-  config: Extract<ValidatorConfig['carriers'], { kind: 'fixed' }>,
-  call: ts.CallExpression,
-  scope: Scope,
-): Carrier[] {
-  const added = (config.optionCarriers ?? [])
-    .filter((option) => optionIsTrue(call.arguments[option.argument], option.property, scope))
-    .map((option) => option.carrier)
-  return [...new Set([...config.carriers, ...added])]
+type FixedCarriers = Extract<ValidatorConfig['carriers'], { kind: 'fixed' }>
+
+function fixedInput(config: FixedCarriers, call: ts.CallExpression, scope: Scope): InputResolution {
+  const options = (config.optionCarriers ?? []).map((option) => ({
+    option,
+    ...optionEnabled(call.arguments[option.argument], option.property, scope),
+  }))
+  const added = options.filter((item) => item.enabled).map((item) => item.option.carrier)
+  const unresolved = options.find((item) => item.unresolved)?.unresolved
+  return {
+    carriers: [...new Set([...config.carriers, ...added])].map((carrier) => ({
+      carrier,
+      origins: [carrier],
+    })),
+    ...(unresolved && { unresolved }),
+    nodes: [],
+  }
 }
 
 export function validatorSite(
@@ -52,13 +69,7 @@ export function validatorSite(
   const input: InputResolution =
     config.carriers.kind === 'input-object'
       ? resolveInput(call.arguments[config.carriers.argument], scope)
-      : {
-          carriers: fixedCarriers(config.carriers, call, scope).map((carrier) => ({
-            carrier,
-            origins: [carrier],
-          })),
-          nodes: [],
-        }
+      : fixedInput(config.carriers, call, scope)
   const site: ValidatorSite = {
     exportName: config.exportName,
     source: sourceOf(call),
@@ -82,6 +93,7 @@ export function factorySite(
       config.operationProperty,
       scope.checker,
       scope.keys,
+      scope.roots,
     ) ?? null
   return {
     exportName: config.exportName,

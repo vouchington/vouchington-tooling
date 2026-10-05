@@ -148,7 +148,8 @@ describe('request validation conditional sites', () => {
       'while-loop',
     ])
       expect(conditionals(id)).toEqual([true])
-    expect(conditionals('switch')).toEqual([true])
+    // Two distinct calls on one line are both reported.
+    expect(conditionals('switch')).toEqual([true, true])
     expect(conditionals('early-return')).toEqual([false])
   })
 

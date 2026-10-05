@@ -63,6 +63,19 @@ function destructuredRead(element: ts.BindingElement, carrier: RawRead['carrier'
   return { carrier, key: null, access: 'computed' }
 }
 
+/** True for the target of a plain assignment or `delete`, which replaces without reading. */
+function isWriteTarget(node: ts.Expression): boolean {
+  let outer: ts.Node = node
+  while (isTransparent(outer.parent)) outer = outer.parent
+  const parent = outer.parent
+  return (
+    ts.isDeleteExpression(parent) ||
+    (ts.isBinaryExpression(parent) &&
+      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      parent.left === outer)
+  )
+}
+
 /** The raw request reads made by exactly this node, not by its children. */
 export function rawReadsAt(node: ts.Node, scope: Scope): RawRead[] {
   const keyed = (carrier: RawRead['carrier'], expression: ts.Expression | undefined): RawRead => {
@@ -74,6 +87,11 @@ export function rawReadsAt(node: ts.Node, scope: Scope): RawRead[] {
       return [{ carrier: 'body', key: null, access: 'whole' }]
     return isHeaderGet(node, scope.roots, scope.checker) ? [keyed('header', node.arguments[0])] : []
   }
+  if (
+    (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+    isWriteTarget(node)
+  )
+    return []
   if (ts.isPropertyAccessExpression(node)) {
     const carrier = carrierRoot(node.expression, scope)
     if (carrier) return [{ carrier, key: node.name.text, access: 'key' }]

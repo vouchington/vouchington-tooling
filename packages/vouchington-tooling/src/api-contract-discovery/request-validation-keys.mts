@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
 import { resolveSymbol } from './response-contract-symbols.mts'
+import { reachingWrites } from './request-validation-trace-helpers.mts'
 
 /** Static string values bound to helper or factory parameters. */
 export type KeyBindings = ReadonlyMap<ts.Symbol, string>
@@ -52,46 +53,60 @@ export function resolveKey(
   return resolveKey(initializer, checker, bindings, new Set(seen).add(initializer))
 }
 
-/** The object literal an expression denotes, through const identifiers. */
+/** Call-site bindings of parameters; an `expression` is the argument the call passes. */
+export type ParamBindings = ReadonlyMap<ts.Symbol, { expression?: ts.Expression | undefined }>
+const NO_PARAMS: ParamBindings = new Map()
+
+/** The argument bound to a parameter, unless the helper reassigns the parameter first. */
+function boundArgument(identifier: ts.Identifier, checker: ts.TypeChecker, params: ParamBindings) {
+  const symbol = identifierSymbol(identifier, checker)
+  const expression = symbol && params.get(symbol)?.expression
+  if (!symbol || !expression) return undefined
+  return reachingWrites(identifier, symbol, checker).writes.length > 0 ? undefined : expression
+}
+
+/** The object literal an expression denotes, through const identifiers and bound parameters. */
 export function resolveObject(
   expression: ts.Expression | undefined,
   checker: ts.TypeChecker,
+  params: ParamBindings = NO_PARAMS,
   seen = new Set<ts.Node>(),
 ): ts.ObjectLiteralExpression | undefined {
   if (!expression || seen.has(expression)) return undefined
   const value = unwrapTransparentExpression(expression)
   if (ts.isObjectLiteralExpression(value)) return value
-  const initializer = ts.isIdentifier(value) ? constInitializer(value, checker) : undefined
-  return resolveObject(initializer, checker, new Set(seen).add(expression))
+  if (!ts.isIdentifier(value)) return undefined
+  const next = boundArgument(value, checker, params) ?? constInitializer(value, checker)
+  return resolveObject(next, checker, params, new Set(seen).add(expression))
 }
 
-const ABSENT = Symbol('absent')
-type Lookup = string | undefined | typeof ABSENT
+export const ABSENT = Symbol('absent')
+/** `undefined` means the property cannot be statically resolved. */
+type Found = ts.Expression | undefined | typeof ABSENT
 
-function lookupProperty(
+/** The value expression a property ends with, applying properties and spreads in order. */
+export function findProperty(
   object: ts.ObjectLiteralExpression,
   name: string,
   checker: ts.TypeChecker,
-  bindings: KeyBindings,
+  params: ParamBindings,
   seen: Set<ts.Node>,
-): Lookup {
+): Found {
   for (const property of object.properties.toReversed()) {
     if (ts.isSpreadAssignment(property)) {
-      const spread = resolveObject(property.expression, checker)
+      const spread = resolveObject(property.expression, checker, params)
       const found =
         spread && !seen.has(spread)
-          ? lookupProperty(spread, name, checker, bindings, new Set(seen).add(spread))
+          ? findProperty(spread, name, checker, params, new Set(seen).add(spread))
           : undefined
       if (found !== ABSENT) return found
+    } else if (ts.isComputedPropertyName(property.name)) {
+      return undefined
     } else if (
       (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
       propertyNameText(property.name) === name
     )
-      return resolveKey(
-        ts.isPropertyAssignment(property) ? property.initializer : property.name,
-        checker,
-        bindings,
-      )
+      return ts.isPropertyAssignment(property) ? property.initializer : property.name
   }
   return ABSENT
 }
@@ -102,9 +117,10 @@ export function resolveOptionString(
   name: string,
   checker: ts.TypeChecker,
   bindings: KeyBindings,
+  params: ParamBindings = NO_PARAMS,
 ): string | undefined {
-  const object = resolveObject(expression, checker)
+  const object = resolveObject(expression, checker, params)
   if (!object) return undefined
-  const found = lookupProperty(object, name, checker, bindings, new Set([object]))
-  return found === ABSENT ? undefined : found
+  const found = findProperty(object, name, checker, params, new Set([object]))
+  return found === ABSENT ? undefined : resolveKey(found, checker, bindings)
 }

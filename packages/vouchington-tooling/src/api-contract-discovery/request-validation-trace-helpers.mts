@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { isConditionalPosition } from './request-validation-conditional.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import type { Followable } from './request-validation-follow.mts'
 
 const owningFunction = (node: ts.Node) => {
@@ -67,7 +68,8 @@ export function returnedValues(fn: Followable): ts.Node[] {
   const values: ts.Node[] = []
   const scan = (node: ts.Node): void => {
     if (ts.isFunctionLike(node)) return
-    if (ts.isReturnStatement(node) && node.expression) values.push(node.expression)
+    if (ts.isReturnStatement(node) && node.expression && potentiallyExecuted(node.expression))
+      values.push(node.expression)
     ts.forEachChild(node, scan)
   }
   ts.forEachChild(body, scan)

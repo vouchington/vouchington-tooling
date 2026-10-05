@@ -24,7 +24,7 @@ function collect(
   found.nodes.push(object)
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property)) {
-      const spread = resolveObject(property.expression, scope.checker)
+      const spread = resolveObject(property.expression, scope.checker, scope.roots)
       if (spread && !seen.has(spread)) collect(spread, scope, found, new Set(seen).add(spread))
       else
         found.unresolved ??= `spread \`${property.expression.getText()}\` is not statically resolvable`
@@ -44,7 +44,7 @@ function collect(
 /** Resolves the object a validator receives as input, through const objects and spreads. */
 export function resolveInput(input: ts.Expression | undefined, scope: Scope): InputResolution {
   const found: Collected = { entries: new Map(), nodes: input ? [input] : [] }
-  const object = resolveObject(input, scope.checker)
+  const object = resolveObject(input, scope.checker, scope.roots)
   if (object) collect(object, scope, found, new Set([object]))
   else if (input) found.unresolved = `input \`${input.getText()}\` is not statically resolvable`
   const carriers = [...found.entries].map(([carrier, value]) => {

@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
-import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
+import { attributionFunctionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 
 type ExportRef = { module: string; exportName: string }
 
@@ -58,7 +58,9 @@ export function insideConfiguredImplementation(
   checker: ts.TypeChecker,
 ): boolean {
   for (let current: ts.Node | undefined = node; current; current = current.parent) {
-    const symbol = ts.isFunctionLike(current) ? functionSymbol(current, checker) : undefined
+    const symbol = ts.isFunctionLike(current)
+      ? attributionFunctionSymbol(current, checker)
+      : undefined
     if (symbol && configs.some((config) => matchesExport(symbol, config, checker))) return true
   }
   return false

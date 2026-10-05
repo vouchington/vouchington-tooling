@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { returnedExpressions, returnsOnEveryPath } from './registered-route-factory-returns.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 
 export type HandlerProof = {
@@ -17,9 +18,20 @@ export function handlerNodes(
   proofs?: HandlerProof[],
   /** Ignore `let`, `var` and reassigned bindings; always on under `staticProof`. */
   stableBindings = staticProof,
+  /** Ignore returned values on statically dead paths. */
+  executableReturns = false,
 ): ts.Node[] {
   const again = (node: ts.Expression, bindings = parameterBindings, seen = active, sink = proofs) =>
-    handlerNodes(node, checker, bindings, seen, staticProof, sink, stableBindings)
+    handlerNodes(
+      node,
+      checker,
+      bindings,
+      seen,
+      staticProof,
+      sink,
+      stableBindings,
+      executableReturns,
+    )
   const unwrapped = unwrapHandlerExpression(argument)
   if (unwrapped !== argument) return again(unwrapped)
   let bound = argument
@@ -64,7 +76,9 @@ export function handlerNodes(
         const symbol = checker.getSymbolAtLocation(parameter.name)
         if (callArgument && symbol) bindings.set(symbol, callArgument)
       })
-      const returned = returnedExpressions(implementation)
+      const returned = returnedExpressions(implementation).filter(
+        (value) => !executableReturns || !value || potentiallyExecuted(value),
+      )
       if (
         staticProof &&
         (!returnsOnEveryPath(implementation.body!) || returned.some((value) => !value))
@@ -89,6 +103,7 @@ export function handlerNodes(
     parameterBindings,
     proofs,
     stableBindings,
+    executableReturns,
   )
 }
 
@@ -128,6 +143,7 @@ function declarationImplementations(
   parameterBindings: Map<ts.Symbol, ts.Expression>,
   proofs?: HandlerProof[],
   stableBindings = staticProof,
+  executableReturns = false,
 ): ts.Node[] {
   const symbol = checker.getSymbolAtLocation(node)
   if (!symbol) return []
@@ -152,6 +168,7 @@ function declarationImplementations(
           staticProof,
           proofs,
           stableBindings,
+          executableReturns,
         ),
       ]
     return []

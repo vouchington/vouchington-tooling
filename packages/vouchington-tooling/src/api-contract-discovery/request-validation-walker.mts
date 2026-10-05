@@ -18,6 +18,7 @@ import type { KeyBindings } from './request-validation-keys.mts'
 import type { RootBindings } from './request-validation-origin.mts'
 import { rawReadsAt } from './request-validation-reads.mts'
 import { factorySite, sourceOf, validatorSite } from './request-validation-sites.mts'
+import { createReporter } from './request-validation-report.mts'
 import { createStateKey } from './request-validation-state-key.mts'
 import { bindArguments } from './request-validation-trace.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
@@ -53,7 +54,7 @@ export function createRouteWalker(config: WalkerConfig) {
   const { checker, sourceFiles, validators, factories, executedCallbacks } = config
   const configured = [...validators, ...factories, ...executedCallbacks]
   const facts: RouteFacts = { validatorSites: [], factorySites: [], carrierReads: [] }
-  const reported = new Map<string, object>()
+  const report = createReporter()
   const visited = new Map<ts.Node, Set<string>>()
 
   const scopeOf = (state: State): Scope => ({
@@ -63,20 +64,6 @@ export function createRouteWalker(config: WalkerConfig) {
     roots: state.roots,
     keys: state.keys,
   })
-  /** Adds a fact once; a repeat returns the fact already reported. */
-  const report = <T extends object>(
-    kind: string,
-    target: T[],
-    item: T,
-    identity: object = item,
-  ) => {
-    const key = `${kind}${JSON.stringify(identity)}`
-    const existing = reported.get(key) as T | undefined
-    if (existing) return existing
-    reported.set(key, item)
-    target.push(item)
-    return item
-  }
   const stateKey = createStateKey()
   const inputs = new Set<ts.Node>()
   const pendingReads: { node: ts.Node; read: CarrierRead }[] = []
@@ -107,7 +94,7 @@ export function createRouteWalker(config: WalkerConfig) {
     inputNodes.forEach((node) => inputs.add(node))
     const { conditional, ...identity } = site
     // A site reached both conditionally and unconditionally is unconditional.
-    report('validator', facts.validatorSites, site, identity).conditional &&= conditional
+    report('validator', facts.validatorSites, site, call, identity).conditional &&= conditional
     return true
   }
 
@@ -115,7 +102,7 @@ export function createRouteWalker(config: WalkerConfig) {
   function reportFactory(call: ts.CallExpression, state: State) {
     const factory = findConfig(call.expression, factories, checker)
     if (!factory) return false
-    report('factory', facts.factorySites, factorySite(call, factory, scopeOf(state)))
+    report('factory', facts.factorySites, factorySite(call, factory, scopeOf(state)), call)
     return true
   }
 
@@ -123,7 +110,10 @@ export function createRouteWalker(config: WalkerConfig) {
     const conditional = state.conditional || isConditionalPosition(call)
     const callee = inlineFunction(unwrapTransparentExpression(call.expression))
     const runners = new Set<ts.Node>(callee ? [callee] : [])
-    if (callee) walkFunction(callee, { ...state, conditional })
+    if (callee) {
+      const { keys, roots } = bindArguments(callee, call, scopeOf(state))
+      walkFunction(callee, { keys, roots, conditional })
+    }
     for (const implementation of followedImplementations(call, scopeOf(state))) {
       const { keys, roots } = bindArguments(implementation, call, scopeOf(state))
       runners.add(implementation)

@@ -10,6 +10,8 @@ export type Bound = {
   kind?: RootKind | undefined
   origins: readonly Carrier[]
   unresolved?: string | undefined
+  /** The argument expression the call passed, for resolving object literals through it. */
+  expression?: ts.Expression | undefined
 }
 export type RootBindings = ReadonlyMap<ts.Symbol, Bound>
 

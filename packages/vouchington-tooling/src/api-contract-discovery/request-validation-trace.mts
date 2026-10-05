@@ -1,9 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import {
-  followedImplementations,
-  type Followable,
-  type Scope,
-} from './request-validation-follow.mts'
+import { followedImplementations, type Scope } from './request-validation-follow.mts'
 import { reachingWrites, returnedValues } from './request-validation-trace-helpers.mts'
 import { identifierSymbol, resolveKey } from './request-validation-keys.mts'
 import { isBodyRead, isHeaderGet, rootKind, type Bound } from './request-validation-origin.mts'
@@ -16,7 +12,11 @@ export type Trace = { origins: Set<Carrier>; unresolved?: string | undefined }
 type Visit = { trace: Trace; seen: Set<ts.Node>; functions: Set<ts.Node> }
 
 /** Binds a followed function's parameters to what the call passes, with their origins. */
-export function bindArguments(fn: Followable, call: ts.CallExpression, scope: Scope): Scope {
+export function bindArguments(
+  fn: ts.FunctionLikeDeclaration,
+  call: ts.CallExpression,
+  scope: Scope,
+): Scope {
   const keys = new Map(scope.keys)
   const roots = new Map(scope.roots)
   runtimeParameters(fn).forEach((parameter, index) => {
@@ -35,6 +35,7 @@ export function bindArguments(fn: Followable, call: ts.CallExpression, scope: Sc
       kind: rootKind(argument, scope.roots, scope.checker),
       origins: [...traced.origins],
       unresolved: traced.unresolved,
+      expression: argument,
     }
     roots.set(symbol, bound)
   })
@@ -69,11 +70,15 @@ function visitDeclared(identifier: ts.Identifier, symbol: ts.Symbol, scope: Scop
     const owner = ts.isBindingElement(declaration) ? declaration.parent.parent : declaration
     if (ts.isVariableDeclaration(owner) && owner.initializer)
       visitValue(owner.initializer, scope, visit)
+    // `for (const [key, value] of Object.entries(x))` derives from the iterated expression.
+    else if (ts.isVariableDeclaration(owner) && ts.isForOfStatement(owner.parent.parent))
+      visitValue(owner.parent.parent.expression, scope, visit)
   }
 }
 
 function visitCall(call: ts.CallExpression, scope: Scope, visit: Visit) {
-  for (const fn of followedImplementations(call, scope)) {
+  const followed = followedImplementations(call, scope)
+  for (const fn of followed) {
     if (visit.functions.has(fn)) continue
     const next = {
       ...visit,
@@ -83,7 +88,8 @@ function visitCall(call: ts.CallExpression, scope: Scope, visit: Visit) {
     const bound = bindArguments(fn, call, scope)
     for (const value of returnedValues(fn)) visitValue(value, bound, next)
   }
-  ts.forEachChild(call, (child) => visitValue(child, scope, visit))
+  // An opaque call may use any argument; a followed helper's return values already say which.
+  if (followed.length === 0) ts.forEachChild(call, (child) => visitValue(child, scope, visit))
 }
 
 function visitValue(node: ts.Node, scope: Scope, visit: Visit): void {
