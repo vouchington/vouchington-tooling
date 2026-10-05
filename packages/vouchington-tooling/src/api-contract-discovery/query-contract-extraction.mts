@@ -1,13 +1,17 @@
 import type { QueryParameterContract } from './query-contract-types.mts'
+import type { OpenApiQueryParameterShape } from '../openapi-document/query-types.mts'
 import ts from '../contract-schema/typescript-api.mts'
 
 import { contractError } from './response-contract-registration.mts'
 import {
   optionalNumberLiteral,
+  declaresProperty,
+  optionalTrueLiteral,
   optionalStringLiteral,
   requiredBooleanLiteral,
   requiredNumberLiteral,
   requiredPropertyType,
+  rejectUnresolvedType,
   requiredStringLiteral,
   stringTuple,
 } from './query-contract-literals.mts'
@@ -19,9 +23,35 @@ export function extractQueryParameterDescriptor(
   node: ts.Node,
   parameterName: string,
 ): QueryParameterContract {
-  const fail = (detail: string): never => {
+  rejectUnresolvedType(type, failure(sourceFile, node, parameterName))
+  const descriptor = extractDescriptorShape(type, checker, sourceFile, node, parameterName)
+  if (!optionalTrueLiteral(type, 'required', checker, failure(sourceFile, node, parameterName))) {
+    return descriptor
+  }
+  if (declaresProperty(type, 'default')) {
+    failure(sourceFile, node, parameterName)('required cannot be combined with default')
+  }
+  return { ...descriptor, required: true }
+}
+
+function failure(
+  sourceFile: ts.SourceFile,
+  node: ts.Node,
+  parameterName: string,
+): (detail: string) => never {
+  return (detail) => {
     throw contractError(sourceFile, node, `Malformed query parameter "${parameterName}": ${detail}`)
   }
+}
+
+function extractDescriptorShape(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+  node: ts.Node,
+  parameterName: string,
+): OpenApiQueryParameterShape {
+  const fail = failure(sourceFile, node, parameterName)
   const kind = requiredStringLiteral(type, 'kind', checker, fail)
   const description = optionalStringLiteral(type, 'description', checker, node, fail)
   const options = description === undefined ? {} : { description }
@@ -71,13 +101,9 @@ export function extractQueryParameterDescriptor(
     if (requiredBooleanLiteral(type, 'explode', checker, fail) !== false)
       fail('explode must be false')
     const itemType = requiredPropertyType(type, 'items', checker, fail)
-    const items = extractQueryParameterDescriptor(
-      itemType,
-      checker,
-      sourceFile,
-      node,
-      `${parameterName}[]`,
-    )
+    rejectUnresolvedType(itemType, fail)
+    if (declaresProperty(itemType, 'required')) fail('array items cannot be required')
+    const items = extractDescriptorShape(itemType, checker, sourceFile, node, `${parameterName}[]`)
     if (items.kind === 'string' || items.kind === 'enum') {
       return { kind, items, style: 'form', explode: false, ...options }
     }

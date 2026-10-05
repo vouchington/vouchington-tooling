@@ -38,16 +38,46 @@ const descriptors = {
   mappedKind: `{ [Key in 'kind']: 'string' }`,
   mappedDescription: `{ kind: 'string' } & { [Key in 'description']: 'Mapped description' }`,
   mappedDefault: `{ kind: 'integer'; minimum: 0; maximum: 10 } & { [Key in 'default']: 2 }`,
+  requiredIntersection: `{ kind: 'string' } & { readonly required: true }`,
+  requiredEnum: `{ kind: 'enum'; values: readonly ['a', 'b']; required: true }`,
+  requiredFalse: `{ kind: 'string'; required: false }`,
+  requiredBoolean: `{ kind: 'string'; required: boolean }`,
+  requiredOptional: `{ kind: 'string'; required?: true }`,
+  requiredDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; required: true }`,
+  requiredStringDefault: `{ kind: 'string'; default: 'x'; required: true }`,
+  requiredItems: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } }`,
+  requiredCsv: `{ kind: 'csv-array'; style: 'form'; explode: false; required: true; items: { kind: 'string' } }`,
+  requiredPartialUnion: `{ kind: 'string'; required: true } | { kind: 'string' }`,
+  requiredPartialDefaultUnion: `{ kind: 'string'; required: true; default: 'x' } | { kind: 'string'; required: true }`,
+  requiredPartialItemsUnion: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string'; required: true } | { kind: 'string' } }`,
+  requiredUnion: `{ kind: 'string'; required: true; a: 1 } | { kind: 'string'; required: true; b: 1 }`,
   unionDescription: `{ kind: 'string'; description: 'x'; a: 1 } | { kind: 'string'; description: 'x'; b: 1 }`,
   unionDefault: `{ kind: 'integer'; minimum: 0; maximum: 10; default: 2; a: 1 } | { kind: 'integer'; minimum: 0; maximum: 10; default: 2; b: 1 }`,
 } as const
+const generics = {
+  conditionalRequired: `{ kind: 'string' } & (T extends true ? { required: true } : {})`,
+  conditionalDefault: `{ kind: 'integer'; minimum: 0; maximum: 10 } & (T extends true ? { default: 2 } : {})`,
+  conditionalUnion: `{ kind: 'string' } | (T extends true ? { required: true } : { kind: 'string' })`,
+  bareTypeParameter: `T`,
+  conditionalItems: `{ kind: 'csv-array'; style: 'form'; explode: false; items: { kind: 'string' } & (T extends true ? { required: true } : {}) }`,
+} as const
 let matrix: VirtualProgramMatrix<string>
 
-function extract(name: keyof typeof descriptors) {
+function extract(name: keyof typeof descriptors | keyof typeof generics) {
   const source = matrix.sourceFile(name.toLowerCase())
+  const checker = matrix.program.getTypeChecker()
+  const fn = source.statements.find(ts.isFunctionDeclaration)
+  if (fn) {
+    return extractQueryParameterDescriptor(
+      checker.getTypeFromTypeNode(fn.type!),
+      checker,
+      source,
+      fn,
+      'value',
+    )
+  }
   const statement = source.statements.find(ts.isVariableStatement)!
   const declaration = statement.declarationList.declarations[0]!
-  const checker = matrix.program.getTypeChecker()
   return extractQueryParameterDescriptor(
     checker.getTypeAtLocation(declaration.name),
     checker,
@@ -59,15 +89,20 @@ function extract(name: keyof typeof descriptors) {
 
 describe('query descriptor compiler boundaries', () => {
   beforeAll(() => {
-    matrix = buildVirtualProgramMatrix(
-      import.meta,
-      Object.fromEntries(
+    matrix = buildVirtualProgramMatrix(import.meta, {
+      ...Object.fromEntries(
         Object.entries(descriptors).map(([name, type]) => [
           name.toLowerCase(),
           `declare const descriptor: ${type}`,
         ]),
       ),
-    )
+      ...Object.fromEntries(
+        Object.entries(generics).map(([name, type]) => [
+          name.toLowerCase(),
+          `declare function descriptor<T extends boolean>(): ${type}`,
+        ]),
+      ),
+    })
   })
 
   it.each([
@@ -89,6 +124,19 @@ describe('query descriptor compiler boundaries', () => {
     ],
     ['mappedDescription', { kind: 'string', description: 'Mapped description' }],
     ['mappedDefault', { kind: 'integer', minimum: 0, maximum: 10, default: 2 }],
+    ['requiredIntersection', { kind: 'string', required: true }],
+    ['requiredEnum', { kind: 'enum', values: ['a', 'b'], required: true }],
+    [
+      'requiredCsv',
+      {
+        kind: 'csv-array',
+        style: 'form',
+        explode: false,
+        required: true,
+        items: { kind: 'string' },
+      },
+    ],
+    ['requiredUnion', { kind: 'string', required: true }],
     ['unionDescription', { kind: 'string', description: 'x' }],
     ['unionDefault', { kind: 'integer', minimum: 0, maximum: 10, default: 2 }],
   ] as const)('extracts %s', (name, expected) => {
@@ -115,7 +163,23 @@ describe('query descriptor compiler boundaries', () => {
     ['badItems', 'array items must be string or enum'],
     ['unknown', 'unsupported kind'],
     ['mappedKind', 'requires declared kind'],
+    ['requiredFalse', 'required must be the literal true'],
+    ['requiredBoolean', 'required must be the literal true'],
+    ['requiredOptional', 'required must be literal when present'],
+    ['requiredDefault', 'required cannot be combined with default'],
+    ['requiredStringDefault', 'required cannot be combined with default'],
+    ['requiredItems', 'array items cannot be required'],
+    ['requiredPartialUnion', 'required must be present on every union member'],
+    ['requiredPartialDefaultUnion', 'required cannot be combined with default'],
+    ['requiredPartialItemsUnion', 'array items cannot be required'],
   ] as const)('rejects %s', (name, reason) => {
     expect(() => extract(name)).toThrow(reason)
   })
+
+  it.each(Object.keys(generics) as (keyof typeof generics)[])(
+    'rejects unresolved conditional or generic %s',
+    (name) => {
+      expect(() => extract(name)).toThrow('unresolved conditional or generic')
+    },
+  )
 })

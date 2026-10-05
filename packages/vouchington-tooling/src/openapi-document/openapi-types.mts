@@ -25,7 +25,7 @@ export type OpenApiParameter =
   | {
       name: string
       in: 'query'
-      required: false
+      required: boolean
       description?: string
       style?: 'form'
       explode?: false

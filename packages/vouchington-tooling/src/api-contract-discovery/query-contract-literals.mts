@@ -74,6 +74,29 @@ export function optionalNumberLiteral(
   return value.isNumberLiteral() ? value.value : fail(`requires literal ${name}`)
 }
 
+export function optionalTrueLiteral(
+  type: ts.Type,
+  name: string,
+  checker: ts.TypeChecker,
+  fail: (detail: string) => never,
+): boolean {
+  const property = type.getProperty(name)
+  if (!property) {
+    if (declaresProperty(type, name)) return fail(`${name} must be present on every union member`)
+    return false
+  }
+  if (property.flags & ts.SymbolFlags.Optional) return fail(`${name} must be literal when present`)
+  const value = requiredPropertyType(type, name, checker, fail)
+  const isTrue = value.flags & ts.TypeFlags.BooleanLiteral && checker.typeToString(value) === 'true'
+  return isTrue ? true : fail(`${name} must be the literal true`)
+}
+
+/** True when the type, or any member of a union type, declares the property. */
+export function declaresProperty(type: ts.Type, name: string): boolean {
+  if (type.getProperty(name)) return true
+  return type.isUnion() && type.types.some((member) => member.getProperty(name) !== undefined)
+}
+
 export function stringTuple(
   type: ts.Type,
   name: string,
@@ -87,4 +110,14 @@ export function stringTuple(
     return fail(`${name} must contain string literals`)
   }
   return values.map((item) => (item as ts.StringLiteralType).value)
+}
+
+/** Fails when the type, or any union/intersection constituent, is conditional or generic. */
+export function rejectUnresolvedType(type: ts.Type, fail: (detail: string) => never): void {
+  if (type.flags & (ts.TypeFlags.Conditional | ts.TypeFlags.Instantiable)) {
+    fail('descriptor must not contain unresolved conditional or generic types')
+  }
+  if (type.isUnionOrIntersection()) {
+    for (const member of type.types) rejectUnresolvedType(member, fail)
+  }
 }
