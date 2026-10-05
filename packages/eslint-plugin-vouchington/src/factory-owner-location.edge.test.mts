@@ -127,6 +127,10 @@ Reflect.construct(makeGraph, [], ({ ['method']() {} }).method)
 Reflect.construct(makeGraph, [], ({ other() {} }).method)
 Reflect.construct(makeGraph, [], NewTarget.method)
 Reflect.construct(makeGraph, [], ({ ...source }).method)
+Reflect.construct(makeGraph, [], ({ ctor() {}, ctor: function () {} }).ctor)
+Reflect.construct(makeGraph, [], ({ ctor: function () {}, ctor() {} }).ctor)
+Reflect.construct(makeGraph, [], ({ ctor() {}, ...override }).ctor)
+Reflect.construct(makeGraph, [], ({ ctor() {}, [key]: value }).ctor)
 Reflect.construct(makeGraph, [], function () {})
 Reflect.construct(makeGraph, [], class {})
 Reflect.construct(makeGraph, [], NewTarget)
@@ -140,6 +144,9 @@ function shadow(undefined, NaN, Infinity) {
     'src/check.js',
   )
   expect(messageIds(result)).toEqual([
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',
@@ -326,6 +333,14 @@ it('uses destructuring defaults only when a static source can select them', asyn
     `import { makeGraph } from '1'
 const { graph = makeGraph } = { graph: () => 1 }
 graph()
+const { duplicate = makeGraph } = { duplicate: () => 1, duplicate: undefined }
+duplicate()
+const { replaced = makeGraph } = { replaced: undefined, replaced: () => 1 }
+replaced()
+const { spread = makeGraph } = { spread: () => 1, ...override }
+spread()
+const { computed = makeGraph } = { computed: () => 1, [key]: value }
+computed()
 const { text = makeGraph } = { text: 'known' }
 text()
 const { template = makeGraph } = { template: \`known\` }
@@ -357,5 +372,5 @@ possible()`,
     OPTIONS,
     'src/check.js',
   )
-  expect(messageIds(result)).toEqual(Array(7).fill('constructionOwner'))
+  expect(messageIds(result)).toEqual(Array(10).fill('constructionOwner'))
 })

@@ -5,8 +5,11 @@ export function isStaticMethod(value: NodeLike): boolean {
   const object = unwrap(value.object as NodeLike)
   if (object?.type !== 'ObjectExpression') return false
   const name = propertyName(value)
-  return (object.properties as NodeLike[]).some(
-    (property) =>
-      property.type === 'Property' && property.method && patternPropertyName(property) === name,
-  )
+  for (const property of (object.properties as NodeLike[]).toReversed()) {
+    if (property.type !== 'Property') return false
+    const candidateName = patternPropertyName(property)
+    if (candidateName === null) return false
+    if (candidateName === name) return Boolean(property.method)
+  }
+  return false
 }

@@ -39,10 +39,13 @@ function patternEntrySource(
   }
   if (current?.type !== 'ObjectExpression') return undefined
   const name = patternPropertyName(entry)
-  const property = (current.properties as NodeLike[]).find(
-    (candidate) => candidate.type === 'Property' && patternPropertyName(candidate) === name,
-  )
-  return property ? (property.value as NodeLike) : null
+  for (const candidate of (current.properties as NodeLike[]).toReversed()) {
+    if (candidate.type !== 'Property') return undefined
+    const candidateName = patternPropertyName(candidate)
+    if (candidateName === null) return undefined
+    if (candidateName === name) return candidate.value as NodeLike
+  }
+  return null
 }
 
 function isDefinitelyPresent(value: NodeLike | null | undefined): boolean {
