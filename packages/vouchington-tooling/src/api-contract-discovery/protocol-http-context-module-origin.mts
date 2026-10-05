@@ -84,3 +84,25 @@ function fulfillmentModule(checker: ts.TypeChecker, parameter: ts.ParameterDecla
     ? checker.getSymbolAtLocation(imported.arguments[0])
     : undefined
 }
+
+/** Only a fulfillment function's own first arguments slot denotes the imported module. */
+export function contextImportArgumentsModule(checker: ts.TypeChecker, value: ts.Expression) {
+  value = unwrapTransparentExpression(value)
+  if (
+    !ts.isElementAccessExpression(value) ||
+    !ts.isIdentifier(value.expression) ||
+    value.expression.text !== 'arguments' ||
+    !ts.isNumericLiteral(value.argumentExpression) ||
+    value.argumentExpression.text !== '0'
+  )
+    return undefined
+  let owner: ts.Node | undefined = value.parent
+  while (owner && !ts.isFunctionLike(owner)) owner = owner.parent
+  while (owner && ts.isArrowFunction(owner)) {
+    owner = owner.parent
+    while (owner && !ts.isFunctionLike(owner)) owner = owner.parent
+  }
+  return owner && ts.isFunctionExpression(owner) && owner.parameters[0]
+    ? fulfillmentModule(checker, owner.parameters[0])
+    : undefined
+}

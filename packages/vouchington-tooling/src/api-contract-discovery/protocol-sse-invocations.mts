@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { visit } from './response-contract-route-analysis.mts'
-import { sseWriteMutation, type SseWriteMutation } from './protocol-sse-write-mutations.mts'
+import { sseWriteMutations, type SseWriteMutation } from './protocol-sse-write-mutations.mts'
 
 export function collectSseInvocations(files: readonly ts.SourceFile[]) {
   const invocations: (ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression)[] = []
@@ -13,8 +13,7 @@ export function collectSseInvocations(files: readonly ts.SourceFile[]) {
         ts.isTaggedTemplateExpression(node)
       )
         invocations.push(node)
-      const mutation = sseWriteMutation(node)
-      if (mutation) mutations.push(mutation)
+      mutations.push(...sseWriteMutations(node))
     })
   return { invocations, mutations }
 }

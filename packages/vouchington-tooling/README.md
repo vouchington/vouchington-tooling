@@ -736,7 +736,10 @@ exact stream invocation. A non-SSE sibling or a second unframed stream cannot re
 uniquely bound helper pipelines must match every executable invocation on the selected route.
 A factory pipeline must execute unconditionally before any path returns its selected stream.
 Tagged-template substitutions, including literal containers and callable captures, retain selected
-stream capabilities and make an unproved tag unavailable.
+stream capabilities and make an unproved tag unavailable. Concrete helper results retain selected
+stream capabilities through caller-bound parameters, constant aliases and returned containers;
+separate scalar and fresh independent results preserve their existing proof. Loop and destructuring
+assignment targets invalidate replaced selected stream writers using the shared mutation index.
 The current pipeline proof requires a concrete factory-returned stream property; stream identities
 that cannot pass the existing raw-write validation remain unavailable.
 Feasible assignments or deletions of response methods through canonical context aliases invalidate

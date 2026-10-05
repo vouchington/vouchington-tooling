@@ -3,6 +3,10 @@ import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
 import { callbackCapturesSelectedReceiver } from './protocol-sse-callback-capture.mts'
 import { actualReceivers } from './protocol-sse-actual-receivers.mts'
 import { createSseCallbackOrigins } from './protocol-sse-callback-origins.mts'
+import {
+  implementationDeclaration,
+  selectedReturnedSseCapability,
+} from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import {
@@ -21,24 +25,6 @@ import { expressionReceiver, type WriteReceiver } from './protocol-write-receive
 
 export function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
-}
-
-function implementationDeclaration(
-  declaration: ts.Signature['declaration'],
-  checker: ts.TypeChecker,
-): ts.FunctionLikeDeclaration | undefined {
-  if (!declaration) return undefined
-  if (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) return declaration
-  if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) {
-    if (declaration.body) return declaration
-    const symbol = declaration.name && checker.getSymbolAtLocation(declaration.name)
-    return symbol?.declarations?.find(
-      (candidate): candidate is ts.FunctionLikeDeclaration =>
-        (ts.isFunctionDeclaration(candidate) || ts.isMethodDeclaration(candidate)) &&
-        !!candidate.body,
-    )
-  }
-  return undefined
 }
 
 type SseWriteLookup = ReturnType<typeof createSseWriteLookup>
@@ -65,7 +51,19 @@ export function opaqueCallReceivesSelectedStream(
           framed.some((frame) => callbackCapturesSelectedReceiver(leaf, frame, checker))
         )
           return true
+        if (
+          ts.isCallExpression(leaf) &&
+          selectedReturnedSseCapability(
+            leaf,
+            checker,
+            lookup.implementationCall,
+            framed,
+            (receiver) => actualReceivers(receiver, binding, checker, lookup),
+          )
+        )
+          return true
         const receiver = expressionReceiver(leaf, checker)
+
         if (!receiver) return false
         if (
           !receiver.mutableAlias &&
