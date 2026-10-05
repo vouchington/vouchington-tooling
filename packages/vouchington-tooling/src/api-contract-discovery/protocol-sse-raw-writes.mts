@@ -1,4 +1,5 @@
 import { collectSseInvocations } from './protocol-sse-invocations.mts'
+import { selectedSseTagReceiver } from './protocol-sse-tag-arguments.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
@@ -37,7 +38,7 @@ export function rejectRawSseWrites(
   framedWrites: ReadonlySet<ts.CallExpression>,
   routes: ReadonlyMap<string, SseRouteWrites>,
   reject: (
-    node: ts.CallExpression | ts.NewExpression,
+    node: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression,
     binding: RouteBinding,
     keys: readonly string[],
   ) => void,
@@ -98,6 +99,15 @@ export function rejectRawSseWrites(
     for (const candidate of candidates) {
       const route = routes.get(routeKey(candidate))
       if (!route) continue
+      if (ts.isTaggedTemplateExpression(node)) {
+        if (
+          selectedSseTagReceiver(node, checker, route.receivers, (receiver) =>
+            actualReceivers(receiver, candidate, checker, lookup),
+          )
+        )
+          reject(node, candidate, route.keys)
+        continue
+      }
       const receiver = access?.receiver && expressionReceiver(access.receiver, checker)
       const actual = receiver ? actualReceivers(receiver, candidate, checker, lookup) : []
       const framed = route.receivers.flatMap((value) =>

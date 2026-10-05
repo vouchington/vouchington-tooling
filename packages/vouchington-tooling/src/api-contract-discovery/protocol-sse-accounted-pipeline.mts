@@ -1,3 +1,4 @@
+import { unconditionalSsePipeline } from './protocol-sse-pipeline-execution.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { contextResponseMethod } from './protocol-http-context.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -29,6 +30,7 @@ export function createSseAccountedPipeline(
     const name = fn && runtimeParameters(fn)[0]?.name
     if (!fn || !name || !ts.isIdentifier(name) || checker.getSymbolAtLocation(name) !== context)
       return false
+    if (!unconditionalSsePipeline(call, fn)) return false
     const binding = enclosingRouteBinding(root, checker, bindings, false)
     const route = binding && routes.get(routeKey(binding))
     if (
