@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { sseCallableAlias } from './protocol-sse-returned-capability.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import {
   expressionReceiver,
@@ -18,9 +19,13 @@ function selectedSseTagArgument(
     node.template.templateSpans.some(({ expression }) =>
       someSseArgumentValue(expression, checker, (leaf) => {
         if (selected(leaf)) return true
-        if (!ts.isArrowFunction(leaf) && !ts.isFunctionExpression(leaf)) return false
+        const callback =
+          ts.isArrowFunction(leaf) || ts.isFunctionExpression(leaf)
+            ? leaf
+            : sseCallableAlias(leaf, checker)
+        if (!callback) return false
         let captured = false
-        visit(leaf, (child) => {
+        visit(callback, (child) => {
           if (ts.isExpression(child) && selected(child)) captured = true
         })
         return captured

@@ -4,7 +4,7 @@ import {
 } from './protocol-callback-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
-import { returnedExpressions } from './registered-route-factory-returns.mts'
+import { sseCapabilityOutputs } from './protocol-sse-capability-outputs.mts'
 import {
   expressionReceiver,
   sameWriteReceiver,
@@ -38,10 +38,10 @@ function returnedSseCapability(
           const symbol = checker.getSymbolAtLocation(parameter.name)!
           next.set(symbol, argumentsSelected[index] ?? false)
         }
-        return returnedExpressions(fn).some((returned) => !!returned && contains(returned, next))
+        return sseCapabilityOutputs(fn).some((returned) => !!returned && contains(returned, next))
       }
       if (ts.isArrowFunction(value) || ts.isFunctionExpression(value))
-        return returnedExpressions(value).some(
+        return sseCapabilityOutputs(value).some(
           (returned) => !!returned && contains(returned, bindings),
         )
       if (ts.isConditionalExpression(value))
@@ -61,7 +61,7 @@ function returnedSseCapability(
         if (symbol && bindings.has(symbol)) return bindings.get(symbol)!
         const declaration = symbol?.valueDeclaration
         if (declaration && ts.isFunctionDeclaration(declaration) && declaration.body)
-          return returnedExpressions(declaration).some(
+          return sseCapabilityOutputs(declaration).some(
             (returned) => !!returned && contains(returned, bindings),
           )
         if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer)
