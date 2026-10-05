@@ -79,6 +79,7 @@ export function discoverImplicitContract(
     return
   }
   if (!key) return
+  if (context && httpValues?.accountedSse(call, context, call, call)) return
 
   const body = responseBodyExpression(call)
   if (body) {

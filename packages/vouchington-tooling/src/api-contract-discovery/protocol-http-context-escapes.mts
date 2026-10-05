@@ -1,6 +1,9 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { expressionReceiver } from './protocol-write-receiver.mts'
-import { httpHandlerContext, contextResponseMethod } from './protocol-http-context.mts'
+import {
+  httpHandlerContext,
+  contextResponseMethod,
+  httpContextArgument,
+} from './protocol-http-context.mts'
 import { httpContextInvocations } from './protocol-http-context-callers.mts'
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -12,6 +15,8 @@ import type { CallbackBindings } from './protocol-callback-values.mts'
 import { standardReflectApply } from './protocol-http-reflect.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import { receiverUsesThis } from './protocol-http-context-receiver.mts'
+import { mutatesHttpResponseMethod } from './protocol-http-method-mutations.mts'
+import { createContextAccountedEmissionProof } from './protocol-http-context-accounted-emissions.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
 export function opaqueHttpContextArgument(
@@ -22,9 +27,10 @@ export function opaqueHttpContextArgument(
   env: CallbackBindings = new Map(),
   boundHandler?: ts.FunctionLikeDeclaration,
   proof = createHttpContextValueResolver(checker),
+  root = call,
 ): boolean {
   const matches = (symbol: ts.Symbol) =>
-    call.arguments.some((argument) => contextArgument(argument, symbol, checker))
+    call.arguments.some((argument) => httpContextArgument(argument, symbol, checker))
   if (context && !matches(context)) return false
   if (
     !(
@@ -33,24 +39,14 @@ export function opaqueHttpContextArgument(
     )
   )
     return false
-  if (context) return !implementedCallee(call, context, checker, active, env, proof)
+  if (context) return !implementedCallee(call, context, checker, active, env, proof, root)
   for (let owner = enclosingFunction(call); owner; owner = enclosingFunction(owner)) {
     const name = runtimeParameters(owner)[0]?.name
     const symbol = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
     if (symbol && matches(symbol) && httpHandlerContext(owner, checker) === symbol)
-      return !implementedCallee(call, symbol, checker, active, env, proof)
+      return !implementedCallee(call, symbol, checker, active, env, proof, root)
   }
   return false
-}
-
-function contextArgument(expression: ts.Expression, context: ts.Symbol, checker: ts.TypeChecker) {
-  const receiver = expressionReceiver(expression, checker)
-  return (
-    (receiver?.root === context &&
-      (receiver.path.length === 0 ||
-        (receiver.path.length === 1 && receiver.path[0] === 'response'))) ||
-    contextResponseMethod(unwrapExpression(expression), context, checker, true) === 'response'
-  )
 }
 
 /** Actual caller bindings retain the concrete implementations of consumed callback parameters. */
@@ -61,6 +57,7 @@ function implementedCallee(
   active: Set<ts.FunctionLikeDeclaration>,
   callerEnv: CallbackBindings,
   values: ReturnType<typeof createHttpContextValueResolver>,
+  root: ts.CallExpression,
 ): boolean {
   const resolver = values.callbacks
   if (standardReflectApply(call, checker)) {
@@ -82,7 +79,17 @@ function implementedCallee(
           !!target &&
           isProtocolCallbackFunction(target.node) &&
           !!target.node.body &&
-          !calleeEscapes(target.node, call, context, checker, active, env, target.env, values),
+          !calleeEscapes(
+            target.node,
+            call,
+            context,
+            checker,
+            active,
+            env,
+            target.env,
+            values,
+            root,
+          ),
       )
     )
   }
@@ -126,6 +133,7 @@ function calleeEscapes(
   callerEnv: CallbackBindings,
   captured: CallbackBindings,
   values: ReturnType<typeof createHttpContextValueResolver>,
+  root: ts.CallExpression,
 ): boolean {
   if (active.has(fn)) return true
   if (
@@ -141,11 +149,12 @@ function calleeEscapes(
   const contexts = [context]
   for (const [index, parameter] of runtimeParameters(fn).entries()) {
     const argument = call.arguments[index]
-    if (!argument || !contextArgument(argument, context, checker)) continue
+    if (!argument || !httpContextArgument(argument, context, checker)) continue
     if (!ts.isIdentifier(parameter.name)) return true
     contexts.push(checker.getSymbolAtLocation(parameter.name)!)
   }
   let escaped = false
+  const accounted = createContextAccountedEmissionProof(fn, checker)
   const visitBound = (node: ts.Node): void => {
     if (ts.isIfStatement(node)) {
       const condition = values.resolve(node.expression, env)
@@ -161,10 +170,25 @@ function calleeEscapes(
     ts.forEachChild(node, visitBound)
   }
   const inspect = (node: ts.Node): void => {
+    if (contexts.some((symbol) => mutatesHttpResponseMethod(node, symbol, checker, fn)))
+      escaped = true
+    if (
+      ts.isCallExpression(node) &&
+      executableProtocolPath(node, checker, fn) &&
+      contexts.some(
+        (symbol) =>
+          ['json', 'pipeline', 'response.buffer'].includes(
+            contextResponseMethod(node.expression, symbol, checker, true) ?? '',
+          ) &&
+          !accounted(node, symbol) &&
+          !values.accountedSse(node, symbol, call, root),
+      )
+    )
+      escaped = true
     if (
       ts.isCallExpression(node) &&
       contexts.some((symbol) =>
-        opaqueHttpContextArgument(node, checker, symbol, next, env, fn, values),
+        opaqueHttpContextArgument(node, checker, symbol, next, env, fn, values, root),
       )
     )
       escaped = true

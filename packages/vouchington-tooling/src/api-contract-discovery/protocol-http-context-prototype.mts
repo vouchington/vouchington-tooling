@@ -1,7 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { createContextCapture } from './protocol-http-context-capture.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
-import { contextWriteTargets } from './protocol-http-context-write-targets.mts'
+import { contextMutationTargets } from './protocol-http-context-write-targets.mts'
 
 /** Missing own properties require unchanged global prototype capabilities in this Program. */
 export function createContextPrototypeProof(
@@ -19,18 +19,7 @@ export function createContextPrototypeProof(
     result = !!sources
     function visit(node: ts.Node) {
       if (!result) return
-      const write = ts.isDeleteExpression(node)
-        ? node.expression
-        : ts.isBinaryExpression(node) &&
-            node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-            node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-          ? node.left
-          : (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
-              (node.operator === ts.SyntaxKind.PlusPlusToken ||
-                node.operator === ts.SyntaxKind.MinusMinusToken)
-            ? node.operand
-            : undefined
-      if (write && contextWriteTargets(write).some((target) => globalObject(roots.root(target))))
+      if (contextMutationTargets(node).some((target) => globalObject(roots.root(target))))
         result = false
       if (
         (ts.isCallExpression(node) || ts.isNewExpression(node)) &&

@@ -67,6 +67,8 @@ export function createLiteralWrapperIndex(
       node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
     )
       for (const symbol of capture(node.right)) stored.add(symbol)
+    if (ts.isPropertyDeclaration(node) && node.initializer)
+      for (const symbol of capture(node.initializer)) stored.add(symbol)
   }
   return { capture, record, stored, parents, returnedParameters }
 }

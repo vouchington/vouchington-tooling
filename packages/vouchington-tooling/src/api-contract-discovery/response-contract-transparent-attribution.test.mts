@@ -279,9 +279,12 @@ describe('transparent response-attribution expressions', () => {
     ])
   })
 
-  it('preserves legacy handling of parenthesized helper calls', () => {
+  it('keeps unaccounted parenthesized helper bodies unavailable', () => {
     const facts: AmbiguousAttributionFact[] = []
-    expect(discover('wrapped-helper-call')).toEqual({})
+    const rows = discover('wrapped-helper-call')
+    expect(Object.keys(rows).toSorted()).toEqual(['POST:/api/v1/one', 'POST:/api/v1/two'])
+    expect(Object.values(rows).every((row) => row.statusKnowledge === 'unknown')).toBe(true)
+    expect(Object.values(rows).every((row) => !!row.unavailableReason)).toBe(true)
     discover('wrapped-helper-call', facts)
     expect(facts.map(({ routes }) => routes)).toEqual([['POST:/api/v1/one', 'POST:/api/v1/two']])
   })

@@ -161,5 +161,14 @@ export function createHttpContextValueResolver(
     }
     return undefined
   }
-  return { resolve, callbacks }
+  return {
+    resolve,
+    callbacks,
+    accountedSse: (
+      _call: ts.CallExpression,
+      _context: ts.Symbol,
+      _invocation: ts.CallExpression,
+      _root: ts.CallExpression,
+    ): boolean => false,
+  }
 }

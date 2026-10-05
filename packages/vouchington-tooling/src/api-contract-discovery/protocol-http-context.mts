@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { httpContextInvocations } from './protocol-http-context-callers.mts'
-import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 import { expressionReceiver } from './protocol-write-receiver.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -89,4 +89,18 @@ export function indirectHttpResponseMethod(
     : receiver.path.length === 1 && receiver.path[0] === 'response'
       ? `response.${name}`
       : undefined
+}
+
+export function httpContextArgument(
+  expression: ts.Expression,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+) {
+  const receiver = expressionReceiver(expression, checker)
+  return (
+    (receiver?.root === context &&
+      (receiver.path.length === 0 ||
+        (receiver.path.length === 1 && receiver.path[0] === 'response'))) ||
+    contextResponseMethod(unwrapExpression(expression), context, checker, true) === 'response'
+  )
 }

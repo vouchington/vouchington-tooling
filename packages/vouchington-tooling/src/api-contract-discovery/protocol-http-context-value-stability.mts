@@ -1,5 +1,5 @@
 import { createContextReceiverChecks } from './protocol-http-context-receiver-checks.mts'
-import { contextWriteTargets } from './protocol-http-context-write-targets.mts'
+import { contextMutationTargets } from './protocol-http-context-write-targets.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { contextFunctionOwns } from './protocol-http-context-capture.mts'
@@ -12,6 +12,7 @@ import { createContextConsumerSources } from './protocol-http-context-consumer-s
 type Facts = {
   writes: ts.Expression[]
   calls: (ts.CallExpression | ts.NewExpression)[]
+  tagged: Set<ts.Symbol>
   wrappers: ReturnType<typeof createLiteralWrapperIndex>
 }
 /** One proof indexes source mutations once; aliases and forwarded parameters retain their roots. */
@@ -54,23 +55,17 @@ export function createContextValueStability(
     const result: Facts = {
       writes: [],
       calls: [],
+      tagged: new Set(),
       wrappers: createLiteralWrapperIndex(checker, roots),
     }
     function visit(node: ts.Node) {
       result.wrappers.record(node)
-      const write = ts.isDeleteExpression(node)
-        ? node.expression
-        : ts.isBinaryExpression(node) &&
-            node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-            node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-          ? node.left
-          : (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
-              (node.operator === ts.SyntaxKind.PlusPlusToken ||
-                node.operator === ts.SyntaxKind.MinusMinusToken)
-            ? node.operand
-            : undefined
-      if (write) result.writes.push(...contextWriteTargets(write))
+      result.writes.push(...contextMutationTargets(node))
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) result.calls.push(node)
+      if (ts.isTaggedTemplateExpression(node) && ts.isTemplateExpression(node.template))
+        for (const span of node.template.templateSpans)
+          if (!primitiveMember(span.expression))
+            for (const symbol of result.wrappers.capture(span.expression)) result.tagged.add(symbol)
       ts.forEachChild(node, visit)
     }
     visit(source)
@@ -112,6 +107,7 @@ export function createContextValueStability(
         safe = false
       if (!immutableFunction) {
         if (data.wrappers.stored.has(symbol)) safe = false
+        if (data.tagged.has(symbol)) safe = false
         for (const wrapper of data.wrappers.parents.get(symbol) ?? [])
           if (!stable(wrapper, next)) safe = false
       }
