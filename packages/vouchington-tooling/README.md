@@ -16,7 +16,8 @@ declaration name, route label, factory pattern, and exception.
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
-# optional, if you import vouchington-tooling/contract-schema or finite-enum-ripple
+# optional, if you import vouchington-tooling/contract-schema, finite-enum-ripple,
+# or post-publication-inventory
 # (classic compiler API; typescript@7's package root is version-only)
 npm install @typescript/typescript6
 # optional, only if you use the Vitest reporter export
@@ -721,3 +722,23 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 TypeScript and route rows from Markdown. Callers configure declaration names and
 runbook headings, then compare the returned data using their own route policy.
 See the [API contract](docs/basic-auth-doc-sync.md).
+
+## Publication writer inventory facts
+
+`vouchington-tooling/post-publication-inventory` exports
+`analyzePostPublicationWriterSource(source, fileName, options)`. It returns five booleans for an
+approved capture-helper call, a capture opt-out, writes through a configured entity table,
+generated relation writes, and eligibility-table writes. Consumers supply every module, symbol,
+property, receiver, and table name through `PostPublicationWriterSourceOptions` and retain their
+inventory schema, tracked files, exceptions, and diagnostics.
+
+This preserves source-inventory heuristics, rather than proving runtime execution or SQL safety.
+Capture imports/calls are name-based and order-independent; relation-variable appends are
+order-sensitive. DML recognition examines literal/template text. Static table matching lowercases
+the extracted name; dynamic literal table matching preserves case. Malformed TypeScript uses the
+compiler's recovery tree. An argument-free append returns no relation fact.
+Pass TypeScript source (`.ts` or `.mts`); the parser uses TypeScript mode even if the file name ends
+in `.tsx`. Template expressions join their static fragments for DML matching, while DML prefixes
+for generated-table facts come from templates rather than ordinary quoted strings. Dynamic
+eligibility-table matching expects an unquoted literal immediately after the DML prefix and does
+not recognize `DELETE FROM ONLY`.
