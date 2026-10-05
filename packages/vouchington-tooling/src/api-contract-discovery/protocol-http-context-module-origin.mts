@@ -11,6 +11,27 @@ export function contextModuleOrigin(
   const symbol = binding.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(binding) : binding
   if (symbol.flags & ts.SymbolFlags.Module) return symbol
   const declaration = symbol.valueDeclaration
+  if (declaration && ts.isParameter(declaration) && ts.isIdentifier(declaration.name)) {
+    const fn = declaration.parent
+    const call = fn.parent
+    if (
+      (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
+      ts.isCallExpression(call) &&
+      call.arguments[0] === fn &&
+      fn.parameters[0] === declaration &&
+      ts.isPropertyAccessExpression(call.expression) &&
+      call.expression.name.text === 'then'
+    ) {
+      const imported = unwrapTransparentExpression(call.expression.expression)
+      if (
+        ts.isCallExpression(imported) &&
+        imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        imported.arguments[0] &&
+        ts.isStringLiteral(imported.arguments[0])
+      )
+        return checker.getSymbolAtLocation(imported.arguments[0])
+    }
+  }
   if (
     !declaration ||
     !ts.isVariableDeclaration(declaration) ||

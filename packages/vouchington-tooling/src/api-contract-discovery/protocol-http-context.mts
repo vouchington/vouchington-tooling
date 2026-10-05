@@ -119,3 +119,32 @@ export function opaqueHttpContextConstruction(
     !!node.arguments?.some((argument) => httpContextArgument(argument, context, checker))
   )
 }
+
+/** Literal containers expose a selected context even when a foreign parameter is not direct. */
+export function wrappedHttpContextArgument(
+  expression: ts.Expression,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+): boolean {
+  const value = unwrapExpression(expression)
+  if (ts.isSpreadElement(value))
+    return (
+      httpContextArgument(value.expression, context, checker) ||
+      wrappedHttpContextArgument(value.expression, context, checker)
+    )
+  if (!(ts.isObjectLiteralExpression(value) || ts.isArrayLiteralExpression(value))) return false
+  let found = false
+  function visit(node: ts.Node) {
+    if (ts.isFunctionLike(node)) return
+    if (ts.isShorthandPropertyAssignment(node)) {
+      if (checker.getShorthandAssignmentValueSymbol(node) === context) found = true
+    } else if (ts.isExpression(node) && httpContextArgument(node, context, checker)) {
+      found = true
+      return
+    }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) return
+    ts.forEachChild(node, visit)
+  }
+  visit(value)
+  return found
+}
