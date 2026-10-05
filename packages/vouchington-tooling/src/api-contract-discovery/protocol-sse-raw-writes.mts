@@ -37,21 +37,26 @@ export function rejectRawSseWrites(
   bindings: HandlerBindings,
   framedWrites: ReadonlySet<ts.CallExpression>,
   routes: ReadonlyMap<string, SseRouteWrites>,
-  reject: (node: ts.CallExpression, binding: RouteBinding, keys: readonly string[]) => void,
+  reject: (
+    node: ts.CallExpression | ts.NewExpression,
+    binding: RouteBinding,
+    keys: readonly string[],
+  ) => void,
 ): void {
   if (routes.size === 0) return
 
-  const calls: ts.CallExpression[] = []
+  const invocations: (ts.CallExpression | ts.NewExpression)[] = []
   const mutations: SseWriteMutation[] = []
   for (const file of files)
     visit(file, (node) => {
-      if (ts.isCallExpression(node)) calls.push(node)
+      if (ts.isCallExpression(node) || ts.isNewExpression(node)) invocations.push(node)
       const mutation = sseWriteMutation(node)
       if (mutation) mutations.push(mutation)
     })
-  const lookup = createSseWriteLookup(calls, checker, bindings)
-  for (const node of calls) {
-    if (framedWrites.has(node)) {
+  const calls = invocations.filter(ts.isCallExpression)
+  const lookup = createSseWriteLookup(calls, checker, bindings, files)
+  for (const node of invocations) {
+    if (ts.isCallExpression(node) && framedWrites.has(node)) {
       const binding = enclosingRouteBinding(node, checker, bindings, false)
       const route = binding && routes.get(routeKey(binding))
       const source = node.getSourceFile()
@@ -88,7 +93,7 @@ export function rejectRawSseWrites(
         reject(node, binding, route.keys)
       continue
     }
-    const access = sseWriteInvocation(node, checker)
+    const access = ts.isCallExpression(node) ? sseWriteInvocation(node, checker) : undefined
     if (!potentiallyExecuted(node)) continue
     const proven =
       executableProtocolPath(node, checker) || opaqueProtocolCallbackPath(node, checker)
@@ -104,7 +109,7 @@ export function rejectRawSseWrites(
       const framed = route.receivers.flatMap((value) =>
         actualReceivers(value, candidate, checker, lookup),
       )
-      const bound = writeAccess(node.expression)
+      const bound = ts.isCallExpression(node) ? writeAccess(node.expression) : undefined
       const boundReceiver = bound?.method === 'bind' && expressionReceiver(bound.receiver, checker)
       const boundActual = boundReceiver
         ? actualReceivers(boundReceiver, candidate, checker, lookup)
