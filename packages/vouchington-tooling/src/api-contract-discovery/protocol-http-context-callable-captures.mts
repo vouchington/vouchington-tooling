@@ -16,12 +16,13 @@ import {
 
 /** Foreign callable consumers retain literal callbacks that capture the selected context. */
 export function opaqueWrappedHttpContextArgument(
-  call: ts.CallExpression,
+  call: { expression: ts.Expression; arguments: readonly ts.Expression[] },
   context: ts.Symbol,
   checker: ts.TypeChecker,
   resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
   env: CallbackBindings,
   safeCapture: (fn: ts.FunctionLikeDeclaration) => boolean,
+  argumentOffset = 0,
 ): boolean {
   if (call.arguments.some((argument) => wrappedHttpContextArgument(argument, context, checker)))
     return true
@@ -68,7 +69,7 @@ export function opaqueWrappedHttpContextArgument(
   if (!target || !isProtocolCallbackFunction(target) || !target.body) return true
   const parameters = runtimeParameters(target)
   return indices.some((index) => {
-    const parameter = parameters[index]
+    const parameter = parameters[index + argumentOffset]
     if (!parameter || !ts.isIdentifier(parameter.name) || parameter.dotDotDotToken) return true
     const symbol = checker.getSymbolAtLocation(parameter.name)
     let used = false
@@ -83,4 +84,27 @@ export function opaqueWrappedHttpContextArgument(
     visit(target.body!)
     return used
   })
+}
+
+/** Tags have a template-string argument before the actual substitution expressions. */
+export function opaqueWrappedHttpContextTag(
+  tag: ts.TaggedTemplateExpression,
+  context: ts.Symbol,
+  checker: ts.TypeChecker,
+  resolver: ReturnType<typeof createProtocolCallbackValueResolver>,
+  env: CallbackBindings,
+  safeCapture: (fn: ts.FunctionLikeDeclaration) => boolean,
+): boolean {
+  return (
+    ts.isTemplateExpression(tag.template) &&
+    opaqueWrappedHttpContextArgument(
+      { expression: tag.tag, arguments: tag.template.templateSpans.map((span) => span.expression) },
+      context,
+      checker,
+      resolver,
+      env,
+      safeCapture,
+      1,
+    )
+  )
 }

@@ -7,6 +7,10 @@ import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { contextResponseMethod, methodAccess } from './protocol-http-method-access.mts'
 import { reflectHttpResponseMethod } from './protocol-http-reflect.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
+import {
+  contextLiteralBinding,
+  constructedContextCapture,
+} from './protocol-http-context-literal-captures.mts'
 import { contextResultBranches } from './protocol-http-context-result-branches.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 export { contextResponseMethod } from './protocol-http-method-access.mts'
@@ -98,14 +102,18 @@ export function httpContextArgument(
   expression: ts.Expression,
   context: ts.Symbol,
   checker: ts.TypeChecker,
+  seen = new Set<ts.Node>(),
 ): boolean {
+  if (seen.has(expression)) return false
+  const next = new Set(seen).add(expression)
+  const literal = contextLiteralBinding(unwrapExpression(expression), checker)
+  if (literal) return httpContextArgument(literal, context, checker, next)
   const branches = contextResultBranches(unwrapExpression(expression))
-  if (branches.length) return branches.some((value) => httpContextArgument(value, context, checker))
+  if (branches.length)
+    return branches.some((value) => httpContextArgument(value, context, checker, next))
   const receiver = expressionReceiver(expression, checker)
   return (
-    (receiver?.root === context &&
-      (receiver.path.length === 0 ||
-        (receiver.path.length === 1 && receiver.path[0] === 'response'))) ||
+    (receiver?.root === context && ['', 'response'].includes(receiver.path.join('.'))) ||
     contextResponseMethod(unwrapExpression(expression), context, checker, true) === 'response'
   )
 }
@@ -120,11 +128,18 @@ export function opaqueHttpContextConstruction(
   return (
     ts.isNewExpression(node) &&
     executableProtocolPath(node, checker, boundHandler) &&
-    !!node.arguments?.some(
+    (!!node.arguments?.some(
       (argument) =>
         httpContextArgument(argument, context, checker) ||
         wrappedHttpContextArgument(argument, context, checker),
-    )
+    ) ||
+      constructedContextCapture(
+        node,
+        checker,
+        (value) =>
+          httpContextArgument(value, context, checker) ||
+          wrappedHttpContextArgument(value, context, checker),
+      ))
   )
 }
 
