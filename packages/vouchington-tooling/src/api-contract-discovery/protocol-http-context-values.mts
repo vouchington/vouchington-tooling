@@ -24,7 +24,9 @@ export function createHttpContextValueResolver(checker: ts.TypeChecker) {
     if (!stable(target)) return undefined
     const bound = env.get(target)
     if (bound) return resolve(bound.node, bound.env, seen)
-    const node = target.valueDeclaration!
+    const node =
+      target.declarations?.find((node) => isProtocolCallbackFunction(node) && node.body) ??
+      target.valueDeclaration!
     if (seen.has(node)) return undefined
     if (isProtocolCallbackFunction(node) && node.body) return [{ node, env }]
     if (
