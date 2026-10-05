@@ -8,11 +8,15 @@ GitHub Actions policy checks and compiler host freshness with bounded build sett
 [`config-inventory`](../../docs/config-inventory.md) collects environment, dynamic-configuration,
 and package-manager evidence using caller-owned file roles and policies.
 
+[`finite-enum-ripple`](../../docs/finite-enum-ripple.md) compares finite TypeScript declarations,
+route configuration, routed pages, and factory calls. Consumers supply every tracked-file role,
+declaration name, route label, factory pattern, and exception.
+
 ```bash
 npm install vouchington-tooling
 # optional, only if you import vouchington-tooling/sql-ast
 npm install @libpg-query/parser
-# optional, only if you import vouchington-tooling/contract-schema
+# optional, if you import vouchington-tooling/contract-schema or finite-enum-ripple
 # (classic compiler API; typescript@7's package root is version-only)
 npm install @typescript/typescript6
 # optional, only if you use the Vitest reporter export

@@ -341,6 +341,11 @@
       "types": "./dist/basic-auth-doc-sync/runbook.d.mts",
       "import": "./dist/basic-auth-doc-sync/runbook.mjs",
       "default": "./dist/basic-auth-doc-sync/runbook.mjs"
+    },
+    "./finite-enum-ripple": {
+      "types": "./dist/finite-enum-ripple/index.d.mts",
+      "import": "./dist/finite-enum-ripple/index.mjs",
+      "default": "./dist/finite-enum-ripple/index.mjs"
     }
   },
   "publishConfig": {
