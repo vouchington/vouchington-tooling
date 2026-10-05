@@ -14,7 +14,10 @@ import {
   type WriteReceiver,
 } from './protocol-write-receiver.mts'
 
-function selectedStreamHasFreshOrigin(receiver: WriteReceiver, checker: ts.TypeChecker): boolean {
+export function selectedStreamHasFreshOrigin(
+  receiver: WriteReceiver,
+  checker: ts.TypeChecker,
+): boolean {
   if (ownerHasFreshAllocation(receiver, checker)) return true
   const declaration = receiver.root.valueDeclaration
   return (

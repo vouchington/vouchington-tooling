@@ -12,7 +12,10 @@ import {
 } from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
-import { opaqueArgumentExcludesSelectedStream } from './protocol-sse-opaque-identity.mts'
+import {
+  opaqueArgumentExcludesSelectedStream,
+  selectedStreamHasFreshOrigin,
+} from './protocol-sse-opaque-identity.mts'
 import type { RouteBinding } from './response-contract-route-analysis.mts'
 import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
 type SseWriteLookup = {
@@ -62,7 +65,8 @@ export function opaqueCallReceivesSelectedStream(
           )
         )
           return true
-        if (callback && selectedSseOriginUnexposed(framed, checker)) return false
+        if (callback && selectedSseOriginUnexposed(framed, checker, selectedStreamHasFreshOrigin))
+          return false
         const receiver = expressionReceiver(leaf, checker)
 
         if (!receiver) return false

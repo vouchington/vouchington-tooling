@@ -65,9 +65,9 @@ export function containsSelectedSseOrigin(
 export function selectedSseOriginUnexposed(
   selected: readonly WriteReceiver[],
   checker: ts.TypeChecker,
+  freshlyAllocated: typeof ownerHasFreshAllocation = ownerHasFreshAllocation,
 ): boolean {
-  if (!selected.length || selected.some((frame) => !ownerHasFreshAllocation(frame, checker)))
-    return false
+  if (!selected.length || selected.some((frame) => !freshlyAllocated(frame, checker))) return false
   const sources = new Set(
     selected.flatMap((frame) =>
       frame.root.valueDeclaration ? [frame.root.valueDeclaration.getSourceFile()] : [],
