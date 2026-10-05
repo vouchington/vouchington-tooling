@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import type { ProtocolCache } from './protocol-analysis-cache.mts'
 import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { registeredHandler } from './protocol-callback-registration.mts'
@@ -6,14 +7,25 @@ import { executableProtocolPath } from './protocol-execution-path.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 
 /** Use the same actual invocation sites for context admission and caller emission coverage. */
-export function httpContextInvocations(fn: ts.FunctionLikeDeclaration, checker: ts.TypeChecker) {
+export function httpContextInvocations(
+  fn: ts.FunctionLikeDeclaration,
+  checker: ts.TypeChecker,
+  cache?: ProtocolCache,
+) {
   const resolver = createProtocolCallbackValueResolver(checker)
-  const calls: ts.CallExpression[] = []
-  function visit(node: ts.Node) {
-    if (ts.isCallExpression(node) && executableProtocolPath(node, checker)) calls.push(node)
-    ts.forEachChild(node, visit)
+  const sourceFile = fn.getSourceFile()
+  let calls = cache?.calls.get(sourceFile)
+  if (!calls) {
+    const found: ts.CallExpression[] = []
+    const visit = (node: ts.Node) => {
+      if (ts.isCallExpression(node) && executableProtocolPath(node, checker, undefined, cache))
+        found.push(node)
+      ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    calls = found
+    cache?.calls.set(sourceFile, calls)
   }
-  visit(fn.getSourceFile())
   const registered = calls.some(
     (call) =>
       registeredHandler(call) &&

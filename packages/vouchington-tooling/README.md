@@ -500,6 +500,117 @@ otherwise `required: false`. `required` must be the literal `true`; `false`, `bo
 non-literal values fail as a malformed query parameter, as do `required` together with `default` and
 `required` on `csv-array` `items`.
 
+`discoverRequestValidationFacts({ program, sourceFiles, validators, factories, executedCallbacks })`
+reports, per registered route (`METHOD:/template`), the route `kind` and `source`, every configured
+validator call its handlers reach (`validatorSites`), every configured handler-factory call
+(`factorySites`), and the raw request carriers the handlers read (`carrierReads`). It reports
+facts only; which routes must validate and what counts as covered stay with the caller.
+
+```ts
+import { discoverRequestValidationFacts } from 'vouchington-tooling/api-contract-discovery'
+
+const facts = discoverRequestValidationFacts({
+  program,
+  sourceFiles,
+  validators: [
+    {
+      module: 'lib/validation.ts', // resolved declaration path suffix, or a package specifier
+      exportName: 'validateInput',
+      operationArgument: 1,
+      carriers: { kind: 'input-object', argument: 2 }, // or { kind: 'fixed', carriers, optionCarriers }
+    },
+  ],
+  factories: [
+    {
+      module: 'lib/factory.ts',
+      exportName: 'createThingHandler',
+      optionsArgument: 0,
+      operationProperty: 'operation',
+      carriers: ['path', 'body'],
+    },
+  ],
+  executedCallbacks: [
+    {
+      module: 'lib/admit.ts',
+      exportName: 'admitWork',
+      argument: 0,
+      properties: ['beforeCapacity'],
+    },
+  ],
+})
+```
+
+A call matches only when its callee resolves, through aliases, re-exports and path mappings, to the
+configured export of a declaration file matching `module` (`.d.ts`, `.d.mts` and `.d.cts` suffixes
+are ignored when comparing, and the configured `module` may be written with or without a `.ts`,
+`.mts`, `.cts`, `.js`, `.mjs` or `.cjs` extension, so `lib/validation.js` matches `lib/validation.ts`
+and `lib/validation.d.ts`); import specifier text and same-named local functions never match.
+Operation keys resolve through literals, `const`s (including imported ones), `as const`,
+`satisfies`, helper parameters bound to static arguments, and, for factories, the option property
+including spread `const` objects; anything else, including a name with no symbol, gives
+`operation: null` with `unresolvedReason`. Each validated carrier reports `origins`, the request
+carriers (`path`, `query`, `body`, `header`) its value derives from, traced through calls, followed
+helper returns, branches, logical operands, spreads and earlier assignments; `unresolved` is set
+when part of the value depends on an unbound parameter. An unconditional reassignment of the
+identifier itself earlier in the same function body (not inside a branch, loop or `try`) replaces
+the earlier origins, conditional reassignments merge, and property writes such as `x.limit = n`
+always add; an assignment on a statically dead path (`if (false)`) is ignored. A destructured
+local traces only the property or element it binds (`const { chosen } = pair`), resolved through
+object and array literals, `const`s and followed helper returns (also awaited), and falls back to the
+whole initializer when it cannot be selected (rest, computed key, spread, unknown source).
+A destructured handler context parameter (`({ query, params, request }) => ...`) binds each member
+to its carrier. A helper parameter that is reassigned is not trusted as the bound operation key:
+only a lone unconditional reassignment is used, anything else gives `operation: null`.
+Generator functions are not followed, because calling one does not run its body.
+Fixed-carrier validators report the carrier itself as their origin.
+
+An input-object validator's input is resolved through `const` objects and spreads with
+last-write-wins semantics, like the factory option resolver. When it cannot be fully resolved (a
+non-literal input, a spread of something that is not a resolvable `const` object, a cyclic spread,
+or a computed property name), `carriers` lists what was found and the site sets
+`unresolvedCarriers` to the reason, so a consumer must not treat `carriers` as complete. A `const`
+object (input or factory options) with a property write before the use (`o.p = x`, `o[k] = x`,
+`delete o.p`, `o.n++`, `Object.assign(o, ...)`) is unresolvable too, and a factory then reports
+`operation: null`.
+
+`conditional` is true under `if`/ternary branches, the right of `&&`/`||`/`??`, `switch` cases,
+loop bodies, `catch` and `finally`. Handlers are walked into function declarations and `const`
+function expressions in `sourceFiles`, and only through bindings that are never reassigned (`let`
+and reassigned bindings are not trusted as handlers). A callback passed to a followed helper is
+followed only when the helper runs it, and is conditional unless it is invoked directly from the
+helper's own body outside any condition. Known limit: the invocations of an inline callback are
+found only in the callback's own source file, so a callback passed to a helper declared in another
+file (`withTx(ctx, async () => { validateInput(...) })`) is not walked. Inline callback properties of an `executedCallbacks` host,
+written as identifiers or string literals, are walked as executed and take only the condition of
+the call to the configured host, never how its implementation invokes them. Configured validator
+and factory implementations are never entered, but their callee and arguments are still walked for
+nested validator sites and reads; only reads that build a validator's input are left out, including
+reads inside a followed helper that only prepares that input. Validators evaluated while a handler is
+built (registration time) are not sites: only the walk of the handler reports validators. A handler a
+helper returns under a runtime branch (`if (flag) return ctx => ...`) reports `conditional: true`. Factory
+sites are reported for factory calls whose returned handler is a registration-time value (a route
+registration argument, a module `const` used as one, or a helper-returned handler); a factory call
+inside a handler body, such as a discarded `createThingHandler(options);`, is not a factory site.
+A factory site is also found through a module `const` initialized by a factory call that a handler
+calls (`const handler = createThingHandler({...})`, then `handler(ctx)`). Like validator sites,
+`FactorySite.conditional` is true when the site is reached only under a condition, and a site
+reached both ways is reported unconditional. A template-literal operation key folds to a string
+when every substitution resolves (literals, `const`s, bound parameters); otherwise it is `null`.
+
+Pass the `program` you already built: the function uses it as given and never builds its own.
+Helpers are followed only within `sourceFiles`, so pass every file that declares a followed helper,
+not just the route files; a helper declared elsewhere is not entered, which silently yields empty
+`origins` rather than an error. An omitted optional or defaulted helper argument contributes no
+origin and is not `unresolved`; an omitted required argument is `unresolved`. Per-call caches make
+repeated helpers cheap, so a 700-route program completes in seconds once the program exists.
+
+Each `carrierReads` entry has `access`: `key` for a static key (`ctx.query.limit`, destructured
+names, a resolvable `ctx.query[name]`), `computed` for a non-static key (`ctx.query[name]`, a
+computed destructuring key; `key: null`), and `whole` for the carrier used as a value
+(`consume(ctx.query)`, `{ ...ctx.params }`, `return ctx.headers`, a rest element) or a body read
+such as `ctx.request.json()` (`key: null`). A `const` alias of a carrier is not itself a read; its
+uses are.
+
 Version one recognizes literal-key `apiResponse`, `apiNoContent`, `apiOpenApiRawResponse`,
 `apiRequest`, `apiRequestContract`, `apiNoRequestBody`, `apiQuery`, and `apiHeaders` markers inside
 `app.route(...).get/post/put/patch/delete(...)` handlers. It also inspects unmarked `ctx.json`,
