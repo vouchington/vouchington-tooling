@@ -134,6 +134,10 @@ export function propertyImplementationSymbol(
     const name = property.name!
     return objectLiteralPropertyName(name) === access.name.text
   })
+  if (implementation && ts.isPropertyAssignment(implementation)) {
+    const value = unwrapTransparentExpression(implementation.initializer)
+    if (ts.isIdentifier(value)) return checker.getSymbolAtLocation(value)
+  }
   return implementation?.name && checker.getSymbolAtLocation(implementation.name)
 }
 

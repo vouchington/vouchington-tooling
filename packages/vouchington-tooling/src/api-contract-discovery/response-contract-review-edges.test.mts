@@ -120,6 +120,14 @@ const sources = {
     app.route('/a').post(handlers.send)
     app.route('/b').post(handlers.send)
   `,
+  'identifier-valued-property-handler': `
+    declare const app: any
+    function send(ctx: any) { ctx.json({ shared: true }) }
+    const alias = send
+    const handlers = { handler: alias }
+    app.route('/a').post(handlers.handler)
+    app.route('/b').post(handlers.handler)
+  `,
   'dynamic-computed-property-handler': `
     declare const app: any
     declare const handlerName: string
@@ -310,15 +318,16 @@ it('fails closed for polymorphic class receivers outside object-literal resoluti
   expect(discover('polymorphic-class-property-handler').facts).toEqual([])
 })
 
-it.each(['property-handler-alias', 'computed-property-handler'] as const)(
-  'resolves %s to its object-literal implementation',
-  (sourceId) => {
-    const { facts } = discover(sourceId)
-    expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
-      { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
-    ])
-  },
-)
+it.each([
+  'property-handler-alias',
+  'computed-property-handler',
+  'identifier-valued-property-handler',
+] as const)('resolves %s to its object-literal implementation', (sourceId) => {
+  const { facts } = discover(sourceId)
+  expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
+    { label: 'ctx.json()', routes: ['POST:/a', 'POST:/b'] },
+  ])
+})
 
 it('keeps a dynamic object property name on the contextual symbol fallback', () => {
   expect(discover('dynamic-computed-property-handler').facts).toEqual([])
