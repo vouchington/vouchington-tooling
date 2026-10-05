@@ -643,6 +643,11 @@ Broad names, unknown root payloads, executable unmarked frames through stream al
 conditional or mutable-context status changes fail closed. Called SSE helpers inherit the proven
 request context and its status at the invocation; mutually exclusive complete status branches retain
 their separate responses. Explicit SSE statuses must be integers from 100 through 599.
+Temporal exclusion requires a fresh Node PassThrough or a local, constructorless class without
+heritage, ambient declarations, or decorators. The owner allocation must occur later in the same
+function outside loops. Arguments that capture the owner or reference local callables or locally
+created containers remain unknown, including callbacks retained for later invocation; generator
+callbacks are never independent origins.
 Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
 Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assuming status 200.
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
