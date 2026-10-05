@@ -82,7 +82,12 @@ export function optionalTrueLiteral(
   fail: (detail: string) => never,
 ): boolean {
   const property = type.getProperty(name)
-  if (!property) return false
+  if (!property) {
+    if (type.isUnion() && type.types.some((member) => member.getProperty(name))) {
+      return fail(`${name} must be present on every union member`)
+    }
+    return false
+  }
   if (property.flags & ts.SymbolFlags.Optional) return fail(`${name} must be literal when present`)
   const location = property.valueDeclaration ?? property.declarations?.[0] ?? node
   const value = checker.getTypeOfSymbolAtLocation(property, location)
