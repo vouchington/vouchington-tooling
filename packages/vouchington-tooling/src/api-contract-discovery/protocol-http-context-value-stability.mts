@@ -81,6 +81,10 @@ export function createContextValueStability(
     if (hit !== undefined) return hit
     const declaration = symbol.valueDeclaration
     if (!declaration || active.has(symbol)) return false
+    if (declaration.getSourceFile().isDeclarationFile) {
+      cache.set(symbol, false)
+      return false
+    }
     const next = new Set(active).add(symbol)
     const allData = consumerSources(declaration.getSourceFile()).map(facts)
     const value =
