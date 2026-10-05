@@ -17,6 +17,7 @@ import {
 } from './protocol-http-context-bound-nodes.mts'
 import { createContextAccountedEmissionProof } from './protocol-http-context-accounted-emissions.mts'
 import { contextCallbackExecutionRoots } from './protocol-http-context-parameter-initializers.mts'
+import { createContextForwardedArguments } from './protocol-http-context-forwarded-target.mts'
 import { opaqueWrappedHttpContextArgument } from './protocol-http-context-callable-captures.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
@@ -30,8 +31,9 @@ export function opaqueHttpContextArgument(
   proof = createHttpContextValueResolver(checker),
   root = call,
 ): boolean {
+  const arguments_ = createContextForwardedArguments(checker)(call)
   const matches = (symbol: ts.Symbol) =>
-    call.arguments.some((argument) => httpContextArgument(argument, symbol, checker))
+    arguments_.some((argument) => httpContextArgument(argument, symbol, checker))
   if (
     !(
       executableProtocolPath(call, checker, boundHandler) ||
