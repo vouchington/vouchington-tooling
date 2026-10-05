@@ -1,19 +1,18 @@
 import ts from '../contract-schema/typescript-api.mts'
 
 import { executableProtocolPath } from './protocol-execution-path.mts'
-import { propertyImplementationSymbol } from './response-contract-symbols.mts'
+import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
+import { propertyImplementationSymbol } from './response-contract-object-symbols.mts'
 import {
-  propertyName,
-  routeTemplateFromExpression,
+  isInlineRouteHandler,
   unwrapTransparentExpression,
 } from './response-contract-route-syntax.mts'
-
-const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 
 export function handlerArgumentSymbols(
   node: ts.CallExpression,
   checker: ts.TypeChecker,
   unwrapArguments = false,
+  mutatedProperties?: ReadonlySet<ts.Symbol>,
 ): ts.Symbol[] {
   const symbols: ts.Symbol[] = []
   for (const originalArgument of node.arguments) {
@@ -35,11 +34,25 @@ export function handlerArgumentSymbols(
       const callee = unwrapArguments
         ? unwrapTransparentExpression(child.expression)
         : child.expression
+      if (isMutatedPropertyAccess(callee, checker, mutatedProperties)) return
       const symbol = handlerSymbol(callee, checker, unwrapArguments)
       if (symbol) symbols.push(symbol)
     })
   }
   return symbols
+}
+
+function isMutatedPropertyAccess(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+  mutatedProperties: ReadonlySet<ts.Symbol> | undefined,
+): boolean {
+  if (!mutatedProperties || !ts.isPropertyAccessExpression(expression)) return false
+  const contextual = checker.getSymbolAtLocation(expression.name)
+  return (
+    !!contextual &&
+    mutatedProperties.has(attributionSymbol(resolveSymbol(contextual, checker), checker))
+  )
 }
 
 function handlerSymbol(
@@ -59,7 +72,7 @@ function visitHandlerCalls(
   attributeNestedCalls: boolean,
   onCall: (node: ts.CallExpression) => void,
 ): void {
-  if (node !== root && isRouteHandlerFunction(node)) return
+  if (node !== root && isInlineRouteHandler(node)) return
   const callee = ts.isCallExpression(node)
     ? attributeNestedCalls
       ? unwrapTransparentExpression(node.expression)
@@ -74,14 +87,6 @@ function visitHandlerCalls(
     onCall(node)
   ts.forEachChild(node, (child) =>
     visitHandlerCalls(child, root, checker, attributeNestedCalls, onCall),
-  )
-}
-
-function isRouteHandlerFunction(node: ts.Node): boolean {
-  if (!isFunctionLike(node) || !ts.isCallExpression(node.parent)) return false
-  const method = propertyName(node.parent.expression)?.toUpperCase()
-  return (
-    !!method && HTTP_METHODS.has(method) && !!routeTemplateFromExpression(node.parent.expression)
   )
 }
 

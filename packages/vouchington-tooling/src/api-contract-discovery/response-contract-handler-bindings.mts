@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 
+import { executableProtocolPath } from './protocol-execution-path.mts'
 import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import {
   findMutatedBindings,
@@ -7,19 +8,21 @@ import {
 } from './response-contract-property-mutations.mts'
 import { handlerArgumentSymbols } from './response-contract-handler-calls.mts'
 import {
+  HTTP_METHODS,
   propertyName,
   routeTemplateFromExpression,
   unwrapTransparentExpression,
   visit,
 } from './response-contract-route-syntax.mts'
-import { propertyImplementationSymbol } from './response-contract-symbols.mts'
+import {
+  destructuredPropertyImplementationSymbol,
+  propertyImplementationSymbol,
+} from './response-contract-object-symbols.mts'
 import type {
   AmbiguousHandlerBindings,
   HandlerBindings,
   RouteBinding,
 } from './response-contract-route-analysis.mts'
-
-const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 
 export function collectHandlerBindings(
   sourceFiles: readonly ts.SourceFile[],
@@ -35,6 +38,7 @@ export function collectHandlerBindings(
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
       if (!ts.isCallExpression(node)) return
+      if (!executableProtocolPath(node, checker)) return
       const method = propertyName(node.expression)?.toUpperCase()
       if (!method || !HTTP_METHODS.has(method)) return
       const routeTemplate = routeTemplateFromExpression(node.expression)
@@ -47,7 +51,7 @@ export function collectHandlerBindings(
         bindingsBySymbol.set(resolved, candidates)
       }
       if (ambiguousBindings) {
-        for (const symbol of handlerArgumentSymbols(node, checker, true)) {
+        for (const symbol of handlerArgumentSymbols(node, checker, true, mutatedProperties)) {
           const propertySymbol = attributionSymbol(resolveSymbol(symbol, checker), checker)
           if (mutatedProperties?.has(propertySymbol)) continue
           const handlerSymbol = resolveHandlerSymbol(symbol, checker)
@@ -100,6 +104,12 @@ function resolveHandlerSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
   while (!seen.has(current)) {
     seen.add(current)
     const declaration = current.valueDeclaration
+    if (declaration && ts.isBindingElement(declaration)) {
+      const value = destructuredPropertyImplementationSymbol(declaration, checker)
+      if (!value) return current
+      current = resolveSymbol(value, checker)
+      continue
+    }
     if (declaration && ts.isShorthandPropertyAssignment(declaration)) {
       const value = checker.getShorthandAssignmentValueSymbol(declaration)
       if (!value) return current

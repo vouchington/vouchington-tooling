@@ -112,7 +112,7 @@ export function discoverApiResponseContracts(
       if (!ts.isCallExpression(node)) return
       const callLabel = implicitResponseCallLabel(node)
       if (options?.onAmbiguousAttribution) {
-        const attributionLabel = implicitResponseCallLabel(node, true)
+        const attributionLabel = implicitResponseCallLabel(node, true, checker)
         const routes = attributionLabel
           ? ambiguousBindings &&
             ambiguousRoutesForCall(node, checker, handlerBindings, ambiguousBindings)

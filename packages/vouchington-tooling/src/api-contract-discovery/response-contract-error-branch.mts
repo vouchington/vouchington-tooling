@@ -20,6 +20,7 @@ import { responseBodyExpression } from './response-contract-registration.mts'
 export function isInErrorBranch(
   call: ts.CallExpression,
   excludeDynamicErrorObjects = false,
+  checker?: ts.TypeChecker,
 ): boolean {
   let statement: ts.Node = call
   while (!ts.isStatement(statement)) statement = statement.parent
@@ -27,7 +28,7 @@ export function isInErrorBranch(
   const latestStatus = latestStatusSetter(statement)
   if (!latestStatus) return false
   if (isBareErrorStatusStatement(latestStatus, true)) return true
-  return isErrorObjectJson(call) && isDynamicStatusStatement(latestStatus)
+  return isErrorObjectJson(call, checker) && isDynamicStatusStatement(latestStatus)
 }
 
 /**
@@ -70,15 +71,10 @@ function latestStatusSetter(statement: ts.Statement): StatusSetterStatement | un
 
 function mayConditionallySetStatus(statement: ts.Statement): boolean {
   if (
-    !ts.isIfStatement(statement) &&
-    !ts.isSwitchStatement(statement) &&
-    !ts.isTryStatement(statement) &&
-    !ts.isForStatement(statement) &&
-    !ts.isForInStatement(statement) &&
-    !ts.isForOfStatement(statement) &&
-    !ts.isWhileStatement(statement) &&
-    !ts.isDoStatement(statement) &&
-    !ts.isExpressionStatement(statement)
+    ts.isFunctionDeclaration(statement) ||
+    ts.isInterfaceDeclaration(statement) ||
+    ts.isTypeAliasDeclaration(statement) ||
+    ts.isImportDeclaration(statement)
   )
     return false
   let found = false
@@ -116,9 +112,9 @@ function isDynamicStatusStatement(statement: StatusSetterStatement): boolean {
   return !!status && !ts.isNumericLiteral(unwrapTransparentExpression(status))
 }
 
-function isErrorObjectJson(call: ts.CallExpression): boolean {
+function isErrorObjectJson(call: ts.CallExpression, checker?: ts.TypeChecker): boolean {
   const body = responseBodyExpression(call, true)
-  const errorObject = body && unwrapTransparentExpression(body)
+  const errorObject = body && resolveConstObjectAlias(unwrapTransparentExpression(body), checker)
   return (
     !!errorObject &&
     ts.isObjectLiteralExpression(errorObject) &&
@@ -131,6 +127,31 @@ function isErrorObjectJson(call: ts.CallExpression): boolean {
       const key = unwrapTransparentExpression(name.expression)
       return ts.isStringLiteral(key) && key.text === 'error'
     })
+  )
+}
+
+function resolveConstObjectAlias(
+  expression: ts.Expression,
+  checker: ts.TypeChecker | undefined,
+  seen = new Set<ts.Symbol>(),
+): ts.Expression {
+  if (!checker || !ts.isIdentifier(expression)) return expression
+  const symbol = checker.getSymbolAtLocation(expression)
+  if (!symbol || seen.has(symbol)) return expression
+  seen.add(symbol)
+  const declaration = symbol.valueDeclaration
+  if (
+    !declaration ||
+    !ts.isVariableDeclaration(declaration) ||
+    !declaration.initializer ||
+    !ts.isVariableDeclarationList(declaration.parent) ||
+    !(declaration.parent.flags & ts.NodeFlags.Const)
+  )
+    return expression
+  return resolveConstObjectAlias(
+    unwrapTransparentExpression(declaration.initializer),
+    checker,
+    seen,
   )
 }
 

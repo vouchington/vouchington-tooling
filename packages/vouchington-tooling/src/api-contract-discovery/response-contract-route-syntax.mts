@@ -1,5 +1,19 @@
 import ts from '../contract-schema/typescript-api.mts'
 
+export const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+
+export function isInlineRouteHandler(node: ts.Node): boolean {
+  if (
+    (!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) ||
+    !ts.isCallExpression(node.parent)
+  )
+    return false
+  const method = propertyName(node.parent.expression)?.toUpperCase()
+  return (
+    !!method && HTTP_METHODS.has(method) && !!routeTemplateFromExpression(node.parent.expression)
+  )
+}
+
 export function routeTemplateFromExpression(expression: ts.Expression): string | undefined {
   if (!ts.isPropertyAccessExpression(expression)) return undefined
   return findRouteCall(expression.expression)

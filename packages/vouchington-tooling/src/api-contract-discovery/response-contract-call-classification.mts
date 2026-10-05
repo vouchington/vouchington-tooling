@@ -20,13 +20,16 @@ export type ImplicitResponseCallLabel =
 export function implicitResponseCallLabel(
   call: ts.CallExpression,
   excludeDynamicErrorObjects = false,
+  checker?: ts.TypeChecker,
 ): ImplicitResponseCallLabel | undefined {
   if (isContextMethod(call.expression, 'json')) {
-    if (!call.arguments[0] || isInErrorBranch(call, excludeDynamicErrorObjects)) return undefined
+    if (!call.arguments[0] || isInErrorBranch(call, excludeDynamicErrorObjects, checker))
+      return undefined
     return 'ctx.json()'
   }
   if (isStreamJsonPipeline(call, excludeDynamicErrorObjects))
-    return isInErrorBranch(call, excludeDynamicErrorObjects) ? undefined : 'ctx.pipeline()'
+    return isInErrorBranch(call, excludeDynamicErrorObjects, checker) ? undefined : 'ctx.pipeline()'
+  if (excludeDynamicErrorObjects && isInErrorBranch(call, true, checker)) return undefined
   if (isXmlResponseCall(call)) return call.arguments[0] ? 'ctx.response.xml()' : undefined
   if (isContextResponseBufferCall(call.expression)) return 'ctx.response.buffer()'
   if (isContextResponseEmptyCall(call.expression)) return 'ctx.response.empty()'

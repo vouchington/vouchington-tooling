@@ -1,7 +1,11 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { functionSymbol, resolveSymbol } from './response-contract-symbols.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
-import { propertyName, routeTemplateFromExpression } from './response-contract-route-syntax.mts'
+import {
+  HTTP_METHODS,
+  propertyName,
+  routeTemplateFromExpression,
+} from './response-contract-route-syntax.mts'
 
 export { collectHandlerBindings } from './response-contract-handler-bindings.mts'
 export {
@@ -24,8 +28,6 @@ export type RouteBinding = {
 
 export type HandlerBindings = Map<ts.Symbol, RouteBinding>
 export type AmbiguousHandlerBindings = Map<ts.Symbol, readonly string[]>
-
-const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 
 export function requestedKeyForBinding(
   binding: RouteBinding,

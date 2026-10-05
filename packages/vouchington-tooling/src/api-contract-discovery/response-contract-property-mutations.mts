@@ -1,10 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 
-import {
-  attributionSymbol,
-  propertyImplementationSymbol,
-  resolveSymbol,
-} from './response-contract-symbols.mts'
+import { attributionSymbol, resolveSymbol } from './response-contract-symbols.mts'
+import { propertyImplementationSymbol } from './response-contract-object-symbols.mts'
 import { unwrapTransparentExpression, visit } from './response-contract-route-syntax.mts'
 
 /** Direct syntactic property writes are excluded; indirect mutation is outside this proof. */
