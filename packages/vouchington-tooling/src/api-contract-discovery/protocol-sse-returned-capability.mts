@@ -10,7 +10,7 @@ import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 
 /** Concrete helper results retain caller-bound selected arguments and constant local aliases. */
 function returnedSseCapability(
-  call: ts.CallExpression,
+  call: ts.Expression,
   checker: ts.TypeChecker,
   implementation: (call: ts.CallExpression) => ts.Node | undefined,
   selected: (value: ts.Expression) => boolean,
@@ -72,7 +72,7 @@ function returnedSseCapability(
 }
 
 export function selectedReturnedSseCapability(
-  call: ts.CallExpression,
+  call: ts.Expression,
   checker: ts.TypeChecker,
   implementation: (call: ts.CallExpression) => ts.Node | undefined,
   framed: readonly (WriteReceiver | undefined)[],
@@ -89,4 +89,22 @@ export function selectedReturnedSseCapability(
       )
     )
   })
+}
+
+export function implementationDeclaration(
+  declaration: ts.Signature['declaration'],
+  checker: ts.TypeChecker,
+): ts.FunctionLikeDeclaration | undefined {
+  if (!declaration) return undefined
+  if (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) return declaration
+  if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) {
+    if (declaration.body) return declaration
+    const symbol = declaration.name && checker.getSymbolAtLocation(declaration.name)
+    return symbol?.declarations?.find(
+      (candidate): candidate is ts.FunctionLikeDeclaration =>
+        (ts.isFunctionDeclaration(candidate) || ts.isMethodDeclaration(candidate)) &&
+        !!candidate.body,
+    )
+  }
+  return undefined
 }

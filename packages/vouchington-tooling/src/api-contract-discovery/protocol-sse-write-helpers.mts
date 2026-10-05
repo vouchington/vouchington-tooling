@@ -1,4 +1,7 @@
-import { selectedReturnedSseCapability } from './protocol-sse-returned-capability.mts'
+import {
+  implementationDeclaration,
+  selectedReturnedSseCapability,
+} from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
@@ -24,24 +27,6 @@ export function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
 }
 
-function implementationDeclaration(
-  declaration: ts.Signature['declaration'],
-  checker: ts.TypeChecker,
-): ts.FunctionLikeDeclaration | undefined {
-  if (!declaration) return undefined
-  if (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) return declaration
-  if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) {
-    if (declaration.body) return declaration
-    const symbol = declaration.name && checker.getSymbolAtLocation(declaration.name)
-    return symbol?.declarations?.find(
-      (candidate): candidate is ts.FunctionLikeDeclaration =>
-        (ts.isFunctionDeclaration(candidate) || ts.isMethodDeclaration(candidate)) &&
-        !!candidate.body,
-    )
-  }
-  return undefined
-}
-
 type SseWriteLookup = ReturnType<typeof createSseWriteLookup>
 
 export function opaqueCallReceivesSelectedStream(
@@ -56,11 +41,26 @@ export function opaqueCallReceivesSelectedStream(
   const framed = selectedReceivers.flatMap((receiver) =>
     actualReceivers(receiver, binding, checker, lookup),
   )
+  const target = ts.isCallExpression(call) && call.expression
+  if (target && (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target))) {
+    const receiver = expressionReceiver(target.expression, checker)
+    if (
+      receiver &&
+      actualReceivers(receiver, binding, checker, lookup).some(
+        (actual) =>
+          actual !== undefined &&
+          framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+      )
+    )
+      return true
+  }
   return (
     call.arguments?.some((argument) =>
       someSseArgumentValue(argument, checker, (value) => {
         if (
-          ts.isCallExpression(value) &&
+          (ts.isCallExpression(value) ||
+            ts.isArrowFunction(value) ||
+            ts.isFunctionExpression(value)) &&
           selectedReturnedSseCapability(
             value,
             checker,
