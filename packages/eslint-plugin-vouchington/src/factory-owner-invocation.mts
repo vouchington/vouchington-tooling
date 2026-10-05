@@ -34,7 +34,9 @@ function directReflectFactory(
       isUnshadowedGlobal(context, finalSequenceValue(object.object as NodeLike), 'globalThis'))
   if (!reflectGlobal) return false
   const method = propertyName(member)
-  return (method === 'apply' || method === 'construct') && isFactory(args[0])
+  const hasRequiredArguments =
+    (method === 'apply' && args.length >= 3) || (method === 'construct' && args.length >= 2)
+  return hasRequiredArguments && isFactory(args[0])
 }
 
 function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null | undefined {

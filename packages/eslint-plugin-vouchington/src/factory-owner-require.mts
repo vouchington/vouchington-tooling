@@ -7,6 +7,7 @@ import {
   type RuleContextLike,
 } from './ast-helpers.mts'
 import { isQualifiedCreateRequireAlias } from './factory-owner-create-require-alias.mts'
+import { requireBindingSource } from './factory-owner-require-binding.mts'
 
 export function isValueImportEquals(declaration: NodeLike): boolean {
   return declaration.importKind !== 'type' && !declaration.isTypeOnly
@@ -153,16 +154,7 @@ function isCreateRequireBinding(
 ): boolean {
   const identifier = unwrap(node)
   if (identifier?.type !== 'Identifier') return false
-  return Boolean(
-    findVariable(context, identifier)?.defs?.some((definition) => {
-      const declarator = definition.node
-      return (
-        definition.type === 'Variable' &&
-        declarator.type === 'VariableDeclarator' &&
-        isCreateRequireCall(context, declarator.init as NodeLike)
-      )
-    }),
-  )
+  return isCreateRequireCall(context, requireBindingSource(context, identifier))
 }
 
 export function requiredModuleSpecifier(

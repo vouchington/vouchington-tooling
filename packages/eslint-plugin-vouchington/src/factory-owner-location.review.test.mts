@@ -49,7 +49,7 @@ describe('factory-owner-location direct syntax', () => {
       visitors.CallExpression?.({
         type: 'CallExpression',
         callee: instantiate(callee),
-        arguments: callee.object === factory ? [] : [factory],
+        arguments: callee.object === factory ? [] : [factory, { type: 'Literal', value: null }, []],
       })
     }
     expect(reports).toEqual(['constructionOwner', 'constructionOwner'])

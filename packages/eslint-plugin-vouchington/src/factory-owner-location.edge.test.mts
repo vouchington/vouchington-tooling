@@ -74,8 +74,53 @@ it('coerces primitive literal dynamic import specifiers', async () => {
   for (const source of [
     `const specifier = '1'; (await import(specifier)).makeGraph()`,
     `(await import({})).makeGraph()`,
+    `(await import(+1n)).makeGraph()`,
   ]) {
     const result = await lintRule('factory-owner-location', source, OPTIONS, 'src/check.js')
     expect(messageIds(result)).toEqual([])
   }
+})
+
+it('coerces signed numeric dynamic import specifiers', async () => {
+  for (const [specifier, moduleName] of [
+    ['-1', '-1'],
+    ['+1', '1'],
+    ['-1n', '-1'],
+  ] as const) {
+    const result = await lintRule(
+      'factory-owner-location',
+      `(await import(${specifier})).makeGraph()`,
+      { ...OPTIONS, modules: [moduleName] },
+      'src/check.js',
+    )
+    expect(messageIds(result)).toEqual(['constructionOwner'])
+  }
+})
+
+it('requires Reflect argument lists before reporting construction', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { makeGraph } from '1'
+Reflect.apply(makeGraph)
+Reflect.apply(makeGraph, null, [])
+Reflect.construct(makeGraph)
+Reflect.construct(makeGraph, [])`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual(['constructionOwner', 'constructionOwner'])
+})
+
+it('follows destructuring defaults for createRequire loaders', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { createRequire } from 'node:module'
+const { load = createRequire(import.meta.url) } = {}
+const [, arrayLoad = createRequire(import.meta.url)] = []
+load('1').makeGraph()
+arrayLoad('1').makeGraph()`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual(['constructionOwner', 'constructionOwner'])
 })

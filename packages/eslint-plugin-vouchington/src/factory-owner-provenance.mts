@@ -33,6 +33,15 @@ export type FactoryProvenanceOptions = {
   factories: ReadonlySet<string>
 }
 
+function isWithin(node: NodeLike, ancestor: NodeLike): boolean {
+  let current: NodeLike | null | undefined = node
+  while (current) {
+    if (current === ancestor) return true
+    current = current.parent
+  }
+  return false
+}
+
 export function createFactoryProvenance(
   context: RuleContextLike,
   options: FactoryProvenanceOptions,
@@ -62,7 +71,8 @@ export function createFactoryProvenance(
       if (
         definition &&
         loader?.references.some(
-          (reference) => reference.identifier !== definition.node.id && reference.isWrite(),
+          (reference) =>
+            !isWithin(reference.identifier, definition.node.id as NodeLike) && reference.isWrite(),
         )
       ) {
         return false

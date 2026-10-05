@@ -10,7 +10,14 @@ import {
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
 
 function staticModuleSpecifier(value: NodeLike | null | undefined): string | null {
-  const name = staticPropertyName(value)
+  const current = unwrap(value)
+  if (current?.type === 'UnaryExpression' && ['+', '-'].includes(String(current.operator))) {
+    const operand = staticPropertyName(current.argument as NodeLike)
+    if (typeof operand === 'number') return String(current.operator === '-' ? -operand : +operand)
+    if (typeof operand === 'bigint' && current.operator === '-') return String(-operand)
+    return null
+  }
+  const name = staticPropertyName(current)
   return name === null ? null : String(name)
 }
 
