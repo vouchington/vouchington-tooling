@@ -1,5 +1,9 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
+import {
+  createProtocolCallbackValueResolver,
+  protocolCallbackSourceCalls,
+} from './protocol-callback-values.mts'
 
 /** Namespace identity follows executable import origins, never an asserted module type. */
 export function contextModuleOrigin(
@@ -64,25 +68,31 @@ export function contextImportBindingMember(checker: ts.TypeChecker, binding?: ts
 
 function fulfillmentModule(checker: ts.TypeChecker, parameter: ts.ParameterDeclaration) {
   const fn = parameter.parent
-  const call = fn.parent
   if (
-    !(
-      (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
-      ts.isCallExpression(call) &&
-      call.arguments[0] === fn &&
-      fn.parameters[0] === parameter &&
-      ts.isPropertyAccessExpression(call.expression) &&
-      call.expression.name.text === 'then'
-    )
+    !(ts.isFunctionDeclaration(fn) || ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) ||
+    fn.parameters[0] !== parameter
   )
     return undefined
-  const imported = unwrapTransparentExpression(call.expression.expression)
-  return ts.isCallExpression(imported) &&
-    imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
-    imported.arguments[0] &&
-    ts.isStringLiteral(imported.arguments[0])
-    ? checker.getSymbolAtLocation(imported.arguments[0])
-    : undefined
+  const callbacks = createProtocolCallbackValueResolver(checker)
+  const calls = ts.isCallExpression(fn.parent) ? [fn.parent] : protocolCallbackSourceCalls(fn)
+  for (const call of calls) {
+    if (
+      !call.arguments[0] ||
+      !ts.isPropertyAccessExpression(call.expression) ||
+      call.expression.name.text !== 'then' ||
+      callbacks.resolve(call.arguments[0], new Map())?.node !== fn
+    )
+      continue
+    const imported = unwrapTransparentExpression(call.expression.expression)
+    if (
+      ts.isCallExpression(imported) &&
+      imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      imported.arguments[0] &&
+      ts.isStringLiteral(imported.arguments[0])
+    )
+      return checker.getSymbolAtLocation(imported.arguments[0])
+  }
+  return undefined
 }
 
 /** Only a fulfillment function's own first arguments slot denotes the imported module. */
