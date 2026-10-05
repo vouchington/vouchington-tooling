@@ -86,6 +86,10 @@ const controls = {
   objectShorthand: 'const {ctx:saved}={ctx};opaque(saved)',
   arrayRest: 'const [...saved]=[ctx];opaque(saved)',
   arrayHole: 'const [saved]=[,];opaque(saved)',
+  formalIndependent:
+    'function consume({saved}:{saved:unknown}){opaque(saved)};consume({saved:{independent:true}})',
+  cyclicIndependent:
+    'var [first]=[second] as [unknown];var [second]=[first] as [unknown];opaque(first)',
   objectOpaque: 'declareObject(ctx)',
   methodIndependent: 'const {action:saved}={action(){ctx.assert(true)}};opaque(saved)',
   methodLeak: 'const {action:saved}={action(){ctx.json({bad:true})}};opaque(saved)',
@@ -121,6 +125,8 @@ it.each([
   'objectOpaque',
   'methodIndependent',
   'arrayHole',
+  'formalIndependent',
+  'cyclicIndependent',
   'arrayUnused',
   'arrayIgnored',
   'arrayDead',
