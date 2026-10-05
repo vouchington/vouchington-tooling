@@ -5,6 +5,7 @@ import {
   type NodeLike,
   type RuleContextLike,
 } from './ast-helpers.mts'
+import { isStaticMethod } from './factory-owner-static-method.mts'
 
 function isUnshadowedGlobal(
   context: RuleContextLike,
@@ -65,7 +66,8 @@ function isKnownNonConstructor(context: RuleContextLike, value: NodeLike | undef
       current.type === 'ArrayExpression' ||
       (current.type === 'Literal' && Boolean(current.regex)) ||
       current.type === 'ArrowFunctionExpression' ||
-      (current.type === 'FunctionExpression' && (current.async || current.generator))),
+      (current.type === 'FunctionExpression' && (current.async || current.generator)) ||
+      isStaticMethod(current)),
   )
 }
 
@@ -120,7 +122,12 @@ export function createFactoryInvocationVisitors(
     },
     TaggedTemplateExpression(value) {
       const tag = value.tag as NodeLike
-      if (isFactory(tag) || directFactoryMember(context, tag, [], isFactory)) report(value)
+      const substitutions = (value.quasi as NodeLike).expressions as NodeLike[]
+      if (
+        isFactory(tag) ||
+        directFactoryMember(context, tag, [value.quasi as NodeLike, ...substitutions], isFactory)
+      )
+        report(value)
     },
     Decorator(value) {
       if (isFactory(value.expression as NodeLike)) report(value)

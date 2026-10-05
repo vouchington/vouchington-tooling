@@ -122,6 +122,11 @@ Reflect.construct(makeGraph, [], function* () {})
 Reflect.construct(makeGraph, [], {})
 Reflect.construct(makeGraph, [], [])
 Reflect.construct(makeGraph, [], /x/)
+Reflect.construct(makeGraph, [], ({ method() {} }).method)
+Reflect.construct(makeGraph, [], ({ ['method']() {} }).method)
+Reflect.construct(makeGraph, [], ({ other() {} }).method)
+Reflect.construct(makeGraph, [], NewTarget.method)
+Reflect.construct(makeGraph, [], ({ ...source }).method)
 Reflect.construct(makeGraph, [], function () {})
 Reflect.construct(makeGraph, [], class {})
 Reflect.construct(makeGraph, [], NewTarget)
@@ -145,6 +150,9 @@ function shadow(undefined, NaN, Infinity) {
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
   ])
 })
 
@@ -156,11 +164,14 @@ makeGraph.apply(null, 1)
 makeGraph.apply(null, 'args')
 makeGraph.apply(null, null)
 makeGraph.apply(null, undefined)
-makeGraph.apply(null, args)`,
+makeGraph.apply(null, args)
+makeGraph.apply\`known\`
+makeGraph.apply\`known\${1}\``,
     OPTIONS,
     'src/check.js',
   )
   expect(messageIds(result)).toEqual([
+    'constructionOwner',
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',
@@ -296,6 +307,7 @@ createRequire(1)('1').makeGraph()
 createRequire('relative')('1').makeGraph()
 createRequire('/workspace/file.js')('1').makeGraph()
 createRequire('file:///workspace/file.js')('1').makeGraph()
+createRequire(\`/workspace/\${file}\`)('1').makeGraph()
 createRequire(base)('1').makeGraph()`,
     OPTIONS,
     'src/check.js',
@@ -304,5 +316,46 @@ createRequire(base)('1').makeGraph()`,
     'constructionOwner',
     'constructionOwner',
     'constructionOwner',
+    'constructionOwner',
   ])
+})
+
+it('uses destructuring defaults only when a static source can select them', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { makeGraph } from '1'
+const { graph = makeGraph } = { graph: () => 1 }
+graph()
+const { text = makeGraph } = { text: 'known' }
+text()
+const { template = makeGraph } = { template: \`known\` }
+template()
+const { array = makeGraph } = { array: [] }
+array()
+const { callable = makeGraph } = { callable: function () {} }
+callable()
+const { constructable = makeGraph } = { constructable: class {} }
+constructable()
+const { object = makeGraph } = { object: {} }
+object()
+const { missing = makeGraph } = { other: 1 }
+missing()
+const { undef = makeGraph } = { undef: undefined }
+undef()
+const { voided = makeGraph } = { voided: void 0 }
+voided()
+const [arrayGraph = makeGraph] = [() => 1]
+arrayGraph()
+const [arrayMissing = makeGraph] = []
+arrayMissing()
+const [unknownArray = makeGraph] = sourceArray
+unknownArray()
+const { nested: { plain }, later = makeGraph } = { nested: {} }
+later()
+const { possible = makeGraph } = source
+possible()`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual(Array(7).fill('constructionOwner'))
 })

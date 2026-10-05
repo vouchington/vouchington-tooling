@@ -13,6 +13,7 @@ import {
   namedPatternSource,
 } from './factory-owner-provenance-binding.mts'
 import { patternDefaultValue } from './factory-owner-pattern-default.mts'
+import { patternDefaultCanApply } from './factory-owner-pattern-source.mts'
 import { valueImportEqualsSource } from './factory-owner-import-equals-source.mts'
 import { withActiveVariable } from './factory-owner-recursion.mts'
 import { isFactoryMember } from './factory-owner-member.mts'
@@ -114,7 +115,16 @@ export function createFactoryProvenance(
     if (!declarator) return false
     return withActiveVariable(variable, active, () => {
       const defaultValue = patternDefaultValue(declarator.id as NodeLike, String(current.name))
-      if (defaultValue && isFactory(defaultValue, active)) return true
+      if (
+        defaultValue &&
+        patternDefaultCanApply(
+          declarator.id as NodeLike,
+          String(current.name),
+          declarator.init as NodeLike,
+        ) &&
+        isFactory(defaultValue, active)
+      )
+        return true
       const defaultNamespace = namedPatternDefaultSource(
         declarator.id as NodeLike,
         String(current.name),
