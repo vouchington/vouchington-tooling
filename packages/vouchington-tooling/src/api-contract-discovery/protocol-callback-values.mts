@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { registeredHandler } from './protocol-callback-registration.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
+import type { ProtocolCache } from './protocol-analysis-cache.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 
 type FunctionNode = ts.FunctionLikeDeclaration
@@ -140,9 +141,10 @@ export function createProtocolCallbackValueResolver(checker: ts.TypeChecker) {
 export function protocolCallbackHasWrittenBindings(
   fn: FunctionNode,
   checker: ts.TypeChecker,
+  cache?: ProtocolCache,
 ): boolean {
   return (
-    (ts.isFunctionDeclaration(fn) && hasBindingWrite(fn, checker)) ||
-    runtimeParameters(fn).some((parameter) => hasBindingWrite(parameter, checker))
+    (ts.isFunctionDeclaration(fn) && hasBindingWrite(fn, checker, cache)) ||
+    runtimeParameters(fn).some((parameter) => hasBindingWrite(parameter, checker, cache))
   )
 }

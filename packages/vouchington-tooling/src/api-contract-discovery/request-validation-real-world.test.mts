@@ -118,6 +118,9 @@ const files = {
     })
     function checkAt(ctx: Ctx, path: string) { validateInput(ctx, \`GET:\${path}\`, {}) }
     app.route('/api/template-param').get(async (ctx: Ctx) => { checkAt(ctx, '/api/param') })
+    function makeHandler() { return (c: Ctx) => c }
+    const plain = makeHandler()
+    app.route('/api/plain-const').post(async (ctx: Ctx) => { plain(ctx) })
   `,
 }
 
@@ -188,6 +191,7 @@ describe('request validation real-world shapes', () => {
       { operation: 'POST:/api/const-factory', conditional: false },
     ])
     expect(route('discarded-factory').factorySites).toEqual([])
+    expect(route('plain-const').factorySites).toEqual([])
   })
 
   it('folds template literals whose substitutions are all static', () => {

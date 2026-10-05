@@ -573,6 +573,18 @@ nested validator sites and reads; only reads that build a validator's input are 
 sites are reported for factory calls whose returned handler is a registration-time value (a route
 registration argument, a module `const` used as one, or a helper-returned handler); a factory call
 inside a handler body, such as a discarded `createThingHandler(options);`, is not a factory site.
+A factory site is also found through a module `const` initialized by a factory call that a handler
+calls (`const handler = createThingHandler({...})`, then `handler(ctx)`). Like validator sites,
+`FactorySite.conditional` is true when the site is reached only under a condition, and a site
+reached both ways is reported unconditional. A template-literal operation key folds to a string
+when every substitution resolves (literals, `const`s, bound parameters); otherwise it is `null`.
+
+Pass the `program` you already built: the function uses it as given and never builds its own.
+Helpers are followed only within `sourceFiles`, so pass every file that declares a followed helper,
+not just the route files; a helper declared elsewhere is not entered, which silently yields empty
+`origins` rather than an error. An omitted optional or defaulted helper argument contributes no
+origin and is not `unresolved`; an omitted required argument is `unresolved`. Per-call caches make
+repeated helpers cheap, so a 700-route program completes in seconds once the program exists.
 
 Each `carrierReads` entry has `access`: `key` for a static key (`ctx.query.limit`, destructured
 names, a resolvable `ctx.query[name]`), `computed` for a non-static key (`ctx.query[name]`, a

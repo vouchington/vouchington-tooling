@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { isConditionalPosition } from './request-validation-conditional.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
+import type { Assignment, ProtocolCache } from './protocol-analysis-cache.mts'
 import type { Followable } from './request-validation-follow.mts'
 
 const owningFunction = (node: ts.Node) => {
@@ -27,6 +28,32 @@ function maybeSkipped(node: ts.Node): boolean {
   return false
 }
 
+/** Plain assignments to the symbol within the scope, excluding nested functions, in source order. */
+function assignmentsTo(
+  scope: ts.Node,
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+  cache: ProtocolCache | undefined,
+): Assignment[] {
+  let bySymbol = cache?.assignments.get(scope)
+  if (!bySymbol) {
+    const found = new Map<ts.Symbol, Assignment[]>()
+    const scan = (node: ts.Node): void => {
+      if (node !== scope && ts.isFunctionLike(node)) return
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+        const written = writtenSymbol(node.left, checker)
+        const entry = { node, direct: ts.isIdentifier(node.left), start: node.getStart() }
+        if (written) found.set(written, [...(found.get(written) ?? []), entry])
+      }
+      ts.forEachChild(node, scan)
+    }
+    scan(scope)
+    bySymbol = found
+    cache?.assignments.set(scope, bySymbol)
+  }
+  return bySymbol.get(symbol) ?? []
+}
+
 /**
  * The assignments that can supply a value at the use: property writes, plus reassignments of the
  * identifier itself made earlier in the same function. An unconditional reassignment replaces
@@ -36,24 +63,13 @@ export function reachingWrites(
   use: ts.Node,
   symbol: ts.Symbol,
   checker: ts.TypeChecker,
+  cache?: ProtocolCache,
 ): { writes: ts.Expression[]; initializer: boolean } {
-  const owner = owningFunction(use)
+  const scope = owningFunction(use) ?? use.getSourceFile()
   const before = use.getStart()
-  const entries: { node: ts.BinaryExpression; direct: boolean }[] = []
-  const scan = (node: ts.Node): void => {
-    if (node.getStart() >= before || (node !== owner && ts.isFunctionLike(node))) return
-    if (
-      ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      writtenSymbol(node.left, checker) === symbol
-    ) {
-      const direct = ts.isIdentifier(node.left)
-      // A reassignment whose right side contains the use has not taken effect yet.
-      if (!direct || node.getEnd() <= before) entries.push({ node, direct })
-    }
-    ts.forEachChild(node, scan)
-  }
-  scan(owner ?? use.getSourceFile())
+  const entries = assignmentsTo(scope, symbol, checker, cache).filter(
+    (entry) => entry.start < before && (!entry.direct || entry.node.getEnd() <= before),
+  )
   const killer = entries.findLast((entry) => entry.direct && !maybeSkipped(entry.node))
   const kept = entries.filter(
     (entry) => !entry.direct || !killer || entries.indexOf(entry) >= entries.indexOf(killer),

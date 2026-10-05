@@ -1,5 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { findConfig, calleeSymbol } from './request-validation-match.mts'
+import type { ProtocolCache } from './protocol-analysis-cache.mts'
 import type { KeyBindings } from './request-validation-keys.mts'
 import type { RootBindings } from './request-validation-origin.mts'
 import { unwrapTransparentExpression } from './response-contract-route-syntax.mts'
@@ -14,6 +15,8 @@ export type Scope = {
   configured: readonly ExportRef[]
   roots: RootBindings
   keys: KeyBindings
+  /** Memoized proofs shared across one facts run. */
+  cache?: ProtocolCache | undefined
 }
 
 export type Followable = ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression

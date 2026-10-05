@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import type { ProtocolCache } from './protocol-analysis-cache.mts'
 import type { HandlerProof } from './registered-route-handler-analysis.mts'
 import { handlerBindings } from './request-validation-handler-state.mts'
 import { httpContextInvocations } from './protocol-http-context-callers.mts'
@@ -48,11 +49,13 @@ export type WalkerConfig = {
   validators: readonly ValidatorConfig[]
   factories: readonly FactoryConfig[]
   executedCallbacks: readonly ExecutedCallbackConfig[]
+  /** Shared across the routes of one facts run. */
+  protocolCache?: ProtocolCache
 }
 
 /** Walks handlers and the helpers they run, collecting validation facts for one route. */
 export function createRouteWalker(config: WalkerConfig) {
-  const { checker, sourceFiles, validators, factories, executedCallbacks } = config
+  const { checker, sourceFiles, validators, factories, executedCallbacks, protocolCache } = config
   const configured = [...validators, ...factories, ...executedCallbacks]
   const facts: RouteFacts = { validatorSites: [], factorySites: [], carrierReads: [] }
   const report = createReporter()
@@ -64,6 +67,7 @@ export function createRouteWalker(config: WalkerConfig) {
     configured,
     roots: state.roots,
     keys: state.keys,
+    cache: protocolCache,
   })
   const stateKey = createStateKey()
   const inputs = new Set<ts.Node>()
@@ -141,7 +145,7 @@ export function createRouteWalker(config: WalkerConfig) {
     for (const argument of call.arguments) {
       const callback = unwrapTransparentExpression(argument)
       if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) continue
-      const { callers } = httpContextInvocations(callback, checker)
+      const { callers } = httpContextInvocations(callback, checker, protocolCache)
       // A helper that runs the callback under its own condition makes the sites conditional.
       if (callers.length > 0)
         walkFunction(callback, {

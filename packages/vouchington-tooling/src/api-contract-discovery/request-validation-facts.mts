@@ -1,4 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { memoizeCheckerSymbols } from './request-validation-checker.mts'
+import { createProtocolCache } from './protocol-analysis-cache.mts'
 import { discoverRegisteredRoutes } from './registered-route-catalog.mts'
 import { handlerNodes, type HandlerProof } from './registered-route-handler-analysis.mts'
 import { insideConfiguredImplementation } from './request-validation-match.mts'
@@ -49,8 +51,10 @@ export function discoverRequestValidationFacts(
   input: RequestValidationFactsInput,
 ): Record<string, RouteValidationFacts> {
   const { program, sourceFiles, validators, factories = [], executedCallbacks = [] } = input
-  const checker = program.getTypeChecker()
+  const checker = memoizeCheckerSymbols(program.getTypeChecker())
   const registrations = registrationCalls(sourceFiles)
+  const sourceFileSet = new Set(sourceFiles)
+  const protocolCache = createProtocolCache()
   const result: Record<string, RouteValidationFacts> = {}
   for (const route of discoverRegisteredRoutes(program, sourceFiles)) {
     // Same call-selection logic as route discovery, so every discovered route has a registration.
@@ -59,7 +63,8 @@ export function discoverRequestValidationFacts(
     )!
     const walker = createRouteWalker({
       checker,
-      sourceFiles: new Set(sourceFiles),
+      sourceFiles: sourceFileSet,
+      protocolCache,
       validators,
       factories,
       executedCallbacks,

@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import type { ProtocolCache } from './protocol-analysis-cache.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { invokedResult, registeredHandler } from './protocol-callback-registration.mts'
 import { platformCallbackArgument } from './protocol-platform-callbacks.mts'
@@ -14,8 +15,25 @@ import {
 } from './protocol-callback-values.mts'
 type FunctionNode = ts.FunctionLikeDeclaration
 /** Proves callback consumption through concrete helper bodies, without executing nested closures. */
-export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeChecker): boolean {
-  if (!fn.body || fn.asteriskToken || protocolCallbackHasWrittenBindings(fn, checker)) return false
+export function isSupportedProtocolCallback(
+  fn: FunctionNode,
+  checker: ts.TypeChecker,
+  cache?: ProtocolCache,
+): boolean {
+  const known = cache?.supported.get(fn)
+  if (known !== undefined) return known
+  const supported = proveProtocolCallback(fn, checker, cache)
+  cache?.supported.set(fn, supported)
+  return supported
+}
+
+function proveProtocolCallback(
+  fn: FunctionNode,
+  checker: ts.TypeChecker,
+  cache?: ProtocolCache,
+): boolean {
+  if (!fn.body || fn.asteriskToken || protocolCallbackHasWrittenBindings(fn, checker, cache))
+    return false
   const resolver = createProtocolCallbackValueResolver(checker)
   const { resolve, symbol } = resolver
   let invalidated = false
@@ -31,7 +49,7 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
       invalidated ||= callbackOptionsEscape(call, env, fn, resolver)
       return false
     }
-    if (protocolCallbackHasWrittenBindings(callee.node, checker)) {
+    if (protocolCallbackHasWrittenBindings(callee.node, checker, cache)) {
       invalidated = true
       return false
     }
@@ -102,7 +120,7 @@ export function isSupportedProtocolCallback(fn: FunctionNode, checker: ts.TypeCh
   const call = argument.parent
   if (!ts.isCallExpression(call) && !ts.isNewExpression(call)) {
     const owner = enclosingFunction(fn)
-    if (owner && isSupportedProtocolCallback(owner, checker))
+    if (owner && isSupportedProtocolCallback(owner, checker, cache))
       return body(owner.body!, new Map(), new Set([owner]), false)
     return protocolCallbackSourceCalls(fn).some(
       (candidate) =>

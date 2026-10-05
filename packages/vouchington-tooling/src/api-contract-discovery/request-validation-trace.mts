@@ -66,7 +66,7 @@ function visitIdentifier(identifier: ts.Identifier, scope: Scope, visit: Visit) 
   const symbol = identifierSymbol(identifier, scope.checker)
   if (!symbol || seen.has(identifier)) return
   seen.add(identifier)
-  const { writes, initializer } = reachingWrites(identifier, symbol, scope.checker)
+  const { writes, initializer } = reachingWrites(identifier, symbol, scope.checker, scope.cache)
   if (initializer) visitDeclared(identifier, symbol, scope, visit)
   for (const write of writes) visitValue(write, scope, visit)
 }
