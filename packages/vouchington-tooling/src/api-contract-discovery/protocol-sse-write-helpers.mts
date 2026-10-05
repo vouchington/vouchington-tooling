@@ -1,3 +1,4 @@
+import { selectedReturnedSseCapability } from './protocol-sse-returned-capability.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import { hasBindingWrite } from './registered-route-binding-writes.mts'
@@ -58,6 +59,17 @@ export function opaqueCallReceivesSelectedStream(
   return (
     call.arguments?.some((argument) =>
       someSseArgumentValue(argument, checker, (value) => {
+        if (
+          ts.isCallExpression(value) &&
+          selectedReturnedSseCapability(
+            value,
+            checker,
+            lookup.implementationCall,
+            framed,
+            (receiver) => actualReceivers(receiver, binding, checker, lookup),
+          )
+        )
+          return true
         const receiver = expressionReceiver(value, checker)
         if (!receiver) return false
         return actualReceivers(receiver, binding, checker, lookup).some(

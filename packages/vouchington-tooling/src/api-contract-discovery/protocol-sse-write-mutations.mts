@@ -1,3 +1,4 @@
+import { contextMutationTargets } from './protocol-http-context-write-targets.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
@@ -7,22 +8,13 @@ import { writeAccess } from './protocol-sse-write-resolution.mts'
 
 export type SseWriteMutation = { node: ts.Node; receiver: ts.Expression }
 
-export function sseWriteMutation(node: ts.Node): SseWriteMutation | undefined {
-  if (ts.isBinaryExpression(node) && isAssignment(node.operatorToken.kind)) {
-    const access = writeAccess(node.left)
-    if (access && (access.method === 'write' || access.method === 'end'))
-      return { node, receiver: access.receiver }
-  }
-  if (ts.isDeleteExpression(node)) {
-    const access = writeAccess(node.expression)
-    if (access && (access.method === 'write' || access.method === 'end'))
-      return { node, receiver: access.receiver }
-  }
-  return undefined
-}
-
-function isAssignment(kind: ts.SyntaxKind): boolean {
-  return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment
+export function sseWriteMutations(node: ts.Node): SseWriteMutation[] {
+  return contextMutationTargets(node).flatMap((target) => {
+    const access = writeAccess(target)
+    return access && (access.method === 'write' || access.method === 'end')
+      ? [{ node, receiver: access.receiver }]
+      : []
+  })
 }
 
 export function mutationAffectsSelectedStream(
