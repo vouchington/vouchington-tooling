@@ -696,6 +696,10 @@ uncollected response body or status, expose a context through a literal argument
 context alias, or mutate a canonical response method. Conditions are inspected even when their
 resolved return value skips a branch. Prototype capabilities reached through `getPrototypeOf`,
 `__proto__`, or `constructor.prototype` also invalidate missing-own-property proofs.
+Caller-bound defaults execute before the callback body when an argument is omitted or may be
+undefined; proven provided values bypass those defaults. Context-bearing tagged substitutions remain
+opaque escapes, while primitive context members preserve ordinary value semantics. A local `satisfies`
+wrapper preserves the underlying factory value and existing provenance checks.
 Validated SSE frame and receiver evidence accounts for a pipeline only on its selected route and
 exact stream invocation. A non-SSE sibling or a second unframed stream cannot reuse that evidence;
 uniquely bound helper pipelines must match every executable invocation on the selected route.

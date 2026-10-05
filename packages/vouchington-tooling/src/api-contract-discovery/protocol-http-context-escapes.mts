@@ -20,6 +20,7 @@ import {
   uncollectedContextMethod,
 } from './protocol-http-context-bound-nodes.mts'
 import { createContextAccountedEmissionProof } from './protocol-http-context-accounted-emissions.mts'
+import { contextCallbackExecutionRoots } from './protocol-http-context-parameter-initializers.mts'
 
 /** Opaque consumers of the canonical context may emit undocumented status or bodies. */
 export function opaqueHttpContextArgument(
@@ -146,15 +147,14 @@ function calleeEscapes(
   const receiver =
     ts.isPropertyAccessExpression(call.expression) || ts.isElementAccessExpression(call.expression)
   if (receiver && !ts.isArrowFunction(fn) && receiverUsesThis(fn.body!)) return true
-  const resolver = values.callbacks
-  const env = callbackArgumentBindings(fn, call, callerEnv, captured, checker, resolver)
+  const env = callbackArgumentBindings(fn, call, callerEnv, captured, checker, values.callbacks)
   if (!env) return true
   const next = new Set(active).add(fn)
   const contexts = boundHttpContexts(fn, call, context, checker)
   if (!contexts) return true
   let escaped = false
   const accounted = createContextAccountedEmissionProof(fn, checker)
-  const direct = resolver.resolve(call.expression, new Map())?.node === fn
+  const direct = values.callbacks.resolve(call.expression, new Map())?.node === fn
   const visitBound = (node: ts.Node): void => {
     if (ts.isIfStatement(node)) {
       const condition = values.resolve(node.expression, env)
@@ -195,6 +195,6 @@ function calleeEscapes(
     )
       escaped = true
   }
-  visitBound(fn.body!)
+  contextCallbackExecutionRoots(fn, call, callerEnv, checker, contexts).forEach(visitBound)
   return escaped
 }
