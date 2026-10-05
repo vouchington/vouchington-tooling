@@ -31,6 +31,10 @@ export function createFactoryExportVisitors(
     context.report({ node: value, messageId: 'constructionOwner' })
   const restricted = (value: NodeLike | undefined) =>
     provenance.isFactory(value) || provenance.isNamespace(value)
+  const restrictedExpression = (value: NodeLike | undefined) =>
+    restricted(value) ||
+    (value?.type === 'Identifier' &&
+      restricted(mutableExportInitializer(context, value, options.factories)))
   return {
     ExportAllDeclaration(value) {
       if (
@@ -42,10 +46,10 @@ export function createFactoryExportVisitors(
       }
     },
     ExportDefaultDeclaration(value) {
-      if (restricted(node(value.declaration))) report(value)
+      if (restrictedExpression(node(value.declaration))) report(value)
     },
     TSExportAssignment(value) {
-      if (restricted(node(value.expression))) report(value)
+      if (restrictedExpression(node(value.expression))) report(value)
     },
     ExportNamedDeclaration(value) {
       if (value.exportKind === 'type') return
@@ -70,7 +74,7 @@ export function createFactoryExportVisitors(
         if (
           !declaration.isTypeOnly &&
           ((moduleName !== null && options.modules.has(moduleName)) ||
-            provenance.isFactory(node(declaration.id)))
+            restricted(node(declaration.id)))
         )
           report(declaration)
       }

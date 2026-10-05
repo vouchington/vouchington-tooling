@@ -75,7 +75,8 @@ export function createFactoryInvocationVisitors(
       if (isFactory(value.callee as NodeLike)) report(value)
     },
     TaggedTemplateExpression(value) {
-      if (isFactory(value.tag as NodeLike)) report(value)
+      const tag = value.tag as NodeLike
+      if (isFactory(tag) || directFactoryMember(tag, isFactory)) report(value)
     },
     Decorator(value) {
       if (isFactory(value.expression as NodeLike)) report(value)

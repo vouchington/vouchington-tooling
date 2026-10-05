@@ -98,6 +98,13 @@ export = compiler
 `,
     )
     writeFileSync(
+      join(root, 'src/ts-mutable-export.ts'),
+      `import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export = graph
+`,
+    )
+    writeFileSync(
       join(root, 'src/ts-qualified.ts'),
       `import * as runtime from '@compiler/runtime'
 export import graph = runtime.makeGraph
@@ -149,7 +156,7 @@ compiler.makeGraph()
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 45 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 47 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(
@@ -159,6 +166,7 @@ compiler.makeGraph()
           filename.endsWith('src/ts-export.ts') ||
           filename.endsWith('src/ts-import-equals.ts') ||
           filename.endsWith('src/ts-import-binding.ts') ||
+          filename.endsWith('src/ts-mutable-export.ts') ||
           filename.endsWith('src/ts-qualified.ts'),
       ),
     ).toBe(true)

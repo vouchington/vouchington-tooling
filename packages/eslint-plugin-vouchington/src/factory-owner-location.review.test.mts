@@ -34,6 +34,14 @@ other.apply(null)`),
     ).toEqual(['constructionOwner', 'constructionOwner'])
   })
 
+  it('recognizes factory call and apply members used as template tags', async () => {
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+makeGraph.call\`source\`
+makeGraph.apply\`source\``),
+    ).toEqual(['constructionOwner', 'constructionOwner'])
+  })
+
   it('preserves factory identity through await and exported default', async () => {
     expect(
       await diagnostics(`import { makeGraph } from '@compiler/runtime'
@@ -165,6 +173,14 @@ let { makeGraph: selected } = { makeGraph }
 export { selected }
 let unrelated = () => 1
 export { unrelated }`),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('checks mutable aliases in default expression exports', async () => {
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export default graph`),
     ).toEqual(['constructionOwner'])
   })
 
