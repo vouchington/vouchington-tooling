@@ -8,6 +8,7 @@ import {
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { opaqueArgumentExcludesSelectedStream } from './protocol-sse-opaque-identity.mts'
 import {
   enclosingRouteBinding,
   type HandlerBindings,
@@ -60,10 +61,12 @@ export function opaqueCallReceivesSelectedStream(
       someSseArgumentValue(argument, checker, (value) => {
         const receiver = expressionReceiver(value, checker)
         if (!receiver) return false
+        if (opaqueArgumentExcludesSelectedStream(call, value, receiver, selectedReceivers, checker))
+          return false
         return actualReceivers(receiver, binding, checker, lookup).some(
-          (value) =>
-            value === undefined ||
-            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, value)),
+          (actual) =>
+            actual === undefined ||
+            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, actual)),
         )
       }),
     ) ?? false
