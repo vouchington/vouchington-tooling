@@ -127,6 +127,9 @@ compiler.makeGraph()
 import defaultCompiler = runtime.default
 defaultCompiler.makeGraph()
 export import exposed = runtime.default
+import nestedGraph = runtime.default.makeGraph
+nestedGraph()
+export import exportedGraph = runtime.default.makeGraph
 `,
     )
     writeFileSync(
@@ -172,7 +175,7 @@ export import exposed = runtime.default
       diagnostics: Array<{ code: string; filename: string }>
     }
     expect(diagnostics.map(({ code }) => code)).toEqual(
-      Array.from({ length: 54 }, () => 'vouchington(factory-owner-location)'),
+      Array.from({ length: 56 }, () => 'vouchington(factory-owner-location)'),
     )
     expect(
       diagnostics.every(

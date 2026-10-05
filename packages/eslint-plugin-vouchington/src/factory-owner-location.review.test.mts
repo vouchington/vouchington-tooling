@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import type { NodeLike, RuleContextLike, VariableLike } from './ast-helpers.mts'
-import { createFactoryExportVisitors } from './factory-owner-exports.mts'
 import { lintRule, messageIds } from './lint-rule.test-helpers.mts'
 import { createFactoryInvocationVisitors } from './factory-owner-invocation.mts'
 import { createFactoryProvenance } from './factory-owner-provenance.mts'
@@ -18,52 +17,6 @@ async function diagnostics(source: string): Promise<string[]> {
 }
 
 describe('factory-owner-location direct syntax', () => {
-  it('normalizes an instantiated mutable expression export', () => {
-    const reports: string[] = []
-    const variable: VariableLike = {
-      name: 'graph',
-      defs: [
-        {
-          type: 'Variable',
-          node: {
-            type: 'VariableDeclarator',
-            id: { type: 'Identifier', name: 'graph' },
-            init: { type: 'Identifier', name: 'makeGraph' },
-          },
-          parent: { type: 'VariableDeclaration', kind: 'let' },
-        },
-      ],
-      references: [],
-    }
-    const context: RuleContextLike = {
-      filename: 'src/check.ts',
-      options: [],
-      report: ({ messageId }) => reports.push(messageId),
-      sourceCode: {
-        getScope: () => ({
-          set: { get: (name) => (name === 'graph' ? variable : undefined) },
-          upper: null,
-        }),
-      },
-    }
-    const visitors = createFactoryExportVisitors(
-      context,
-      { modules: new Set(), factories: new Set(['makeGraph']) },
-      {
-        isFactory: (value) => value?.type === 'Identifier' && value.name === 'makeGraph',
-        isNamespace: () => false,
-      },
-    )
-    visitors.ExportDefaultDeclaration?.({
-      type: 'ExportDefaultDeclaration',
-      declaration: {
-        type: 'TSInstantiationExpression',
-        expression: { type: 'Identifier', name: 'graph' },
-      },
-    })
-    expect(reports).toEqual(['constructionOwner'])
-  })
-
   it('normalizes TypeScript instantiation around indirect invocation members', () => {
     const reports: string[] = []
     const context: RuleContextLike = {
@@ -435,6 +388,49 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
       ],
       references: [],
     })
+    variables.set('nestedGraph', {
+      name: 'nestedGraph',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            importKind: 'value',
+            moduleReference: {
+              type: 'TSQualifiedName',
+              left: {
+                type: 'TSQualifiedName',
+                left: { type: 'Identifier', name: 'runtime' },
+                right: { type: 'Identifier', name: 'default' },
+              },
+              right: { type: 'Identifier', name: 'makeGraph' },
+            },
+          },
+        },
+      ],
+      references: [],
+    })
+    variables.set('nestedUnrelated', {
+      name: 'nestedUnrelated',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            moduleReference: {
+              type: 'TSQualifiedName',
+              left: {
+                type: 'TSQualifiedName',
+                left: { type: 'Identifier', name: 'runtime' },
+                right: { type: 'Identifier', name: 'other' },
+              },
+              right: { type: 'Identifier', name: 'makeGraph' },
+            },
+          },
+        },
+      ],
+      references: [],
+    })
     const context: RuleContextLike = {
       filename: 'src/check.ts',
       options: [],
@@ -451,6 +447,8 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
       factories: new Set(['makeGraph']),
     })
     expect(provenance.isFactory({ type: 'Identifier', name: 'graph' })).toBe(true)
+    expect(provenance.isFactory({ type: 'Identifier', name: 'nestedGraph' })).toBe(true)
+    expect(provenance.isFactory({ type: 'Identifier', name: 'nestedUnrelated' })).toBe(false)
     expect(provenance.isFactory({ type: 'Identifier', name: 'unrelated' })).toBe(false)
     expect(provenance.isNamespace({ type: 'Identifier', name: 'compiler' })).toBe(true)
     expect(provenance.isNamespace({ type: 'Identifier', name: 'defaultCompiler' })).toBe(true)

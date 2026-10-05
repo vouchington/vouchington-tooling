@@ -1,6 +1,12 @@
 import { findVariable, type NodeLike, type RuleContextLike } from './ast-helpers.mts'
 import { isValueImportEquals } from './factory-owner-require.mts'
 
+function qualifiedNamespaceSource(value: NodeLike): NodeLike | null {
+  if (value.type === 'Identifier') return value
+  if (value.type !== 'TSQualifiedName' || (value.right as NodeLike).name !== 'default') return null
+  return qualifiedNamespaceSource(value.left as NodeLike)
+}
+
 export function qualifiedImportNamespaceSource(
   context: RuleContextLike,
   identifier: NodeLike,
@@ -11,7 +17,7 @@ export function qualifiedImportNamespaceSource(
   )?.node
   const reference = declaration?.moduleReference as NodeLike | undefined
   return reference?.type === 'TSQualifiedName' && (reference.right as NodeLike).name === 'default'
-    ? (reference.left as NodeLike)
+    ? qualifiedNamespaceSource(reference.left as NodeLike)
     : null
 }
 
@@ -25,9 +31,14 @@ export function isQualifiedImportFactory(
   const qualified = variable?.defs.find(
     (definition) => definition.node.type === 'TSImportEqualsDeclaration',
   )?.node.moduleReference as NodeLike | undefined
+  const namespaceSource =
+    qualified?.type === 'TSQualifiedName'
+      ? qualifiedNamespaceSource(qualified.left as NodeLike)
+      : null
   return (
     qualified?.type === 'TSQualifiedName' &&
     factories.has(String((qualified.right as NodeLike).name)) &&
-    isNamespace(qualified.left as NodeLike)
+    namespaceSource !== null &&
+    isNamespace(namespaceSource)
   )
 }
