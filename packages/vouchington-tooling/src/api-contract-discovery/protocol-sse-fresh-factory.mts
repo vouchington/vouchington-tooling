@@ -90,6 +90,12 @@ function freshConstructor(value: ts.NewExpression, checker: ts.TypeChecker): boo
   if (!declaration || (!ts.isClassDeclaration(declaration) && !ts.isClassExpression(declaration)))
     return false
   if (declaration.heritageClauses?.length) return false
+  if (
+    declaration.getSourceFile().isDeclarationFile ||
+    ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient ||
+    (ts.canHaveDecorators(declaration) && ts.getDecorators(declaration)?.length)
+  )
+    return false
   if (symbol && symbolBindingWritten(declaration.getSourceFile(), symbol, checker)) return false
   return !declaration.members.some(ts.isConstructorDeclaration)
 }
