@@ -660,6 +660,7 @@ prior handler invocations remain unknown. Async or generator declarations cannot
 returned by a synchronous factory invocation.
 Script-global property replacement invalidates a factory binding. Fresh object properties require
 object destructuring; deleting the selected owner property invalidates its allocation proof.
+Writes through constant owner aliases also invalidate freshness through the existing receiver facts.
 Unconditional blocks preserve the last proven status setter; conditional or foreign overwrites fail closed.
 Indirect `setStatus.call`, `apply`, and `bind` forms fail closed instead of assuming status 200.
 Ambiguous caller contexts fail closed. A raw stream failure invalidates all
