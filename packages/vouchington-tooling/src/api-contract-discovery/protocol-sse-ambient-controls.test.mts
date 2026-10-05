@@ -5,7 +5,17 @@ import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-set
 const preamble = `declare const app:any;
   declare const stream:{write(frame:string):void};
   declare function apiSseFrame<K extends string,const T>(key:K,event:T):string;`
+const generatorRoute = (
+  body: string,
+) => `declare const app:any;declare function opaque(value:unknown):void;
+ declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
+ class Stream{write(_value:string):void{}}const stream=new Stream();const other=new Stream();
+ app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
+  nestedgenerator: generatorRoute(
+    'opaque(function*(){function* unused(){yield stream}yield other})',
+  ),
+  deadgenerator: generatorRoute('opaque(function*(){if(false)yield stream;yield other})'),
   union: `${preamble}app.route('/events').get((ctx:any)=>{
     const event:{event:'done';data:{}}|{event:'progress';data:{count:number}}=ctx.query.done
       ?{event:'done',data:{}}:{event:'progress',data:{count:1}};
@@ -33,7 +43,7 @@ beforeAll(() => {
   matrix = buildVirtualProgramMatrix(import.meta, sources)
 })
 
-it.each(['union', 'factory', 'timer'] as const)(
+it.each(['union', 'factory', 'timer', 'nestedgenerator', 'deadgenerator'] as const)(
   'fails closed when %s lacks executable stream or encoder provenance',
   (name) => {
     const contracts = discoverApiResponseContracts(
