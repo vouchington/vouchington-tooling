@@ -20,8 +20,12 @@ import {
   isConfiguredFactoryImport,
   isNamespaceImport,
   requiredModuleSpecifier,
+  isValueImportEquals,
 } from './factory-owner-require.mts'
-import { isQualifiedImportFactory } from './factory-owner-qualified-import.mts'
+import {
+  isQualifiedImportFactory,
+  qualifiedImportNamespaceSource,
+} from './factory-owner-qualified-import.mts'
 
 export type FactoryProvenanceOptions = {
   modules: ReadonlySet<string>
@@ -73,11 +77,16 @@ export function createFactoryProvenance(
     if (isNamespaceImport(context, current, options.modules)) return true
     const variable = findVariable(context, current)
     if (!variable || active.has(variable)) return false
-    const importAlias = variable.defs.find(
-      (entry) => entry.node.type === 'TSImportEqualsDeclaration',
-    )?.node.moduleReference as NodeLike | undefined
+    const importDeclaration = variable.defs.find(
+      (entry) => entry.node.type === 'TSImportEqualsDeclaration' && isValueImportEquals(entry.node),
+    )?.node
+    const importAlias = importDeclaration?.moduleReference as NodeLike | undefined
     if (importAlias?.type === 'Identifier') {
       return withActiveVariable(variable, active, () => isNamespace(importAlias, active))
+    }
+    const qualifiedNamespace = qualifiedImportNamespaceSource(context, current)
+    if (qualifiedNamespace) {
+      return withActiveVariable(variable, active, () => isNamespace(qualifiedNamespace, active))
     }
     const declarator = constantDefinition(variable)
     if (!declarator) return false

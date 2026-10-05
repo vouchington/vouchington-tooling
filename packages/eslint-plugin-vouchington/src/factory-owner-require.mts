@@ -111,7 +111,11 @@ export function isNamespaceImport(
 function isCreateRequireCall(context: RuleContextLike, node: NodeLike | null | undefined): boolean {
   const call = unwrap(node)
   if (call?.type !== 'CallExpression') return false
-  const callee = unwrap(call.callee as NodeLike)
+  const rawCallee = unwrap(call.callee as NodeLike)
+  const callee =
+    rawCallee?.type === 'SequenceExpression'
+      ? unwrap((rawCallee.expressions as NodeLike[]).at(-1))
+      : rawCallee
   if (callee?.type === 'Identifier') {
     return hasImport(
       context,

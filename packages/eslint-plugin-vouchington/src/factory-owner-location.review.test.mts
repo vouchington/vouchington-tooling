@@ -314,6 +314,10 @@ let load = createRequire(import.meta.url)
 load = () => ({ makeGraph() {} })
 ;(0, load)('@compiler/runtime').makeGraph()`),
     ).toEqual([])
+    expect(
+      await diagnostics(`import { createRequire } from 'node:module'
+;(0, createRequire)(import.meta.url)('@compiler/runtime').makeGraph()`),
+    ).toEqual(['constructionOwner'])
   })
 
   it('preserves nested defaults that select the default namespace', async () => {
@@ -413,6 +417,24 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
       ],
       references: [],
     })
+    variables.set('defaultCompiler', {
+      name: 'defaultCompiler',
+      defs: [
+        {
+          type: 'ImportBinding',
+          node: {
+            type: 'TSImportEqualsDeclaration',
+            importKind: 'value',
+            moduleReference: {
+              type: 'TSQualifiedName',
+              left: { type: 'Identifier', name: 'runtime' },
+              right: { type: 'Identifier', name: 'default' },
+            },
+          },
+        },
+      ],
+      references: [],
+    })
     const context: RuleContextLike = {
       filename: 'src/check.ts',
       options: [],
@@ -431,5 +453,6 @@ function shadow(Reflect) { (0, Reflect).apply(makeGraph, null, []) }`),
     expect(provenance.isFactory({ type: 'Identifier', name: 'graph' })).toBe(true)
     expect(provenance.isFactory({ type: 'Identifier', name: 'unrelated' })).toBe(false)
     expect(provenance.isNamespace({ type: 'Identifier', name: 'compiler' })).toBe(true)
+    expect(provenance.isNamespace({ type: 'Identifier', name: 'defaultCompiler' })).toBe(true)
   })
 })
