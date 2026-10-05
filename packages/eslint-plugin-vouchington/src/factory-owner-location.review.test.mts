@@ -226,6 +226,11 @@ export default graph`),
 let graph = makeGraph
 export default (0, graph)`),
     ).toEqual(['constructionOwner'])
+    expect(
+      await diagnostics(`import { makeGraph } from '@compiler/runtime'
+let graph = makeGraph
+export default await graph`),
+    ).toEqual(['constructionOwner'])
   })
 
   it('checks namespace defaults for inline and split nested mutable exports', async () => {
@@ -255,6 +260,35 @@ export { split }`),
       await diagnostics(`import { createRequire } from 'node:module'
 const load = createRequire(import.meta.url)
 ;(0, load)('@compiler/runtime').makeGraph()`),
+    ).toEqual(['constructionOwner'])
+    expect(
+      await diagnostics(`import { createRequire } from 'node:module'
+let load = createRequire(import.meta.url)
+load = () => ({ makeGraph() {} })
+;(0, load)('@compiler/runtime').makeGraph()`),
+    ).toEqual([])
+  })
+
+  it('preserves nested defaults that select the default namespace', async () => {
+    expect(
+      await diagnostics(`import * as runtime from '@compiler/runtime'
+const { nested: { default: compiler } = runtime } = {}
+compiler.makeGraph()`),
+    ).toEqual(['constructionOwner'])
+  })
+
+  it('matches a configured null literal property name', async () => {
+    expect(
+      messageIds(
+        await lintRule(
+          'factory-owner-location',
+          `import * as runtime from '@compiler/runtime'
+const { [null]: graph } = runtime
+graph()`,
+          { ...OPTIONS, factories: ['null'] },
+          'src/check.js',
+        ),
+      ),
     ).toEqual(['constructionOwner'])
   })
 

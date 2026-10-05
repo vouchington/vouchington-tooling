@@ -34,6 +34,7 @@ export function createFactoryExportVisitors(
     provenance.isFactory(value) || provenance.isNamespace(value)
   const finalExpression = (value: NodeLike): NodeLike => {
     const current = unwrap(value) as NodeLike
+    if (current.type === 'AwaitExpression') return finalExpression(current.argument as NodeLike)
     return current.type === 'SequenceExpression'
       ? finalExpression((current.expressions as NodeLike[]).at(-1) as NodeLike)
       : current

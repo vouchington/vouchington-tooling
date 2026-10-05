@@ -231,6 +231,13 @@ describe('patternPropertyName and memberIsRead', () => {
     expect(
       patternPropertyName({
         type: 'Property',
+        computed: true,
+        key: { type: 'Literal', value: null },
+      }),
+    ).toBe('null')
+    expect(
+      patternPropertyName({
+        type: 'Property',
         computed: false,
         key: { type: 'Identifier', name: 1 },
       }),

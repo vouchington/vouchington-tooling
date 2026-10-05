@@ -51,7 +51,12 @@ export function createFactoryProvenance(
       return propertyName(current) === 'default' && isNamespace(current.object as NodeLike, active)
     }
     if (current?.type === 'CallExpression') {
-      const loader = findVariable(context, unwrap(current.callee as NodeLike) as NodeLike)
+      const rawCallee = unwrap(current.callee as NodeLike) as NodeLike
+      const callee =
+        rawCallee.type === 'SequenceExpression'
+          ? (unwrap((rawCallee.expressions as NodeLike[]).at(-1)) as NodeLike)
+          : rawCallee
+      const loader = findVariable(context, callee)
       const definition = loader?.defs.find((entry) => entry.type === 'Variable')
       if (
         definition &&

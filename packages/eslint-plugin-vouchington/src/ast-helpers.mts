@@ -110,7 +110,9 @@ export function patternPropertyName(
     const name = (property.key as NodeLike).name
     return typeof name === 'string' ? name : null
   }
-  return staticPropertyName(property.key as NodeLike | undefined)
+  const key = property.key as NodeLike | undefined
+  if (property.computed && key?.type === 'Literal' && key.value === null) return 'null'
+  return staticPropertyName(key)
 }
 
 export function memberIsRead(node: NodeLike): boolean {
