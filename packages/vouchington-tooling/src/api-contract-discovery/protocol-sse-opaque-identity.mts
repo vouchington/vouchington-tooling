@@ -82,7 +82,7 @@ export function opaqueArgumentExcludesSelectedStream(
     )
       return false
     if (
-      !independentArgumentOrigin(actual, checker) &&
+      !independentArgumentOrigin(actual, checker, frame) &&
       !selectedStreamHasFreshOrigin(actual, checker)
     )
       return false

@@ -1,6 +1,6 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
-import { literalStrings } from './protocol-platform-mutation-targets.mts'
+import { literalStrings, mutatorKind, sourceKeys } from './protocol-platform-mutation-targets.mts'
 
 const contexts = new WeakMap<
   ts.TypeChecker,
@@ -83,6 +83,20 @@ export function nodePassThroughUnmodified(source: ts.SourceFile, checker: ts.Typ
       nodeModuleApi(node.expression, 'syncBuiltinESMExports', checker)
     )
       synced = true
+    if (ts.isCallExpression(node)) {
+      const kind = mutatorKind(node, checker, undefined)
+      const target = node.arguments[0]
+      if (kind && target && requiredStream(target, checker)) {
+        const affectsExport = (keys: readonly string[] | undefined) =>
+          !keys || keys.includes('PassThrough')
+        if (
+          kind === 'assign'
+            ? node.arguments.slice(1).some((value) => affectsExport(sourceKeys(value, checker)))
+            : affectsExport(literalStrings(node.arguments[1], checker))
+        )
+          mutated = true
+      }
+    }
     if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
