@@ -1,5 +1,6 @@
 import ts from '@typescript/typescript6'
 import { getPropertyNameText, getStringLiteralValue, unwrapExpression } from './ast.mts'
+import { getConfiguredPropertyName } from './create-page-properties.mts'
 
 /** Inspect syntax nodes so comments and strings containing example code are ignored. */
 export function collectCreatePageLiterals(
@@ -19,10 +20,7 @@ export function collectCreatePageLiterals(
         if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
           if (configuredBeforeSpread)
             throw new Error(`${file}: create page type can be overridden by a trailing spread`)
-        } else if (
-          (ts.isPropertyAssignment(member) && names.has(getPropertyNameText(member.name) ?? '')) ||
-          (ts.isJsxAttribute(member) && ts.isIdentifier(member.name) && names.has(member.name.text))
-        ) {
+        } else if (getConfiguredPropertyName(member, names) !== undefined) {
           configuredBeforeSpread = true
         }
       }
@@ -33,11 +31,7 @@ export function collectCreatePageLiterals(
           const expression = unwrapExpression(member.expression)
           if (ts.isObjectLiteralExpression(expression)) {
             for (const later of node.properties.slice(index + 1)) {
-              const name = ts.isPropertyAssignment(later)
-                ? getPropertyNameText(later.name)
-                : ts.isJsxAttribute(later) && ts.isIdentifier(later.name)
-                  ? later.name.text
-                  : undefined
+              const name = getConfiguredPropertyName(later, names)
               if (name && names.has(name)) overridden.add(name)
             }
           }
@@ -54,6 +48,10 @@ export function collectCreatePageLiterals(
       if (names.has(name) && !ignoredProperties.has(name) && value === undefined)
         throw new Error(`${file}: create page ${name} must be a string literal`)
       if (names.has(name) && !ignoredProperties.has(name) && value !== undefined) values.push(value)
+      ts.forEachChild(node, (child) => visit(child, new Set()))
+      return
+    } else if (ts.isShorthandPropertyAssignment(node) && names.has(node.name.text)) {
+      throw new Error(`${file}: create page ${node.name.text} must be a string literal`)
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && names.has(node.name.text)) {
       const value =
         node.initializer && ts.isJsxExpression(node.initializer)

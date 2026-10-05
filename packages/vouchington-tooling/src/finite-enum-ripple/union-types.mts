@@ -83,6 +83,12 @@ export function checkUnionTypes(
     const typedRouteConfigs = routeConfigs.filter(
       (routeConfig) => routeConfig.unionTypes.length > 0,
     )
+    const effectiveSingleTypeRouteConfigs = routeConfigs.flatMap((routeConfig) => {
+      if (routeConfig.unionTypes.length === 1) return [routeConfig]
+      if (!config.routeConfigExceptions.includes(routeConfig.key)) return []
+      const inferredType = slugToType.get(routeConfig.singularPath)
+      return inferredType === undefined ? [] : [{ ...routeConfig, unionTypes: [inferredType] }]
+    })
     for (const routeConfig of routeConfigs) {
       if (
         routeConfig.unionTypes.length > 0 ||
@@ -173,7 +179,7 @@ export function checkUnionTypes(
     })
     checkUnionCreatePageTypes(
       errors,
-      typedRouteConfigs,
+      effectiveSingleTypeRouteConfigs,
       files.unionCreatePages,
       readTracked,
       config.createPageTypeProperties,
@@ -183,7 +189,7 @@ export function checkUnionTypes(
       files.unionCollectionPages,
       errors,
       config.collectionLabel,
-      new Set(typedRouteConfigs.map((routeConfig) => routeConfig.pluralPath)),
+      new Set(effectiveSingleTypeRouteConfigs.map((routeConfig) => routeConfig.pluralPath)),
       readTracked,
       config.collectionPathLiteralPattern,
     )

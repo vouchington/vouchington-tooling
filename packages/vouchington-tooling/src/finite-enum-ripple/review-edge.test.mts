@@ -121,6 +121,13 @@ it('keeps route matches active after JSX apostrophes and regex quotes', () => {
       'page.ts',
     ),
   ).toEqual(['stale'])
+  expect(
+    collectActivePatternCaptures(
+      "const identity = <T>(value: T) => value; push('/later')",
+      /push\('\/([^']+)'\)/g,
+      'page.ts',
+    ),
+  ).toEqual(['later'])
 })
 
 it('accepts an empty string constituent in a finite union', () => {
@@ -130,18 +137,24 @@ it('accepts an empty string constituent in a finite union', () => {
   ])
 })
 
-it('accepts an empty union value mapped through a single-type route', () => {
+it('uses inferred exception routes for create-page and collection-path checks', () => {
   const contents = new Map([
     ['types.ts', "type Kind = '' | 'entry'"],
     [
       'routes.ts',
       "const slugs = { root: '', entry: 'entry' }; const routes = { roots: { singular: 'root', plural: 'roots', kinds: [''] }, entries: { singular: 'entry', plural: 'entries' } }",
     ],
+    ['create.tsx', "const fields = { action: 'entry' }"],
+    ['collection.tsx', "const route = { path: '/wrong' }"],
+    ['collection-root.tsx', "const route = { path: '/roots' }"],
   ])
   const files: FiniteEnumFiles = {
     existingFileSet: new Set(contents.keys()),
-    unionCollectionPages: [],
-    unionCreatePages: [],
+    unionCollectionPages: [
+      { file: 'collection.tsx', slug: 'entries', isTopLevel: true },
+      { file: 'collection-root.tsx', slug: 'roots', isTopLevel: true },
+    ],
+    unionCreatePages: [{ file: 'create.tsx', slug: 'entries', isTopLevel: true }],
     unionDetailPages: [],
     structuredCollectionPages: [],
     structuredComponentFiles: [],
@@ -174,6 +187,10 @@ it('accepts an empty union value mapped through a single-type route', () => {
   checkUnionTypes(errors, files, (path) => contents.get(path)!, config)
   expect(errors.join('\n')).not.toContain('maps singular')
   expect(errors.join('\n')).not.toContain('route config singular paths mismatch')
+  expect(errors.join('\n')).not.toContain('no matching single-type route config')
+  expect(errors.join('\n')).toContain(
+    'collection path literal "/wrong" does not match route directory "entries"',
+  )
 })
 
 it('counts an inferred exempt structured route as a present declaration value', () => {
@@ -327,6 +344,7 @@ it('rejects selected create pages with no literal or with dynamic configured val
   expect(errors.join('\n')).toContain('no inspectable type literal')
   for (const source of [
     'const fields = { action: selectedType }',
+    "const action = choose(); const fields = { action, other: 'entry' }",
     'const view = <Form action={selectedType} />',
     'form.action = selectedType',
   ]) {
@@ -366,6 +384,13 @@ it('rejects object and JSX spreads after a configured create-page type', () => {
       ]),
     ).toEqual(['entry'])
   }
+  expect(
+    collectCreatePageLiterals(
+      "const fields = { ...{ nested: { action: 'wrong' } }, action: 'entry' }",
+      'page.ts',
+      ['action'],
+    ),
+  ).toEqual(['wrong', 'entry'])
 })
 
 it('retains empty create-page values in objects, JSX, and assignments', () => {
