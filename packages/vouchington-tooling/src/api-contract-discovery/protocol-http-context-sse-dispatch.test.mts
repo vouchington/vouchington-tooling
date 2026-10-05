@@ -1,53 +1,83 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
-import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;
+const preamble = `import {PassThrough} from 'node:stream';
+  declare const app:any;
   declare function apiNoContent(key:string):void;
   declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
-  class Stream{write(_value:string){return true}}
-  type SSEContext={stream:Stream};
+  type SSEContext={stream:PassThrough};
   function start(ctx:any):SSEContext{
-    const stream=new Stream();ctx.pipeline(stream);return {stream}}`
+    const stream=new PassThrough();ctx.pipeline(stream);return {stream}}`
 const frame = `apiSseFrame('GET:/events',{event:'done' as const,data:{ok:true}})`
 const sources = {
   'framed-get': `${preamble}
     app.route('/events').get((ctx:any)=>{
-      const holder=start(ctx);holder.stream.write(${frame})})`,
+      const {stream}=start(ctx);stream.write(${frame})})`,
   'shared-helper': `${preamble}
     app.route('/events').get((ctx:any)=>{
-      const holder=start(ctx);holder.stream.write(${frame})});
+      const {stream}=start(ctx);stream.write(${frame})});
     app.route('/plain').put((ctx:any)=>{
       apiNoContent('PUT:/plain');start(ctx)})`,
   'second-stream': `${preamble}
     app.route('/events').get((ctx:any)=>{
-      const first=start(ctx);start(ctx);first.stream.write(${frame})})`,
+      const {stream}=start(ctx);start(ctx);stream.write(${frame})})`,
   'manual-json': `${preamble.replace('ctx.pipeline(stream);', 'ctx.pipeline(stream);ctx.json({unexpected:true});')}
     app.route('/events').get((ctx:any)=>{
-      const holder=start(ctx);holder.stream.write(${frame})})`,
+      const {stream}=start(ctx);stream.write(${frame})})`,
   'missing-pipeline-stream': `${preamble.replace('ctx.pipeline(stream);', 'ctx.pipeline();')}
     app.route('/events').get((ctx:any)=>{
-      const holder=start(ctx);holder.stream.write(${frame})})`,
+      const {stream}=start(ctx);stream.write(${frame})})`,
   'captured-context-pipeline': `${preamble.replace(
     'ctx.pipeline(stream);',
     'function emit(n:number){ctx.pipeline(stream)}emit(1);',
   )}
     app.route('/events').get((ctx:any)=>{
-      const holder=start(ctx);holder.stream.write(${frame})})`,
+      const {stream}=start(ctx);stream.write(${frame})})`,
 } as const
 type SourceName = keyof typeof sources
-let matrix: VirtualProgramMatrix<SourceName>
+let program: ts.Program
+let fixtureDirectory: string
+const fixtureFiles = new Map<SourceName, string>()
+
+function sourceFile(name: SourceName): ts.SourceFile {
+  const file = fixtureFiles.get(name)
+  if (!file) throw new Error(`Missing fixture ${name}`)
+  const source = program.getSourceFile(file)
+  if (!source) throw new Error(`Missing source ${file}`)
+  return source
+}
 
 function contracts(name: SourceName, keys: readonly string[]) {
-  return discoverApiResponseContracts(matrix.program, [matrix.sourceFile(name)], new Set(keys))
+  return discoverApiResponseContracts(program, [sourceFile(name)], new Set(keys))
 }
 
 describe('HTTP context emissions follow the selected SSE route and stream', () => {
   beforeAll(() => {
-    matrix = buildVirtualProgramMatrix(import.meta, sources)
-    for (const name of Object.keys(sources) as SourceName[]) matrix.sourceFile(name)
+    fixtureDirectory = mkdtempSync(join(tmpdir(), 'sse-dispatch-'))
+    for (const [name, source] of Object.entries(sources) as [SourceName, string][]) {
+      const file = join(fixtureDirectory, `${name}.ts`)
+      writeFileSync(file, source)
+      fixtureFiles.set(name, file)
+    }
+    program = ts.createProgram([...fixtureFiles.values()], {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      noEmit: true,
+      skipLibCheck: true,
+      strict: true,
+      target: ts.ScriptTarget.ESNext,
+      typeRoots: [join(dirname(fileURLToPath(import.meta.url)), '../../../../node_modules/@types')],
+      types: ['node'],
+    })
+    expect(ts.getPreEmitDiagnostics(program)).toEqual([])
   })
+  afterAll(() => rmSync(fixtureDirectory, { recursive: true, force: true }))
 
   it('keeps a framed stream returned through an explicit helper result as SSE', () => {
     const row = contracts('framed-get', ['GET:/events'])['GET:/events']
