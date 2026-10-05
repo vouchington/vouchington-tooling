@@ -1,6 +1,7 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { yieldsBoundHttpContext } from './protocol-http-context-bound-nodes.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { methodAccess } from './protocol-http-method-access.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
 import {
@@ -29,6 +30,8 @@ export function opaqueWrappedHttpContextArgument(
   function captures(argument: ts.Expression): boolean {
     const value = unwrapExpression(argument)
     if (ts.isCallExpression(value)) {
+      const method = methodAccess(unwrapExpression(value.expression))
+      if (method?.name === 'bind') return captures(method.receiver)
       const generator = resolver.resolve(value.expression, env)?.node
       return (
         !!generator &&
