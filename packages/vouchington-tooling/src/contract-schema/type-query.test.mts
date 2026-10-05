@@ -35,6 +35,10 @@ export interface RequiredThenDefaulted {
   <T extends string>(): T
   <T = Projected>(): T
 }
+export interface CrossOverloadDefaults {
+  <T = { first: string }>(): T
+  <T = { second: number }, U = T>(argument: 1): U
+}
 export function overloaded<T>(): T
 export function overloaded<T = Projected>(): T { throw new Error('not called') }
 namespace Types { export interface External { id: string } }
@@ -261,6 +265,15 @@ describe('type-query exported facts', () => {
         }),
       ).toThrow(/Missing default for type parameter 0/)
     }
+    expect(() =>
+      getExportedTypeFacts({
+        typescript: ts,
+        program,
+        fileName: contracts,
+        exportName: 'CrossOverloadDefaults',
+        defaultTypeParameterIndex: 1,
+      }),
+    ).toThrow(/Missing default for type parameter 1/)
   })
 
   it('follows a reexport to its declared type in a second real source file', () => {
