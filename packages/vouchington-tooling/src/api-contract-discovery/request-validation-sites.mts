@@ -86,6 +86,7 @@ export function factorySite(
   call: ts.CallExpression,
   config: FactoryConfig,
   scope: Scope,
+  conditional: boolean,
 ): FactorySite {
   const operation =
     resolveOptionString(
@@ -103,6 +104,7 @@ export function factorySite(
       unresolvedReason: `option "${config.operationProperty}" is not statically resolvable`,
     }),
     carriers: [...config.carriers],
+    conditional,
   }
 }
 

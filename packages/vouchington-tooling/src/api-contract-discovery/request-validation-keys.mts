@@ -34,7 +34,23 @@ function constInitializer(
   return declaration?.initializer && isConst(declaration) ? declaration.initializer : undefined
 }
 
-/** Resolves string literals, const identifiers and bound parameters; anything else is `undefined`. */
+/** Folds a template literal whose every substitution resolves to a static string. */
+function resolveTemplate(
+  template: ts.TemplateExpression,
+  checker: ts.TypeChecker,
+  bindings: KeyBindings,
+  seen: Set<ts.Node>,
+): string | undefined {
+  let text = template.head.text
+  for (const span of template.templateSpans) {
+    const part = resolveKey(span.expression, checker, bindings, seen)
+    if (part === undefined) return undefined
+    text += part + span.literal.text
+  }
+  return text
+}
+
+/** Resolves string literals, templates, const identifiers and bound parameters, else `undefined`. */
 export function resolveKey(
   expression: ts.Expression | undefined,
   checker: ts.TypeChecker,
@@ -44,6 +60,7 @@ export function resolveKey(
   if (!expression) return undefined
   const value = unwrapTransparentExpression(expression)
   if (ts.isStringLiteralLike(value)) return value.text
+  if (ts.isTemplateExpression(value)) return resolveTemplate(value, checker, bindings, seen)
   if (!ts.isIdentifier(value)) return undefined
   const symbol = identifierSymbol(value, checker)
   const bound = symbol && bindings.get(symbol)

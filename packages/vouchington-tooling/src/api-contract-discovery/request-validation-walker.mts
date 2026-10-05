@@ -13,6 +13,7 @@ import {
   inlineFunction,
   type Scope,
 } from './request-validation-follow.mts'
+import { calledFactory } from './request-validation-factory-calls.mts'
 import { findConfig } from './request-validation-match.mts'
 import type { KeyBindings } from './request-validation-keys.mts'
 import type { RootBindings } from './request-validation-origin.mts'
@@ -98,16 +99,31 @@ export function createRouteWalker(config: WalkerConfig) {
     return true
   }
 
+  /** Records a factory site once per call node; one reached both ways is unconditional. */
+  function recordFactory(
+    call: ts.CallExpression,
+    factory: FactoryConfig,
+    state: State,
+    conditional: boolean,
+  ) {
+    const site = factorySite(call, factory, scopeOf(state), conditional)
+    const { conditional: merged, ...identity } = site
+    report('factory', facts.factorySites, site, call, identity).conditional &&= merged
+  }
+
   /** Records a configured factory call whose returned handler is a registration-time value. */
   function reportFactory(call: ts.CallExpression, state: State) {
     const factory = findConfig(call.expression, factories, checker)
     if (!factory) return false
-    report('factory', facts.factorySites, factorySite(call, factory, scopeOf(state)), call)
+    recordFactory(call, factory, state, state.conditional || isConditionalPosition(call))
     return true
   }
 
   function visitCall(call: ts.CallExpression, state: State) {
     const conditional = state.conditional || isConditionalPosition(call)
+    // A handler built by a configured factory at module level and invoked here.
+    const built = calledFactory(call, factories, checker)
+    if (built) recordFactory(built.call, built.config, emptyState, conditional)
     const callee = inlineFunction(unwrapTransparentExpression(call.expression))
     const runners = new Set<ts.Node>(callee ? [callee] : [])
     if (callee) {

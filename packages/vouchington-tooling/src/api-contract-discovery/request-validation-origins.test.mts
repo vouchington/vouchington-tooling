@@ -150,13 +150,8 @@ describe('request validation carrier origins', () => {
 
   it('binds helper parameters to call-site origins and reports unbound ones', () => {
     expect(carriers('bound-body')).toEqual([{ carrier: 'body', origins: ['body'] }])
-    expect(carriers('no-argument')).toEqual([
-      {
-        carrier: 'body',
-        origins: [],
-        unresolved: 'parameter `raw` has no call-site binding',
-      },
-    ])
+    // An omitted optional argument is the default, not an unknown value.
+    expect(carriers('no-argument')).toEqual([{ carrier: 'body', origins: [] }])
     expect(facts['GET:/api/extra']!.validatorSites[0]!.carriers[0]).toMatchObject({
       origins: [],
       unresolved: 'parameter `extra` has no call-site binding',

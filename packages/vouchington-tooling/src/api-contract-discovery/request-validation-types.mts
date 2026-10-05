@@ -63,6 +63,8 @@ export type FactorySite = {
   operation: string | null
   unresolvedReason?: string
   carriers: Carrier[]
+  /** True when the factory call is reached only under a branch, loop or short-circuit. */
+  conditional: boolean
 }
 
 /**

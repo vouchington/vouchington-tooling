@@ -29,7 +29,7 @@ function moduleMatches(fileName: string, module: string): boolean {
 
 /** True when the symbol is the configured export of a declaration file matching the module. */
 function matchesExport(symbol: ts.Symbol, config: ExportRef, checker: ts.TypeChecker): boolean {
-  return symbol.declarations!.some((declaration) => {
+  return (symbol.declarations ?? []).some((declaration) => {
     const file = declaration.getSourceFile()
     if (!moduleMatches(file.fileName, config.module)) return false
     const moduleSymbol = checker.getSymbolAtLocation(file)
