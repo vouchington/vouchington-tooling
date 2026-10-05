@@ -2,6 +2,7 @@ import ts from '../contract-schema/typescript-api.mts'
 import { contextResponseMethod } from './protocol-http-context.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
+import { contextMutationTargets } from './protocol-http-context-write-targets.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 
 const responseMethods = new Set([
@@ -20,24 +21,11 @@ export function mutatesHttpResponseMethod(
   checker: ts.TypeChecker,
   boundHandler?: ts.Node,
 ): boolean {
-  let target: ts.Expression | undefined
   if (
-    ts.isBinaryExpression(node) &&
-    node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-    node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-  )
-    target = node.left
-  if (ts.isDeleteExpression(node)) target = node.expression
-  if (
-    (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
-    (node.operator === ts.SyntaxKind.PlusPlusToken ||
-      node.operator === ts.SyntaxKind.MinusMinusToken)
-  )
-    target = node.operand
-  if (
-    !target ||
-    !responseMethods.has(
-      contextResponseMethod(unwrapExpression(target), context, checker, true) ?? '',
+    !contextMutationTargets(node).some((target) =>
+      responseMethods.has(
+        contextResponseMethod(unwrapExpression(target), context, checker, true) ?? '',
+      ),
     )
   )
     return false
