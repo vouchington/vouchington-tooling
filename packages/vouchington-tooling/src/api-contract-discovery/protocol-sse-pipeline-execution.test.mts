@@ -14,6 +14,12 @@ const fixture = (pipeline: string) => `declare const app:any;declare const choos
  sse.stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{ok:true}}))})`
 const sources = {
   direct: fixture('ctx.pipeline(stream)'),
+  labeled: fixture('block:{if(choose)break block;ctx.pipeline(stream)}'),
+  nestedlabel: fixture('outer:{inner:{if(choose)break outer;ctx.pipeline(stream)}}'),
+  directlabel: fixture('block:{ctx.pipeline(stream)}'),
+  deadlabel: fixture('block:{if(false)break block;ctx.pipeline(stream)}'),
+  separatelabel: fixture('block:{prior:{if(choose)break prior};ctx.pipeline(stream)}'),
+  separateloop: fixture('while(choose){break};ctx.pipeline(stream)'),
   dead: fixture('if(false)return {stream};ctx.pipeline(stream)'),
   local: fixture('function unused(){return stream};ctx.pipeline(stream)'),
   chained: fixture('const result=ctx.pipeline(stream).catch(()=>{})'),
@@ -78,11 +84,17 @@ function accounted(name: keyof typeof sources): boolean {
   expect(expressionReceiver(pipeline.arguments[0]!, checker)).toBeDefined()
   return proof(pipeline, context, invocation, invocation)
 }
-it.each(['conditional', 'logical', 'ternary', 'loop', 'early'] as const)(
+it.each(['conditional', 'logical', 'ternary', 'loop', 'early', 'labeled', 'nestedlabel'] as const)(
   'rejects unproven pipeline execution in %s',
   (name) => expect(accounted(name)).toBe(false),
 )
-it.each(['direct', 'chained', 'dead', 'local'] as const)(
-  'preserves unconditional pipeline in %s',
-  (name) => expect(accounted(name)).toBe(true),
-)
+it.each([
+  'direct',
+  'chained',
+  'dead',
+  'local',
+  'directlabel',
+  'deadlabel',
+  'separatelabel',
+  'separateloop',
+] as const)('preserves unconditional pipeline in %s', (name) => expect(accounted(name)).toBe(true))
