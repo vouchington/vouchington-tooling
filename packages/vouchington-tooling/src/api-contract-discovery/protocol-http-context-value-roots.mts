@@ -134,5 +134,18 @@ export function createContextValueRoots(
           )
     return primitive(checker.getTypeAtLocation(node))
   }
-  return { root, primitiveMember, primitiveValue }
+  function referencesContainer(
+    expression: ts.Expression,
+    symbol: ts.Symbol,
+    module?: ts.Symbol,
+    captures: ReadonlySet<ts.Symbol> = new Set(),
+  ): boolean {
+    const target = root(expression)
+    return (
+      target === symbol ||
+      captures.has(symbol) ||
+      (!!module && (target === module || captures.has(module)))
+    )
+  }
+  return { root, primitiveMember, primitiveValue, referencesContainer }
 }

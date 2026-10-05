@@ -25,7 +25,17 @@ export function unsupportedBoundContextNode(
     : ts.isArrowFunction(handler) && handler.body === node && ts.isExpression(node)
       ? node
       : undefined
+  const invoked = ts.isCallExpression(node)
+    ? unwrapExpression(node.expression)
+    : ts.isTaggedTemplateExpression(node)
+      ? unwrapExpression(node.tag)
+      : undefined
   return (
+    (invoked &&
+      ts.isElementAccessExpression(invoked) &&
+      !ts.isStringLiteral(invoked.argumentExpression) &&
+      httpContextArgument(invoked.expression, context, checker) &&
+      executableProtocolPath(node, checker, handler)) ||
     (!!returned &&
       executableProtocolPath(node, checker, handler) &&
       (httpContextArgument(returned, context, checker) ||
@@ -40,13 +50,16 @@ export function unsupportedBoundContextNode(
       executableProtocolPath(node, checker, handler)) ||
     opaqueHttpContextConstruction(node, checker, context, handler) ||
     (ts.isTaggedTemplateExpression(node) &&
-      ts.isTemplateExpression(node.template) &&
       executableProtocolPath(node, checker, handler) &&
-      node.template.templateSpans.some(
-        (span) =>
-          httpContextArgument(span.expression, context, checker) ||
-          wrappedHttpContextArgument(span.expression, context, checker),
-      ))
+      (['json', 'pipeline', 'setStatus', 'response.buffer', 'response.empty'].includes(
+        contextResponseMethod(node.tag, context, checker, true) ?? '',
+      ) ||
+        (ts.isTemplateExpression(node.template) &&
+          node.template.templateSpans.some(
+            (span) =>
+              httpContextArgument(span.expression, context, checker) ||
+              wrappedHttpContextArgument(span.expression, context, checker),
+          ))))
   )
 }
 
