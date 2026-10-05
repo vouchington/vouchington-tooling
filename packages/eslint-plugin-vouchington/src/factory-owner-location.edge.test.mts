@@ -106,11 +106,42 @@ Reflect.apply(makeGraph)
 Reflect.apply(makeGraph, null, [])
 Reflect.apply(makeGraph, null, null)
 Reflect.apply(makeGraph, null, 'args')
+Reflect.apply(makeGraph, null, undefined)
+Reflect.apply(makeGraph, null, NaN)
+Reflect.apply(makeGraph, null, Infinity)
 Reflect.apply(makeGraph, null, args)
 Reflect.other(makeGraph, [])
 Reflect.construct(makeGraph)
 Reflect.construct(makeGraph, [])
-Reflect.construct(makeGraph, 1)`,
+Reflect.construct(makeGraph, 1)
+Reflect.construct(makeGraph, [], () => {})
+function shadow(undefined, NaN, Infinity) {
+  Reflect.apply(makeGraph, null, undefined)
+  Reflect.construct(makeGraph, NaN)
+  Reflect.apply(makeGraph, null, Infinity)
+}`,
+    OPTIONS,
+    'src/check.js',
+  )
+  expect(messageIds(result)).toEqual([
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+    'constructionOwner',
+  ])
+})
+
+it('rejects primitive direct apply lists but permits empty-list values', async () => {
+  const result = await lintRule(
+    'factory-owner-location',
+    `import { makeGraph } from '1'
+makeGraph.apply(null, 1)
+makeGraph.apply(null, 'args')
+makeGraph.apply(null, null)
+makeGraph.apply(null, undefined)
+makeGraph.apply(null, args)`,
     OPTIONS,
     'src/check.js',
   )

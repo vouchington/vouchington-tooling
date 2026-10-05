@@ -35,16 +35,30 @@ function directReflectFactory(
   if (!reflectGlobal) return false
   const method = propertyName(member)
   const argumentList = method === 'apply' ? args[2] : method === 'construct' ? args[1] : undefined
-  return Boolean(argumentList && !isStaticPrimitive(argumentList) && isFactory(args[0]))
+  const newTarget = method === 'construct' ? args[2] : undefined
+  return Boolean(
+    argumentList &&
+    !isStaticPrimitive(context, argumentList) &&
+    !isKnownNonConstructor(newTarget) &&
+    isFactory(args[0]),
+  )
 }
 
-function isStaticPrimitive(value: NodeLike): boolean {
+function isStaticPrimitive(context: RuleContextLike, value: NodeLike): boolean {
   const current = unwrap(value)
   return Boolean(
     (current?.type === 'Literal' && !current.regex) ||
     current?.type === 'TemplateLiteral' ||
-    current?.type === 'UnaryExpression',
+    current?.type === 'UnaryExpression' ||
+    (current?.type === 'Identifier' &&
+      ['undefined', 'NaN', 'Infinity'].includes(String(current.name)) &&
+      !findVariable(context, current, true)?.defs.length),
   )
+}
+
+function isKnownNonConstructor(value: NodeLike | undefined): boolean {
+  const current = unwrap(value)
+  return current?.type === 'ArrowFunctionExpression'
 }
 
 function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null | undefined {
@@ -55,12 +69,24 @@ function finalSequenceValue(value: NodeLike | null | undefined): NodeLike | null
 }
 
 function directFactoryMember(
+  context: RuleContextLike,
   callee: NodeLike,
+  args: readonly NodeLike[],
   isFactory: (value: NodeLike | null | undefined) => boolean,
 ): boolean {
   const member = unwrap(callee)
   if (member?.type !== 'MemberExpression') return false
   const method = propertyName(member)
+  if (method === 'apply') {
+    const argumentList = unwrap(args[1])
+    const emptyList =
+      argumentList?.type === 'Literal' && argumentList.value === null
+        ? true
+        : argumentList?.type === 'Identifier' &&
+          argumentList.name === 'undefined' &&
+          !findVariable(context, argumentList, true)?.defs.length
+    if (argumentList && !emptyList && isStaticPrimitive(context, argumentList)) return false
+  }
   return (method === 'call' || method === 'apply') && isFactory(member.object as NodeLike)
 }
 
@@ -76,7 +102,7 @@ export function createFactoryInvocationVisitors(
       const args = value.arguments as NodeLike[]
       if (
         isFactory(callee) ||
-        directFactoryMember(callee, isFactory) ||
+        directFactoryMember(context, callee, args, isFactory) ||
         directReflectFactory(context, callee, args, isFactory)
       )
         report(value)
@@ -86,7 +112,7 @@ export function createFactoryInvocationVisitors(
     },
     TaggedTemplateExpression(value) {
       const tag = value.tag as NodeLike
-      if (isFactory(tag) || directFactoryMember(tag, isFactory)) report(value)
+      if (isFactory(tag) || directFactoryMember(context, tag, [], isFactory)) report(value)
     },
     Decorator(value) {
       if (isFactory(value.expression as NodeLike)) report(value)
