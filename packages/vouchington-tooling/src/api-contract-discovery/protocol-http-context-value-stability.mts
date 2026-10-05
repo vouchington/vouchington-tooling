@@ -1,7 +1,8 @@
 import { createContextReceiverChecks } from './protocol-http-context-receiver-checks.mts'
 import { contextWriteTargets } from './protocol-http-context-write-targets.mts'
 import ts from '../contract-schema/typescript-api.mts'
-import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { contextFunctionOwns } from './protocol-http-context-capture.mts'
 import { createContextValueRoots } from './protocol-http-context-value-roots.mts'
 import { isProtocolCallbackFunction } from './protocol-callback-values.mts'
 import { createLiteralWrapperIndex } from './protocol-http-context-literal-wrappers.mts'
@@ -35,7 +36,7 @@ export function createContextValueStability(
         ? unwrapExpression(declaration.initializer)
         : declaration
     if (!value || isProtocolCallbackFunction(value)) return false
-    if (owner && declaration && enclosingFunction(declaration) === owner) {
+    if (owner && declaration && contextFunctionOwns(declaration, owner)) {
       if (ts.isParameter(declaration)) return false
       return [...facts(declaration.getSourceFile()).wrappers.capture(value)].some((captured) =>
         capturedContainer(captured, owner, new Set(seen).add(symbol)),

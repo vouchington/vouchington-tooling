@@ -75,6 +75,23 @@ const sources = {
     `function makeOptions(){const local={assertAccess:(ctx:any)=>ctx.assert(true)};
      return local}const options=makeOptions();`,
   ),
+  'returned-async-method-control.ts': `declare const app:any;
+    declare function apiNoContent(key:string):void;
+    declare function knownData(id:number):Promise<number[]>;
+    function createUpsert(){return async function upsert(id:number){
+      const rows=await knownData(id);return rows}}
+    const options={assertAccess:(ctx:any)=>ctx.assert(true),upsert:createUpsert()};
+    type Options={assertAccess:(ctx:any)=>void;upsert:(id:number)=>Promise<number[]>};
+    function factory(options:Options){return(ctx:any)=>{
+      void options.upsert(1);options.assertAccess(ctx);ctx.setStatus(204)}}
+    app.route('/vote').put((ctx:any)=>{
+      apiNoContent('PUT:/vote');const handler=factory(options);handler(ctx)})
+    export {}`,
+  'nested-returned-wrapper-exposure.ts': route(
+    `${callback}function createExpose(){return function expose(){
+       const local={options};return local}}
+     opaque(createExpose()());`,
+  ),
   'shared-safe-first.ts': sharedRoutes(['safe', 'unsafe']),
   'shared-unsafe-first.ts': sharedRoutes(['unsafe', 'safe']),
   'nested-receiver-opaque.ts': `declare const app:any;
@@ -134,6 +151,7 @@ describe('HTTP callback proof observes consumer writes and exposures', () => {
     'immutable-control.ts',
     'arrow-receiver-control.ts',
     'fresh-local-options-control.ts',
+    'returned-async-method-control.ts',
   ] as const)('retains a callback that remains concrete in %s', (name) => {
     const row = contract(name)
     expect(row?.unavailableReason).toBeUndefined()
@@ -154,6 +172,7 @@ describe('HTTP callback proof observes consumer writes and exposures', () => {
     'named-local-wrapper-exposure.ts',
     'forwarded-wrapper-exposure.ts',
     'opaque-receiver.ts',
+    'nested-returned-wrapper-exposure.ts',
   ] as const)('rejects uncertain callback after %s', (name) => {
     const row = contract(name)
     expect(row?.statusKnowledge).toBe('unknown')
