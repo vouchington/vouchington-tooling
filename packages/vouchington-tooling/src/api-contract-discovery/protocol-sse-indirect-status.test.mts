@@ -3,8 +3,8 @@ import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;declare const other:any;
-  declare const stream:{write(value:string):void};
+const preamble = `declare const app:any;class Context{setStatus(_status:number):void{}}const other=new Context();
+  class Stream{write(_value:string):void{}}const stream=new Stream();
   declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
   function ignore(callback:()=>void){}
   function invoke(callback:()=>void){callback()}`

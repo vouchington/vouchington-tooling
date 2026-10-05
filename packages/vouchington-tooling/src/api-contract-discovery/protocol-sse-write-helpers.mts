@@ -14,11 +14,7 @@ import {
   type HandlerBindings,
   type RouteBinding,
 } from './response-contract-route-analysis.mts'
-import {
-  expressionReceiver,
-  sameWriteReceiver,
-  type WriteReceiver,
-} from './protocol-write-receiver.mts'
+import { expressionReceiver, type WriteReceiver } from './protocol-write-receiver.mts'
 
 export function routeKey(binding: RouteBinding): string {
   return `${binding.method}:${binding.routeTemplate}`
@@ -53,20 +49,28 @@ export function opaqueCallReceivesSelectedStream(
 ): boolean {
   const implementation = ts.isCallExpression(call) && lookup.implementationCall(call)
   if (implementation && ts.isFunctionLike(implementation) && 'body' in implementation) return false
-  const framed = selectedReceivers.flatMap((receiver) =>
-    actualReceivers(receiver, binding, checker, lookup),
+  const framed = selectedReceivers.flatMap((frame) =>
+    actualReceivers(frame, binding, checker, lookup).map((value) => value ?? frame),
   )
   return (
     call.arguments?.some((argument) =>
-      someSseArgumentValue(argument, checker, (value) => {
-        const receiver = expressionReceiver(value, checker)
+      someSseArgumentValue(argument, checker, (leaf) => {
+        const receiver = expressionReceiver(leaf, checker)
         if (!receiver) return false
-        if (opaqueArgumentExcludesSelectedStream(call, value, receiver, selectedReceivers, checker))
+        if (
+          !receiver.mutableAlias &&
+          opaqueArgumentExcludesSelectedStream(call, leaf, receiver, framed, checker)
+        )
           return false
-        return actualReceivers(receiver, binding, checker, lookup).some(
-          (actual) =>
-            actual === undefined ||
-            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, actual)),
+        const values = actualReceivers(receiver, binding, checker, lookup)
+        // Resolve known helper forwarding before requiring independent allocation evidence.
+        return (
+          !values.length ||
+          values.some(
+            (value) =>
+              value === undefined ||
+              !opaqueArgumentExcludesSelectedStream(call, leaf, value, framed, checker),
+          )
         )
       }),
     ) ?? false

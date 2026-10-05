@@ -127,3 +127,9 @@ export function factoryCreatesFreshSelectedStream(
     })
   )
 }
+
+/** A direct new expression must use the same bounded constructor proof as stream factories. */
+export function freshStreamAllocation(expression: ts.Expression, checker: ts.TypeChecker): boolean {
+  const value = unwrapExpression(expression)
+  return ts.isNewExpression(value) && freshConstructor(value, checker)
+}

@@ -2,8 +2,8 @@ import { beforeAll, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;declare const stream:{write(...values:any[]):void;end(...values:any[]):void;flush(...values:any[]):void};
-  declare const other:typeof stream;
+const preamble = `declare const app:any;class Stream{write(..._values:any[]):void{}end(..._values:any[]):void{}flush(..._values:any[]):void{}}const stream=new Stream();
+  const other=new Stream();
   declare function apiSseFrame<K extends string,T>(key:K,event:T):string;`
 const frame = `stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}));`
 const route = (body: string) => `${preamble}app.route('/events').get(()=>{${frame}${body}})`

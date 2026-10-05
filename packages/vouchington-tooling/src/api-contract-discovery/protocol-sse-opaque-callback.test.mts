@@ -5,8 +5,8 @@ import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;declare const stream:{write(value:string):void;end(value?:string):void};
-  declare const other:typeof stream;declare function opaque(callback:any):void;
+const preamble = `declare const app:any;class Stream{write(_value:string):void{}end(_value?:string):void{}}const stream=new Stream();
+  const other=new Stream();declare function opaque(callback:any):void;
   declare function opaqueWriter(destination:typeof stream):void;
   declare const service:{write(value:typeof stream):void;end(value:typeof stream):void;consume(value:typeof stream):void};
   declare function apiSseFrame<K extends string,T>(key:K,event:T):string;`
@@ -72,7 +72,7 @@ const nodeSources = {
     app.route('/events').get(()=>{stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}));if(false)pipeline(source,stream,()=>{})})`,
   'node-pipeline-other-destination': `import { PassThrough, Readable, pipeline } from 'node:stream';
     declare const app:any;declare function apiSseFrame<K extends string,T>(key:K,event:T):string;
-    const stream=new PassThrough();const other=new PassThrough();const source=Readable.from(['raw']);
+    const stream=new PassThrough();const other=new PassThrough();const source=new PassThrough();
     app.route('/events').get(()=>{stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}));pipeline(source,other,()=>{})})`,
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>

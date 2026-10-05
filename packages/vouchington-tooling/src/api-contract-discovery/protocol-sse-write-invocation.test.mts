@@ -2,9 +2,9 @@ import { beforeAll, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
-const preamble = `declare const app:any;declare const stream:{write(...values:any[]):void;end(...values:any[]):void;flush(...values:any[]):void};
-  declare const source:{pipe(destination:typeof stream):typeof stream};
-  declare const other:typeof stream;
+const preamble = `declare const app:any;class Stream{write(..._values:any[]):void{}end(..._values:any[]):void{}flush(..._values:any[]):void{}}const stream=new Stream();
+  class Source{pipe(destination:typeof stream):typeof stream{return destination}}const source=new Source();
+  const other=new Stream();
   declare const stringPayloads:string[];declare const unknownPayloads:unknown[];
   declare function register(callback:()=>void):void;
   declare function apiSseFrame<K extends string,T>(key:K,event:T):string;`

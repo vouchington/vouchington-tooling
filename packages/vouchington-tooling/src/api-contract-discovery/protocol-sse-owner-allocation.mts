@@ -17,10 +17,10 @@ function hasRepeatingAncestor(node: ts.Node, owner: ts.Node): boolean {
 }
 
 /** A selected owner with no initializer cannot exist before its sole assignment. */
-export function ownerAssignedOnlyAfter(
-  call: ts.CallExpression,
+export function ownerHasFreshAllocation(
   receiver: WriteReceiver,
   checker: ts.TypeChecker,
+  call?: ts.CallExpression,
 ): boolean {
   const declaration = receiver.root.valueDeclaration
   const bindingOwner =
@@ -35,6 +35,8 @@ export function ownerAssignedOnlyAfter(
       : undefined
   if (
     declaration &&
+    receiver.path.length === 0 &&
+    !!enclosingFunction(declaration) &&
     bindingOwner &&
     bindingProperty &&
     ts.isIdentifier(bindingProperty) &&
@@ -42,9 +44,10 @@ export function ownerAssignedOnlyAfter(
     ts.isVariableDeclarationList(bindingOwner.parent) &&
     !!(bindingOwner.parent.flags & ts.NodeFlags.Const) &&
     ts.isCallExpression(unwrapExpression(bindingOwner.initializer)) &&
-    declaration.getSourceFile() === call.getSourceFile() &&
-    enclosingFunction(declaration) === enclosingFunction(call) &&
-    declaration.getStart() > call.getEnd() &&
+    (!call ||
+      (declaration.getSourceFile() === call.getSourceFile() &&
+        enclosingFunction(declaration) === enclosingFunction(call) &&
+        declaration.getStart() > call.getEnd())) &&
     !hasRepeatingAncestor(declaration, enclosingFunction(declaration)!) &&
     factoryCreatesFreshSelectedStream(
       unwrapExpression(bindingOwner.initializer) as ts.CallExpression,
@@ -57,11 +60,11 @@ export function ownerAssignedOnlyAfter(
     !declaration ||
     !ts.isVariableDeclaration(declaration) ||
     declaration.initializer ||
-    declaration.getSourceFile() !== call.getSourceFile()
+    (call && declaration.getSourceFile() !== call.getSourceFile())
   )
     return false
   const owner = enclosingFunction(declaration)
-  if (!owner || enclosingFunction(call) !== owner) return false
+  if (!owner || (call && enclosingFunction(call) !== owner)) return false
   let assignment: ts.BinaryExpression | undefined
   let invalidWrite = false
   const writesOwner = (node: ts.Node): boolean => {
@@ -97,7 +100,7 @@ export function ownerAssignedOnlyAfter(
     !invalidWrite &&
     assignment !== undefined &&
     enclosingFunction(assignment) === owner &&
-    assignment.getStart() > call.getEnd() &&
+    (!call || assignment.getStart() > call.getEnd()) &&
     !hasRepeatingAncestor(assignment, owner) &&
     receiver.path.length === 1 &&
     ts.isCallExpression(unwrapExpression(assignment.right)) &&
@@ -107,4 +110,13 @@ export function ownerAssignedOnlyAfter(
       checker,
     )
   )
+}
+
+/** Temporal exclusion additionally requires the allocation to occur after this call. */
+export function ownerAssignedOnlyAfter(
+  call: ts.CallExpression,
+  receiver: WriteReceiver,
+  checker: ts.TypeChecker,
+): boolean {
+  return ownerHasFreshAllocation(receiver, checker, call)
 }

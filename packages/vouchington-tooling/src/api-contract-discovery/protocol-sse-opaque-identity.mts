@@ -1,7 +1,11 @@
 import ts from '../contract-schema/typescript-api.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
-import { ownerAssignedOnlyAfter } from './protocol-sse-owner-allocation.mts'
+import {
+  ownerAssignedOnlyAfter,
+  ownerHasFreshAllocation,
+} from './protocol-sse-owner-allocation.mts'
 import { argumentMayReachFutureOwner } from './protocol-sse-future-owner.mts'
+import { freshStreamAllocation } from './protocol-sse-fresh-factory.mts'
 import { independentArgumentOrigin } from './protocol-sse-independent-origin.mts'
 import {
   expressionReceiver,
@@ -9,16 +13,18 @@ import {
   type WriteReceiver,
 } from './protocol-write-receiver.mts'
 
-function receiverType(receiver: WriteReceiver, checker: ts.TypeChecker): ts.Type | undefined {
+function selectedStreamHasFreshOrigin(receiver: WriteReceiver, checker: ts.TypeChecker): boolean {
+  if (ownerHasFreshAllocation(receiver, checker)) return true
   const declaration = receiver.root.valueDeclaration
-  if (!declaration) return undefined
-  let type = checker.getTypeOfSymbolAtLocation(receiver.root, declaration)
-  for (const part of receiver.path) {
-    const property = checker.getPropertyOfType(checker.getNonNullableType(type), part)
-    if (!property) return undefined
-    type = checker.getTypeOfSymbolAtLocation(property, declaration)
-  }
-  return checker.getNonNullableType(type)
+  return (
+    receiver.path.length === 0 &&
+    declaration !== undefined &&
+    ts.isVariableDeclaration(declaration) &&
+    ts.isVariableDeclarationList(declaration.parent) &&
+    !!(declaration.parent.flags & ts.NodeFlags.Const) &&
+    declaration.initializer !== undefined &&
+    freshStreamAllocation(declaration.initializer, checker)
+  )
 }
 
 function argumentMayContainSelectedSource(
@@ -75,17 +81,14 @@ export function opaqueArgumentExcludesSelectedStream(
       (actual.root.valueDeclaration && ts.isBindingElement(actual.root.valueDeclaration))
     )
       return false
-    if (!independentArgumentOrigin(actual, checker)) return false
-    const selectedType = receiverType(frame, checker)
+    if (
+      !independentArgumentOrigin(actual, checker) &&
+      !selectedStreamHasFreshOrigin(actual, checker)
+    )
+      return false
     return (
-      selectedType !== undefined &&
-      !(selectedType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) &&
-      !(
-        argumentType.flags &
-        (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Intersection)
-      ) &&
-      !checker.isTypeAssignableTo(selectedType, argumentType) &&
-      !checker.isTypeAssignableTo(argumentType, selectedType)
+      selectedStreamHasFreshOrigin(frame, checker) &&
+      !(argumentType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Intersection))
     )
   })
 }
