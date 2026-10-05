@@ -18,9 +18,10 @@ import { createContextPrototypeProof } from './protocol-http-context-prototype.m
 export function createHttpContextValueResolver(
   checker: ts.TypeChecker,
   programSources?: readonly ts.SourceFile[],
+  compilerOptions?: ts.CompilerOptions,
 ) {
   const callbacks = createProtocolCallbackValueResolver(checker)
-  const stable = createContextValueStability(checker, programSources)
+  const stable = createContextValueStability(checker, programSources, compilerOptions)
   const receivers = createContextReceiverGuard(checker, resolve)
   const prototypeSafe = createContextPrototypeProof(checker, programSources)
   function declaration(
@@ -171,4 +172,13 @@ export function createHttpContextValueResolver(
       _root: ts.CallExpression,
     ): boolean => false,
   }
+}
+
+/** Registry entry uses the actual Program's compiler options and complete sources. */
+export function createProgramHttpContextValueResolver(program: ts.Program) {
+  return createHttpContextValueResolver(
+    program.getTypeChecker(),
+    program.getSourceFiles(),
+    program.getCompilerOptions(),
+  )
 }

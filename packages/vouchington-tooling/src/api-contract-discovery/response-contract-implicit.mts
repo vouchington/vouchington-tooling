@@ -31,12 +31,17 @@ import {
   supportedResponseContext,
 } from './protocol-http-association.mts'
 import { contextResponseMethod } from './protocol-http-context.mts'
-import { taintRouteKeys, markRouteTaint, isSseSetter } from './protocol-http-implicit-taint.mts'
+import {
+  taintRouteKeys,
+  markRouteTaint,
+  isSseSetter,
+  taintContextConstruction,
+} from './protocol-http-implicit-taint.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 import type { createHttpContextValueResolver } from './protocol-http-context-values.mts'
 
 export function discoverImplicitContract(
-  call: ts.CallExpression,
+  call: ts.CallExpression | ts.NewExpression,
   checker: ts.TypeChecker,
   sourceFile: ts.SourceFile,
   contracts: Map<string, BackendResponseContract>,
@@ -46,6 +51,8 @@ export function discoverImplicitContract(
   options: DiscoverApiResponseContractsOptions | undefined,
   httpValues?: ReturnType<typeof createHttpContextValueResolver>,
 ): void {
+  if (ts.isNewExpression(call))
+    return taintContextConstruction(call, checker, contracts, handlerBindings, requestedKeys)
   const opaqueResponse = opaqueHttpResponse(call, checker, undefined, httpValues)
   const binding = enclosingRouteBinding(call, checker, handlerBindings, !opaqueResponse)
   if (!binding) return

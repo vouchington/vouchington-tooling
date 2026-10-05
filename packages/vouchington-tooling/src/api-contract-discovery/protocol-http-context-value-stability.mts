@@ -11,6 +11,7 @@ import {
   contextForwardedTarget,
 } from './protocol-http-context-forwarded-target.mts'
 import { createContextConsumerSources } from './protocol-http-context-consumer-sources.mts'
+import { createContextRequiredModule } from './protocol-http-context-require.mts'
 
 type Facts = {
   writes: ts.Expression[]
@@ -22,12 +23,14 @@ type Facts = {
 export function createContextValueStability(
   checker: ts.TypeChecker,
   programSources?: readonly ts.SourceFile[],
+  compilerOptions?: ts.CompilerOptions,
 ) {
-  const roots = createContextValueRoots(checker)
+  const requiredModule = createContextRequiredModule(checker, programSources, compilerOptions)
+  const roots = createContextValueRoots(checker, requiredModule)
   const { root, primitiveMember } = roots
   const cache = new Map<ts.Symbol, boolean>()
   const sources = new Map<ts.SourceFile, Facts>()
-  const consumerSources = createContextConsumerSources(checker, programSources)
+  const consumerSources = createContextConsumerSources(checker, programSources, requiredModule)
   const forwardedArguments = createContextForwardedArguments(checker)
   function capturedContainer(
     symbol: ts.Symbol,

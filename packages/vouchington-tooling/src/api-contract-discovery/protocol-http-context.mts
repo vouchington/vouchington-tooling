@@ -116,7 +116,11 @@ export function opaqueHttpContextConstruction(
   return (
     ts.isNewExpression(node) &&
     executableProtocolPath(node, checker, boundHandler) &&
-    !!node.arguments?.some((argument) => httpContextArgument(argument, context, checker))
+    !!node.arguments?.some(
+      (argument) =>
+        httpContextArgument(argument, context, checker) ||
+        wrappedHttpContextArgument(argument, context, checker),
+    )
   )
 }
 

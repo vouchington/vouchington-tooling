@@ -2,7 +2,6 @@ import ts from '../contract-schema/typescript-api.mts'
 import { registerPlatformCompilerLibraries } from './protocol-platform-callbacks.mts'
 import { protocolBindingRequested, requestedProtocolKey } from './protocol-requested-keys.mts'
 import { discoverProtocolContracts } from './protocol-contract-registry.mts'
-
 import { discoverImplicitContract } from './response-contract-implicit.mts'
 import { ambiguousRoutesForCall } from './response-contract-attribution.mts'
 import { sortAttributionFacts } from './response-contract-attribution-facts.mts'
@@ -29,10 +28,9 @@ import {
 } from './response-contract-route-analysis.mts'
 import { resolveEmissionStatus } from './response-contract-status.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
-import { createHttpContextValueResolver } from './protocol-http-context-values.mts'
+import { createProgramHttpContextValueResolver } from './protocol-http-context-values.mts'
 
-export type { BackendResponseContract } from './response-contract-types.mts'
-export type { DiscoverApiResponseContractsOptions } from './response-contract-lenient.mts'
+export type { BackendResponseContract, DiscoverApiResponseContractsOptions }
 
 export function discoverApiResponseContracts(
   program: ts.Program,
@@ -42,7 +40,7 @@ export function discoverApiResponseContracts(
 ): Record<string, BackendResponseContract> {
   registerPlatformCompilerLibraries(program)
   const checker = program.getTypeChecker()
-  const httpValues = createHttpContextValueResolver(checker, program.getSourceFiles())
+  const httpValues = createProgramHttpContextValueResolver(program)
   const contracts = new Map<string, BackendResponseContract>()
   const ambiguousBindings: AmbiguousHandlerBindings | undefined = options?.onAmbiguousAttribution
     ? new Map()
@@ -115,9 +113,9 @@ export function discoverApiResponseContracts(
 
   for (const sourceFile of sourceFiles) {
     visit(sourceFile, (node) => {
-      if (!ts.isCallExpression(node)) return
-      const callLabel = implicitResponseCallLabel(node)
-      if (options?.onAmbiguousAttribution) {
+      if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return
+      const callLabel = ts.isCallExpression(node) ? implicitResponseCallLabel(node) : undefined
+      if (options?.onAmbiguousAttribution && ts.isCallExpression(node)) {
         const attributionLabel = implicitResponseCallLabel(node, true, checker)
         const routes = attributionLabel
           ? ambiguousBindings &&
@@ -144,7 +142,11 @@ export function discoverApiResponseContracts(
           })
         }
       }
-      if (responseMarker(node.expression) || protocolEmissions.has(node)) return
+      if (
+        ts.isCallExpression(node) &&
+        (responseMarker(node.expression) || protocolEmissions.has(node))
+      )
+        return
       discoverImplicitContract(
         node,
         checker,

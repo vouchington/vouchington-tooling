@@ -3,13 +3,16 @@ import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { contextModuleOrigin } from './protocol-http-context-module-origin.mts'
 
 /** Bounded literal aliases retain mutation origins; only primitive members cannot expose parents. */
-export function createContextValueRoots(checker: ts.TypeChecker) {
+export function createContextValueRoots(
+  checker: ts.TypeChecker,
+  requiredModule?: (value: ts.Expression) => ts.Symbol | undefined,
+) {
   function root(node: ts.Expression, seen = new Set<ts.Symbol>()): ts.Symbol | undefined {
     node = unwrapExpression(node)
     while (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const owner = unwrapExpression(node.expression)
       const binding = ts.isIdentifier(owner) ? checker.getSymbolAtLocation(owner) : undefined
-      const module = contextModuleOrigin(checker, binding)
+      const module = contextModuleOrigin(checker, binding, new Set(), requiredModule)
       const key = ts.isPropertyAccessExpression(node)
         ? node.name.text
         : node.argumentExpression && ts.isStringLiteral(node.argumentExpression)

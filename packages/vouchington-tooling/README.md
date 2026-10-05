@@ -680,12 +680,16 @@ and array arguments with the selected caller bindings. A missing own callback is
 only when the complete Program preserves the global object prototype capability; prototype writes
 or exposure to another call make that callback unavailable. Internal proofs without a Program source
 list cannot establish this absence. Explicit own callbacks retain their concrete implementation.
+Literal standard Node `require` consumers use the actual Program's source files and compiler options;
+shadowed calls and modules outside that Program cannot establish a namespace identity. Concrete
+helpers returning the Object prototype retain its capability when passed to another call.
 Namespace identities follow actual imports, awaited literal dynamic imports through const aliases,
 and the first fulfillment parameter of an inline literal-import promise callback;
 asserted module types and pending import promises cannot substitute for executable provenance.
 Loop assignment targets, class field initializers, and tagged-template substitutions preserve mutable
 callback capabilities. Concrete omitted-argument defaults retain their forwarded parameter proof.
-Inherited Object prototype methods stay unknown; constructors receiving the selected context cannot
+Inherited Object prototype methods stay unknown; constructors receiving the selected context,
+including through a literal array spread, cannot
 prove bounded status or body behavior. The discovery-owned consumer index is lazy and includes
 TypeScript import-equals edges. Implemented callback bodies remain unavailable when they emit an otherwise
 uncollected response body or status, expose a context through a literal argument, retain a mutable

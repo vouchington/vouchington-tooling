@@ -1,5 +1,14 @@
 import { markBufferedRouteUnavailable } from './response-contract-lenient.mts'
-import type { RouteBinding } from './response-contract-route-analysis.mts'
+import {
+  enclosingRouteBinding,
+  requestedKeyForBinding,
+  type RouteBinding,
+  type HandlerBindings,
+} from './response-contract-route-analysis.mts'
+import ts from '../contract-schema/typescript-api.mts'
+import { enclosingFunction } from './protocol-marker-analysis.mts'
+import { httpHandlerContext, opaqueHttpContextConstruction } from './protocol-http-context.mts'
+import { sourceLocation } from './response-contract-registration.mts'
 import type { BackendResponseContract } from './response-contract-types.mts'
 
 /** Only already-selected route rows are tainted; implicit-only routes use their requested key. */
@@ -48,4 +57,21 @@ export function isSseSetter(
         !!row.sseEvents?.length,
     )
   )
+}
+
+/** Constructors cannot retain the selected registered context behind a declared empty row. */
+export function taintContextConstruction(
+  node: ts.NewExpression,
+  checker: ts.TypeChecker,
+  contracts: Map<string, BackendResponseContract>,
+  handlers: HandlerBindings,
+  requestedKeys?: ReadonlySet<string>,
+): void {
+  const handler = enclosingFunction(node)
+  const context = handler && httpHandlerContext(handler, checker)
+  if (!context || !opaqueHttpContextConstruction(node, checker, context)) return
+  const binding = enclosingRouteBinding(node, checker, handlers)
+  if (!binding) return
+  const keys = taintRouteKeys(contracts, binding, requestedKeyForBinding(binding, requestedKeys))
+  markRouteTaint(contracts, keys, binding, sourceLocation(node.getSourceFile(), node), false)
 }

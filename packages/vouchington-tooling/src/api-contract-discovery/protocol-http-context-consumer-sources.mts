@@ -4,6 +4,7 @@ import ts from '../contract-schema/typescript-api.mts'
 export function createContextConsumerSources(
   checker: ts.TypeChecker,
   sources?: readonly ts.SourceFile[],
+  requiredModule?: (value: ts.Expression) => ts.Symbol | undefined,
 ) {
   const consumers = new Map<ts.SourceFile, Set<ts.SourceFile>>()
   const cache = new Map<ts.SourceFile, readonly ts.SourceFile[]>()
@@ -22,7 +23,9 @@ export function createContextConsumerSources(
               : ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
                 ? node.arguments[0]
                 : undefined
-        const module = specifier && checker.getSymbolAtLocation(specifier)
+        const module =
+          (specifier && checker.getSymbolAtLocation(specifier)) ||
+          (ts.isCallExpression(node) ? requiredModule?.(node) : undefined)
         for (const declaration of module?.declarations ?? []) {
           if (!ts.isSourceFile(declaration)) continue
           const rows = consumers.get(declaration) ?? new Set<ts.SourceFile>()
