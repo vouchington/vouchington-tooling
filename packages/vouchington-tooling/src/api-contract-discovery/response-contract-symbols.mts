@@ -127,14 +127,14 @@ export function propertyImplementationSymbol(
   )
     return undefined
   const initializer = unwrapTransparentExpression(declaration.initializer)
-  if (!ts.isObjectLiteralExpression(initializer)) return contextual
-  if (initializer.properties.some(ts.isSpreadAssignment)) return contextual
+  if (!ts.isObjectLiteralExpression(initializer)) return undefined
+  if (initializer.properties.some(ts.isSpreadAssignment)) return undefined
   const implementation = initializer.properties.findLast((property) => {
     // Every non-spread object-literal member has a name; spread members were excluded above.
     const name = property.name!
     return objectLiteralPropertyName(name) === access.name.text
   })
-  return (implementation?.name && checker.getSymbolAtLocation(implementation.name)) || contextual
+  return implementation?.name && checker.getSymbolAtLocation(implementation.name)
 }
 
 function objectLiteralPropertyName(name: ts.PropertyName): string | undefined {

@@ -88,6 +88,23 @@ const sources = {
     handlers = { send(ctx) { ctx.json({ replacement: true }) } }
     app.route('/b').post(handlers.send)
   `,
+  'mutated-property-before-const-alias': `
+    declare const app: any
+    type Handlers = { send(ctx: any): void }
+    const handlers: Handlers = { send(ctx) { ctx.json({ original: true }) } }
+    handlers.send = (ctx) => ctx.json({ replacement: true })
+    const alias = handlers.send
+    app.route('/a').post(alias)
+    app.route('/b').post(alias)
+  `,
+  'polymorphic-class-property-handler': `
+    declare const app: any
+    class Base { send(ctx: any) { ctx.json({ base: true }) } }
+    class Derived extends Base { send(ctx: any) { ctx.json({ derived: true }) } }
+    const controller: Base = new Derived()
+    app.route('/a').post(controller.send)
+    app.route('/b').post(controller.send)
+  `,
   'property-handler-alias': `
     declare const app: any
     type Handlers = { send(ctx: any): void }
@@ -263,6 +280,14 @@ it('resolves a contextually typed object handler to its implementation', () => {
 
 it('fails closed when a mutable property receiver is reassigned', () => {
   expect(discover('reassigned-mutable-property-receiver').facts).toEqual([])
+})
+
+it('fails closed when a property alias hides an earlier direct reassignment', () => {
+  expect(discover('mutated-property-before-const-alias').facts).toEqual([])
+})
+
+it('fails closed for polymorphic class receivers outside object-literal resolution', () => {
+  expect(discover('polymorphic-class-property-handler').facts).toEqual([])
 })
 
 it.each(['property-handler-alias', 'computed-property-handler'] as const)(

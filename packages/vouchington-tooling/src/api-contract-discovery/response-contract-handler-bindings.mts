@@ -50,10 +50,9 @@ export function collectHandlerBindings(
         for (const symbol of handlerArgumentSymbols(node, checker, true)) {
           const propertySymbol = attributionSymbol(resolveSymbol(symbol, checker), checker)
           if (mutatedProperties?.has(propertySymbol)) continue
-          const resolvedAttributionSymbol = attributionSymbol(
-            resolveHandlerSymbol(symbol, checker),
-            checker,
-          )
+          const handlerSymbol = resolveHandlerSymbol(symbol, checker)
+          const resolvedAttributionSymbol = attributionSymbol(handlerSymbol, checker)
+          if (mutatedProperties?.has(resolvedAttributionSymbol)) continue
           if (mutatedBindings?.has(resolvedAttributionSymbol)) continue
           const attributionCandidates =
             attributionBindingsBySymbol.get(resolvedAttributionSymbol) ?? []

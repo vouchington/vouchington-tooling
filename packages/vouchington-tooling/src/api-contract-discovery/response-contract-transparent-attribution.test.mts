@@ -235,7 +235,7 @@ describe('transparent response-attribution expressions', () => {
     ])
   })
 
-  it('attributes object and class property-access handlers', () => {
+  it('attributes object-literal property-access handlers', () => {
     const facts: AmbiguousAttributionFact[] = []
     discover('property-methods', facts)
     expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
@@ -246,10 +246,6 @@ describe('transparent response-attribution expressions', () => {
       {
         label: 'ctx.json()',
         routes: ['POST:/api/v1/arrow-a', 'POST:/api/v1/arrow-b'],
-      },
-      {
-        label: 'ctx.response.xml()',
-        routes: ['POST:/api/v1/class-a', 'POST:/api/v1/class-b'],
       },
     ])
   })
@@ -375,7 +371,6 @@ describe('transparent response-attribution expressions', () => {
     discover('wrapped-initializer-and-class-field', facts)
     expect(facts.map(({ label, routes }) => ({ label, routes }))).toEqual([
       { label: 'ctx.json()', routes: ['POST:/api/v1/initial-a', 'POST:/api/v1/initial-b'] },
-      { label: 'ctx.response.xml()', routes: ['POST:/api/v1/class-a', 'POST:/api/v1/class-b'] },
     ])
   })
 
