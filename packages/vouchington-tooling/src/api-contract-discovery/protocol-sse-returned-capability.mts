@@ -1,4 +1,7 @@
-import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
+import {
+  createProtocolCallbackValueResolver,
+  isProtocolCallbackFunction,
+} from './protocol-callback-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { returnedExpressions } from './registered-route-factory-returns.mts'
@@ -138,7 +141,8 @@ export function sseCallableAlias(
   expression: ts.Expression,
   checker: ts.TypeChecker,
 ): ts.FunctionLikeDeclaration | undefined {
-  return ts.isIdentifier(expression)
+  const fn = ts.isIdentifier(expression)
     ? createProtocolCallbackValueResolver(checker).resolve(expression, new Map())?.node
     : undefined
+  return fn && isProtocolCallbackFunction(fn) && fn.body ? fn : undefined
 }
