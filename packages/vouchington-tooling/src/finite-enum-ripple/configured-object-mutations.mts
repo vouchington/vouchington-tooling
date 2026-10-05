@@ -2,7 +2,7 @@ import ts from '@typescript/typescript6'
 import { resolve } from 'node:path'
 import { unwrapExpression } from './ast.mts'
 
-export function hasPostDeclarationSlugMapMutation(
+export function hasPostDeclarationConfiguredObjectMutation(
   content: string,
   file: string,
   name: string,

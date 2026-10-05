@@ -5,6 +5,7 @@ import {
   getStringLiteralValue,
   unwrapExpression,
 } from './ast.mts'
+import { hasPostDeclarationConfiguredObjectMutation } from './configured-object-mutations.mts'
 
 export function parseRouteConfigEntries(
   content: string,
@@ -14,6 +15,8 @@ export function parseRouteConfigEntries(
   singularPathProperty: string,
 ) {
   const object = findConstObjectLiteral(content, name, file)
+  if (hasPostDeclarationConfiguredObjectMutation(content, file, name, object.end))
+    throw new Error(`${file}: ${name} has a post-declaration property mutation`)
   const entries: {
     key: string
     body: ts.ObjectLiteralExpression

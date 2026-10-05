@@ -40,6 +40,17 @@ export function visitCreatePageObject(
     if (ts.isSpreadAssignment(member) || ts.isJsxSpreadAttribute(member)) {
       const overridden = new Set<string>()
       const expression = unwrapExpression(member.expression)
+      if (
+        !ts.isObjectLiteralExpression(expression) &&
+        spreadMayOverrideConfiguredProperty(member, names)
+      ) {
+        for (const later of node.properties.slice(index + 1)) {
+          const name = getConfiguredPropertyName(later, names)
+          if (isConfiguredPropertyName(name, names)) overridden.add(name)
+        }
+        if ([...names].some((name) => !overridden.has(name)))
+          throw new Error(`${file}: create page type cannot be inspected through a leading spread`)
+      }
       if (ts.isObjectLiteralExpression(expression)) {
         for (const later of node.properties.slice(index + 1)) {
           const name = getConfiguredPropertyName(later, names)

@@ -194,6 +194,57 @@ describe('finite enum parsers', () => {
     expect([...parseUnionSlugToType(shadowed, file, 'recordSlugs')]).toEqual([['entry', 'entry']])
   })
 
+  it('rejects direct mutations of configured route and structured maps', () => {
+    for (const mutation of [
+      "routes.entries = { singular: 'wrong', plural: 'entries', kinds: ['entry'] }",
+      'delete routes.entries',
+      'routes.entries++',
+    ]) {
+      const source =
+        "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'] } }; " +
+        mutation
+      expect(() =>
+        parseUnionRouteConfigEntries(source, file, 'routes', 'kinds', 'plural', 'singular'),
+      ).toThrow('post-declaration property mutation')
+      expect(() =>
+        parseStructuredRouteConfigEntries(
+          source,
+          file,
+          'routes',
+          'kinds',
+          'exempt',
+          'plural',
+          'singular',
+        ),
+      ).toThrow('post-declaration property mutation')
+    }
+    for (const mutation of [
+      "kinds.alpha = { slug: 'wrong', slugs: 'alphas' }",
+      'delete kinds.alpha',
+      'kinds.alpha++',
+    ]) {
+      expect(() =>
+        parseStructuredTypeEntries(
+          `const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' } }; ${mutation}`,
+          file,
+          'kinds',
+          'slug',
+          'slugs',
+        ),
+      ).toThrow('post-declaration property mutation')
+    }
+    const shadowedRoutes =
+      "const routes = { entries: { singular: 'entry', plural: 'entries', kinds: ['entry'] } }; function update() { const routes = {}; routes.entries = {} }"
+    expect(
+      parseUnionRouteConfigEntries(shadowedRoutes, file, 'routes', 'kinds', 'plural', 'singular'),
+    ).toHaveLength(1)
+    const shadowedKinds =
+      "const kinds = { alpha: { slug: 'alpha', slugs: 'alphas' } }; function update() { const kinds = {}; kinds.alpha = {} }"
+    expect(parseStructuredTypeEntries(shadowedKinds, file, 'kinds', 'slug', 'slugs')).toEqual([
+      { value: 'alpha', slug: 'alpha', slugPlural: 'alphas' },
+    ])
+  })
+
   it('rejects prototype-setter slug keys and preserves caller regex state', () => {
     expect(() =>
       parseUnionSlugToType("const recordSlugs = { __proto__: 'entry' }", file, 'recordSlugs'),
