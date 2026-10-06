@@ -1,4 +1,5 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["src/**/*.mts"]
+  "compilerOptions": { "allowJs": true },
+  "include": ["src/**/*.mts", "src/**/*.cjs"]
 }

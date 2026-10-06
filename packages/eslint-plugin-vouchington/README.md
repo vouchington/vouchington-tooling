@@ -81,7 +81,7 @@ Configure `functions: ['writeRows']` and the shared `include` / `exclude` / `inc
 
 Keep configured factory construction in owner files. Detects named, default, and namespace imports; dynamic imports with string, number, boolean, null, or substitution-free template literal specifiers; exact `createRequire(...)(module)` loads with string module ids from `node:module`; constant namespace/factory aliases and object destructuring; and direct calls, `new`, tagged templates, decorators, `Reflect.apply`, and `Reflect.construct`. It also rejects direct factory and namespace reexports through ESM and TypeScript export declarations. CommonJS assignment exports such as `module.exports = factory` remain outside this direct-provenance subset. Scope bindings distinguish these values from unrelated functions with the same names.
 
-If `modules`, `factories`, or `owners` is missing or empty, the rule loads and reports nothing. Mutable reassignment provenance, values returned through wrappers or containers, `Proxy` and bound-function calls, and virtual-program/test-lifecycle checks remain in the consuming repo pending [issue #376](https://github.com/vouchington/vouchington-tooling/issues/376).
+If `modules`, `factories`, or `owners` is missing or empty, the rule loads and reports nothing. This rule covers direct, constant provenance. For mutable reassignment, wrapper and container results, `Proxy` and bound-function calls, and virtual matrix lifecycle checks, use `typescript-program-location` below.
 
 ### Options
 
@@ -93,6 +93,35 @@ If `modules`, `factories`, or `owners` is missing or empty, the rule loads and r
 | `include`      | `string[]` | no       | `**/*.{ts,mts,tsx,js,mjs}` |
 | `exclude`      | `string[]` | no       | `[]`                       |
 | `includeFiles` | `string[]` | no       | `[]`                       |
+
+## `typescript-program-location`
+
+Keep configured compiler factory construction in owner files. This rule preserves the flow analysis used by the consuming repository for aliases, reassignment, branches, wrappers, containers, `createRequire`, `Proxy`, bound functions, exports, and virtual matrix test lifecycle. It is separate from the narrower `factory-owner-location` rule; configure one rule for each protected surface as needed.
+
+`modules`, `factories`, and `owners` are required nonempty arrays. The shared `include`, `exclude`, and `includeFiles` selectors choose files to protect. Owner paths and `virtualMatrix.allowLifecycleFiles` are exact paths relative to the lint cwd. With missing or invalid required options, the rule reports nothing.
+
+```json
+{
+  "vouchington/typescript-program-location": [
+    "error",
+    {
+      "modules": ["@compiler/runtime"],
+      "factories": ["createProgram", "createCompilerHost"],
+      "owners": ["lib/test-helpers/compiler-owner.mts"],
+      "include": ["lib/test-helpers/**/*.mts"],
+      "virtualMatrix": {
+        "moduleBasename": "virtual-program",
+        "builder": "buildVirtualProgramMatrix",
+        "testModule": "vitest",
+        "testHook": "beforeAll",
+        "allowLifecycleFiles": ["lib/test-helpers/virtual-program.test.mts"]
+      }
+    }
+  ]
+}
+```
+
+`virtualMatrix` is optional. When supplied, all five fields are required. Its `moduleBasename` matches imports and reexports ending in that basename, with or without `.mts`; `builder` names the restricted export. Calls to that builder outside an allowed lifecycle file require `import.meta` as the first argument in a direct callback to the configured test hook. The allowed lifecycle files remain subject to factory construction and export checks.
 
 ### Oxlint
 
