@@ -1,4 +1,8 @@
 import ts from '../contract-schema/typescript-api.mts'
+import {
+  defaultBindingValue,
+  unknownContextBindingDefault,
+} from './protocol-http-context-binding-values.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
@@ -16,8 +20,7 @@ export function contextLiteralBinding(
 ): ts.Expression | undefined {
   if (!ts.isIdentifier(value)) return undefined
   const binding = checker.getSymbolAtLocation(value)?.valueDeclaration
-  if (!binding || !ts.isBindingElement(binding) || binding.dotDotDotToken || binding.initializer)
-    return undefined
+  if (!binding || !ts.isBindingElement(binding) || binding.dotDotDotToken) return undefined
   const owner = binding.parent.parent
   if (!ts.isVariableDeclaration(owner)) return undefined
   const source = literalInitializer(owner, checker)
@@ -28,7 +31,11 @@ export function contextLiteralBinding(
     !source.elements.some(ts.isSpreadElement)
   ) {
     const selected = source.elements[binding.parent.elements.indexOf(binding)]
-    return selected && !ts.isOmittedExpression(selected) ? selected : undefined
+    return defaultBindingValue(
+      selected && !ts.isOmittedExpression(selected) ? selected : undefined,
+      binding.initializer,
+      checker,
+    )
   }
   const key = binding.propertyName ?? binding.name
   if (
@@ -44,7 +51,8 @@ export function contextLiteralBinding(
       (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) &&
       member.name.text === key.text,
   )
-  if (member && ts.isPropertyAssignment(member)) return member.initializer
+  if (member && ts.isPropertyAssignment(member))
+    return defaultBindingValue(member.initializer, binding.initializer, checker)
   if (member && ts.isShorthandPropertyAssignment(member)) {
     const declaration = checker.getShorthandAssignmentValueSymbol(member)?.valueDeclaration
     return declaration &&
@@ -53,7 +61,7 @@ export function contextLiteralBinding(
       ? declaration.name
       : undefined
   }
-  return undefined
+  return !member ? binding.initializer : undefined
 }
 /** Unsupported destructures of a selected literal container cannot erase its capabilities. */
 export function unsupportedLiteralContextBinding(
@@ -63,21 +71,25 @@ export function unsupportedLiteralContextBinding(
 ): boolean {
   if (ts.isIdentifier(node.name) || !node.initializer) return false
   const source = literalInitializer(node, checker)
+  if (
+    node.name.elements.some((element) =>
+      unknownContextBindingDefault(element, checker, selected, contextLiteralBinding),
+    )
+  )
+    return true
   if (!source || !ts.isExpression(source) || !selected(source)) return false
   const simple = node.name.elements.every(
     (element) =>
       ts.isOmittedExpression(element) ||
       (!element.dotDotDotToken &&
-        !element.initializer &&
         ts.isIdentifier(element.name) &&
         (!element.propertyName ||
           ts.isIdentifier(element.propertyName) ||
           ts.isStringLiteral(element.propertyName))),
   )
   const literal =
-    source &&
-    ((ts.isArrayLiteralExpression(source) && !source.elements.some(ts.isSpreadElement)) ||
-      (ts.isObjectLiteralExpression(source) && !source.properties.some(ts.isSpreadAssignment)))
+    (ts.isArrayLiteralExpression(source) && !source.elements.some(ts.isSpreadElement)) ||
+    (ts.isObjectLiteralExpression(source) && !source.properties.some(ts.isSpreadAssignment))
   return !simple || !literal
 }
 /** Construction reaches this actual class's instance initializers and constructor body. */

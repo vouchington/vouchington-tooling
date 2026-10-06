@@ -1,3 +1,4 @@
+import { storedSseContainerCapability } from './protocol-sse-container-writes.mts'
 import {
   createProtocolCallbackValueResolver,
   isProtocolCallbackFunction,
@@ -60,6 +61,8 @@ function returnedSseCapability(
       )
         return contains(value.left, bindings) || contains(value.right, bindings)
       if (ts.isIdentifier(value)) {
+        if (storedSseContainerCapability(value, checker, (stored) => contains(stored, bindings)))
+          return true
         const symbol = checker.getSymbolAtLocation(value)
         if (symbol && bindings.has(symbol)) return bindings.get(symbol)!
         const declaration = symbol?.valueDeclaration
