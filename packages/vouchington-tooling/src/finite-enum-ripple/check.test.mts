@@ -468,12 +468,12 @@ describe('checkFiniteEnumRipple', () => {
     )
   })
 
-  it('checks captured root paths against non-root routes', () => {
+  it('ignores empty collection captures but rejects root navigation paths', () => {
     const { contents, config, check } = fixture()
     contents.set(paths.collection, "export default { path: '/' }")
     contents.set(paths.component, "push('/')")
     config.structured!.navigationPathLiteralPattern = /\bpush\(\s*['"]\/([^'"]*)/g
-    expect(check()).toContainEqual(expect.stringContaining('collection path literal "/"'))
+    expect(check()).not.toContainEqual(expect.stringContaining('collection path literal "/"'))
     expect(check()).toContainEqual(expect.stringContaining('component navigation path "/"'))
   })
 

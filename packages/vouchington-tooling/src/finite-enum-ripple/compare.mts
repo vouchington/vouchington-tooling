@@ -32,10 +32,6 @@ export function checkUnionCreatePageTypes(
     }
     const content = readTracked(page.file)
     const actualTypes = collectCreatePageLiterals(content, page.file, createPageTypeProperties)
-    if (actualTypes.length === 0)
-      errors.push(
-        finiteEnumError(page.file, `${label} create page has no inspectable type literal`),
-      )
     for (const actualType of actualTypes) {
       if (actualType === expectedType) continue
       errors.push(
@@ -60,7 +56,8 @@ export function checkCollectionPagePathLiterals(
     if (!routeSlugs.has(page.slug)) continue
     const content = readTracked(page.file)
     for (const literalPath of collectActivePatternCaptures(content, pathPattern, page.file)) {
-      if (literalPath === page.slug || literalPath.startsWith(`${page.slug}/`)) continue
+      if (!literalPath || literalPath === page.slug || literalPath.startsWith(`${page.slug}/`))
+        continue
       errors.push(
         finiteEnumError(
           page.file,
