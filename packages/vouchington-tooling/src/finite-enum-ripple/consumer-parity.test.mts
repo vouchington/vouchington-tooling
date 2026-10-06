@@ -1,7 +1,7 @@
 import ts from '@typescript/typescript6'
 import { describe, expect, it } from 'vitest'
-import { parseUnionRouteConfigEntries } from './parsers.mts'
-import { checkCollectionPagePathLiterals } from './compare.mts'
+import { parseUnionRouteConfigEntries, parseStructuredRouteFactoryArgs } from './parsers.mts'
+import { checkCollectionPagePathLiterals, checkUnionCreatePageTypes } from './compare.mts'
 import { checkFiniteEnumRipple } from './check.mts'
 import type { FiniteEnumRippleConfig } from './model.mts'
 
@@ -66,6 +66,31 @@ describe('released consumer parity', () => {
     expect(
       parse(`export {}; ${route.replace('kinds: undefined', "kinds: ['item']")}`)[0]!.unionTypes,
     ).toEqual(['item'])
+  })
+
+  it('ignores a zero-argument structured factory while retaining selected literal calls', () => {
+    const content =
+      "declare function createKindPage(slug?: string): unknown; const page = createKindPage(); const stale = createKindPage('wrong')"
+    assertZeroDiagnostics(content)
+    expect(parseStructuredRouteFactoryArgs(content, file, /^createKindPage$/)).toEqual([
+      { slug: 'wrong' },
+    ])
+  })
+
+  it('accepts a create page without local type fields and still rejects stale literal fields', () => {
+    const pages = [{ file, slug: 'items', isTopLevel: true }]
+    const routes = [{ pluralPath: 'items', unionTypes: ['item'] }]
+    const errors: string[] = []
+    const absent = 'export const render = () => null'
+    assertZeroDiagnostics(absent)
+    checkUnionCreatePageTypes(errors, routes, pages, () => absent, ['action', 'itemType'], 'item')
+    expect(errors).toEqual([])
+    const stale = "export const form = { action: 'other' }"
+    assertZeroDiagnostics(stale)
+    checkUnionCreatePageTypes(errors, routes, pages, () => stale, ['action', 'itemType'], 'item')
+    expect(errors).toEqual([
+      `::error file=${file}::${file}: item create page literal uses "other" but items expects "item".`,
+    ])
   })
 
   it('ignores empty collection paths and still rejects stale concrete paths', () => {

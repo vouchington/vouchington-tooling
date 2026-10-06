@@ -326,7 +326,7 @@ it('reports a selected create page without a matching single-type route', () => 
   )
   expect(errors.join('\n')).toContain('no matching single-type route config for "drafts"')
 })
-it('rejects selected create pages with no literal or with dynamic configured values', () => {
+it('ignores absent create fields but rejects dynamic configured values', () => {
   const errors: string[] = []
   const routes = [{ pluralPath: 'entries', unionTypes: ['entry'] }]
   const pages = [{ file: 'page.tsx', slug: 'entries', isTopLevel: true }]
@@ -338,7 +338,7 @@ it('rejects selected create pages with no literal or with dynamic configured val
     ['action'],
     'record',
   )
-  expect(errors.join('\n')).toContain('no inspectable type literal')
+  expect(errors).toEqual([])
   for (const source of [
     'const fields = { action: selectedType }',
     "const action = choose(); const fields = { action, other: 'entry' }",
