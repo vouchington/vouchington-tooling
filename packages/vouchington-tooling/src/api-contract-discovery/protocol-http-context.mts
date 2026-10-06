@@ -12,6 +12,7 @@ import {
   constructedContextCapture,
 } from './protocol-http-context-literal-captures.mts'
 import { contextResultBranches } from './protocol-http-context-result-branches.mts'
+import { httpContextContainerMembers } from './protocol-http-context-container-members.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 export { contextResponseMethod } from './protocol-http-method-access.mts'
 
@@ -159,7 +160,8 @@ export function wrappedHttpContextArgument(
       httpContextArgument(value.expression, context, checker) ||
       wrappedHttpContextArgument(value.expression, context, checker, captured)
     )
-  if (!(ts.isObjectLiteralExpression(value) || ts.isArrayLiteralExpression(value))) return false
+  const members = httpContextContainerMembers(value)
+  if (!members) return false
   let found = false
   function visit(node: ts.Node) {
     if (!potentiallyExecuted(node)) return
@@ -176,6 +178,6 @@ export function wrappedHttpContextArgument(
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) return
     ts.forEachChild(node, visit)
   }
-  visit(value)
+  members.forEach(visit)
   return found
 }
