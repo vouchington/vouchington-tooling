@@ -2,7 +2,11 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { httpContextScopes } from './protocol-http-context.mts'
-import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
+import {
+  buildVirtualProgramMatrix,
+  COLD_VIRTUAL_PROGRAM_TIMEOUT_MS,
+  type VirtualProgramMatrix,
+} from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app:any;declare const sink:any;declare const raw:unknown;
   type Http=Response & {readonly apiHttpResponseVariants?:
@@ -128,6 +132,7 @@ describe('HTTP contracts include actual caller emissions and indirect methods', 
           expect(rows[key]?.unavailableReason).toBeTruthy()
       }
     },
+    COLD_VIRTUAL_PROGRAM_TIMEOUT_MS,
   )
   it.each(Object.keys(valid) as (keyof typeof valid)[])(
     'preserves accounted response %s',
