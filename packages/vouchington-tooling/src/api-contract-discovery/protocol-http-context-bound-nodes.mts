@@ -45,6 +45,10 @@ export function unsupportedBoundContextNode(
       executableProtocolPath(node, checker, handler) &&
       (httpContextArgument(returned, context, checker) ||
         wrappedHttpContextArgument(returned, context, checker))) ||
+    (ts.isForOfStatement(node) &&
+      ts.isArrayLiteralExpression(unwrapExpression(node.expression)) &&
+      executableProtocolPath(node, checker, handler) &&
+      wrappedHttpContextArgument(node.expression, context, checker)) ||
     unsupportedContextAssignment(node, context, checker) ||
     (ts.isVariableDeclaration(node) &&
       (unsupportedContextAlias(node, context, checker) ||
