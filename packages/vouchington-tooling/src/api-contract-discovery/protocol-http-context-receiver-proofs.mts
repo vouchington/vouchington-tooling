@@ -17,12 +17,22 @@ export function createHttpContextReceiverProofs(
     sources,
     options,
   )
-  const applications = new Map<ts.CallExpression, ts.Symbol | undefined>()
+  const applications = new Map<
+    ts.CallExpression,
+    Map<ts.Symbol | undefined, ts.Symbol | undefined>
+  >()
   const extensions = createHttpContextExtensionLookup(checker, sources, callbacks, applicationClass)
-  const extension = (call: ts.CallExpression, context: ts.Symbol, root: ts.CallExpression) => {
-    if (!applications.has(root))
-      applications.set(root, registeredContextApplication(root, checker, sources))
-    const application = applications.get(root)
+  const extension = (
+    call: ts.CallExpression,
+    context: ts.Symbol,
+    root: ts.CallExpression,
+    rootContext?: ts.Symbol,
+  ) => {
+    let selected = applications.get(root)
+    if (!selected) applications.set(root, (selected = new Map()))
+    if (!selected.has(rootContext))
+      selected.set(rootContext, registeredContextApplication(root, checker, sources, rootContext))
+    const application = selected.get(rootContext)
     return application ? extensions(call, context, application) : undefined
   }
   return {

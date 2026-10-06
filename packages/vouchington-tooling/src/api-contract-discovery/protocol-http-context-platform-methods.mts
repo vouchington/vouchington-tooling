@@ -44,7 +44,7 @@ export function createHttpContextPlatformMethodProof(
     const access = methodAccess(call.expression)
     if (
       !access ||
-      !['set', 'setType', 'throw'].includes(access.name) ||
+      !['set', 'setType', 'throw', 'cacheControl'].includes(access.name) ||
       contextResponseMethod(call.expression, context, checker, true) !== access.name
     )
       return false

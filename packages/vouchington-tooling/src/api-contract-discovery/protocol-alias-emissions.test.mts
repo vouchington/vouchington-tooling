@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import ts from '../contract-schema/typescript-api.mts'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
-import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
+import { type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const preamble = `declare const app:any
   declare const stream:{write(value:string):void}
@@ -29,7 +29,9 @@ const sources = {
   'mutable-context': http(`${emit};let sender=ctx;sender={};sender.json(unknownBody)`),
   'mutable-response': http(`${emit};let target=ctx.response;target={};target.buffer(unknownBody)`),
   'destructured-context': http(`${emit};const {response:target}=ctx;target.buffer(unknownBody)`),
-  'request-read': http(`${emit};let input=ctx.req;input={};ctx.set('X',input)`),
+  'request-read': http(
+    `${emit};let input=ctx.req;input={};(ctx as Context).set('X',String(input))`,
+  ),
   'stream-alias': sse(`${frame};const output=stream;output.write('raw')`),
   'mutable-stream-alias': sse(`${frame};let output=stream;output.write('raw')`),
   'mutable-stream-frame': sse(
@@ -44,6 +46,10 @@ const sources = {
   'different-stream': sse(`${frame};const output=other;output.write('log')`),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
+let fixtureRoot: string
+afterAll(() => {
+  if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+})
 const discover = (name: keyof typeof sources, lenient = false) =>
   discoverApiResponseContracts(
     matrix.program,
@@ -54,7 +60,53 @@ const discover = (name: keyof typeof sources, lenient = false) =>
 
 describe('protocol emission aliases', () => {
   beforeAll(() => {
-    matrix = buildVirtualProgramMatrix(import.meta, sources)
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'protocol-platform-provenance-'))
+    const dependency = join(fixtureRoot, 'node_modules/@jongleberry/api-server')
+    mkdirSync(dependency, { recursive: true })
+    writeFileSync(
+      join(dependency, 'package.json'),
+      JSON.stringify({
+        name: '@jongleberry/api-server',
+        version: '0.0.0',
+        type: 'module',
+        types: './index.d.mts',
+      }),
+    )
+    writeFileSync(
+      join(dependency, 'index.d.mts'),
+      'export declare class Context {set(header:string,value:string):void}',
+    )
+    const files = new Map(
+      Object.entries(sources).map(([name, source]) => {
+        const file = join(fixtureRoot, `${name}.ts`)
+        writeFileSync(
+          file,
+          `import type {Context} from '@jongleberry/api-server';
+${source}
+export {}`,
+        )
+        return [name, file]
+      }),
+    )
+    const program = ts.createProgram([...files.values()], {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      target: ts.ScriptTarget.ESNext,
+      strict: true,
+      skipLibCheck: true,
+      noEmit: true,
+    })
+    expect(
+      ts
+        .getPreEmitDiagnostics(program)
+        .map((value) => ts.flattenDiagnosticMessageText(value.messageText, '\n')),
+    ).toEqual([])
+    matrix = {
+      program,
+      sourceFile(name) {
+        return program.getSourceFile(files.get(name)!)!
+      },
+    }
   })
   it.each(['context-alias', 'response-alias', 'request-read', 'different-stream'] as const)(
     'preserves the actual emissions in %s',
@@ -107,7 +159,11 @@ it.each([
       typeRoots: [join(process.cwd(), 'node_modules/@types')],
       types: ['node'],
     })
-    expect(ts.getPreEmitDiagnostics(program)).toEqual([])
+    expect(
+      ts
+        .getPreEmitDiagnostics(program)
+        .map((value) => ts.flattenDiagnosticMessageText(value.messageText, '\n')),
+    ).toEqual([])
     const discoverReadable = () =>
       discoverApiResponseContracts(program, [program.getSourceFile(file)!])
     if (supported)

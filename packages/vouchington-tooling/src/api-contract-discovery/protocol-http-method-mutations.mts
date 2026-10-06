@@ -12,6 +12,7 @@ const responseMethods = new Set([
   'response',
   'response.buffer',
   'response.empty',
+  'response.xml',
 ])
 
 /** A feasible write through a canonical context alias invalidates response dispatch evidence. */

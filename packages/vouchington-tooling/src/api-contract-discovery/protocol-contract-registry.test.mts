@@ -1,36 +1,21 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildOpenApiDocument, type OpenApiResponse } from '../openapi-document/index.mts'
 import { validateResponseContract } from '../contract-schema/index.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { associateHttpResponse } from './protocol-http-association.mts'
 import { visit } from './response-contract-route-analysis.mts'
-import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
-
-const preamble = `declare const app: any
-  function subscribe(options:{emit:()=>void}):void {options.emit()}
-  declare const stream: { write(frame: string): void }
-  declare function apiSseFrame<K extends string, T>(key: K, event: T): string
-  type Http<T> = Response & { readonly apiHttpResponseVariants?: T }
-  declare function apiOpenApiHttpResponse<K extends string, T>(key: K, response: Http<T>): Http<T>
-  type Variants = {status:200; bodyKind:'content'; mediaType:'application/json'; body:{id:string}|{id:null;error:{code:number}}|{id:string}[]}
-    | {status:202; bodyKind:'none'} | {status:400; bodyKind:'content';mediaType:'application/json';body:{id:null;error:{code:number}}}
-  declare const opaque: Http<Variants>;
-  declare const unknownBody: unknown;`
-const sse = (body: string) => `${preamble}
-  app.route('/events').get((ctx:any) => { ${body} })`
-const http = (body: string, declarations = '') => `${preamble}
-  ${declarations}
-  app.route('/rpc').post(async (ctx:any) => {
-    const response = apiOpenApiHttpResponse('POST:/rpc', opaque)
-    ctx.setStatus(response.status)
-    ${body}
-  })`
+import { type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
+const preamble = `declare const app: any\n  function subscribe(options:{emit:()=>void}):void {options.emit()}\n  declare const stream: { write(frame: string): void }\n  declare function apiSseFrame<K extends string, T>(key: K, event: T): string\n  type Http<T> = Response & { readonly apiHttpResponseVariants?: T }\n  declare function apiOpenApiHttpResponse<K extends string, T>(key: K, response: Http<T>): Http<T>\n  type Variants = {status:200; bodyKind:'content'; mediaType:'application/json'; body:{id:string}|{id:null;error:{code:number}}|{id:string}[]}\n    | {status:202; bodyKind:'none'} | {status:400; bodyKind:'content';mediaType:'application/json';body:{id:null;error:{code:number}}}\n  declare const opaque: Http<Variants>;\n  declare const unknownBody: unknown;`
+const sse = (body: string) => `${preamble}\n  app.route('/events').get((ctx:any) => { ${body} })`
+const http = (body: string, declarations = '') =>
+  `${preamble}\n  ${declarations}\n  app.route('/rpc').post(async (ctx:any) => {\n    const response = apiOpenApiHttpResponse('POST:/rpc', opaque)\n    ctx.setStatus(response.status)\n    ${body}\n  })`
 const emit = `if (!response.body) ctx.response.empty(); else ctx.pipeline(response.body)`
-const typedHttp = (type: string) => `${preamble}
-  declare const special:Http<${type}>
-  app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',special);
-    ctx.setStatus(response.status); ${emit} })`
+const typedHttp = (type: string) =>
+  `${preamble}\n  declare const special:Http<${type}>\n  app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',special);\n    ctx.setStatus(response.status); ${emit} })`
 const sources = {
   sse: sse(`stream.write(apiSseFrame('GET:/events',{event:'progress' as const,data:{count:1}}))
     stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))`),
@@ -73,9 +58,7 @@ const sources = {
     const response=apiOpenApiHttpResponse('POST:/rpc',new Response())
     ctx.setStatus(response.status);ctx.pipeline(response.body)
   })`,
-  'http-broad-status': `${preamble} declare const broad:Http<{status:number;bodyKind:'none'}>
-    app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',broad);
-      ctx.setStatus(response.status);if(!response.body)ctx.response.empty()})`,
+  'http-broad-status': `${preamble} declare const broad:Http<{status:number;bodyKind:'none'}>\n    app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',broad);\n      ctx.setStatus(response.status);if(!response.body)ctx.response.empty()})`,
   'empty-carrier': typedHttp('undefined'),
   'unknown-carrier': typedHttp('unknown'),
   'invalid-status-low': typedHttp("{status:99;bodyKind:'none'}"),
@@ -155,7 +138,7 @@ const sources = {
   'terminal-branches-http': http(`if(ctx.query.flag) return; else throw new Error(); ${emit}`),
   'one-branch-http': http(`if(ctx.query.flag) return; ${emit}`),
   'branch-missing-else-http': http(`if(ctx.query.flag) {} ${emit}`),
-  'block-read-http': http(`{ctx.set('X','ok')}; ${emit}`),
+  'block-read-http': http(`{(ctx as Context).set('X','ok')}; ${emit}`),
   'conditional-sse-status': sse(
     "if(ctx.query.created) ctx.setStatus(201); stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))",
   ),
@@ -220,7 +203,10 @@ const sources = {
   'renamed-http-context': http(emit).replaceAll('ctx', 'context'),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
-
+let fixtureRoot: string
+afterAll(() => {
+  if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+})
 function discover(name: keyof typeof sources, lenient = false) {
   return discoverApiResponseContracts(
     matrix.program,
@@ -229,12 +215,43 @@ function discover(name: keyof typeof sources, lenient = false) {
     lenient ? { onRouteError: () => {} } : undefined,
   )
 }
-
 describe('compiler-discovered protocol contracts', () => {
   beforeAll(() => {
-    matrix = buildVirtualProgramMatrix(import.meta, sources)
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'protocol-platform-provenance-'))
+    const dependency = join(fixtureRoot, 'node_modules/@jongleberry/api-server')
+    mkdirSync(dependency, { recursive: true })
+    writeFileSync(
+      join(dependency, 'package.json'),
+      '{"name":"@jongleberry/api-server","version":"0.0.0","type":"module","types":"./index.d.mts"}',
+    )
+    writeFileSync(
+      join(dependency, 'index.d.mts'),
+      'export declare class Context {set(header:string,value:string):void}',
+    )
+    const files = new Map(
+      Object.entries(sources).map(([name, source]) => {
+        const file = join(fixtureRoot, `${name}.ts`)
+        writeFileSync(
+          file,
+          "import type {Context} from '@jongleberry/api-server';\n" + source + '\nexport {}',
+        )
+        return [name, file]
+      }),
+    )
+    const program = ts.createProgram([...files.values()], {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      target: ts.ScriptTarget.ESNext,
+      strict: true,
+      skipLibCheck: true,
+      noEmit: true,
+    })
+    expect(ts.getPreEmitDiagnostics(program).map((value) => value.code)).toEqual([])
+    matrix = {
+      program,
+      sourceFile: (name) => program.getSourceFile(files.get(name)!)!,
+    }
   })
-
   it.each([
     'sse',
     'union',
@@ -265,7 +282,6 @@ describe('compiler-discovered protocol contracts', () => {
       expect.arrayContaining(events.map((event) => event.eventName)),
     )
   })
-
   it.each(
     [
       [],
@@ -282,7 +298,6 @@ describe('compiler-discovered protocol contracts', () => {
     )
     expect(Object.keys(contracts)).toEqual(keys.filter((key) => key !== 'GET:/unrelated'))
   })
-
   it('does not validate excluded protocol routes', () => {
     for (const name of ['broad-name', 'dynamic-key', 'http-broad-status'] as const) {
       const contracts = discoverApiResponseContracts(
@@ -293,7 +308,6 @@ describe('compiler-discovered protocol contracts', () => {
       expect(contracts).toEqual({})
     }
   })
-
   it('restricts branded HTTP variants to their exact requested key', () => {
     const contracts = discoverApiResponseContracts(
       matrix.program,
@@ -303,7 +317,6 @@ describe('compiler-discovered protocol contracts', () => {
     expect(Object.keys(contracts)).toEqual(['POST:/rpc#protocol-2'])
     expect(contracts['POST:/rpc#protocol-2']!.statusCodes).toEqual([202])
   })
-
   it.each(['GET:/events/:eventId', 'GET:/events/:eventId#protocol-2'])(
     'maps normalized requested protocol key %s',
     (key) => {
@@ -315,7 +328,6 @@ describe('compiler-discovered protocol contracts', () => {
       expect(Object.keys(contracts)).toEqual([key])
     },
   )
-
   it('validates only the requested generated protocol variants', () => {
     expect(
       Object.keys(
@@ -335,14 +347,12 @@ describe('compiler-discovered protocol contracts', () => {
     ).toThrow()
     expect(() => discover('partly-broad-sse')).toThrow()
   })
-
   it('validates the actual data shape rather than the framed string', () => {
     const events = Object.values(discover('sse')).flatMap((contract) => contract.sseEvents ?? [])
     const progress = events.find((event) => event.eventName === 'progress')!.contract
     expect(validateResponseContract(progress.schema, { count: 2 })).toEqual([])
     expect(validateResponseContract(progress.schema, 'data: {}')).not.toEqual([])
   })
-
   it.each(['broad-name', 'unknown-root', 'any-root', 'raw', 'unused'] as const)(
     'fails closed for %s',
     (name) => {
@@ -351,14 +361,12 @@ describe('compiler-discovered protocol contracts', () => {
       expect(Object.values(contracts).some((contract) => contract.unavailableReason)).toBe(true)
     },
   )
-
   it.each(['mismatch', 'dynamic-key', 'outside', 'registration-evaluation'] as const)(
     'rejects misplaced marker %s',
     (name) => {
       expect(() => discover(name)).toThrow(/route|literal contract key/)
     },
   )
-
   it.each([
     'http',
     'buffered',
@@ -392,7 +400,6 @@ describe('compiler-discovered protocol contracts', () => {
       (document.paths['/rpc']!.post!.responses[202] as OpenApiResponse).content,
     ).toBeUndefined()
   })
-
   it('retains an unrelated raw response as unavailable', () => {
     const contracts = discover('unknown-raw', true)
     expect(Object.values(contracts).some((contract) => contract.unavailableReason)).toBe(true)
@@ -400,7 +407,6 @@ describe('compiler-discovered protocol contracts', () => {
       buildOpenApiDocument({ title: 'Raw', responseContracts: contracts })['x-unavailable-routes'],
     ).toEqual(['POST:/rpc'])
   })
-
   it.each([
     'unused-http',
     'wrong-empty',

@@ -1,8 +1,12 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import ts from '../contract-schema/typescript-api.mts'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { COLD_VIRTUAL_PROGRAM_TIMEOUT_MS } from './test-setup.test-helpers.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
-import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
+import { type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
 const sources = {
   variants: `
@@ -10,10 +14,10 @@ const sources = {
     declare const format: string
     declare const stream: unknown
     declare function risky(): any
-    app.route('/api/v1/export').get((ctx: any) => {
+    app.route('/api/v1/export').get((ctx: Context) => {
       if (format === 'json') { ctx.json({ results: [] as string[] }); return }
       if (format === 'csv') {
-        ctx.set('Content-Type', 'text/csv; charset=utf-8')
+        ctx.set('Content-Type', 'text/csv; charset=utf-8');
         ctx.pipeline(stream)
         return
       }
@@ -25,43 +29,93 @@ const sources = {
     declare const app: any
     declare const stream: unknown
     declare const dynamicType: string
-    app.route('/api/v1/enclosing').get((ctx: any) => {
-      ctx.set('Content-Type', 'text/csv; charset=utf-8')
+    app.route('/api/v1/enclosing').get((ctx: Context) => {
+      ctx.set('Content-Type', 'text/csv; charset=utf-8');
       if (ctx.query.download) { ctx.pipeline(stream) }
     })
-    app.route('/api/v1/xml-stream').get((ctx: any) => {
-      ctx.set('Content-Type', 'application/xml; charset=utf-8')
+    app.route('/api/v1/xml-stream').get((ctx: Context) => {
+      ctx.set('Content-Type', 'application/xml; charset=utf-8');
       ctx.pipeline(stream)
     })
-    app.route('/api/v1/overwritten').get((ctx: any) => {
-      ctx.set('Content-Type', 'text/csv')
-      ctx.set('Content-Type', 'application/octet-stream')
+    app.route('/api/v1/overwritten').get((ctx: Context) => {
+      ctx.set('Content-Type', 'text/csv');
+      ctx.set('Content-Type', 'application/octet-stream');
       ctx.pipeline(stream)
     })
-    app.route('/api/v1/dynamic').get((ctx: any) => {
-      ctx.set('Content-Type', dynamicType)
+    app.route('/api/v1/dynamic').get((ctx: Context) => {
+      ctx.set('Content-Type', dynamicType);
       ctx.pipeline(stream)
     })
   `,
   'marked-streams': `
     declare const app: any
     declare function apiResponse<K extends string, T>(key: K, body: T): T
-    app.route('/api/v1/csv').get((ctx: any) => {
-      ctx.set('Content-Type', 'text/csv; charset=utf-8')
+    app.route('/api/v1/csv').get((ctx: Context) => {
+      ctx.set('Content-Type', 'text/csv; charset=utf-8');
       ctx.pipeline(apiResponse('GET:/api/v1/csv', { id: 'one' }))
     })
-    app.route('/api/v1/xml').get((ctx: any) => {
-      ctx.set('Content-Type', 'application/xml; charset=utf-8')
+    app.route('/api/v1/xml').get((ctx: Context) => {
+      ctx.set('Content-Type', 'application/xml; charset=utf-8');
       ctx.pipeline(apiResponse('GET:/api/v1/xml', { id: 'one' }))
     })
   `,
 } as const
 
 let matrix: VirtualProgramMatrix<keyof typeof sources>
+let fixtureRoot: string
+afterAll(() => {
+  if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+})
 
 describe('API response media contracts', () => {
   beforeAll(() => {
-    matrix = buildVirtualProgramMatrix(import.meta, sources)
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'protocol-platform-provenance-'))
+    const dependency = join(fixtureRoot, 'node_modules/@jongleberry/api-server')
+    mkdirSync(dependency, { recursive: true })
+    writeFileSync(
+      join(dependency, 'package.json'),
+      JSON.stringify({
+        name: '@jongleberry/api-server',
+        version: '0.0.0',
+        type: 'module',
+        types: './index.d.mts',
+      }),
+    )
+    writeFileSync(
+      join(dependency, 'index.d.mts'),
+      'export declare class Context {set(header:string,value:string):void;query:any;json(value:unknown):void;pipeline(value:unknown):void;response:{xml(value?:string):void}}',
+    )
+    const files = new Map(
+      Object.entries(sources).map(([name, source]) => {
+        const file = join(fixtureRoot, `${name}.ts`)
+        writeFileSync(
+          file,
+          `import type {Context} from '@jongleberry/api-server';
+${source}
+export {}`,
+        )
+        return [name, file]
+      }),
+    )
+    const program = ts.createProgram([...files.values()], {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      target: ts.ScriptTarget.ESNext,
+      strict: true,
+      skipLibCheck: true,
+      noEmit: true,
+    })
+    expect(
+      ts
+        .getPreEmitDiagnostics(program)
+        .map((value) => ts.flattenDiagnosticMessageText(value.messageText, '\n')),
+    ).toEqual([])
+    matrix = {
+      program,
+      sourceFile(name) {
+        return program.getSourceFile(files.get(name)!)!
+      },
+    }
   }, COLD_VIRTUAL_PROGRAM_TIMEOUT_MS)
 
   it('separates JSON, XML, and CSV media while retaining failed secondary variants', () => {
