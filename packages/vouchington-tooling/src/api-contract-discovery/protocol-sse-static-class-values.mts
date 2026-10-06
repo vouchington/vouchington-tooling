@@ -19,6 +19,8 @@ export function selectedStaticSseClassCapability(
       node.parent.expression === node
         ? node.expression
         : node
+    if (ts.isObjectLiteralExpression(actual) || ts.isArrayLiteralExpression(actual))
+      return selected(actual)
     if (ts.isExpression(actual) && selected(actual)) return true
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) return false
     return ts.forEachChild(node, contains) === true
