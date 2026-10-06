@@ -45,11 +45,12 @@ export function createHttpContextWeakMembershipProof(
       if (
         (ts.isReturnStatement(node) || ts.isExportAssignment(node)) &&
         node.expression &&
-        refers(node.expression, symbol)
+        (refers(node.expression, symbol) || refers(node.expression, constructor))
       )
         return true
       return (
-        ts.isExportSpecifier(node) && checker.getExportSpecifierLocalTargetSymbol(node) === symbol
+        ts.isExportSpecifier(node) &&
+        [symbol, constructor].includes(roots.root(node.propertyName ?? node.name)!)
       )
     })
     safe.set(symbol, result)
