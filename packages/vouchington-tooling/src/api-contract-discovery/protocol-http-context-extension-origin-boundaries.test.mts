@@ -9,6 +9,7 @@ import { enclosingFunction } from './protocol-marker-analysis.mts'
 import { registeredContextApplication } from './protocol-http-context-application.mts'
 import { createHttpContextPlatformMethodProof } from './protocol-http-context-platform-methods.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
+import { COLD_VIRTUAL_PROGRAM_TIMEOUT_MS } from './test-setup.test-helpers.mts'
 
 const bodies = {
   headers: "this.set('X-Test','safe');this.setType('text/plain')",
@@ -97,7 +98,7 @@ beforeAll(() => {
   rows = discoverApiResponseContracts(program, [program.getSourceFile(file)!], undefined, {
     onRouteError: () => {},
   })
-})
+}, COLD_VIRTUAL_PROGRAM_TIMEOUT_MS)
 afterAll(() => {
   if (root) rmSync(root, { recursive: true, force: true })
   extraRoots.forEach((directory) => rmSync(directory, { recursive: true, force: true }))
