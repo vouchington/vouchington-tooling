@@ -126,10 +126,15 @@ it.each([
   expectNoContent(files(name)),
 )
 
-it('does not invent a module origin for an opaque JavaScript promise receiver', () => {
-  const program = checkedProgram({
-    'consumer.js': 'external.then(function(module){module.options.assertAccess=globalOpaque})',
-  })
+it.each([
+  ['opaque', 'external.then(function(module){module.options.assertAccess=globalOpaque})'],
+  // Unchecked JavaScript accepts this source; runtime TDZ prevents a real module origin.
+  [
+    'cyclic',
+    'const pending=pending;pending.then(function(module){module.options.assertAccess=globalOpaque})',
+  ],
+])('does not invent a module origin for a %s JavaScript promise receiver', (_name, sourceText) => {
+  const program = checkedProgram({ 'consumer.js': sourceText! })
   const source = program.getSourceFile('/virtual/consumer.js')!
   const checker = program.getTypeChecker()
   let parameter: ts.ParameterDeclaration | undefined
