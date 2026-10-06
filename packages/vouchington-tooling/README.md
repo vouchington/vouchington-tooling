@@ -676,3 +676,18 @@ in `.tsx`. Template expressions join their static fragments for DML matching, wh
 for generated-table facts come from templates rather than ordinary quoted strings. Dynamic
 eligibility-table matching expects an unquoted literal immediately after the DML prefix and does
 not recognize `DELETE FROM ONLY`.
+
+## Publication reader source facts
+
+The same subpath exports `sourceImportsAndComposesAny`, `sourceImportsAndUsesBoundaryAny`, and
+`sourceFiltersWithPublicBoundary`. Each accepts source text, selected imported symbols, and
+`ReaderSourceAnalysisOptions`. Configure allowed modules per imported symbol, SQL tag and executor
+imports through the existing `ReaderSqlTemplateOptions`, the ignored-call identifier, and the
+candidate ID property. Missing import configuration admits no module.
+
+These functions preserve the existing lexical source heuristics: named import aliases, local
+builder bindings, reassignment rejection, append/push consumption, returned boundary results,
+and collection filtering with the selected ID set. They do not prove runtime execution, general
+call graphs, or type identity. Malformed source throws through the ESTree parser. Inventory
+selection, classifications, exceptions, and diagnostics remain consumer policy. SQL public-view
+composition analysis is not included in this source-analysis API.

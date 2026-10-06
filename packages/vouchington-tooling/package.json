@@ -359,6 +359,7 @@
   "dependencies": {
     "@types/mdast": "4.0.4",
     "@types/unist": "3.0.3",
+    "@typescript-eslint/parser": "^8.71.1",
     "csv-parse": "7.0.3",
     "csv-stringify": "6.9.0",
     "dockerfile-ast": "0.7.1",
@@ -366,6 +367,7 @@
     "remark": "15.0.1",
     "remark-gfm": "4.0.1",
     "spdx-expression-parse": "5.0.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "yaml": "2.9.1"
   },
   "devDependencies": {

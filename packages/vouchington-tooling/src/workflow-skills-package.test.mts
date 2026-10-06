@@ -25,6 +25,7 @@ type SkillManifest = {
 }
 
 describe('workflow skills package contract', () => {
+  // Builds and packs the full package before verifying its installed skill resources.
   it('ships canonical resources and links required skills without tracked copies', async () => {
     const output = realpathSync(mkdtempSync(resolve(tmpdir(), 'vouchington-skills-pack-')))
     try {
@@ -160,7 +161,7 @@ describe('workflow skills package contract', () => {
     } finally {
       rmSync(output, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 })
 
 function skillPaths(root: string, path = root, entrypointsOnly = true): string[] {
