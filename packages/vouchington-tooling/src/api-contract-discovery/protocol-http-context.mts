@@ -148,20 +148,25 @@ export function wrappedHttpContextArgument(
   expression: ts.Expression,
   context: ts.Symbol,
   checker: ts.TypeChecker,
+  captured?: (fn: ts.SignatureDeclaration) => boolean,
 ): boolean {
   const value = unwrapExpression(expression)
   const branches = contextResultBranches(value)
   if (branches.length)
-    return branches.some((branch) => wrappedHttpContextArgument(branch, context, checker))
+    return branches.some((branch) => wrappedHttpContextArgument(branch, context, checker, captured))
   if (ts.isSpreadElement(value))
     return (
       httpContextArgument(value.expression, context, checker) ||
-      wrappedHttpContextArgument(value.expression, context, checker)
+      wrappedHttpContextArgument(value.expression, context, checker, captured)
     )
   if (!(ts.isObjectLiteralExpression(value) || ts.isArrayLiteralExpression(value))) return false
   let found = false
   function visit(node: ts.Node) {
-    if (ts.isFunctionLike(node) || !potentiallyExecuted(node)) return
+    if (!potentiallyExecuted(node)) return
+    if (ts.isFunctionLike(node)) {
+      if (captured?.(node)) found = true
+      return
+    }
     if (ts.isShorthandPropertyAssignment(node)) {
       if (checker.getShorthandAssignmentValueSymbol(node) === context) found = true
     } else if (ts.isExpression(node) && httpContextArgument(node, context, checker)) {
