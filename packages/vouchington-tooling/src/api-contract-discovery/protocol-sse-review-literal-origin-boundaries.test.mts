@@ -10,7 +10,10 @@ const route = (body: string) => `declare const app:any;declare function opaque(v
  class Stream{write(_value:string):void{}}const stream=new Stream();const other=new Stream();
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
-  repeated: route('const value={other};opaque({first:value,second:value})'),
+  repeated: route(
+    'function ignore(_value:unknown){}const value={other};ignore({first:value,second:value})',
+  ),
+  ambientrepeated: route('const value={other};opaque({first:value,second:value})'),
   alias: route('const wrapper={stream};opaque(wrapper)'),
   chain: route('const wrapper={stream};const next=wrapper;opaque(next)'),
   array: route('const wrapper=[stream];opaque(wrapper)'),
@@ -18,8 +21,10 @@ const sources = {
   receiveralias: route('const wrapper=[stream];wrapper.forEach(opaque)'),
   getter: route('const wrapper={get expose(){return stream}};opaque(wrapper.expose)'),
   getterelement: route("const wrapper={get expose(){return stream}};opaque(wrapper['expose'])"),
-  independentalias: route('const wrapper={other};opaque(wrapper)'),
-  independentarray: route('const wrapper=[other];opaque(wrapper)'),
+  independentalias: route('function ignore(_value:unknown){}const wrapper={other};ignore(wrapper)'),
+  ambientalias: route('const wrapper={other};opaque(wrapper)'),
+  independentarray: route('function ignore(_value:unknown){}const wrapper=[other];ignore(wrapper)'),
+  ambientarray: route('const wrapper=[other];opaque(wrapper)'),
   ambientreceiver: route('[other].forEach(opaque)'),
   independentreceiver: route('function ignore(_value:unknown){}[other].forEach(ignore)'),
   independentgetter: route('const wrapper={get expose(){return other}};opaque(wrapper.expose)'),
@@ -118,3 +123,33 @@ it('distinguishes actual independent literal receivers from an opaque callback a
   if (!frame || !call) throw new Error('Missing actual literal receiver fixture')
   expect(selectedOpaqueSseReceiver(call, checker, [frame], (receiver) => [receiver])).toBe(false)
 })
+
+it.each(['ambientrepeated', 'ambientalias', 'ambientarray'] as const)(
+  'preserves the published opaque-container boundary in %s',
+  (name) => {
+    expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame')
+    const source = matrix.sourceFile(name)
+    const checker = matrix.program.getTypeChecker()
+    const declaration = source.statements
+      .filter(ts.isVariableStatement)
+      .flatMap((statement) => statement.declarationList.declarations)
+      .find((value) => ts.isIdentifier(value.name) && value.name.text === 'stream')
+    let call: ts.CallExpression | undefined
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'opaque'
+      )
+        call = node
+      node.forEachChild(visit)
+    }
+    visit(source)
+    const frame =
+      declaration &&
+      ts.isIdentifier(declaration.name) &&
+      expressionReceiver(declaration.name, checker)
+    if (!frame || !call) throw new Error('Missing actual independent-container fixture')
+    expect(selectedOpaqueSseReceiver(call, checker, [frame], (receiver) => [receiver])).toBe(false)
+  },
+)
