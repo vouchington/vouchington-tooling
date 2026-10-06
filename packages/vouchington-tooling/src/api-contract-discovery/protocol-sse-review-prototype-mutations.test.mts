@@ -1,5 +1,10 @@
 import { beforeAll, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
+import {
+  mutationAffectsSelectedStream,
+  sseWriteMutations,
+} from './protocol-sse-write-mutations.mts'
+import { expressionReceiver, writeReceiver } from './protocol-write-receiver.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
 
@@ -10,7 +15,36 @@ const route = (body: string) => `declare const app:any;
  const stream=new Stream();const other=new Other();const sibling=new Stream();
  const replacement=(_value?:unknown)=>{};
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
+const withReceiver = (declaration: string, receiver: string, body: string) =>
+  route(body)
+    .replace('const stream=new Stream();', declaration)
+    .replace('stream.write(apiSseFrame', `${receiver}.write(apiSseFrame`)
 const sources = {
+  nested: withReceiver(
+    'declare const stream:{inner:Stream};',
+    'stream.inner',
+    'Stream.prototype.write=replacement',
+  ),
+  missing: withReceiver(
+    'const stream={} as any;',
+    'stream.inner',
+    'Stream.prototype.write=replacement',
+  ),
+  union: withReceiver(
+    'declare const stream:Other|Stream;',
+    'stream',
+    'Stream.prototype.write=replacement',
+  ),
+  structural: withReceiver(
+    'declare const stream:{write(value:string):void;end(value?:unknown):void};',
+    'stream',
+    'Stream.prototype.write=replacement',
+  ),
+  ownfield: withReceiver(
+    'class Own extends Stream {override write=(_value:string)=>{}};const stream=new Own();',
+    'stream',
+    'Stream.prototype.write=replacement',
+  ),
   constructor: route('Stream.prototype.write=replacement'),
   instance: route('(stream as Stream & {__proto__:Stream}).__proto__.write=replacement'),
   inheritedconstructor: route('stream.constructor.prototype.write=replacement'),
@@ -40,6 +74,8 @@ const row = (name: keyof typeof sources) =>
   })['GET:/events']
 
 it.each([
+  'union',
+  'structural',
   'constructor',
   'instance',
   'inheritedconstructor',
@@ -53,6 +89,7 @@ it.each([
   expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
 it.each([
+  'ownfield',
   'independent',
   'independentinstance',
   'independentconstructor',
@@ -62,3 +99,30 @@ it.each([
 ] as const)('preserves independent or unexecuted prototype mutation: %s', (name) =>
   expect(row(name)?.unavailableReason).toBeUndefined(),
 )
+
+it.each(['nested', 'missing'] as const)('matches actual nested receiver prototype: %s', (name) => {
+  const checker = matrix.program.getTypeChecker()
+  const mutations: ReturnType<typeof sseWriteMutations> = []
+  const frames: NonNullable<ReturnType<typeof writeReceiver>>[] = []
+  const visit = (node: ts.Node) => {
+    mutations.push(...sseWriteMutations(node))
+    if (ts.isCallExpression(node)) {
+      const receiver = writeReceiver(node, checker)
+      if (receiver) frames.push(receiver)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(matrix.sourceFile(name))
+  expect(frames).toHaveLength(1)
+  expect(
+    mutationAffectsSelectedStream(
+      mutations,
+      frames,
+      checker,
+      () => true,
+      () => false,
+      (expression) => [expressionReceiver(expression, checker)],
+      (receiver) => [receiver],
+    ),
+  ).toBe(true)
+})
