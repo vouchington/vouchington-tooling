@@ -208,7 +208,7 @@ ts.createProgram(files, options)`,
   ...additionalValid,
 ]
 
-describe('voucha/backend-contract-program-construction-location', () => {
+describe('vouchington/typescript-program-location', () => {
   let root: string
 
   beforeAll(() => {

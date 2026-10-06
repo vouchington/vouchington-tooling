@@ -53,22 +53,7 @@ function revocableProxy(value, context, findVariable, propertyName, unwrap, isFa
       unwrap,
       isFactoryValue,
     )
-  if (node?.type !== 'Identifier') return false
-  return findVariable(context, node)?.defs?.some(
-    (definition) =>
-      definition.node.id?.type === 'ObjectPattern' &&
-      definition.node.id.properties.some(
-        (property) => propertyName(property) === 'proxy' && property.value?.name === node.name,
-      ) &&
-      isRevocableProxyCall(
-        definition.node.init,
-        context,
-        findVariable,
-        propertyName,
-        unwrap,
-        isFactoryValue,
-      ),
-  )
+  return false
 }
 
 function isFactoryPathResult(

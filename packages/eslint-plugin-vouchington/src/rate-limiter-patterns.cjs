@@ -88,7 +88,7 @@ function patternSourceExpression(identifier, memberPath, receiverAtPath, unwrap)
       candidates,
       parent: candidates[0]?.expression.parent,
       range: candidates[0]?.expression.range,
-      type: 'VouchaPatternDefaultExpression',
+      type: 'PatternDefaultCandidatesExpression',
     }
   }
   const candidates = patternMemberSources(identifier, memberPath).map(({ path, source }) => ({
@@ -101,12 +101,12 @@ function patternSourceExpression(identifier, memberPath, receiverAtPath, unwrap)
     candidates,
     parent: candidates[0].expression.parent,
     range: candidates[0].expression.range,
-    type: 'VouchaPatternDefaultExpression',
+    type: 'PatternDefaultCandidatesExpression',
   }
 }
 
 function patternPossibleResults(node, unwrap) {
-  if (node?.type !== 'VouchaPatternDefaultExpression') return null
+  if (node?.type !== 'PatternDefaultCandidatesExpression') return null
   const results = []
   for (const candidate of node.candidates) {
     results.push(candidate.expression)
