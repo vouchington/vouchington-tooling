@@ -83,16 +83,37 @@ function fulfillmentModule(checker: ts.TypeChecker, parameter: ts.ParameterDecla
       callbacks.resolve(call.arguments[0], new Map())?.node !== fn
     )
       continue
-    const imported = unwrapTransparentExpression(call.expression.expression)
-    if (
-      ts.isCallExpression(imported) &&
-      imported.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      imported.arguments[0] &&
-      ts.isStringLiteral(imported.arguments[0])
-    )
-      return checker.getSymbolAtLocation(imported.arguments[0])
+    const module = importPromiseModule(checker, call.expression.expression)
+    if (module) return module
   }
   return undefined
+}
+
+/** Promise aliases retain origins only through stable const initializers and literal imports. */
+function importPromiseModule(
+  checker: ts.TypeChecker,
+  value: ts.Expression,
+  seen = new Set<ts.Symbol>(),
+): ts.Symbol | undefined {
+  value = unwrapTransparentExpression(value)
+  if (ts.isIdentifier(value)) {
+    const binding = checker.getSymbolAtLocation(value)
+    if (!binding || seen.has(binding)) return undefined
+    const declaration = binding.valueDeclaration
+    return declaration &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      declaration.parent.flags & ts.NodeFlags.Const
+      ? importPromiseModule(checker, declaration.initializer, new Set(seen).add(binding))
+      : undefined
+  }
+  return ts.isCallExpression(value) &&
+    value.expression.kind === ts.SyntaxKind.ImportKeyword &&
+    value.arguments[0] &&
+    ts.isStringLiteral(value.arguments[0])
+    ? checker.getSymbolAtLocation(value.arguments[0])
+    : undefined
 }
 
 /** Only a fulfillment function's own first arguments slot denotes the imported module. */
