@@ -55,6 +55,7 @@ export function opaqueCallReceivesSelectedStream(
       someSseArgumentValue(argument, checker, (value) => {
         if (
           (ts.isCallExpression(value) ||
+            ts.isNewExpression(value) ||
             sseCallableAlias(value, checker) ||
             ts.isArrowFunction(value) ||
             ts.isFunctionExpression(value)) &&
