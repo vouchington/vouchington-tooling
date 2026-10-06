@@ -88,7 +88,9 @@ it('fails closed on an actual unchecked JavaScript literal alias cycle', () => {
     .map((s) => s.expression)
     .find(ts.isCallExpression)
   if (!call?.arguments[0]) throw new Error('Missing real literal-cycle argument')
-  expect(someSseArgumentValue(call.arguments[0], program.getTypeChecker(), () => false)).toBe(true)
+  expect(someSseArgumentValue(call.arguments[0], program.getTypeChecker(), () => false, true)).toBe(
+    true,
+  )
 })
 
 it('distinguishes actual independent literal receivers from an opaque callback argument', () => {
