@@ -114,15 +114,17 @@ export function selectedOpaqueSseReceiver(
     : ts.isCallExpression(call) && call.expression
   if (!target || !(ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)))
     return false
-  const receiver = expressionReceiver(target.expression, checker)
-  return (
-    !!receiver &&
-    resolve(receiver).some(
-      (actual) =>
-        actual !== undefined &&
-        framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+  return someSseArgumentValue(target.expression, checker, (value) => {
+    const receiver = expressionReceiver(value, checker)
+    return (
+      !!receiver &&
+      resolve(receiver).some(
+        (actual) =>
+          actual !== undefined &&
+          framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+      )
     )
-  )
+  })
 }
 
 /** Only stable actual callable aliases participate in the callable return proof. */
