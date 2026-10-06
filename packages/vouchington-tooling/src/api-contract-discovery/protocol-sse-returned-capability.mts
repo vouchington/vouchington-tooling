@@ -4,6 +4,7 @@ import {
 } from './protocol-callback-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { selectedSseWrapperCapture } from './protocol-sse-wrapper-captures.mts'
 import { sseCapabilityOutputs } from './protocol-sse-capability-outputs.mts'
 import {
   expressionReceiver,
@@ -26,6 +27,8 @@ function returnedSseCapability(
     if (active.has(value)) return true
     active.add(value)
     try {
+      if (selectedSseWrapperCapture(value, checker, (value) => contains(value, bindings)))
+        return true
       if (ts.isCallExpression(value)) {
         const argumentsSelected = value.arguments.map((argument) => contains(argument, bindings))
         const fn = implementation(value)

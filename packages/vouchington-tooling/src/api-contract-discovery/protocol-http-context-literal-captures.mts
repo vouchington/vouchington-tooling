@@ -37,7 +37,7 @@ export function contextLiteralBinding(
     !(ts.isIdentifier(key) || ts.isStringLiteral(key))
   )
     return undefined
-  const member = source.properties.find(
+  const member = source.properties.findLast(
     (member) =>
       member.name &&
       (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) &&
