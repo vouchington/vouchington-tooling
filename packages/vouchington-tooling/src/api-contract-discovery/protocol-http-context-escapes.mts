@@ -54,6 +54,7 @@ export function opaqueHttpContextArgument(
       : undefined
   const directReceiver = (symbol: ts.Symbol) => {
     if (!receiver || !httpContextArgument(receiver, symbol, checker)) return false
+    if (proof.platformMethod(call, symbol)) return false
     // Canonical protocol calls retain their existing emission and mutation proofs.
     const method = contextResponseMethod(invoked, symbol, checker, true)
     return ![
@@ -113,12 +114,15 @@ function calleeEscapes(
   if (active.has(fn)) return true
   const receiver =
     ts.isPropertyAccessExpression(call.expression) || ts.isElementAccessExpression(call.expression)
-  if (receiver && !ts.isArrowFunction(fn) && receiverUsesThis(fn.body!)) return true
+  const extension = values.extension(call, context, root)
+  if (receiver && !ts.isArrowFunction(fn) && receiverUsesThis(fn.body!) && extension?.node !== fn)
+    return true
   const env = callbackArgumentBindings(fn, call, callerEnv, captured, checker, values.callbacks)
   if (!env) return true
   const next = new Set(active).add(fn)
   const contexts = boundHttpContexts(fn, call, context, checker)
   if (!contexts) return true
+  if (extension?.node === fn) contexts.push(extension.thisParameter)
   let escaped = false
   const accounted = createContextAccountedEmissionProof(fn, checker)
   const direct = values.callbacks.resolve(call.expression, new Map())?.node === fn

@@ -30,6 +30,20 @@ export function implementedHttpContextCallee(
   calleeEscapes: CalleeEscapeProof,
 ): boolean {
   const resolver = values.callbacks
+  if (values.weakMembership(call, context)) return true
+  const extension = values.extension(call, context, root)
+  if (extension)
+    return !calleeEscapes(
+      extension.node,
+      call,
+      context,
+      checker,
+      active,
+      callerEnv,
+      extension.env,
+      values,
+      root,
+    )
   if (standardReflectApply(call, checker)) {
     const target = call.arguments[0] && resolver.resolve(call.arguments[0], new Map())
     return !!(
