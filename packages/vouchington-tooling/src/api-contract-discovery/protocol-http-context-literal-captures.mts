@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { executableProtocolPath } from './protocol-execution-path.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
 
@@ -79,7 +80,7 @@ export function unsupportedLiteralContextBinding(
       (ts.isObjectLiteralExpression(source) && !source.properties.some(ts.isSpreadAssignment)))
   return !simple || !literal
 }
-/** Construction reaches only this actual class's non-static property initializers. */
+/** Construction reaches this actual class's instance initializers and constructor body. */
 export function constructedContextCapture(
   node: ts.NewExpression,
   checker: ts.TypeChecker,
@@ -97,11 +98,33 @@ export function constructedContextCapture(
       target = unwrapExpression(target.initializer)
   }
   if (!target || (!ts.isClassDeclaration(target) && !ts.isClassExpression(target))) return false
-  return target.members.some(
-    (member) =>
+  return target.members.some((member) => {
+    if (ts.isConstructorDeclaration(member) && member.body) {
+      function captured(value: ts.Node): boolean {
+        if (
+          ts.isTypeNode(value) ||
+          ts.isClassLike(value) ||
+          !executableProtocolPath(value, checker, member)
+        )
+          return false
+        if (ts.isFunctionLike(value))
+          return (
+            'body' in value &&
+            !!value.body &&
+            executableProtocolPath(value.body, checker, member) &&
+            captured(value.body)
+          )
+        if (ts.isVariableDeclaration(value))
+          return !!value.initializer && captured(value.initializer)
+        return (ts.isExpression(value) && selected(value)) || value.forEachChild(captured) === true
+      }
+      return captured(member.body)
+    }
+    return (
       ts.isPropertyDeclaration(member) &&
       !!member.initializer &&
       !member.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword) &&
-      selected(member.initializer),
-  )
+      selected(member.initializer)
+    )
+  })
 }
