@@ -20,8 +20,16 @@ export function selectedSseWrapperCapture(
   const resolved = createProtocolCallbackValueResolver(checker).resolve(method.receiver, new Map())
   const fn = resolved?.node
   if (!fn || !isProtocolCallbackFunction(fn) || !fn.body) return false
+  return selectedSseCallableCapture(fn, selected)
+}
+
+/** An opaque consumer can invoke an actual literal method or accessor body. */
+export function selectedSseCallableCapture(
+  fn: ts.FunctionLikeDeclaration,
+  selected: (value: ts.Expression) => boolean,
+): boolean {
   function captured(node: ts.Node): boolean {
     return (ts.isExpression(node) && selected(node)) || node.forEachChild(captured) === true
   }
-  return captured(fn.body)
+  return fn.body !== undefined && captured(fn.body)
 }
