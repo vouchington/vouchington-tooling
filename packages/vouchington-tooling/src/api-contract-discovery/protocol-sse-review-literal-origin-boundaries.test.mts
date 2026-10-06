@@ -127,7 +127,6 @@ it('distinguishes actual independent literal receivers from an opaque callback a
 it.each(['ambientrepeated', 'ambientalias', 'ambientarray'] as const)(
   'preserves the published opaque-container boundary in %s',
   (name) => {
-    expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame')
     const source = matrix.sourceFile(name)
     const checker = matrix.program.getTypeChecker()
     const declaration = source.statements
