@@ -29,7 +29,13 @@ export function selectedSseCallableCapture(
   selected: (value: ts.Expression) => boolean,
 ): boolean {
   function captured(node: ts.Node): boolean {
-    return (ts.isExpression(node) && selected(node)) || node.forEachChild(captured) === true
+    const value =
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+      ts.isCallExpression(node.parent) &&
+      node.parent.expression === node
+        ? node.expression
+        : node
+    return (ts.isExpression(value) && selected(value)) || node.forEachChild(captured) === true
   }
   return fn.body !== undefined && captured(fn.body)
 }

@@ -7,6 +7,10 @@ const route = (body: string) => `declare const app:any;declare function opaque(v
  class Stream{write(_value:string):void{}}const stream=new Stream();const other=new Stream();
  app.route('/events').get(()=>{${body};stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))})`
 const sources = {
+  computed: route("opaque({expose(){(other as any)[stream as any]('raw')}})"),
+  argument: route('opaque({expose(){other.write(stream as any)}})'),
+  exported: route('opaque({expose(){return stream.write}})'),
+  elementother: route("opaque({set expose(_value:unknown){other['write']('raw')}})"),
   spread: route('opaque({...{expose(){return stream}}})'),
   spreadother: route('opaque({...{expose(){return other}}})'),
   method: route('opaque({expose(){return stream}})'),
@@ -30,11 +34,22 @@ const row = (name: keyof typeof sources) =>
   discoverApiResponseContracts(matrix.program, [matrix.sourceFile(name)], undefined, {
     onRouteError: () => {},
   })['GET:/events']
-it.each(['spread', 'method', 'write', 'getter', 'setter', 'tag', 'returned'] as const)(
-  'rejects selected capability in %s',
-  (name) => expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
+it.each([
+  'computed',
+  'argument',
+  'exported',
+  'spread',
+  'method',
+  'write',
+  'getter',
+  'setter',
+  'tag',
+  'returned',
+] as const)('rejects selected capability in %s', (name) =>
+  expect(row(name)?.unavailableReason).toBe('SSE route writes an unmarked frame'),
 )
 it.each([
+  'elementother',
   'spreadother',
   'independent',
   'unused',
