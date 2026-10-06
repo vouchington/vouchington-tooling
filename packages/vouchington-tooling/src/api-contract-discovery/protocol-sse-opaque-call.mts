@@ -55,7 +55,7 @@ export function opaqueCallReceivesSelectedStream(
         )
           return true
         if (
-          (ts.isCallExpression(leaf) || callback) &&
+          (ts.isCallExpression(leaf) || ts.isNewExpression(leaf) || callback) &&
           selectedReturnedSseCapability(
             leaf,
             checker,
