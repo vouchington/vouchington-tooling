@@ -64,6 +64,8 @@ function isMeaningfulBoundaryCall(
   }
   return (
     node.callee.type === 'MemberExpression' &&
-    ['all', 'allSettled', 'assert', 'then'].includes(propertyName(node.callee.property as Node) ?? '')
+    ['all', 'allSettled', 'assert', 'then'].includes(
+      propertyName(node.callee.property as Node) ?? '',
+    )
   )
 }
