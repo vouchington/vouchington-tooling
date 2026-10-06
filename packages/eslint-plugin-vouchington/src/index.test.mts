@@ -9,6 +9,7 @@ describe('eslint-plugin-vouchington', () => {
       'postgres-cursor-call-contract',
       'banned-member-read',
       'factory-owner-location',
+      'typescript-program-location',
       'serial-cursor-drains',
     ])
     expect(plugin.rules['postgres-cursor-call-contract']).toEqual(

@@ -3,6 +3,7 @@ import { readPackageVersion } from './package-version.mts'
 import { createSerialCursorDrainsRule } from './serial-cursor-drains.mts'
 import { createBannedMemberReadRule } from './banned-member-read.mts'
 import { createFactoryOwnerLocationRule } from './factory-owner-location.mts'
+import { createTypescriptProgramLocationRule } from './typescript-program-location.mts'
 import { createPostgresCursorCallContractRule } from './postgres-cursor-call-contract.mts'
 
 export interface VouchingtonPlugin {
@@ -25,6 +26,7 @@ export function createPlugin(version = readInstalledVersion()): VouchingtonPlugi
       'postgres-cursor-call-contract': createPostgresCursorCallContractRule(),
       'banned-member-read': createBannedMemberReadRule(),
       'factory-owner-location': createFactoryOwnerLocationRule(),
+      'typescript-program-location': createTypescriptProgramLocationRule(),
       'serial-cursor-drains': createSerialCursorDrainsRule(),
     },
   }

@@ -6,6 +6,6 @@
     "rootDir": "./src",
     "declaration": true
   },
-  "include": ["src/**/*.mts"],
+  "include": ["src/**/*.mts", "src/**/*.cjs"],
   "exclude": ["src/**/*.test.mts"]
 }
