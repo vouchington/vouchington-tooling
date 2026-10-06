@@ -49,6 +49,13 @@ export function opaqueWrappedHttpContextArgument(
       )
     }
     const fn = resolver.resolve(argument, env)?.node ?? value
+    if (ts.isObjectLiteralExpression(fn) || ts.isArrayLiteralExpression(fn))
+      return wrappedHttpContextArgument(
+        fn,
+        context,
+        checker,
+        (member) => isProtocolCallbackFunction(member) && capturesFunction(member),
+      )
     if (!isProtocolCallbackFunction(fn)) return false
     return capturesFunction(fn)
   }

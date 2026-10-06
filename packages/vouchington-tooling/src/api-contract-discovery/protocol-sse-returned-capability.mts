@@ -123,8 +123,8 @@ export function selectedOpaqueSseReceiver(
         !!receiver &&
         resolve(receiver).some(
           (actual) =>
-            actual !== undefined &&
-            framed.some((frame) => frame !== undefined && sameWriteReceiver(frame, actual)),
+            actual === undefined ||
+            framed.some((frame) => frame === undefined || sameWriteReceiver(frame, actual)),
         )
       )
     },
