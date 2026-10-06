@@ -14,6 +14,7 @@ import type { ContextValues } from './protocol-http-context-value-types.mts'
 import { contextProperty } from './protocol-http-context-properties.mts'
 import { createContextReceiverGuard } from './protocol-http-context-receiver.mts'
 import { createContextPrototypeProof } from './protocol-http-context-prototype.mts'
+import { createHttpContextReceiverProofs } from './protocol-http-context-receiver-proofs.mts'
 /** All possible concrete values must be retained; null denotes a proven absent value. */
 export function createHttpContextValueResolver(
   checker: ts.TypeChecker,
@@ -24,6 +25,12 @@ export function createHttpContextValueResolver(
   const stable = createContextValueStability(checker, programSources, compilerOptions)
   const receivers = createContextReceiverGuard(checker, resolve)
   const prototypeSafe = createContextPrototypeProof(checker, programSources)
+  const receiverProofs = createHttpContextReceiverProofs(
+    checker,
+    programSources ?? [],
+    compilerOptions ?? {},
+    callbacks,
+  )
   function declaration(
     target: ts.Symbol,
     env: CallbackBindings,
@@ -166,6 +173,7 @@ export function createHttpContextValueResolver(
   return {
     resolve,
     callbacks,
+    ...receiverProofs,
     accountedSse: (
       _call: ts.CallExpression,
       _context: ts.Symbol,

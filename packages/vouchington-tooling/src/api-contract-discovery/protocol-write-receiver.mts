@@ -1,5 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
-import { unwrapExpression } from './protocol-marker-analysis.mts'
+import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
 
 export type WriteReceiver = { root: ts.Symbol; path: readonly string[]; mutableAlias?: boolean }
 
@@ -27,6 +27,15 @@ export function expressionReceiver(
   active = new Set<ts.Symbol>(),
 ): WriteReceiver | undefined {
   const value = unwrapExpression(expression)
+  if (value.kind === ts.SyntaxKind.ThisKeyword) {
+    let owner = enclosingFunction(value)
+    while (owner && ts.isArrowFunction(owner)) owner = enclosingFunction(owner)
+    const parameter = owner?.parameters.find(
+      (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'this',
+    )
+    const symbol = parameter && checker.getSymbolAtLocation(parameter.name)
+    return symbol ? { root: symbol, path: [] } : undefined
+  }
   if (ts.isIdentifier(value)) {
     const symbol = checker.getSymbolAtLocation(value)
     if (!symbol) return undefined
