@@ -9,12 +9,14 @@ const sources = {
   repeated: route('const value={other};opaque({first:value,second:value})'),
   alias: route('const wrapper={other};opaque(wrapper)'),
   array: route('const wrapper=[other];opaque(wrapper)'),
+  dead: route('const box:{value?:Stream}={};if(false)box.value=stream;opaque(box)'),
+  unused: route('const box:{value?:Stream}={};function unused(){box.value=stream}opaque(box)'),
 } as const
 let matrix: VirtualProgramMatrix<keyof typeof sources>
 beforeAll(() => {
   matrix = buildVirtualProgramMatrix(import.meta, sources)
 })
-it.each(['repeated', 'alias', 'array'] as const)(
+it.each(['repeated', 'alias', 'array', 'dead', 'unused'] as const)(
   'retains the published conservative opaque container boundary in %s',
   (name) =>
     expect(
