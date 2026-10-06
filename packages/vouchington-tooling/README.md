@@ -689,5 +689,14 @@ These functions preserve the existing lexical source heuristics: named import al
 builder bindings, reassignment rejection, append/push consumption, returned boundary results,
 and collection filtering with the selected ID set. They do not prove runtime execution, general
 call graphs, or type identity. Malformed source throws through the ESTree parser. Inventory
-selection, classifications, exceptions, and diagnostics remain consumer policy. SQL public-view
-composition analysis is not included in this source-analysis API.
+selection, classifications, exceptions, and diagnostics remain consumer policy.
+
+`composesPublicEligibilityView(source, options)` checks live SQL fragments with
+`ReaderPublicViewOptions`: SQL extraction settings, source and eligibility relation names, and
+their ID columns. Await `initSqlAst()` from `vouchington-tooling/sql-ast` before calling it. The
+existing parser is reused; no separate SQL facts or parser dependency is introduced.
+
+The check preserves the existing nested SELECT/CTE, equality, inner-join, and correlated EXISTS
+heuristics. It rejects weakened OR/NOT/boolean/CASE predicates and non-filtering left joins. Every
+recognized live source reader must be protected. Unparseable SQL fragments are skipped; malformed
+source returns false. These are bounded syntactic heuristics, not a general SQL safety proof.

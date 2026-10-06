@@ -1,0 +1,222 @@
+[
+  {
+    "name": "rejects a public-view reader that only names the view in a comment",
+    "source": "-- eligible_entries\nSELECT COUNT(*) FROM entries",
+    "expected": false
+  },
+  {
+    "name": "rejects a public-view reader with a complete fake JOIN in a SQL comment",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n            /* JOIN eligible_entries eligibility\n              ON eligibility.entry_id = entries.id */\n            SELECT COUNT(*) FROM entries\n          `",
+    "expected": false
+  },
+  {
+    "name": "rejects a public-view reader whose eligibility join is isolated in an unused CTE",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n            WITH eligible_entries AS (\n              SELECT entries.id\n              FROM entries\n              JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n            )\n            SELECT COUNT(*) FROM entries\n          `",
+    "expected": false
+  },
+  {
+    "name": "rejects a chained dead CTE that never feeds the reader select",
+    "source": "const query = sql`\n            WITH eligible_entries AS (\n              SELECT entries.id\n              FROM entries\n              JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n            ), chained_entries AS (\n              SELECT * FROM eligible_entries\n            )\n            SELECT COUNT(*) FROM entries\n          `",
+    "expected": false
+  },
+  {
+    "name": "rejects a string literal that merely describes an eligibility join",
+    "source": "const fake = 'SELECT entries.id FROM entries JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id'\nconst query = sql`SELECT COUNT(*) FROM entries`",
+    "expected": false
+  },
+  {
+    "name": "accepts a static SQL select that joins eligibility to its posts alias",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n            SELECT entries.id\n            FROM entries\n            JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n          `\nread(query)",
+    "expected": true
+  },
+  {
+    "name": "rejects a decoy eligibility SQL statement that is never executed",
+    "source": "import { read } from '@fixture/database'\nconst decoyQuery = sql`\n            SELECT entries.id\n            FROM entries\n            JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n          `\nignore(decoyQuery)\nconst readerQuery = sql`SELECT entries.id FROM entries`\nread(readerQuery)",
+    "expected": false
+  },
+  {
+    "name": "accepts a manually declared, untagged static SQL template",
+    "source": "import { read } from '@fixture/database'\nconst query = `\n            SELECT entries.id\n            FROM entries\n            JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n          `\nread(query)",
+    "expected": true
+  },
+  {
+    "name": "accepts eligibility joined within a consumed nested select scope",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n            SELECT visible.id\n            FROM (\n              SELECT entries.id\n              FROM entries\n              JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n            ) visible\n          `\nread(query)",
+    "expected": true
+  },
+  {
+    "name": "rejects a file with a safe live reader followed by an unsafe live reader",
+    "source": "import { read } from '@fixture/database'\nconst safe = sql`\n  SELECT entries.id FROM entries\n  JOIN eligible_entries eligibility ON eligibility.entry_id = entries.id\n`\nconst unsafe = sql`SELECT entries.id FROM entries`\nread(safe)\nread(unsafe)",
+    "expected": false
+  },
+  {
+    "name": "rejects an eligibility equality weakened by OR TRUE",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT entries.id FROM entries\n  JOIN eligible_entries eligibility\n    ON eligibility.entry_id = entries.id OR TRUE\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects a negated eligibility equality",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT entries.id FROM entries\n  JOIN eligible_entries eligibility\n    ON NOT (eligibility.entry_id = entries.id)\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects an unprotected outer post reader beside a protected nested reader",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT outer_post.id\n  FROM entries outer_post\n  CROSS JOIN (\n    SELECT protected_post.id\n    FROM entries protected_post\n    JOIN eligible_entries eligibility\n      ON eligibility.entry_id = protected_post.id\n  ) safe_summary\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects an unprotected post reader in a set-operation branch",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT protected_post.id\n  FROM entries protected_post\n  JOIN eligible_entries eligibility\n    ON eligibility.entry_id = protected_post.id\n  UNION ALL\n  SELECT unsafe_post.id FROM entries unsafe_post\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects an unprotected post reader nested in join conditions",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT protected_post.id\n  FROM entries protected_post\n  JOIN eligible_entries eligibility\n    ON eligibility.entry_id = protected_post.id\n   AND EXISTS (SELECT 1 FROM entries unsafe_post)\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects a correlated eligibility check weakened by an outer OR",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  WHERE EXISTS (\n    SELECT 1 FROM eligible_entries eligibility\n    WHERE eligibility.entry_id = post.id\n  ) OR TRUE\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects a negated correlated eligibility check",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  WHERE NOT EXISTS (\n    SELECT 1 FROM eligible_entries eligibility\n    WHERE eligibility.entry_id = post.id\n  )\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects post readers nested in values and distinct expressions",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`VALUES ((SELECT id FROM entries))`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects post readers nested in values and distinct expressions",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT DISTINCT ON ((SELECT id FROM entries LIMIT 1)) eligibility.entry_id\n  FROM eligible_entries eligibility\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects a non-filtering left join to eligibility",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  LEFT JOIN eligible_entries eligibility\n    ON eligibility.entry_id = post.id\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects eligibility predicates inverted through boolean wrappers",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  JOIN eligible_entries eligibility\n    ON (eligibility.entry_id = post.id) IS FALSE\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects eligibility predicates inverted through boolean wrappers",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  WHERE EXISTS (\n    SELECT 1 FROM eligible_entries eligibility\n    WHERE eligibility.entry_id = post.id\n  ) = FALSE\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects eligibility checks neutralized by a case expression",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n  SELECT post.id FROM entries post\n  WHERE CASE WHEN EXISTS (\n    SELECT 1 FROM eligible_entries eligibility\n    WHERE eligibility.entry_id = post.id\n  ) THEN TRUE ELSE TRUE END\n`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "reader sourced directly from eligibility relation",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT COUNT(*) FROM eligible_entries`;read(query)",
+    "expected": true
+  },
+  {
+    "name": "appended correlated eligibility EXISTS",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`\n            SELECT p.id\n            FROM entries p\n            WHERE p.deleted_at IS NULL\n          `\nquery.append(sql`\n  AND EXISTS (\n    SELECT 1\n    FROM eligible_entries eligibility\n    WHERE eligibility.entry_id = p.id\n  )\n`)\nread(query)",
+    "expected": true
+  },
+  {
+    "name": "consumed safe CTE",
+    "source": "import {read} from '@fixture/database';const query=sql`WITH safe AS (SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id) SELECT * FROM safe`;read(query)",
+    "expected": true
+  },
+  {
+    "name": "consumed chained safe CTE",
+    "source": "import {read} from '@fixture/database';const query=sql`WITH safe AS (SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id), chain AS (SELECT * FROM safe) SELECT * FROM chain`;read(query)",
+    "expected": true
+  },
+  {
+    "name": "recursive CTE cycle",
+    "source": "import {read} from '@fixture/database';const query=sql`WITH RECURSIVE cycle AS (SELECT id FROM cycle UNION ALL SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id) SELECT * FROM cycle`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "nonselect CTE retains existing source heuristic",
+    "source": "import {read} from '@fixture/database';const query=sql`WITH changed AS (DELETE FROM entries RETURNING *) SELECT * FROM eligible_entries`;read(query)",
+    "expected": true
+  },
+  {
+    "name": "unqualified ID equality",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = id`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "schema-qualified ID reference",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT entries.id FROM public.entries JOIN eligible_entries e ON e.entry_id = public.entries.id`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "composite whole-row ID reference",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.*`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "literal equality operand",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = 1`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "unsupported arithmetic equality operand",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id + 0 = p.id`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "wrong equality operator",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id <> p.id`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "unrelated SQL relation",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT id FROM unrelated`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "nonselect source statement",
+    "source": "import {read} from '@fixture/database';const query=sql`UPDATE entries SET id=1`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "empty SQL statements",
+    "source": "import {read} from '@fixture/database';const query=sql`;;;`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "invalid SQL fragment",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT FROM`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "literal unsupported SQL predicate",
+    "source": "import {read} from '@fixture/database';const query=sql`SELECT p.id FROM entries p WHERE 1=1`;read(query)",
+    "expected": false
+  },
+  {
+    "name": "protects a nested reader without an outer FROM clause",
+    "source": "import { sql, read } from \"@fixture/database\"; read(sql`SELECT (SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id LIMIT 1)`)",
+    "expected": true
+  },
+  {
+    "name": "rejects reversed equality against the wrong source column",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`SELECT p.id FROM entries p JOIN eligible_entries e ON p.other = e.entry_id`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects non-SELECT statements containing a source read",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`INSERT INTO unrelated SELECT p.id FROM entries p`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "ignores unrelated modifying CTEs around a protected source select",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`WITH changed AS (UPDATE unrelated SET id = id RETURNING id) SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id`\nread(query)",
+    "expected": true
+  }
+]
