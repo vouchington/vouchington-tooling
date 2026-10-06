@@ -12,6 +12,7 @@ import {
 } from './protocol-http-context-forwarded-target.mts'
 import { createContextConsumerSources } from './protocol-http-context-consumer-sources.mts'
 import { createContextRequiredModule } from './protocol-http-context-require.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 
 type Facts = {
   writes: ts.Expression[]
@@ -79,7 +80,7 @@ export function createContextValueStability(
     }
     function visit(node: ts.Node) {
       result.wrappers.record(node)
-      result.writes.push(...contextMutationTargets(node))
+      if (potentiallyExecuted(node)) result.writes.push(...contextMutationTargets(node))
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) result.calls.push(node)
       if (ts.isTaggedTemplateExpression(node) && ts.isTemplateExpression(node.template))
         for (const span of node.template.templateSpans)
