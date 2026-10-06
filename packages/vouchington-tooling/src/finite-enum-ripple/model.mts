@@ -39,6 +39,8 @@ export interface FiniteEnumRippleConfig {
     collectionRouteExclusions: readonly string[]
     routeLabels: { detailTop: string; detail: string; collectionTop: string; collection: string }
     collectionLabel: string
+    /** Wording for collection path diagnostics; defaults to collectionLabel. */
+    collectionPathLabel?: string
     ignoredNavigationPaths: readonly string[]
     collectionPathLiteralPattern: RegExp
     navigationPathLiteralPattern: RegExp
@@ -63,6 +65,8 @@ export interface FiniteEnumRippleConfig {
       factory: string
     }
     collectionLabel: string
+    /** Wording for collection path diagnostics; defaults to collectionLabel. */
+    collectionPathLabel?: string
     createPageTypeProperties: readonly string[]
     collectionPathLiteralPattern: RegExp
   }

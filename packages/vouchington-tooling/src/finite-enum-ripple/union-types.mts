@@ -188,7 +188,7 @@ export function checkUnionTypes(
     checkCollectionPagePathLiterals(
       files.unionCollectionPages,
       errors,
-      config.collectionLabel,
+      config.collectionPathLabel ?? config.collectionLabel,
       new Set(effectiveSingleTypeRouteConfigs.map((routeConfig) => routeConfig.pluralPath)),
       readTracked,
       config.collectionPathLiteralPattern,

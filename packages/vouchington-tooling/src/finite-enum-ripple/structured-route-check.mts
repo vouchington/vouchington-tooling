@@ -141,7 +141,7 @@ export function checkStructuredRouteConfigs(
       checkCollectionPagePathLiterals(
         files.structuredCollectionPages,
         errors,
-        config.collectionLabel,
+        config.collectionPathLabel ?? config.collectionLabel,
         new Set(routeConfigs.map((routeConfig) => routeConfig.pluralPath)),
         readTracked,
         config.collectionPathLiteralPattern,

@@ -60,7 +60,7 @@ export function parseStringArray(
   file: string,
 ): string[] {
   const array = getPropertyValue(content, property)
-  if (!array) return []
+  if (!array || isIntrinsicUndefined(array)) return []
   if (!ts.isArrayLiteralExpression(array))
     throw new Error(`${file}: ${property} must be a literal string array`)
   return array.elements.map((element) => {
@@ -107,4 +107,19 @@ function unwrapTypeNode(type: ts.TypeNode): ts.TypeNode {
   let current = type
   while (ts.isParenthesizedTypeNode(current)) current = current.type
   return current
+}
+
+function isIntrinsicUndefined(expression: ts.Expression): boolean {
+  if (!ts.isIdentifier(expression)) return false
+  const source = expression.getSourceFile()
+  const options: ts.CompilerOptions = { noLib: true, noResolve: true }
+  const host = ts.createCompilerHost(options)
+  host.getSourceFile = (file) => (file === source.fileName ? source : undefined)
+  const checker = ts.createProgram([source.fileName], options, host).getTypeChecker()
+  const symbol = checker.getSymbolAtLocation(expression)
+  return (
+    symbol !== undefined &&
+    symbol.declarations?.length === 0 &&
+    checker.getTypeAtLocation(expression).flags === ts.TypeFlags.Undefined
+  )
 }
