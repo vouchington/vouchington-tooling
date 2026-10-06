@@ -9,6 +9,7 @@ export function someSseArgumentValue(
   expression: ts.Expression,
   checker: ts.TypeChecker,
   matches: (expression: ts.Expression) => boolean,
+  followLiteralAliases = false,
 ): boolean {
   const active = new Set<ts.Node>()
   function contains(expression: ts.Expression): boolean {
@@ -16,7 +17,7 @@ export function someSseArgumentValue(
     if (active.has(value)) return true
     active.add(value)
     try {
-      if (ts.isIdentifier(value)) {
+      if (followLiteralAliases && ts.isIdentifier(value)) {
         const resolved = createProtocolCallbackValueResolver(checker).resolve(
           value,
           new Map(),
