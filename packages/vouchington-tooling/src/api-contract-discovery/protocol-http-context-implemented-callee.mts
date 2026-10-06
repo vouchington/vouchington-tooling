@@ -17,6 +17,7 @@ type CalleeEscapeProof = (
   captured: CallbackBindings,
   values: ReturnType<typeof createHttpContextValueResolver>,
   root: ts.CallExpression,
+  rootContext?: ts.Symbol,
 ) => boolean
 
 export function implementedHttpContextCallee(
@@ -28,10 +29,11 @@ export function implementedHttpContextCallee(
   values: ReturnType<typeof createHttpContextValueResolver>,
   root: ts.CallExpression,
   calleeEscapes: CalleeEscapeProof,
+  rootContext = context,
 ): boolean {
   const resolver = values.callbacks
   if (values.weakMembership(call, context)) return true
-  const extension = values.extension(call, context, root)
+  const extension = values.extension(call, context, root, rootContext)
   if (extension)
     return !calleeEscapes(
       extension.node,
@@ -43,6 +45,7 @@ export function implementedHttpContextCallee(
       extension.env,
       values,
       root,
+      rootContext,
     )
   if (standardReflectApply(call, checker)) {
     const target = call.arguments[0] && resolver.resolve(call.arguments[0], new Map())
@@ -73,6 +76,7 @@ export function implementedHttpContextCallee(
             target.env,
             values,
             root,
+            rootContext,
           ),
       )
     )

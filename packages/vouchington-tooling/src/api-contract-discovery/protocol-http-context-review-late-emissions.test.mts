@@ -1,10 +1,13 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
 import { contextModuleOrigin } from './protocol-http-context-module-origin.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { responseStatusCodesForContract } from './response-contract-status.mts'
 
-function checkedProgram(files: Record<string, string>): ts.Program {
+function checkedProgram(files: Record<string, string>, directory = '/virtual'): ts.Program {
   const options: ts.CompilerOptions = {
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -13,7 +16,9 @@ function checkedProgram(files: Record<string, string>): ts.Program {
     strict: true,
     target: ts.ScriptTarget.ESNext,
   }
-  const contents = new Map(Object.entries(files).map(([name, text]) => [`/virtual/${name}`, text]))
+  const contents = new Map(
+    Object.entries(files).map(([name, text]) => [join(directory, name), text]),
+  )
   const host = ts.createCompilerHost(options, true)
   const getSourceFile = host.getSourceFile.bind(host)
   const fileExists = host.fileExists.bind(host)
@@ -26,7 +31,7 @@ function checkedProgram(files: Record<string, string>): ts.Program {
       : ts.createSourceFile(name, text, languageVersion, true)
   }
   host.fileExists = (name) => contents.has(name) || fileExists(name)
-  host.directoryExists = (name) => name === '/virtual' || !!directoryExists?.(name)
+  host.directoryExists = (name) => name === directory || !!directoryExists?.(name)
   host.readFile = (name) => contents.get(name) ?? readFile(name)
   const program = ts.createProgram([...contents.keys()], options, host)
   expect(
@@ -69,21 +74,45 @@ const optionalFactory = `type Options={assertAccess?:(ctx:any)=>void};
 
 describe('HTTP context proof includes late effects and module consumers', () => {
   it('keeps a documented 302 redirect through nested direct helpers response-only', () => {
-    const program = checkedProgram({
-      'route.ts': `declare const app:any;
+    let fixtureRoot: string
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'protocol-platform-provenance-'))
+    const dependency = join(fixtureRoot, 'node_modules/@jongleberry/api-server')
+    mkdirSync(dependency, { recursive: true })
+    writeFileSync(
+      join(dependency, 'package.json'),
+      JSON.stringify({
+        name: '@jongleberry/api-server',
+        version: '0.0.0',
+        type: 'module',
+        types: './index.d.mts',
+      }),
+    )
+    writeFileSync(
+      join(dependency, 'index.d.mts'),
+      'export declare class Context {set(header:string,value:string):void;setStatus(status:number):void;response:{empty():void}}',
+    )
+    try {
+      const program = checkedProgram(
+        {
+          'route.ts': `import type {Context} from '@jongleberry/api-server';declare const app:any;
         declare function apiOpenApiNoContent(key:string,status:number):void;
-        function redirect(ctx:any){
-          ctx.setStatus(302);ctx.setHeader('Location','/ui');ctx.response.empty()}
-        function complete(ctx:any){redirect(ctx)}
-        app.route('/login').get((ctx:any)=>{
+        function redirect(ctx:Context){
+          ctx.setStatus(302);ctx.set('Location','/ui');ctx.response.empty()}
+        function complete(ctx:Context){redirect(ctx)}
+        app.route('/login').get((ctx:Context)=>{
           apiOpenApiNoContent('GET:/login',302);complete(ctx)});export {};`,
-    })
-    const source = program.getSourceFile('/virtual/route.ts')
-    if (!source) throw new Error('Missing redirect route')
-    const row = discoverApiResponseContracts(program, [source], new Set(['GET:/login']))[
-      'GET:/login'
-    ]
-    expect(row).toBeUndefined()
+        },
+        fixtureRoot,
+      )
+      const source = program.getSourceFile(join(fixtureRoot, 'route.ts'))
+      if (!source) throw new Error('Missing redirect route')
+      const row = discoverApiResponseContracts(program, [source], new Set(['GET:/login']))[
+        'GET:/login'
+      ]
+      expect(row).toBeUndefined()
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true })
+    }
   })
 
   it('rejects JSON emitted while evaluating a handler condition', () => {

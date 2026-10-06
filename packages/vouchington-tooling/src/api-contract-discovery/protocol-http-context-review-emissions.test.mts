@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
@@ -22,18 +25,38 @@ function contract(setup: string, callback = '(ctx:any)=>ctx.assert(true)') {
 function redirectContract(body: string) {
   const content = `declare const app:any;
     declare function apiOpenApiNoContent(key:string,status:number):void;
-    function redirect(ctx:any){
-      ctx.setStatus(302);ctx.setHeader('Location','/ui');
+    function redirect(ctx:Context){
+      ctx.setStatus(302);ctx.set('Location','/ui');
       ${body}
       ctx.response.empty()}
-    function redirectToUi(ctx:any){redirect(ctx)}
-    app.route('/login').get((ctx:any)=>{
+    function redirectToUi(ctx:Context){redirect(ctx)}
+    app.route('/login').get((ctx:Context)=>{
       apiOpenApiNoContent('GET:/login',302);redirectToUi(ctx)});export {};`
   return discover(content, 'GET:/login')
 }
 
 function discover(content: string, key: string) {
-  const name = '/virtual/route.ts'
+  let fixtureRoot: string | undefined
+  if (key === 'GET:/login') {
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'protocol-platform-provenance-'))
+    const dependency = join(fixtureRoot, 'node_modules/@jongleberry/api-server')
+    mkdirSync(dependency, { recursive: true })
+    writeFileSync(
+      join(dependency, 'package.json'),
+      JSON.stringify({
+        name: '@jongleberry/api-server',
+        version: '0.0.0',
+        type: 'module',
+        types: './index.d.mts',
+      }),
+    )
+    writeFileSync(
+      join(dependency, 'index.d.mts'),
+      'export declare class Context {set(header:string,value:string):void;setStatus(status:number):void;json(value:unknown):void;response:{empty():void}}',
+    )
+    content = `import type {Context} from '@jongleberry/api-server';${content}`
+  }
+  const name = fixtureRoot ? join(fixtureRoot, 'route.ts') : '/virtual/route.ts'
   const options: ts.CompilerOptions = {
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -50,7 +73,8 @@ function discover(content: string, key: string) {
   const originalExists = host.fileExists.bind(host)
   host.fileExists = (file) => file === name || originalExists(file)
   const originalDirectory = host.directoryExists?.bind(host)
-  host.directoryExists = (file) => file === '/virtual' || !!originalDirectory?.(file)
+  host.directoryExists = (file) =>
+    file === (fixtureRoot ?? '/virtual') || !!originalDirectory?.(file)
   const originalRead = host.readFile.bind(host)
   host.readFile = (file) => (file === name ? content : originalRead(file))
   const program = ts.createProgram([name], options, host)
@@ -61,7 +85,11 @@ function discover(content: string, key: string) {
   ).toEqual([])
   const source = program.getSourceFile(name)
   if (!source) throw new Error('Missing route fixture')
-  return discoverApiResponseContracts(program, [source], new Set([key]))[key]
+  try {
+    return discoverApiResponseContracts(program, [source], new Set([key]))[key]
+  } finally {
+    if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true })
+  }
 }
 
 describe('HTTP context proof includes writes and opaque emissions', () => {

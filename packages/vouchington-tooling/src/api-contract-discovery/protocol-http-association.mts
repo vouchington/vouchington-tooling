@@ -25,6 +25,7 @@ const responseMethods = new Set([
   'json',
   'response.buffer',
   'response.empty',
+  'response.xml',
 ])
 
 export function associateHttpResponse(
@@ -139,7 +140,15 @@ export function unsupportedContextResponse(
 ): boolean {
   if (!executableProtocolPath(call, checker)) return false
   const context = supportedResponseContext(call, checker)
-  return !!context && contextResponseMethod(call.expression, context, checker) === undefined
+  if (!context) return false
+  let mutated = false
+  const handler = enclosingFunction(call)
+  if (handler)
+    for (const [scope, symbol] of httpContextScopes(handler, checker))
+      visit(scope, (node) => {
+        if (mutatesHttpResponseMethod(node, symbol, checker, handler)) mutated = true
+      })
+  return mutated || contextResponseMethod(call.expression, context, checker) === undefined
 }
 
 export function supportedResponseContext(
