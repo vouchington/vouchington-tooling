@@ -203,5 +203,20 @@
     "name": "protects a nested reader without an outer FROM clause",
     "source": "import { sql, read } from \"@fixture/database\"; read(sql`SELECT (SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id LIMIT 1)`)",
     "expected": true
+  },
+  {
+    "name": "rejects reversed equality against the wrong source column",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`SELECT p.id FROM entries p JOIN eligible_entries e ON p.other = e.entry_id`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "rejects non-SELECT statements containing a source read",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`INSERT INTO unrelated SELECT p.id FROM entries p`\nread(query)",
+    "expected": false
+  },
+  {
+    "name": "ignores unrelated modifying CTEs around a protected source select",
+    "source": "import { read } from '@fixture/database'\nconst query = sql`WITH changed AS (UPDATE unrelated SET id = id RETURNING id) SELECT p.id FROM entries p JOIN eligible_entries e ON e.entry_id = p.id`\nread(query)",
+    "expected": true
   }
 ]

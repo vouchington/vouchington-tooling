@@ -45,8 +45,8 @@ function selectTreeComposesPublicEligibility(
   options: ReaderPublicViewOptions,
 ): boolean {
   const selects = tree.stmts!.flatMap((statement) =>
-    isRecord(statement) && isRecord(statement.stmt) && isRecord(statement.stmt.SelectStmt)
-      ? [statement.stmt.SelectStmt]
+    'SelectStmt' in statement.stmt!
+      ? [statement.stmt!.SelectStmt as unknown as Record<string, unknown>]
       : [],
   )
   return (
