@@ -29,6 +29,15 @@ export function opaqueWrappedHttpContextArgument(
     return true
   function captures(argument: ts.Expression): boolean {
     const value = unwrapExpression(argument)
+    if (
+      wrappedHttpContextArgument(
+        value,
+        context,
+        checker,
+        (fn) => isProtocolCallbackFunction(fn) && capturesFunction(fn),
+      )
+    )
+      return true
     if (ts.isCallExpression(value)) {
       const method = methodAccess(unwrapExpression(value.expression))
       if (method?.name === 'bind') return captures(method.receiver)
@@ -40,7 +49,11 @@ export function opaqueWrappedHttpContextArgument(
       )
     }
     const fn = resolver.resolve(argument, env)?.node ?? value
-    if (!isProtocolCallbackFunction(fn) || !fn.body) return false
+    if (!isProtocolCallbackFunction(fn)) return false
+    return capturesFunction(fn)
+  }
+  function capturesFunction(fn: ts.FunctionLikeDeclaration): boolean {
+    if (!fn.body) return false
     let found = false
     function visit(node: ts.Node) {
       if (ts.isExpression(node)) {
