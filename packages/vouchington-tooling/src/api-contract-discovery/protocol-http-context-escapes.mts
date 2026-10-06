@@ -7,6 +7,7 @@ import {
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
 import { enclosingFunction, unwrapExpression } from './protocol-marker-analysis.mts'
+import { standardCompilerDeclaration } from './protocol-platform-callbacks.mts'
 import { executableProtocolPath } from './protocol-execution-path.mts'
 import { opaqueProtocolCallbackPath } from './protocol-opaque-callback.mts'
 import { createHttpContextValueResolver } from './protocol-http-context-values.mts'
@@ -39,6 +40,13 @@ export function opaqueHttpContextArgument(
 ): boolean {
   const arguments_ = createContextForwardedArguments(checker)(call)
   const invoked = unwrapExpression(call.expression)
+  const directEval =
+    !call.questionDotToken &&
+    ts.isIdentifier(invoked) &&
+    invoked.text === 'eval' &&
+    checker
+      .getSymbolAtLocation(invoked)
+      ?.declarations?.every((declaration) => standardCompilerDeclaration(declaration, checker))
   const receiver =
     ts.isPropertyAccessExpression(invoked) || ts.isElementAccessExpression(invoked)
       ? invoked.expression
@@ -53,6 +61,7 @@ export function opaqueHttpContextArgument(
     )
   )
     return false
+  if (context && directEval) return true
   if (context) {
     const safeCapture = (fn: ts.FunctionLikeDeclaration) =>
       !calleeEscapes(fn, call, context, checker, active, env, env, proof, root)
@@ -65,8 +74,11 @@ export function opaqueHttpContextArgument(
   for (let owner = enclosingFunction(call); owner; owner = enclosingFunction(owner)) {
     const name = runtimeParameters(owner)[0]?.name
     const symbol = name && ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined
-    if (symbol && matches(symbol) && httpHandlerContext(owner, checker) === symbol)
-      return !implementedCallee(call, symbol, checker, active, env, proof, root, calleeEscapes)
+    if (symbol && (directEval || matches(symbol)) && httpHandlerContext(owner, checker) === symbol)
+      return (
+        !!directEval ||
+        !implementedCallee(call, symbol, checker, active, env, proof, root, calleeEscapes)
+      )
   }
   return false
 }
