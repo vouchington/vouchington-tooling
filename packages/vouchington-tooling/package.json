@@ -181,11 +181,6 @@
       "import": "./dist/api-fixtures/index.mjs",
       "default": "./dist/api-fixtures/index.mjs"
     },
-    "./api-contract-discovery": {
-      "types": "./dist/api-contract-discovery/index.d.mts",
-      "import": "./dist/api-contract-discovery/index.mjs",
-      "default": "./dist/api-contract-discovery/index.mjs"
-    },
     "./transient-retry": {
       "types": "./dist/transient-retry/index.d.mts",
       "import": "./dist/transient-retry/index.mjs",
