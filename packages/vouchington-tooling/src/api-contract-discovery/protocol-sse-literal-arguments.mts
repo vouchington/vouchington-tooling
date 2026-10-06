@@ -1,6 +1,11 @@
+import { selectedStaticSseClassCapability } from './protocol-sse-static-class-values.mts'
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { selectedSseCallableCapture } from './protocol-sse-wrapper-captures.mts'
-import { createProtocolCallbackValueResolver } from './protocol-callback-values.mts'
+import {
+  createProtocolCallbackValueResolver,
+  isProtocolCallbackFunction,
+} from './protocol-callback-values.mts'
 import { methodAccess } from './protocol-http-method-access.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 
@@ -13,10 +18,19 @@ export function someSseArgumentValue(
 ): boolean {
   const active = new Set<ts.Node>()
   function contains(expression: ts.Expression): boolean {
+    if (!potentiallyExecuted(expression)) return false
     const value = unwrapExpression(expression)
     if (active.has(value)) return true
     active.add(value)
     try {
+      if (
+        selectedStaticSseClassCapability(
+          value,
+          contains,
+          (fn) => isProtocolCallbackFunction(fn) && selectedSseCallableCapture(fn, contains),
+        )
+      )
+        return true
       if (followLiteralAliases && ts.isIdentifier(value)) {
         const resolved = createProtocolCallbackValueResolver(checker).resolve(
           value,
