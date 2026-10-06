@@ -36,8 +36,8 @@ export function terminalSqlExecutorBindings(
     if (node.type !== 'VariableDeclarator' || !isNode(node.id) || !isNode(node.init)) return
     const binding = propertyName(node.id)
     if (!binding || node.init.type !== 'ConditionalExpression') return
-    const consequent = propertyName(isNode(node.init.consequent) ? node.init.consequent : undefined)
-    const alternate = propertyName(isNode(node.init.alternate) ? node.init.alternate : undefined)
+    const consequent = propertyName(node.init.consequent as Node)
+    const alternate = propertyName(node.init.alternate as Node)
     if ((consequent && bindings.has(consequent)) || (alternate && bindings.has(alternate))) {
       bindings.add(binding)
     }

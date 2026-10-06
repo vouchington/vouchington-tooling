@@ -60,11 +60,10 @@ function isMeaningfulBoundaryCall(
   if (canonicalCallNames(node, imported).length === 0 || !isNode(node.callee)) return false
   if (node.callee.type === 'Identifier') {
     const callee = propertyName(node.callee)
-    return callee !== options.ignoredCall && !imported.has(callee ?? '')
+    return callee !== options.ignoredCall && !imported.has(node.callee.name as string)
   }
   return (
     node.callee.type === 'MemberExpression' &&
-    isNode(node.callee.property) &&
-    ['all', 'allSettled', 'assert', 'then'].includes(propertyName(node.callee.property) ?? '')
+    ['all', 'allSettled', 'assert', 'then'].includes(propertyName(node.callee.property as Node) ?? '')
   )
 }

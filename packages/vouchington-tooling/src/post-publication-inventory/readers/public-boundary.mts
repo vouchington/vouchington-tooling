@@ -55,11 +55,7 @@ export function sourceFiltersWithPublicBoundary(
     ) {
       return
     }
-    const receiver = propertyName(
-      isNode(node.callee) && node.callee.type === 'MemberExpression' && isNode(node.callee.object)
-        ? node.callee.object
-        : undefined,
-    )
+    const receiver = propertyName((node.callee as Node).object as Node)
     if (
       receiver &&
       bindings.some(
@@ -83,7 +79,7 @@ function isDirectCanonicalBoundaryCall(node: Node, imported: Set<string>): boole
     expression.type === 'CallExpression' &&
     isNode(expression.callee) &&
     expression.callee.type === 'Identifier' &&
-    imported.has(propertyName(expression.callee) ?? '')
+    imported.has(expression.callee.name as string)
   )
 }
 

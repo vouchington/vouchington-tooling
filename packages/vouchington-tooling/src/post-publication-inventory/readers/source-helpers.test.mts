@@ -38,7 +38,7 @@ describe('relocated private AST boundaries', () => {
     const ast =
       parseSource(`import db,{read as execute} from '@fixture/database';import {other} from '@fixture/database';
  const run=flag?execute:opaque;const unrelated=flag?other:opaque;
- function fn(){return;} const object={['quoted']:1,[value]:2};
+ function fn(){return;} const object={['quoted']:1,[value]:2};const holes=[,,];
  sql\`SELECT 1\`; receiver.append();receiver.push();receiver.has();(make()).append();
  // ordinary comment
  `).ast
@@ -48,6 +48,9 @@ describe('relocated private AST boundaries', () => {
     expect(isNode(null)).toBe(false)
     expect(propertyName(undefined)).toBeNull()
     expect(propertyName(ast)).toBeNull()
+    expect(
+      propertyName(nodes.find((node) => node.type === 'Literal' && node.value === 'quoted')),
+    ).toBe('quoted')
     expect(
       propertyName(nodes.find((node) => node.type === 'Literal' && node.value === 1)),
     ).toBeNull()

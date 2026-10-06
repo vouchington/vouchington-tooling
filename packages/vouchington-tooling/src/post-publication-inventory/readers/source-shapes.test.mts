@@ -35,6 +35,7 @@ describe('existing reader source shapes', () => {
     ['build().then(consume)', true],
     ['ignore(build())', false],
     ['consume(build())', true],
+    ['consume[42](build())', false],
     ['const {ids}=await build(); respond(ids)', true],
     ['const value=build(); return value', true],
   ])('boundary result %s', (source, expected) =>
@@ -61,6 +62,13 @@ describe('existing reader source shapes', () => {
     ],
     ['const values=[];values.push(build());ignore(values)', true],
     ['external.push(build())', false],
+    ['for(const value of [build()])consume(value)', false],
+    ['let value=build(); ({value}=other);return value', true],
+    ['const q=sql`SELECT 1`;q.append(q);return build()', true],
+    ['build();make().consume();return null', false],
+    ['const q=sql`SELECT 1`;q.append(value);const value=build();return q', false],
+    ['const holes=[,,];return build()', true],
+
     ['const value=build();external.push(value)', false],
   ])('builder composition %s', (source, expected) =>
     expect(sourceImportsAndComposesAny(builder + source, ['buildFilter'], options)).toBe(expected),
@@ -115,6 +123,31 @@ describe('existing reader source shapes', () => {
     ['const ids=collect(values);return rows.filter(ids.has(row.id))', false],
     ['consume(ids=>{return rows.filter(row=>ids.has(row.id))})', false],
     ['const ids=collect(values);return rows.filter(row=>ids.has())', false],
+    [
+      'const ids=collect(values);({visible}=rows.filter(row=>ids.has(row.id)));return visible',
+      false,
+    ],
+    [
+      'const ids=collect(values);const [visible]=rows.filter(row=>ids.has(row.id));return visible',
+      false,
+    ],
+    [
+      'const ids=collect(values);const filtered=rows.filter(row=>ids.has(row.id));filtered.map;return rows',
+      false,
+    ],
+    [
+      'const ids=collect(values);const filtered=rows.filter(row=>ids.has(row.id));const [mapped]=filtered.map(row=>row.id);return mapped',
+      false,
+    ],
+    [
+      'const ids=collect(values);return rows.filter(row=>{if(ids.has(row.id))consume(row);return true})',
+      false,
+    ],
+    ['const holes=[,,];return collect(values)', true],
+    [
+      'const ids=collect(values);const filtered=rows.filter(row=>ids.has(row.id));let mapped;mapped=filtered.map(row=>row.id);return mapped',
+      false,
+    ],
   ])('public ID consumption %s', (source, expected) =>
     expect(sourceFiltersWithPublicBoundary(boundary + source, ['collectVisibleIds'], options)).toBe(
       expected,

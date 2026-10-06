@@ -38,7 +38,7 @@ export function composeAppendAndPush(
       const binding = propertyName(argument as Node)
       const declaration = canonicalBindings.get(binding ?? '')
       if (declaration && argument.range[0] > declaration.declaredAt)
-        addBindingComposition(composed, declaration, reassignedBindings.has(binding ?? ''))
+        addBindingComposition(composed, declaration, reassignedBindings.has(binding as string))
     }
   })
   walk(ast, (node: Node) => {

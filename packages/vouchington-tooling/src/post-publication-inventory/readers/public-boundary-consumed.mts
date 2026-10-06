@@ -17,7 +17,7 @@ export function derivedBindingIsConsumed(ast: Node, name: string, declaredAt: nu
     }
     if (node.type !== 'MemberExpression' || !isNode(node.object)) return
     if (propertyName(node.object) !== name) return
-    const method = isNode(node.property) ? propertyName(node.property) : null
+    const method = propertyName(node.property as Node)
     if (!['entries', 'filter', 'flatMap', 'map'].includes(method ?? '')) return
     const call = ancestors.at(-1)
     if (!call || call.type !== 'CallExpression') return
@@ -28,7 +28,7 @@ export function derivedBindingIsConsumed(ast: Node, name: string, declaredAt: nu
     const declaration = [...ancestors]
       .toReversed()
       .find((ancestor) => ancestor.type === 'VariableDeclarator' && isNode(ancestor.id))
-    const derivedName = declaration && isNode(declaration.id) ? propertyName(declaration.id) : null
+    const derivedName = declaration ? propertyName(declaration.id as Node) : null
     if (declaration && derivedName) {
       consumed = derivedBindingIsConsumed(ast, derivedName, declaration.range[1])
     }

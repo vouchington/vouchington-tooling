@@ -35,7 +35,7 @@ export function sourceImportsAndComposesAny(
   const composed = new Set<string>()
   walk(ast, (node: Node) => {
     if (node.type !== 'VariableDeclarator') return
-    const binding = propertyName(isNode(node.id) ? node.id : undefined)
+    const binding = propertyName(node.id as Node)
     const initializer = isNode(node.init) ? node.init : undefined
     if (binding && isSqlStatementInitializer(initializer, options)) localSqlStatements.add(binding)
     if (binding && initializer?.type === 'ArrayExpression') localCollections.add(binding)
@@ -84,7 +84,7 @@ export function sourceImportsAndComposesAny(
       isNode(node.callee) &&
       node.callee.type === 'MemberExpression'
     ) {
-      const receiver = propertyName(isNode(node.callee.object) ? node.callee.object : undefined)
+      const receiver = propertyName(node.callee.object as Node)
       if (receiver) consumedBindings.add(receiver)
     }
   })

@@ -59,7 +59,7 @@ export function walk(node: UnknownNode | undefined, visit: (node: UnknownNode) =
 
 export function propertyName(node: UnknownNode | undefined): string | null {
   if (!node) return null
-  if (node.type === 'Identifier') return typeof node.name === 'string' ? node.name : null
+  if (node.type === 'Identifier') return node.name as string
   if (node.type === 'Literal') return typeof node.value === 'string' ? node.value : null
   return null
 }

@@ -40,9 +40,7 @@ function hasCallDeterminesCallbackResult(hasCall: Node, descendants: Node[]): bo
   const callback = descendants.find(isFunctionLike)
   if (!callback || !isNode(callback.body)) return false
   if (callback.body.type !== 'BlockStatement') return containsNode(callback.body, hasCall)
-  return descendants.some(
-    (descendant) => descendant.type === 'ReturnStatement' && containsNode(descendant, hasCall),
-  )
+  return descendants.some((descendant) => descendant.type === 'ReturnStatement')
 }
 
 function derivedCallReachesConsumer(ancestors: Node[], ast: Node): boolean {

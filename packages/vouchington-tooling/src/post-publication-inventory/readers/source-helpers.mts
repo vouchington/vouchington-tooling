@@ -86,5 +86,5 @@ export function importedCanonicalBindings(
 
 export function isTerminalSqlCall(node: Node, bindings: Set<string>): boolean {
   if (node.type !== 'CallExpression' || !isNode(node.callee)) return false
-  return node.callee.type === 'Identifier' && bindings.has(propertyName(node.callee) ?? '')
+  return node.callee.type === 'Identifier' && bindings.has(node.callee.name as string)
 }
