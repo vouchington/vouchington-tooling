@@ -1,3 +1,4 @@
+import { potentiallyExecuted } from './protocol-executable-path.mts'
 import { storedSseContainerCapability } from './protocol-sse-container-writes.mts'
 import {
   createProtocolCallbackValueResolver,
@@ -23,6 +24,7 @@ function returnedSseCapability(
 ): boolean {
   const active = new Set<ts.Node>()
   function contains(expression: ts.Expression, bindings: ReadonlyMap<ts.Symbol, boolean>): boolean {
+    if (!potentiallyExecuted(expression)) return false
     const value = unwrapExpression(expression)
     if (selected(value)) return true
     if (active.has(value)) return true

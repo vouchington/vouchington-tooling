@@ -3,6 +3,7 @@ import {
   httpHandlerContext,
   httpContextArgument,
   wrappedHttpContextArgument,
+  contextResponseMethod,
 } from './protocol-http-context.mts'
 import { callbackArgumentBindings } from './protocol-callback-argument-bindings.mts'
 import { runtimeParameters } from './registered-route-runtime-parameters.mts'
@@ -51,8 +52,22 @@ export function opaqueHttpContextArgument(
     ts.isPropertyAccessExpression(invoked) || ts.isElementAccessExpression(invoked)
       ? invoked.expression
       : undefined
+  const directReceiver = (symbol: ts.Symbol) => {
+    if (!receiver || !httpContextArgument(receiver, symbol, checker)) return false
+    // Canonical protocol calls retain their existing emission and mutation proofs.
+    const method = contextResponseMethod(invoked, symbol, checker, true)
+    return ![
+      'assert',
+      'setStatus',
+      'json',
+      'pipeline',
+      'response.buffer',
+      'response.empty',
+    ].includes(method ?? '')
+  }
   const matches = (symbol: ts.Symbol) =>
     arguments_.some((argument) => httpContextArgument(argument, symbol, checker)) ||
+    directReceiver(symbol) ||
     (!!receiver && wrappedHttpContextArgument(receiver, symbol, checker))
   if (
     !(

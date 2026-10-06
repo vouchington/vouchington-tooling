@@ -1,3 +1,4 @@
+import { selectedStaticSseClassCapability } from './protocol-sse-static-class-values.mts'
 import ts from '../contract-schema/typescript-api.mts'
 import { constructedContextCapture } from './protocol-http-context-literal-captures.mts'
 import { methodAccess } from './protocol-http-method-access.mts'
@@ -13,6 +14,12 @@ export function selectedSseWrapperCapture(
   checker: ts.TypeChecker,
   selected: (value: ts.Expression) => boolean,
 ): boolean {
+  if (ts.isClassExpression(value))
+    return selectedStaticSseClassCapability(
+      value,
+      selected,
+      (fn) => isProtocolCallbackFunction(fn) && selectedSseCallableCapture(fn, selected),
+    )
   if (ts.isNewExpression(value)) return constructedContextCapture(value, checker, selected)
   if (!ts.isCallExpression(value)) return false
   const method = methodAccess(unwrapExpression(value.expression))
