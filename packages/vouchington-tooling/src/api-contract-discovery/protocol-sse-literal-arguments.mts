@@ -1,4 +1,5 @@
 import ts from '../contract-schema/typescript-api.mts'
+import { selectedSseCallableCapture } from './protocol-sse-wrapper-captures.mts'
 import { unwrapExpression } from './protocol-marker-analysis.mts'
 
 /** Literal containers pass their values to a consumer even without a receiver of their own. */
@@ -18,9 +19,14 @@ export function someSseArgumentValue(
     return value.properties.some((property) => {
       if (ts.isPropertyAssignment(property))
         return someSseArgumentValue(property.initializer, checker, matches)
+      if (
+        ts.isMethodDeclaration(property) ||
+        ts.isGetAccessorDeclaration(property) ||
+        ts.isSetAccessorDeclaration(property)
+      )
+        return selectedSseCallableCapture(property, matches)
       if (ts.isSpreadAssignment(property))
         return someSseArgumentValue(property.expression, checker, matches)
-      if (!ts.isShorthandPropertyAssignment(property)) return false
       const declaration = checker.getShorthandAssignmentValueSymbol(property)?.valueDeclaration
       return !!(
         declaration &&
