@@ -17,6 +17,8 @@ const sources = {
     function second():unknown{return first()};const alias=first;opaque(alias())`),
   'container-cycle': fixture(`function build(){const box:{self?:unknown}={};
     box.self=box;return box}opaque(build())`),
+  'dead-selected-return': fixture('function build(){return false?stream:other};opaque(build())'),
+  'executed-selected-return': fixture('function build(){return true?stream:other};opaque(build())'),
   'independent-return': fixture('function build(){return {other}};opaque(build())'),
   'independent-stored-return': fixture(`function build(){const box:{value?:Stream}={};
     box.value=other;return box}opaque(build())`),
@@ -70,6 +72,8 @@ it.each([
   ['independent-class-write', false],
   ['callable-cycle', true],
   ['container-cycle', true],
+  ['dead-selected-return', false],
+  ['executed-selected-return', true],
   ['independent-return', false],
   ['independent-stored-return', false],
 ] as const)('retains selected or indeterminate returned capability for %s', (name, expected) => {
