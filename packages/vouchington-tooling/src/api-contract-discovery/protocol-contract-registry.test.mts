@@ -17,25 +17,19 @@ const emit = `if (!response.body) ctx.response.empty(); else ctx.pipeline(respon
 const typedHttp = (type: string) =>
   `${preamble}\n  declare const special:Http<${type}>\n  app.route('/rpc').post((ctx:any)=>{const response=apiOpenApiHttpResponse('POST:/rpc',special);\n    ctx.setStatus(response.status); ${emit} })`
 const sources = {
-  sse: sse(`stream.write(apiSseFrame('GET:/events',{event:'progress' as const,data:{count:1}}))
-    stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))`),
-  union:
-    sse(`const event: {event:'done';data:{}} | {event:'progress';data:{count:number}} = ctx.query.done
-    ? {event:'done',data:{}} : {event:'progress',data:{count:1}}
-    stream.write(apiSseFrame('GET:/events',event))`).replace(
+  sse: sse(
+    `stream.write(apiSseFrame('GET:/events',{event:'progress' as const,data:{count:1}}))\n    stream.write(apiSseFrame('GET:/events',{event:'done' as const,data:{}}))`,
+  ),
+  union: sse(
+    `const event: {event:'done';data:{}} | {event:'progress';data:{count:number}} = ctx.query.done\n    ? {event:'done',data:{}} : {event:'progress',data:{count:1}}\n    stream.write(apiSseFrame('GET:/events',event))`,
+  ).replace(/declare (function apiSseFrame[^\n]+)/, "$1 {return 'data: {}\\n\\n'}"),
+  factory:
+    `${preamble}\n    function factory<T>(options:{value:T;emit:(stream:{write(frame:string):void},event:{event:'snapshot';data:T}|{event:'error';data:{message:string}})=>void}):(ctx:any)=>void {return ctx=>options.emit(stream,{event:'snapshot',data:options.value})}\n    app.route('/events').get(factory({value:{count:1},emit:(stream,event)=>stream.write(apiSseFrame('GET:/events',event))}))`.replace(
       /declare (function apiSseFrame[^\n]+)/,
       "$1 {return 'data: {}\\n\\n'}",
     ),
-  factory: `${preamble}
-    function factory<T>(options:{value:T;emit:(stream:{write(frame:string):void},event:{event:'snapshot';data:T}|{event:'error';data:{message:string}})=>void}):(ctx:any)=>void {return ctx=>options.emit(stream,{event:'snapshot',data:options.value})}
-    app.route('/events').get(factory({value:{count:1},emit:(stream,event)=>stream.write(apiSseFrame('GET:/events',event))}))`.replace(
-    /declare (function apiSseFrame[^\n]+)/,
-    "$1 {return 'data: {}\\n\\n'}",
-  ),
   nested: sse(
-    `class NestedStream {write(_frame:string):void {}}
-      const stream=new NestedStream();
-      stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
+    `class NestedStream {write(_frame:string):void {}}\n      const stream=new NestedStream();\n      stream.write(apiSseFrame('GET:/events',{event:'status' as const,data:{result:unknownBody}}))`,
   ).replace(/declare (function apiSseFrame[^\n]+)/, "$1 {return 'data: {}\\n\\n'}"),
   'broad-name': sse(
     `stream.write(apiSseFrame('GET:/events',{event:'progress' as string,data:{count:1}}))`,
