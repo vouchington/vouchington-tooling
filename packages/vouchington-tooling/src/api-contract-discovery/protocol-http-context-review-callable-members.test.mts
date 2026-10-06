@@ -70,6 +70,9 @@ const route = (setup: string, selected = 'options') => `${preamble}
 
 const controls = {
   methodReturn: 'opaque({expose(){return ctx}})',
+  overloadReturn: 'opaque({Holder:class {expose():unknown;expose(){return ctx}}})',
+  overloadIndependent:
+    'opaque({Holder:class {expose():unknown;expose(){return {independent:true}}}})',
   methodEmit: 'opaque({emit(){ctx.json({bad:true})}})',
   methodForward: 'opaque({emit(){opaque(ctx)}})',
   getterReturn: 'opaque({get exposed(){return ctx}})',
@@ -88,6 +91,7 @@ const fixture = (name: keyof typeof controls) => ({
 })
 it.each([
   'methodReturn',
+  'overloadReturn',
   'methodEmit',
   'methodForward',
   'getterReturn',
@@ -95,7 +99,14 @@ it.each([
   'arrowReturn',
   'nestedReturn',
 ] as const)('rejects selected callable literal member %s', (name) => expectUnknown(fixture(name)))
-it.each(['independent', 'unused', 'ignored', 'readonly', 'getterReadonly', 'dead'] as const)(
-  'retains independent or ignored literal member %s',
-  (name) => expectNoContent(fixture(name)),
+it.each([
+  'independent',
+  'overloadIndependent',
+  'unused',
+  'ignored',
+  'readonly',
+  'getterReadonly',
+  'dead',
+] as const)('retains independent or ignored literal member %s', (name) =>
+  expectNoContent(fixture(name)),
 )
