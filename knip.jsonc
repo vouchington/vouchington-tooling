@@ -33,7 +33,6 @@
         "src/openapi-document/index.mts!",
         "src/contract-schema/index.mts!",
         "src/api-fixtures/index.mts!",
-        "src/api-contract-discovery/index.mts!",
         "src/vitest-diagnostics/index.mts!",
         "src/config-inventory/index.mts!",
         "src/finite-enum-ripple/index.mts!",
