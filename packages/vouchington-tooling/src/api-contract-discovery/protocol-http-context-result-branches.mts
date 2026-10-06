@@ -9,6 +9,9 @@ export function contextResultBranches(value: ts.Expression): ts.Expression[] {
   if (value.operatorToken.kind === ts.SyntaxKind.CommaToken) return [value.right]
   return [
     ts.SyntaxKind.QuestionQuestionToken,
+    ts.SyntaxKind.QuestionQuestionEqualsToken,
+    ts.SyntaxKind.BarBarEqualsToken,
+    ts.SyntaxKind.AmpersandAmpersandEqualsToken,
     ts.SyntaxKind.BarBarToken,
     ts.SyntaxKind.AmpersandAmpersandToken,
   ].includes(value.operatorToken.kind)
