@@ -114,7 +114,7 @@ function isIntrinsicUndefined(expression: ts.Expression): boolean {
   const source = expression.getSourceFile()
   const options: ts.CompilerOptions = { noLib: true, noResolve: true }
   const host = ts.createCompilerHost(options)
-  host.getSourceFile = (file) => (file === source.fileName ? source : undefined)
+  host.getSourceFile = () => source
   const checker = ts.createProgram([source.fileName], options, host).getTypeChecker()
   const symbol = checker.getSymbolAtLocation(expression)
   return (
