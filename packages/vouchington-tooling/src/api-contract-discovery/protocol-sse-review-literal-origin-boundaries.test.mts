@@ -1,5 +1,7 @@
 import { beforeAll, expect, it } from 'vitest'
 import ts from '../contract-schema/typescript-api.mts'
+import { expressionReceiver } from './protocol-write-receiver.mts'
+import { selectedOpaqueSseReceiver } from './protocol-sse-returned-capability.mts'
 import { someSseArgumentValue } from './protocol-sse-literal-arguments.mts'
 import { discoverApiResponseContracts } from './response-contract-registry.mts'
 import { buildVirtualProgramMatrix, type VirtualProgramMatrix } from './test-setup.test-helpers.mts'
@@ -18,7 +20,8 @@ const sources = {
   getterelement: route("const wrapper={get expose(){return stream}};opaque(wrapper['expose'])"),
   independentalias: route('const wrapper={other};opaque(wrapper)'),
   independentarray: route('const wrapper=[other];opaque(wrapper)'),
-  independentreceiver: route('[other].forEach(opaque)'),
+  ambientreceiver: route('[other].forEach(opaque)'),
+  independentreceiver: route('function ignore(_value:unknown){}[other].forEach(ignore)'),
   independentgetter: route('const wrapper={get expose(){return other}};opaque(wrapper.expose)'),
   scalargetter: route('const wrapper={get expose(){return 1}};opaque(wrapper.expose)'),
   unusedgetter: route('const wrapper={get expose(){return stream}}'),
@@ -86,4 +89,30 @@ it('fails closed on an actual unchecked JavaScript literal alias cycle', () => {
     .find(ts.isCallExpression)
   if (!call?.arguments[0]) throw new Error('Missing real literal-cycle argument')
   expect(someSseArgumentValue(call.arguments[0], program.getTypeChecker(), () => false)).toBe(true)
+})
+
+it('distinguishes actual independent literal receivers from an opaque callback argument', () => {
+  const source = matrix.sourceFile('ambientreceiver')
+  const checker = matrix.program.getTypeChecker()
+  const declaration = source.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((s) => s.declarationList.declarations)
+    .find((d) => ts.isIdentifier(d.name) && d.name.text === 'stream')
+  let call: ts.CallExpression | undefined
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'forEach'
+    )
+      call = node
+    node.forEachChild(visit)
+  }
+  visit(source)
+  const frame =
+    declaration &&
+    ts.isIdentifier(declaration.name) &&
+    expressionReceiver(declaration.name, checker)
+  if (!frame || !call) throw new Error('Missing actual literal receiver fixture')
+  expect(selectedOpaqueSseReceiver(call, checker, [frame], (receiver) => [receiver])).toBe(false)
 })
