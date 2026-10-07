@@ -213,6 +213,7 @@ import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
 import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'
 import {
   buildSharedContext,
+  createSourceModuleGraph,
   installFakeGit,
   runNamedChecks,
 } from 'vouchington-tooling/shared-context'
@@ -656,6 +657,17 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 TypeScript and route rows from Markdown. Callers configure declaration names and
 runbook headings, then compare the returned data using their own route policy.
 See the [API contract](docs/basic-auth-doc-sync.md).
+
+## TypeScript source graph
+
+`createSourceModuleGraph` accepts the `modules` report from released no-mistakes
+`analyzeTypeScriptModules({ root, files })`, plus the caller's root, ordered source extensions,
+aliases, and file inventory. It resolves local imports and reexport owners without reading or
+parsing source again. `runtimeImports(file)` uses binding references rather than declaration
+presence, and `reachableFrom(entrypoints, { runtimeOnly: true })` follows used runtime imports,
+reexports, and literal dynamic/require loads. Missing or incomplete facts for a reached file
+throw; external specifiers resolve to `null`. The default inventory/traversal limit is 10,000
+files and can be reduced with `maxFiles`.
 
 ## SQL view declarations
 
