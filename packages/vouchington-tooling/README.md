@@ -657,6 +657,17 @@ TypeScript and route rows from Markdown. Callers configure declaration names and
 runbook headings, then compare the returned data using their own route policy.
 See the [API contract](docs/basic-auth-doc-sync.md).
 
+## SQL index shapes
+
+`vouchington-tooling/sql-ast` exports `extractIndexShapes(sql)`. Await `initSqlAst()` before
+calling it. It returns `{ idxname, table, shapeKey }` for each named top-level `CREATE INDEX`.
+Consumers can group identical `shapeKey` values to find differently named index definitions
+with the same projected physical shape. The key normalizes effective sort and null ordering and
+removes parser locations from expressions and predicates. Invalid SQL throws. Anonymous indexes
+and indexes inside `DO` blocks are omitted. The projection does not model operator classes,
+collations, or `INCLUDE` columns, so callers using those features must extend it before relying
+on shape collisions.
+
 ## Publication writer inventory facts
 
 `vouchington-tooling/post-publication-inventory` exports
