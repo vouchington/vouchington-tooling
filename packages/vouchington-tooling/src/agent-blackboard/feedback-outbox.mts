@@ -101,7 +101,8 @@ export function readFeedbackOutbox(directory: string): FeedbackOutboxRecord[] {
 }
 /**
  * Retains the record unless the same event is already retained, in which case that record stays:
- * the event is the session, `sourceEventId`, and content, and the earlier `timestamp` wins. The
+ * the event is the session identity (any `version`), `sourceEventId`, and content, and the earlier
+ * `timestamp` wins. The
  * returned record is the one to deliver.
  */
 export function persistFeedbackOutbox(
@@ -117,8 +118,11 @@ export function persistFeedbackOutbox(
     const existing = current.find((item) => item.path === join(path, name))
     const serialized = JSON.stringify(record)
     if (existing) {
+      // A version-only difference is the same event: delivery accepts it into the stored session.
+      const { version: _retained, ...retainedIdentity } = existing.record.identity
+      const { version: _supplied, ...suppliedIdentity } = record.identity
       if (
-        canonicalFeedback(existing.record.identity) !== canonicalFeedback(record.identity) ||
+        canonicalFeedback(retainedIdentity) !== canonicalFeedback(suppliedIdentity) ||
         canonicalFeedbackEvent(existing.record.envelope) !== canonicalFeedbackEvent(record.envelope)
       )
         throw new Error('feedback source event conflicts with a retained unsent record')

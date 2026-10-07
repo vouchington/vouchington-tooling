@@ -160,7 +160,9 @@ describe('journal_append', () => {
       'identity-conflict: agent stored "other", supplied "codex"',
     )
     expect(textOf(conflicting)).not.toContain('version')
-    expect(textOf(conflicting)).toContain('different parent or agent')
+    expect(textOf(conflicting)).toContain(
+      'different parent or agent, or an unusable stored version',
+    )
   })
 
   it('delivers a version-only mismatch into the stored session and reports storedVersion', async () => {

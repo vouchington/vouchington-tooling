@@ -36,7 +36,8 @@ const HANDLERS: Record<string, ToolHandler> = {
 }
 
 const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
-  'identity-conflict': 'the session already exists with a different parent or agent',
+  'identity-conflict':
+    'the session already exists with a different parent or agent, or an unusable stored version',
   'event-conflict':
     'sourceEventId was already used with different content; use a new sourceEventId',
   'archived-session': 'the session is archived; write to a new session',
