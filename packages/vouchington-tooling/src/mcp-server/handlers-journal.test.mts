@@ -183,6 +183,33 @@ describe('journal_append', () => {
     expect(h.fake.calls.append).toHaveLength(1)
   })
 
+  it('rejects an interactive identity conflict without leaving a pending record', async () => {
+    const h = harness(fixture(), {
+      conflictingSession: {
+        id: 'native:owner',
+        parentSessionId: null,
+        agent: 'other',
+        version: '1',
+      },
+    })
+    const result = await h.call('journal_append', {
+      ...JOURNAL_ARGS,
+      mode: 'interactive',
+      worktree: fixture().linked,
+    })
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('agent stored "other", supplied "codex"')
+    expect(
+      jsonOf(
+        await h.call('outbox_status', { sessionId: 'native:owner', worktree: fixture().linked }),
+      ),
+    ).toMatchObject({
+      pendingCount: 0,
+      worktreePendingCount: 0,
+      rejectedCount: 1,
+    })
+  })
+
   it('names every differing field with its stored and supplied value', async () => {
     const h = harness(fixture(), {
       conflictingSession: {
