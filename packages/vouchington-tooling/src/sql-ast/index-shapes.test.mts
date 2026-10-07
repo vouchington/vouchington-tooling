@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { extractIndexShapes, initSqlAst } from './index.mts'
 
 describe('extractIndexShapes', () => {
@@ -97,5 +97,44 @@ describe('extractIndexShapes', () => {
       CREATE INDEX idx_b ON sample (owner_id DESC);
     `)
     expect(shapes[0]?.shapeKey).not.toBe(shapes[1]?.shapeKey)
+  })
+
+  it('handles incomplete parser nodes without inventing an index name', async () => {
+    vi.resetModules()
+    const fresh = await import('./index.mts')
+    const parseSync = (sql: string) =>
+      sql === 'empty'
+        ? {}
+        : {
+            stmts: [
+              { stmt: undefined },
+              { stmt: { SelectStmt: {} } },
+              { stmt: { IndexStmt: {} } },
+              { stmt: { IndexStmt: { idxname: 'minimal' } } },
+              {
+                stmt: {
+                  IndexStmt: {
+                    idxname: 'expression',
+                    relation: { relname: 'sample' },
+                    indexParams: [
+                      { Integer: { ival: 1, location: 99 } },
+                      {
+                        IndexElem: {
+                          expr: { ColumnRef: { fields: [{ String: { sval: 'owner_id' } }] } },
+                          ordering: 'SORTBY_DESC',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+    await fresh.initSqlAst(async () => ({ loadModule: async () => undefined, parseSync }) as never)
+    expect(fresh.extractIndexShapes('empty')).toEqual([])
+    const shapes = fresh.extractIndexShapes('tree')
+    expect(shapes.map(({ idxname }) => idxname)).toEqual(['minimal', 'expression'])
+    expect(JSON.parse(shapes[0]!.shapeKey)).toMatchObject({ table: '', indexParams: [] })
+    expect(shapes[1]!.shapeKey).not.toContain('location')
   })
 })
