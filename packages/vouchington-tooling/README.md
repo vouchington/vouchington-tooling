@@ -663,7 +663,8 @@ See the [API contract](docs/basic-auth-doc-sync.md).
 `ManagedViewDeclaration` type. Await `initSqlAst()` before calling the extractor. It returns the
 qualified, PostgreSQL-quoted names and kinds of top-level `CREATE VIEW` and
 `CREATE MATERIALIZED VIEW` declarations. It ignores comments, string literals, and other SQL
-statements. Blank or unparseable SQL returns an empty array. Consumers own view teardown and
+statements. Reserved keyword identifiers remain quoted. Blank or unparseable SQL returns an empty
+array; parser initialization and unexpected errors propagate. Consumers own view teardown and
 lifecycle decisions.
 
 ## SQL index shapes

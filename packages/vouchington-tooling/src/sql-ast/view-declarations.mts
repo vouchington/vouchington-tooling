@@ -1,5 +1,5 @@
 import type { RangeVar } from '@libpg-query/parser'
-import { parseSql } from './parser.mts'
+import { isReservedSqlKeyword, isSqlParseError, parseSql } from './parser.mts'
 
 export type ManagedViewDeclaration = {
   name: string
@@ -7,12 +7,12 @@ export type ManagedViewDeclaration = {
 }
 
 /**
- * Returns a PostgreSQL-quoted identifier. Simple lowercase names are returned unquoted;
- * names containing uppercase, spaces, punctuation, or other special characters are
- * wrapped in double-quotes with internal double-quotes escaped as "".
+ * Returns a PostgreSQL-quoted identifier. Simple lowercase non-keywords are returned unquoted;
+ * keywords and names containing uppercase, spaces, punctuation, or other special characters
+ * are wrapped in double-quotes with internal double-quotes escaped as "".
  */
 function quotePgName(name: string): string {
-  if (/^[a-z_][a-z0-9_]*$/.test(name)) return name
+  if (/^[a-z_][a-z0-9_]*$/.test(name) && !isReservedSqlKeyword(name)) return name
   return `"${name.replace(/"/g, '""')}"`
 }
 
@@ -37,8 +37,9 @@ export function extractViewDeclarations(sql: string): ManagedViewDeclaration[] {
   let result
   try {
     result = parseSql(sql)
-  } catch {
-    return []
+  } catch (error) {
+    if (isSqlParseError(error)) return []
+    throw error
   }
   const declarations: ManagedViewDeclaration[] = []
   for (const stmt of result.stmts ?? []) {

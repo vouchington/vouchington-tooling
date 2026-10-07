@@ -37,9 +37,23 @@ describe('extractViewDeclarations', () => {
     ])
   })
 
+  it('keeps quoted reserved keywords valid in schema and view references', () => {
+    expect(extractViewDeclarations('CREATE VIEW "select"."from" AS SELECT 1')).toEqual([
+      { name: '"select"."from"', type: 'view' },
+    ])
+  })
+
   it('returns no declarations for malformed SQL or blank input', () => {
     expect(extractViewDeclarations('CREATE TABLE (')).toEqual([])
     expect(extractViewDeclarations('  ')).toEqual([])
+  })
+
+  it('propagates an uninitialized parser error instead of hiding it as no views', async () => {
+    vi.resetModules()
+    const fresh = await import('./index.mts')
+    expect(() => fresh.extractViewDeclarations('CREATE VIEW sample AS SELECT 1')).toThrow(
+      'initSqlAst() must be awaited before calling parse helpers',
+    )
   })
 
   it('ignores incomplete parser nodes without producing declarations', async () => {
