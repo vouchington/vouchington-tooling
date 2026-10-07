@@ -657,6 +657,16 @@ TypeScript and route rows from Markdown. Callers configure declaration names and
 runbook headings, then compare the returned data using their own route policy.
 See the [API contract](docs/basic-auth-doc-sync.md).
 
+## SQL view declarations
+
+`vouchington-tooling/sql-ast` exports `extractViewDeclarations(sql)` and the
+`ManagedViewDeclaration` type. Await `initSqlAst()` before calling the extractor. It returns the
+qualified, PostgreSQL-quoted names and kinds of top-level `CREATE VIEW` and
+`CREATE MATERIALIZED VIEW` declarations. It ignores comments, string literals, and other SQL
+statements. Keywords that cannot be bare relation names remain quoted. Blank or unparseable SQL returns an empty
+array; parser initialization and unexpected errors propagate. Consumers own view teardown and
+lifecycle decisions.
+
 ## SQL index shapes
 
 `vouchington-tooling/sql-ast` exports `extractIndexShapes(sql)`. Await `initSqlAst()` before

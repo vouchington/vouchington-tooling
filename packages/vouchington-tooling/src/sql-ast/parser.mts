@@ -32,10 +32,23 @@ export function initSqlAst(
 }
 
 export function parseSql(content: string): ReturnType<LibPgQuery['parseSync']> {
+  return getParser().parseSync(content)
+}
+
+export function isUnsafeUnquotedRelationKeyword(name: string): boolean {
+  const keywordName = getParser().scanSync(name).tokens[0]?.keywordName
+  return keywordName === 'RESERVED_KEYWORD' || keywordName === 'TYPE_FUNC_NAME_KEYWORD'
+}
+
+function getParser(): LibPgQuery {
   if (!parser) {
     throw new Error('initSqlAst() must be awaited before calling parse helpers')
   }
-  return parser.parseSync(content)
+  return parser
+}
+
+export function isSqlParseError(error: unknown): boolean {
+  return Boolean(parser?.SqlError && error instanceof parser.SqlError)
 }
 
 async function loadParser(importer: () => Promise<LibPgQuery>): Promise<LibPgQuery> {
