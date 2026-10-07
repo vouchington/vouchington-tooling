@@ -11,6 +11,7 @@ export { extractDefaultFunction, extractFuncCallArgColumnNames } from './default
 export { extractDropIndexMetadata } from './drop-index.mts'
 export type { SqlDropIndexMetadata } from './drop-index.mts'
 export { extractCreateIndexMetadata } from './index-metadata.mts'
+export { extractIndexShapes } from './index-shapes.mts'
 export type { SqlCreateIndexMetadata, SqlIndexParam } from './index-metadata.mts'
 export { lineOfUtf8ByteOffset } from './line-of-offset.mts'
 export { initSqlAst, MissingSqlAstParserError, parseSql } from './parser.mts'
