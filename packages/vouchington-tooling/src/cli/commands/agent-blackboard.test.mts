@@ -69,6 +69,8 @@ describe('agent-blackboard CLI', () => {
     vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({
       pendingCount: 0,
       worktreePendingCount: 2,
+      rejectedCount: 1,
+      worktreeRejectedCount: 1,
     })
     expect(
       await runAgentBlackboardCommand([
@@ -85,6 +87,8 @@ describe('agent-blackboard CLI', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 2,
+      rejectedCount: 1,
+      worktreeRejectedCount: 1,
     })
     for (const sessionId of ['bad/id', '', 'x'.repeat(257)]) {
       expect(
@@ -110,6 +114,8 @@ describe('agent-blackboard CLI', () => {
     vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({
       pendingCount: 1,
       worktreePendingCount: 2,
+      rejectedCount: 1,
+      worktreeRejectedCount: 1,
     })
     vi.mocked(flushFeedbackOutbox).mockResolvedValue({
       status: 'pending',
@@ -432,7 +438,12 @@ describe('agent-blackboard CLI', () => {
 })
 
 it('reports interactive session and worktree counts without failing primary work', async () => {
-  vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({ pendingCount: 1, worktreePendingCount: 2 })
+  vi.mocked(feedbackOutboxCounts).mockReturnValueOnce({
+    pendingCount: 1,
+    worktreePendingCount: 2,
+    rejectedCount: 0,
+    worktreeRejectedCount: 0,
+  })
   vi.mocked(appendJournal).mockResolvedValue({
     status: 'pending',
     sourceEventId: 'cli:pending',
@@ -475,6 +486,7 @@ it('reports interactive session and worktree counts without failing primary work
       pendingCount: 1,
       worktreePendingCount: 2,
     })
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).not.toHaveProperty('rejectedCount')
   } finally {
     stdout.mockRestore()
   }

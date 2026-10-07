@@ -9,6 +9,7 @@ import {
   persistFeedbackOutbox,
   removeFeedbackOutbox,
 } from './feedback-outbox.mts'
+import { rejectFeedbackOutbox } from './feedback-outbox-rejected.mts'
 import type {
   FeedbackDeliveryOptions,
   FeedbackDeliveryResult,
@@ -16,6 +17,7 @@ import type {
   FeedbackOnlineOptions,
 } from './feedback-types.mts'
 export { FeedbackDeliveryError } from './feedback-online-error.mts'
+const PERMANENT: FeedbackDiagnostic[] = ['identity-conflict', 'event-conflict', 'archived-session']
 export async function writeFeedback(
   input: FeedbackDeliveryOptions,
 ): Promise<FeedbackDeliveryResult> {
@@ -43,8 +45,10 @@ export async function writeFeedback(
     return { status: 'delivered', sourceEventId: envelope.sourceEventId, ...cleanup, receipt }
   } catch (error) {
     const diagnostic = feedbackDiagnostic(error)
-    if (['identity-conflict', 'event-conflict', 'archived-session'].includes(diagnostic))
+    if (PERMANENT.includes(diagnostic)) {
+      rejectFeedbackOutbox(input.outboxDirectory, record)
       throw new FeedbackDeliveryError(diagnostic)
+    }
     return {
       status: 'pending',
       sourceEventId: envelope.sourceEventId,
@@ -70,11 +74,13 @@ export async function flushFeedbackOutbox(input: {
   pendingCount: number
   deliveredCount: number
   diagnostic?: FeedbackDiagnostic
+  rejected?: Array<{ sourceEventId: string; diagnostic: FeedbackDiagnostic }>
   cleanupDiagnostic?: 'outbox-cleanup-failed'
 }> {
   let deliveredCount = 0
   let diagnostic: FeedbackDiagnostic | undefined
   let cleanupDiagnostic: 'outbox-cleanup-failed' | undefined
+  const rejected: Array<{ sourceEventId: string; diagnostic: FeedbackDiagnostic }> = []
   for (const record of listFeedbackOutbox(input.directory)) {
     try {
       await deliverFeedbackOnline({
@@ -87,8 +93,11 @@ export async function flushFeedbackOutbox(input: {
       deliveredCount++
     } catch (error) {
       const current = feedbackDiagnostic(error)
-      diagnostic ??= current
-      if (['identity-conflict', 'event-conflict', 'archived-session'].includes(current)) continue
+      if (PERMANENT.includes(current)) {
+        rejectFeedbackOutbox(input.directory, record)
+        rejected.push({ sourceEventId: record.envelope.sourceEventId, diagnostic: current })
+        continue
+      }
       diagnostic = current
       break
     }
@@ -98,6 +107,7 @@ export async function flushFeedbackOutbox(input: {
     deliveredCount,
     ...(cleanupDiagnostic === undefined ? {} : { cleanupDiagnostic }),
     ...(diagnostic === undefined ? {} : { diagnostic }),
+    ...(rejected.length === 0 ? {} : { rejected }),
   }
 }
 

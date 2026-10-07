@@ -74,6 +74,8 @@ describe('journal_append', () => {
       status: 'pending',
       pendingCount: 1,
       worktreePendingCount: 1,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
     })
   })
 

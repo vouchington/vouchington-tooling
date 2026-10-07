@@ -126,6 +126,8 @@ describe('journal_append event identity ignores the timestamp', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
       deliveredCount: 1,
     })
     expect(recovered.fake.calls.append).toEqual([])

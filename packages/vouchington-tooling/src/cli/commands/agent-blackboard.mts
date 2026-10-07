@@ -156,7 +156,7 @@ async function runJournal(args: string[]): Promise<number> {
     const counts =
       values.mode === 'autonomous'
         ? { pendingCount: 0, worktreePendingCount: 0 }
-        : feedbackOutboxCounts(required(values, 'outbox-directory'), required(values, 'session-id'))
+        : pendingCounts(required(values, 'outbox-directory'), required(values, 'session-id'))
     process.stdout.write(`${JSON.stringify({ ...result, ...counts })}\n`)
     return 0
   }
@@ -180,6 +180,12 @@ function extractRepositories(flags: string[]): { repositories: string[]; remaini
 function requiredRepositories(repositories: string[]): string[] {
   if (repositories.length === 0) throw new Error('--repository is required')
   return repositories
+}
+
+/** An append receipt reports only unsent records; rejected records are not pending. */
+function pendingCounts(directory: string, sessionId: string) {
+  const { pendingCount, worktreePendingCount } = feedbackOutboxCounts(directory, sessionId)
+  return { pendingCount, worktreePendingCount }
 }
 
 function isNotFound(error: unknown): boolean {
