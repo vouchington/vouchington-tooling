@@ -66,4 +66,6 @@ export type SessionFrictionReport = {
 
 export type SessionFrictionReportOptions = FrictionLogOptions & {
   journalLoader: JournalLoader
+  /** Redacts raw field text before Markdown escaping, which would otherwise break matching. */
+  redact?: (value: string) => string
 }

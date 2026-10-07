@@ -37,13 +37,21 @@ export function isSafeAuditText(value: unknown): value is string {
   )
 }
 
-// No length cap: every caller's input is already bounded (CI blocks by the 10,000-byte block
-// limit, friction events by EVENT_FIELD_MAX_LENGTH/DETAIL_MAX_LENGTH, session IDs by 4096), and
-// cutting a field mid-value drops evidence (run URLs, commit SHAs) or leaves trailing whitespace.
-// normalizeAuditText trims, and escaping never adds whitespace, so the result has none either.
-export function markdownAuditText(value: string): string {
-  let result = ''
-  for (const character of normalizeAuditText(value))
-    result += MARKDOWN_CHARACTER.test(character) ? `\\${character}` : character
-  return result
+export type AuditRedactor = (value: string) => string
+
+/**
+ * Splits a field into atomic Markdown-escaped units (one code point, plus its backslash when
+ * escaped), so a later cut can never land inside an escape sequence. Redaction runs on the raw
+ * text first: escaping inserts backslashes that would otherwise break secret and token matching.
+ * normalizeAuditText trims and escaping adds no whitespace, so the result has none at its edges.
+ */
+export function markdownAuditUnits(value: string, redact?: AuditRedactor): string[] {
+  const raw = normalizeAuditText(value)
+  return Array.from(redact ? normalizeAuditText(redact(raw)) : raw).map((character) =>
+    MARKDOWN_CHARACTER.test(character) ? `\\${character}` : character,
+  )
+}
+
+export function markdownAuditText(value: string, redact?: AuditRedactor): string {
+  return markdownAuditUnits(value, redact).join('')
 }

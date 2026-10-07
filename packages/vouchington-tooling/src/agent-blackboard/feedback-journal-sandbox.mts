@@ -1,4 +1,6 @@
 import { conformingBlocks, matchAuditBlock } from '../session-friction/audit-block.mts'
+import type { AuditRender } from '../session-friction/audit-fit.mts'
+import type { AuditRedactor } from '../session-friction/text.mts'
 import type { JournalEntry } from '../session-friction/types.mts'
 
 const SANDBOX_SECTION_HEADER = '## Sandbox & Permission Audit'
@@ -26,16 +28,21 @@ const FIELD_PREFIXES = [
   '  - Disposition: ',
 ]
 
-function matchBlock(markdown: string): string | null {
+const SANDBOX_BLOCKS_MAX_BYTES = 3_000
+
+function matchBlock(markdown: string, render: AuditRender): string | null {
   return (
-    matchAuditBlock(markdown, ESCALATION, FIELD_PREFIXES) ??
-    matchAuditBlock(markdown, FAILURE, FIELD_PREFIXES)
+    matchAuditBlock(markdown, ESCALATION, FIELD_PREFIXES, render) ??
+    matchAuditBlock(markdown, FAILURE, FIELD_PREFIXES, render)
   )
 }
 
 /** Journal entries that hold exactly one sandbox or permission block, made paste-safe. */
-export function getConformingSandboxBlocks(entries: Iterable<JournalEntry>): string[] {
-  return conformingBlocks(entries, matchBlock)
+export function getConformingSandboxBlocks(
+  entries: Iterable<JournalEntry>,
+  redact?: AuditRedactor,
+): string[] {
+  return conformingBlocks(entries, matchBlock, SANDBOX_BLOCKS_MAX_BYTES, redact)
 }
 
 export function unavailableSandboxSection(reason: string, blocks: string[] = []): string {

@@ -12,7 +12,11 @@ import {
   unavailableSandboxSection,
 } from './feedback-journal-sandbox.mts'
 
-export type JournalAuditOptions = { journalLoader: JournalLoader }
+export type JournalAuditOptions = {
+  journalLoader: JournalLoader
+  /** Redacts raw field text before Markdown escaping, which would otherwise break matching. */
+  redact?: (value: string) => string
+}
 
 /** `journal-only` says both sections were assessed from journal entries, with no log observed. */
 export type JournalAuditReport = {
@@ -52,8 +56,8 @@ export async function buildJournalAuditReport(
   const scanned = await scanJournal(sessionId, options.journalLoader)
   if (scanned.status === 'unreachable') return unavailable('blackboard unreachable')
   if (scanned.status === 'not-found') return unavailable('no journal for session')
-  const ci = getConformingGroups(scanned.entries)
-  const sandbox = getConformingSandboxBlocks(scanned.entries)
+  const ci = getConformingGroups(scanned.entries, options.redact)
+  const sandbox = getConformingSandboxBlocks(scanned.entries, options.redact)
   if (scanned.truncated)
     return report(
       'partial',

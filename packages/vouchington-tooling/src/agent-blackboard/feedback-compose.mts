@@ -12,6 +12,7 @@ import {
   auditAssessed,
   buildAuditReport,
   completeCoverageError,
+  type AuditSourceInput,
 } from './feedback-audit-source.mts'
 import type { JournalAuditOptions } from './feedback-journal-audit.mts'
 import { createFeedbackEnvelope, redactFeedbackText } from './feedback-codec.mts'
@@ -80,6 +81,15 @@ function unavailable(marker: string, input: Unassessed): string {
     throw new Error('unavailable reason must be bounded and explicit')
   return `${marker}\nStatus: ${input.status.replaceAll('-', ' ')} (${input.reason})`
 }
+/** Redacts audit fields from their raw text; escaping them first would defeat the matching. */
+function redactingAuditSource(input: RetrospectiveCompositionInput): AuditSourceInput {
+  const redact = (value: string): string => redactFeedbackText(value, input.knownSensitiveValues)
+  return input.friction
+    ? { friction: { ...input.friction, redact } }
+    : input.journal
+      ? { journal: { ...input.journal, redact } }
+      : {}
+}
 export async function composeRetrospective(input: RetrospectiveCompositionInput): Promise<string> {
   assertSingleAuditSource(input)
   const unavailableFacts =
@@ -103,7 +113,7 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
     'status' in input.transcript
       ? Promise.resolve(unavailableTranscript!)
       : runRetrospectiveTranscriptReport(input.transcript),
-    buildAuditReport(input.sessionId, input),
+    buildAuditReport(input.sessionId, redactingAuditSource(input)),
   ])
   if (
     input.feedbackCoverage.status === 'complete' &&

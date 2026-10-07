@@ -1,6 +1,7 @@
 import type { FrictionLogReadResult, JournalEntry } from './types.mts'
 import { conformingBlocks, matchAuditBlock } from './audit-block.mts'
-import { markdownAuditText } from './text.mts'
+import type { AuditRender } from './audit-fit.mts'
+import { markdownAuditText, type AuditRedactor } from './text.mts'
 
 const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$/
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
@@ -17,11 +18,14 @@ const FIELD_PREFIXES = [
   '  - Disposition: ',
 ]
 
-function matchBlock(markdown: string): string | null {
+const CI_SECTION_MAX_BYTES = 4_000
+
+function matchBlock(markdown: string, render: AuditRender = {}): string | null {
   return matchAuditBlock(
     markdown,
     [GROUP_HEADER, EVIDENCE, ROOT_DIAGNOSTIC, DISPOSITION],
     FIELD_PREFIXES,
+    render,
   )
 }
 
@@ -34,8 +38,11 @@ export function isConformingCiFailureBlock(markdown: string): boolean {
   return matchBlock(markdown) !== null
 }
 
-export function getConformingGroups(entries: Iterable<JournalEntry>): string[] {
-  return conformingBlocks(entries, matchBlock)
+export function getConformingGroups(
+  entries: Iterable<JournalEntry>,
+  redact?: AuditRedactor,
+): string[] {
+  return conformingBlocks(entries, matchBlock, CI_SECTION_MAX_BYTES, redact)
 }
 
 export function incompleteCiSection(markdownBlocks: string[]): string {

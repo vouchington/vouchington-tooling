@@ -191,7 +191,7 @@ describe('sandbox journal grammar', () => {
     )
   })
 
-  it('escapes Markdown and bounds each field before rendering', () => {
+  it('escapes Markdown and keeps each field whole before rendering', () => {
     const unsafe = failure
       .replace('EPERM writing outside the worktree', '<!-- hidden')
       .replace('moved output under TMPDIR', '--> *forged* ' + 'x'.repeat(200))
@@ -200,7 +200,7 @@ describe('sandbox journal grammar', () => {
     expect(block).not.toMatch(/(?:^|[^\\])<!--/)
     const disposition = block!.split('\n').at(-1)!
     expect(disposition).toMatch(/^ {2}- Disposition: \\-\\-\\> \\\*forged\\\* x+$/)
-    expect(disposition.length).toBeLessThanOrEqual('  - Disposition: '.length + 120)
+    expect(disposition.endsWith(`x${'x'.repeat(199)}`)).toBe(true)
   })
 
   it('ignores null entries', () => {
