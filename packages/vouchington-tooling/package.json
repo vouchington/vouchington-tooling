@@ -136,6 +136,11 @@
       "import": "./dist/shared-context/index.mjs",
       "default": "./dist/shared-context/index.mjs"
     },
+    "./source-module-graph": {
+      "types": "./dist/source-module-graph/index.d.mts",
+      "import": "./dist/source-module-graph/index.mjs",
+      "default": "./dist/source-module-graph/index.mjs"
+    },
     "./gha-selected-files": {
       "types": "./dist/gha-selected-files/index.d.mts",
       "import": "./dist/gha-selected-files/index.mjs",
@@ -376,12 +381,14 @@
     "@types/picomatch": "^4.0.3",
     "@types/spdx-expression-parse": "4.0.0",
     "agent-blackboard": "^0.6.0",
+    "no-mistakes": "0.78.0",
     "smol-toml": "1.9.0",
     "typescript5": "npm:typescript@5.9.3"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "agent-blackboard": "^0.6.0",
+    "no-mistakes": "^0.78.0",
     "typescript": ">=5",
     "vitest": ">=5"
   },
@@ -390,6 +397,9 @@
       "optional": true
     },
     "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "no-mistakes": {
       "optional": true
     },
     "typescript": {
