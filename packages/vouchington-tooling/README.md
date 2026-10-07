@@ -89,6 +89,22 @@ vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
 ```
 
+### Running `allocate-browser-safe-ports` without an install
+
+The allocator is a standalone Python script that needs only the Python 3 standard library: no
+Node, no `pnpm install`. Run it from the extracted published tarball:
+
+```bash
+npm pack vouchington-tooling@<version>   # or download the registry .tgz
+mkdir extracted && tar -xzf vouchington-tooling-<version>.tgz -C extracted
+python3 extracted/package/scripts/allocate-browser-safe-ports.py <count> [--policy ...] [--forbidden-ports ...]
+```
+
+`pnpm dlx` and `npx` resolve the package's whole dependency tree, which can fail under
+`minimumReleaseAge` (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`) when a lockstep-published dependency
+straddles the cutoff. CI jobs without an install should fetch the tarball instead. Tests enforce
+that the script stays stdlib-only and reads only its two sibling JSON files.
+
 For persistent `pnpm-install`, v5 metadata tracks structural inputs separately from the
 `--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
