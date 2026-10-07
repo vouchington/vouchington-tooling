@@ -47,7 +47,7 @@ export async function writeFeedback(
     const diagnostic = feedbackDiagnostic(error)
     if (PERMANENT.includes(diagnostic)) {
       rejectFeedbackOutbox(input.outboxDirectory, record)
-      throw new FeedbackDeliveryError(diagnostic)
+      throw error instanceof FeedbackDeliveryError ? error : new FeedbackDeliveryError(diagnostic)
     }
     return {
       status: 'pending',

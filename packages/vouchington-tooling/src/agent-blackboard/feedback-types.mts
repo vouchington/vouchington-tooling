@@ -42,6 +42,8 @@ export type FeedbackReceipt = {
   /** The `timestamp` of the stored entry, which may be earlier than the attempt that confirmed it. */
   timestamp: string
   verified: true
+  /** Set when the session already stored a different `version`; the entry was delivered into it. */
+  storedVersion?: string
 }
 export type FeedbackDiagnostic =
   | 'blackboard-unavailable'

@@ -11,12 +11,7 @@ async function ensureSession(
   identity: FeedbackOnlineOptions['identity'],
 ) {
   try {
-    return await sessions.ensure({
-      id: identity.sessionId,
-      parentSessionId: identity.parentSessionId,
-      agent: identity.agent,
-      version: identity.version,
-    })
+    return { ensured: await sessions.ensure(identity), storedVersion: undefined }
   } catch (error) {
     let existing: unknown
     try {
@@ -24,15 +19,28 @@ async function ensureSession(
     } catch {
       throw error
     }
-    if (
-      isObject(existing) &&
-      existing.id === identity.sessionId &&
-      (['parentSessionId', 'agent', 'version'] as const).some(
-        (field) => (existing[field] ?? null) !== identity[field],
-      )
+    if (!isObject(existing) || existing.id !== identity.sessionId) throw error
+    const differing = (['parentSessionId', 'agent', 'version'] as const).filter(
+      (field) => (existing[field] ?? null) !== identity[field],
     )
-      throw new FeedbackDeliveryError('identity-conflict')
-    throw error
+    if (differing.length === 0) throw error
+    const storedVersion = existing.version
+    // Entries do not record a version, so a version-only difference (an agent CLI upgrade, or a
+    // session another writer created) delivers into the existing session under its stored version.
+    if (differing.length === 1 && differing[0] === 'version' && typeof storedVersion === 'string')
+      return {
+        ensured: await sessions.ensure({ ...identity, version: storedVersion }),
+        storedVersion,
+      }
+    throw new FeedbackDeliveryError(
+      'identity-conflict',
+      differing
+        .map(
+          (field) =>
+            `${field} stored ${JSON.stringify(existing[field] ?? null)}, supplied ${JSON.stringify(identity[field])}`,
+        )
+        .join('; '),
+    )
   }
 }
 async function findEvent(
@@ -111,7 +119,8 @@ export async function deliverFeedbackOnline(
       const { Sessions, Entries } = client
       const sessions = new Sessions(connection)
       const entries = new Entries(connection)
-      const ensured = await ensureSession(sessions, input.identity)
+      const { ensured, storedVersion } = await ensureSession(sessions, input.identity)
+      const stored = storedVersion === undefined ? {} : { storedVersion }
       if (ensured.session.archivedAt != null) throw new FeedbackDeliveryError('archived-session')
       const existing = await findEvent(
         entries.get({ sessionId: input.identity.sessionId, format: 'jsonl' }),
@@ -136,6 +145,7 @@ export async function deliverFeedbackOnline(
           createdAt: existing.createdAt,
           timestamp: existing.timestamp,
           verified: true,
+          ...stored,
         }
       const appended = await entries.append({
         sessionId: input.identity.sessionId,
@@ -161,9 +171,12 @@ export async function deliverFeedbackOnline(
         createdAt: confirmed.createdAt,
         timestamp: confirmed.timestamp,
         verified: true,
+        ...stored,
       }
     } catch (error) {
-      throw new FeedbackDeliveryError(feedbackDiagnostic(error))
+      throw error instanceof FeedbackDeliveryError
+        ? error
+        : new FeedbackDeliveryError(feedbackDiagnostic(error))
     }
   }, input.timeoutMs)
 }

@@ -55,19 +55,21 @@ async function provider(
     duplicate?: boolean
     unauthorized?: boolean
     existingAgent?: string
+    existingVersion?: string
   } = {},
 ) {
   const entries: Array<{ createdAt: string; data: unknown }> = []
-  let session: Record<string, unknown> | undefined = options.existingAgent
-    ? {
-        id: identity.sessionId,
-        parentSessionId: null,
-        agent: options.existingAgent,
-        version: '1',
-        data: {},
-        archivedAt: null,
-      }
-    : undefined
+  let session: Record<string, unknown> | undefined =
+    (options.existingAgent ?? options.existingVersion)
+      ? {
+          id: identity.sessionId,
+          parentSessionId: null,
+          agent: options.existingAgent ?? identity.agent,
+          version: options.existingVersion ?? '1',
+          data: {},
+          archivedAt: null,
+        }
+      : undefined
   let appends = 0
   const server = createServer(async (request, response) => {
     const body = []
@@ -333,6 +335,33 @@ it('classifies actual SDK identity mismatches as hard conflicts while retaining 
   await expect(
     flushFeedbackOutbox({ directory: path, env: service.env, dependencies }),
   ).resolves.toEqual({ status: 'empty', pendingCount: 0, deliveredCount: 0 })
+})
+
+it('names the differing field and both values for an agent mismatch', async () => {
+  const service = await provider({ existingAgent: 'claude' })
+  await expect(
+    verifyFreshFeedback({ identity, envelope: envelope(), env: service.env, dependencies }),
+  ).rejects.toThrow('identity-conflict: agent stored "claude", supplied "codex"')
+  expect(service.appends).toBe(0)
+})
+it('delivers a version-only mismatch into the existing session and reports storedVersion', async () => {
+  const service = await provider({ existingVersion: 'unknown' })
+  const path = await directory()
+  const result = await writeFeedback({
+    identity,
+    envelope: envelope(),
+    mode: 'interactive',
+    outboxDirectory: path,
+    env: service.env,
+    dependencies,
+  })
+  expect(result).toMatchObject({
+    status: 'delivered',
+    receipt: { verified: true, storedVersion: 'unknown' },
+  })
+  expect(service.appends).toBe(1)
+  expect(service.session).toMatchObject({ version: 'unknown' })
+  expect(feedbackOutboxStatus(path)).toEqual({ status: 'empty', pendingCount: 0 })
 })
 
 it('delivers journal defaults and replays through the consumer context with default credentials', async () => {

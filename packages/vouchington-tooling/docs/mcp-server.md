@@ -111,6 +111,13 @@ entries exist, but the report names the earliest stored one and later retries re
 Admission freshness (`verifyFreshFeedback`) keeps its stricter rule: any earlier record of the event,
 whatever its timestamp, is a conflict.
 
+A session that already exists with a different `version` (an agent upgrade, or a session another
+writer created) is not a conflict: the entry is delivered into it and the result reports
+`storedVersion`, in `journal_append` and in `vouchington agent-blackboard journal append`. A
+different `parentSessionId` or `agent` is an `identity-conflict`, and the error names each
+differing field with its stored and supplied value, for example
+`identity-conflict: agent stored "claude", supplied "codex"`.
+
 `journal_entries` returns `{ sessionId, entries }`. Each entry is exactly what the `agent-blackboard`
 client returns (`sessionId`, `createdAt`, `data`), so `data` keeps its envelope fields such as
 `repositories`, `sourceEventId`, `workOutcome`, and `feedbackCoverage`. Entries of every type come

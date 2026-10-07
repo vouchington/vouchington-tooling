@@ -155,7 +155,48 @@ describe('journal_append', () => {
         version: '1',
       },
     }).call('journal_append', JOURNAL_ARGS)
-    expect(textOf(conflicting)).toContain('different parent, agent, or version')
+    expect(conflicting.isError).toBe(true)
+    expect(textOf(conflicting)).toContain(
+      'identity-conflict: agent stored "other", supplied "codex"',
+    )
+    expect(textOf(conflicting)).not.toContain('version')
+    expect(textOf(conflicting)).toContain('different parent or agent')
+  })
+
+  it('delivers a version-only mismatch into the stored session and reports storedVersion', async () => {
+    const h = harness(fixture(), {
+      conflictingSession: {
+        id: 'native:owner',
+        parentSessionId: null,
+        agent: 'codex',
+        version: 'unknown',
+      },
+    })
+    const result = await h.call('journal_append', JOURNAL_ARGS)
+    expect(result.isError).toBeUndefined()
+    expect(jsonOf(result)).toMatchObject({
+      status: 'delivered',
+      storedVersion: 'unknown',
+      receipt: { verified: true, storedVersion: 'unknown' },
+    })
+    expect(h.fake.calls.ensure.at(-1)).toMatchObject({ version: 'unknown' })
+    expect(h.fake.calls.append).toHaveLength(1)
+  })
+
+  it('names every differing field with its stored and supplied value', async () => {
+    const h = harness(fixture(), {
+      conflictingSession: {
+        id: 'native:owner',
+        parentSessionId: null,
+        agent: 'other',
+        version: 'unknown',
+      },
+    })
+    const result = await h.call('journal_append', JOURNAL_ARGS)
+    expect(textOf(result)).toContain(
+      'agent stored "other", supplied "codex"; version stored "unknown", supplied "1"',
+    )
+    expect(h.fake.calls.append).toHaveLength(0)
   })
 
   it('refuses to reuse a sourceEventId for different content', async () => {

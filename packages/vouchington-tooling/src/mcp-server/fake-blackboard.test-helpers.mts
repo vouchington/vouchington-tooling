@@ -15,7 +15,7 @@ export type FakeOptions = {
   omitArchive?: boolean
   omitSnapshots?: boolean
   exportResult?: unknown
-  /** Makes `ensure` fail and `get` report a session with this different identity. */
+  /** Makes `ensure` fail for any other identity, and `get` report a session with this one. */
   conflictingSession?: { id: string; parentSessionId: null; agent: string; version: string }
   entries?: StoredEntry[]
   entriesError?: unknown
@@ -57,9 +57,15 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
   const stored = options.entries ?? []
   const data: { repositories: string[] } = { repositories: [] }
   class Sessions {
-    async ensure(input: unknown) {
+    async ensure(input: { parentSessionId: null; agent: string; version: string }) {
       calls.ensure.push(input)
-      if (options.conflictingSession) throw new Error('session identity differs')
+      if (
+        options.conflictingSession &&
+        (options.conflictingSession.parentSessionId !== input.parentSessionId ||
+          options.conflictingSession.agent !== input.agent ||
+          options.conflictingSession.version !== input.version)
+      )
+        throw new Error('session identity differs')
       return {
         status: 'created' as const,
         session: { data, archivedAt: options.archived ? '2026-01-01T00:00:00.000Z' : null },
