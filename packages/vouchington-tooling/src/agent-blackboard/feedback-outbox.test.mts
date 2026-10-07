@@ -117,6 +117,20 @@ it('keeps one record per event and the earlier timestamp when only the timestamp
   ).toThrow(conflicting)
   expect(readFeedbackOutbox(path)).toEqual([record])
 })
+it('treats a retry with only a different version as the retained event', async () => {
+  const path = await directory()
+  const record = { identity, envelope: envelope('upgrade:event') }
+  persistFeedbackOutbox(path, record)
+  const upgraded = { identity: { ...identity, version: '2' }, envelope: record.envelope }
+  expect(persistFeedbackOutbox(path, upgraded)).toEqual(record)
+  expect(readFeedbackOutbox(path)).toEqual([record])
+  expect(() =>
+    persistFeedbackOutbox(path, {
+      ...upgraded,
+      envelope: { ...record.envelope, markdown: 'Changed' },
+    }),
+  ).toThrow(/conflicts with a retained unsent record/)
+})
 it('reads retained records without creating the directory', async () => {
   const path = await directory()
   const record = { identity, envelope: envelope('read:source') }

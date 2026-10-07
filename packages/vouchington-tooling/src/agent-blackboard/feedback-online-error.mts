@@ -3,8 +3,8 @@ import type { FeedbackDiagnostic } from './feedback-types.mts'
 export class FeedbackDeliveryError extends Error {
   readonly status = 'blocked'
   readonly diagnostic: FeedbackDiagnostic
-  constructor(diagnostic: FeedbackDiagnostic) {
-    super(`Blackboard feedback blocked: ${diagnostic}`)
+  constructor(diagnostic: FeedbackDiagnostic, detail?: string) {
+    super(`Blackboard feedback blocked: ${diagnostic}${detail === undefined ? '' : `: ${detail}`}`)
     this.name = 'FeedbackDeliveryError'
     this.diagnostic = diagnostic
   }

@@ -157,7 +157,9 @@ async function runJournal(args: string[]): Promise<number> {
       values.mode === 'autonomous'
         ? { pendingCount: 0, worktreePendingCount: 0 }
         : pendingCounts(required(values, 'outbox-directory'), required(values, 'session-id'))
-    process.stdout.write(`${JSON.stringify({ ...result, ...counts })}\n`)
+    const storedVersion = result.status === 'delivered' ? result.receipt.storedVersion : undefined
+    // JSON.stringify drops an undefined `storedVersion`.
+    process.stdout.write(`${JSON.stringify({ ...result, storedVersion, ...counts })}\n`)
     return 0
   }
   throw new Error('usage: agent-blackboard journal append|entries|flush|status')

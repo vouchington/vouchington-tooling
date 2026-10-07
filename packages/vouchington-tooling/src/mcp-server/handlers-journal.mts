@@ -84,7 +84,15 @@ export const journalAppend: ToolHandler = async (args, context) => {
     mode === 'interactive'
       ? outboxCounts(context.worktree, context.sessionId)
       : { pendingCount: 0, worktreePendingCount: 0 }
-  return { sessionId: context.sessionId, ...result, timestamp, ...counts }
+  // A version-only mismatch delivers into the existing session; say which version it stores.
+  const storedVersion = result.status === 'delivered' ? result.receipt.storedVersion : undefined
+  return {
+    sessionId: context.sessionId,
+    ...result,
+    timestamp,
+    ...(storedVersion === undefined ? {} : { storedVersion }),
+    ...counts,
+  }
 }
 
 // `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose

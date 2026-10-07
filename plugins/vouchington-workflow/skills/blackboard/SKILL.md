@@ -125,7 +125,10 @@ retention, or delivery checks because the transport changed.
    `journal_append` ensures that session and merges the entry's `repositories` into the session's
    cumulative repository union, so list every repository the entry concerns. Never infer another
    repository from prose or create a child identity from a model guess. Call `session_ensure` with
-   the exact identity only when a runner must confirm the session before work starts.
+   the exact identity only when a runner must confirm the session before work starts. A session
+   that already stores a different `version` still receives the entry, and the result reports its
+   `storedVersion`. A different `parentSessionId` or `agent` is an `identity-conflict` whose error
+   names each differing field with its stored and supplied values.
 4. Select the repository's trusted `mode` (`interactive` or `autonomous`) explicitly. In interactive
    mode an outage may retain the validated, sanitized record in the bounded durable outbox, and
    `journal_append` reports it as pending. Report `pendingCount` (this session's unsent records),

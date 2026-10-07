@@ -2,7 +2,7 @@ import type { BlackboardClientDependencies } from './client.mts'
 import { createFeedbackEnvelope, validateFeedbackEnvelope } from './feedback-codec.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { deliverFeedbackOnline } from './feedback-online.mts'
-import { FeedbackDeliveryError, feedbackDiagnostic } from './feedback-online-error.mts'
+import { feedbackDiagnostic } from './feedback-online-error.mts'
 import {
   feedbackOutboxStatus,
   listFeedbackOutbox,
@@ -47,7 +47,7 @@ export async function writeFeedback(
     const diagnostic = feedbackDiagnostic(error)
     if (PERMANENT.includes(diagnostic)) {
       rejectFeedbackOutbox(input.outboxDirectory, record)
-      throw new FeedbackDeliveryError(diagnostic)
+      throw error
     }
     return {
       status: 'pending',
