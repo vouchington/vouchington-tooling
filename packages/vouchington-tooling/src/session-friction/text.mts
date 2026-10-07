@@ -1,6 +1,5 @@
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}]+/gu
 const MARKDOWN_CHARACTER = /\\|`|\*|_|~|\[|\]|<|>|#|-|\+|!|\||&/
-const MARKDOWN_AUDIT_MAX_LENGTH = 120
 
 export function normalizeAuditText(value: string): string {
   return value.replace(CONTROL_CHARACTERS, ' ').trim()
@@ -38,13 +37,13 @@ export function isSafeAuditText(value: unknown): value is string {
   )
 }
 
+// No length cap: every caller's input is already bounded (CI blocks by the 10,000-byte block
+// limit, friction events by EVENT_FIELD_MAX_LENGTH/DETAIL_MAX_LENGTH, session IDs by 4096), and
+// cutting a field mid-value drops evidence (run URLs, commit SHAs) or leaves trailing whitespace.
+// normalizeAuditText trims, and escaping never adds whitespace, so the result has none either.
 export function markdownAuditText(value: string): string {
-  // Escaping is atomic, so the result may be shorter than the maximum.
   let result = ''
-  for (const character of normalizeAuditText(value)) {
-    const escaped = MARKDOWN_CHARACTER.test(character) ? `\\${character}` : character
-    if (result.length + escaped.length > MARKDOWN_AUDIT_MAX_LENGTH) break
-    result += escaped
-  }
+  for (const character of normalizeAuditText(value))
+    result += MARKDOWN_CHARACTER.test(character) ? `\\${character}` : character
   return result
 }

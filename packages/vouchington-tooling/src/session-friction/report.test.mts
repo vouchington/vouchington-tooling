@@ -120,26 +120,18 @@ describe('buildSessionFrictionReport', () => {
     expect(section).not.toContain('sandbox-failure')
   })
 
-  it('bounds sandbox fields after Markdown escaping', () => {
+  it('keeps long sandbox fields whole after Markdown escaping, without trailing whitespace', () => {
+    const detail = `${'a '.repeat(80)}*end`
     const section = buildSandboxSection([
       {
         kind: 'sandbox-escalation',
         commandPrefix: 'git push',
-        detail: '*'.repeat(120),
+        detail,
         timestamp: '1',
       },
     ])
-    expect(section.split(' — ')[1]).toHaveLength(120)
-    const boundary = buildSandboxSection([
-      {
-        kind: 'sandbox-escalation',
-        commandPrefix: 'git push',
-        detail: `${'a'.repeat(119)}*`,
-        timestamp: '1',
-      },
-    ])
-    expect(boundary.split(' — ')[1]).toHaveLength(119)
-    expect(boundary.split(' — ')[1]).not.toMatch(/\\$/)
+    expect(section.split(' — ')[1]).toBe(`${'a '.repeat(80)}\\*end`)
+    for (const line of section.split('\n')) expect(line).toBe(line.trimEnd())
     expect(
       buildSandboxSection([
         {
