@@ -26,5 +26,21 @@ evidence record.
 Load only the references required by the current phase. Keep scope changes explicit; a discovered
 blocker or follow-up does not authorize widening the task.
 
+## Parallel by default
+
+Split work into independent units and run them concurrently, one worker and worktree each, within
+any cap the human set. Dispatching to a peer session in another repository is a unit.
+
+Serialize only on a named dependency:
+
+- A consumer change needs an upstream API or fix that is not yet released.
+- Units change the same files or contract. Stack them instead of waiting.
+- Units would write in the same worktree.
+
+For upstream work, open every independent pull request at once, shepherd them concurrently, merge
+the ready set together, and cut one release. Start each consumer adoption once an admitted release
+contains what it needs; start consumer work that does not need the unreleased change now. A ready,
+queued, or shepherding pull request does not pause other units.
+
 Consumer wrapper or local instructions own: default branch, runner class, documentation root,
 review system, merge policy, and command catalog.

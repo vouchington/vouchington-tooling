@@ -18,7 +18,8 @@ diagram, independent reviewer, or separate issue are required by this skill.
    fresh base. Record which evidence supports each proposed path.
 3. Map affected owners, contracts, operational boundaries, and tests. Use independent review or
    exploration when the change is cross-cutting or uncertain and local policy calls for it.
-4. Record the chosen approach, steps, validation, and unresolved decisions. Add rollout details
+4. Record the chosen approach, steps, validation, and unresolved decisions. Mark which steps run
+   concurrently and name the dependency that serializes each remaining step. Add rollout details
    only when an established deployment contract requires them.
 5. Save the plan once outside Git: an existing issue, a PR description, or a durable native plan
    file outside the repository. Do not commit task plans or count temporary scratch files as saved
