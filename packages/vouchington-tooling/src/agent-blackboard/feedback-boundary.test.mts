@@ -118,6 +118,23 @@ it('distinguishes invalid configuration and unavailable client dependencies from
     }),
   ).rejects.toMatchObject({ diagnostic: 'archived-session' })
 })
+it('reports a missing stored identity field as null and does not re-ensure it', async () => {
+  await expect(
+    verifyFreshFeedback({
+      identity,
+      envelope: envelope(),
+      env,
+      dependencies: provider({
+        error: new Error('differs'),
+        existing: {
+          id: identity.sessionId,
+          parentSessionId: identity.parentSessionId,
+          agent: identity.agent,
+        },
+      }),
+    }),
+  ).rejects.toThrow(`version stored null, supplied ${JSON.stringify(identity.version)}`)
+})
 it('blocks hostile matching records and bounded incomplete readback without authorizing admission', async () => {
   for (const before of [
     [null, 1, {}],
