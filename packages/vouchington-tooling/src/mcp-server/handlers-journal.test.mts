@@ -159,7 +159,7 @@ describe('journal_append', () => {
     expect(textOf(conflicting)).toContain(
       'identity-conflict: agent stored "other", supplied "codex"',
     )
-    expect(textOf(conflicting)).not.toContain('version')
+    expect(textOf(conflicting)).not.toContain('version stored')
     expect(textOf(conflicting)).toContain(
       'different parent or agent, or an unusable stored version',
     )
