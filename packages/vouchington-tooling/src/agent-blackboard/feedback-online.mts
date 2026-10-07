@@ -6,12 +6,20 @@ import { normalizeRepositories, validateFeedbackEnvelope } from './feedback-code
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { isObject } from './snapshot-partition-guards.mts'
 import type { FeedbackEnvelope, FeedbackOnlineOptions, FeedbackReceipt } from './feedback-types.mts'
+function sessionInput(identity: FeedbackOnlineOptions['identity'], version = identity.version) {
+  return {
+    id: identity.sessionId,
+    parentSessionId: identity.parentSessionId,
+    agent: identity.agent,
+    version,
+  }
+}
 async function ensureSession(
   sessions: InstanceType<BlackboardClientModule['Sessions']>,
   identity: FeedbackOnlineOptions['identity'],
 ) {
   try {
-    return { ensured: await sessions.ensure(identity), storedVersion: undefined }
+    return { ensured: await sessions.ensure(sessionInput(identity)), storedVersion: undefined }
   } catch (error) {
     let existing: unknown
     try {
@@ -29,7 +37,7 @@ async function ensureSession(
     // session another writer created) delivers into the existing session under its stored version.
     if (differing.length === 1 && differing[0] === 'version' && typeof storedVersion === 'string')
       return {
-        ensured: await sessions.ensure({ ...identity, version: storedVersion }),
+        ensured: await sessions.ensure(sessionInput(identity, storedVersion)),
         storedVersion,
       }
     throw new FeedbackDeliveryError(

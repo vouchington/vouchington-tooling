@@ -57,8 +57,9 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
   const stored = options.entries ?? []
   const data: { repositories: string[] } = { repositories: [] }
   class Sessions {
-    async ensure(input: { parentSessionId: null; agent: string; version: string }) {
+    async ensure(input: { id: string; parentSessionId: null; agent: string; version: string }) {
       calls.ensure.push(input)
+      if (typeof input.id !== 'string') throw new Error('ensure requires id')
       if (
         options.conflictingSession &&
         (options.conflictingSession.parentSessionId !== input.parentSessionId ||

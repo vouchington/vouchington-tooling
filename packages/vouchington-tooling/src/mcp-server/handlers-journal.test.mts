@@ -179,7 +179,7 @@ describe('journal_append', () => {
       storedVersion: 'unknown',
       receipt: { verified: true, storedVersion: 'unknown' },
     })
-    expect(h.fake.calls.ensure.at(-1)).toMatchObject({ version: 'unknown' })
+    expect(h.fake.calls.ensure.at(-1)).toMatchObject({ id: 'native:owner', version: 'unknown' })
     expect(h.fake.calls.append).toHaveLength(1)
   })
 

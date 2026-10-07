@@ -8,7 +8,12 @@ export type BlackboardConnection = {
 }
 export type BlackboardClientModule = {
   Sessions: new (connection: BlackboardConnection) => {
-    ensure(input: unknown): Promise<{
+    ensure(input: {
+      id: string
+      parentSessionId: string | null
+      agent: string
+      version: string
+    }): Promise<{
       status: 'created' | 'exists'
       session: { data: Record<string, unknown>; archivedAt?: string | null }
     }>

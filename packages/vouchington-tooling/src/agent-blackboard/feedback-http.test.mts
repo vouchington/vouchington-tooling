@@ -83,6 +83,7 @@ async function provider(
     }
     if (options.unauthorized) return send(401, { error: 'private provider message' })
     if (request.method === 'POST' && path === '/sessions') {
+      if (typeof input.id !== 'string') return send(400, { error: 'id required' })
       if (session) return send(409, { error: 'exists' })
       session = { ...input, data: {}, archivedAt: null }
       return send(201, session)
