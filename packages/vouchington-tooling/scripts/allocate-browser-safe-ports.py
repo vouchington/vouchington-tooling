@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Must stay stdlib-only and self-contained (reads only the sibling fetch-forbidden-ports.json
+# and runner-port-policy.json): CI runs it from the extracted published tarball with no install.
+# Enforced by allocate-browser-safe-ports-no-install.test.mts.
 from __future__ import annotations
 
 import argparse
