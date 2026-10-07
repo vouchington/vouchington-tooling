@@ -68,7 +68,8 @@ export function createSourceModuleGraph(options: SourceModuleGraphOptions): Sour
       const bindings = entry.bindings.filter((imported) => {
         if (imported.typeOnly) return false
         const binding = facts.bindings.find((item) => item.id === imported.bindingId)
-        return binding?.references.some((reference) => reference.runtime && !reference.typeOnly)
+        if (!binding) throw new Error(`Missing import binding facts: ${file}`)
+        return binding.references.some((reference) => reference.runtime && !reference.typeOnly)
       })
       return bindings.length > 0 ? [{ ...entry, bindings }] : []
     })
@@ -83,19 +84,17 @@ export function createSourceModuleGraph(options: SourceModuleGraphOptions): Sour
     for (let index = 0; index < queue.length; index++) {
       const file = queue[index]
       if (!file || !fileSet.has(file) || seen.has(file)) continue
-      if (seen.size >= maxFiles) throw new Error('Source graph traversal limit exceeded')
       seen.add(file)
       const facts = factsFor(file)
       const imports = traversal.runtimeOnly ? runtimeImports(file) : facts.imports
       const specifiers = [
         ...imports.map((item) => item.specifier),
-        ...facts.exports
-          .filter((item) => item.specifier && (!traversal.runtimeOnly || !item.typeOnly))
-          .map((item) => item.specifier),
+        ...facts.exports.flatMap((item) =>
+          item.specifier && (!traversal.runtimeOnly || !item.typeOnly) ? [item.specifier] : [],
+        ),
         ...facts.loads.map((item) => item.specifier),
       ]
       for (const specifier of specifiers) {
-        if (!specifier) continue
         const resolved = resolveSourcePath(paths, file, specifier)
         if (resolved && !seen.has(resolved)) queue.push(resolved)
       }
@@ -107,6 +106,6 @@ export function createSourceModuleGraph(options: SourceModuleGraphOptions): Sour
     resolveSource: (fromFile, specifier) => resolveSourcePath(paths, fromFile, specifier),
     runtimeImports,
     reachableFrom,
-    resolveExportOwner: createExportOwnerResolver(paths, maxFiles, factsFor),
+    resolveExportOwner: createExportOwnerResolver(paths, factsFor),
   }
 }

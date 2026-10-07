@@ -28,7 +28,7 @@ export function resolveSourcePath(
     const alias = Object.keys(paths.aliases)
       .filter((prefix) => specifier.startsWith(prefix))
       .sort((a, b) => b.length - a.length)[0]
-    if (alias) target = posix.join(paths.aliases[alias] ?? '', specifier.slice(alias.length))
+    if (alias) target = posix.join(paths.aliases[alias]!, specifier.slice(alias.length))
   }
   if (!target) return null
   const base = relativeFile(paths.root, target)
