@@ -1,3 +1,4 @@
+import { feedbackOutboxCounts } from './feedback-outbox-counts.mts'
 import { feedbackDeadline } from './feedback-deadline.mts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -212,7 +213,7 @@ it('exposes failed outbox replay and removes a delivered interactive record only
   })
   expect(result).toMatchObject({ status: 'delivered', pendingCount: 0 })
 })
-it('retains unsent records but hard-fails permanent event and archive conflicts', async () => {
+it('moves permanently rejected event and archive conflicts out of the pending set', async () => {
   for (const options of [
     { archived: true },
     {
@@ -233,7 +234,11 @@ it('retains unsent records but hard-fails permanent event and archive conflicts'
     ).rejects.toMatchObject({
       diagnostic: options.archived ? 'archived-session' : 'event-conflict',
     })
-    expect(feedbackOutboxStatus(path)).toEqual({ status: 'pending', pendingCount: 1 })
+    expect(feedbackOutboxStatus(path)).toEqual({ status: 'empty', pendingCount: 0 })
+    expect(feedbackOutboxCounts(path, identity.sessionId)).toMatchObject({
+      pendingCount: 0,
+      rejectedCount: 1,
+    })
   }
 })
 it('keeps ensure failures classified as outages when fetched metadata does not establish a conflict', async () => {

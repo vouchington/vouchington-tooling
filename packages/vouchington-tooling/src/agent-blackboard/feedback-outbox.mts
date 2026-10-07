@@ -21,19 +21,19 @@ import type { FeedbackOutboxRecord, FeedbackOutboxStatus } from './feedback-type
 const FEEDBACK_OUTBOX_MAX_RECORDS = 128
 const FEEDBACK_OUTBOX_MAX_BYTES = 2_000_000
 const RECORD_MAX_BYTES = 18_000
-function outboxDirectory(directory: string, create: boolean): string {
+export function outboxDirectory(directory: string, create: boolean): string {
   if (typeof directory !== 'string' || directory.length > 4096 || !isAbsolute(directory))
     throw new Error('feedback outbox requires an absolute directory')
   const path = resolve(directory)
   ensureOutboxDirectory(path, create)
   return path
 }
-function filename(record: FeedbackOutboxRecord): string {
+export function filename(record: FeedbackOutboxRecord): string {
   return `${createHash('sha256')
     .update(JSON.stringify([record.identity.sessionId, record.envelope.sourceEventId]))
     .digest('hex')}.json`
 }
-function readRecord(path: string): { record: FeedbackOutboxRecord; bytes: number } {
+export function readRecord(path: string): { record: FeedbackOutboxRecord; bytes: number } {
   const descriptor = openLogFile(path, constants.O_RDONLY)
   try {
     const status = fstatSync(descriptor)
@@ -52,11 +52,11 @@ function readRecord(path: string): { record: FeedbackOutboxRecord; bytes: number
     closeSync(descriptor)
   }
 }
-function records(
+export function records(
   directory: string,
 ): Array<{ record: FeedbackOutboxRecord; bytes: number; path: string }> {
   const paths = readdirSync(directory).filter(
-    (name) => name !== '.records.lock' && name !== '.records.lock.reap',
+    (name) => !name.endsWith('.rejected') && !name.startsWith('.records.lock'),
   )
   if (paths.length > FEEDBACK_OUTBOX_MAX_RECORDS)
     throw new Error('feedback outbox capacity exceeded; unsent records retained')
@@ -73,7 +73,7 @@ function records(
     throw new Error('feedback outbox byte capacity exceeded; unsent records retained')
   return result
 }
-function syncDirectory(directory: string): void {
+export function syncDirectory(directory: string): void {
   const descriptor = openSync(directory, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     fsyncSync(descriptor)

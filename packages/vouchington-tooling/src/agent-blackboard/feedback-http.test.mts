@@ -329,15 +329,10 @@ it('classifies actual SDK identity mismatches as hard conflicts while retaining 
     }),
   ).rejects.toMatchObject({ status: 'blocked', diagnostic: 'identity-conflict' })
   expect(service.appends).toBe(0)
-  expect(feedbackOutboxStatus(path)).toEqual({ status: 'pending', pendingCount: 1 })
+  expect(feedbackOutboxStatus(path)).toEqual({ status: 'empty', pendingCount: 0 })
   await expect(
     flushFeedbackOutbox({ directory: path, env: service.env, dependencies }),
-  ).resolves.toMatchObject({
-    status: 'pending',
-    pendingCount: 1,
-    deliveredCount: 0,
-    diagnostic: 'identity-conflict',
-  })
+  ).resolves.toEqual({ status: 'empty', pendingCount: 0, deliveredCount: 0 })
 })
 
 it('delivers journal defaults and replays through the consumer context with default credentials', async () => {
@@ -410,12 +405,12 @@ it('replays healthy records behind a permanent conflicting record while preservi
   })
   const result = await flushFeedbackOutbox({ directory: path, env: service.env, dependencies })
   expect(result).toMatchObject({
-    status: 'pending',
-    pendingCount: 1,
+    status: 'empty',
+    pendingCount: 0,
     deliveredCount: 1,
-    diagnostic: 'event-conflict',
+    rejected: [{ sourceEventId: records[0]!.envelope.sourceEventId, diagnostic: 'event-conflict' }],
   })
-  expect(listFeedbackOutbox(path)).toEqual([records[0]])
+  expect(listFeedbackOutbox(path)).toEqual([])
   expect(
     service.entries.some(
       (entry) => JSON.stringify(entry.data) === JSON.stringify(records[1]!.envelope),

@@ -32,12 +32,16 @@ describe('outbox_status and outbox_flush', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
     })
     expect(jsonOf(await h.call('outbox_flush', { sessionId: 'x' }))).toEqual({
       sessionId: 'x',
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
       deliveredCount: 0,
     })
     expect(existsSync(outboxPath(fixture().main))).toBe(false)
@@ -59,6 +63,8 @@ describe('outbox_status and outbox_flush', () => {
       status: 'pending',
       pendingCount: 2,
       worktreePendingCount: 3,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
     })
     expect(await status('native:other')).toMatchObject({ pendingCount: 1, worktreePendingCount: 3 })
     expect(await status('x')).toEqual({
@@ -66,6 +72,8 @@ describe('outbox_status and outbox_flush', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 3,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
     })
   })
 
@@ -87,6 +95,8 @@ describe('outbox_status and outbox_flush', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
       deliveredCount: 1,
     })
     expect(online.fake.calls.append).toHaveLength(1)
@@ -105,12 +115,14 @@ describe('outbox_status and outbox_flush', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
       deliveredCount: 3,
     })
     expect(online.fake.calls.append).toHaveLength(3)
   })
 
-  it('leaves a stuck record counted against its own session only', async () => {
+  it('moves a permanently conflicting record to the rejected area of its own session', async () => {
     const offline = harness(fixture(), { env: {} })
     await retainRecords(offline)
     // The remote already holds the owner's journal:1 with different content, so that one record
@@ -133,11 +145,19 @@ describe('outbox_status and outbox_flush', () => {
     expect(byOther).toMatchObject({
       status: 'empty',
       pendingCount: 0,
-      worktreePendingCount: 1,
+      worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 1,
       deliveredCount: 2,
-      diagnostic: 'event-conflict',
+      rejected: [{ sourceEventId: 'journal:1', diagnostic: 'event-conflict' }],
     })
     const byOwner = jsonOf(await online.call('outbox_status', { sessionId: 'native:owner' }))
-    expect(byOwner).toMatchObject({ status: 'pending', pendingCount: 1, worktreePendingCount: 1 })
+    expect(byOwner).toMatchObject({
+      status: 'empty',
+      pendingCount: 0,
+      worktreePendingCount: 0,
+      rejectedCount: 1,
+      worktreeRejectedCount: 1,
+    })
   })
 })

@@ -29,6 +29,10 @@ Every call takes an exact `sessionId`, never inferred, whose meaning depends on 
   worktree, so `outbox_status` and `outbox_flush` report two counts: `pendingCount` is the unsent
   records of that `sessionId`, and `worktreePendingCount` is the unsent records of every session in
   the worktree outbox. `outbox_flush` delivers every retained record in the worktree.
+  A permanently rejected record (`identity-conflict`, `event-conflict`, `archived-session`) is moved out
+  of the pending set, not retained: `rejectedCount` and `worktreeRejectedCount` count the kept copies,
+  `outbox_flush` reports them as `rejected` (`sourceEventId` and `diagnostic`), and a corrected retry
+  with the same `sourceEventId` is accepted.
 
 Every call may take `worktree`, the absolute path of a worktree of the current repository (the
 launch worktree by default). Writing or retrying an entry needs no provider skill, temporary file,

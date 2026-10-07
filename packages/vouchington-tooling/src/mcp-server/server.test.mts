@@ -98,6 +98,8 @@ describe('in-process client and server round trip', () => {
       status: 'empty',
       pendingCount: 0,
       worktreePendingCount: 0,
+      rejectedCount: 0,
+      worktreeRejectedCount: 0,
     })
   })
 
