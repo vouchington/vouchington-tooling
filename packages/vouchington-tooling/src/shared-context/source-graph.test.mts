@@ -24,6 +24,7 @@ describe('source module graph', () => {
     'web/components/other.ts',
     'web/components/ambiguous.ts',
     'web/components/uncertain.ts',
+    'web/components/alias.ts',
     'web/components/dep.ts',
     'web/components/dep.mts',
     'web/components/dep.cts',
@@ -73,6 +74,7 @@ describe('source module graph', () => {
         export * from './button'
         export * from 'external-package'
       `,
+      'web/components/alias.ts': `export { A as B } from './alias'`,
       'web/components/dep.ts': `export const Dep = 1`,
       'web/components/dep.mts': `export const DepM = 1`,
       'web/components/dep.cts': `export const DepC = 1`,
@@ -192,6 +194,14 @@ describe('source module graph', () => {
       'Incomplete source module facts',
     )
     expect(() => graph({ maxFiles: files.length - 1 })).toThrow('Source graph file limit exceeded')
+    const aliasFile = 'web/components/alias.ts'
+    const aliasFacts = facts.modules.filter((module) => module.fileName.endsWith(aliasFile))
+    expect(() =>
+      graph({ files: [aliasFile], facts: { modules: aliasFacts }, maxFiles: 1 }).resolveExportOwner(
+        aliasFile,
+        'B',
+      ),
+    ).toThrow('Source graph file limit exceeded')
     expect(() => graph({ files: ['../outside.ts'] })).toThrow('Source graph file escapes root')
     expect(() => graph({ facts: { modules: [facts.modules[0]!, facts.modules[0]!] } })).toThrow(
       'Unexpected source module facts',

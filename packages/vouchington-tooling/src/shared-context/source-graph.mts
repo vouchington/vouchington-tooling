@@ -107,6 +107,6 @@ export function createSourceModuleGraph(options: SourceModuleGraphOptions): Sour
     resolveSource: (fromFile, specifier) => resolveSourcePath(paths, fromFile, specifier),
     runtimeImports,
     reachableFrom,
-    resolveExportOwner: createExportOwnerResolver(paths, factsFor),
+    resolveExportOwner: createExportOwnerResolver(paths, factsFor, maxFiles),
   }
 }

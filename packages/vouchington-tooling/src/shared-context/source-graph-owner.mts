@@ -5,6 +5,7 @@ import type { SourceExportOwner } from './source-graph.mts'
 export function createExportOwnerResolver(
   paths: SourceGraphPaths,
   factsFor: (file: string) => TypeScriptModuleFacts,
+  maxFiles: number,
 ): (file: string, exportName: string) => SourceExportOwner | null {
   return (file, exportName) => {
     const start = relativeFile(paths.root, file)
@@ -18,6 +19,7 @@ export function createExportOwnerResolver(
       const key = `${current.file}\0${current.exportName}`
       if (seen.has(key)) continue
       seen.add(key)
+      if (seen.size > maxFiles) throw new Error('Source graph file limit exceeded')
       const facts = factsFor(current.file)
       const direct = facts.exports.filter(
         (item) => !item.typeOnly && item.exported === current.exportName,
