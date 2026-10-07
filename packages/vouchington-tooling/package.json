@@ -136,6 +136,11 @@
       "import": "./dist/shared-context/index.mjs",
       "default": "./dist/shared-context/index.mjs"
     },
+    "./source-module-graph": {
+      "types": "./dist/source-module-graph/index.d.mts",
+      "import": "./dist/source-module-graph/index.mjs",
+      "default": "./dist/source-module-graph/index.mjs"
+    },
     "./gha-selected-files": {
       "types": "./dist/gha-selected-files/index.d.mts",
       "import": "./dist/gha-selected-files/index.mjs",

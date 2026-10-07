@@ -7,12 +7,6 @@ const execFileAsync = promisify(execFile)
 
 export { clearFakeGitEnv, installFakeGit, setFakeGitTrackedFiles } from './fake-git.mts'
 export type { FakeGitOptions } from './fake-git.mts'
-export { createSourceModuleGraph } from './source-graph.mts'
-export type {
-  SourceExportOwner,
-  SourceModuleGraph,
-  SourceModuleGraphOptions,
-} from './source-graph.mts'
 
 export function gitEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(

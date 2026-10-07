@@ -213,10 +213,10 @@ import { prepareVitestReports } from 'vouchington-tooling/vitest-reports'
 import { runInstallLifecycle, validateReleaseAgePolicy } from 'vouchington-tooling/pnpm-install'
 import {
   buildSharedContext,
-  createSourceModuleGraph,
   installFakeGit,
   runNamedChecks,
 } from 'vouchington-tooling/shared-context'
+import { createSourceModuleGraph } from 'vouchington-tooling/source-module-graph'
 import {
   decodeSelectedFiles,
   writeSelectedFilesOutput,
@@ -660,13 +660,14 @@ See the [API contract](docs/basic-auth-doc-sync.md).
 
 ## TypeScript source graph
 
-`createSourceModuleGraph` accepts the `modules` report from released no-mistakes
+`vouchington-tooling/source-module-graph` exports `createSourceModuleGraph`. It accepts the
+`modules` report from released no-mistakes
 `analyzeTypeScriptModules({ root, files })`, plus the caller's root, ordered source extensions,
 aliases, and file inventory. It resolves local imports and reexport owners without reading or
 parsing source again. `runtimeImports(file)` uses binding references rather than declaration
 presence, and `reachableFrom(entrypoints, { runtimeOnly: true })` follows used runtime imports,
 reexports, and literal dynamic/require loads. Missing or incomplete facts for a reached file
-throw; external specifiers resolve to `null`. The default inventory/traversal limit is 10,000
+throw; external specifiers resolve to `null`. The default file inventory limit is 10,000
 files and can be reduced with `maxFiles`.
 
 ## SQL view declarations

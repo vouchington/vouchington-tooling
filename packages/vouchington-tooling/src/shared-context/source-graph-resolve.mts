@@ -21,9 +21,11 @@ export function resolveSourcePath(
   fromFile: string,
   specifier: string,
 ): string | null {
+  const normalizedFrom = relativeFile(paths.root, fromFile)
+  if (!normalizedFrom || !paths.files.has(normalizedFrom)) return null
   let target: string | null = null
   if (specifier.startsWith('.')) {
-    target = posix.join(posix.dirname(fromFile), specifier)
+    target = posix.join(posix.dirname(normalizedFrom), specifier)
   } else {
     const alias = Object.keys(paths.aliases)
       .filter((prefix) => specifier.startsWith(prefix))
@@ -33,6 +35,22 @@ export function resolveSourcePath(
   if (!target) return null
   const base = relativeFile(paths.root, target)
   if (!base) return null
+  const runtimeExtension = posix.extname(base)
+  const mappedExtensions: Readonly<Record<string, readonly string[]>> = {
+    '.js': ['.ts', '.tsx'],
+    '.jsx': ['.tsx'],
+    '.mjs': ['.mts'],
+    '.cjs': ['.cts'],
+  }
+  const mapped = mappedExtensions[runtimeExtension]
+  if (mapped) {
+    const stem = base.slice(0, -runtimeExtension.length)
+    for (const suffix of paths.extensions) {
+      if (!mapped.includes(suffix)) continue
+      const candidate = `${stem}${suffix}`
+      if (paths.files.has(candidate)) return candidate
+    }
+  }
   for (const suffix of paths.extensions) {
     const candidate = `${base}${suffix}`
     if (paths.files.has(candidate)) return candidate

@@ -55,7 +55,8 @@ export function createSourceModuleGraph(options: SourceModuleGraphOptions): Sour
   }
 
   function factsFor(file: string): TypeScriptModuleFacts {
-    const facts = modules.get(file)
+    const normalized = relativeFile(root, file)
+    const facts = normalized && fileSet.has(normalized) ? modules.get(normalized) : undefined
     if (!facts || !facts.complete) throw new Error(`Incomplete source module facts: ${file}`)
     return facts
   }

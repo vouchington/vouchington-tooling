@@ -12,6 +12,7 @@ export function createExportOwnerResolver(
     const queue = [{ file: start, exportName }]
     const seen = new Set<string>()
     const owners = new Map<string, SourceExportOwner>()
+    let unresolved = false
     for (let index = 0; index < queue.length; index++) {
       const current = queue[index]!
       const key = `${current.file}\0${current.exportName}`
@@ -32,9 +33,12 @@ export function createExportOwnerResolver(
       for (const item of matches) {
         if (item.specifier) {
           const target = resolveSourcePath(paths, current.file, item.specifier)
-          if (target && item.local === '*' && item.exported !== '*') {
+          if (!target) {
+            unresolved = true
+          } else if (item.local === '*' && item.exported !== '*') {
+            factsFor(target)
             owners.set(`${target}\0*`, { file: target, exportName: '*' })
-          } else if (target) {
+          } else {
             queue.push({
               file: target,
               exportName: item.local === '*' ? current.exportName : item.local,
@@ -49,13 +53,20 @@ export function createExportOwnerResolver(
         )[0]
         if (imported) {
           const target = resolveSourcePath(paths, current.file, imported.entry.specifier)
-          if (target) queue.push({ file: target, exportName: imported.binding.imported })
+          if (!target) {
+            unresolved = true
+          } else if (imported.binding.kind === 'namespace') {
+            factsFor(target)
+            owners.set(`${target}\0*`, { file: target, exportName: '*' })
+          } else {
+            queue.push({ file: target, exportName: imported.binding.imported })
+          }
           continue
         }
         const owner = { file: current.file, exportName: item.exported }
         owners.set(`${owner.file}\0${owner.exportName}`, owner)
       }
     }
-    return owners.size === 1 ? [...owners.values()][0]! : null
+    return !unresolved && owners.size === 1 ? [...owners.values()][0]! : null
   }
 }
