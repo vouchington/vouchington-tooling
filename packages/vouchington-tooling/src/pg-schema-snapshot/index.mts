@@ -28,6 +28,8 @@ export type {
 export { generateSchemaSnapshot, stableStringify, writeSchemaSnapshot } from './generate.mts'
 export { detectRenamedIndexes, indexShapeKey } from './index-rename-detect.mts'
 export type { RenamedIndex, SchemaIndexRenameSnapshot } from './index-rename-detect.mts'
+export { createPostgresReplayContext } from './replay-context.mts'
+export type { GeneratedColumnReferences, PostgresReplayContext } from './replay-context.mts'
 export { renderSchemaMarkdown } from './render-markdown.mts'
 export type { SchemaMarkdownFiles } from './render-markdown.mts'
 export { renderTableDocument } from './render-tables.mts'
