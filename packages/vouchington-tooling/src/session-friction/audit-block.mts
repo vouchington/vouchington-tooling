@@ -1,11 +1,11 @@
 import type { JournalEntry } from './types.mts'
-import { fitFields, type AuditRender } from './audit-fit.mts'
+import { byteLength, fitFields, selectWithin, type AuditRender } from './audit-fit.mts'
 import { isWellFormedUnicode, markdownAuditUnits, type AuditRedactor } from './text.mts'
 
 const BLANK = /^\s*$/
-// Total escaped bytes one report section may add, so the composed retrospective stays well under
-// its 12,000-byte limit; each block gets an equal share once the blocks together exceed it.
-const MIN_BLOCK_BYTES = 400
+// Below this a block would keep little beyond its field names, so it is omitted (and counted)
+// instead. This only ever drops groups; it never lets the section exceed its budget.
+const MIN_BLOCK_SHARE_BYTES = 300
 
 function parseField(
   line: string,
@@ -40,44 +40,48 @@ export function matchAuditBlock(
   markdown: string,
   patterns: readonly RegExp[],
   prefixes: readonly string[],
-  render: AuditRender = {},
+  render: AuditRender & { shrinkOrder: readonly number[] },
 ): string | null {
   const fields = matchLines(markdown, patterns)
   if (!fields) return null
   const parsed = fields.map((field) => parseField(field, prefixes, render.redact))
   const safe = parsed.filter((field) => field !== null)
   if (safe.length !== parsed.length) return null
-  const overhead = safe.reduce(
-    (sum, { prefix }) => sum + Buffer.byteLength(prefix),
-    safe.length - 1,
-  )
+  const overhead = safe.reduce((sum, { prefix }) => sum + byteLength(prefix), safe.length - 1)
   const contents = fitFields(
     safe.map(({ units }) => units),
     overhead,
     render.budgetBytes ?? Infinity,
+    render.shrinkOrder,
   )
   return safe.map(({ prefix }, index) => `${prefix}${contents[index]}`).join('\n')
 }
 
 /**
- * Matches every journal block whole; when together they exceed `totalBudgetBytes`, re-renders each
- * within an equal share (never below a minimum) so the section cannot overflow the report limit.
+ * Matches every journal block whole while together they fit `totalBudgetBytes`. Otherwise it keeps
+ * the leading blocks that fit an equal share of the total and appends `omission(count)` — itself a
+ * conforming block — so dropped groups are always reported, never silent.
  */
 export function conformingBlocks(
   entries: Iterable<JournalEntry>,
   match: (markdown: string, render: AuditRender) => string | null,
   totalBudgetBytes: number,
-  redact?: AuditRedactor,
+  redact: AuditRedactor | undefined,
+  omission: (count: number) => string,
 ): string[] {
-  const markdowns = [...entries].flatMap((entry) => {
-    const data = (entry as JournalEntry | null)?.data
-    return data?.type === 'journal' && typeof data.markdown === 'string' ? [data.markdown] : []
-  })
-  const render = (budgetBytes: number): string[] =>
-    markdowns
-      .map((markdown) => match(markdown, { redact, budgetBytes }))
-      .filter((block): block is string => block !== null)
-  const blocks = render(Infinity)
-  if (Buffer.byteLength(blocks.join('\n\n')) <= totalBudgetBytes) return blocks
-  return render(Math.max(MIN_BLOCK_BYTES, Math.floor(totalBudgetBytes / blocks.length)))
+  const markdowns = [...entries]
+    .flatMap((entry) => {
+      const data = (entry as JournalEntry | null)?.data
+      return data?.type === 'journal' && typeof data.markdown === 'string' ? [data.markdown] : []
+    })
+    .filter((markdown) => match(markdown, { redact }) !== null)
+  const { rendered, omitted } = selectWithin(
+    markdowns,
+    totalBudgetBytes,
+    byteLength(omission(markdowns.length)) + 2,
+    2,
+    MIN_BLOCK_SHARE_BYTES,
+    (markdown, budgetBytes) => match(markdown, { redact, budgetBytes })!,
+  )
+  return omitted ? [...rendered, omission(omitted)] : rendered
 }

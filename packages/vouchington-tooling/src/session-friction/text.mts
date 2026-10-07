@@ -52,6 +52,33 @@ export function markdownAuditUnits(value: string, redact?: AuditRedactor): strin
   )
 }
 
-export function markdownAuditText(value: string, redact?: AuditRedactor): string {
-  return markdownAuditUnits(value, redact).join('')
+const CUT_MARKER = '…'
+const WHITESPACE = /^\s$/u
+
+/**
+ * Joins escaped units whole, or, when over `maxBytes`, keeps only complete whitespace-separated
+ * tokens (so URLs and SHAs are never split) and marks the cut. Never ends in whitespace.
+ */
+export function fitUnits(units: string[], maxBytes: number, atTokens = true): string {
+  const whole = units.join('')
+  if (Buffer.byteLength(whole) <= maxBytes) return whole
+  const room = maxBytes - Buffer.byteLength(` ${CUT_MARKER}`)
+  let used = 0
+  let boundary = 0
+  for (const [index, unit] of units.entries()) {
+    used += Buffer.byteLength(unit)
+    if (used > room) break
+    if (!atTokens || WHITESPACE.test(unit)) boundary = atTokens ? index : index + 1
+  }
+  const kept = units.slice(0, boundary).join('').trimEnd()
+  return kept ? `${kept}${atTokens ? ' ' : ''}${CUT_MARKER}` : CUT_MARKER
+}
+
+export function markdownAuditText(
+  value: string,
+  redact?: AuditRedactor,
+  maxBytes = Infinity,
+): string {
+  // Used for identifiers, which have no token boundaries to cut at.
+  return fitUnits(markdownAuditUnits(value, redact), maxBytes, false)
 }

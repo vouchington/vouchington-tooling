@@ -38,4 +38,44 @@ describe('CI failure block composition', () => {
     expect(evidenceLine).toContain(RUN_URL.replaceAll('_', '\\_'))
     expect(evidenceLine).toContain('no\\-mistakes impact: none')
   })
+
+  const entry = (markdown: string) => [{ data: { type: 'journal', markdown } }]
+  const block = (evidenceWords: number): string =>
+    [
+      '- `one-off` — `GitHub Actions` — merge job timed out',
+      `  - Evidence: ${RUN_URL} at commit ${SHA} ${'word '.repeat(evidenceWords)}end`,
+      `  - Root diagnostic: ${'starved '.repeat(400)}end`,
+      '  - Disposition: reran',
+    ].join('\n')
+
+  it('cuts Root diagnostic before Evidence when a block must shrink', () => {
+    const [group] = getConformingGroups(entry(block(20)), undefined, 700)
+    const lines = group!.split('\n')
+    expect(lines[1]).toContain(`${RUN_URL} at commit ${SHA} ${'word '.repeat(20)}end`)
+    expect(lines[2]).toMatch(/^ {2}- Root diagnostic: (starved )+…$/)
+    expect(Buffer.byteLength(group!)).toBeLessThanOrEqual(700)
+  })
+
+  it('cuts Evidence only at token boundaries, never inside a URL or SHA', () => {
+    const [group] = getConformingGroups(entry(block(200)), undefined, 700)
+    const lines = group!.split('\n')
+    expect(lines[1]).toMatch(new RegExp(`^ {2}- Evidence: ${RUN_URL} at commit ${SHA} (word )+…$`))
+    for (const line of lines) expect(line).toBe(line.trimEnd())
+  })
+
+  it('reports omission as a conforming group and never falls back to none observed', () => {
+    const groups = getConformingGroups([...entry(block(5)), ...entry(block(5))], undefined, 100)
+    expect(groups).toHaveLength(1)
+    const lines = groups[0]!.split('\n')
+    expect(lines[0]).toMatch(FAILURE_GROUP_HEADER)
+    expect(lines[0]).toContain(
+      '2 further failure groups omitted to fit the size limit; see journal',
+    )
+    const section = buildCiFailuresSection(
+      'session',
+      { status: 'ok', markdownBlocks: groups, truncated: false },
+      'events',
+    )
+    expect(section).toContain('Status: failures observed')
+  })
 })
