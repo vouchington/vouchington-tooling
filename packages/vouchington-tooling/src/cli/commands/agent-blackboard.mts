@@ -158,9 +158,8 @@ async function runJournal(args: string[]): Promise<number> {
         ? { pendingCount: 0, worktreePendingCount: 0 }
         : pendingCounts(required(values, 'outbox-directory'), required(values, 'session-id'))
     const storedVersion = result.status === 'delivered' ? result.receipt.storedVersion : undefined
-    process.stdout.write(
-      `${JSON.stringify({ ...result, ...(storedVersion === undefined ? {} : { storedVersion }), ...counts })}\n`,
-    )
+    // JSON.stringify drops an undefined `storedVersion`.
+    process.stdout.write(`${JSON.stringify({ ...result, storedVersion, ...counts })}\n`)
     return 0
   }
   throw new Error('usage: agent-blackboard journal append|entries|flush|status')
