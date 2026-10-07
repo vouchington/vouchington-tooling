@@ -203,6 +203,8 @@ describe('source module graph', () => {
       ),
     ).toThrow('Source graph file limit exceeded')
     expect(() => graph({ files: ['../outside.ts'] })).toThrow('Source graph file escapes root')
+    expect(() => graph({ files: ['D:\\outside.ts'] })).toThrow('Source graph file escapes root')
+    expect(() => graph({ files: ['D:outside.ts'] })).toThrow('Source graph file escapes root')
     expect(() => graph({ facts: { modules: [facts.modules[0]!, facts.modules[0]!] } })).toThrow(
       'Unexpected source module facts',
     )

@@ -1,5 +1,4 @@
-import { isAbsolute, relative } from 'node:path'
-import { posix } from 'node:path'
+import { isAbsolute, posix, relative, win32 } from 'node:path'
 
 export type SourceGraphPaths = {
   root: string
@@ -10,6 +9,7 @@ export type SourceGraphPaths = {
 
 export function relativeFile(root: string, file: string): string | null {
   const value = isAbsolute(file) ? relative(root, file) : file
+  if (win32.isAbsolute(value) || /^[A-Za-z]:/u.test(value)) return null
   const normalized = posix.normalize(value.replaceAll('\\', '/'))
   return normalized === '..' || normalized.startsWith('../') || posix.isAbsolute(normalized)
     ? null
