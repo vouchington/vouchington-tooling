@@ -1,6 +1,6 @@
 import { eventLimit, readFrictionLog, requireDirectory } from './log.mts'
 import { buildCiFailuresSection, getConformingGroups, incompleteCiSection } from './ci-failures.mts'
-import { errorMessage, scanJournal } from './journal.mts'
+import { errorMessage, scanJournal, type JournalScan } from './journal.mts'
 import { buildSandboxSection } from './sandbox.mts'
 import { validateSessionId } from './session-id.mts'
 import type {
@@ -8,6 +8,10 @@ import type {
   SessionFrictionReport,
   SessionFrictionReportOptions,
 } from './types.mts'
+
+type FrictionRead = { result: FrictionLogReadResult } | { error: unknown }
+/** Everything a report reads from outside, loaded once so rendering can be repeated for free. */
+export type FrictionReportInputs = { scanned: JournalScan; read: FrictionRead }
 
 type ReportJournal =
   | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
@@ -29,9 +33,10 @@ function reportFromLog(
   sessionId: string,
   logOptions: SessionFrictionReportOptions,
   journal: ReportJournal,
+  read: FrictionRead,
 ): SessionFrictionReport {
-  try {
-    const friction = readFrictionLog(sessionId, logOptions)
+  if ('result' in read) {
+    const friction = read.result
     const coverage = {
       journalStatus:
         journal.status === 'unreachable'
@@ -53,7 +58,7 @@ function reportFromLog(
       }
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
     return { coverage, markdown: `${markdown}\n\n${sandboxMarkdown(friction, logOptions)}` }
-  } catch (error) {
+  } else {
     const ciMarkdown =
       journal.status === 'ok' && journal.truncated
         ? incompleteCiSection(journal.markdownBlocks)
@@ -72,19 +77,31 @@ function reportFromLog(
         truncated: true,
       },
       markdown: `${ciMarkdown}\n\n## Sandbox & Permission Audit\nStatus: unavailable (friction log unreadable)`,
-      diagnostic: errorMessage(error),
+      diagnostic: errorMessage(read.error),
     }
   }
 }
 
-export async function buildSessionFrictionReport(
+export async function loadFrictionReportInputs(
   sessionId: string,
   options: SessionFrictionReportOptions,
-): Promise<SessionFrictionReport> {
+): Promise<FrictionReportInputs> {
   validateSessionId(sessionId)
   requireDirectory(options.directory)
   eventLimit(options.maxEvents)
   const scanned = await scanJournal(sessionId, options.journalLoader)
+  try {
+    return { scanned, read: { result: readFrictionLog(sessionId, options) } }
+  } catch (error) {
+    return { scanned, read: { error } }
+  }
+}
+
+export function renderFrictionReport(
+  sessionId: string,
+  options: SessionFrictionReportOptions,
+  { scanned, read }: FrictionReportInputs,
+): SessionFrictionReport {
   const journal: ReportJournal =
     scanned.status === 'unreachable'
       ? scanned
@@ -99,7 +116,7 @@ export async function buildSessionFrictionReport(
             ),
             truncated: scanned.truncated,
           }
-  const report = reportFromLog(sessionId, options, journal)
+  const report = reportFromLog(sessionId, options, journal, read)
   if (journal.status === 'unreachable') {
     const diagnostic = report.diagnostic
       ? `${journal.diagnostic}; ${report.diagnostic}`
@@ -107,4 +124,15 @@ export async function buildSessionFrictionReport(
     return { ...report, diagnostic }
   }
   return report
+}
+
+export async function buildSessionFrictionReport(
+  sessionId: string,
+  options: SessionFrictionReportOptions,
+): Promise<SessionFrictionReport> {
+  return renderFrictionReport(
+    sessionId,
+    options,
+    await loadFrictionReportInputs(sessionId, options),
+  )
 }

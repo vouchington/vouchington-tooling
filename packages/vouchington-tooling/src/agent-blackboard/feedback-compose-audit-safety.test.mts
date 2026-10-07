@@ -161,6 +161,27 @@ describe('audit size fitting', () => {
       expect(Array.from({ length: 20 }, (_, n) => sha(n))).toContain(hash)
   })
 
+  it('loads the journal once, even single-use, however many fitting attempts it takes', async () => {
+    let calls = 0
+    const blocks = Array.from({ length: 20 }, (_, index) => ciBlock(index))
+    async function* entriesOnce(): AsyncGenerator<JournalEntry> {
+      yield* entries(...blocks)
+    }
+    const markdown = await compose([], {
+      narrative: 'n'.repeat(7_500),
+      journal: {
+        journalLoader: () => {
+          calls++
+          return { status: 'ok', entries: entriesOnce() }
+        },
+      },
+    })
+    expectLimits(markdown)
+    expect(calls).toBe(1)
+    expect(ciGroups(markdown).length).toBeGreaterThan(1)
+    expect(markdown).toContain('further failure groups omitted')
+  })
+
   it('reports omitted sandbox events when 100 long events overflow', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'feedback-fit-events-'))
     directories.push(directory)

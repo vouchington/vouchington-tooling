@@ -10,7 +10,8 @@ import type { SessionFrictionReportOptions } from '../session-friction/index.mts
 import {
   assertSingleAuditSource,
   auditAssessed,
-  buildAuditReport,
+  loadAuditInputs,
+  renderAuditReport,
   completeCoverageError,
   type AuditReport,
 } from './feedback-audit-source.mts'
@@ -155,11 +156,12 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
   })
   // The audit sections are the only unbounded ones: render them, measure the real envelope against
   // its limits, and shrink the audit caps by the measured overflow until it fits.
+  const loaded = await loadAuditInputs(input.sessionId, input)
   let caps = UNBOUNDED_CAPS
   let audit: AuditReport
   let markdown: string
   for (let attempt = 1; ; attempt++) {
-    audit = await buildAuditReport(input.sessionId, boundedAuditSource(input, caps))
+    audit = renderAuditReport(input.sessionId, boundedAuditSource(input, caps), loaded)
     markdown = assemble(audit.markdown)
     const overflow = feedbackOverflowBytes(envelopeFor(markdown))
     if (!overflow || attempt === AUDIT_ATTEMPTS) break
