@@ -41,8 +41,9 @@ function matchBlock(markdown: string, render: AuditRender): string | null {
 export function getConformingSandboxBlocks(
   entries: Iterable<JournalEntry>,
   redact?: AuditRedactor,
+  maxBytes = SANDBOX_BLOCKS_MAX_BYTES,
 ): string[] {
-  return conformingBlocks(entries, matchBlock, SANDBOX_BLOCKS_MAX_BYTES, redact)
+  return conformingBlocks(entries, matchBlock, Math.min(maxBytes, SANDBOX_BLOCKS_MAX_BYTES), redact)
 }
 
 export function unavailableSandboxSection(reason: string, blocks: string[] = []): string {

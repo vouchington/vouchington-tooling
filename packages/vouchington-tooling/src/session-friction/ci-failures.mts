@@ -41,8 +41,9 @@ export function isConformingCiFailureBlock(markdown: string): boolean {
 export function getConformingGroups(
   entries: Iterable<JournalEntry>,
   redact?: AuditRedactor,
+  maxBytes = CI_SECTION_MAX_BYTES,
 ): string[] {
-  return conformingBlocks(entries, matchBlock, CI_SECTION_MAX_BYTES, redact)
+  return conformingBlocks(entries, matchBlock, Math.min(maxBytes, CI_SECTION_MAX_BYTES), redact)
 }
 
 export function incompleteCiSection(markdownBlocks: string[]): string {

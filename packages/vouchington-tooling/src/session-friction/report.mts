@@ -3,9 +3,7 @@ import { buildCiFailuresSection, getConformingGroups, incompleteCiSection } from
 import { errorMessage, scanJournal } from './journal.mts'
 import { buildSandboxSection } from './sandbox.mts'
 import { validateSessionId } from './session-id.mts'
-import type { AuditRedactor } from './text.mts'
 import type {
-  FrictionLogOptions,
   FrictionLogReadResult,
   SessionFrictionReport,
   SessionFrictionReportOptions,
@@ -15,9 +13,12 @@ type ReportJournal =
   | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
   | { status: 'unreachable'; diagnostic: string }
 
-function sandboxMarkdown(friction: FrictionLogReadResult, redact?: AuditRedactor): string {
+function sandboxMarkdown(
+  friction: FrictionLogReadResult,
+  options: SessionFrictionReportOptions,
+): string {
   if (friction.status === 'events')
-    return `${friction.truncated ? `## Capture Coverage\nStatus: partial\nDropped records: ${friction.droppedCount}\n\n` : ''}${buildSandboxSection(friction.events, redact)}`
+    return `${friction.truncated ? `## Capture Coverage\nStatus: partial\nDropped records: ${friction.droppedCount}\n\n` : ''}${buildSandboxSection(friction.events, options.redact, options.budgets?.sandboxBytes)}`
   if (friction.status === 'empty' && friction.truncated)
     return `## Sandbox & Permission Audit\nStatus: unavailable (partial capture; dropped ${friction.droppedCount} records)`
   const status = friction.status === 'empty' ? 'none observed' : 'unavailable (no friction log)'
@@ -26,7 +27,7 @@ function sandboxMarkdown(friction: FrictionLogReadResult, redact?: AuditRedactor
 
 function reportFromLog(
   sessionId: string,
-  logOptions: FrictionLogOptions & { redact?: AuditRedactor },
+  logOptions: SessionFrictionReportOptions,
   journal: ReportJournal,
 ): SessionFrictionReport {
   try {
@@ -48,10 +49,10 @@ function reportFromLog(
         markdown:
           incompleteCiSection(journal.markdownBlocks) +
           '\n\n' +
-          sandboxMarkdown(friction, logOptions.redact),
+          sandboxMarkdown(friction, logOptions),
       }
     const markdown = buildCiFailuresSection(sessionId, journal, friction.status)
-    return { coverage, markdown: `${markdown}\n\n${sandboxMarkdown(friction, logOptions.redact)}` }
+    return { coverage, markdown: `${markdown}\n\n${sandboxMarkdown(friction, logOptions)}` }
   } catch (error) {
     const ciMarkdown =
       journal.status === 'ok' && journal.truncated
@@ -91,7 +92,11 @@ export async function buildSessionFrictionReport(
         ? { status: 'ok', markdownBlocks: [], truncated: false }
         : {
             status: 'ok',
-            markdownBlocks: getConformingGroups(scanned.entries, options.redact),
+            markdownBlocks: getConformingGroups(
+              scanned.entries,
+              options.redact,
+              options.budgets?.ciBytes,
+            ),
             truncated: scanned.truncated,
           }
   const report = reportFromLog(sessionId, options, journal)

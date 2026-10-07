@@ -11,7 +11,11 @@ const KIND_ORDER: FrictionEventKind[] = [
   'ambiguous-failure',
 ]
 
-export function buildSandboxSection(events: FrictionEvent[], redact?: AuditRedactor): string {
+export function buildSandboxSection(
+  events: FrictionEvent[],
+  redact?: AuditRedactor,
+  maxBytes = SANDBOX_SECTION_MAX_BYTES,
+): string {
   const observations = events.flatMap((event) =>
     event.failure
       ? [event, { ...event, kind: event.failure.kind, detail: event.failure.detail }]
@@ -20,7 +24,7 @@ export function buildSandboxSection(events: FrictionEvent[], redact?: AuditRedac
   // Fields stay whole until the events together would overflow the section, then share it equally.
   const eventBytes = Math.max(
     MIN_EVENT_BYTES,
-    Math.floor(SANDBOX_SECTION_MAX_BYTES / observations.length),
+    Math.floor(Math.min(maxBytes, SANDBOX_SECTION_MAX_BYTES) / observations.length),
   )
   const render = (event: FrictionEvent): string => {
     const outcome =

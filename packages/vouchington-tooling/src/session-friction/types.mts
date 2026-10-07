@@ -68,4 +68,6 @@ export type SessionFrictionReportOptions = FrictionLogOptions & {
   journalLoader: JournalLoader
   /** Redacts raw field text before Markdown escaping, which would otherwise break matching. */
   redact?: (value: string) => string
+  /** Byte allowances for the CI and sandbox sections, as maximums over the built-in budgets. */
+  budgets?: { ciBytes: number; sandboxBytes: number }
 }

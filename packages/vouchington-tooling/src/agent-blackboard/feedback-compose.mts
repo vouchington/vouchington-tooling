@@ -12,8 +12,8 @@ import {
   auditAssessed,
   buildAuditReport,
   completeCoverageError,
-  type AuditSourceInput,
 } from './feedback-audit-source.mts'
+import { boundedAuditSource } from './feedback-compose-audit.mts'
 import type { JournalAuditOptions } from './feedback-journal-audit.mts'
 import { createFeedbackEnvelope, redactFeedbackText } from './feedback-codec.mts'
 import { validateFeedbackText } from './feedback-fields.mts'
@@ -81,15 +81,6 @@ function unavailable(marker: string, input: Unassessed): string {
     throw new Error('unavailable reason must be bounded and explicit')
   return `${marker}\nStatus: ${input.status.replaceAll('-', ' ')} (${input.reason})`
 }
-/** Redacts audit fields from their raw text; escaping them first would defeat the matching. */
-function redactingAuditSource(input: RetrospectiveCompositionInput): AuditSourceInput {
-  const redact = (value: string): string => redactFeedbackText(value, input.knownSensitiveValues)
-  return input.friction
-    ? { friction: { ...input.friction, redact } }
-    : input.journal
-      ? { journal: { ...input.journal, redact } }
-      : {}
-}
 export async function composeRetrospective(input: RetrospectiveCompositionInput): Promise<string> {
   assertSingleAuditSource(input)
   const unavailableFacts =
@@ -106,15 +97,36 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
           coverage: input.transcript.status,
         }
       : undefined
-  const [facts, transcript, audit] = await Promise.all([
+  const [facts, transcript] = await Promise.all([
     'status' in input.facts
       ? Promise.resolve(unavailableFacts!)
       : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
     'status' in input.transcript
       ? Promise.resolve(unavailableTranscript!)
       : runRetrospectiveTranscriptReport(input.transcript),
-    buildAuditReport(input.sessionId, redactingAuditSource(input)),
   ])
+  const assemble = (auditMarkdown: string): string =>
+    [
+      '---',
+      `date: ${JSON.stringify(input.date)}`,
+      `issues: ${JSON.stringify(input.issues)}`,
+      `prs: ${JSON.stringify(input.prs)}`,
+      `session_id: ${JSON.stringify(input.sessionId)}`,
+      `description: ${JSON.stringify(input.description)}`,
+      `work_outcome: ${JSON.stringify(input.workOutcome)}`,
+      `feedback_coverage: ${JSON.stringify(input.feedbackCoverage)}`,
+      '---',
+      '',
+      input.narrative,
+      `## Outcome\nWork outcome: ${input.workOutcome}\nFeedback coverage: ${input.feedbackCoverage.status}\nDropped records: ${input.feedbackCoverage.droppedCount}`,
+      `## Verifiable Facts\n${facts.markdown.trim()}`,
+      `## Transcript Facts\n${transcript.markdown.trim()}`,
+      auditMarkdown,
+      assessment('Tool Findings', input.tools),
+      assessment('Architecture Findings', input.architecture),
+    ].join('\n\n')
+  // The audit sections are the only unbounded ones, so they get what the other sections leave.
+  const audit = await buildAuditReport(input.sessionId, boundedAuditSource(input, assemble('')))
   if (
     input.feedbackCoverage.status === 'complete' &&
     (facts.coverage !== 'complete' ||
@@ -126,25 +138,7 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
     throw completeCoverageError(input)
   if ((audit.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
     throw new Error('feedback coverage dropped count must include observed friction drops')
-  const markdown = [
-    '---',
-    `date: ${JSON.stringify(input.date)}`,
-    `issues: ${JSON.stringify(input.issues)}`,
-    `prs: ${JSON.stringify(input.prs)}`,
-    `session_id: ${JSON.stringify(input.sessionId)}`,
-    `description: ${JSON.stringify(input.description)}`,
-    `work_outcome: ${JSON.stringify(input.workOutcome)}`,
-    `feedback_coverage: ${JSON.stringify(input.feedbackCoverage)}`,
-    '---',
-    '',
-    input.narrative,
-    `## Outcome\nWork outcome: ${input.workOutcome}\nFeedback coverage: ${input.feedbackCoverage.status}\nDropped records: ${input.feedbackCoverage.droppedCount}`,
-    `## Verifiable Facts\n${facts.markdown.trim()}`,
-    `## Transcript Facts\n${transcript.markdown.trim()}`,
-    audit.markdown,
-    assessment('Tool Findings', input.tools),
-    assessment('Architecture Findings', input.architecture),
-  ].join('\n\n')
+  const markdown = assemble(audit.markdown)
   const envelope = createFeedbackEnvelope({
     schemaVersion: 1,
     type: 'retrospective',

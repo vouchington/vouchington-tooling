@@ -16,6 +16,8 @@ export type JournalAuditOptions = {
   journalLoader: JournalLoader
   /** Redacts raw field text before Markdown escaping, which would otherwise break matching. */
   redact?: (value: string) => string
+  /** Byte allowances for the CI and sandbox sections, as maximums over the built-in budgets. */
+  budgets?: { ciBytes: number; sandboxBytes: number }
 }
 
 /** `journal-only` says both sections were assessed from journal entries, with no log observed. */
@@ -56,8 +58,12 @@ export async function buildJournalAuditReport(
   const scanned = await scanJournal(sessionId, options.journalLoader)
   if (scanned.status === 'unreachable') return unavailable('blackboard unreachable')
   if (scanned.status === 'not-found') return unavailable('no journal for session')
-  const ci = getConformingGroups(scanned.entries, options.redact)
-  const sandbox = getConformingSandboxBlocks(scanned.entries, options.redact)
+  const ci = getConformingGroups(scanned.entries, options.redact, options.budgets?.ciBytes)
+  const sandbox = getConformingSandboxBlocks(
+    scanned.entries,
+    options.redact,
+    options.budgets?.sandboxBytes,
+  )
   if (scanned.truncated)
     return report(
       'partial',
