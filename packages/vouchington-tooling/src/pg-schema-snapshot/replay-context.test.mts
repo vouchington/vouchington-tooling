@@ -75,7 +75,8 @@ describe('createPostgresReplayContext', () => {
     })
 
     expect(context.triggerTextsForTable('topics')).toEqual(['CREATE TRIGGER before_update'])
-    expect(context.generatedDependenciesForTable('topics')).toEqual(
+    const dependencies = context.generatedDependenciesForTable('topics')
+    expect(dependencies).toEqual(
       new Map([
         ['search_vector', new Set(['alias'])],
         ['score', new Set(['votes_score_up', 'votes_score_none', 'votes_score_down'])],
@@ -83,14 +84,18 @@ describe('createPostgresReplayContext', () => {
         ['lifecycle_time', new Set(['expired_at', 'revoked_at'])],
       ]),
     )
+    expect(context.generatedDependenciesForTable('topics')).toBe(dependencies)
     expect(context.triggerTextsForTable('unknown')).toBeUndefined()
     expect(context.generatedDependenciesForTable('unknown')).toBeUndefined()
   })
 
-  it('keeps a known table with no STORED dependencies as an empty map', () => {
+  it('keeps known tables with virtual or no-reference stored columns as empty maps', () => {
     const context = createPostgresReplayContext({
-      schema: schema({ virtual_value: column('virtual', 'alias') }),
-      generatedColumnReferences: [],
+      schema: schema({
+        virtual_value: column('virtual', 'alias'),
+        constant_value: column('stored', "'fixed'"),
+      }),
+      generatedColumnReferences: [{ table: 'topics', column: 'constant_value', sourceColumns: [] }],
     })
 
     expect(context.generatedDependenciesForTable('topics')).toEqual(new Map())

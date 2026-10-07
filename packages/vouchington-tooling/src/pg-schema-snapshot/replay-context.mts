@@ -10,7 +10,7 @@ export type GeneratedColumnReferences = {
 export type PostgresReplayContext = {
   /** Unknown tables return undefined so callers can fail closed. */
   triggerTextsForTable(table: string): readonly string[] | undefined
-  /** Unknown tables return undefined; known tables with no dependencies return an empty map. */
+  /** Memoized per table; unknown tables return undefined and empty dependency sets return an empty map. */
   generatedDependenciesForTable(table: string): ReadonlyMap<string, ReadonlySet<string>> | undefined
 }
 

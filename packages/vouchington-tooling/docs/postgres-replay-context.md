@@ -13,4 +13,4 @@ empty dependency set.
 
 Unknown tables return `undefined` from both lookups. Known tables return their trigger text and a
 map of STORED generated columns to nonempty dependency sets; VIRTUAL columns are excluded. A known
-table with no STORED dependencies returns an empty map.
+table with no STORED dependencies returns an empty map. Dependency maps are memoized per table.
