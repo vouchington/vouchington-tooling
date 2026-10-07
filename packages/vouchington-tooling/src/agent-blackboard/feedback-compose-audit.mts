@@ -14,7 +14,7 @@ type AuditInput = AuditSourceInput & { knownSensitiveValues?: string[] | undefin
  * Bytes the CI and sandbox audit blocks may add to a retrospective whose other sections are
  * `otherMarkdown`. Escaped text can double under JSON (each backslash), hence half the envelope room.
  */
-export function auditBudgets(otherMarkdown: string): { ciBytes: number; sandboxBytes: number } {
+function auditBudgets(otherMarkdown: string): { ciBytes: number; sandboxBytes: number } {
   const markdownRoom = MARKDOWN_MAX_BYTES - Buffer.byteLength(otherMarkdown)
   const envelopeRoom =
     ENVELOPE_MAX_BYTES - ENVELOPE_RESERVE_BYTES - Buffer.byteLength(JSON.stringify(otherMarkdown))
