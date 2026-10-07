@@ -1,10 +1,14 @@
 import {
-  buildSessionFrictionReport,
+  loadFrictionReportInputs,
+  renderFrictionReport,
+  type FrictionReportInputs,
   type SessionFrictionReport,
   type SessionFrictionReportOptions,
 } from '../session-friction/index.mts'
+import type { JournalScan } from '../session-friction/journal.mts'
 import {
-  buildJournalAuditReport,
+  loadJournalAuditInput,
+  renderJournalAuditReport,
   type JournalAuditOptions,
   type JournalAuditReport,
 } from './feedback-journal-audit.mts'
@@ -25,13 +29,33 @@ export function assertSingleAuditSource(input: AuditSourceInput): void {
     throw new Error('composition accepts either a friction or a journal audit source, not both')
 }
 
-/** Builds the CI-failure and sandbox sections from the friction log or from journal entries alone. */
-export async function buildAuditReport(
+/** What the audit sections read from outside, loaded once and rendered as often as needed. */
+export type AuditInputs =
+  | { kind: 'friction'; loaded: FrictionReportInputs }
+  | { kind: 'journal'; scanned: JournalScan }
+  | { kind: 'none' }
+
+export async function loadAuditInputs(
   sessionId: string,
   input: AuditSourceInput,
-): Promise<AuditReport> {
-  if (input.friction) return buildSessionFrictionReport(sessionId, input.friction)
-  if (input.journal) return buildJournalAuditReport(sessionId, input.journal)
+): Promise<AuditInputs> {
+  if (input.friction)
+    return { kind: 'friction', loaded: await loadFrictionReportInputs(sessionId, input.friction) }
+  if (input.journal)
+    return { kind: 'journal', scanned: await loadJournalAuditInput(sessionId, input.journal) }
+  return { kind: 'none' }
+}
+
+/** Builds the CI-failure and sandbox sections from loaded inputs, with no further I/O. */
+export function renderAuditReport(
+  sessionId: string,
+  input: AuditSourceInput,
+  inputs: AuditInputs,
+): AuditReport {
+  if (inputs.kind === 'friction')
+    return renderFrictionReport(sessionId, input.friction!, inputs.loaded)
+  if (inputs.kind === 'journal')
+    return renderJournalAuditReport(sessionId, input.journal!, inputs.scanned)
   return {
     coverage: { journalStatus: 'unavailable', frictionStatus: 'absent', truncated: false },
     markdown: NOT_ASSESSED_MARKDOWN,

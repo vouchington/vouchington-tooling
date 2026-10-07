@@ -3,7 +3,7 @@ import {
   getConformingGroups,
   incompleteCiSection,
 } from '../session-friction/ci-failures.mts'
-import { scanJournal } from '../session-friction/journal.mts'
+import { scanJournal, type JournalScan } from '../session-friction/journal.mts'
 import { validateSessionId } from '../session-friction/session-id.mts'
 import type { JournalLoader, SessionFrictionCoverage } from '../session-friction/types.mts'
 import {
@@ -12,7 +12,13 @@ import {
   unavailableSandboxSection,
 } from './feedback-journal-sandbox.mts'
 
-export type JournalAuditOptions = { journalLoader: JournalLoader }
+export type JournalAuditOptions = {
+  journalLoader: JournalLoader
+  /** Redacts raw field text before Markdown escaping, which would otherwise break matching. */
+  redact?: (value: string) => string
+  /** Byte allowances for the CI and sandbox sections, as maximums over the built-in budgets. */
+  budgets?: { ciBytes: number; sandboxBytes: number }
+}
 
 /** `journal-only` says both sections were assessed from journal entries, with no log observed. */
 export type JournalAuditReport = {
@@ -44,16 +50,28 @@ function unavailable(reason: string): JournalAuditReport {
  * alone. Unlike `buildSessionFrictionReport`, a session with no journal is unavailable rather than
  * empty: without a log, nothing else establishes that the session was observed.
  */
-export async function buildJournalAuditReport(
+export async function loadJournalAuditInput(
   sessionId: string,
   options: JournalAuditOptions,
-): Promise<JournalAuditReport> {
+): Promise<JournalScan> {
   validateSessionId(sessionId)
-  const scanned = await scanJournal(sessionId, options.journalLoader)
+  return scanJournal(sessionId, options.journalLoader)
+}
+
+/** Pure render of a loaded journal scan, so it can be repeated without reloading. */
+export function renderJournalAuditReport(
+  sessionId: string,
+  options: JournalAuditOptions,
+  scanned: JournalScan,
+): JournalAuditReport {
   if (scanned.status === 'unreachable') return unavailable('blackboard unreachable')
   if (scanned.status === 'not-found') return unavailable('no journal for session')
-  const ci = getConformingGroups(scanned.entries)
-  const sandbox = getConformingSandboxBlocks(scanned.entries)
+  const ci = getConformingGroups(scanned.entries, options.redact, options.budgets?.ciBytes)
+  const sandbox = getConformingSandboxBlocks(
+    scanned.entries,
+    options.redact,
+    options.budgets?.sandboxBytes,
+  )
   if (scanned.truncated)
     return report(
       'partial',
@@ -63,5 +81,16 @@ export async function buildJournalAuditReport(
   return report(
     'complete',
     `${buildCiFailuresSection(sessionId, journal, 'journal-only')}\n\n${journalSandboxSection(sandbox)}`,
+  )
+}
+
+export async function buildJournalAuditReport(
+  sessionId: string,
+  options: JournalAuditOptions,
+): Promise<JournalAuditReport> {
+  return renderJournalAuditReport(
+    sessionId,
+    options,
+    await loadJournalAuditInput(sessionId, options),
   )
 }

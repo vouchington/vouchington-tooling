@@ -10,13 +10,30 @@ import type { SessionFrictionReportOptions } from '../session-friction/index.mts
 import {
   assertSingleAuditSource,
   auditAssessed,
-  buildAuditReport,
+  loadAuditInputs,
+  renderAuditReport,
   completeCoverageError,
+  type AuditReport,
 } from './feedback-audit-source.mts'
+import {
+  AUDIT_ATTEMPTS,
+  boundedAuditSource,
+  shrinkCaps,
+  UNBOUNDED_CAPS,
+} from './feedback-compose-audit.mts'
 import type { JournalAuditOptions } from './feedback-journal-audit.mts'
-import { createFeedbackEnvelope, redactFeedbackText } from './feedback-codec.mts'
+import {
+  createFeedbackEnvelope,
+  feedbackOverflowBytes,
+  redactFeedbackText,
+} from './feedback-codec.mts'
 import { validateFeedbackText } from './feedback-fields.mts'
-import type { FeedbackCoverage, FeedbackReference, WorkOutcome } from './feedback-types.mts'
+import type {
+  FeedbackCoverage,
+  FeedbackEnvelope,
+  FeedbackReference,
+  WorkOutcome,
+} from './feedback-types.mts'
 export type FeedbackAssessment = {
   status: 'findings' | 'none-observed' | 'not-assessed' | 'unavailable'
   findings?: Array<{
@@ -96,46 +113,35 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
           coverage: input.transcript.status,
         }
       : undefined
-  const [facts, transcript, audit] = await Promise.all([
+  const [facts, transcript] = await Promise.all([
     'status' in input.facts
       ? Promise.resolve(unavailableFacts!)
       : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
     'status' in input.transcript
       ? Promise.resolve(unavailableTranscript!)
       : runRetrospectiveTranscriptReport(input.transcript),
-    buildAuditReport(input.sessionId, input),
   ])
-  if (
-    input.feedbackCoverage.status === 'complete' &&
-    (facts.coverage !== 'complete' ||
-      transcript.coverage !== 'complete' ||
-      ['not-assessed', 'unavailable'].includes(input.tools.status) ||
-      ['not-assessed', 'unavailable'].includes(input.architecture.status) ||
-      !auditAssessed(audit))
-  )
-    throw completeCoverageError(input)
-  if ((audit.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
-    throw new Error('feedback coverage dropped count must include observed friction drops')
-  const markdown = [
-    '---',
-    `date: ${JSON.stringify(input.date)}`,
-    `issues: ${JSON.stringify(input.issues)}`,
-    `prs: ${JSON.stringify(input.prs)}`,
-    `session_id: ${JSON.stringify(input.sessionId)}`,
-    `description: ${JSON.stringify(input.description)}`,
-    `work_outcome: ${JSON.stringify(input.workOutcome)}`,
-    `feedback_coverage: ${JSON.stringify(input.feedbackCoverage)}`,
-    '---',
-    '',
-    input.narrative,
-    `## Outcome\nWork outcome: ${input.workOutcome}\nFeedback coverage: ${input.feedbackCoverage.status}\nDropped records: ${input.feedbackCoverage.droppedCount}`,
-    `## Verifiable Facts\n${facts.markdown.trim()}`,
-    `## Transcript Facts\n${transcript.markdown.trim()}`,
-    audit.markdown,
-    assessment('Tool Findings', input.tools),
-    assessment('Architecture Findings', input.architecture),
-  ].join('\n\n')
-  const envelope = createFeedbackEnvelope({
+  const assemble = (auditMarkdown: string): string =>
+    [
+      '---',
+      `date: ${JSON.stringify(input.date)}`,
+      `issues: ${JSON.stringify(input.issues)}`,
+      `prs: ${JSON.stringify(input.prs)}`,
+      `session_id: ${JSON.stringify(input.sessionId)}`,
+      `description: ${JSON.stringify(input.description)}`,
+      `work_outcome: ${JSON.stringify(input.workOutcome)}`,
+      `feedback_coverage: ${JSON.stringify(input.feedbackCoverage)}`,
+      '---',
+      '',
+      input.narrative,
+      `## Outcome\nWork outcome: ${input.workOutcome}\nFeedback coverage: ${input.feedbackCoverage.status}\nDropped records: ${input.feedbackCoverage.droppedCount}`,
+      `## Verifiable Facts\n${facts.markdown.trim()}`,
+      `## Transcript Facts\n${transcript.markdown.trim()}`,
+      auditMarkdown,
+      assessment('Tool Findings', input.tools),
+      assessment('Architecture Findings', input.architecture),
+    ].join('\n\n')
+  const envelopeFor = (markdown: string): FeedbackEnvelope => ({
     schemaVersion: 1,
     type: 'retrospective',
     sourceEventId: 'composition-validation',
@@ -148,5 +154,34 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
     workOutcome: input.workOutcome,
     feedbackCoverage: input.feedbackCoverage,
   })
-  return envelope.markdown
+  // The audit sections are the only unbounded ones: render them, measure the real envelope against
+  // its limits, and shrink the audit caps by the measured overflow until it fits.
+  const loaded = await loadAuditInputs(input.sessionId, input)
+  let caps = UNBOUNDED_CAPS
+  let audit: AuditReport
+  let markdown: string
+  for (let attempt = 1; ; attempt++) {
+    audit = renderAuditReport(input.sessionId, boundedAuditSource(input, caps), loaded)
+    markdown = assemble(audit.markdown)
+    const overflow = feedbackOverflowBytes(envelopeFor(markdown))
+    if (!overflow || attempt === AUDIT_ATTEMPTS) break
+    caps = shrinkCaps(
+      caps,
+      Buffer.byteLength(audit.markdown),
+      overflow,
+      attempt === AUDIT_ATTEMPTS - 1,
+    )
+  }
+  if (
+    input.feedbackCoverage.status === 'complete' &&
+    (facts.coverage !== 'complete' ||
+      transcript.coverage !== 'complete' ||
+      ['not-assessed', 'unavailable'].includes(input.tools.status) ||
+      ['not-assessed', 'unavailable'].includes(input.architecture.status) ||
+      !auditAssessed(audit))
+  )
+    throw completeCoverageError(input)
+  if ((audit.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
+    throw new Error('feedback coverage dropped count must include observed friction drops')
+  return createFeedbackEnvelope(envelopeFor(markdown)).markdown
 }

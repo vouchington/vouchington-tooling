@@ -8,6 +8,7 @@ import { isCount, isObject } from './snapshot-partition-guards.mts'
 import type { FeedbackEnvelope } from './feedback-types.mts'
 
 const FEEDBACK_MAX_BYTES = 16_384
+const FEEDBACK_MARKDOWN_MAX_BYTES = 12_000
 const OUTCOMES = [
   'in-progress',
   'success',
@@ -57,7 +58,7 @@ export function validateFeedbackEnvelope(value: unknown): asserts value is Feedb
     JSON.stringify(value.repositories) !== JSON.stringify(normalizeRepositories(value.repositories))
   )
     throw new Error('repositories must be canonical')
-  validateFeedbackText(value.markdown, 'markdown', 12_000)
+  validateFeedbackText(value.markdown, 'markdown', FEEDBACK_MARKDOWN_MAX_BYTES)
   if (typeof value.workOutcome !== 'string' || !OUTCOMES.includes(value.workOutcome))
     throw new Error('workOutcome must be explicit')
   if (
@@ -112,13 +113,33 @@ export function redactFeedbackText(value: string, knownSensitiveValues: string[]
       '$1[REDACTED]',
     )
 }
+/** Bytes by which the envelope exceeds its markdown or whole-envelope limit; 0 when it fits. */
+export function feedbackOverflowBytes(
+  input: FeedbackEnvelope,
+  options: { knownSensitiveValues?: string[] } = {},
+): number {
+  const envelope = redactedEnvelope(input, options)
+  return Math.max(
+    0,
+    Buffer.byteLength(envelope.markdown) - FEEDBACK_MARKDOWN_MAX_BYTES,
+    Buffer.byteLength(JSON.stringify(envelope)) - FEEDBACK_MAX_BYTES,
+  )
+}
 export function createFeedbackEnvelope(
   input: FeedbackEnvelope,
   options: { knownSensitiveValues?: string[] } = {},
 ): FeedbackEnvelope {
-  validateFeedbackText(input.markdown, 'markdown', 12_000)
+  validateFeedbackText(input.markdown, 'markdown', FEEDBACK_MARKDOWN_MAX_BYTES)
   validateFeedbackText(input.timestamp, 'timestamp', 40)
-  const envelope: FeedbackEnvelope = {
+  const envelope = redactedEnvelope(input, options)
+  validateFeedbackEnvelope(envelope)
+  return envelope
+}
+function redactedEnvelope(
+  input: FeedbackEnvelope,
+  options: { knownSensitiveValues?: string[] },
+): FeedbackEnvelope {
+  return {
     ...input,
     repositories: normalizeRepositories(input.repositories),
     markdown: redactFeedbackText(input.markdown, options.knownSensitiveValues),
@@ -149,6 +170,4 @@ export function createFeedbackEnvelope(
           ),
         }),
   }
-  validateFeedbackEnvelope(envelope)
-  return envelope
 }
