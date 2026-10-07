@@ -1,5 +1,5 @@
 import type { RangeVar } from '@libpg-query/parser'
-import { isReservedSqlKeyword, isSqlParseError, parseSql } from './parser.mts'
+import { isSqlParseError, isUnsafeUnquotedRelationKeyword, parseSql } from './parser.mts'
 
 export type ManagedViewDeclaration = {
   name: string
@@ -7,12 +7,13 @@ export type ManagedViewDeclaration = {
 }
 
 /**
- * Returns a PostgreSQL-quoted identifier. Simple lowercase non-keywords are returned unquoted;
- * keywords and names containing uppercase, spaces, punctuation, or other special characters
- * are wrapped in double-quotes with internal double-quotes escaped as "".
+ * Returns a PostgreSQL-quoted identifier. Simple lowercase names valid as bare relation names
+ * are returned unquoted; keywords requiring quotes and names containing uppercase, spaces,
+ * punctuation, or other special characters are wrapped in double-quotes with internal quotes
+ * escaped as "".
  */
 function quotePgName(name: string): string {
-  if (/^[a-z_][a-z0-9_]*$/.test(name) && !isReservedSqlKeyword(name)) return name
+  if (/^[a-z_][a-z0-9_]*$/.test(name) && !isUnsafeUnquotedRelationKeyword(name)) return name
   return `"${name.replace(/"/g, '""')}"`
 }
 

@@ -41,6 +41,9 @@ describe('extractViewDeclarations', () => {
     expect(extractViewDeclarations('CREATE VIEW "select"."from" AS SELECT 1')).toEqual([
       { name: '"select"."from"', type: 'view' },
     ])
+    expect(extractViewDeclarations('CREATE VIEW "left"."right" AS SELECT 1')).toEqual([
+      { name: '"left"."right"', type: 'view' },
+    ])
   })
 
   it('returns no declarations for malformed SQL or blank input', () => {
