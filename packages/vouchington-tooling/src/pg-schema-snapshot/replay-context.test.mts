@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createPostgresReplayContext } from './replay-context.mts'
+import {
+  createPostgresReplayContext,
+  createPostgresReplayContextFromSchema,
+} from './replay-context.mts'
 import type { SchemaSnapshot, SchemaTableSnapshot } from './types.mts'
 
 function table(columns: SchemaTableSnapshot['columns']): SchemaTableSnapshot {
@@ -46,6 +49,40 @@ function schema(columns: SchemaTableSnapshot['columns']): SchemaSnapshot {
 }
 
 describe('createPostgresReplayContext', () => {
+  it('collects nested generated dependencies from the released parser facts', async () => {
+    const context = await createPostgresReplayContextFromSchema(
+      schema({
+        score: column('stored', 'coalesce(UP, 0) + down'),
+        label: column('stored', 'CASE WHEN "MixedCase" IS NULL THEN alias ELSE "MixedCase" END'),
+        constant: column('stored', "'fixed'"),
+        virtual: column('virtual', 'ignored'),
+      }),
+    )
+    expect(context.generatedDependenciesForTable('topics')).toEqual(
+      new Map([
+        ['score', new Set(['up', 'down'])],
+        ['label', new Set(['MixedCase', 'alias'])],
+      ]),
+    )
+    expect(context.triggerTextsForTable('topics')).toEqual(['CREATE TRIGGER before_update'])
+    expect(context.generatedDependenciesForTable('unknown')).toBeUndefined()
+  })
+
+  it('keeps snapshots without stored expressions independent of the parser', async () => {
+    const context = await createPostgresReplayContextFromSchema(
+      schema({ value: column(null, null) }),
+    )
+    expect(context.generatedDependenciesForTable('topics')).toEqual(new Map())
+  })
+
+  it.each(['(', '1); SELECT 2'])(
+    'rejects malformed or additional expression %s',
+    async (expression) => {
+      await expect(
+        createPostgresReplayContextFromSchema(schema({ value: column('stored', expression) })),
+      ).rejects.toThrow('Unable to collect generated-column references for topics.value')
+    },
+  )
   it('projects trigger text and nested STORED generated dependencies from injected facts', () => {
     const context = createPostgresReplayContext({
       schema: schema({
