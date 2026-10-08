@@ -1,23 +1,21 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { extractIndexShapes, initSqlAst } from './index.mts'
+import { describe, expect, it } from 'vitest'
+import { extractIndexShapes } from './index.mts'
 
 describe('extractIndexShapes', () => {
-  beforeAll(() => initSqlAst())
-
-  it('returns no shapes for blank SQL', () => {
-    expect(extractIndexShapes('')).toEqual([])
-    expect(extractIndexShapes('   ')).toEqual([])
+  it('returns no shapes for blank SQL', async () => {
+    expect(await extractIndexShapes('')).toEqual([])
+    expect(await extractIndexShapes('   ')).toEqual([])
   })
 
-  it('throws for malformed SQL', () => {
-    expect(() => extractIndexShapes('CREATE INDEX (')).toThrow('syntax error')
-    expect(() =>
+  it('throws for malformed SQL', async () => {
+    await expect(extractIndexShapes('CREATE INDEX (')).rejects.toThrow('syntax error')
+    await expect(
       extractIndexShapes('CREATE INDEX idx_a ON sample (owner_id); CREATE TABLE ('),
-    ).toThrow('syntax error')
-    expect(() => extractIndexShapes('DO $$ BEGIN;')).toThrow()
+    ).rejects.toThrow('syntax error')
+    await expect(extractIndexShapes('DO $$ BEGIN;')).rejects.toThrow()
   })
 
-  it('skips anonymous indexes and indexes nested inside DO blocks', () => {
+  it('skips anonymous indexes and indexes nested inside DO blocks', async () => {
     const sql = `
       CREATE INDEX ON "sample" (owner_id);
       DO $$
@@ -25,10 +23,10 @@ describe('extractIndexShapes', () => {
         CREATE INDEX IF NOT EXISTS idx_inside ON "sample" (owner_id);
       END $$;
     `
-    expect(extractIndexShapes(sql)).toEqual([])
+    expect(await extractIndexShapes(sql)).toEqual([])
   })
 
-  it('treats generated nested conditionals, locks, and indexes as one opaque DO block', () => {
+  it('treats generated nested conditionals, locks, and indexes as one opaque DO block', async () => {
     const sql = `
       CREATE INDEX idx_top ON sample (owner_id);
       DO $$ BEGIN
@@ -41,11 +39,11 @@ describe('extractIndexShapes', () => {
         END IF;
       END $$;
     `
-    expect(extractIndexShapes(sql).map(({ idxname }) => idxname)).toEqual(['idx_top'])
+    expect((await extractIndexShapes(sql)).map(({ idxname }) => idxname)).toEqual(['idx_top'])
   })
 
-  it('uses the same shape for differently named identical definitions', () => {
-    const shapes = extractIndexShapes(`
+  it('uses the same shape for differently named identical definitions', async () => {
+    const shapes = await extractIndexShapes(`
       CREATE INDEX IF NOT EXISTS idx_a ON "sample" (owner_id) WHERE deleted_at IS NULL;
       CREATE INDEX IF NOT EXISTS idx_b ON "sample" (owner_id) WHERE deleted_at IS NULL;
     `)
@@ -54,36 +52,36 @@ describe('extractIndexShapes', () => {
     expect(shapes[0]?.shapeKey).toBe(shapes[1]?.shapeKey)
   })
 
-  it('distinguishes different columns', () => {
-    const shapes = extractIndexShapes(`
+  it('distinguishes different columns', async () => {
+    const shapes = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id);
       CREATE INDEX idx_b ON sample (group_id);
     `)
     expect(shapes[0]?.shapeKey).not.toBe(shapes[1]?.shapeKey)
   })
 
-  it('normalizes implicit and explicit ASC', () => {
-    const shapes = extractIndexShapes(`
+  it('normalizes implicit and explicit ASC', async () => {
+    const shapes = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id);
       CREATE INDEX idx_b ON sample (owner_id ASC);
     `)
     expect(shapes[0]?.shapeKey).toBe(shapes[1]?.shapeKey)
   })
 
-  it('normalizes redundant predicate parentheses', () => {
-    const shapes = extractIndexShapes(`
+  it('normalizes redundant predicate parentheses', async () => {
+    const shapes = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id) WHERE (deleted_at IS NULL);
       CREATE INDEX idx_b ON sample (owner_id) WHERE ((deleted_at IS NULL));
     `)
     expect(shapes[0]?.shapeKey).toBe(shapes[1]?.shapeKey)
   })
 
-  it('resolves implicit null ordering for ascending and descending indexes', () => {
-    const ascending = extractIndexShapes(`
+  it('resolves implicit null ordering for ascending and descending indexes', async () => {
+    const ascending = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id);
       CREATE INDEX idx_b ON sample (owner_id NULLS LAST);
     `)
-    const descending = extractIndexShapes(`
+    const descending = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id DESC);
       CREATE INDEX idx_b ON sample (owner_id DESC NULLS FIRST);
     `)
@@ -91,50 +89,28 @@ describe('extractIndexShapes', () => {
     expect(descending[0]?.shapeKey).toBe(descending[1]?.shapeKey)
   })
 
-  it('distinguishes ascending and descending indexes', () => {
-    const shapes = extractIndexShapes(`
+  it('distinguishes ascending and descending indexes', async () => {
+    const shapes = await extractIndexShapes(`
       CREATE INDEX idx_a ON sample (owner_id ASC);
       CREATE INDEX idx_b ON sample (owner_id DESC);
     `)
     expect(shapes[0]?.shapeKey).not.toBe(shapes[1]?.shapeKey)
   })
 
-  it('handles incomplete parser nodes without inventing an index name', async () => {
-    vi.resetModules()
-    const fresh = await import('./index.mts')
-    const parseSync = (sql: string) =>
-      sql === 'empty'
-        ? {}
-        : {
-            stmts: [
-              { stmt: undefined },
-              { stmt: { SelectStmt: {} } },
-              { stmt: { IndexStmt: {} } },
-              { stmt: { IndexStmt: { idxname: 'minimal' } } },
-              {
-                stmt: {
-                  IndexStmt: {
-                    idxname: 'expression',
-                    relation: { relname: 'sample' },
-                    indexParams: [
-                      { Integer: { ival: 1, location: 99 } },
-                      {
-                        IndexElem: {
-                          expr: { ColumnRef: { fields: [{ String: { sval: 'owner_id' } }] } },
-                          ordering: 'SORTBY_DESC',
-                        },
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          }
-    await fresh.initSqlAst(async () => ({ loadModule: async () => undefined, parseSync }) as never)
-    expect(fresh.extractIndexShapes('empty')).toEqual([])
-    const shapes = fresh.extractIndexShapes('tree')
-    expect(shapes.map(({ idxname }) => idxname)).toEqual(['minimal', 'expression'])
-    expect(JSON.parse(shapes[0]!.shapeKey)).toMatchObject({ table: '', indexParams: [] })
-    expect(shapes[1]!.shapeKey).not.toContain('location')
+  it('accepts ONLY indexes without treating them as malformed SQL', async () => {
+    const shapes = await extractIndexShapes('CREATE INDEX idx_only ON ONLY sample (owner_id);')
+    expect(shapes).toHaveLength(1)
+    expect(shapes[0]).toMatchObject({ idxname: 'idx_only', table: 'sample' })
+  })
+
+  it('preserves quoted identity and distinguishes INCLUDE and operator classes', async () => {
+    const shapes = await extractIndexShapes(`
+      CREATE INDEX idx_a ON "MixedCase" (owner_id);
+      CREATE INDEX idx_b ON "mixedcase" (owner_id);
+      CREATE INDEX idx_c ON "MixedCase" (owner_id) INCLUDE (other_id);
+      CREATE INDEX idx_d ON "MixedCase" (owner_id uuid_ops);
+    `)
+    expect(new Set(shapes.map(({ shapeKey }) => shapeKey)).size).toBe(4)
+    expect(shapes[0]?.table).toBe('MixedCase')
   })
 })

@@ -698,14 +698,17 @@ lifecycle decisions.
 
 ## SQL index shapes
 
-`vouchington-tooling/sql-ast` exports `extractIndexShapes(sql)`. Await `initSqlAst()` before
-calling it. It returns `{ idxname, table, shapeKey }` for each named top-level `CREATE INDEX`.
-Consumers can group identical `shapeKey` values to find differently named index definitions
-with the same projected physical shape. The key normalizes effective sort and null ordering and
-removes parser locations from expressions and predicates. Invalid SQL throws. Anonymous indexes
-and indexes inside `DO` blocks are omitted. The projection does not model operator classes,
-collations, or `INCLUDE` columns, so callers using those features must extend it before relying
-on shape collisions.
+`vouchington-tooling/sql-ast` exports asynchronous `extractIndexShapes(sql)`. Await its result;
+it lazily loads the optional `no-mistakes` peer and requires version 0.81.0 or newer when
+called with nonblank SQL. Other SQL exports do not require this peer. It does not need
+`initSqlAst()`. It returns
+`{ idxname, table, shapeKey }` for each named top-level `CREATE INDEX`. Consumers can group
+identical keys to detect collisions. Keys use upstream structural identity, including effective
+sort/null ordering, quoted relation identity, expressions, predicates, operator classes, and
+`INCLUDE` columns. Key serialization is opaque and must not be persisted across versions.
+Any parse diagnostic rejects the whole input. Anonymous indexes and indexes inside `DO` blocks
+are omitted. Consumer call sites must change from synchronous calls to `await` when adopting
+this release.
 
 ## Publication writer inventory facts
 

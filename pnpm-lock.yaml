@@ -125,8 +125,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(supports-color@7.2.0)(zod@4.6.5)
       no-mistakes:
-        specifier: 0.78.0
-        version: 0.78.0
+        specifier: 0.81.0
+        version: 0.81.0
       smol-toml:
         specifier: 1.9.0
         version: 1.9.0
@@ -2021,30 +2021,30 @@ packages:
     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
     engines: {node: '>=18'}
 
-  no-mistakes-darwin-arm64@0.78.0:
-    resolution: {integrity: sha512-nHoqX1tFP4dHPxACbeq9evJJydkW6x8afJD7R6NGkMSnzo0OzxpYCvz/hldI4ENerBh9odu9H/8k7Zx6zPzyTw==}
+  no-mistakes-darwin-arm64@0.81.0:
+    resolution: {integrity: sha512-Ha7L4dmPmOANDM9oQr80RM9mOwmxzWT1Y33v4HO6M5TiNQYBU66vqvb2e3QaI3iHH+ed1L+Veyu3Gr7hau2hNg==}
     cpu: [arm64]
     os: [darwin]
 
-  no-mistakes-linux-arm64-gnu@0.78.0:
-    resolution: {integrity: sha512-j48kB6c+/HTmq/6zpmZaiJ3reYS6KYqwnWkZo2SWNUhn+SIUEOyHChMVSk9Nc9FWua+WS+qO8eaHXNoazeyluw==}
+  no-mistakes-linux-arm64-gnu@0.81.0:
+    resolution: {integrity: sha512-DBU+l1g5zwTIx0IxWJTDXvS8QB4+KxQZJu7J7sFSchWAQ1sm/FCoXc0mJc5jzs69y9dF4rS6TaGCxBwpT5ToVQ==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-linux-x64-gnu@0.78.0:
-    resolution: {integrity: sha512-C3PZfYKCSoMEabfAglai0vUocqY9UN4yMbnZarNBrxxPbBKGJ72OcTR2aa8lj6w7xtSpcHzO3Loe9Tb0tXHF9w==}
+  no-mistakes-linux-x64-gnu@0.81.0:
+    resolution: {integrity: sha512-5zqI2sRiKVkZOklDJER2kM5NYQhXBQI1EmAwggFGLrVdyI/9A26BrwVFXkopDriZmlImVhtp91KqjCMI0Q0oNQ==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-win32-x64-msvc@0.78.0:
-    resolution: {integrity: sha512-1lyau7pf0VkW0zo3FALvgaB8NQBCgdVgrjMwBCtakfw8vPg69He3SSHBhsTdQ+luqbXE+OKSD2RGh2ZmS4mHdg==}
+  no-mistakes-win32-x64-msvc@0.81.0:
+    resolution: {integrity: sha512-J8772cXSGDPB1/rh2vWDEDc9Uvd0uuTlVI2hZskCSxCFOEpaYF17AXm3GaT413DlpdQlqVc0GwcAfM2GKGMKug==}
     cpu: [x64]
     os: [win32]
 
-  no-mistakes@0.78.0:
-    resolution: {integrity: sha512-BCrT+nj5+YUqj+XJbDFlitWbj6vFHYNz4Lo6FCB62kEWSFb1rNxOHLCDRUB3waZ4qMklIdF/bspF2xzvJFDQhQ==}
+  no-mistakes@0.81.0:
+    resolution: {integrity: sha512-cMwQoAgC816DGRlmt2yedg5IIJ4rrhcgXKFScCCexRDnLNglAGCvoVnEy9L9+9HbeHaJR4jdYPMUTd6Bbdou1A==}
     hasBin: true
 
   object-assign@4.1.1:
@@ -4289,24 +4289,24 @@ snapshots:
     dependencies:
       content-type: 2.1.0
 
-  no-mistakes-darwin-arm64@0.78.0:
+  no-mistakes-darwin-arm64@0.81.0:
     optional: true
 
-  no-mistakes-linux-arm64-gnu@0.78.0:
+  no-mistakes-linux-arm64-gnu@0.81.0:
     optional: true
 
-  no-mistakes-linux-x64-gnu@0.78.0:
+  no-mistakes-linux-x64-gnu@0.81.0:
     optional: true
 
-  no-mistakes-win32-x64-msvc@0.78.0:
+  no-mistakes-win32-x64-msvc@0.81.0:
     optional: true
 
-  no-mistakes@0.78.0:
+  no-mistakes@0.81.0:
     optionalDependencies:
-      no-mistakes-darwin-arm64: 0.78.0
-      no-mistakes-linux-arm64-gnu: 0.78.0
-      no-mistakes-linux-x64-gnu: 0.78.0
-      no-mistakes-win32-x64-msvc: 0.78.0
+      no-mistakes-darwin-arm64: 0.81.0
+      no-mistakes-linux-arm64-gnu: 0.81.0
+      no-mistakes-linux-x64-gnu: 0.81.0
+      no-mistakes-win32-x64-msvc: 0.81.0
 
   object-assign@4.1.1: {}
 
