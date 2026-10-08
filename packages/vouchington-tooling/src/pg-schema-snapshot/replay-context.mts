@@ -54,10 +54,7 @@ export async function createPostgresReplayContextFromSchema(
       column,
       sourceColumns: [
         ...new Set(
-          statement.query.columns.flatMap((reference) => {
-            const name = reference.name.parts.at(-1)?.identity
-            return name === undefined ? [] : [name]
-          }),
+          statement.query.columns.map((reference) => reference.name.parts.at(-1)!.identity),
         ),
       ],
     }
