@@ -32,10 +32,11 @@ Use `pr-shepherd` (not `gh pr checks`) to iterate pull requests.
 
 ## Agent Blackboard
 
-Journal through this repository's own `vouchington mcp` server, registered as `vouchington-tooling`
-in `.mcp.json` and `.codex/config.toml` and run from `packages/vouchington-tooling/src`, and follow
-`vouchington-workflow:blackboard` for the tools and journaling policy. The upstream
-`agent-blackboard` plugin is disabled here. Choose an explicit root session id and ensure it before
+Journal through the `vouchington mcp` server. vouchington-machines registers it machine-wide as
+`vouchington-tooling` in every harness and disables the upstream `agent-blackboard` plugin
+(vouchington#1019); this repository carries no `.mcp.json`, `.claude/settings.json`, or
+`.codex/config.toml` for that. Follow `vouchington-workflow:blackboard` for the tools and
+journaling policy. Choose an explicit root session id and ensure it before
 recording work, preserve exact parent/child session identities, and append contemporaneous notes
 for failed checks, denied permissions, scope changes, repeated fixes, and reusable tool gaps. Tag
 every entry's `repositories` with only the sorted, deduplicated lowercase `owner/name` values
@@ -52,8 +53,9 @@ before admission and acknowledged terminal reporting; missing or rejected creden
 Never substitute an ad hoc local journal file or use an outbox to authorize autonomous work.
 When MCP is unavailable, use the supported CLI fallback in the blackboard skill, journal the
 fallback and delivery result, and notify the human. Host permission denials still require approval.
-Opening a harness session here starts the server from the checked-out source with the blackboard
-credentials, so review untrusted branches without a session or with the credentials unset.
+The machine-registered server runs its own installation and loads no code from this checkout, but
+the source CLI here still sees the blackboard credentials when run with them, so review untrusted
+branches with the credentials unset.
 
 ## Extracted modules
 
