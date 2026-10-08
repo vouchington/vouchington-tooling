@@ -5,13 +5,11 @@ async function loadParser() {
   const metadata: { version: string } = JSON.parse(
     await readFile(new URL('package.json', entry), 'utf8'),
   )
-  const [major, minor] = metadata.version.split('.').map(Number)
-  if (
-    !Number.isInteger(major) ||
-    !Number.isInteger(minor) ||
-    major! < 0 ||
-    (major === 0 && minor! < 81)
-  ) {
+  const version = /^(\d+)\.(\d+)\.(\d+)(-[\w.-]+)?(?:\+[\w.-]+)?$/.exec(metadata.version)
+  const major = Number(version?.[1])
+  const minor = Number(version?.[2])
+  const patch = Number(version?.[3])
+  if (!version || (major === 0 && (minor < 81 || (minor === 81 && patch === 0 && version[4])))) {
     throw new Error('extractIndexShapes requires no-mistakes >=0.81.0')
   }
   return import('no-mistakes')
