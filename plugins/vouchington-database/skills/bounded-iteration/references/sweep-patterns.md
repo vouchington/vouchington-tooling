@@ -362,7 +362,10 @@ An account crosses age `M` when `now - M` passes its creation time, which the ke
 "crossed `M` since the last run" is a primary-key range with no stored column. `$1` is the previous
 run's time minus an overlap (the window start), `$2` the window end, fixed when the window opens,
 `$3` the milestone interval, `$4` the last `id` already read (the nil UUID at the start of a
-window), and `$5` the cap:
+window), and `$5` the cap. This holds only when ids are minted at creation and never for imports
+or backfills; where that is not guaranteed, drive milestones from an indexed immutable `created_at`
+range instead (see the [parent lower bound](../../postgres-partitioning-uuid-v7/references/partition-lifecycle.md#parent-lower-bound)
+conditions on historical ids):
 
 ```sql
 CREATE INDEX idx_accounts__open ON accounts (id) WHERE closed_at IS NULL;
@@ -521,7 +524,7 @@ for (const account of await db.query(recentlyChangedAccountsSql, [
 ])) {
   // Monotonic: the write compares `version`, so a delayed repair never overwrites a newer value.
   await accountCache.fillIfNotOlder(account.id, account, account.version)
-  await handleFilter.add(account.handle) // idempotent: re-adds a key a failed write path missed
+  await addHandle(account.handle) // idempotent; the invalidating helper from membership filters
 }
 ```
 
@@ -566,7 +569,11 @@ export async function hasHandle(handle: string): Promise<boolean> {
   }
   // Hint only: a negative means "definitely absent" for keys committed before the last
   // successful add or rebuild. A positive may be a false positive, so verify it at the source.
-  if (!(await handleFilter.has(handle))) return false
+  try {
+    if (!(await handleFilter.has(handle))) return false
+  } catch {
+    await enqueueRebuild(await handleFilter.invalidate()) // a failing filter is not trusted
+  }
   return handleExistsInDatabase(handle)
 }
 ```
@@ -579,7 +586,9 @@ read-your-writes lookup, use the database or its unique constraint and never tru
 The rebuild is an explicit, capped, resumable backfill with a keyset cursor, as in the
 high-water-mark window. Each capped page enqueues its continuation with the cursor in the job id
 (`rebuildFilter__handles__${generation}__${afterId}`), because a generation-only id would block the
-next page of the same generation. The rebuild captures its generation when it starts and sets the
+next page of the same generation. Each page checks that its generation is still current before
+scanning and again before enqueueing a continuation, and a stale page exits without doing
+anything. The rebuild captures its generation when it starts and sets the
 ready marker last, by a compare-and-set that succeeds only while that generation is still current
 (`markReady(generation)`), so a stale rebuild never overwrites a newer invalidation. Deleted keys and growth past
 capacity only cost false positives, so they are an operator's rebuild, not a schedule.
@@ -633,10 +642,10 @@ not a bound: items that keep failing at the front starve the rest.
 
 ```ts
 export async function listingJob(
-  { token }: { token?: string },
+  { token, traversalId = randomUUID() }: { token?: string; traversalId?: string },
   config: ListingConfig,
 ): Promise<void> {
-  let next = token
+  let next = token // traversalId is minted when a traversal starts at page one
   for (let page = 0; page < config.maxPagesPerRun; page += 1) {
     const result = await provider.list({ continuationToken: next, maxKeys: config.pageSize })
     await enqueueItems(result.items)
@@ -646,7 +655,12 @@ export async function listingJob(
     next = result.nextToken
     if (!next) return
   }
-  await queue.add('listing', { token: next }, { jobId: `listing__${next}` })
+  // The traversal id keeps a provider that reuses a token across traversals from colliding.
+  await queue.add(
+    'listing',
+    { token: next, traversalId },
+    { jobId: `listing__${traversalId}__${next}` },
+  )
 }
 ```
 
