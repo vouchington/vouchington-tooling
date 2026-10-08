@@ -360,24 +360,31 @@ Filter` is near zero.
 
 An account crosses age `M` when `now - M` passes its creation time, which the key encodes. So
 "crossed `M` since the last run" is a primary-key range with no stored column. `$1` is the previous
-run's time minus an overlap, `$2` the milestone interval, and `$3` the cap:
+run's time minus an overlap (the window start), `$2` the window end, fixed when the window opens,
+`$3` the milestone interval, `$4` the last `id` already read (the nil UUID at the start of a
+window), and `$5` the cap:
 
 ```sql
 CREATE INDEX idx_accounts__open ON accounts (id) WHERE closed_at IS NULL;
 
 SELECT id FROM accounts
-WHERE id >= min_uuidv7($1::timestamptz - $2::interval)
-  AND id <  min_uuidv7(now() - $2::interval)
+WHERE id >= min_uuidv7($1::timestamptz - $3::interval)
+  AND id <  min_uuidv7($2::timestamptz - $3::interval)
+  AND id >  $4
   AND closed_at IS NULL
 ORDER BY id
-LIMIT $3;
+LIMIT $5;
 ```
 
 Without the partial index, `closed_at IS NULL` is a filter on the primary-key range, and a window
 where most accounts are closed reads every one of them. Verify by rows: the plan's rows read stay
 close to the rows returned.
 
-Persist the window's end as the next run's start, as in the high-water-mark window.
+A window can hold more accounts than the cap, so persist the last `id` returned after each batch
+and page inside the fixed window with `id > $4`. Advance the window only after a short batch: the
+next window starts an overlap before this one's end (`$2`), with the nil UUID as `$4`. Moving the
+start to the window's end after a capped batch would skip the accounts not yet read. This is the
+`age_milestone` signal's `last_id` in the dispatcher cursor table below.
 
 ## One dispatcher per signal
 
@@ -530,11 +537,17 @@ export async function hasHandle(handle: string): Promise<boolean> {
     await queue.add('rebuildFilter', {}, { jobId: `rebuildFilter__handles__${generation}` })
     return handleExistsInDatabase(handle)
   }
-  // A negative is definite. A positive may be a false positive, so verify it at the source.
+  // Hint only: a negative means "definitely absent" for keys committed before the last
+  // successful add or rebuild. A positive may be a false positive, so verify it at the source.
   if (!(await handleFilter.has(handle))) return false
   return handleExistsInDatabase(handle)
 }
 ```
+
+The add happens after commit, so while it is in flight a committed handle can be missing from a
+ready filter. The filter is therefore only a hint for callers that tolerate a just-committed miss,
+such as an availability pre-check. Correctness-critical paths, such as a uniqueness check or a
+read-your-writes lookup, use the database or its unique constraint and never trust a negative.
 
 The rebuild is an explicit, capped, resumable backfill with a keyset cursor, as in the
 high-water-mark window; it sets the ready marker when it finishes. Deleted keys and growth past
@@ -593,6 +606,9 @@ export async function listingJob(
   for (let page = 0; page < config.maxPagesPerRun; page += 1) {
     const result = await provider.list({ continuationToken: next, maxKeys: config.pageSize })
     await enqueueItems(result.items)
+    if (result.nextToken !== undefined && result.nextToken === next) {
+      throw new Error('Provider repeated its continuation token') // never loop or re-enqueue it
+    }
     next = result.nextToken
     if (!next) return
   }

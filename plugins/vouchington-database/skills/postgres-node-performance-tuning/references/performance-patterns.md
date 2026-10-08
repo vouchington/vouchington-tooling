@@ -29,7 +29,8 @@ of `RANGE (id)` needs an id or time bound.
 For a `RANGE (id)` child read by parent id, a shared lower-bound helper equivalent to
 `id >= min_uuidv7(uuid_extract_timestamp(parent_id) - interval '1 hour')` prunes earlier
 partitions; the overlap allows clock skew. It is safe only when every writer sets the parent at
-insert to an existing parent and nothing mints child ids from a historical time; see
+insert to an existing parent, never re-points it to a newer parent, and nothing mints child ids
+from a historical time; see
 [parent lower bound](../../postgres-partitioning-uuid-v7/references/partition-lifecycle.md#parent-lower-bound).
 Rate limits query an actor-keyed table rather than
 recipient-keyed fan-out rows. Verify actual pruning with EXPLAIN.
