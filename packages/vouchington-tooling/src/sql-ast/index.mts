@@ -1,5 +1,3 @@
-export { extractMigrationConstraintMetadata } from './constraint.mts'
-export type { ForeignKey, SqlMigrationConstraintMetadata } from './constraint-shared.mts'
 export { extractCreateTableMetadata } from './create-table.mts'
 export type {
   SqlCreateTableColumn,
@@ -7,9 +5,7 @@ export type {
   SqlCreateTableMetadata,
 } from './create-table.mts'
 export { extractDefaultFunction, extractFuncCallArgColumnNames } from './default-function.mts'
-export { extractCreateIndexMetadata } from './index-metadata.mts'
 export { extractIndexShapes } from './index-shapes.mts'
-export type { SqlCreateIndexMetadata, SqlIndexParam } from './index-metadata.mts'
 export { lineOfUtf8ByteOffset } from './line-of-offset.mts'
 export { initSqlAst, MissingSqlAstParserError, parseSql } from './parser.mts'
 export { extractViewDeclarations } from './view-declarations.mts'
