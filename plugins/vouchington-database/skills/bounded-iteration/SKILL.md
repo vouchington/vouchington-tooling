@@ -45,8 +45,8 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    idempotent job. Writes that cause a signal enqueue directly; the sweep is the backstop. See
    [one dispatcher per signal](references/sweep-patterns.md#one-dispatcher-per-signal).
 10. **Deduplicate jobs by entity and triggering event.** A job id keyed only by the entity drops a
-    new trigger while the last job runs or is retained. Key it by entity and event; a failed
-    retained job still claims its id. See
+    new trigger while the last job runs or is retained. Key it by entity and event; dedup lasts
+    only while the record is retained, and a failed retained job still claims its id. See
     [queue job ids](references/sweep-patterns.md#queue-job-ids-for-deduplication).
 11. **Repair through an existing reconciler.** Repeat a fire-and-forget side effect (cache fill,
     filter add, enqueue) idempotently from the reconciler that already sweeps recently changed

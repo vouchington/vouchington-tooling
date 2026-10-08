@@ -298,28 +298,52 @@ the lookup.
 When the rule lives on the row, such as a per-site refresh interval, compare the stored fact with
 a bound per distinct threshold value, never with another column. `swept_at` stores when the last
 _completed_ sweep started; set it from the sweep's own start time when the sweep reports no more
-work. Each interval value is a bucket the index can seek into:
+work. Each interval value is a bucket the index can seek into. A recursive CTE walks the leading
+column of the index one distinct value at a time (a loose index scan, or skip scan), so finding
+the buckets reads one index entry per bucket, not every enabled site. Each bucket is capped on its
+own, so one busy bucket cannot starve the others and a run reads at most buckets times `$1` rows
+per branch:
 
 ```sql
 CREATE INDEX idx_sites__refresh_due
   ON sites (refresh_interval_days, swept_at NULLS FIRST, id)
   WHERE is_enabled;
 
-SELECT due.id
-FROM (SELECT DISTINCT refresh_interval_days FROM sites WHERE is_enabled) bucket
-CROSS JOIN LATERAL (
-  (SELECT id FROM sites
-   WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
-     AND swept_at IS NULL
-   ORDER BY id LIMIT $1)
+WITH RECURSIVE bucket AS (
+  (SELECT refresh_interval_days FROM sites
+   WHERE is_enabled
+   ORDER BY refresh_interval_days LIMIT 1)
   UNION ALL
-  (SELECT id FROM sites
-   WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
-     AND swept_at < now() - bucket.refresh_interval_days * interval '1 day'
-   ORDER BY swept_at, id LIMIT $1)
-) due
-LIMIT $1;
+  SELECT next_bucket.refresh_interval_days
+  FROM bucket
+  CROSS JOIN LATERAL (
+    SELECT refresh_interval_days FROM sites
+    WHERE is_enabled AND refresh_interval_days > bucket.refresh_interval_days
+    ORDER BY refresh_interval_days LIMIT 1
+  ) next_bucket
+)
+SELECT due.id, bucket.refresh_interval_days
+FROM bucket
+CROSS JOIN LATERAL (
+  SELECT id FROM (
+    (SELECT id FROM sites
+     WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
+       AND swept_at IS NULL
+     ORDER BY id LIMIT $1)
+    UNION ALL
+    (SELECT id FROM sites
+     WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
+       AND swept_at < now() - bucket.refresh_interval_days * interval '1 day'
+     ORDER BY swept_at, id LIMIT $1)
+  ) either_branch
+  LIMIT $1
+) due;
 ```
+
+The loose scan beats a small thresholds table here because the intervals are chosen per row and
+there is no second source of truth to drift. If the intervals are a fixed, reviewed set, a
+thresholds table is just as bounded. Either way the bucket count must itself be bounded, for
+example by a `CHECK` that restricts `refresh_interval_days` to the allowed values.
 
 Comparing `swept_at < now() - refresh_interval_days * interval '1 day'` alone cannot use an index:
 the right side depends on the row's own column, and `timestamptz + interval` is not immutable, so
@@ -339,6 +363,8 @@ An account crosses age `M` when `now - M` passes its creation time, which the ke
 run's time minus an overlap, `$2` the milestone interval, and `$3` the cap:
 
 ```sql
+CREATE INDEX idx_accounts__open ON accounts (id) WHERE closed_at IS NULL;
+
 SELECT id FROM accounts
 WHERE id >= min_uuidv7($1::timestamptz - $2::interval)
   AND id <  min_uuidv7(now() - $2::interval)
@@ -346,6 +372,10 @@ WHERE id >= min_uuidv7($1::timestamptz - $2::interval)
 ORDER BY id
 LIMIT $3;
 ```
+
+Without the partial index, `closed_at IS NULL` is a filter on the primary-key range, and a window
+where most accounts are closed reads every one of them. Verify by rows: the plan's rows read stay
+close to the rows returned.
 
 Persist the window's end as the next run's start, as in the high-water-mark window.
 
@@ -369,37 +399,51 @@ LIMIT $4;
 
 Replace it with one dispatcher per signal, each with its own index-served predicate, position, and
 schedule. A signal backed by several timestamp columns reads one indexed range per column, joined
-with `UNION ALL`, not an `OR` across columns. `$1` and `$2` are the window, `$3` the cap:
+with `UNION ALL`, not an `OR` across columns. A window can hold more rows than the cap, so each
+dispatcher pages inside it with a composite keyset position, as in the high-water-mark window.
+`$1` is the window end, `$2` and `$3` the position (`last_at`, `last_id`), and `$4` the cap:
 
 ```sql
--- age milestones: the accounts range above
+-- age milestones: the accounts range above, with `id > $3` as the position and
+-- `id < min_uuidv7($1 - milestone)` as the window end
 
--- subscription expirations: one indexed range per timestamp column
-(SELECT account_id FROM subscriptions
- WHERE expires_at >= $1 AND expires_at < $2
- ORDER BY expires_at LIMIT $3)
-UNION ALL
-(SELECT account_id FROM subscriptions
- WHERE grace_ends_at >= $1 AND grace_ends_at < $2
- ORDER BY grace_ends_at LIMIT $3);
+-- subscription expirations: one indexed range per timestamp column, merged by (at, id)
+SELECT at, id, account_id FROM (
+  (SELECT expires_at AS at, id, account_id FROM subscriptions
+   WHERE (expires_at, id) > ($2, $3) AND expires_at < $1
+   ORDER BY expires_at, id LIMIT $4)
+  UNION ALL
+  (SELECT grace_ends_at AS at, id, account_id FROM subscriptions
+   WHERE (grace_ends_at, id) > ($2, $3) AND grace_ends_at < $1
+   ORDER BY grace_ends_at, id LIMIT $4)
+) either_column
+ORDER BY at, id
+LIMIT $4;
 
--- plan changes: a UUIDv7 window
+-- plan changes: a UUIDv7 window, with `last_id` as the position
 SELECT id, account_id FROM plan_changes
-WHERE id >= min_uuidv7($1) AND id < min_uuidv7($2)
+WHERE id > $3 AND id < min_uuidv7($1)
 ORDER BY id
-LIMIT $3;
+LIMIT $4;
 ```
 
-Each dispatcher keeps its position in one cursor table keyed by an enum:
+Each dispatcher keeps its window end and position in one cursor table keyed by an enum:
 
 ```sql
 CREATE TYPE account_recalc_signals AS ENUM ('age_milestone', 'subscription_expiry', 'plan_change');
 
 CREATE TABLE account_recalc_cursors (
   signal account_recalc_signals PRIMARY KEY,
-  changes_through_at timestamptz
+  changes_through_at timestamptz NOT NULL,
+  last_at timestamptz NOT NULL,
+  last_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'
 );
 ```
+
+`changes_through_at` is the window end, fixed when the window opens. Advance `(last_at, last_id)`
+after each batch with a compare-and-set. When a batch is short, the window is drained: the next
+window opens with a new `changes_through_at`, and its position restarts an overlap before the
+previous end with the nil `last_id`.
 
 All of them enqueue the same `recalculateAccount` job with the per-event ids below, so a repeat
 read is harmless. Writes that cause a signal, such as recording a plan change, enqueue the job in
@@ -426,8 +470,11 @@ await queue.add(
 )
 ```
 
-This guarantees each trigger is enqueued once, not that it runs. If that job fails for good and its
-record is retained, the same id is still claimed, so retrying it needs an explicit
+While the job record is retained, each trigger is enqueued at most once; that does not mean it
+runs. Deduplication lasts only as long as the record: retention must cover the longest overlap or
+replay interval, or a re-read event enqueues again after the record is removed. A requirement that
+a trigger take effect exactly once needs a durable event ledger, not job ids. If a job fails for
+good and its record is retained, the same id is still claimed, so retrying it needs an explicit
 reactivate-or-remove step before the next add.
 
 ## Repair through an existing reconciler
@@ -447,36 +494,45 @@ LIMIT $3;
 
 ```ts
 for (const account of await db.query(recentlyChangedAccountsSql, [from, to, config.batchSize])) {
-  await accountCache.fill(account) // idempotent: a repeat is harmless
-  await handleFilter.add(account.handle) // re-adds a key a failed write path missed
+  // Monotonic: the write compares `changedAt`, so a delayed repair never overwrites a newer value.
+  await accountCache.fillIfNotOlder(account.id, account, account.changed_at)
+  await handleFilter.add(account.handle) // idempotent: re-adds a key a failed write path missed
 }
 ```
 
-Repeating the side effect must be idempotent, because the overlap reads rows twice.
+Idempotence alone is not enough, because the overlap reads rows twice and a delayed repair can land
+after a newer write. Make each repair monotonic: compare `changed_at` or a version on write, or
+invalidate the cache entry and let the next read load the current row.
 
 ## Membership filters
 
 A membership filter needs every key, but never on a schedule. The write path adds immediately after
 commit. A failed add stops trusting the filter, by clearing its ready marker so reads fall back to
-the source of truth, and enqueues a rebuild under a fixed job id. The reconciler repairs missed
-adds from its window, and a read that finds the filter missing enqueues the same rebuild:
+the source of truth, and enqueues a rebuild. The job id includes the filter generation: a fixed id
+would stay claimed once its record is retained, so a later failure could never enqueue. Each
+invalidation bumps the generation, so concurrent enqueues for one failure share an id and a new
+failure gets a new one. The reconciler repairs missed adds from its window, and a read that finds
+the filter missing enqueues the same rebuild:
 
 ```ts
 export async function addHandle(handle: string): Promise<void> {
   try {
     await handleFilter.add(handle)
   } catch {
-    await handleFilter.clearReady()
-    await queue.add('rebuildFilter', {}, { jobId: 'rebuildFilter__handles' })
+    const generation = await handleFilter.invalidate() // clears ready, bumps the generation
+    await queue.add('rebuildFilter', {}, { jobId: `rebuildFilter__handles__${generation}` })
   }
 }
 
 export async function hasHandle(handle: string): Promise<boolean> {
   if (!(await handleFilter.isReady())) {
-    await queue.add('rebuildFilter', {}, { jobId: 'rebuildFilter__handles' })
+    const generation = await handleFilter.generation()
+    await queue.add('rebuildFilter', {}, { jobId: `rebuildFilter__handles__${generation}` })
     return handleExistsInDatabase(handle)
   }
-  return handleFilter.has(handle) || handleExistsInDatabase(handle)
+  // A negative is definite. A positive may be a false positive, so verify it at the source.
+  if (!(await handleFilter.has(handle))) return false
+  return handleExistsInDatabase(handle)
 }
 ```
 
@@ -495,11 +551,16 @@ WITH per_plan AS (
   FROM subscriptions s
   WHERE s.canceled_at IS NULL
   GROUP BY s.channel_id, s.plan_id
-), scores AS (
+), weighted AS (
   SELECT p.channel_id, sum(p.subscribers * plan.subscriber_weight) AS score
   FROM per_plan p
   JOIN plans plan ON plan.id = p.plan_id
   GROUP BY p.channel_id
+), scores AS (
+  -- Start from channels so one with no active subscribers scores 0 instead of dropping out.
+  SELECT c.id AS channel_id, coalesce(w.score, 0) AS score
+  FROM channels c
+  LEFT JOIN weighted w ON w.channel_id = c.id
 ), ranked AS (
   SELECT channel_id, CUME_DIST() OVER (ORDER BY score) AS percentile
   FROM scores
