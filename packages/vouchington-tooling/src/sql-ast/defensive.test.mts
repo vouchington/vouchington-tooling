@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 describe('sql-ast defensive parse trees', () => {
-  it('covers create-table, constraint, and index empty branches', async () => {
+  it('covers create-table empty branches', async () => {
     vi.resetModules()
     const fresh = await import('./index.mts')
     const parseSync = (sql: string) => {
@@ -48,78 +48,12 @@ describe('sql-ast defensive parse trees', () => {
           ],
         }
       }
-      if (sql === 'alter') {
-        return {
-          stmts: [
-            { stmt: { AlterTableStmt: { relation: { relname: 'no_cmds' } } } },
-            {
-              stmt: {
-                AlterTableStmt: {
-                  relation: { relname: 't' },
-                  cmds: [
-                    undefined,
-                    { SelectStmt: {} },
-                    { AlterTableCmd: { subtype: 'AT_DropColumn' } },
-                    { AlterTableCmd: { subtype: 'AT_AddConstraint' } },
-                    {
-                      AlterTableCmd: { subtype: 'AT_AddConstraint', def: { Integer: { ival: 1 } } },
-                    },
-                    {
-                      AlterTableCmd: {
-                        subtype: 'AT_AddConstraint',
-                        def: { Constraint: { contype: 'CONSTR_CHECK' } },
-                      },
-                    },
-                    {
-                      AlterTableCmd: {
-                        subtype: 'AT_ValidateConstraint',
-                        name: 'chk',
-                      },
-                    },
-                  ],
-                },
-              },
-            },
-            { stmt: { DoStmt: { args: [undefined, { DefElem: {} }] } } },
-          ],
-        }
-      }
-      return {
-        stmts: [
-          { stmt: { IndexStmt: {} } },
-          { stmt: { IndexStmt: { relation: { relname: 'bare' } } } },
-          {
-            stmt_location: 4,
-            stmt: {
-              IndexStmt: {
-                relation: { relname: 't' },
-                indexParams: [
-                  undefined,
-                  { IndexElem: { name: 'n', opclass: [] } },
-                  { IndexElem: { name: 'n', opclass: [{ String: {} }, { Integer: { ival: 1 } }] } },
-                  { IndexElem: { name: 'n', opclass: [{ String: { sval: 'ops' } }] } },
-                ],
-              },
-            },
-          },
-        ],
-      }
+      return {}
     }
     await fresh.initSqlAst(async () => ({ loadModule: async () => undefined, parseSync }) as never)
     expect(fresh.extractCreateTableMetadata('empty')).toEqual([])
     expect(
       fresh.extractCreateTableMetadata('create').some((table) => table.tableName === 't'),
     ).toBe(true)
-    expect(fresh.extractCreateIndexMetadata('create').some((index) => index.relname === 't')).toBe(
-      true,
-    )
-    expect(fresh.extractMigrationConstraintMetadata('empty')).toMatchObject({ foreignKeys: [] })
-    expect(
-      fresh.extractMigrationConstraintMetadata('alter').validatedConstraints.has('t.chk'),
-    ).toBe(true)
-    expect(fresh.extractCreateIndexMetadata('empty')).toEqual([])
-    expect(fresh.extractCreateIndexMetadata('index').some((index) => index.relname === 't')).toBe(
-      true,
-    )
   })
 })

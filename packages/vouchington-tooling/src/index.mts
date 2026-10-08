@@ -94,24 +94,15 @@ export {
 export type { EphemeralListenerOptions, RunnerPortPolicy } from './runner-port-policy/index.mts'
 
 export {
-  extractCreateIndexMetadata,
   extractCreateTableMetadata,
   extractDefaultFunction,
   extractFuncCallArgColumnNames,
-  extractMigrationConstraintMetadata,
   initSqlAst,
   lineOfUtf8ByteOffset,
   MissingSqlAstParserError,
   parseSql,
 } from './sql-ast/index.mts'
-export type {
-  ForeignKey,
-  SqlCreateIndexMetadata,
-  SqlCreateTableColumn,
-  SqlCreateTableMetadata,
-  SqlIndexParam,
-  SqlMigrationConstraintMetadata,
-} from './sql-ast/index.mts'
+export type { SqlCreateTableColumn, SqlCreateTableMetadata } from './sql-ast/index.mts'
 export {
   dollarQuoteEnd,
   lineOf,
