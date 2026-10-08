@@ -4,7 +4,6 @@ import { collectCreateStmtImplicitIndexes } from './implicit-indexes.mts'
 import {
   extractCreateIndexMetadata,
   extractCreateTableMetadata,
-  extractDropIndexMetadata,
   extractMigrationConstraintMetadata,
   initSqlAst,
 } from './index.mts'
@@ -79,12 +78,6 @@ describe('sql-ast helpers', () => {
     `)
     expect(indexes.some((index) => index.unique && index.indexParams.includes('id'))).toBe(true)
     expect(indexes.some((index) => index.idxname === 'items_name_lower')).toBe(true)
-  })
-
-  it('extracts DROP INDEX names', () => {
-    expect(extractDropIndexMetadata('DROP INDEX IF EXISTS public.items_name_idx;')).toEqual([
-      { idxname: 'items_name_idx', location: 0 },
-    ])
   })
 
   it('extracts table-level foreign keys and unique indexes', () => {

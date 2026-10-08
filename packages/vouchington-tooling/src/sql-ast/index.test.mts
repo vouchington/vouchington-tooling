@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { extractAlterTableAddColumnLocations, initSqlAst, lineOfUtf8ByteOffset } from './index.mts'
+import { initSqlAst, lineOfUtf8ByteOffset } from './index.mts'
 
 describe('sql-ast', () => {
   beforeAll(async () => {
@@ -8,25 +8,6 @@ describe('sql-ast', () => {
 
   it('is idempotent when initSqlAst is called twice', async () => {
     await expect(initSqlAst()).resolves.toBeUndefined()
-  })
-
-  it('extracts ALTER TABLE ADD column locations with optional syntax', () => {
-    const content = [
-      'ALTER TABLE users',
-      '  ADD IF NOT EXISTS locale text,',
-      '  ADD COLUMN timezone text;',
-    ].join('\n')
-
-    expect(
-      extractAlterTableAddColumnLocations(content).map((location) =>
-        lineOfUtf8ByteOffset(content, location),
-      ),
-    ).toEqual([1, 1])
-  })
-
-  it('ignores statements that are not ALTER TABLE ADD COLUMN', () => {
-    expect(extractAlterTableAddColumnLocations('SELECT 1;')).toEqual([])
-    expect(extractAlterTableAddColumnLocations('ALTER TABLE users DROP COLUMN locale;')).toEqual([])
   })
 
   it('computes utf-8 line numbers from parser byte offsets', () => {
@@ -47,7 +28,7 @@ describe('sql-ast loader errors', () => {
   it('requires initSqlAst before parse helpers', async () => {
     vi.resetModules()
     const fresh = await import('./index.mts')
-    expect(() => fresh.extractAlterTableAddColumnLocations('SELECT 1;')).toThrow(
+    expect(() => fresh.parseSql('SELECT 1;')).toThrow(
       'initSqlAst() must be awaited before calling parse helpers',
     )
   })
@@ -68,38 +49,6 @@ describe('sql-ast loader errors', () => {
     vi.resetModules()
     const fresh = await import('./index.mts')
     await expect(fresh.initSqlAst(() => Promise.reject(new Error('boom')))).rejects.toThrow('boom')
-  })
-
-  it('covers defensive parse-tree branches with a fake parser', async () => {
-    vi.resetModules()
-    const fresh = await import('./index.mts')
-    const parseSync = (sql: string) => {
-      if (sql === 'empty') return {}
-      return {
-        stmts: [
-          { stmt: undefined },
-          { stmt: { SelectStmt: {} } },
-          { stmt: { AlterTableStmt: {} } },
-          {
-            stmt: {
-              AlterTableStmt: {
-                cmds: [
-                  undefined,
-                  { SelectStmt: {} },
-                  { AlterTableCmd: { subtype: 'AT_DropColumn' } },
-                  { AlterTableCmd: { subtype: 'AT_AddColumn' } },
-                  { AlterTableCmd: { subtype: 'AT_AddColumn', def: { Integer: { ival: 1 } } } },
-                  { AlterTableCmd: { subtype: 'AT_AddColumn', def: { ColumnDef: {} } } },
-                ],
-              },
-            },
-          },
-        ],
-      }
-    }
-    await fresh.initSqlAst(async () => ({ loadModule: async () => undefined, parseSync }) as never)
-    expect(fresh.extractAlterTableAddColumnLocations('empty')).toEqual([])
-    expect(fresh.extractAlterTableAddColumnLocations('tree')).toEqual([0])
   })
 
   it('maps module-not-found only when the import error has that code', async () => {

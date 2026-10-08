@@ -1,4 +1,3 @@
-export { extractAlterTableAddColumnLocations } from './add-column.mts'
 export { extractMigrationConstraintMetadata } from './constraint.mts'
 export type { ForeignKey, SqlMigrationConstraintMetadata } from './constraint-shared.mts'
 export { extractCreateTableMetadata } from './create-table.mts'
@@ -8,8 +7,6 @@ export type {
   SqlCreateTableMetadata,
 } from './create-table.mts'
 export { extractDefaultFunction, extractFuncCallArgColumnNames } from './default-function.mts'
-export { extractDropIndexMetadata } from './drop-index.mts'
-export type { SqlDropIndexMetadata } from './drop-index.mts'
 export { extractCreateIndexMetadata } from './index-metadata.mts'
 export { extractIndexShapes } from './index-shapes.mts'
 export type { SqlCreateIndexMetadata, SqlIndexParam } from './index-metadata.mts'
