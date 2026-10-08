@@ -37,3 +37,25 @@ recipient-keyed fan-out rows. Verify actual pruning with EXPLAIN.
 
 Generic `jonathanong/no-mistakes` checks include `postgres-no-offset`; inspect available rules
 and configure reviewed cross-partition exceptions rather than treating a rule as plan evidence.
+
+## Round trips
+
+Each sequential query costs a network round trip plus planning; count round trips per request
+before tuning individual statements.
+
+Load a parent and the viewer's relation to it in one query: join the membership row, or use a
+lateral subquery, rather than reading the parent and then the relation.
+
+`Promise.all` over statements on one transaction client is still serial, because one connection
+runs one statement at a time. Merge them instead: CTEs, `UNNEST`, or one multi-row statement.
+
+Give every per-item lookup helper a batch twin that takes an array of keys and returns a keyed
+map, and call the twin from loops, `.map` callbacks, and `Promise.all` fan-outs. `no-await-in-loop`
+misses a helper that queries internally and `Promise.all(items.map(helper))`; review those call
+sites by hand.
+
+Overlap independent cache and PostgreSQL reads with `Promise.all`, such as a rate-limiter check
+alongside the user fetch. Serialize only true dependencies, where one result feeds the next call.
+
+Run a symmetric check, such as "is either party blocking the other", as one query with an `OR`
+or both-direction predicate, not twice with the arguments swapped.
