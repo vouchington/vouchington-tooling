@@ -1,5 +1,11 @@
 # PostgreSQL replay context
 
+`await createPostgresReplayContextFromSchema(schema)` collects STORED generated-expression
+references using the optional `no-mistakes` SQL peer, then returns the memoized replay context.
+It rejects malformed expressions, additional statements, and unsupported queries instead of
+treating missing facts as an empty dependency set. Snapshots without STORED expressions do not
+load the peer. Snapshot loading and INSERT policy remain the caller's responsibility.
+
 `createPostgresReplayContext` projects a caller-owned schema snapshot and generated-column
 reference facts into the two lookups used by replay checks. It does not load snapshots, parse SQL,
 or decide INSERT policy.

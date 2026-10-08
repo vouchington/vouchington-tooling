@@ -14,6 +14,56 @@ export type PostgresReplayContext = {
   generatedDependenciesForTable(table: string): ReadonlyMap<string, ReadonlySet<string>> | undefined
 }
 
+/** Collects generated-expression facts with the optional SQL peer, once per snapshot. */
+export async function createPostgresReplayContextFromSchema(
+  schema: SchemaSnapshot,
+): Promise<PostgresReplayContext> {
+  const definitions = Object.entries(schema.tables).flatMap(([table, snapshotTable]) =>
+    Object.entries(snapshotTable.columns).flatMap(([column, definition]) =>
+      definition.generated === 'stored' && definition.generatedExpression !== null
+        ? [{ table, column, expression: definition.generatedExpression }]
+        : [],
+    ),
+  )
+  if (definitions.length === 0) {
+    return createPostgresReplayContext({ schema, generatedColumnReferences: [] })
+  }
+  const { parsePostgresSql } = await import('no-mistakes')
+  const parsed = await parsePostgresSql(
+    definitions.map(({ table, column, expression }) => ({
+      sql: `SELECT (${expression})`,
+      fileName: `schema-snapshot:${table}.${column}`,
+    })),
+  )
+  const generatedColumnReferences = definitions.map(({ table, column }, index) => {
+    const facts = parsed[index]
+    const statement = facts?.statements[0]
+    if (
+      !facts ||
+      facts.diagnostics.length > 0 ||
+      facts.statements.length !== 1 ||
+      statement?.kind !== 'select' ||
+      !statement.query.complete ||
+      statement.query.unsupported.length > 0
+    ) {
+      throw new Error(`Unable to collect generated-column references for ${table}.${column}`)
+    }
+    return {
+      table,
+      column,
+      sourceColumns: [
+        ...new Set(
+          statement.query.columns.flatMap((reference) => {
+            const name = reference.name.parts.at(-1)?.value
+            return name === undefined ? [] : [name]
+          }),
+        ),
+      ],
+    }
+  })
+  return createPostgresReplayContext({ schema, generatedColumnReferences })
+}
+
 /**
  * Projects injected schema snapshot data and parser-derived generated-expression references for
  * replay checks. The caller owns snapshot loading and SQL parsing. Every STORED generated column
