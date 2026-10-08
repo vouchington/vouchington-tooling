@@ -699,7 +699,9 @@ lifecycle decisions.
 ## SQL index shapes
 
 `vouchington-tooling/sql-ast` exports asynchronous `extractIndexShapes(sql)`. Await its result;
-it uses the installed `no-mistakes` SQL facts and does not need `initSqlAst()`. It returns
+it lazily loads the optional `no-mistakes` peer and requires version 0.81.0 or newer when
+called with nonblank SQL. Other SQL exports do not require this peer. It does not need
+`initSqlAst()`. It returns
 `{ idxname, table, shapeKey }` for each named top-level `CREATE INDEX`. Consumers can group
 identical keys to detect collisions. Keys use upstream structural identity, including effective
 sort/null ordering, quoted relation identity, expressions, predicates, operator classes, and
