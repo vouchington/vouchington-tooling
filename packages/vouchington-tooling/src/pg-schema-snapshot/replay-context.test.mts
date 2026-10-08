@@ -52,7 +52,7 @@ describe('createPostgresReplayContext', () => {
   it('collects nested generated dependencies from the released parser facts', async () => {
     const context = await createPostgresReplayContextFromSchema(
       schema({
-        score: column('stored', 'coalesce(up, 0) + down'),
+        score: column('stored', 'coalesce(UP, 0) + down'),
         label: column('stored', 'CASE WHEN "MixedCase" IS NULL THEN alias ELSE "MixedCase" END'),
         constant: column('stored', "'fixed'"),
         virtual: column('virtual', 'ignored'),

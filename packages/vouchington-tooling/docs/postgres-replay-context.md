@@ -13,7 +13,7 @@ or decide INSERT policy.
 The caller supplies one `{ table, column, sourceColumns }` fact for each snapshot column whose
 `generated` value is `stored` and whose `generatedExpression` is present. Build `sourceColumns` from
 the parser's typed expression column references, retaining each reference's final identifier
-component. Supply an empty array for a valid expression with no column references. Missing facts
+identity (unquoted names fold to lowercase; quoted names preserve case). Supply an empty array for a valid expression with no column references. Missing facts
 throw when that table's dependencies are requested, so parser failures cannot silently become an
 empty dependency set.
 
