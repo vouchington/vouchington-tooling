@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 describe('sql-ast defensive parse trees', () => {
-  it('covers create-table, constraint, index, and drop-index empty branches', async () => {
+  it('covers create-table, constraint, and index empty branches', async () => {
     vi.resetModules()
     const fresh = await import('./index.mts')
     const parseSync = (sql: string) => {
@@ -84,26 +84,6 @@ describe('sql-ast defensive parse trees', () => {
           ],
         }
       }
-      if (sql === 'drop') {
-        return {
-          stmts: [
-            { stmt: { DropStmt: { removeType: 'OBJECT_TABLE' } } },
-            { stmt: { DropStmt: { removeType: 'OBJECT_INDEX' } } },
-            {
-              stmt: {
-                DropStmt: {
-                  removeType: 'OBJECT_INDEX',
-                  objects: [
-                    undefined,
-                    { List: {} },
-                    { List: { items: [{ Integer: { ival: 1 } }] } },
-                  ],
-                },
-              },
-            },
-          ],
-        }
-      }
       return {
         stmts: [
           { stmt: { IndexStmt: {} } },
@@ -137,8 +117,6 @@ describe('sql-ast defensive parse trees', () => {
     expect(
       fresh.extractMigrationConstraintMetadata('alter').validatedConstraints.has('t.chk'),
     ).toBe(true)
-    expect(fresh.extractDropIndexMetadata('empty')).toEqual([])
-    expect(fresh.extractDropIndexMetadata('drop')).toEqual([])
     expect(fresh.extractCreateIndexMetadata('empty')).toEqual([])
     expect(fresh.extractCreateIndexMetadata('index').some((index) => index.relname === 't')).toBe(
       true,

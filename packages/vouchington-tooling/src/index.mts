@@ -94,11 +94,9 @@ export {
 export type { EphemeralListenerOptions, RunnerPortPolicy } from './runner-port-policy/index.mts'
 
 export {
-  extractAlterTableAddColumnLocations,
   extractCreateIndexMetadata,
   extractCreateTableMetadata,
   extractDefaultFunction,
-  extractDropIndexMetadata,
   extractFuncCallArgColumnNames,
   extractMigrationConstraintMetadata,
   initSqlAst,
@@ -111,7 +109,6 @@ export type {
   SqlCreateIndexMetadata,
   SqlCreateTableColumn,
   SqlCreateTableMetadata,
-  SqlDropIndexMetadata,
   SqlIndexParam,
   SqlMigrationConstraintMetadata,
 } from './sql-ast/index.mts'
