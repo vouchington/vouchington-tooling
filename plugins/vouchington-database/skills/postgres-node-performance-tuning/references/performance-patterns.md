@@ -26,10 +26,13 @@ Use keyset pagination, never `OFFSET`. An optimizer fence is a `MATERIALIZED` CT
 cross-partition query. Choose the partition key from dominant access patterns; a hot reader
 of `RANGE (id)` needs an id or time bound.
 
-A UUIDv7 child cannot predate its parent. For a `RANGE (id)` child read by parent id, use a
-shared lower-bound helper equivalent to
-`id >= min_uuidv7(uuid_extract_timestamp(parent_id) - interval '1 hour')` to prune earlier
-partitions; the overlap allows clock skew. Rate limits query an actor-keyed table rather than
+For a `RANGE (id)` child read by parent id, a shared lower-bound helper equivalent to
+`id >= min_uuidv7(uuid_extract_timestamp(parent_id) - interval '1 hour')` prunes earlier
+partitions; the overlap allows clock skew. It is safe only when every writer sets the parent at
+insert to an existing parent, never re-points it to a newer parent, and nothing mints child ids
+from a historical time; see
+[parent lower bound](../../postgres-partitioning-uuid-v7/references/partition-lifecycle.md#parent-lower-bound).
+Rate limits query an actor-keyed table rather than
 recipient-keyed fan-out rows. Verify actual pruning with EXPLAIN.
 
 Generic `jonathanong/no-mistakes` checks include `postgres-no-offset`; inspect available rules
