@@ -32,10 +32,11 @@ Use `pr-shepherd` (not `gh pr checks`) to iterate pull requests.
 
 ## Agent Blackboard
 
-Journal through the `vouchington mcp` server, which each machine registers as `vouchington-tooling`
-in every harness. This repository registers no MCP server of its own. Follow
-`vouchington-workflow:blackboard` for the tools and journaling policy. The upstream
-`agent-blackboard` plugin is disabled here. Choose an explicit root session id and ensure it before
+Journal through the `vouchington mcp` server. vouchington-machines registers it machine-wide as
+`vouchington-tooling` in every harness and disables the upstream `agent-blackboard` plugin
+(vouchington#1019); this repository carries no `.mcp.json`, `.claude/settings.json`, or
+`.codex/config.toml` for that. Follow `vouchington-workflow:blackboard` for the tools and
+journaling policy. Choose an explicit root session id and ensure it before
 recording work, preserve exact parent/child session identities, and append contemporaneous notes
 for failed checks, denied permissions, scope changes, repeated fixes, and reusable tool gaps. Tag
 every entry's `repositories` with only the sorted, deduplicated lowercase `owner/name` values

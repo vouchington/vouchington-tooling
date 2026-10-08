@@ -1,7 +1,0 @@
-{
-  "enabledMcpjsonServers": ["vouchington-tooling"],
-  "enabledPlugins": { "agent-blackboard@agent-blackboard": false },
-  "permissions": {
-    "allow": ["mcp__vouchington-tooling__*"]
-  }
-}
