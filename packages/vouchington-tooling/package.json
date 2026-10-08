@@ -388,7 +388,7 @@
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "agent-blackboard": "^0.6.0",
-    "no-mistakes": "^0.78.0",
+    "no-mistakes": "*",
     "typescript": ">=5",
     "vitest": ">=5"
   },
