@@ -15,8 +15,8 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(vitest@5.0.3)
       agent-blackboard:
-        specifier: ^0.6.0
-        version: 0.6.0(supports-color@7.2.0)(zod@4.6.5)
+        specifier: ^0.6.1
+        version: 0.6.1(supports-color@7.2.0)(zod@4.6.5)
       dependency-cruiser:
         specifier: ^18.5.0
         version: 18.5.0
@@ -122,8 +122,8 @@ importers:
         specifier: 4.0.0
         version: 4.0.0
       agent-blackboard:
-        specifier: ^0.6.0
-        version: 0.6.0(supports-color@7.2.0)(zod@4.6.5)
+        specifier: ^0.6.1
+        version: 0.6.1(supports-color@7.2.0)(zod@4.6.5)
       no-mistakes:
         specifier: 0.81.0
         version: 0.81.0
@@ -1202,8 +1202,8 @@ packages:
     resolution: {integrity: sha512-ufJnssQGbxzLNS1Ho9bCtX4rQKCCvoVuDLHoJyc3F9dOGDB4BkWs2Ci0kv53lqocAEQ/Cbi+I2XCsNYGqVYqng==}
     engines: {node: '>=12.0'}
 
-  agent-blackboard@0.6.0:
-    resolution: {integrity: sha512-WhwgBJVLHjwS4K4T3FZGbAS90pXNy/tQqep86q1WrLlzMseGGfI90n0Jb3ukd7ovsAhkSXQ2rJhAB5Xsn1HSDw==}
+  agent-blackboard@0.6.1:
+    resolution: {integrity: sha512-3faF/qWRsUjeVQtnYkSV+MpAqFxbnXj3SPvZDuN0ucVI+IkbjjJ8VtY32lsj8U9u0pGUbwoNj/k5+L/mtPHJPw==}
     engines: {node: '>=24.0.0'}
     hasBin: true
 
@@ -3319,7 +3319,7 @@ snapshots:
 
   adm-zip@0.5.18: {}
 
-  agent-blackboard@0.6.0(supports-color@7.2.0)(zod@4.6.5):
+  agent-blackboard@0.6.1(supports-color@7.2.0)(zod@4.6.5):
     dependencies:
       '@modelcontextprotocol/sdk': 1.31.0(supports-color@7.2.0)(zod@4.6.5)
     transitivePeerDependencies:
