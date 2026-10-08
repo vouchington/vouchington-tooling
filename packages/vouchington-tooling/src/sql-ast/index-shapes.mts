@@ -1,19 +1,4 @@
-import { readFile } from 'node:fs/promises'
-
-async function loadParser() {
-  const entry = import.meta.resolve('no-mistakes')
-  const metadata: { version: string } = JSON.parse(
-    await readFile(new URL('package.json', entry), 'utf8'),
-  )
-  const version = /^(\d+)\.(\d+)\.(\d+)(-[\w.-]+)?(?:\+[\w.-]+)?$/.exec(metadata.version)
-  const major = Number(version?.[1])
-  const minor = Number(version?.[2])
-  const patch = Number(version?.[3])
-  if (!version || (major === 0 && (minor < 81 || (minor === 81 && patch === 0 && version[4])))) {
-    throw new Error('extractIndexShapes requires no-mistakes >=0.81.0')
-  }
-  return import('no-mistakes')
-}
+import { loadPostgresParser } from './no-mistakes-peer.mts'
 
 /**
  * Returns collision keys for named top-level CREATE INDEX statements using released SQL facts.
@@ -25,7 +10,7 @@ export async function extractIndexShapes(
   sql: string,
 ): Promise<{ idxname: string; table: string; shapeKey: string }[]> {
   if (!sql.trim()) return []
-  const { parsePostgresSql } = await loadParser()
+  const { parsePostgresSql } = await loadPostgresParser('extractIndexShapes')
   const facts = await parsePostgresSql({ sql })
   if (facts.diagnostics.length > 0) {
     throw new Error(

@@ -1,3 +1,4 @@
+import { loadPostgresParser } from '../sql-ast/no-mistakes-peer.mts'
 import type { SchemaSnapshot } from './types.mts'
 
 /** Column references for one STORED generated expression, projected from parser facts. */
@@ -28,7 +29,7 @@ export async function createPostgresReplayContextFromSchema(
   if (definitions.length === 0) {
     return createPostgresReplayContext({ schema, generatedColumnReferences: [] })
   }
-  const { parsePostgresSql } = await import('no-mistakes')
+  const { parsePostgresSql } = await loadPostgresParser('createPostgresReplayContextFromSchema')
   const parsed = await parsePostgresSql(
     definitions.map(({ table, column, expression }) => ({
       sql: `SELECT (${expression})`,

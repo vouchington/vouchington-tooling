@@ -17,6 +17,10 @@ it('imports without the optional peer and rejects an older peer before parsing',
     new URL('./index-shapes.mts', import.meta.url),
     join(directory, 'index-shapes.mts'),
   )
+  await copyFile(
+    new URL('./no-mistakes-peer.mts', import.meta.url),
+    join(directory, 'no-mistakes-peer.mts'),
+  )
   const execute = promisify(execFile)
   const imported = await execute(
     process.execPath,
