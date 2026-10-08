@@ -293,12 +293,251 @@ const fresh = candidates.filter((ref) => !known.has(ref))
 When the goal is only to insert the new rows, `INSERT ... ON CONFLICT DO NOTHING RETURNING` skips
 the lookup.
 
-## Work that needs every key
+## Per-row interval: one bucket per threshold
 
-A membership filter or a reindex needs every key, but not on every run. Keep the derived state
-current on write: the insert or a dirty marker updates it. A full rebuild is a backfill started on
-purpose, with a row cap per run and a keyset cursor to resume from, as in the high-water-mark
-window. A scheduler never starts it as a pass over everything.
+When the rule lives on the row, such as a per-site refresh interval, compare the stored fact with
+a bound per distinct threshold value, never with another column. `swept_at` stores when the last
+_completed_ sweep started; set it from the sweep's own start time when the sweep reports no more
+work. Each interval value is a bucket the index can seek into:
+
+```sql
+CREATE INDEX idx_sites__refresh_due
+  ON sites (refresh_interval_days, swept_at NULLS FIRST, id)
+  WHERE is_enabled;
+
+SELECT due.id
+FROM (SELECT DISTINCT refresh_interval_days FROM sites WHERE is_enabled) bucket
+CROSS JOIN LATERAL (
+  (SELECT id FROM sites
+   WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
+     AND swept_at IS NULL
+   ORDER BY id LIMIT $1)
+  UNION ALL
+  (SELECT id FROM sites
+   WHERE is_enabled AND refresh_interval_days = bucket.refresh_interval_days
+     AND swept_at < now() - bucket.refresh_interval_days * interval '1 day'
+   ORDER BY swept_at, id LIMIT $1)
+) due
+LIMIT $1;
+```
+
+Comparing `swept_at < now() - refresh_interval_days * interval '1 day'` alone cannot use an index:
+the right side depends on the row's own column, and `timestamptz + interval` is not immutable, so
+the sum cannot be indexed or stored as a generated column. Inside a bucket the interval is a
+constant, so the bound is a plain range on `swept_at`.
+
+Each condition is its own branch. `swept_at IS NULL OR swept_at < $bound` is not one index range:
+the planner makes `refresh_interval_days = k` the index condition and applies the `OR` as a filter.
+When fewer rows are due than the cap, that scan reads every row in the bucket. Verify by rows, not
+scan type: the plan's actual rows read stay close to the rows returned, and `Rows Removed by
+Filter` is near zero.
+
+## Age milestones from the UUIDv7 key
+
+An account crosses age `M` when `now - M` passes its creation time, which the key encodes. So
+"crossed `M` since the last run" is a primary-key range with no stored column. `$1` is the previous
+run's time minus an overlap, `$2` the milestone interval, and `$3` the cap:
+
+```sql
+SELECT id FROM accounts
+WHERE id >= min_uuidv7($1::timestamptz - $2::interval)
+  AND id <  min_uuidv7(now() - $2::interval)
+  AND closed_at IS NULL
+ORDER BY id
+LIMIT $3;
+```
+
+Persist the window's end as the next run's start, as in the high-water-mark window.
+
+## One dispatcher per signal
+
+The anti-pattern is one keyset walk over every account with an `OR` of unrelated reasons. No index
+serves the `OR`, so every account is read to find the few that need work:
+
+```sql
+SELECT a.id
+FROM accounts a
+WHERE a.id > $1
+  AND (a.id < min_uuidv7(now() - $2::interval)
+       OR EXISTS (SELECT 1 FROM subscriptions s
+                  WHERE s.account_id = a.id AND s.expires_at < now())
+       OR EXISTS (SELECT 1 FROM plan_changes c
+                  WHERE c.account_id = a.id AND c.id > $3))
+ORDER BY a.id
+LIMIT $4;
+```
+
+Replace it with one dispatcher per signal, each with its own index-served predicate, position, and
+schedule. A signal backed by several timestamp columns reads one indexed range per column, joined
+with `UNION ALL`, not an `OR` across columns. `$1` and `$2` are the window, `$3` the cap:
+
+```sql
+-- age milestones: the accounts range above
+
+-- subscription expirations: one indexed range per timestamp column
+(SELECT account_id FROM subscriptions
+ WHERE expires_at >= $1 AND expires_at < $2
+ ORDER BY expires_at LIMIT $3)
+UNION ALL
+(SELECT account_id FROM subscriptions
+ WHERE grace_ends_at >= $1 AND grace_ends_at < $2
+ ORDER BY grace_ends_at LIMIT $3);
+
+-- plan changes: a UUIDv7 window
+SELECT id, account_id FROM plan_changes
+WHERE id >= min_uuidv7($1) AND id < min_uuidv7($2)
+ORDER BY id
+LIMIT $3;
+```
+
+Each dispatcher keeps its position in one cursor table keyed by an enum:
+
+```sql
+CREATE TYPE account_recalc_signals AS ENUM ('age_milestone', 'subscription_expiry', 'plan_change');
+
+CREATE TABLE account_recalc_cursors (
+  signal account_recalc_signals PRIMARY KEY,
+  changes_through_at timestamptz
+);
+```
+
+All of them enqueue the same `recalculateAccount` job with the per-event ids below, so a repeat
+read is harmless. Writes that cause a signal, such as recording a plan change, enqueue the job in
+the write path. The dispatchers are the backstop for a missed enqueue.
+
+## Queue job ids for deduplication
+
+A queue that deduplicates by job id ignores an add whose id already exists, including a job that is
+running or retained after completion. An id keyed only by the entity drops a new trigger:
+
+```ts
+// Account A's job is running when A's subscription expires: this second add is ignored.
+await queue.add('recalculateAccount', { accountId }, { jobId: `recalc__${accountId}` })
+```
+
+Key the id by the entity and the event instead. Re-reading the same event in an overlap gives the
+same id, and a new event gets a new id:
+
+```ts
+await queue.add(
+  'recalculateAccount',
+  { accountId, changeId },
+  { jobId: `recalc__${accountId}__planChanged__${changeId}` },
+)
+```
+
+This guarantees each trigger is enqueued once, not that it runs. If that job fails for good and its
+record is retained, the same id is still claimed, so retrying it needs an explicit
+reactivate-or-remove step before the next add.
+
+## Repair through an existing reconciler
+
+When a side effect after commit is fire-and-forget (a cache fill, a filter add, an enqueue), repair
+it in the reconciler that already reads a `changed_through_at` window of recently changed rows. Do
+not create a new sweeper. `$1` is the window start minus an overlap, `$2` the window end, and `$3`
+the cap:
+
+```sql
+SELECT id, handle, changed_at
+FROM accounts
+WHERE changed_at > $1 AND changed_at <= $2
+ORDER BY changed_at, id
+LIMIT $3;
+```
+
+```ts
+for (const account of await db.query(recentlyChangedAccountsSql, [from, to, config.batchSize])) {
+  await accountCache.fill(account) // idempotent: a repeat is harmless
+  await handleFilter.add(account.handle) // re-adds a key a failed write path missed
+}
+```
+
+Repeating the side effect must be idempotent, because the overlap reads rows twice.
+
+## Membership filters
+
+A membership filter needs every key, but never on a schedule. The write path adds immediately after
+commit. A failed add stops trusting the filter, by clearing its ready marker so reads fall back to
+the source of truth, and enqueues a rebuild under a fixed job id. The reconciler repairs missed
+adds from its window, and a read that finds the filter missing enqueues the same rebuild:
+
+```ts
+export async function addHandle(handle: string): Promise<void> {
+  try {
+    await handleFilter.add(handle)
+  } catch {
+    await handleFilter.clearReady()
+    await queue.add('rebuildFilter', {}, { jobId: 'rebuildFilter__handles' })
+  }
+}
+
+export async function hasHandle(handle: string): Promise<boolean> {
+  if (!(await handleFilter.isReady())) {
+    await queue.add('rebuildFilter', {}, { jobId: 'rebuildFilter__handles' })
+    return handleExistsInDatabase(handle)
+  }
+  return handleFilter.has(handle) || handleExistsInDatabase(handle)
+}
+```
+
+The rebuild is an explicit, capped, resumable backfill with a keyset cursor, as in the
+high-water-mark window; it sets the ready marker when it finishes. Deleted keys and growth past
+capacity only cost false positives, so they are an operator's rebuild, not a schedule.
+
+## Global ranking
+
+A result that depends on every row, such as a percentile tier, needs every row's score whatever the
+design. Keep one periodic aggregate. `$1` and `$2` are the tier cutoffs:
+
+```sql
+WITH per_plan AS (
+  SELECT s.channel_id, s.plan_id, count(*) AS subscribers
+  FROM subscriptions s
+  WHERE s.canceled_at IS NULL
+  GROUP BY s.channel_id, s.plan_id
+), scores AS (
+  SELECT p.channel_id, sum(p.subscribers * plan.subscriber_weight) AS score
+  FROM per_plan p
+  JOIN plans plan ON plan.id = p.plan_id
+  GROUP BY p.channel_id
+), ranked AS (
+  SELECT channel_id, CUME_DIST() OVER (ORDER BY score) AS percentile
+  FROM scores
+)
+SELECT channel_id,
+       CASE WHEN percentile >= $1 THEN 'top'
+            WHEN percentile >= $2 THEN 'mid'
+            ELSE 'low' END AS tier
+FROM ranked;
+```
+
+Write back only the changed tiers, in capped keyset batches over the result. Keeping a subscriber
+count current on every subscribe and unsubscribe is more total work: it makes one hot `channels`
+row take every write, and a plan change fans out to every channel the account follows. It does not
+make tiers fresher either, because the percentile still needs every channel's score. Give the one
+aggregate pass an EXPLAIN budget at representative size.
+
+## External listing with a continuation token
+
+An object-storage or API listing loop caps the pages per run. When more remain, it enqueues a
+continuation job carrying the provider's continuation token. Restarting from page one each run is
+not a bound: items that keep failing at the front starve the rest.
+
+```ts
+export async function listingJob(
+  { token }: { token?: string },
+  config: ListingConfig,
+): Promise<void> {
+  let next = token
+  for (let page = 0; page < config.maxPagesPerRun; page += 1) {
+    const result = await provider.list({ continuationToken: next, maxKeys: config.pageSize })
+    await enqueueItems(result.items)
+    next = result.nextToken
+    if (!next) return
+  }
+  await queue.add('listing', { token: next }, { jobId: `listing__${next}` })
+}
+```
 
 ## Verify with a plan
 
@@ -338,5 +577,11 @@ claim statement, and check the index scan's actual rows while several workers cl
 | A key-only walk: select every account id, then check each   | Touches every entity to find the few with work                           | Read work items, dirty markers, or a due timestamp           |
 | A literal `LIMIT 500` in SQL text                           | Cannot be tuned per environment or during an incident                    | A validated tunable with a hard maximum, bound as `LIMIT $1` |
 | `Promise.all(accounts.map(sync))` over a result of any size | One task per row exhausts the pool or the upstream API                   | A bounded batch with bounded concurrency                     |
+| An `OR` across unrelated signals in one walk                | No index serves the `OR`, so every account is read                       | One dispatcher per signal, each with its own range           |
+| Comparing a fact column with a per-row interval column      | The sum is not indexable, so every row is read                           | One bucket per interval value, bounded by a plain range      |
+| Job ids keyed only by entity                                | A running or retained job silently drops a new trigger                   | An id keyed by entity and triggering event                   |
+| A new sweeper beside an existing reconciler                 | A second pass over rows the reconciler already reads                     | Add the idempotent repair to the existing reconciler         |
+| A scheduled membership filter rebuild                       | Reads every key on every run                                             | Rebuild on operator action or detected failure only          |
+| Restarting an external listing at page one                  | Failing items at the front starve the rest                               | A continuation job carrying the provider's token             |
 | `OFFSET` pagination                                         | Every page rescans and discards the rows before it                       | Keyset on the indexed key                                    |
 | `UPDATE` or `DELETE` with a predicate but no `LIMIT`        | One statement locks and rewrites an unbounded row set in one transaction | A CTE that selects a capped, `SKIP LOCKED` id set            |
