@@ -60,3 +60,4 @@ export type {
   SchemaTableSnapshot,
   SchemaViewSnapshot,
 } from './types.mts'
+export { extractStaticStringPairs } from './static-string-pairs.mts'

@@ -698,6 +698,16 @@ reexports, and literal dynamic/require loads. Missing or incomplete facts for a 
 throw; external specifiers resolve to `null`. The default file inventory limit is 10,000
 files and can be reduced with `maxFiles`.
 
+## Static schema-allowlist pairs
+
+`extractStaticStringPairs(source)` from `pg-schema-snapshot` collects the first two string literals
+of every array expression in ESTree field traversal order, including arrays with extra elements.
+Conditional alternatives precede consequents, preserving the existing parser walker. It
+preserves duplicates and decoded string values. It does not evaluate imports, exported constants,
+spreads, or templates, and malformed source throws. Schema-allowlist consumers retain their own
+file selection, key filtering, deduplication, snapshot comparison, and diagnostics. Parsing is
+source-only and does not build a TypeScript compiler program or execute the source.
+
 ## SQL view declarations
 
 `vouchington-tooling/sql-ast` exports `extractViewDeclarations(sql)` and the
