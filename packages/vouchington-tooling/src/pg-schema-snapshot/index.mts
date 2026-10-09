@@ -1,3 +1,8 @@
+export { projectGeneratedArbiterInput } from './generated-arbiter-input.mts'
+export type {
+  GeneratedArbiterInput,
+  GeneratedArbiterAssignmentInput,
+} from './generated-arbiter-input.mts'
 export { buildSchemaSnapshot, buildTableSnapshots } from './build-snapshot.mts'
 export {
   readColumns,

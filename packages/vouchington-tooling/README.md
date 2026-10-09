@@ -512,6 +512,16 @@ the dedicated process group to exit after the direct child closes so descendants
 `isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
 process-group probe and bounded-drain semantics outside a browser session.
 
+### Generated arbiter input
+
+The `pg-schema-snapshot` export also provides `projectGeneratedArbiterInput(conflict)` for
+`PostgresSqlConflict` facts from `no-mistakes@0.83.0` or newer. It projects normalized key and
+partial-predicate column identities, ordered assignment columns, direct non-EXCLUDED references,
+and assignment indirection. Named constraints and unresolved expression keys have undefined
+`keyColumns`; missing or incomplete expression coverage sets `complete` to false. Callers must
+reject incomplete projections and retain their own snapshot-dependent replay verdict. The adapter
+loads no optional parser peer at runtime and implements no replay-safety policy.
+
 ### Contract schema type queries
 
 `getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
