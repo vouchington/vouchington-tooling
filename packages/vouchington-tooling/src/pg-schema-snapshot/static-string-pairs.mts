@@ -1,7 +1,8 @@
 import { isNode, parseSource, walk } from '../post-publication-inventory/readers/source-ast.mts'
 
 /**
- * Collects the first two string literals of every source array expression, in traversal order.
+ * Collects the first two string literals of every source array in ESTree field traversal order.
+ * Order follows the existing parser walker, including conditional alternatives before consequents.
  * Arrays may contain further elements. This does not evaluate constants, imports, or spreads;
  * repeated pairs remain repeated so callers can apply their own selection and deduplication.
  * Invalid source throws through the source-only parser.

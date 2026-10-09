@@ -17,6 +17,27 @@ describe('extractStaticStringPairs', () => {
     ])
   })
 
+  it('preserves legacy ESTree field order across conditionals, parameter defaults, and loops', () => {
+    expect(
+      extractStaticStringPairs(`
+        flag ? [['first.id', 'first']] : [['second.id', 'second']]
+        function run(value = [['parameter.id', 'parameter']]) {
+          return [['function_body.id', 'function body']]
+        }
+        for (const value of [['iterable.id', 'iterable']]) {
+          const body = [['loop_body.id', 'loop body']]
+        }
+      `),
+    ).toEqual([
+      ['second.id', 'second'],
+      ['first.id', 'first'],
+      ['function_body.id', 'function body'],
+      ['parameter.id', 'parameter'],
+      ['loop_body.id', 'loop body'],
+      ['iterable.id', 'iterable'],
+    ])
+  })
+
   it('decodes strings and retains empty strings without imposing a schema-key pattern', () => {
     expect(
       extractStaticStringPairs(String.raw`[['not a column', ''], ["a\u002eb", 'it\'s']];`),

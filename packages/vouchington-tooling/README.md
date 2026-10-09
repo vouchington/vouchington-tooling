@@ -689,7 +689,8 @@ files and can be reduced with `maxFiles`.
 ## Static schema-allowlist pairs
 
 `extractStaticStringPairs(source)` from `pg-schema-snapshot` collects the first two string literals
-of every array expression in source traversal order, including arrays with extra elements. It
+of every array expression in ESTree field traversal order, including arrays with extra elements.
+Conditional alternatives precede consequents, preserving the existing parser walker. It
 preserves duplicates and decoded string values. It does not evaluate imports, exported constants,
 spreads, or templates, and malformed source throws. Schema-allowlist consumers retain their own
 file selection, key filtering, deduplication, snapshot comparison, and diagnostics. Parsing is
