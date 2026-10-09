@@ -41,6 +41,8 @@ describe('projectGeneratedArbiterInput', () => {
   it.each([
     ['source = source', 'source', false],
     ['source = items.source', 'source', false],
+    ['source = (source)', 'source', false],
+    ['source = (items.source)', 'source', false],
     ['source = EXCLUDED.source', undefined, false],
     ['source = source::text', undefined, false],
     ["source = 'fixed'", undefined, false],
@@ -59,6 +61,16 @@ describe('projectGeneratedArbiterInput', () => {
       })
     },
   )
+
+  it('retains a direct nested parenthesized reference while closing incomplete child facts', async () => {
+    const { projected } = await input('(key)', 'source = ((items.source))')
+    expect(projected.complete).toBe(false)
+    expect(projected.assignments[0]).toMatchObject({
+      referencedColumn: 'source',
+      hasIndirection: false,
+      complete: false,
+    })
+  })
 
   it('retains ordered multi-column assignments without treating tuple values as bare references', async () => {
     const { projected } = await input('(key)', '(source, other) = (other, source)')

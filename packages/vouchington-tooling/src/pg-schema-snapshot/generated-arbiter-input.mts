@@ -53,7 +53,8 @@ export function projectGeneratedArbiterInput(conflict: PostgresSqlConflict): Gen
             columns.every((column) => column !== undefined) &&
             expressionComplete(assignment.expression)
           complete &&= represented
-          const root = assignment.expression.root
+          let root = assignment.expression.root
+          while (root.kind === 'parenthesized') root = root.expression
           return {
             columns: columns.filter((column): column is string => column !== undefined),
             referencedColumn:
