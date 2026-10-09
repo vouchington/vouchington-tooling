@@ -30,6 +30,7 @@ describe('projectGeneratedArbiterInput', () => {
     ['((lower(label)))', ['label']],
     ['((source || source))', ['source']],
     ['((source || other))', undefined],
+    ['((lower(EXCLUDED.source)))', undefined],
     ['((1))', undefined],
     ['ON CONSTRAINT item_key', undefined],
   ])('resolves expression key %s conservatively', async (target, keys) => {
