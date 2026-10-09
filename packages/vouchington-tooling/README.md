@@ -512,15 +512,6 @@ the dedicated process group to exit after the direct child closes so descendants
 `isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
 process-group probe and bounded-drain semantics outside a browser session.
 
-### Static schema-allowlist pairs
-
-`extractStaticStringPairs(source)` from `pg-schema-snapshot` collects the first two string literals
-of every array expression in source traversal order, including arrays with extra elements. It
-preserves duplicates and decoded string values. It does not evaluate imports, exported constants,
-spreads, or templates, and malformed source throws. Schema-allowlist consumers retain their own
-file selection, key filtering, deduplication, snapshot comparison, and diagnostics. Parsing is
-source-only and does not build a TypeScript compiler program or execute the source.
-
 ### Contract schema type queries
 
 `getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
@@ -694,6 +685,15 @@ presence, and `reachableFrom(entrypoints, { runtimeOnly: true })` follows used r
 reexports, and literal dynamic/require loads. Missing or incomplete facts for a reached file
 throw; external specifiers resolve to `null`. The default file inventory limit is 10,000
 files and can be reduced with `maxFiles`.
+
+## Static schema-allowlist pairs
+
+`extractStaticStringPairs(source)` from `pg-schema-snapshot` collects the first two string literals
+of every array expression in source traversal order, including arrays with extra elements. It
+preserves duplicates and decoded string values. It does not evaluate imports, exported constants,
+spreads, or templates, and malformed source throws. Schema-allowlist consumers retain their own
+file selection, key filtering, deduplication, snapshot comparison, and diagnostics. Parsing is
+source-only and does not build a TypeScript compiler program or execute the source.
 
 ## SQL view declarations
 

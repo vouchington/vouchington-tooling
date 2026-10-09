@@ -1,4 +1,3 @@
-export { extractStaticStringPairs } from './static-string-pairs.mts'
 export { buildSchemaSnapshot, buildTableSnapshots } from './build-snapshot.mts'
 export {
   readColumns,
@@ -55,3 +54,4 @@ export type {
   SchemaTableSnapshot,
   SchemaViewSnapshot,
 } from './types.mts'
+export { extractStaticStringPairs } from './static-string-pairs.mts'
