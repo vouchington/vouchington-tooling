@@ -40,8 +40,9 @@ and configure reviewed cross-partition exceptions rather than treating a rule as
 
 ## Round trips
 
-Each sequential query costs a network round trip plus planning; count round trips per request
-before tuning individual statements.
+Sequential queries can add network round trips when the client waits between statements, and planning
+can add latency when PostgreSQL does not reuse a prepared plan; count round trips per request before
+tuning individual statements.
 
 Load a parent and the viewer's relation to it in one query: join the membership row, or use a
 lateral subquery, rather than reading the parent and then the relation.
