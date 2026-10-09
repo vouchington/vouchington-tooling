@@ -1,4 +1,8 @@
-import type { PostgresSqlConflict, PostgresSqlExpression, PostgresSqlName } from 'no-mistakes'
+import type {
+  GeneratedArbiterConflict,
+  GeneratedArbiterExpression,
+  GeneratedArbiterName,
+} from './generated-arbiter-facts.mts'
 
 export type GeneratedArbiterAssignmentInput = {
   columns: readonly string[]
@@ -21,7 +25,9 @@ export type GeneratedArbiterInput = {
 /** Projects released SQL facts for a snapshot-dependent generated-column replay verdict.
  * This reports syntax and identities only; callers own protection and safety policy.
  */
-export function projectGeneratedArbiterInput(conflict: PostgresSqlConflict): GeneratedArbiterInput {
+export function projectGeneratedArbiterInput(
+  conflict: GeneratedArbiterConflict,
+): GeneratedArbiterInput {
   let complete = true
   const predicateColumns = new Set<string>()
   if (conflict.predicate) {
@@ -73,22 +79,22 @@ export function projectGeneratedArbiterInput(conflict: PostgresSqlConflict): Gen
   return { action: conflict.action.kind, keyColumns, predicateColumns, assignments, complete }
 }
 
-function lastIdentity(name: PostgresSqlName): string | undefined {
+function lastIdentity(name: GeneratedArbiterName): string | undefined {
   return name.parts.at(-1)?.identity
 }
 
-function isExcluded(name: PostgresSqlName): boolean {
+function isExcluded(name: GeneratedArbiterName): boolean {
   return name.parts.length === 2 && name.parts[0]?.identity === 'excluded'
 }
 
-function collectColumns(expression: PostgresSqlExpression, columns: Set<string>): void {
+function collectColumns(expression: GeneratedArbiterExpression, columns: Set<string>): void {
   for (const name of expression.columns) {
     const column = lastIdentity(name)
     if (!isExcluded(name) && column !== undefined) columns.add(column)
   }
 }
 
-function expressionComplete(expression: PostgresSqlExpression): boolean {
+function expressionComplete(expression: GeneratedArbiterExpression): boolean {
   // Older optional peers do not carry completeness; do not silently admit their partial facts.
   return (
     'childrenComplete' in expression &&

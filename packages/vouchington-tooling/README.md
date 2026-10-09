@@ -520,7 +520,9 @@ partial-predicate column identities, ordered assignment columns, direct non-EXCL
 and assignment indirection. Named constraints and unresolved expression keys have undefined
 `keyColumns`; missing or incomplete expression coverage sets `complete` to false. Callers must
 reject incomplete projections and retain their own snapshot-dependent replay verdict. The adapter
-loads no optional parser peer at runtime and implements no replay-safety policy.
+loads no optional parser peer at runtime and implements no replay-safety policy. Its public
+`GeneratedArbiterConflict` contract is structural, so importing snapshot declarations does not
+require the optional peer either.
 
 ### Contract schema type queries
 
