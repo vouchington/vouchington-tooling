@@ -1,5 +1,16 @@
 /* eslint-disable max-lines -- package entry point enumerates the supported public API. */
 
+export {
+  assertTestTimeout,
+  assertTimeoutConfig,
+  guardRegistration,
+  guardRuntimeConfig,
+  guardVitestExports,
+  protectRunnerTimeouts,
+  protectTimeoutConfig,
+} from './test-timeout-policy/index.mts'
+export { testTimeoutPolicyPlugin } from './test-timeout-policy/plugin.mts'
+
 export { linkSkill, readSkillManifest } from './skill-discovery/index.mts'
 export type {
   LinkSkillOptions,

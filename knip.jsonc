@@ -11,6 +11,8 @@
       "ignoreDependencies": ["vitest"],
       "entry": [
         "src/index.mts!",
+        "src/test-timeout-policy/index.mts!",
+        "src/test-timeout-policy/plugin.mts!",
         "src/agent-blackboard/index.mts!",
         "src/session-friction/index.mts!",
         "src/cli/index.mts!",
