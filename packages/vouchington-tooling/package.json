@@ -30,6 +30,16 @@
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
+    "./test-timeout-policy/plugin": {
+      "types": "./dist/test-timeout-policy/plugin.d.mts",
+      "import": "./dist/test-timeout-policy/plugin.mjs",
+      "default": "./dist/test-timeout-policy/plugin.mjs"
+    },
+    "./test-timeout-policy": {
+      "types": "./dist/test-timeout-policy/index.d.mts",
+      "import": "./dist/test-timeout-policy/index.mjs",
+      "default": "./dist/test-timeout-policy/index.mjs"
+    },
     "./config-inventory": {
       "types": "./dist/config-inventory/index.d.mts",
       "import": "./dist/config-inventory/index.mjs",
