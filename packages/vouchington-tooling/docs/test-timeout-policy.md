@@ -6,7 +6,7 @@ including setup and teardown, into a single test deadline. Hooks have separate d
 Vitest test fixtures execute within their enclosing test deadline. A synchronous blocked event loop requires the existing
 outer process deadline and cleanup; an in-process timer cannot preempt it.
 
-## Current Vitest 5 integration contract
+## Current Vitest 5 Node integration contract
 
 Call `protectRunnerTimeouts(this)` after the existing custom runner's constructor.
 It preserves the runner instance and delegates its existing `extendTaskContext`
@@ -68,3 +68,12 @@ errors alongside cleanup diagnostics. Artifacts are read only after close and dr
 undrained resources are retained and fail qualification. Linux ownership checks do
 not provide an atomic pidfd guarantee. The deliberate blocked-loop control is the
 only qualified forced-cleanup child; ordinary children must exit without it.
+
+## Browser boundary
+
+Qualification covers Node Vitest 5 runners. BrowserTestRunner ignores config.runner
+and extends the public TestRunner constructor; the current export-star facade does
+not guard that constructor. Browser runner routing, prebundling and hook registration
+closure are unqualified. This module must not be described as protecting every browser
+case. A public constructor guard and explicit virtual export are a separate proposal
+requiring actual browser qualification before adoption.

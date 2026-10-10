@@ -17,6 +17,7 @@ type Registration = (...args: never[]) => unknown
 type Kind = 'test' | 'suite' | 'hook'
 const curriedMethods = new Set(['each', 'for', 'extend', 'override', 'scoped', 'skipIf', 'runIf'])
 const chainedMethods = new Set(['concurrent', 'shuffle', 'skip', 'only', 'todo', 'fails'])
+const suiteMethods = new Set(['describe', 'suite'])
 const hookMethods = new Set([
   'beforeAll',
   'beforeEach',
@@ -57,8 +58,7 @@ export function guardRegistration<T extends Registration>(
         !curriedMethods.has(name) &&
         !chainedMethods.has(name) &&
         !hookMethods.has(name) &&
-        name !== 'describe' &&
-        name !== 'suite'
+        !suiteMethods.has(name)
       )
         return value
       const guarded = curriedMethods.has(name)
@@ -72,11 +72,7 @@ export function guardRegistration<T extends Registration>(
           })
         : guardRegistration(
             value as Registration,
-            hookMethods.has(name)
-              ? 'hook'
-              : name === 'describe' || name === 'suite'
-                ? 'suite'
-                : kind,
+            hookMethods.has(name) ? 'hook' : suiteMethods.has(name) ? 'suite' : kind,
             maximum,
           )
       cache.set(key, guarded)
