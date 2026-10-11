@@ -7,6 +7,14 @@ export interface NodeRunnerPolicy {
   runner: string | null
 }
 
+type PolicyConfig = {
+  test?: {
+    runner?: string
+    server?: { deps?: { inline?: true | (string | RegExp)[] } }
+    reporters?: string | (string | Reporter)[]
+  }
+}
+
 type OptimizerConfig = { include?: string[]; exclude?: string[] }
 type BrowserConfig = {
   optimizeDeps?: OptimizerConfig
@@ -39,13 +47,17 @@ export function testTimeoutPolicyPlugin(
     name: 'test-timeout-policy',
     enforce: 'pre' as const,
     // Externalized modules bypass Vite resolution entirely; registration helpers must be inlined.
-    config(config: { test?: { runner?: string } } = {}) {
+    config(config: PolicyConfig = {}) {
       if (nodeRunner && config.test?.runner && config.test.runner !== originalRunner)
         throw new Error('Configured runner differs from the supplied final runner')
       return {
         test: {
           ...(nodeRunner ? { runner: runnerId } : {}),
-          server: { deps: { inline: [...registrationPackages] } },
+          server: {
+            deps: {
+              inline: config.test?.server?.deps?.inline === true ? true : [...registrationPackages],
+            },
+          },
         },
       }
     },
@@ -121,7 +133,7 @@ export function browserTestTimeoutPolicyPlugin(
         }
       },
     },
-    config(config: { test?: { reporters?: string | (string | Reporter)[] } } = {}) {
+    config(config: PolicyConfig = {}) {
       const existing = config.test?.reporters
       const reporters =
         existing === undefined ? ['default'] : Array.isArray(existing) ? existing : [existing]
@@ -142,8 +154,8 @@ export function browserTestTimeoutPolicyPlugin(
         },
       }
       return {
-        ...base.config(),
-        test: { ...base.config().test, reporters: [...reporters, lifecycle] },
+        ...base.config(config),
+        test: { ...base.config(config).test, reporters: [...reporters, lifecycle] },
         optimizeDeps: { exclude: excluded },
       }
     },

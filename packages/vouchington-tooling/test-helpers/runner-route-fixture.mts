@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export interface RunnerRouteCase {
+  assertDirectNewTarget?: boolean
   nativeDefault?: boolean
   standalone?: boolean
   mergedOverride?: boolean
@@ -36,6 +37,7 @@ export async function prepareRunnerRoute(
       }
       constructor(config) {
         super(config)
+        ${route.assertDirectNewTarget ? `if (new.target !== FinalRunner) throw new Error('FINAL_NEW_TARGET_CHANGED')` : ''}
         if (Object.getPrototypeOf(FinalRunner.prototype) !== TestRunner.prototype)
           throw new Error('public TestRunner base identity changed')
         writeFileSync('lifecycle.marker', 'final constructor initialized')

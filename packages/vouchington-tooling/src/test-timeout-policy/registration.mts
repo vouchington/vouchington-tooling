@@ -34,7 +34,13 @@ export function guardRegistration<T extends Registration>(
           }
         }
       }
-      return Reflect.apply(target, receiver, args)
+      const result: unknown = Reflect.apply(target, receiver, args)
+      return kind === 'suite' &&
+        result !== null &&
+        typeof result === 'object' &&
+        Reflect.get(result, 'type') === 'collector'
+        ? protectSuiteCollector(result)
+        : result
     },
     get(target, key, receiver) {
       if (cache.has(key)) return cache.get(key)
@@ -66,4 +72,24 @@ export function guardRegistration<T extends Registration>(
       return guarded
     },
   })
+}
+
+const collectors = new WeakMap<object, object>()
+
+/** Native collector.on stores raw callbacks, bypassing Vitest's public hook timeout capture. */
+function protectSuiteCollector(original: object): object {
+  const existing = collectors.get(original)
+  if (existing) return existing
+  const rejectRawHook = () => {
+    throw new Error(
+      'SuiteCollector.on bypasses native hook deadlines; register guarded public hooks inside the suite factory',
+    )
+  }
+  const guarded = new Proxy(original, {
+    get(target, key, receiver) {
+      return key === 'on' ? rejectRawHook : Reflect.get(target, key, receiver)
+    },
+  })
+  collectors.set(original, guarded)
+  return guarded
 }

@@ -113,6 +113,29 @@ describe('public deadline policy contract boundaries', () => {
     expect(guarded.extend()).toEqual({ opaque: true })
   })
 
+  it('rejects returned collector hooks while preserving native collection methods and cache identity', () => {
+    const collector = {
+      type: 'collector',
+      name: 'owned',
+      on: vi.fn(),
+      test: vi.fn(),
+      task: vi.fn(),
+      collect: vi.fn(),
+      clear: vi.fn(),
+      tasks: [],
+    }
+    const register = guardRegistration(() => collector, 'suite')
+    const guarded = register()
+    expect(register()).toBe(guarded)
+    expect(guarded.on).toBe(guarded.on)
+    expect(() => guarded.on('beforeAll', () => {})).toThrow('register guarded public hooks')
+    expect(collector.on).not.toHaveBeenCalled()
+    for (const key of ['name', 'test', 'task', 'collect', 'clear', 'tasks'])
+      expect(Reflect.get(guarded, key)).toBe(Reflect.get(collector, key))
+    guarded.clear()
+    expect(collector.clear).toHaveBeenCalledOnce()
+  })
+
   it('snapshots aliased setter options and preserves configuration API receiver', () => {
     const api = {
       value: 25,

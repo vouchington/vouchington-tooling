@@ -53,6 +53,34 @@ describe('public constructor adapter contracts (parent worker)', () => {
     }).toThrow(RangeError)
   })
 
+  it('preserves direct and genuinely derived constructor new.target values', () => {
+    class Base {
+      readonly target: unknown
+      #marker = 'base brand'
+      constructor(public config: { testTimeout: number; hookTimeout: number }) {
+        this.target = new.target
+      }
+      marker() {
+        return this.#marker
+      }
+    }
+    const Guarded = guardPublicRunner(Base, 30000, protectRunnerTimeouts)
+    const direct = new Guarded({ testTimeout: 25, hookTimeout: 25 })
+    expect(direct.target).toBe(Base)
+    expect(direct.marker()).toBe('base brand')
+    class Derived extends Guarded {
+      #derived = 'derived brand'
+      derived() {
+        return this.#derived
+      }
+    }
+    const derived = new Derived({ testTimeout: 25, hookTimeout: 25 })
+    expect(derived.target).toBe(Derived)
+    expect(derived.marker()).toBe('base brand')
+    expect(derived.derived()).toBe('derived brand')
+    expect(derived).toBeInstanceOf(Derived)
+  })
+
   it('shares adapters per constructor and protector but isolates configured maxima', () => {
     class Base {
       constructor(public config: { testTimeout: number; hookTimeout: number }) {}

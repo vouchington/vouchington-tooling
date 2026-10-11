@@ -29,6 +29,8 @@ function call behavior; aliased runtime setters validate the actual configuratio
 object when called. This module does not parse source or silently clamp deadlines.
 List every package that registers tests or hooks in `registrationPackages`; the plugin
 inlines these packages through Vitest's public server dependency configuration.
+An existing `test.server.deps.inline: true` sentinel is preserved in both Node and
+browser routes; existing array patterns remain available for Vite's normal merge.
 Externalized modules bypass Vite resolution entirely. Transformed helper imports
 under `node_modules`, including preserved symlinks, are routed through the facade.
 This list must include transitive registrar packages reached through helper re-exports,
@@ -36,6 +38,12 @@ not just direct imports. Before consumer adoption, audit each owning configurati
 existing upstream module/export/alias graph and record its complete registration
 package list. This plugin does not discover that graph. An omitted externalized
 registrar can register raw hooks even when every child test has a legal deadline.
+Returned suite collectors retain their public test, task, clear, collect and metadata
+APIs. Their raw `collector.on(...)` hook-registration path is rejected before
+registration: Vitest 5 stores these callbacks without its native hook timeout wrapper.
+Register `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `aroundAll` and `aroundEach`
+through guarded public imports inside the suite factory instead. No private SDK
+wrapper or replacement timer is used.
 Extended and overridden fixture APIs retain guarded test registration. Vitest fixture
 options are not treated as having an independent timeout field that its SDK does not support.
 
@@ -98,7 +106,9 @@ are rejected by the policy.
 
 `guardPublicRunner`, `RunnerConstructor`, and `Protector` are public exports of
 `vouchington-tooling/test-timeout-policy`. The wrapper retains its generic constructor
-type, static properties and native newTarget/instance receivers. Direct callers must
+type, static properties and native newTarget/instance receivers. Direct construction
+exposes the original final class as `new.target`; genuinely derived construction
+retains the most-derived class and its private brands. Direct callers must
 wrap the final class; wrapping a base class does not finalize derived own fields.
 
 ## Browser and Storybook routing

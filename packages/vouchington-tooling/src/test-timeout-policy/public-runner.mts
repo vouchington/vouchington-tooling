@@ -5,7 +5,7 @@ const constructors = new WeakMap<
   WeakMap<Protector, Map<number, RunnerConstructor>>
 >()
 
-/** Candidate public constructor composition; browser routing is not yet qualified. */
+/** Compose a final public constructor while retaining direct and derived new.target contracts. */
 export function guardPublicRunner<T extends RunnerConstructor>(
   original: T,
   maximum: number,
@@ -25,7 +25,11 @@ export function guardPublicRunner<T extends RunnerConstructor>(
   if (existing) return existing as T
   const guarded = new Proxy(original, {
     construct(target, args, newTarget) {
-      const runner = Reflect.construct(target, args, newTarget) as InstanceType<T>
+      const runner = Reflect.construct(
+        target,
+        args,
+        newTarget === guarded ? target : newTarget,
+      ) as InstanceType<T>
       protect(runner, maximum)
       return runner
     },

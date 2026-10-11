@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { browserTestTimeoutPolicyPlugin } from './plugin.mts'
+import { browserTestTimeoutPolicyPlugin, testTimeoutPolicyPlugin } from './plugin.mts'
 import { replaceStorybookAnnotationSetup } from '../../test-helpers/storybook-timeout-fixture.mts'
 
 describe('browser routing policy contracts', () => {
+  it('preserves inline-all sentinels in both public plugin configuration routes', () => {
+    for (const plugin of [
+      testTimeoutPolicyPlugin(30000, ['registrar']),
+      browserTestTimeoutPolicyPlugin(30000, ['registrar']),
+    ]) {
+      const config = { test: { server: { deps: { inline: true as const } } } }
+      expect(plugin.config(config).test.server.deps.inline).toBe(true)
+      const patterns = [/owned/, 'existing']
+      expect(
+        plugin.config({ test: { server: { deps: { inline: patterns } } } }).test.server.deps.inline,
+      ).toEqual(['registrar'])
+      expect(patterns).toEqual([/owned/, 'existing'])
+    }
+  })
+
   it('composes client optimizers without modifying server configuration or caller arrays', () => {
     const plugin = browserTestTimeoutPolicyPlugin(30000, ['registrar'])
     const include = ['dependency > registrar/subpath', 'registrar-extra', 'ordinary']
