@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it, vi, TestRunner } from 'vitest'
 import {
   assertTestTimeout,
   assertTimeoutConfig,
@@ -146,6 +150,46 @@ describe('public deadline policy contract boundaries', () => {
     expect(() => guarded.test('name', 30001)).toThrow(RangeError)
     expect(() => guarded.beforeAll(() => {}, 0)).toThrow(RangeError)
     expect(() => guarded.vi.setConfig({ hookTimeout: Infinity })).toThrow(RangeError)
+  })
+
+  it('guards constructor exports in the parent while preserving constructor and instance identity', () => {
+    class Runner {
+      #marker = 'owned'
+      constructor(public config: { testTimeout: number; hookTimeout: number }) {}
+      marker() {
+        return this.#marker
+      }
+    }
+    const facade = guardVitestExports({ TestRunner: Runner })
+    expect(facade.TestRunner).toBe(facade.TestRunner)
+    const runner = new facade.TestRunner({ testTimeout: 25, hookTimeout: 25 })
+    expect(runner).toBeInstanceOf(Runner)
+    expect(runner.marker()).toBe('owned')
+    expect(() => {
+      runner.config.testTimeout = 30001
+    }).toThrow(RangeError)
+    expect(() => new facade.TestRunner({ testTimeout: 0, hookTimeout: 25 })).toThrow(RangeError)
+    expect(guardVitestExports({ TestRunner: null }).TestRunner).toBeNull()
+  })
+
+  it('worker-loads the generated Node facade without guarding a custom runner base prematurely', async () => {
+    const plugin = testTimeoutPolicyPlugin(30000, [], { runner: null })
+    const id = plugin.resolveId('vitest', '/owned/case.mts')!
+    const directory = await mkdtemp(join(tmpdir(), 'parent-node-facade-'))
+    try {
+      await symlink(
+        fileURLToPath(new URL('../../../../node_modules', import.meta.url)),
+        join(directory, 'node_modules'),
+      )
+      const module = join(directory, 'facade.mts')
+      await writeFile(module, plugin.load(id)!)
+      const facade: { TestRunner: typeof TestRunner } = await import(module)
+      expect(facade.TestRunner).toBe(TestRunner)
+      class Custom extends facade.TestRunner {}
+      expect(Object.getPrototypeOf(Custom.prototype)).toBe(TestRunner.prototype)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 
   it('composes runner context and completion callbacks without masking raw invalid tasks', () => {
