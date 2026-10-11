@@ -2,7 +2,7 @@ import { assertClientOptimizerClosure } from '../../test-helpers/browser-optimiz
 import { describe, expect, it } from 'vitest'
 import { browserFixture } from '../../test-helpers/browser-timeout-child.mts'
 
-describe('actual Browser Mode routing proposals (UNRUN)', () => {
+describe('actual Browser Mode routing contracts', () => {
   it('routes the SDK tester constructor and preserves browser body/context execution', async () => {
     const result = await browserFixture(`test('body', ({ expect }) => { expect(2 + 2).toBe(4) })`)
     expect(result.code, result.output).toBe(0)

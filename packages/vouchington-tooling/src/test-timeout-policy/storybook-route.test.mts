@@ -2,7 +2,7 @@ import { assertClientOptimizerClosure } from '../../test-helpers/browser-optimiz
 import { describe, expect, it } from 'vitest'
 import { browserFixture } from '../../test-helpers/browser-timeout-child.mts'
 
-describe('actual Storybook addon generated-test closure proposals (UNRUN)', () => {
+describe('actual Storybook addon generated-test closure contracts', () => {
   it.each([false, true])(
     'runs generated story and transitive annotation hooks; stableSetup=%s',
     async (stableSetup) => {
