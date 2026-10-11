@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const closeFailure = vi.hoisted(() => ({ mode: '' as '' | 'stage' | 'partition' | 'source' }))
+const closeFailure = vi.hoisted(() => ({
+  mode: '' as '' | 'stage' | 'partition' | 'source',
+  cleanup: new Set<() => Promise<void>>(),
+}))
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
@@ -17,10 +20,16 @@ vi.mock('node:fs/promises', async () => {
         (closeFailure.mode === 'stage' && path.includes('snapshot-stage-')) ||
         (closeFailure.mode === 'partition' && path.includes('.partition-')) ||
         (closeFailure.mode === 'source' && path.includes('agent-blackboard-snapshot-'))
-      )
+      ) {
+        const nativeClose = file.close.bind(file)
+        closeFailure.cleanup.add(async () => {
+          await nativeClose()
+          expect(file.fd).toBe(-1)
+        })
         file.close = async () => {
           throw new Error('injected close failure')
         }
+      }
       return file
     },
   }
@@ -60,8 +69,17 @@ const manifest = {
 afterEach(async () => {
   closeFailure.mode = ''
   setSnapshotFilesystemForTest()
-  await Promise.all([...paths].map((path) => rm(path, { recursive: true, force: true })))
+  // Failure injection must not transfer real descriptor ownership to garbage collection.
+  const closed = await Promise.allSettled([...closeFailure.cleanup].map((close) => close()))
+  closeFailure.cleanup.clear()
+  const removed = await Promise.allSettled(
+    [...paths].map((path) => rm(path, { recursive: true, force: true })),
+  )
   paths.clear()
+  const failures = [...closed, ...removed]
+    .filter((result) => result.status === 'rejected')
+    .map((result) => result.reason)
+  if (failures.length > 0) throw new AggregateError(failures, 'snapshot fixture cleanup failed')
 })
 
 async function source(): Promise<string> {
