@@ -11,6 +11,31 @@ export {
 } from './config.mts'
 
 const installedRunners = new WeakMap<object, { maximum: number; config: object }>()
+const installedContexts = new WeakMap<object, number>()
+
+function protectContextHooks(context: object, maximum: number): void {
+  const existing = installedContexts.get(context)
+  if (existing !== undefined) {
+    if (existing !== maximum) throw new Error('Context timeout policy maximum cannot change')
+    return
+  }
+  for (const name of ['onTestFailed', 'onTestFinished']) {
+    const original: unknown = Reflect.get(context, name)
+    if (typeof original === 'function') {
+      let guarded = guardRegistration(original as Registration, 'hook', maximum)
+      Object.defineProperty(context, name, {
+        // Vitest temporarily replaces/restores these methods while executing completion hooks.
+        get: () => guarded,
+        set(next: unknown) {
+          if (typeof next !== 'function') throw new TypeError('Expected a completion hook method')
+          guarded = guardRegistration(next as Registration, 'hook', maximum)
+        },
+        configurable: false,
+      })
+    }
+  }
+  installedContexts.set(context, maximum)
+}
 
 /** Aliased/destructured setters retain validation because the returned method is guarded. */
 export function guardRuntimeConfig<T extends object>(api: T, maximum = 30_000): T {
@@ -89,21 +114,14 @@ export function protectRunnerTimeouts(runner: { config: object }, maximum = 30_0
     if (task === null || typeof task !== 'object')
       throw new TypeError('Expected Vitest task context')
     assertTestTimeout(Reflect.get(task, 'timeout'), 'Vitest resolved test timeout', maximum)
+    protectContextHooks(context, maximum)
     const result =
       typeof extend === 'function' ? (Reflect.apply(extend, runner, [context]) as object) : context
     if (runner.config !== config)
       throw new Error('Runner timeout configuration identity changed during context extension')
     // Recheck the original task, even if the extension returns a replacement context.
     assertTestTimeout(Reflect.get(task, 'timeout'), 'Vitest resolved test timeout', maximum)
-    for (const name of ['onTestFailed', 'onTestFinished']) {
-      const original: unknown = Reflect.get(result, name)
-      if (typeof original === 'function')
-        Object.defineProperty(result, name, {
-          value: guardRegistration(original as Registration, 'hook', maximum),
-          writable: false,
-          configurable: false,
-        })
-    }
+    protectContextHooks(result, maximum)
     return result
   }
   Object.defineProperty(runner, 'extendTaskContext', {

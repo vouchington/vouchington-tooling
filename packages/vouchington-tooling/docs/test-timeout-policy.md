@@ -12,7 +12,9 @@ Call `protectRunnerTimeouts(this)` after the existing custom runner's constructo
 It preserves the runner instance and delegates its existing `extendTaskContext`
 implementation. Its configuration accessors validate before collection and on writes,
 including native `vi.setConfig` writes to that same resolved configuration object.
-Completion-hook registration is protected when the context is created.
+Completion-hook methods are guarded before custom context extension and on any returned
+replacement context. Guarded setters preserve Vitest's temporary method replacement and
+restoration during native completion-hook execution.
 The original `context.task.timeout` is checked before and after delegating to the existing
 extension. Vitest 5 constructs its timeout wrapper after creating the context, using
 a local deadline captured before context creation. Early validation prevents masking
@@ -44,7 +46,10 @@ APIs. The returned test API validates test and hook registration as well. Their 
 registration: Vitest 5 stores these callbacks without its native hook timeout wrapper.
 Register `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `aroundAll` and `aroundEach`
 through guarded public imports or the guarded test API injected into a suite factory instead.
-Native `test`/`it`, `describe`/`suite` and `vi`/`vitest` aliases retain shared identity.
+Native `test`/`it`, `describe`/`suite` and `vi`/`vitest` aliases retain shared identity,
+including nested `test.describe`, `test.suite` and hook aliases. Registration option
+snapshots validate only own enumerable timeout overrides that Vitest copies; inherited
+and non-enumerable timeout properties do not override the SDK default.
 Only direct suite factories receive a guarded injected test API; `each` and `for`
 data callbacks retain their original row identities, including callable rows. No private SDK
 wrapper or replacement timer is used.
@@ -125,7 +130,9 @@ explicitly exports the guarded public `TestRunner` constructor through the Vites
 facade. Public Vite environment hooks and the public `onBrowserInit` reporter
 lifecycle remove registrar bundles from effective client dependency optimization,
 including nested `dependency > package/subpath` entries. Existing reporters,
-unrelated entries and package near-prefixes are preserved. No installed SDK file
+unrelated entries and package near-prefixes are preserved. Unset reporters retain the
+public SDK's environment-specific defaults, including GitHub annotations and agent output.
+No installed SDK file
 is modified and no SDK-private API is imported.
 
 Actual Vitest 5.0.3 Browser Mode children run through the public Playwright provider

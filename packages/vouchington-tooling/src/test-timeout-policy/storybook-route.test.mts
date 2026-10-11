@@ -8,7 +8,7 @@ describe('actual Storybook addon generated-test closure contracts', () => {
     async (stableSetup) => {
       const result = await browserFixture('', 5000, undefined, { stableSetup })
       expect(result.code, result.output).toBe(0)
-      expect(result.output).toContain('ACTUAL_STORY_PLAY_COMPLETED')
+      expect(result.browserConsole).toContain('ACTUAL_STORY_PLAY_COMPLETED')
       expect(result.forcedCleanup).toBe(false)
       const routes = result.routing
         .trim()
@@ -61,6 +61,7 @@ describe('actual Storybook addon generated-test closure contracts', () => {
       expect(result.code).toBe(1)
       expect(result.output).toContain('hook timeout must be positive, finite')
       expect(result.output).not.toContain('ACTUAL_STORY_PLAY_COMPLETED')
+      expect(result.browserConsole).not.toContain('ACTUAL_STORY_PLAY_COMPLETED')
       expect(result.forcedCleanup).toBe(false)
     },
   )

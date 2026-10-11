@@ -43,6 +43,10 @@ describe('public deadline policy contract boundaries', () => {
       }
     }
     const options = new Options()
+    Object.defineProperty(options, 'timeout', {
+      enumerable: true,
+      get: () => Reflect.get(Options.prototype, 'timeout', options),
+    })
     const captured = snapshotTimeoutOptions(options, 'test timeout')
     expect(Reflect.get(captured, 'timeout')).toBe(25)
     expect(Reflect.get(captured, 'timeout')).toBe(25)
@@ -277,6 +281,13 @@ describe('public deadline policy contract boundaries', () => {
     expect(() => context.onTestFinished(() => {}, 0)).toThrow(RangeError)
     context.onTestFinished(() => {}, 25)
     expect(callback).toHaveBeenCalledOnce()
+    const replacement = vi.fn()
+    expect(() => Reflect.set(context, 'onTestFinished', null)).toThrow(TypeError)
+    Reflect.set(context, 'onTestFinished', replacement)
+    expect(() => context.onTestFinished(() => {}, 30001)).toThrow(RangeError)
+    expect(replacement).not.toHaveBeenCalled()
+    context.onTestFinished(() => {}, 25)
+    expect(replacement).toHaveBeenCalledOnce()
     expect(() => runner.extendTaskContext({ task: null })).toThrow(TypeError)
   })
 
@@ -297,6 +308,18 @@ describe('public deadline policy contract boundaries', () => {
     expect(() => protectRunnerTimeouts({ config: { globals: true } })).toThrow('globals disabled')
     simple.config = { testTimeout: 25, hookTimeout: 25 }
     expect(() => protectRunnerTimeouts(simple)).toThrow('cannot be replaced')
+  })
+
+  it('rejects reusing a context across runners with incompatible deadline policies', () => {
+    const context = { task: { timeout: 10 }, onTestFinished: vi.fn() }
+    const runner = { config: { testTimeout: 25, hookTimeout: 25 } }
+    protectRunnerTimeouts(runner, 25)
+    expect(Reflect.apply(Reflect.get(runner, 'extendTaskContext'), runner, [context])).toBe(context)
+    const other = { config: { testTimeout: 20, hookTimeout: 20 } }
+    protectRunnerTimeouts(other, 20)
+    expect(() => Reflect.apply(Reflect.get(other, 'extendTaskContext'), other, [context])).toThrow(
+      'Context timeout policy maximum cannot change',
+    )
   })
 
   it('routes only public Vitest imports and explicitly declares registrar inlining', () => {

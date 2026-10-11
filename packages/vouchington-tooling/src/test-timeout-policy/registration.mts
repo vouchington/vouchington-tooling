@@ -2,6 +2,7 @@ import { assertTestTimeout, snapshotTimeoutOptions } from './config.mts'
 
 export type Registration = (...args: never[]) => unknown
 export type Kind = 'test' | 'suite' | 'hook'
+const registrations = new WeakMap<Registration, Map<number, Map<string, Registration>>>()
 const curriedMethods = new Set(['each', 'for', 'extend', 'override', 'scoped', 'skipIf', 'runIf'])
 const chainedMethods = new Set(['concurrent', 'shuffle', 'skip', 'only', 'todo', 'fails'])
 const suiteMethods = new Set(['describe', 'suite'])
@@ -29,8 +30,13 @@ function createRegistration<T extends Registration>(
   maximum: number,
   injectFactory: boolean,
 ): T {
+  const deadlines = registrations.get(original) ?? new Map<number, Map<string, Registration>>()
+  const roles = deadlines.get(maximum) ?? new Map<string, Registration>()
+  const role = `${kind}:${injectFactory}`
+  const existing = roles.get(role)
+  if (existing) return existing as T
   const cache = new Map<PropertyKey, unknown>()
-  return new Proxy(original, {
+  const guarded = new Proxy(original, {
     apply(target, receiver, args) {
       if (kind === 'hook') {
         if (args[1] !== undefined) assertTestTimeout(args[1], 'hook timeout', maximum)
@@ -88,6 +94,12 @@ function createRegistration<T extends Registration>(
       return guarded
     },
   })
+  roles.set(role, guarded)
+  deadlines.set(maximum, roles)
+  registrations.set(original, deadlines)
+  // Native completion-hook execution saves and restores a method that is already guarded.
+  registrations.set(guarded, new Map([[maximum, new Map([[role, guarded]])]]))
+  return guarded
 }
 
 function protectSuiteFactory(factory: Function, maximum: number): Function {

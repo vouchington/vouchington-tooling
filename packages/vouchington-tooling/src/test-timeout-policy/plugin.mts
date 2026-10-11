@@ -1,4 +1,5 @@
 import type { Reporter } from 'vitest/node'
+import { configDefaults } from 'vitest/config'
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -142,7 +143,7 @@ export function browserTestTimeoutPolicyPlugin(
     },
     config(config: PolicyConfig = {}) {
       const existing = config.test?.reporters
-      const reporters = existing === undefined ? ['default'] : []
+      const reporters = existing === undefined ? [...configDefaults.reporters] : []
       const lifecycle = {
         onBrowserInit(this: void, project: BrowserOptimizationProject) {
           // Public reporter lifecycle runs before the provider starts browser pages.

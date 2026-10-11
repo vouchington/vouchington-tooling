@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeConfig } from 'vitest/config'
+import { configDefaults, mergeConfig } from 'vitest/config'
 import { browserTestTimeoutPolicyPlugin, testTimeoutPolicyPlugin } from './plugin.mts'
 import { replaceStorybookAnnotationSetup } from '../../test-helpers/storybook-timeout-fixture.mts'
 
@@ -41,7 +41,7 @@ describe('browser routing policy contracts', () => {
   it('preserves default, single and custom reporter registrations before the browser lifecycle guard', () => {
     const plugin = browserTestTimeoutPolicyPlugin()
     const custom = { onInit() {} }
-    expect(plugin.config().test.reporters[0]).toBe('default')
+    expect(plugin.config().test.reporters.slice(0, -1)).toEqual(configDefaults.reporters)
     const single = { test: { reporters: 'verbose' } }
     expect(mergeConfig(single, plugin.config(single)).test.reporters[0]).toBe('verbose')
     const reporters = ['json', custom]

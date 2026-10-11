@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { observeSdkChild } from './owned-sdk-child.mts'
+import { readBrowserOutputs } from './browser-output-receipt.mts'
 
 const require = createRequire(import.meta.url)
 
@@ -19,6 +20,7 @@ export async function browserFixture(
   configTimeout = 5000,
   registrar?: string,
   storybook?: StorybookRouteCase,
+  environment: Record<string, string> = {},
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'browser-timeout-policy-'))
   let removable = true
@@ -57,9 +59,22 @@ export async function browserFixture(
       import { browserTestTimeoutPolicyPlugin } from ${JSON.stringify(plugin)}
       ${story?.imports ?? ''}
       import { playwright } from '@vitest/browser-playwright'
+      import { configDefaults } from 'vitest/config'
       import { appendFileSync } from 'node:fs'
       const policy = browserTestTimeoutPolicyPlugin(30000, ${JSON.stringify([...(registrar ? ['browser-registrar'] : []), ...(story?.registrations ?? [])])})
       const route = policy.resolveId
+      const configure = policy.config
+      policy.config = (...args) => {
+        const configured = configure(...args)
+        const lifecycle = configured.test.reporters.at(-1)
+        lifecycle.onInit = (ctx) => appendFileSync('reporters.json', JSON.stringify({
+          defaults: configDefaults.reporters,
+          resolved: ctx.config.reporters.map(value => Array.isArray(value) ? value[0] :
+            typeof value === 'string' ? value : 'lifecycle'),
+        }))
+        lifecycle.onUserConsoleLog = (log) => appendFileSync('browser-console.log', log.content)
+        return configured
+      }
       policy.resolveId = (source, importer) => {
         const id = route(source, importer)
         if (source === 'vitest') appendFileSync('routing.jsonl', JSON.stringify({ source, importer, id }) + '\\n')
@@ -107,6 +122,7 @@ export async function browserFixture(
       cwd: directory,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
+      env: { ...process.env, ...environment },
     })
     removable = false
     const outcome = await observeSdkChild(child)
@@ -133,17 +149,17 @@ export async function browserFixture(
     if (outcome.errors.length)
       throw new AggregateError(outcome.errors, 'Browser SDK child cleanup failure')
     if (!outcome.result) throw new Error('Browser SDK child did not close')
-    const routing = await readFile(join(directory, 'routing.jsonl'), 'utf8').catch(() => '')
-    const optimizer = await readFile(join(directory, 'optimizer.jsonl'), 'utf8').catch(() => '')
+    const records = await readBrowserOutputs(directory)
     if (process.env.SDK_CHILD_RECEIPT_FILE) {
       const artifacts = process.env.SDK_CHILD_RECEIPT_FILE + '-artifacts/' + child.pid
       await mkdir(artifacts, { recursive: true })
-      await writeFile(join(artifacts, 'routing.jsonl'), routing)
+      await writeFile(join(artifacts, 'routing.jsonl'), records.routing)
       await writeFile(
         join(artifacts, 'registrar-source.jsonl'),
         await readFile(join(directory, 'registrar-source.jsonl'), 'utf8').catch(() => ''),
       )
-      await writeFile(join(artifacts, 'optimizer.jsonl'), optimizer)
+      await writeFile(join(artifacts, 'optimizer.jsonl'), records.optimizer)
+      await writeFile(join(artifacts, 'browser-console.log'), records.browserConsole)
       await writeFile(
         join(artifacts, 'vitest.config.mts'),
         await readFile(join(directory, 'vitest.config.mts')),
@@ -155,8 +171,7 @@ export async function browserFixture(
       ...outcome.result,
       output: outcome.output,
       forcedCleanup: outcome.forcedCleanup,
-      routing,
-      optimizer,
+      ...records,
     }
   }
   const settled = await run().then(

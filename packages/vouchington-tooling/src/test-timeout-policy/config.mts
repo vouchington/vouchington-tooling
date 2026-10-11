@@ -22,6 +22,8 @@ export function snapshotTimeoutOptions(
   maximum = 30_000,
   nullInherits = false,
 ): object {
+  // Vitest copies registration options with object spread, ignoring inherited/hidden keys.
+  if (!Object.prototype.propertyIsEnumerable.call(options, 'timeout')) return options
   const timeout: unknown = Reflect.get(options, 'timeout')
   if (timeout !== undefined && (timeout !== null || !nullInherits))
     assertTestTimeout(timeout, label, maximum)

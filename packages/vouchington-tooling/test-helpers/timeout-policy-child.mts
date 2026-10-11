@@ -24,6 +24,7 @@ export async function fixture(
     inlineTransitive?: boolean
   },
   observation: ChildObservationOptions & {
+    policyMaximum?: number
     onFinalized?: (outcome: Awaited<ReturnType<typeof observeSdkChild>>) => void
   } = {},
   route?: RunnerRouteCase,
@@ -31,6 +32,7 @@ export async function fixture(
   if (process.platform !== 'linux')
     throw new Error('SDK process ownership qualification requires Linux')
   const directory = await mkdtemp(join(tmpdir(), 'test-timeout-policy-'))
+  const maximum = observation.policyMaximum ?? 30000
   let removable = true
   const run = async () => {
     await mkdir(join(directory, 'node_modules'))
@@ -75,7 +77,7 @@ export async function fixture(
       `
       import { testTimeoutPolicyPlugin } from ${JSON.stringify(plugin)}
       const test = ${config}
-      export default { plugins: [testTimeoutPolicyPlugin(30000, ${JSON.stringify([
+      export default { plugins: [testTimeoutPolicyPlugin(${maximum}, ${JSON.stringify([
         'deadline-helper',
         ...(helper?.inlineTransitive ? ['deadline-registrar'] : []),
       ])} , { runner: ${JSON.stringify(join(directory, 'runner.mts'))} })],
@@ -91,7 +93,7 @@ export async function fixture(
       import { protectRunnerTimeouts, guardVitestExports } from ${JSON.stringify(policy)}
       import { writeFileSync } from 'node:fs'
       class ExistingRunner extends TestRunner {
-        constructor(config) { super(config); protectRunnerTimeouts(this) }
+        constructor(config) { super(config); protectRunnerTimeouts(this, ${maximum}) }
         extendTaskContext(context) {
           const result = super.extendTaskContext(context)
           result.ownedRunnerMarker = 'preserved'
@@ -100,7 +102,7 @@ export async function fixture(
         }
       }
       export default class PolicyRunner extends ExistingRunner {
-        constructor(config) { super(config); protectRunnerTimeouts(this) }
+        constructor(config) { super(config); protectRunnerTimeouts(this, ${maximum}) }
       }
     `,
     )
