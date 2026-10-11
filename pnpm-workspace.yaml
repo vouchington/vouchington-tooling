@@ -1,6 +1,7 @@
 packages:
   - packages/*
 allowBuilds:
+  esbuild: true
   '@ast-grep/cli': true
   '@launchql/protobufjs': true
 # Dependabot already holds updates for a week. Do not also fail CI when the

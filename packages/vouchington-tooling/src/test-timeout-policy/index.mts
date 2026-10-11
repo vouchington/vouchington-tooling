@@ -1,9 +1,8 @@
-import {
-  assertTestTimeout,
-  assertTimeoutConfig,
-  snapshotTimeoutOptions,
-  protectTimeoutConfig,
-} from './config.mts'
+import { guardRegistration, type Registration, type Kind } from './registration.mts'
+export { guardRegistration } from './registration.mts'
+import { guardPublicRunner, type RunnerConstructor } from './public-runner.mts'
+export { guardPublicRunner, type RunnerConstructor, type Protector } from './public-runner.mts'
+import { assertTestTimeout, assertTimeoutConfig, protectTimeoutConfig } from './config.mts'
 export {
   assertTestTimeout,
   assertTimeoutConfig,
@@ -12,74 +11,6 @@ export {
 } from './config.mts'
 
 const installedRunners = new WeakMap<object, { maximum: number; config: object }>()
-
-type Registration = (...args: never[]) => unknown
-type Kind = 'test' | 'suite' | 'hook'
-const curriedMethods = new Set(['each', 'for', 'extend', 'override', 'scoped', 'skipIf', 'runIf'])
-const chainedMethods = new Set(['concurrent', 'shuffle', 'skip', 'only', 'todo', 'fails'])
-const suiteMethods = new Set(['describe', 'suite'])
-const hookMethods = new Set([
-  'beforeAll',
-  'beforeEach',
-  'afterAll',
-  'afterEach',
-  'aroundAll',
-  'aroundEach',
-])
-
-/** Validate before Vitest's registration creates its captured timeout wrapper. */
-export function guardRegistration<T extends Registration>(
-  original: T,
-  kind: Kind,
-  maximum = 30_000,
-): T {
-  const cache = new Map<PropertyKey, unknown>()
-  return new Proxy(original, {
-    apply(target, receiver, args) {
-      if (kind === 'hook') {
-        if (args[1] !== undefined) assertTestTimeout(args[1], 'hook timeout', maximum)
-      } else {
-        for (let index = 1; index < Math.min(args.length, 3); index++) {
-          const value: unknown = args[index]
-          if (typeof value === 'number') assertTestTimeout(value, `${kind} timeout`, maximum)
-          else if (value !== null && typeof value === 'object') {
-            args[index] = snapshotTimeoutOptions(value, `${kind} timeout`, maximum, true)
-          }
-        }
-      }
-      return Reflect.apply(target, receiver, args)
-    },
-    get(target, key, receiver) {
-      if (cache.has(key)) return cache.get(key)
-      const value: unknown = Reflect.get(target, key, receiver)
-      if (typeof value !== 'function') return value
-      const name = String(key)
-      if (
-        !curriedMethods.has(name) &&
-        !chainedMethods.has(name) &&
-        !hookMethods.has(name) &&
-        !suiteMethods.has(name)
-      )
-        return value
-      const guarded = curriedMethods.has(name)
-        ? new Proxy(value, {
-            apply(method, owner, args) {
-              const result: unknown = Reflect.apply(method, owner, args)
-              return typeof result === 'function'
-                ? guardRegistration(result as Registration, kind, maximum)
-                : result
-            },
-          })
-        : guardRegistration(
-            value as Registration,
-            hookMethods.has(name) ? 'hook' : suiteMethods.has(name) ? 'suite' : kind,
-            maximum,
-          )
-      cache.set(key, guarded)
-      return guarded
-    },
-  })
-}
 
 /** Aliased/destructured setters retain validation because the returned method is guarded. */
 export function guardRuntimeConfig<T extends object>(api: T, maximum = 30_000): T {
@@ -120,11 +51,13 @@ export function guardVitestExports<T extends object>(api: T, maximum = 30_000): 
       const value: unknown = Reflect.get(target, key, receiver)
       const kind = kinds.get(String(key))
       const guarded =
-        (key === 'vi' || key === 'vitest') && value !== null && typeof value === 'object'
-          ? guardRuntimeConfig(value, maximum)
-          : kind && typeof value === 'function'
-            ? guardRegistration(value as Registration, kind, maximum)
-            : value
+        key === 'TestRunner' && typeof value === 'function'
+          ? guardPublicRunner(value as RunnerConstructor, maximum, protectRunnerTimeouts)
+          : (key === 'vi' || key === 'vitest') && value !== null && typeof value === 'object'
+            ? guardRuntimeConfig(value, maximum)
+            : kind && typeof value === 'function'
+              ? guardRegistration(value as Registration, kind, maximum)
+              : value
       cache.set(key, guarded)
       return guarded
     },
@@ -142,8 +75,11 @@ export function protectRunnerTimeouts(runner: { config: object }, maximum = 30_0
   if (Reflect.get(runner.config, 'globals') === true)
     throw new Error('Timeout policy requires guarded public imports with globals disabled')
   protectTimeoutConfig(runner.config, maximum)
+  const config = runner.config
   const extend: unknown = Reflect.get(runner, 'extendTaskContext')
   const extendTaskContext = (context: object) => {
+    if (runner.config !== config)
+      throw new Error('Runner timeout configuration identity changed after construction')
     // Vitest 5 creates the context after resolving task.timeout, before withTimeout.
     // withTimeout uses a pre-context local timeout; extensions must not mask invalid tasks.
     const task: unknown = Reflect.get(context, 'task')
@@ -152,6 +88,8 @@ export function protectRunnerTimeouts(runner: { config: object }, maximum = 30_0
     assertTestTimeout(Reflect.get(task, 'timeout'), 'Vitest resolved test timeout', maximum)
     const result =
       typeof extend === 'function' ? (Reflect.apply(extend, runner, [context]) as object) : context
+    if (runner.config !== config)
+      throw new Error('Runner timeout configuration identity changed during context extension')
     // Recheck the original task, even if the extension returns a replacement context.
     assertTestTimeout(Reflect.get(task, 'timeout'), 'Vitest resolved test timeout', maximum)
     for (const name of ['onTestFailed', 'onTestFinished']) {

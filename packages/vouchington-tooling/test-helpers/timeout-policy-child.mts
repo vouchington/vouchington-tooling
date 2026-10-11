@@ -1,3 +1,4 @@
+import { prepareRunnerRoute, type RunnerRouteCase } from './runner-route-fixture.mts'
 import { spawn } from 'node:child_process'
 import { appendFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -25,6 +26,7 @@ export async function fixture(
   observation: ChildObservationOptions & {
     onFinalized?: (outcome: Awaited<ReturnType<typeof observeSdkChild>>) => void
   } = {},
+  route?: RunnerRouteCase,
 ) {
   if (process.platform !== 'linux')
     throw new Error('SDK process ownership qualification requires Linux')
@@ -86,7 +88,7 @@ export async function fixture(
       join(directory, 'runner.mts'),
       `
       import { TestRunner } from ${JSON.stringify(vitest)}
-      import { protectRunnerTimeouts } from ${JSON.stringify(policy)}
+      import { protectRunnerTimeouts, guardVitestExports } from ${JSON.stringify(policy)}
       import { writeFileSync } from 'node:fs'
       class ExistingRunner extends TestRunner {
         constructor(config) { super(config); protectRunnerTimeouts(this) }
@@ -112,11 +114,16 @@ export async function fixture(
       ${source}
     `,
     )
-    const child = spawn(process.execPath, [cli, 'run', '--root', directory, '--maxWorkers=1'], {
-      cwd: directory,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-    })
+    const routeArgs = route ? await prepareRunnerRoute(directory, plugin, route, config) : []
+    const child = spawn(
+      process.execPath,
+      [cli, 'run', '--root', directory, '--maxWorkers=1', ...routeArgs],
+      {
+        cwd: directory,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+      },
+    )
     // The directory belongs to the started child until close AND group drain complete.
     removable = false
     const outcome = await observeSdkChild(child, observation)

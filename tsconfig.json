@@ -16,5 +16,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["packages/*/src/**/*.mts"]
+  "include": ["vitest.config.mts", "packages/*/src/**/*.mts", "packages/*/test-helpers/**/*.mts"]
 }

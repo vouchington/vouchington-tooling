@@ -10,6 +10,9 @@
       // Loaded from the consumer package boundary only when the opt-in integration runs.
       "ignoreDependencies": ["vitest"],
       "entry": [
+        // Real child fixture configs load these provider dependencies outside the parent module graph.
+        "test-helpers/browser-timeout-child.mts!",
+        "test-helpers/storybook-timeout-fixture.mts!",
         "src/index.mts!",
         "src/test-timeout-policy/index.mts!",
         "src/test-timeout-policy/plugin.mts!",
