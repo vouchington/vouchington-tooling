@@ -26,7 +26,19 @@ export async function optionalVitestConsumer(source: string, withVitest = false)
       ...Object.keys(manifest.optionalDependencies),
       ...Object.keys(manifest.peerDependencies).filter((name) => name !== 'vitest' || withVitest),
     ])) {
-      const original = await realpath(join(packageRoot, 'node_modules', name))
+      let original: string
+      try {
+        original = await realpath(join(packageRoot, 'node_modules', name))
+      } catch (error) {
+        if (
+          Object.hasOwn(manifest.optionalDependencies, name) &&
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        )
+          continue
+        throw error
+      }
       const installed = join(target, 'node_modules', name)
       await mkdir(dirname(installed), { recursive: true })
       await symlink(original, installed, 'dir')
