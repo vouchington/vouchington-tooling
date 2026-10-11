@@ -93,9 +93,8 @@ function createRegistration<T extends Registration>(
 function protectSuiteFactory(factory: Function, maximum: number): Function {
   return new Proxy(factory, {
     apply(target, owner, values) {
-      const test: unknown = values[0]
-      if (typeof test === 'function')
-        values[0] = guardRegistration(test as Registration, 'test', maximum)
+      // The known direct suite-factory route always receives Vitest's public TestAPI.
+      values[0] = guardRegistration(values[0] as Registration, 'test', maximum)
       return Reflect.apply(target, owner, values)
     },
   })
