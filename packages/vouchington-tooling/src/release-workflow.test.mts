@@ -8,10 +8,22 @@ type Step = {
   id?: string
   name?: string
   run?: string
+  uses?: string
+  with?: Record<string, unknown>
 }
 
 type Workflow = {
-  jobs?: Record<string, { steps?: Step[] }>
+  permissions?: Record<string, string>
+  jobs?: Record<
+    string,
+    {
+      steps?: Step[]
+      needs?: string
+      permissions?: Record<string, string>
+      outputs?: Record<string, string>
+      env?: Record<string, string | number>
+    }
+  >
   on?: { workflow_dispatch?: { inputs?: Record<string, unknown> } }
 }
 
@@ -19,6 +31,38 @@ const workflowText = readFileSync('.github/workflows/release.yml', 'utf8')
 const workflow = load(workflowText) as Workflow
 
 describe('release workflow', () => {
+  it('keeps browser execution outside the credentialed publishing runner', () => {
+    const validation = workflow.jobs?.['browser-validation']
+    const release = workflow.jobs?.release
+    const steps = validation?.steps ?? []
+    const source = steps.find((step) => step.id === 'source')
+    const browser = steps.find((step) => step.run?.includes('playwright install'))
+    const checkout = steps.find((step) => step.uses?.startsWith('actions/checkout@'))
+    const publishCheckout = release?.steps?.find((step) =>
+      step.uses?.startsWith('actions/checkout@'),
+    )
+
+    expect(workflow.permissions).toEqual({})
+    expect(validation?.permissions).toEqual({ contents: 'read' })
+    expect(release?.permissions).toEqual({ contents: 'write', 'id-token': 'write' })
+    expect(release?.needs).toBe('browser-validation')
+    expect(checkout?.with).toEqual({ ref: 'main', 'persist-credentials': false })
+    expect(source?.run).toContain('git rev-parse HEAD')
+    expect(steps.indexOf(source!)).toBeLessThan(steps.indexOf(browser!))
+    expect(validation?.outputs?.['source-sha']).toBe('${{ steps.source.outputs.sha }}')
+    expect(publishCheckout?.with?.ref).toBe('${{ needs.browser-validation.outputs.source-sha }}')
+    expect(steps.some((step) => step.run === 'pnpm run test:coverage')).toBe(true)
+    for (const gate of ['typecheck', 'build', 'lint', 'test:coverage', 'actionlint'])
+      expect(
+        steps.some((step) => step.run === `pnpm run ${gate}`),
+        gate,
+      ).toBe(true)
+    expect(JSON.stringify(validation)).not.toMatch(/secrets\.|npm publish|upload-artifact/)
+    expect(JSON.stringify(release)).not.toMatch(/playwright|test:coverage|download-artifact/)
+    for (const job of [validation, release])
+      expect(job?.env).toEqual({ GOMEMLIMIT: '8GiB', GOMAXPROCS: 2 })
+  })
+
   it('publishes the release commit and its explicit tag atomically', () => {
     expect(workflow.on?.workflow_dispatch?.inputs).toMatchObject({
       package: expect.any(Object),
