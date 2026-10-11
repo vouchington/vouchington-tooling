@@ -28,7 +28,19 @@ export function guardRegistration<T extends Registration>(
       } else {
         for (let index = 1; index < Math.min(args.length, 3); index++) {
           const value: unknown = args[index]
-          if (typeof value === 'number') assertTestTimeout(value, `${kind} timeout`, maximum)
+          if (kind === 'suite' && typeof value === 'function') {
+            args[index] = new Proxy(value, {
+              apply(factory, owner, values) {
+                const test: unknown = values[0]
+                if (
+                  typeof test === 'function' &&
+                  typeof Reflect.get(test, 'beforeAll') === 'function'
+                )
+                  values[0] = guardRegistration(test as Registration, 'test', maximum)
+                return Reflect.apply(factory, owner, values)
+              },
+            })
+          } else if (typeof value === 'number') assertTestTimeout(value, `${kind} timeout`, maximum)
           else if (value !== null && typeof value === 'object') {
             args[index] = snapshotTimeoutOptions(value, `${kind} timeout`, maximum, true)
           }

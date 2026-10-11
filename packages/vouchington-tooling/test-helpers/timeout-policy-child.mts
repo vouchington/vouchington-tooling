@@ -78,10 +78,10 @@ export async function fixture(
       export default { plugins: [testTimeoutPolicyPlugin(30000, ${JSON.stringify([
         'deadline-helper',
         ...(helper?.inlineTransitive ? ['deadline-registrar'] : []),
-      ])})],
+      ])} , { runner: ${JSON.stringify(join(directory, 'runner.mts'))} })],
         resolve: { preserveSymlinks: ${helper?.preserveSymlinks ?? false},
           alias: { 'registration-alias': ${JSON.stringify(join(directory, 'node_modules/deadline-helper/index.mjs'))} } },
-        test: { ...test, runner: './runner.mts' } }
+        test: { ...test, runner: ${JSON.stringify(join(directory, 'runner.mts'))} } }
     `,
     )
     await writeFile(

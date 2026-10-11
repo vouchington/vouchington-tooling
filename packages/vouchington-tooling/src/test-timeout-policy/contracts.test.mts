@@ -13,7 +13,7 @@ import {
   guardVitestExports,
   protectRunnerTimeouts,
 } from './index.mts'
-import { testTimeoutPolicyPlugin } from './plugin.mts'
+import { browserTestTimeoutPolicyPlugin, testTimeoutPolicyPlugin } from './plugin.mts'
 
 describe('public deadline policy contract boundaries', () => {
   it.each([0, -1, NaN, Infinity, '30000', 30001])(
@@ -113,6 +113,43 @@ describe('public deadline policy contract boundaries', () => {
     expect(guarded.extend()).toEqual({ opaque: true })
   })
 
+  it('preserves asynchronous suite-factory receivers and return values while protecting injected APIs', async () => {
+    const receiver = { owner: 'native factory' }
+    const injected = Object.assign(vi.fn(), { beforeAll: vi.fn() })
+    const original = (...args: unknown[]) => {
+      const factory = args.find((value) => typeof value === 'function')
+      if (typeof factory !== 'function') throw new Error('factory absent')
+      return Reflect.apply(factory, receiver, [injected]) as Promise<string>
+    }
+    const suite = guardRegistration(original, 'suite')
+    const result = suite(
+      'owned',
+      { timeout: 25 },
+      async function (this: typeof receiver, test: typeof injected) {
+        expect(this).toBe(receiver)
+        await Promise.resolve()
+        expect(() => test.beforeAll(() => {}, 30001)).toThrow(RangeError)
+        test.beforeAll(() => {}, 25)
+        test('body', () => {}, 25)
+        return 'factory completed'
+      },
+    )
+    await expect(result).resolves.toBe('factory completed')
+    expect(injected.beforeAll).toHaveBeenCalledOnce()
+    expect(injected).toHaveBeenCalledOnce()
+    const row = () => 'data'
+    const table = guardRegistration(
+      (_name: string, factory: (value: typeof row) => string) => factory(row),
+      'suite',
+    )
+    expect(
+      table('row', (value) => {
+        expect(value).toBe(row)
+        return value()
+      }),
+    ).toBe('data')
+  })
+
   it('rejects returned collector hooks while preserving native collection methods and cache identity', () => {
     const collector = {
       type: 'collector',
@@ -195,25 +232,32 @@ describe('public deadline policy contract boundaries', () => {
     expect(guardVitestExports({ TestRunner: null }).TestRunner).toBeNull()
   })
 
-  it('worker-loads the generated Node facade without guarding a custom runner base prematurely', async () => {
-    const plugin = testTimeoutPolicyPlugin(30000, [], { runner: null })
-    const id = plugin.resolveId('vitest', '/owned/case.mts')!
-    const directory = await mkdtemp(join(tmpdir(), 'parent-node-facade-'))
-    try {
-      await symlink(
-        fileURLToPath(new URL('../../../../node_modules', import.meta.url)),
-        join(directory, 'node_modules'),
-      )
-      const module = join(directory, 'facade.mts')
-      await writeFile(module, plugin.load(id)!)
-      const facade: { TestRunner: typeof TestRunner } = await import(module)
-      expect(facade.TestRunner).toBe(TestRunner)
-      class Custom extends facade.TestRunner {}
-      expect(Object.getPrototypeOf(Custom.prototype)).toBe(TestRunner.prototype)
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
+  it.each([false, true])(
+    'worker-loads the public facade with the owning constructor policy; browser=%s',
+    async (browser) => {
+      const plugin = browser
+        ? browserTestTimeoutPolicyPlugin()
+        : testTimeoutPolicyPlugin(30000, [], { runner: null })
+      const id = plugin.resolveId('vitest', '/owned/case.mts')!
+      const directory = await mkdtemp(join(tmpdir(), 'parent-node-facade-'))
+      try {
+        await symlink(
+          fileURLToPath(new URL('../../../../node_modules', import.meta.url)),
+          join(directory, 'node_modules'),
+        )
+        const module = join(directory, 'facade.mts')
+        await writeFile(module, plugin.load(id)!)
+        const facade: { TestRunner: typeof TestRunner } = await import(module)
+        if (browser) expect(facade.TestRunner).not.toBe(TestRunner)
+        else expect(facade.TestRunner).toBe(TestRunner)
+        expect(facade.TestRunner.prototype).toBe(TestRunner.prototype)
+        class Custom extends facade.TestRunner {}
+        expect(Object.getPrototypeOf(Custom.prototype)).toBe(TestRunner.prototype)
+      } finally {
+        await rm(directory, { recursive: true, force: true })
+      }
+    },
+  )
 
   it('composes runner context and completion callbacks without masking raw invalid tasks', () => {
     const extension = vi.fn((context: object) => context)
@@ -254,7 +298,7 @@ describe('public deadline policy contract boundaries', () => {
 
   it('routes only public Vitest imports and explicitly declares registrar inlining', () => {
     const plugin = testTimeoutPolicyPlugin(30000, ['owned-registrar'])
-    expect(plugin.config()).toEqual({ test: { server: { deps: { inline: ['owned-registrar'] } } } })
+    expect(plugin.config().test.server.deps.inline).toEqual(['owned-registrar'])
     expect(() => testTimeoutPolicyPlugin(0)).toThrow(RangeError)
     expect(plugin.resolveId('other', '/case.mts')).toBeNull()
     expect(plugin.resolveId('vitest')).toBeNull()
@@ -263,10 +307,12 @@ describe('public deadline policy contract boundaries', () => {
     expect(plugin.load('other')).toBeNull()
     // Vite load must supply module code for the owned route; SDK children prove its behavior.
     expect(plugin.load(id)).toBeTypeOf('string')
-    // Registration-only routing must leave an independently supplied runner intact.
-    const resolved = { test: { runner: '/owned/existing-runner.mjs' } }
-    expect(() => plugin.configResolved(resolved)).not.toThrow()
-    expect(resolved.test.runner).toBe('/owned/existing-runner.mjs')
+    // Default Node usage installs the native final runner and rejects unsupplied custom runners.
+    const runner = plugin.config().test.runner!
+    expect(() => plugin.configResolved({ test: { runner } })).not.toThrow()
+    expect(() => plugin.config({ test: { runner: '/owned/existing-runner.mjs' } })).toThrow(
+      'differs',
+    )
   })
   it('keeps final Node runner provenance and rejects conflicting merged or browser slots', () => {
     const plugin = testTimeoutPolicyPlugin(30000, [], { runner: '/owned/final-runner.mjs' })

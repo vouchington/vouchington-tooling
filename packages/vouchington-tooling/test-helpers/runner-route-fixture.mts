@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 export interface RunnerRouteCase {
   assertDirectNewTarget?: boolean
+  implicitNative?: boolean
   nativeDefault?: boolean
   standalone?: boolean
   mergedOverride?: boolean
@@ -53,7 +54,7 @@ export async function prepareRunnerRoute(
   `,
   )
   const project = `
-    plugins: [testTimeoutPolicyPlugin(30000, [], { runner: ${route.nativeDefault ? 'null' : JSON.stringify(finalRunner)} })
+    plugins: [testTimeoutPolicyPlugin(30000, []${route.implicitNative ? '' : `, { runner: ${route.nativeDefault ? 'null' : JSON.stringify(finalRunner)} }`})
       ${route.mergedOverride ? `, { name: 'override-runner', config: () => ({ test: { runner: ${JSON.stringify(alternate)} } }) }` : ''}],
     test: { ...${config}, ${route.nativeDefault ? '' : `runner: ${JSON.stringify(finalRunner)},`} }
   `

@@ -20,7 +20,8 @@ that deadline; the second check prevents invalidating the original task metadata
 This also protects tests registered through raw native imports. Hook registration
 requires the import-routing layer because hooks do not create test contexts there.
 
-Install `testTimeoutPolicyPlugin(30000, registrationPackages)` in each owning Vite/Vitest config. It routes
+Install `testTimeoutPolicyPlugin(30000, registrationPackages)` in each owning Node Vite/Vitest config.
+The two-argument form installs a protected native final runner automatically. It routes
 public `vitest` imports from consumer modules through `guardVitestExports(nativeVitest)`
 without parsing consumer source or modifying installed SDK files. This facade validates
 test, inherited suite and hook deadlines before native registration
@@ -42,7 +43,8 @@ Returned suite collectors retain their public test, task, clear, collect and met
 APIs. Their raw `collector.on(...)` hook-registration path is rejected before
 registration: Vitest 5 stores these callbacks without its native hook timeout wrapper.
 Register `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `aroundAll` and `aroundEach`
-through guarded public imports inside the suite factory instead. No private SDK
+through guarded public imports or the guarded test API injected into a suite factory instead.
+Native `test`/`it`, `describe`/`suite` and `vi`/`vitest` aliases retain shared identity. No private SDK
 wrapper or replacement timer is used.
 Extended and overridden fixture APIs retain guarded test registration. Vitest fixture
 options are not treated as having an independent timeout field that its SDK does not support.
@@ -79,7 +81,7 @@ only qualified forced-cleanup child; ordinary children must exit without it.
 
 ## Final-constructor Node composition
 
-The plugin's optional third argument is `NodeRunnerPolicy`, with `runner` set to the
+The plugin's optional third argument is `NodeRunnerPolicy` (default `{ runner: null }`), with `runner` set to the
 absolute resolved module of the existing final custom runner, or null for the native
 runner. That module must default-export the actual final constructor. Preserve its
 public lifecycle methods and own fields; do not substitute its base class.
@@ -97,7 +99,7 @@ export wraps the final constructor with `guardPublicRunner`, so derived fields a
 private brands initialize before configuration and context protection is installed.
 The Node import facade leaves public TestRunner native, avoiding premature base
 installation while guarding registration APIs. The resolved config hook rejects a
-later runner replacement or a browser project. Existing configured runner provenance
+later runner replacement or a browser project. A custom Node runner requires its explicit final module in the third argument. Existing configured runner provenance
 must match the explicitly supplied absolute module; inspect every project/standalone
 config and merged plugin graph before adoption. Real SDK children qualify worker serialization/import resolution, final derived own fields,
 private receivers, the native runner route and standalone project configuration. Vitest

@@ -30,7 +30,7 @@ export function guardRuntimeConfig<T extends object>(api: T, maximum = 30_000): 
 
 /** A single current Vitest API facade. Adoption must route every test import through it. */
 export function guardVitestExports<T extends object>(api: T, maximum = 30_000): T {
-  const cache = new Map<PropertyKey, unknown>()
+  const cache = new Map<unknown, Map<PropertyKey, unknown>>()
   const kinds = new Map<string, Kind>([
     ['test', 'test'],
     ['it', 'test'],
@@ -47,9 +47,11 @@ export function guardVitestExports<T extends object>(api: T, maximum = 30_000): 
   ])
   return new Proxy(api, {
     get(target, key, receiver) {
-      if (cache.has(key)) return cache.get(key)
       const value: unknown = Reflect.get(target, key, receiver)
       const kind = kinds.get(String(key))
+      const role = kind ?? (key === 'vitest' ? 'vi' : key)
+      const values = cache.get(value) ?? new Map<PropertyKey, unknown>()
+      if (values.has(role)) return values.get(role)
       const guarded =
         key === 'TestRunner' && typeof value === 'function'
           ? guardPublicRunner(value as RunnerConstructor, maximum, protectRunnerTimeouts)
@@ -58,7 +60,8 @@ export function guardVitestExports<T extends object>(api: T, maximum = 30_000): 
             : kind && typeof value === 'function'
               ? guardRegistration(value as Registration, kind, maximum)
               : value
-      cache.set(key, guarded)
+      values.set(role, guarded)
+      cache.set(value, values)
       return guarded
     },
   })

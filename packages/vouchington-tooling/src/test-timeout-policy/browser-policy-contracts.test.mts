@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { mergeConfig } from 'vitest/config'
 import { browserTestTimeoutPolicyPlugin, testTimeoutPolicyPlugin } from './plugin.mts'
 import { replaceStorybookAnnotationSetup } from '../../test-helpers/storybook-timeout-fixture.mts'
 
@@ -41,9 +42,12 @@ describe('browser routing policy contracts', () => {
     const plugin = browserTestTimeoutPolicyPlugin()
     const custom = { onInit() {} }
     expect(plugin.config().test.reporters[0]).toBe('default')
-    expect(plugin.config({ test: { reporters: 'verbose' } }).test.reporters[0]).toBe('verbose')
+    const single = { test: { reporters: 'verbose' } }
+    expect(mergeConfig(single, plugin.config(single)).test.reporters[0]).toBe('verbose')
     const reporters = ['json', custom]
-    expect(plugin.config({ test: { reporters } }).test.reporters.slice(0, 2)).toEqual(reporters)
+    const merged = mergeConfig({ test: { reporters } }, plugin.config({ test: { reporters } }))
+    expect(merged.test.reporters.slice(0, 2)).toEqual(reporters)
+    expect(merged.test.reporters).toHaveLength(3)
     expect(reporters).toEqual(['json', custom])
   })
 

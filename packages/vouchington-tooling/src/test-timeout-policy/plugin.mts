@@ -34,6 +34,14 @@ const virtualId = '\0test-timeout-policy:vitest'
 export function testTimeoutPolicyPlugin(
   maximum = 30_000,
   registrationPackages: readonly string[] = [],
+  nodeRunner: NodeRunnerPolicy = { runner: null },
+) {
+  return createPolicyPlugin(maximum, registrationPackages, nodeRunner)
+}
+
+function createPolicyPlugin(
+  maximum: number,
+  registrationPackages: readonly string[],
   nodeRunner?: NodeRunnerPolicy,
 ) {
   if (!Number.isFinite(maximum) || maximum <= 0)
@@ -62,7 +70,6 @@ export function testTimeoutPolicyPlugin(
       }
     },
     configResolved(config: { test?: { runner?: string; browser?: { enabled?: boolean } } }) {
-      if (!nodeRunner) return
       if (config.test?.browser?.enabled)
         throw new Error('Node final-runner composition cannot be used for browser projects')
       if (config.test?.runner !== runnerId)
@@ -104,7 +111,7 @@ export function browserTestTimeoutPolicyPlugin(
   maximum = 30_000,
   registrationPackages: readonly string[] = [],
 ) {
-  const base = testTimeoutPolicyPlugin(maximum, registrationPackages)
+  const base = createPolicyPlugin(maximum, registrationPackages)
   const excluded = ['vitest', '@vitest/browser', ...registrationPackages]
   const filterIncludes = (include: string[]) =>
     include.filter(
@@ -135,10 +142,9 @@ export function browserTestTimeoutPolicyPlugin(
     },
     config(config: PolicyConfig = {}) {
       const existing = config.test?.reporters
-      const reporters =
-        existing === undefined ? ['default'] : Array.isArray(existing) ? existing : [existing]
+      const reporters = existing === undefined ? ['default'] : []
       const lifecycle = {
-        onBrowserInit(project: BrowserOptimizationProject) {
+        onBrowserInit(this: void, project: BrowserOptimizationProject) {
           // Public reporter lifecycle runs before the provider starts browser pages.
           const configs = [project.viteConfig, project.vite.config]
           for (const resolved of configs) {
