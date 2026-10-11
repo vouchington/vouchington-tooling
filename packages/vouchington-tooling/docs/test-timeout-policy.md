@@ -23,6 +23,9 @@ This also protects tests registered through raw native imports. Hook registratio
 requires the import-routing layer because hooks do not create test contexts there.
 
 Install `testTimeoutPolicyPlugin(30000, registrationPackages)` in each owning Node Vite/Vitest config.
+Import both Vite plugins from `vouchington-tooling/test-timeout-policy/plugin`.
+That dedicated entry requires the optional Vitest peer; the package root remains usable
+for unrelated APIs without installing Vitest.
 The two-argument form installs a protected native final runner automatically. It routes
 public `vitest` imports from consumer modules through `guardVitestExports(nativeVitest)`
 without parsing consumer source or modifying installed SDK files. This facade validates
@@ -94,6 +97,8 @@ runner. That module must default-export the actual final constructor. Preserve i
 public lifecycle methods and own fields; do not substitute its base class.
 
 ```ts
+import { testTimeoutPolicyPlugin } from 'vouchington-tooling/test-timeout-policy/plugin'
+
 plugins: [
   testTimeoutPolicyPlugin(30_000, registrationPackages, {
     runner: absoluteFinalRunnerModule,
