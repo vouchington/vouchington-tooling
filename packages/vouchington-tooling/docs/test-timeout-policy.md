@@ -40,11 +40,13 @@ existing upstream module/export/alias graph and record its complete registration
 package list. This plugin does not discover that graph. An omitted externalized
 registrar can register raw hooks even when every child test has a legal deadline.
 Returned suite collectors retain their public test, task, clear, collect and metadata
-APIs. Their raw `collector.on(...)` hook-registration path is rejected before
+APIs. The returned test API validates test and hook registration as well. Their raw `collector.on(...)` hook-registration path is rejected before
 registration: Vitest 5 stores these callbacks without its native hook timeout wrapper.
 Register `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `aroundAll` and `aroundEach`
 through guarded public imports or the guarded test API injected into a suite factory instead.
-Native `test`/`it`, `describe`/`suite` and `vi`/`vitest` aliases retain shared identity. No private SDK
+Native `test`/`it`, `describe`/`suite` and `vi`/`vitest` aliases retain shared identity.
+Only direct suite factories receive a guarded injected test API; `each` and `for`
+data callbacks retain their original row identities, including callable rows. No private SDK
 wrapper or replacement timer is used.
 Extended and overridden fixture APIs retain guarded test registration. Vitest fixture
 options are not treated as having an independent timeout field that its SDK does not support.
@@ -110,7 +112,10 @@ are rejected by the policy.
 `vouchington-tooling/test-timeout-policy`. The wrapper retains its generic constructor
 type, static properties and native newTarget/instance receivers. Direct construction
 exposes the original final class as `new.target`; genuinely derived construction
-retains the most-derived class and its private brands. Direct callers must
+retains the most-derived class and its private brands. Direct static method and accessor
+reads use the original constructor receiver; genuine derived access retains its native
+receiver. Callable-valued static fields, including the SDK public helper aliases, retain
+their original value identity. Direct callers must
 wrap the final class; wrapping a base class does not finalize derived own fields.
 
 ## Browser and Storybook routing

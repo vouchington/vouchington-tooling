@@ -38,6 +38,9 @@ jobs:
     # knip's oxc-parser OOMs on ubuntu-slim; match the CI test job.
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GOMEMLIMIT: 8GiB
+      GOMAXPROCS: 2
     steps:
       - name: Check RELEASE_TOKEN is set
         env:
@@ -74,6 +77,9 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run build
       - run: pnpm run lint
+      - name: Install Chromium for Browser Mode tests
+        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 3
       - run: pnpm run test:coverage
       - run: pnpm run actionlint
 

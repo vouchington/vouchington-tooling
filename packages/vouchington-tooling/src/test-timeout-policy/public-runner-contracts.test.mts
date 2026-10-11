@@ -81,6 +81,71 @@ describe('public constructor adapter contracts (parent worker)', () => {
     expect(derived).toBeInstanceOf(Derived)
   })
 
+  it('retains direct static private brands, getters, method identity and derived receivers', () => {
+    class Base {
+      static #marker = 'base static brand'
+      static get marker() {
+        return this.#marker
+      }
+      static read() {
+        return this.#marker
+      }
+      static owner() {
+        return this
+      }
+      static callableField = () => 'public callable field'
+      static get ownerMarker() {
+        return this
+      }
+      constructor(public config: { testTimeout: number; hookTimeout: number }) {}
+    }
+    const Guarded = guardPublicRunner(Base, 30000, protectRunnerTimeouts)
+    expect(Reflect.get(Guarded, 'callableField')).toBe(Reflect.get(Base, 'callableField'))
+    expect(Guarded.callableField()).toBe('public callable field')
+    expect(Guarded.marker).toBe(Base.marker)
+    expect(Guarded.read()).toBe(Base.read())
+    expect(Reflect.get(Guarded, 'read')).toBe(Reflect.get(Guarded, 'read'))
+    const read: unknown = Reflect.get(Guarded, 'read')
+    if (typeof read !== 'function') throw new Error('Static method missing')
+    expect(() => read()).toThrow(TypeError)
+    expect(() => read.call({})).toThrow(TypeError)
+    class Derived extends Guarded {
+      static #marker = 'derived static brand'
+      static get marker() {
+        return this.#marker
+      }
+      static read() {
+        return this.#marker
+      }
+    }
+    expect(Derived.marker).toBe('derived static brand')
+    expect(Derived.read()).toBe('derived static brand')
+    expect(Derived.owner()).toBe(Derived)
+    expect(Derived.ownerMarker).toBe(Derived)
+    expect(Guarded.ownerMarker).toBe(Base)
+    expect(Reflect.get(Derived, 'callableField')).toBe(Reflect.get(Base, 'callableField'))
+    class Inherited extends Base {}
+    const FinalInherited = guardPublicRunner(Inherited, 30000, protectRunnerTimeouts)
+    expect(Reflect.get(FinalInherited, 'callableField')).toBe(Reflect.get(Base, 'callableField'))
+    expect(FinalInherited.owner()).toBe(Inherited)
+    const Bound = Guarded.bind(null)
+    expect(() => new Bound({ testTimeout: 30001, hookTimeout: 25 })).toThrow(RangeError)
+    expect(Guarded.owner()).toBe(Base)
+    const Frozen = class {
+      constructor(public config: { testTimeout: number; hookTimeout: number }) {}
+      static fixed(this: void) {
+        return 'immutable'
+      }
+    }
+    Object.defineProperty(Frozen, 'fixed', { writable: false, configurable: false })
+    const guardedFrozen = guardPublicRunner(Frozen, 30000, protectRunnerTimeouts)
+    expect(guardedFrozen.fixed).toBe(Frozen.fixed)
+    expect(guardedFrozen.fixed()).toBe('immutable')
+    class FrozenDerived extends guardedFrozen {}
+    expect(Reflect.get(FrozenDerived, 'fixed')).toBe(Reflect.get(Frozen, 'fixed'))
+    expect(FrozenDerived.fixed()).toBe('immutable')
+  })
+
   it('shares adapters per constructor and protector but isolates configured maxima', () => {
     class Base {
       constructor(public config: { testTimeout: number; hookTimeout: number }) {}

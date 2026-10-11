@@ -137,11 +137,11 @@ describe('public deadline policy contract boundaries', () => {
     await expect(result).resolves.toBe('factory completed')
     expect(injected.beforeAll).toHaveBeenCalledOnce()
     expect(injected).toHaveBeenCalledOnce()
-    const row = () => 'data'
-    const table = guardRegistration(
-      (_name: string, factory: (value: typeof row) => string) => factory(row),
-      'suite',
-    )
+    const row = Object.assign(() => 'data', { beforeAll() {} })
+    const registration = Object.assign(() => {}, {
+      each: () => (_name: string, factory: (value: typeof row) => string) => factory(row),
+    })
+    const table = guardRegistration(registration, 'suite').each()
     expect(
       table('row', (value) => {
         expect(value).toBe(row)
@@ -167,7 +167,10 @@ describe('public deadline policy contract boundaries', () => {
     expect(guarded.on).toBe(guarded.on)
     expect(() => guarded.on('beforeAll', () => {})).toThrow('register guarded public hooks')
     expect(collector.on).not.toHaveBeenCalled()
-    for (const key of ['name', 'test', 'task', 'collect', 'clear', 'tasks'])
+    expect(guarded.test).toBe(guarded.test)
+    expect(guarded.test).not.toBe(collector.test)
+    expect(() => guarded.test('invalid', 30001)).toThrow(RangeError)
+    for (const key of ['name', 'task', 'collect', 'clear', 'tasks'])
       expect(Reflect.get(guarded, key)).toBe(Reflect.get(collector, key))
     guarded.clear()
     expect(collector.clear).toHaveBeenCalledOnce()
