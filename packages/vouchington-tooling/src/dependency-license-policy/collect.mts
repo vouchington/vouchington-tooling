@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { withAuditSignalCleanup } from './audit-signals.mts'
-import { ensurePrivateLicenseAuditStore, licenseAuditStoreDirectory } from './audit-store.mts'
+import { ensurePrivateLicenseAuditStore } from './audit-store.mts'
 import { executePnpm } from './execute-pnpm.mts'
 import { parsePnpmLicenseReport } from './report.mts'
 import type { PnpmCommandResult, PnpmExecutor, PnpmLicenseReport } from './types.mts'
@@ -17,7 +17,6 @@ export interface CollectPnpmLicenseReportOptions {
     workspaceSource: string,
   ) => PnpmLicenseAuditWorkspace
   readonly readFile?: (path: string, encoding: 'utf8') => string
-  readonly storeDir?: string
 }
 
 const DEFAULT_OPTIONS = {
@@ -51,7 +50,7 @@ export async function collectPnpmLicenseReport(
     readFile(join(repoRoot, 'pnpm-lock.yaml'), 'utf8'),
     readFile(join(repoRoot, 'pnpm-workspace.yaml'), 'utf8'),
   )
-  const storeDir = options.storeDir ?? licenseAuditStoreDirectory()
+  const storeDir = join(auditWorkspace.cwd, 'store')
   return withAuditSignalCleanup(auditWorkspace.cleanup, async (signal) => {
     ensureStore(storeDir)
     const storeConfig = `--config.store-dir=${storeDir}`

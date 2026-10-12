@@ -1,6 +1,7 @@
 import {
   existsSync,
   lstatSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -13,7 +14,6 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 
-import { licenseAuditStoreDirectory } from './audit-store.mts'
 import { collectPnpmLicenseReport } from './collect.mts'
 import type { PnpmExecutor } from './types.mts'
 import {
@@ -32,7 +32,7 @@ type PnpmResult = {
 function fakeExecutor(
   result: PnpmResult,
   fetchResult: PnpmResult = { status: 0 },
-  storeDir = '/audit-store',
+  storeDir = '/audit/store',
 ): PnpmExecutor {
   const steps = [
     {
@@ -71,7 +71,6 @@ function collectTestReport(execute: PnpmExecutor, cleanup: () => void = () => un
       expect(workspaceSource).toBe('packages: [app]\nengineStrict: true\n')
       return { cwd: '/audit', cleanup }
     },
-    storeDir: '/audit-store',
   })
 }
 
@@ -268,6 +267,41 @@ describe('pnpm license collection', () => {
     expect(cleanupCount).toBe(3)
   })
 
+  it.each([
+    ['success', { status: 0, stdout: '{}' }, { status: 0, stdout: '{}' }],
+    ['fetch failure', { status: 1, stderr: 'fetch failed' }, { status: 0, stdout: '{}' }],
+    ['license failure', { status: 0, stdout: '{}' }, { status: 1, stderr: 'license failed' }],
+  ] as const)('removes downloaded store contents after %s', async (outcome, fetch, licenses) => {
+    const workspace = isolatedDirectory('dependency-license-audit-')
+    const marker = join(workspace, 'store', 'downloaded-package')
+    try {
+      const collection = collectPnpmLicenseReport('/repo', {
+        execute: (_command, args) => {
+          if (args[1] === 'fetch') {
+            mkdirSync(join(workspace, 'store'), { recursive: true })
+            writeFileSync(marker, 'package contents')
+            return { stderr: '', stdout: '', ...fetch }
+          }
+          expect(existsSync(marker)).toBe(true)
+          return { stderr: '', stdout: '', ...licenses }
+        },
+        prepareWorkspace: () => ({
+          cwd: workspace,
+          cleanup: () => rmSync(workspace, { force: true, recursive: true }),
+        }),
+        readFile: () => 'packages: {}\n',
+      })
+      if (outcome === 'success') await expect(collection).resolves.toEqual({})
+      else {
+        const command = outcome === 'fetch failure' ? 'fetch' : 'license'
+        await expect(collection).rejects.toThrow(`${command} failed`)
+      }
+      expect(existsSync(marker)).toBe(false)
+    } finally {
+      rmSync(workspace, { force: true, recursive: true })
+    }
+  })
+
   it('parses a well-formed report using an isolated fetch', async () => {
     await expect(
       collectTestReport(
@@ -293,7 +327,6 @@ describe('pnpm license collection', () => {
             expect(workspaceSource).toBe('packages: []\n')
             return { cwd: '/audit', cleanup: () => undefined }
           },
-          storeDir: '/audit-store',
         }),
       ).resolves.toEqual({})
     } finally {
@@ -301,7 +334,7 @@ describe('pnpm license collection', () => {
     }
   })
 
-  it('fetches into the dedicated pnpm cache store', async () => {
+  it('fetches into the private store nested in the disposable workspace', async () => {
     let seen = ''
     await collectPnpmLicenseReport('/repo', {
       ensureStore: (directory) => {
@@ -315,7 +348,35 @@ describe('pnpm license collection', () => {
       prepareWorkspace: () => ({ cwd: '/audit', cleanup: () => undefined }),
       readFile: () => 'packages: {}\n',
     })
-    expect(seen).toBe(licenseAuditStoreDirectory())
+    expect(seen).toBe('/audit/store')
+  })
+
+  it('gives concurrent audits separate stores', async () => {
+    const workspaces = [
+      isolatedDirectory('dependency-license-audit-'),
+      isolatedDirectory('dependency-license-audit-'),
+    ]
+    const stores = new Set<string>()
+    try {
+      await Promise.all(
+        workspaces.map((workspace) =>
+          collectPnpmLicenseReport('/repo', {
+            execute: (_command, args) => {
+              stores.add(args[0]?.slice('--config.store-dir='.length) ?? '')
+              return { status: 0, stderr: '', stdout: '{}' }
+            },
+            prepareWorkspace: () => ({
+              cwd: workspace,
+              cleanup: () => rmSync(workspace, { force: true, recursive: true }),
+            }),
+            readFile: () => 'packages: {}\n',
+          }),
+        ),
+      )
+      expect(stores).toEqual(new Set(workspaces.map((workspace) => join(workspace, 'store'))))
+    } finally {
+      for (const workspace of workspaces) rmSync(workspace, { force: true, recursive: true })
+    }
   })
 
   it('cleans the workspace when store setup fails', async () => {
@@ -333,7 +394,6 @@ describe('pnpm license collection', () => {
           },
         }),
         readFile: () => 'packages: {}\n',
-        storeDir: '/audit-store',
       }),
     ).rejects.toThrow('store denied')
     expect(cleaned).toBe(true)

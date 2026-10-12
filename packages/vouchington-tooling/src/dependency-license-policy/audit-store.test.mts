@@ -12,37 +12,13 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  assertOwnedDirectory,
-  ensurePrivateLicenseAuditStore,
-  licenseAuditStoreDirectory,
-  pnpmCacheDirectory,
-} from './audit-store.mts'
+import { assertOwnedDirectory, ensurePrivateLicenseAuditStore } from './audit-store.mts'
 
 function tempDirectory(): string {
   return mkdtempSync(join(tmpdir(), 'license-audit-store-'))
 }
 
 describe('license audit store', () => {
-  it('places the store under the platform pnpm cache', () => {
-    expect(pnpmCacheDirectory({ XDG_CACHE_HOME: '/xdg' }, '/home', 'darwin')).toBe(
-      join('/home', 'Library', 'Caches', 'pnpm'),
-    )
-    expect(pnpmCacheDirectory({ LOCALAPPDATA: 'C:\\Local' }, '/home', 'win32')).toBe(
-      join('C:\\Local', 'pnpm-cache'),
-    )
-    expect(pnpmCacheDirectory({}, '/home', 'win32')).toBe(
-      join('/home', 'AppData', 'Local', 'pnpm-cache'),
-    )
-    expect(pnpmCacheDirectory({ XDG_CACHE_HOME: '/xdg' }, '/home', 'linux')).toBe(
-      join('/xdg', 'pnpm'),
-    )
-    expect(pnpmCacheDirectory({}, '/home', 'linux')).toBe(join('/home', '.cache', 'pnpm'))
-    expect(licenseAuditStoreDirectory({}, '/home', 'linux')).toBe(
-      join('/home', '.cache', 'pnpm', 'dependency-license-audit-store'),
-    )
-  })
-
   it('rejects a store that is not an owned real directory', () => {
     const stat = {
       isDirectory: () => false,

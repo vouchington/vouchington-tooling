@@ -429,18 +429,20 @@ architectures to every `os`, `cpu`, and `libc` selector represented in the lockf
 `engines` constraint from the audit copy of the lockfile, and validates the JSON report. Dropping
 `engines` keeps `pnpm fetch` from skipping optional packages that exclude the running Node.js;
 pnpm 12's `fetch` ignores `force`, so their licenses would otherwise report as Unknown.
-Packages are fetched into a dedicated owner-only store under the pnpm cache
-(`dependency-license-audit-store`) so a later audit reuses content-addressed packages instead of
-downloading every platform again, without writing those packages into the developer store.
+Packages are fetched into a private store inside that temporary workspace. Each audit has its own
+store, and workspace cleanup removes every downloaded package when the audit succeeds or fails,
+without changing the developer's pnpm store. The exported options no longer accept a `storeDir`
+override because caller-owned paths cannot be safely removed; callers that provide a custom
+`prepareWorkspace` own the returned workspace and its nested store lifecycle.
 Pass explicit denied SPDX IDs and prefixes, exact aliases, and justified allowlist scopes to
 `evaluatePnpmLicenseReport`. Unknown, malformed, and custom SPDX references fail closed. Allowlist
 scopes are either intentionally global or an exact package-name set; the library returns structured
 violations and does not format CI-provider diagnostics.
 When present, the repository `.npmrc` is copied into the owner-private temporary workspace so pnpm
-can authenticate to the same registries. The workspace is removed when the audit finishes, when the
-process receives SIGINT, SIGTERM, or SIGHUP, and on the next audit if the previous process died
-first, including SIGKILL. Each workspace records its owner's PID so a later audit can delete
-directories whose owner is gone.
+can authenticate to the same registries. The workspace and its package store are removed when the
+audit finishes, when the process receives SIGINT, SIGTERM, or SIGHUP, and on the next audit if the
+previous process died first, including SIGKILL. Each workspace records its owner's PID so a later
+audit can delete directories whose owner is gone.
 
 `session-friction` is an opt-in capture and reporting library. Callers supply the session id,
 absolute log directory, host-independent observation, and journal loader; it does not inspect host
