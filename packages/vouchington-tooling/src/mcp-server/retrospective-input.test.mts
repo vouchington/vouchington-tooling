@@ -157,6 +157,12 @@ describe('composeFromArgs transcript', () => {
     await expect(
       composeFromArgs(withFacts({ ...unassessed, noPr: true, pr: '1' }), base),
     ).rejects.toThrow('compose.facts: status is exclusive with pr, noPr')
+    for (const [facts, message] of [
+      [{ noPr: 'false' }, 'compose.facts.noPr must be a boolean'],
+      [{ pr: 1 }, 'compose.facts.pr must be a string'],
+      [{ branch: null }, 'compose.facts.branch must be a string'],
+    ] as const)
+      await expect(composeFromArgs(withFacts(facts), base)).rejects.toThrow(message)
     // Facts never query another repository with the server's GitHub token.
     await expect(
       composeFromArgs(withFacts({ repo: 'other/private', pr: '1' }), base),

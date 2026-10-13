@@ -148,6 +148,12 @@ function factsInput(facts: Args, base: ComposeBase): Args {
     return facts
   }
   if ('reason' in facts) throw new Error('compose.facts.reason requires a status')
+  // The collector trusts these types; a string "false" must not read as noPr: true.
+  for (const key of ['pr', 'branch'])
+    if (key in facts && typeof facts[key] !== 'string')
+      throw new Error(`compose.facts.${key} must be a string`)
+  if ('noPr' in facts && typeof facts.noPr !== 'boolean')
+    throw new Error('compose.facts.noPr must be a boolean')
   return { ...facts, execute: worktreeExecutor(base.worktree, base.env) }
 }
 
