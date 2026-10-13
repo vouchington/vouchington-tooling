@@ -58,6 +58,10 @@ describe('resolvePolicyModule', () => {
     symlinkSync(outside, join(root, 'dir'))
     declare('dir/x.mts')
     await expect(resolvePolicyModule(root)).rejects.toThrow('stay inside the worktree')
+    for (const path of ['.', '..']) {
+      declare(path)
+      await expect(resolvePolicyModule(root)).rejects.toThrow('stay inside the worktree')
+    }
     declare('missing.mts')
     await expect(resolvePolicyModule(root)).rejects.toThrow('does not exist')
     declare(7)
@@ -169,6 +173,10 @@ describe('runPolicyExport', () => {
     await expect(
       withEnv(outcome({ exitCode: 1, stderr: 'token=ghp_secretvalue' })),
     ).rejects.toThrow('exited with code 1: token=[REDACTED]')
+    // A credential straddling the 2,000-character excerpt cut is scrubbed before the cut.
+    await expect(
+      withEnv(outcome({ exitCode: 1, stderr: `${'x'.repeat(1995)}ghp_secretvalue` })),
+    ).rejects.toThrow(/x\[REDACTED\]$/)
     // A credential with JSON-special characters, printed JSON-escaped to stderr.
     await expect(
       runPolicyExport({

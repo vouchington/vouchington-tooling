@@ -1,5 +1,5 @@
 import { readFile, realpath } from 'node:fs/promises'
-import { isAbsolute, join, sep } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 
 function packagePolicy(worktree: string, text: string): string | undefined {
   let manifest: unknown
@@ -49,7 +49,9 @@ export async function resolvePolicyModule(worktree: string): Promise<string | un
   } catch {
     throw new Error(`policy module ${declared} does not exist in the worktree`)
   }
-  if (!resolved.startsWith(root + sep))
+  const inside = relative(root, resolved)
+  // relative(), not a prefix test, so a worktree at the filesystem root still contains its files.
+  if (!inside || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside))
     throw new Error(`policy path ${declared} must stay inside the worktree`)
   return resolved
 }

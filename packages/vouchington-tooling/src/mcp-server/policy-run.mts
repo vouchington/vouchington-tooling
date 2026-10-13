@@ -60,17 +60,22 @@ function parseReply(name: PolicyExport, outcome: PolicyOutcome): PolicyResult {
  */
 export async function runPolicyExport(run: PolicyRun): Promise<PolicyResult> {
   const secrets = credentialValues(run.env)
+  // A policy can echo a credential it was given (GH_TOKEN) in a stack, stderr, or result; the
+  // caller of an MCP tool must never receive one. Diagnostics may carry it JSON-escaped too.
+  const escaped = secrets.map((secret) => JSON.stringify(secret).slice(1, -1))
+  const forms = [...new Set([...escaped, ...secrets])].sort((a, b) => b.length - a.length)
+  const spawn = run.spawn ?? spawnPolicy
+  // stderr is scrubbed whole, before its excerpt could cut a credential into an unmatched suffix.
+  const scrubbing: PolicySpawner = async (request) => {
+    const outcome = await spawn(request)
+    return { ...outcome, stderr: scrubText(outcome.stderr, forms) }
+  }
   try {
-    const result = await runUnscrubbed(run)
+    const result = await runUnscrubbed(run, scrubbing)
     return result.status === 'ok'
       ? { status: 'ok', result: scrubValue(result.result, secrets) }
       : result
   } catch (error) {
-    // A policy can echo a credential it was given (GH_TOKEN) in a stack, stderr, or result; the
-    // caller of an MCP tool must never receive one.
-    // Diagnostics may carry a credential JSON-escaped (a policy printing JSON to stderr) too.
-    const escaped = secrets.map((secret) => JSON.stringify(secret).slice(1, -1))
-    const forms = [...new Set([...escaped, ...secrets])].sort((a, b) => b.length - a.length)
     throw new Error(scrubText((error as Error).message, forms), { cause: error })
   }
 }
@@ -103,12 +108,12 @@ function scrubValue(value: unknown, secrets: string[]): unknown {
   return JSON.parse(scrubText(JSON.stringify(value), escaped))
 }
 
-async function runUnscrubbed(run: PolicyRun): Promise<PolicyResult> {
+async function runUnscrubbed(run: PolicyRun, spawn: PolicySpawner): Promise<PolicyResult> {
   const { export: name } = run
   const module = await resolvePolicyModule(run.worktree)
   if (module === undefined) return { status: 'no-policy' }
   const timeoutMs = POLICY_TIMEOUTS_MS[name]
-  const outcome = await (run.spawn ?? spawnPolicy)({
+  const outcome = await spawn({
     command: process.execPath,
     args: [RUNNER, module],
     cwd: run.worktree,
