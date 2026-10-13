@@ -247,12 +247,14 @@ describe('pr_create', () => {
     const leaky = args({
       title: 'Fix sh0rt-tok leak',
       summary: 'Saw sh0rt-tok in logs.',
-      base: 'main-sh0rt-tok',
       relatedIssues: [{ number: 7, relation: 'refs', reason: 'leaks sh0rt-tok' }],
     })
     const result = await h.call('pr_create', leaky)
     expect(result.isError).toBeUndefined()
-    expect(p.requests[0]!.input.base).toBe('main-[REDACTED]')
+    // A base ref cannot be redacted into an existing branch, so it is rejected instead.
+    expect(textOf(await h.call('pr_create', args({ base: 'main-sh0rt-tok' })))).toContain(
+      'base contains a server credential',
+    )
     expect(JSON.stringify(p.requests)).not.toContain('sh0rt-tok')
     expect(JSON.stringify(gh.calls)).not.toContain('sh0rt-tok')
     expect(gh.calls[0]!.body).toContain('Saw [REDACTED] in logs.')

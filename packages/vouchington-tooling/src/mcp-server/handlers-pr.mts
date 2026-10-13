@@ -83,9 +83,11 @@ async function prepare(
   checkTitleLength(given.title)
   const git = gitIn(context)
   const head = await currentBranch(git)
-  // The branch name comes from the repository and is passed to gh as is, so it cannot be redacted.
+  // Branch names are refs passed to gh as is: redacting one would name a branch that does not exist.
   if (secrets.some((secret) => head.includes(secret)))
     throw new Error('the worktree branch name contains a server credential: rename the branch')
+  if (secrets.some((secret) => (args.base as string | undefined)?.includes(secret)))
+    throw new Error('base contains a server credential: use another base branch')
   const live = pr === undefined ? undefined : await livePullRequest(ghIn(context), pr)
   if (live !== undefined && live.headRefName !== head)
     throw new Error(
