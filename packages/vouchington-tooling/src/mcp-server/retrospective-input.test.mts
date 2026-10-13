@@ -95,6 +95,10 @@ describe('sensitiveValues', () => {
     expect(
       sensitiveValues({ knownSensitiveValues: ['a'] }, { AGENT_BLACKBOARD_TOKEN: 'tok' }),
     ).toEqual(['a', 'tok'])
+    expect(sensitiveValues(undefined, { GH_TOKEN: 'gh', GITHUB_TOKEN: 'ghub' })).toEqual([
+      'gh',
+      'ghub',
+    ])
     expect(() => sensitiveValues({ knownSensitiveValues: 'a' }, {})).toThrow('array of strings')
     expect(() => sensitiveValues({ knownSensitiveValues: [1] }, {})).toThrow('array of strings')
   })
@@ -134,5 +138,8 @@ describe('composeFromArgs transcript', () => {
     await expect(
       composeFromArgs(compose({ ...unassessed, sessionId: 'native:owner' }), base),
     ).rejects.toThrow('exclusive')
+    await expect(composeFromArgs(compose({ reason: 'not inspected' }), base)).rejects.toThrow(
+      'compose.transcript.reason requires a status',
+    )
   })
 })

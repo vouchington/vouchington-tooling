@@ -97,8 +97,11 @@ export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEn
   const given = compose?.knownSensitiveValues
   if (given !== undefined && (!Array.isArray(given) || given.some((v) => typeof v !== 'string')))
     throw new Error('compose.knownSensitiveValues must be an array of strings')
-  const token = env.AGENT_BLACKBOARD_TOKEN
-  return [...((given as string[] | undefined) ?? []), ...(token ? [token] : [])]
+  // Facts commands inherit the GitHub tokens, so their output is redacted of those values too.
+  const credentials = [env.AGENT_BLACKBOARD_TOKEN, env.GH_TOKEN, env.GITHUB_TOKEN].filter(
+    (value): value is string => Boolean(value),
+  )
+  return [...((given as string[] | undefined) ?? []), ...credentials]
 }
 
 /**
@@ -111,6 +114,8 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
       throw new Error('compose.transcript: sessionId and status are exclusive')
     return transcript
   }
+  // A reason without a status is malformed, not a request to read the transcript.
+  if ('reason' in transcript) throw new Error('compose.transcript.reason requires a status')
   if (transcript.sessionId !== undefined && transcript.sessionId !== base.sessionId)
     throw new Error('compose.transcript.sessionId must equal the sessionId of the call')
   return { sessionId: base.sessionId, cwd: base.worktree }

@@ -8,7 +8,7 @@ import { isCount, isObject } from './snapshot-partition-guards.mts'
 import type { FeedbackEnvelope } from './feedback-types.mts'
 
 const FEEDBACK_MAX_BYTES = 16_384
-const FEEDBACK_MARKDOWN_MAX_BYTES = 12_000
+export const FEEDBACK_MARKDOWN_MAX_BYTES = 12_000
 const OUTCOMES = [
   'in-progress',
   'success',

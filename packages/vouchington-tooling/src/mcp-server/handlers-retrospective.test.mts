@@ -217,6 +217,12 @@ describe('retrospective_save with markdown', () => {
     expect(await call(' ')).toContain('markdown')
     expect(await call(`${FRONT}\n${'x'.repeat(13_000)}`)).toContain('markdown')
     expect(await call('no front matter')).toContain('front matter')
+    // Without repositories anywhere, an oversized document still never reaches pullRequestDefaults.
+    const { repositories: _repositories, ...unscoped } = SAVE
+    const huge = `${FRONT}\n${'x'.repeat(13_000)}`
+    expect(textOf(await h.call('retrospective_save', { ...unscoped, markdown: huge }))).toContain(
+      'markdown must be at most 12000 bytes',
+    )
     expect(p.requests).toEqual([])
   })
 
@@ -351,6 +357,18 @@ describe('retrospective_save redaction and event ids', () => {
     expect(result.isError).toBeUndefined()
     const policyInput = p.requests.find((r) => r.name === 'validateRetrospective')!.input
     expect(JSON.stringify(policyInput)).not.toContain(TOKEN)
+  })
+
+  it('matches front matter coverage that names the token, comparing redacted values', async () => {
+    const h = harness(fixture(), { env })
+    const feedbackCoverage = { status: 'partial', sources: [`log ${TOKEN}`], droppedCount: 0 }
+    const markdown = FRONT.replace(
+      /^feedback_coverage: .*$/m,
+      `feedback_coverage: ${JSON.stringify(feedbackCoverage)}`,
+    )
+    const result = await h.call('retrospective_save', { ...SAVE, markdown, feedbackCoverage })
+    expect(result.isError).toBeUndefined()
+    expect(JSON.stringify(h.fake.stored)).not.toContain(TOKEN)
   })
 
   it('redacts the token and caller values from a composed document before the policy', async () => {

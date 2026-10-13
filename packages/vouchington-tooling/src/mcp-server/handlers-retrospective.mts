@@ -23,7 +23,10 @@ import {
 import { readEntriesIfPresent } from './journal-read.mts'
 import { runValidator, type PolicyRun } from './policy-run.mts'
 import { parseRetrospectiveFrontMatter } from './retrospective-front-matter.mts'
-import { redactFeedbackText } from '../agent-blackboard/feedback-codec.mts'
+import {
+  FEEDBACK_MARKDOWN_MAX_BYTES,
+  redactFeedbackText,
+} from '../agent-blackboard/feedback-codec.mts'
 import { composeFromArgs, sensitiveValues } from './retrospective-input.mts'
 import { checkFrontMatter, resolveRepositories } from './retrospective-resolve.mts'
 
@@ -97,6 +100,9 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
   const secrets = sensitiveValues(compose, context.env)
   // Everything the policy sees is derived from the redacted document, never the raw input.
   const redactedGiven = given === undefined ? undefined : redactFeedbackText(given, secrets)
+  // Reject a document that can never be stored before any policy export runs for it.
+  if (redactedGiven !== undefined && Buffer.byteLength(redactedGiven) > FEEDBACK_MARKDOWN_MAX_BYTES)
+    throw new Error(`markdown must be at most ${FEEDBACK_MARKDOWN_MAX_BYTES} bytes`)
   const early =
     redactedGiven === undefined ? undefined : parseRetrospectiveFrontMatter(redactedGiven)
   const repositories = await resolveRepositories(argRepositories, early?.repositories, policy)
@@ -118,7 +124,11 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
   checkFrontMatter(front, {
     sessionId: context.sessionId,
     workOutcome,
-    feedbackCoverage,
+    // The document was redacted before parsing, so compare it with equally redacted sources.
+    feedbackCoverage: {
+      ...feedbackCoverage,
+      sources: feedbackCoverage.sources.map((source) => redactFeedbackText(source, secrets)),
+    },
     repositories: argRepositories,
   })
   // Building the envelope first rejects empty or oversized markdown before any policy runs.
