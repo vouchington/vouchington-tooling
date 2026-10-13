@@ -58,7 +58,8 @@ disconnected. Its CLI fallback is a last resort, never a reason to
 request an unsandboxed run for the token. Host permission denials still require approval.
 The machine-registered server runs its own installation and imports no checkout code itself, but the
 retrospective and pull request tools run the checkout's declared policy module in a child process
-without blackboard credentials. The source CLI here still sees the blackboard credentials when run
+without blackboard credentials. That child runs as the same user, so it is not a sandbox (on Linux
+it could read the server's `/proc/<pid>/environ`): treat the policy module as trusted code. The source CLI here still sees the blackboard credentials when run
 with them, so review untrusted branches with the credentials unset.
 
 ## Extracted modules

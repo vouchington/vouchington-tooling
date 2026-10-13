@@ -41,7 +41,9 @@ export const RETROSPECTIVE_TOOLS: readonly ToolDefinition[] = [
       'timestamp. sourceEventId defaults to retrospective-<sessionId> (retrospective-<sha256 hex of the ' +
       'sessionId> when that exceeds 256 bytes); saving changed content ' +
       'under the same sourceEventId is an event-conflict, so a revision needs a new ' +
-      'sourceEventId. Repeat the identical call to retry. Counts follow journal_append.',
+      'sourceEventId. Repeat an identical markdown call to retry. compose regenerates the document, ' +
+      'so deliver a retained compose save with outbox_flush instead of repeating it. Counts ' +
+      'follow journal_append.',
     ADDITIVE,
     {
       ...IDENTITY,

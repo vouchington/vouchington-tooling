@@ -112,6 +112,19 @@ describe('retrospective_save with markdown', () => {
     })
   })
 
+  it('rejects a malformed identity before any policy runs, even for a dry run', async () => {
+    declarePolicy()
+    const p = policy(accept)
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy })
+    const result = await h.call('retrospective_save', {
+      ...SAVE,
+      parentSessionId: 'native:owner',
+      dryRun: true,
+    })
+    expect(result.isError).toBe(true)
+    expect(p.requests).toHaveLength(0)
+  })
+
   it('stores the optional category when given', async () => {
     const h = harness(fixture())
     await h.call('retrospective_save', { ...SAVE, category: 'tooling' })

@@ -136,6 +136,20 @@ describe('spawnPolicy', () => {
     await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
   })
 
+  it('kills a grandchild the policy left running after a normal exit', async () => {
+    const pidFile = join(fixture.root, 'orphan.pid')
+    const script = `
+      const { spawn } = require('node:child_process')
+      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+      child.unref()
+      require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(child.pid))
+    `
+    const result = await spawnPolicy(request(script))
+    expect(result).toMatchObject({ exitCode: 0, timedOut: false })
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
+  })
+
   it('kills a process that writes too much', async () => {
     const result = await spawnPolicy(
       request('process.stdout.write("x".repeat(5000)); setInterval(() => {}, 1000)'),

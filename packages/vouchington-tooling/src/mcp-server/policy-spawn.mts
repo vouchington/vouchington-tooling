@@ -73,7 +73,7 @@ export const spawnPolicy: PolicySpawner = (request) =>
       cwd: request.cwd,
       env: request.env,
       stdio: ['pipe', 'pipe', 'pipe'],
-      // Its own process group, so a timeout can kill grandchildren the policy started too.
+      // Its own process group, so every grandchild the policy started can be killed with it.
       detached: process.platform !== 'win32',
     })
     const killGroup = () => {
@@ -105,8 +105,9 @@ export const spawnPolicy: PolicySpawner = (request) =>
     })
     child.on('close', (exitCode) => {
       clearTimeout(timer)
-      // Reap anything the policy left running in its group after a normal exit.
-      if (timedOut || overflowed) killGroup()
+      // Reap anything the policy left running in its group, even after a normal exit: a detached
+      // descendant would otherwise keep the GitHub token it inherited.
+      killGroup()
       const text = (name: 'stdout' | 'stderr') => Buffer.concat(chunks[name]).toString('utf8')
       resolve({ exitCode, stdout: text('stdout'), stderr: text('stderr'), timedOut, overflowed })
     })

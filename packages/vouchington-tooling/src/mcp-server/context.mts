@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { assertSessionId } from '../agent-blackboard/session-id.mts'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
+import { validateFeedbackIdentity } from '../agent-blackboard/feedback-identity.mts'
 import type { FeedbackIdentity } from '../agent-blackboard/feedback-types.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
 import { requiredNullableString, requiredString, type Args } from './args.mts'
@@ -33,13 +34,16 @@ export function readSessionId(args: Args): string {
   return value
 }
 
+/** The caller identity, fully validated before any policy runs or anything is written. */
 export function readIdentity(args: Args, sessionId: string): FeedbackIdentity {
-  return {
+  const identity = {
     sessionId,
     parentSessionId: requiredNullableString(args, 'parentSessionId'),
     agent: requiredString(args, 'agent'),
     version: requiredString(args, 'version'),
   }
+  validateFeedbackIdentity(identity)
+  return identity
 }
 
 /** Policy modules run only for a server whose launch repository bounds the worktrees it acts on. */

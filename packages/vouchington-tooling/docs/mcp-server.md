@@ -195,7 +195,9 @@ present. `repositories` resolves from the argument, else the front matter, else 
 The default `sourceEventId` is `retrospective-<sessionId>`, or `retrospective-<sha256 hex of the
 sessionId>` when that would exceed 256 bytes. Re-saving identical content returns the
 stored receipt and timestamp. Changed content under the same `sourceEventId` is an
-`event-conflict`; a revision needs a new `sourceEventId`.
+`event-conflict`; a revision needs a new `sourceEventId`. `compose` regenerates the document from
+the live journal and repository, so repeating a `compose` call is not a retry: when an interactive
+save is retained in the outbox, deliver it with `outbox_flush`.
 
 ### Policy module
 
@@ -206,7 +208,10 @@ Policy tools also require a server launched inside a repository worktree. Each c
 export in a fresh child process (`bin/policy-runner.mjs`, started with the server's own Node), never
 inside the server, with the worktree as its working directory and an environment of only `HOME`,
 `PATH` (`/usr/bin:/bin` plus the Node directory), and `GH_TOKEN` / `GITHUB_TOKEN` when the server has
-them. Blackboard credentials and `NODE_OPTIONS` are not passed. The runner reads
+them. Blackboard credentials and `NODE_OPTIONS` are not passed. The child still runs as the
+server's user, so this is not a sandbox: on Linux it could read the server's environment from
+`/proc/<server pid>/environ`. Treat the policy module as trusted code. After the runner exits, its
+whole process group is killed, so nothing it started outlives the call. The runner reads
 `{ policyVersion: 1, export, input }` on stdin and writes `{ ok: true, result }` (or
 `{ ok: false, error }`) on stdout; a missing export is skipped.
 
