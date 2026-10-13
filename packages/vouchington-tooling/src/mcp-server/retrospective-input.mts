@@ -23,7 +23,8 @@ const COMPOSE_KEYS = [
   'knownSensitiveValues',
 ]
 const COMPOSE_REQUIRED = COMPOSE_KEYS.filter((key) => key !== 'knownSensitiveValues')
-const FACTS_KEYS = ['pr', 'branch', 'noPr', 'repo', 'status', 'reason']
+/** No `repo`: a caller must not aim the server's GitHub token at another repository. */
+const FACTS_KEYS = ['pr', 'branch', 'noPr', 'status', 'reason']
 /** No path overrides: the server reads the session's transcript from its own default roots. */
 const TRANSCRIPT_KEYS = ['sessionId', 'harnessSessionId', 'status', 'reason']
 /** The longest a facts subprocess may run before it is killed. */
@@ -140,7 +141,7 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
 
 /** Facts are either `{ status, reason }` (unassessed) or a live collection selector, never both. */
 function factsInput(facts: Args, base: ComposeBase): Args {
-  const selectors = ['pr', 'branch', 'noPr', 'repo'].filter((key) => key in facts)
+  const selectors = ['pr', 'branch', 'noPr'].filter((key) => key in facts)
   if ('status' in facts) {
     if (selectors.length)
       throw new Error(`compose.facts: status is exclusive with ${selectors.join(', ')}`)

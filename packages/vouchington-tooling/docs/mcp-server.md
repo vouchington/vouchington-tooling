@@ -184,7 +184,11 @@ UUID; otherwise the call fails rather than reporting the transcript unavailable;
 `grokSessionsDir`, and `cwd` are rejected, and the server reads the transcript from the worktree
 and its default session roots. The server's blackboard token, and any `knownSensitiveValues`, are
 redacted from the document before the policy sees it or the envelope is stored. Facts commands
-are killed after 120 seconds. `dryRun`
+are killed after 120 seconds. `compose.facts` takes `pr`, `branch`, `noPr`, or `{ status, reason }`;
+`repo` is rejected, so the server's GitHub token never queries a repository other than the
+worktree's. Facts run `git` and `gh` in the worktree as the server's user, honoring its
+repository configuration (which can select helpers that run code), so the worktree, including
+`.git/config`, must be as trusted as the policy module. `dryRun`
 runs every check and returns the document without writing.
 
 The document must open with the front matter `composeRetrospective` writes: lines of

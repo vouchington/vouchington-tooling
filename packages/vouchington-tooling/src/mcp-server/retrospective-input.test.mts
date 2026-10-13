@@ -155,7 +155,11 @@ describe('composeFromArgs transcript', () => {
       'compose.facts.reason requires a status',
     )
     await expect(
-      composeFromArgs(withFacts({ ...unassessed, noPr: true, repo: 'o/r' }), base),
-    ).rejects.toThrow('compose.facts: status is exclusive with noPr, repo')
+      composeFromArgs(withFacts({ ...unassessed, noPr: true, pr: '1' }), base),
+    ).rejects.toThrow('compose.facts: status is exclusive with pr, noPr')
+    // Facts never query another repository with the server's GitHub token.
+    await expect(
+      composeFromArgs(withFacts({ repo: 'other/private', pr: '1' }), base),
+    ).rejects.toThrow('unsupported argument(s): repo')
   })
 })
