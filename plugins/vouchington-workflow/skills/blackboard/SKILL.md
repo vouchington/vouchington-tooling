@@ -46,13 +46,14 @@ unavailability: act on its message and retry through MCP.
 MCP is the supported journaling path. If the search finds no such tool, stop journaling and tell the
 human which case applies before continuing:
 
-- Not registered: the machine's agent configuration must register it (for vouchington-machines,
-  `./configure-agents.sh`, then `./diagnose-agents.sh`).
-- Registered but disconnected: reconnect it (`/mcp` in Claude Code, or restart Codex).
+- Not registered: the machine's agent configuration must register it; follow the consumer's
+  registration and diagnosis steps.
+- Registered but disconnected: reconnect it through the harness's MCP controls, or restart the
+  harness.
 - Automated runs with no human to ask: report "journaling unavailable" in the final report.
 
 Prefer restoring MCP over the CLI fallback below, and use the fallback only when the human asks or
-MCP cannot be restored for this session. Sandboxed Claude Code and Codex withhold
+MCP cannot be restored for this session. Harness sandboxes commonly withhold
 `AGENT_BLACKBOARD_TOKEN` from shell commands, so the fallback usually cannot deliver there. Never
 request an unsandboxed run only to obtain the token. When the fallback is used, record its reason,
 entrypoint, affected operations, and observed delivery status in the caller's journal. Do not treat
