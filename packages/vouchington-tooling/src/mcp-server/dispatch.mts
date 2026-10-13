@@ -7,6 +7,8 @@ import { journalAppend, journalEntries } from './handlers-journal.mts'
 import { retrospectiveCheck, retrospectiveSave } from './handlers-retrospective.mts'
 import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
 import { sessionArchive, sessionEnsure, snapshotExport } from './handlers-session.mts'
+import { handlePrCreate, handlePrUpdate, handlePrValidate } from './handlers-pr.mts'
+import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
 import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
@@ -22,6 +24,10 @@ export type ServerEnvironment = {
   blackboard?: BlackboardClientDependencies
   /** Test seam: replaces the child process a policy export runs in. */
   spawnPolicy?: PolicySpawner
+  /** Test seam: replaces locating and running gh. */
+  runGh?: GhRunner
+  /** Test seam: replaces the operating system user and host name. */
+  device?: () => { user: string; host: string }
 }
 
 export type ToolCallResult = {
@@ -37,6 +43,9 @@ const HANDLERS: Record<string, ToolHandler> = {
   session_ensure: sessionEnsure,
   retrospective_check: retrospectiveCheck,
   retrospective_save: retrospectiveSave,
+  pr_validate: handlePrValidate,
+  pr_create: handlePrCreate,
+  pr_update: handlePrUpdate,
   snapshot_export: snapshotExport,
   session_archive: sessionArchive,
 }
@@ -89,6 +98,9 @@ export async function callTool(
       worktree,
       env: environment.env,
       launchRoot: environment.launchRoot,
+      runGit: environment.runGit,
+      ...(environment.runGh === undefined ? {} : { runGh: environment.runGh }),
+      ...(environment.device === undefined ? {} : { device: environment.device }),
       ...(environment.spawnPolicy === undefined ? {} : { spawnPolicy: environment.spawnPolicy }),
       // The client resolves from this package's install, like the SDK, never from the worktree.
       dependencies: {

@@ -14,6 +14,7 @@ import {
   VERSION,
   tool,
 } from './tools-schema.mts'
+import { PR_TOOLS } from './tools-pr.mts'
 import { RETROSPECTIVE_TOOLS } from './tools-retrospective.mts'
 
 export const TOOLS: readonly ToolDefinition[] = [
@@ -86,6 +87,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     IDENTITY_REQUIRED,
   ),
   ...RETROSPECTIVE_TOOLS,
+  ...PR_TOOLS,
   tool(
     'snapshot_export',
     'Exports non-archived sessions into a private local JSONL file chosen by the blackboard ' +

@@ -54,6 +54,14 @@ not evidence of a miss; classify genuine CI-only or external infrastructure fail
 Retain confirmed gap records after CI turns green. Diagnose the failure through the repository's
 CI investigation workflow; a failed status alone does not establish a gap.
 
+Create, update, and validate pull requests through the `pr_create`, `pr_update`, and `pr_validate`
+MCP tools with structured input, not by hand-writing a body: pass `title`, `summary`, `impact`,
+`relatedIssues` (`closes` or `refs`, each with a reason), `details` (Markdown paragraphs or
+bullets), `base`, `agent`, optional `model`, `mode`, and `workspaceSetup`. The server renders the
+required headings and provenance lines, runs the repository's policy validation, and blocks on its
+errors, so put the guidance above into `summary`, `impact`, and `details`. Run `pr_validate` first
+to preview the rendered body. `pr_update` preserves the live Shepherd Journal.
+
 Use the repository's approved PR tooling and preserve sections managed by its review automation
 verbatim. Close only issues fully resolved and explain non-closing issue links. Apply this guidance
 to descriptions being created or updated, not a bulk rewrite of historical pull requests.

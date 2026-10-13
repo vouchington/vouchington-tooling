@@ -73,17 +73,31 @@ export type BuildGhPrCreateArgsOptions = {
   draft?: boolean
   head: string
   labels?: readonly string[]
+  milestone?: string
+  projects?: readonly string[]
   reviewers?: readonly string[]
   title: string
 }
 
 /** Pure argv builder for `gh pr create`. `head` is always passed explicitly (never omitted). */
 export function buildGhPrCreateArgs(options: BuildGhPrCreateArgsOptions): string[] {
-  const { base, bodyFile, draft = false, head, labels = [], reviewers = [], title } = options
+  const {
+    base,
+    bodyFile,
+    draft = false,
+    head,
+    labels = [],
+    milestone,
+    projects = [],
+    reviewers = [],
+    title,
+  } = options
   const args = ['pr', 'create', '--title', title, '--body-file', bodyFile, '--head', head]
   if (base !== undefined) args.push('--base', base)
   if (draft) args.push('--draft')
   for (const label of labels) args.push('--label', label)
+  if (milestone !== undefined) args.push('--milestone', milestone)
+  for (const project of projects) args.push('--project', project)
   for (const reviewer of reviewers) args.push('--reviewer', reviewer)
   return args
 }

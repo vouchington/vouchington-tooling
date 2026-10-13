@@ -7,7 +7,7 @@ existing `vouchington-tooling/agent-blackboard` exports and adds no provider pro
 
 Phase 1 of [vouchington-tooling#324](https://github.com/vouchington/vouchington-tooling/issues/324)
 covers the journal, outbox, session, and snapshot tools below. Phase 2 adds the retrospective tools
-and the policy contract they run. Pull request tools are a later phase.
+and the policy contract they run. Phase 3 adds the pull request tools.
 
 ## Install
 
@@ -225,15 +225,89 @@ whole process group is killed, so nothing it started outlives the call. The runn
 `{ policyVersion: 1, export, input }` on stdin and writes `{ ok: true, result }` (or
 `{ ok: false, error }`) on stdout; a missing export is skipped.
 
-| Export                  | Input                                                                                                                                                                       | Result                                      | Timeout |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------- |
-| `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }` | 30 s    |
-| `pullRequestDefaults`   | `{}`                                                                                                                                                                        | `{ repositories: string[] }`                | 120 s   |
-| `validatePullRequest`   | reserved for the pull request tools                                                                                                                                         | `{ errors: string[], warnings?: string[] }` | 120 s   |
+| Export                  | Input                                                                                                                                                                       | Result                                                         | Timeout |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------- |
+| `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }`                    | 30 s    |
+| `pullRequestDefaults`   | `{}` from `retrospective_save`; `{ title, base, relatedIssues }` from `pr_create`                                                                                           | `{ repositories?, labels?, milestone?, project? }` (an object) | 120 s   |
+| `validatePullRequest`   | `title`, `body`, `base`, `head`, `mode`, and `pr` for an update                                                                                                             | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
 
 Any `errors` reject the save and write nothing. A non-zero exit, a timeout (reported as
 `policy <export> timed out after <N>s`), output over 1 MB, malformed JSON, or a result of the wrong
 shape is an error, never a pass.
+
+## Pull request tools
+
+`vouchington mcp` serves `pr_validate`, `pr_create` and `pr_update` besides the journal and
+retrospective tools. All three take `sessionId` (required) and `worktree` (optional), need a server
+launched inside a repository worktree (they run the checkout policy), and share this structured
+input: `title` (single line, at most 256 characters), `summary`, `impact`, `relatedIssues`
+(`[{ number, relation: "closes" | "refs", reason }]`, may be empty), `details` (string array),
+`base` (default `main`), `agent`, optional `model`, `mode` (`interactive` | `autonomous`) and
+`workspaceSetup`. `pr_update` also requires `pr`; `pr_validate` accepts an optional `pr`.
+
+### Rendering
+
+```
+## Summary
+
+<summary>
+
+## Impact
+
+<impact>
+
+## Related issues
+
+- Closes #N — <reason>      (or "Refs #N"; "- None" when empty)
+
+## Details
+
+<details joined by blank lines>
+
+Workspace setup: <workspaceSetup>
+Agent: <agent>[ (<model>)] session <sessionId>
+Device: <os user>@<lowercased hostname>
+Worktree: <path after "/worktrees/", "main" for the main worktree, else the directory name>
+```
+
+The head branch is the worktree's current branch; a detached HEAD, or a head equal to `base`, is
+rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
+so a consumer policy may reject any `base` other than the default branch; create stacked layers
+with the repository's stack tooling instead.
+
+### Tools
+
+- `pr_validate` (read-only): renders the body, runs the policy `validatePullRequest({ title, body,
+base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With `pr`, the live
+  body is read (never written) so its Shepherd Journal is preserved as in `pr_update`.
+- `pr_create` (additive): renders and validates (errors block), then calls the policy
+  `pullRequestDefaults({ title, base, relatedIssues })` export for optional `labels`, `milestone`
+  and `project`. It checks the head is pushed and current, writes the body to a mode 0600 temp file
+  (removed afterwards) and runs `gh pr create --draft` with the labels, `--milestone` and
+  `--project`. Returns `{ number, url, warnings }`.
+- `pr_update` (mutating): reads `gh pr view <pr> --json body,headRefName,baseRefName,state`,
+  rejects a pull request that is not `OPEN` or whose head is not the worktree branch, and validates
+  against the live base (an explicit `base` must equal it). It renders, appends the live Shepherd
+  Journal (a `<details><summary>Shepherd Journal</summary>` block, or a legacy `## Shepherd Journal`
+  section to the next H2 or the end; examples in fenced code blocks are ignored), validates with
+  `pr` set (errors block), then runs `gh pr edit <pr> --title --body-file`. More than one journal
+  in the live body, one in the rendered fields, an unclosed journal, or rendered fields that leave
+  a code fence open are rejected rather than guessed. Just before the edit the live body is read
+  again, and the update aborts if its journal changed meanwhile. Nothing else is carried over from
+  the live body. Returns `{ number, url, warnings }`.
+
+Every field is redacted of `AGENT_BLACKBOARD_TOKEN`, `GH_TOKEN`, and `GITHUB_TOKEN` before
+rendering, the policy, or `gh`; a worktree branch name containing one is rejected. `title` and
+`workspaceSetup` must be single lines, and the title is limited to 256 characters after redaction.
+
+### gh access
+
+`gh` is found in the absolute directories of the server's `PATH` (relative entries are skipped,
+since they would resolve inside the target worktree), else at `/opt/homebrew/bin/gh`, `/usr/local/bin/gh` or
+`/usr/bin/gh`; otherwise the tool fails with "gh CLI not found on PATH; install gh or add it to the
+server's PATH". It runs with the worktree as its working directory and the server environment
+without `AGENT_BLACKBOARD_URL`, `AGENT_BLACKBOARD_TOKEN`, and `GH_REPO` (which would point it at
+another repository), and each call is killed after 120 seconds.
 
 ## Worktree validation
 
