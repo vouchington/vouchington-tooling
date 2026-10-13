@@ -32,6 +32,8 @@ describe('Shepherd Journal', () => {
     expect(findShepherdJournal('## Shepherd Journal\nx\n##not-a-heading\ny')).toBe(
       '## Shepherd Journal\nx\n##not-a-heading\ny',
     )
+    for (const heading of ['  ## Shepherd Journal', '## Shepherd Journal ##'])
+      expect(findShepherdJournal(`a\n${heading}\nx\n ## Next`)).toBe(`${heading}\nx`)
     // "```js" inside a fence does not close it, so the journal-shaped line stays hidden.
     expect(findShepherdJournal('```\n```js\n## Shepherd Journal\n```')).toBeUndefined()
   })

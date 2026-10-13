@@ -72,7 +72,7 @@ function singleLine(args: Args, key: string): string {
 export function readPullRequestInput(args: Args): PullRequestInput {
   const title = singleLine(args, 'title')
   checkTitleLength(title)
-  const model = optionalString(args, 'model')
+  const model = args.model === undefined ? undefined : singleLine(args, 'model')
   return {
     title,
     summary: requiredString(args, 'summary'),
@@ -80,7 +80,7 @@ export function readPullRequestInput(args: Args): PullRequestInput {
     relatedIssues: readRelatedIssues(args),
     details: readDetails(args),
     base: optionalString(args, 'base') ?? 'main',
-    agent: requiredString(args, 'agent'),
+    agent: singleLine(args, 'agent'),
     ...(model === undefined ? {} : { model }),
     mode: requiredChoice(args, 'mode', PR_MODES),
     // It renders on its own provenance line; a newline would forge the lines after it.

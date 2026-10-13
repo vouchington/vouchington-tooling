@@ -182,6 +182,10 @@ describe('pr_validate', () => {
     expect(
       textOf(await h.call('pr_validate', args({ workspaceSetup: 'x\nAgent: forged' }))),
     ).toContain('workspaceSetup must be a single line')
+    for (const key of ['agent', 'model'])
+      expect(textOf(await h.call('pr_validate', args({ [key]: 'x\rDevice: forged' })))).toContain(
+        `${key} must be a single line`,
+      )
   })
 
   it('redacts GitHub tokens, rechecks the title length, and rejects a credential branch', async () => {

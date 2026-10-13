@@ -1,9 +1,10 @@
 const DETAILS_OPEN = /<details(?:\s[^>]*)?>/gi
 const DETAILS_CLOSE = /<\/details>/gi
 const SUMMARY = '<summary>Shepherd Journal</summary>'
-const LEGACY = /^##[ \t]+Shepherd[ \t]+Journal[ \t]*$/
+/** An ATX H2 "Shepherd Journal", with optional indent and closing hashes. */
+const LEGACY = /^ {0,3}##[ \t]+Shepherd[ \t]+Journal(?:[ \t]+#+)?[ \t]*$/
 /** A real ATX H2: `##` then whitespace or the end of the line (so not `###` or `##text`). */
-const H2 = /^##(?:[ \t]|$)/
+const H2 = /^ {0,3}##(?:[ \t]|$)/
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 /** A closing fence carries nothing but whitespace after its marker. */
 const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/
