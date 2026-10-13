@@ -25,8 +25,15 @@ export async function resolvePolicyModule(worktree: string): Promise<string | un
   let text: string
   try {
     text = await readFile(join(worktree, 'package.json'), 'utf8')
-  } catch {
-    return undefined
+  } catch (error) {
+    // Only a missing manifest means "no policy"; an unreadable one must not silently disable it.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw new Error(
+      `${join(worktree, 'package.json')} could not be read: ${(error as Error).message}`,
+      {
+        cause: error,
+      },
+    )
   }
   const declared = packagePolicy(worktree, text)
   if (declared === undefined) return undefined

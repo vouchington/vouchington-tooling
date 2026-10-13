@@ -2,7 +2,13 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
-import { isolatedGitEnv, launchWorktreeRoot, resolveWorktree, runIsolatedGit } from './worktree.mts'
+import {
+  isolatedGitEnv,
+  launchWorktreeRoot,
+  parseWorktreeList,
+  resolveWorktree,
+  runIsolatedGit,
+} from './worktree.mts'
 
 let fixture: RepoFixture
 beforeAll(() => {
@@ -176,5 +182,22 @@ describe('resolveWorktree', () => {
   it('rejects relative and nonexistent paths', async () => {
     await expect(resolve('main')).rejects.toThrow('worktree must be an absolute path')
     await expect(resolve(join(fixture.root, 'missing'))).rejects.toThrow('not the top level')
+  })
+})
+
+describe('parseWorktreeList', () => {
+  it('reads NUL-separated records, so a newline in a path cannot forge one', () => {
+    const output = [
+      'worktree /repo/evil\nworktree /x',
+      'HEAD abc',
+      'branch refs/heads/main',
+      '',
+      'worktree /repo/two',
+      'HEAD def',
+      'detached',
+      '',
+      '',
+    ].join('\0')
+    expect(parseWorktreeList(output)).toEqual(['/repo/evil\nworktree /x', '/repo/two'])
   })
 })

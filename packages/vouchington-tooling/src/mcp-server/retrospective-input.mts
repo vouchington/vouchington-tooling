@@ -23,15 +23,10 @@ const COMPOSE_KEYS = [
 ]
 const COMPOSE_REQUIRED = COMPOSE_KEYS.filter((key) => key !== 'knownSensitiveValues')
 const FACTS_KEYS = ['pr', 'branch', 'noPr', 'repo', 'status', 'reason']
-const TRANSCRIPT_KEYS = [
-  'sessionId',
-  'jsonlPath',
-  'projectsDir',
-  'codexSessionsDir',
-  'grokSessionsDir',
-  'status',
-  'reason',
-]
+/** No path overrides: the server reads the session's transcript from its own default roots. */
+const TRANSCRIPT_KEYS = ['sessionId', 'status', 'reason']
+/** The longest a facts subprocess may run before it is killed. */
+export const FACTS_TIMEOUT_MS = 120_000
 
 type ComposeBase = {
   sessionId: string
@@ -55,7 +50,11 @@ function section(compose: Args, name: string, keys: string[]): Args {
  * Facts commands run in the worktree and never see the blackboard credentials, NODE_OPTIONS, or
  * GIT_* overrides that could point git away from the validated worktree.
  */
-export function worktreeExecutor(worktree: string, env: NodeJS.ProcessEnv) {
+export function worktreeExecutor(
+  worktree: string,
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number = FACTS_TIMEOUT_MS,
+) {
   const safe = Object.fromEntries(
     Object.entries(env).filter(
       ([name]) =>
@@ -70,16 +69,51 @@ export function worktreeExecutor(worktree: string, env: NodeJS.ProcessEnv) {
         execFile(
           command,
           args,
-          { cwd: worktree, env: safe, maxBuffer: 10_000_000 },
+          {
+            cwd: worktree,
+            env: safe,
+            maxBuffer: 10_000_000,
+            timeout: timeoutMs,
+            killSignal: 'SIGKILL',
+          },
           (error, stdout, stderr) =>
             resolve({
               ok: error === null,
               stdout,
-              stderr: error === null ? stderr : stderr || error.message,
+              stderr:
+                error === null
+                  ? stderr
+                  : error.killed === true
+                    ? `${stderr}${command} timed out after ${timeoutMs} ms`
+                    : stderr || error.message,
               exitCode: error === null ? 0 : typeof error.code === 'number' ? error.code : null,
             }),
         ),
     )
+}
+
+/** The caller's `compose.knownSensitiveValues` plus the server's blackboard token, when set. */
+export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEnv): string[] {
+  const given = compose?.knownSensitiveValues
+  if (given !== undefined && (!Array.isArray(given) || given.some((v) => typeof v !== 'string')))
+    throw new Error('compose.knownSensitiveValues must be an array of strings')
+  const token = env.AGENT_BLACKBOARD_TOKEN
+  return [...((given as string[] | undefined) ?? []), ...(token ? [token] : [])]
+}
+
+/**
+ * The transcript collector input: the server's worktree and default session roots only. A caller
+ * may name the session (it must be this one) or report the transcript as unassessed.
+ */
+function transcriptInput(transcript: Args, base: ComposeBase): Args {
+  if ('status' in transcript) {
+    if ('sessionId' in transcript)
+      throw new Error('compose.transcript: sessionId and status are exclusive')
+    return transcript
+  }
+  if (transcript.sessionId !== undefined && transcript.sessionId !== base.sessionId)
+    throw new Error('compose.transcript.sessionId must equal the sessionId of the call')
+  return { sessionId: base.sessionId, cwd: base.worktree }
 }
 
 /** Builds the retrospective markdown with `composeRetrospective`, rejecting unknown input keys. */
@@ -97,7 +131,8 @@ export async function composeFromArgs(compose: Args, base: ComposeBase): Promise
     feedbackCoverage: base.feedbackCoverage,
     facts:
       'status' in facts ? facts : { ...facts, execute: worktreeExecutor(base.worktree, base.env) },
-    transcript: 'status' in transcript ? transcript : { cwd: base.worktree, ...transcript },
+    transcript: transcriptInput(transcript, base),
+    knownSensitiveValues: sensitiveValues(compose, base.env),
     journal: { journalLoader: serverJournalLoader(base.env, base.dependencies) },
   }
   return composeRetrospective(input as unknown as RetrospectiveCompositionInput)

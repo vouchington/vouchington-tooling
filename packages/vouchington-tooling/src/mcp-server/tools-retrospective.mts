@@ -29,12 +29,17 @@ export const RETROSPECTIVE_TOOLS: readonly ToolDefinition[] = [
       'and optionally session_id, description, work_outcome, feedback_coverage, repositories, ' +
       'each line key: <JSON>; any that repeat an argument must equal it) or compose (the retrospective ' +
       'composer input: narrative, date, issues, prs, description, facts, transcript, tools, ' +
-      'architecture, optional knownSensitiveValues; the server adds the rest). dryRun returns ' +
+      'architecture, optional knownSensitiveValues; the server adds the rest). compose.transcript ' +
+      'takes only { sessionId } (the call sessionId; the server reads the transcript from its ' +
+      'own default session roots in the worktree) or { status, reason } to report it ' +
+      'unassessed; any path override is rejected. The server redacts its blackboard token ' +
+      'from the document before the policy sees it. dryRun returns ' +
       '{ markdown, policy: { warnings } } and writes nothing. The worktree package.json may ' +
       'declare "vouchington-tooling": { "policy": "<module>" }; its validateRetrospective export ' +
       'runs in a child process, and any error it reports rejects the save with nothing written. ' +
       'Policy tools need a server launched inside a repository worktree. The server owns the ' +
-      'timestamp. sourceEventId defaults to retrospective-<sessionId>; saving changed content ' +
+      'timestamp. sourceEventId defaults to retrospective-<sessionId> (retrospective-<sha256 hex of the ' +
+      'sessionId> when that exceeds 256 bytes); saving changed content ' +
       'under the same sourceEventId is an event-conflict, so a revision needs a new ' +
       'sourceEventId. Repeat the identical call to retry. Counts follow journal_append.',
     ADDITIVE,

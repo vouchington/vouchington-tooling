@@ -176,7 +176,13 @@ does (same receipt, `pendingCount`, `worktreePendingCount`, outbox rules, and se
 timestamp; a `timestamp` argument is rejected). The document comes from `markdown` or from
 `compose`, the input of `composeRetrospective` (`narrative`, `date`, `issues`, `prs`,
 `description`, `facts`, `transcript`, `tools`, `architecture`, optional `knownSensitiveValues`;
-unknown keys are rejected, and the journal audit reads through the server's own client). `dryRun`
+unknown keys are rejected, and the journal audit reads through the server's own client).
+`compose.transcript` accepts only `{ sessionId }` (which must equal the call's `sessionId`) or
+`{ status, reason }` for an unassessed transcript; `jsonlPath`, `projectsDir`, `codexSessionsDir`,
+`grokSessionsDir`, and `cwd` are rejected, and the server reads the transcript from the worktree
+and its default session roots. The server's blackboard token, and any `knownSensitiveValues`, are
+redacted from the document before the policy sees it or the envelope is stored. Facts commands
+are killed after 120 seconds. `dryRun`
 runs every check and returns the document without writing.
 
 The document must open with the front matter `composeRetrospective` writes: lines of
@@ -186,7 +192,8 @@ The document must open with the front matter `composeRetrospective` writes: line
 `session_id`, `work_outcome`, `feedback_coverage`, and `repositories` must equal the arguments when
 present. `repositories` resolves from the argument, else the front matter, else the policy's
 `pullRequestDefaults()` result, else an error, and is stored sorted, deduplicated, and lowercase.
-The default `sourceEventId` is `retrospective-<sessionId>`. Re-saving identical content returns the
+The default `sourceEventId` is `retrospective-<sessionId>`, or `retrospective-<sha256 hex of the
+sessionId>` when that would exceed 256 bytes. Re-saving identical content returns the
 stored receipt and timestamp. Changed content under the same `sourceEventId` is an
 `event-conflict`; a revision needs a new `sourceEventId`.
 

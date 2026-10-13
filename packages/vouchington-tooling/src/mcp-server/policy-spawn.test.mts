@@ -1,6 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { delimiter, dirname, join } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
 import { runPolicyExport, runValidator } from './policy-run.mts'
 import { policyEnvironment, spawnPolicy } from './policy-spawn.mts'
@@ -79,6 +79,30 @@ describe('policyEnvironment', () => {
       Object.keys(policyEnvironment({ HOME: '/h', GITHUB_TOKEN: 't', GH_TOKEN: 't' })).toSorted(),
     ).toEqual(['GH_TOKEN', 'GITHUB_TOKEN', 'HOME', 'PATH'])
   })
+
+  it('puts the system directories, node, and the first gh directory on PATH, deduplicated', () => {
+    const first = join(fixture.root, 'first-bin')
+    const second = join(fixture.root, 'second-bin')
+    for (const directory of [first, second]) {
+      mkdirSync(directory, { recursive: true })
+      writeFileSync(join(directory, 'gh'), '#!/bin/sh\n')
+      chmodSync(join(directory, 'gh'), 0o755)
+    }
+    const path = (serverPath?: string) =>
+      policyEnvironment(serverPath === undefined ? {} : { PATH: serverPath }).PATH
+    const base = [
+      '/usr/bin',
+      '/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      dirname(process.execPath),
+    ]
+    expect(path([second, first].join(delimiter))).toBe([...base, second].join(delimiter))
+    expect(path(['', fixture.root, first].join(delimiter))).toBe([...base, first].join(delimiter))
+    expect(path(['/usr/bin', '/bin'].join(delimiter))).toBe(base.join(delimiter))
+    expect(path(fixture.root)).toBe(base.join(delimiter))
+    expect(path()).toBe(base.join(delimiter))
+  })
 })
 
 describe('spawnPolicy', () => {
@@ -96,6 +120,20 @@ describe('spawnPolicy', () => {
   it('kills a process that outlives its timeout', async () => {
     const result = await spawnPolicy(request('setInterval(() => {}, 1000)', { timeoutMs: 100 }))
     expect(result).toMatchObject({ timedOut: true, exitCode: null })
+  })
+
+  it('kills the whole process group, including a grandchild, on timeout', async () => {
+    const pidFile = join(fixture.root, 'grandchild.pid')
+    const script = `
+      const { spawn } = require('node:child_process')
+      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+      require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(child.pid))
+      setInterval(() => {}, 1000)
+    `
+    const result = await spawnPolicy(request(script, { timeoutMs: 1500 }))
+    expect(result.timedOut).toBe(true)
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
   })
 
   it('kills a process that writes too much', async () => {

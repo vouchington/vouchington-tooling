@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
-import { dirname } from 'node:path'
+import { accessSync, constants } from 'node:fs'
+import { delimiter, dirname, join } from 'node:path'
 
 export type PolicyRequest = {
   command: string
@@ -22,12 +23,43 @@ export type PolicyOutcome = {
 
 export type PolicySpawner = (request: PolicyRequest) => Promise<PolicyOutcome>
 
+function isExecutable(path: string): boolean {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The directory of the first `gh` on the server's PATH, so policy checks can call it. */
+function ghDirectory(env: NodeJS.ProcessEnv): string[] {
+  const found = (env.PATH ?? '')
+    .split(delimiter)
+    .filter((directory) => directory !== '')
+    .find((directory) => isExecutable(join(directory, 'gh')))
+  return found === undefined ? [] : [found]
+}
+
+/** The fixed system directories, node's own, and the directory holding `gh`, deduplicated. */
+function policyPath(env: NodeJS.ProcessEnv): string {
+  const directories = [
+    '/usr/bin',
+    '/bin',
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    dirname(process.execPath),
+    ...ghDirectory(env),
+  ]
+  return [...new Set(directories)].join(delimiter)
+}
+
 /**
  * The child's whole environment. Blackboard credentials and NODE_OPTIONS are never passed; GitHub
  * tokens are passed only when the server has them, for the checks that call `gh`.
  */
 export function policyEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const child: NodeJS.ProcessEnv = { PATH: `/usr/bin:/bin:${dirname(process.execPath)}` }
+  const child: NodeJS.ProcessEnv = { PATH: policyPath(env) }
   for (const name of ['HOME', 'GH_TOKEN', 'GITHUB_TOKEN']) {
     const value = env[name]
     if (value !== undefined) child[name] = value
@@ -41,21 +73,30 @@ export const spawnPolicy: PolicySpawner = (request) =>
       cwd: request.cwd,
       env: request.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Its own process group, so a timeout can kill grandchildren the policy started too.
+      detached: process.platform !== 'win32',
     })
+    const killGroup = () => {
+      try {
+        process.kill(-(child.pid as number), 'SIGKILL')
+      } catch {
+        child.kill('SIGKILL')
+      }
+    }
     const chunks = { stdout: [] as Buffer[], stderr: [] as Buffer[] }
     const sizes = { stdout: 0, stderr: 0 }
     let timedOut = false
     let overflowed = false
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill('SIGKILL')
+      killGroup()
     }, request.timeoutMs)
     for (const name of ['stdout', 'stderr'] as const)
       child[name].on('data', (chunk: Buffer) => {
         sizes[name] += chunk.length
         if (sizes[name] > request.maxOutputBytes) {
           overflowed = true
-          child.kill('SIGKILL')
+          killGroup()
         } else chunks[name].push(chunk)
       })
     child.on('error', (error) => {
@@ -64,6 +105,8 @@ export const spawnPolicy: PolicySpawner = (request) =>
     })
     child.on('close', (exitCode) => {
       clearTimeout(timer)
+      // Reap anything the policy left running in its group after a normal exit.
+      if (timedOut || overflowed) killGroup()
       const text = (name: 'stdout' | 'stderr') => Buffer.concat(chunks[name]).toString('utf8')
       resolve({ exitCode, stdout: text('stdout'), stderr: text('stderr'), timedOut, overflowed })
     })

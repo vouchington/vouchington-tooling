@@ -69,6 +69,11 @@ describe('resolvePolicyModule', () => {
     writeFileSync(join(root, 'package.json'), '{')
     await expect(resolvePolicyModule(root)).rejects.toThrow('not valid JSON')
   })
+
+  it('fails closed when package.json exists but cannot be read', async () => {
+    mkdirSync(join(root, 'package.json'))
+    await expect(resolvePolicyModule(root)).rejects.toThrow(/could not be read.*EISDIR/)
+  })
 })
 
 describe('runPolicyExport', () => {

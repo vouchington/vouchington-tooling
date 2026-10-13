@@ -67,15 +67,23 @@ export async function launchWorktreeRoot(
 }
 
 /**
- * The real paths of every worktree of the repository containing `root`, as
- * `git worktree list --porcelain` reports them (the primary worktree and each linked one).
+ * The worktree paths in `git worktree list --porcelain -z` output: NUL-terminated fields, an empty
+ * field ending each record, so a path containing a newline cannot forge a record.
+ */
+export function parseWorktreeList(output: string): string[] {
+  return output
+    .split('\0')
+    .filter((field) => field.startsWith('worktree '))
+    .map((field) => field.slice('worktree '.length))
+}
+
+/**
+ * The real paths of every worktree of the repository containing `root` (the primary worktree and
+ * each linked one).
  */
 async function repositoryWorktrees(root: string, runGit: RunTextCommand): Promise<Set<string>> {
-  const output = await runGit(['-C', root, 'worktree', 'list', '--porcelain'])
-  const paths = output
-    .split('\n')
-    .filter((line) => line.startsWith('worktree '))
-    .map((line) => canonical(line.slice('worktree '.length)))
+  const output = await runGit(['-C', root, 'worktree', 'list', '--porcelain', '-z'])
+  const paths = parseWorktreeList(output).map(canonical)
   return new Set((await Promise.all(paths)).filter((path) => path !== undefined))
 }
 

@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { BLACKBOARD_ENV } from './fake-blackboard.test-helpers.mts'
+import { defaultSourceEventId } from './handlers-retrospective.mts'
 import {
   JOURNAL_ARGS,
   harness,
@@ -284,7 +287,7 @@ describe('retrospective_save with compose', () => {
     const compose = {
       ...COMPOSE,
       facts: { noPr: true, branch: 'linked' },
-      transcript: { jsonlPath: join(fixture().root, 'missing.jsonl') },
+      transcript: { sessionId: 'native:owner' },
     }
     const result = await h.call('retrospective_save', { ...args(compose), dryRun: true })
     expect(result.isError).toBeUndefined()
@@ -301,6 +304,66 @@ describe('retrospective_save with compose', () => {
       'compose is missing: facts, tools',
     )
     expect(await call({ ...COMPOSE, facts: [] })).toContain('compose.facts must be an object')
+  })
+})
+
+describe('retrospective_save redaction and event ids', () => {
+  const TOKEN = 'sh0rt-tok'
+  const env = { ...BLACKBOARD_ENV, AGENT_BLACKBOARD_TOKEN: TOKEN }
+
+  it('keeps the blackboard token out of the policy input and the stored envelope', async () => {
+    declarePolicy()
+    const p = policy(accept)
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, env })
+    const leaky = FRONT.replace('Did a thing', `Did ${TOKEN} thing`).replace(
+      'Body of',
+      `Body ${TOKEN} of`,
+    )
+    const result = await h.call('retrospective_save', { ...SAVE, markdown: leaky })
+    expect(result.isError).toBeUndefined()
+    const policyInput = p.requests.find((r) => r.name === 'validateRetrospective')!.input
+    expect(JSON.stringify(policyInput)).not.toContain(TOKEN)
+    expect(policyInput.markdown).toContain('Body [REDACTED] of')
+    expect(policyInput.metadata).toMatchObject({ description: 'Did [REDACTED] thing' })
+    expect(JSON.stringify(h.fake.stored)).not.toContain(TOKEN)
+  })
+
+  it('redacts the token and caller values from a composed document before the policy', async () => {
+    declarePolicy()
+    const p = policy(accept)
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, env })
+    const unassessed = { status: 'not-assessed', reason: 'not inspected' }
+    const compose = {
+      narrative: `We saw ${TOKEN} and custom-secret.`,
+      date: '2026-01-01',
+      issues: [1],
+      prs: [2],
+      description: `Composed ${TOKEN}`,
+      facts: unassessed,
+      transcript: unassessed,
+      tools: { status: 'none-observed', reason: 'nothing' },
+      architecture: { status: 'none-observed', reason: 'nothing' },
+      knownSensitiveValues: ['custom-secret'],
+    }
+    const feedbackCoverage = { status: 'partial', sources: [], droppedCount: 0 }
+    const result = await h.call('retrospective_save', { ...BASE, feedbackCoverage, compose })
+    expect(result.isError).toBeUndefined()
+    const text = JSON.stringify([p.requests, h.fake.stored])
+    expect(text).not.toContain(TOKEN)
+    expect(text).not.toContain('custom-secret')
+  })
+
+  it('defaults the event id to retrospective-<sessionId>, hashed when too long', async () => {
+    expect(defaultSourceEventId('native:owner')).toBe('retrospective-native:owner')
+    const long = `native:${'x'.repeat(300)}`
+    expect(defaultSourceEventId(long)).toBe(
+      `retrospective-${createHash('sha256').update(long).digest('hex')}`,
+    )
+    const exact = `native:${'y'.repeat(256 - 'retrospective-native:'.length)}`
+    expect(defaultSourceEventId(exact)).toBe(`retrospective-${exact}`)
+    const h = harness(fixture())
+    await h.call('retrospective_save', SAVE)
+    expect(h.fake.stored[0]!.data).toMatchObject({ sourceEventId: 'retrospective-native:owner' })
   })
 })
 

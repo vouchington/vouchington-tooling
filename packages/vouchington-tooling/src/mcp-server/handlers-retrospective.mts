@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   createFeedbackEnvelope,
   validateFeedbackEnvelope,
@@ -22,7 +23,8 @@ import {
 import { readEntriesIfPresent } from './journal-read.mts'
 import { runValidator, type PolicyRun } from './policy-run.mts'
 import { parseRetrospectiveFrontMatter } from './retrospective-front-matter.mts'
-import { composeFromArgs } from './retrospective-input.mts'
+import { redactFeedbackText } from '../agent-blackboard/feedback-codec.mts'
+import { composeFromArgs, sensitiveValues } from './retrospective-input.mts'
 import { checkFrontMatter, resolveRepositories } from './retrospective-resolve.mts'
 
 type Data = { type?: unknown; sourceEventId?: unknown; timestamp?: unknown }
@@ -59,6 +61,14 @@ function readMarkdownSource(args: Args): { markdown?: string; compose?: Args } {
   return compose === undefined ? { markdown: requiredString(args, 'markdown') } : { compose }
 }
 
+/** The default event id, hashed when the session id would push it past the 256-byte limit. */
+export function defaultSourceEventId(sessionId: string): string {
+  const id = `retrospective-${sessionId}`
+  return Buffer.byteLength(id) <= 256
+    ? id
+    : `retrospective-${createHash('sha256').update(sessionId).digest('hex')}`
+}
+
 /**
  * Saves the session's retrospective: composes it when `compose` is given, checks the arguments
  * against the document's front matter, runs the checkout's `validateRetrospective` policy (in a
@@ -74,7 +84,7 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
   const argRepositories =
     args.repositories === undefined ? undefined : requiredStringArray(args, 'repositories')
   const sourceEventId =
-    optionalString(args, 'sourceEventId') ?? `retrospective-${context.sessionId}`
+    optionalString(args, 'sourceEventId') ?? defaultSourceEventId(context.sessionId)
   const category = optionalString(args, 'category')
   if (args.dryRun !== undefined && typeof args.dryRun !== 'boolean')
     throw new Error('dryRun must be a boolean')
@@ -84,19 +94,26 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
     ...(context.spawnPolicy === undefined ? {} : { spawn: context.spawnPolicy }),
   }
   const { markdown: given, compose } = readMarkdownSource(args)
-  const early = given === undefined ? undefined : parseRetrospectiveFrontMatter(given)
+  const secrets = sensitiveValues(compose, context.env)
+  // Everything the policy sees is derived from the redacted document, never the raw input.
+  const redactedGiven = given === undefined ? undefined : redactFeedbackText(given, secrets)
+  const early =
+    redactedGiven === undefined ? undefined : parseRetrospectiveFrontMatter(redactedGiven)
   const repositories = await resolveRepositories(argRepositories, early?.repositories, policy)
   const markdown =
-    given ??
-    (await composeFromArgs(compose as Args, {
-      sessionId: context.sessionId,
-      repositories,
-      workOutcome,
-      feedbackCoverage,
-      worktree: context.worktree,
-      env: context.env,
-      dependencies: context.dependencies,
-    }))
+    redactedGiven ??
+    redactFeedbackText(
+      await composeFromArgs(compose as Args, {
+        sessionId: context.sessionId,
+        repositories,
+        workOutcome,
+        feedbackCoverage,
+        worktree: context.worktree,
+        env: context.env,
+        dependencies: context.dependencies,
+      }),
+      secrets,
+    )
   const front = early ?? parseRetrospectiveFrontMatter(markdown)
   checkFrontMatter(front, {
     sessionId: context.sessionId,
@@ -105,21 +122,25 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
     repositories: argRepositories,
   })
   // Building the envelope first rejects empty or oversized markdown before any policy runs.
-  const envelope = createFeedbackEnvelope({
-    schemaVersion: 1,
-    type: 'retrospective',
-    sourceEventId,
-    // The server owns the timestamp, as in journal_append.
-    timestamp: new Date().toISOString(),
-    date: front.date,
-    issues: front.issues,
-    prs: front.prs,
-    repositories,
-    markdown,
-    workOutcome,
-    feedbackCoverage,
-    ...(category === undefined ? {} : { category }),
-  })
+  const envelope = createFeedbackEnvelope(
+    {
+      schemaVersion: 1,
+      type: 'retrospective',
+      sourceEventId,
+      // The server owns the timestamp, as in journal_append.
+      timestamp: new Date().toISOString(),
+      date: front.date,
+      issues: front.issues,
+      prs: front.prs,
+      repositories,
+      markdown,
+      workOutcome,
+      feedbackCoverage,
+      ...(category === undefined ? {} : { category }),
+    },
+    { knownSensitiveValues: secrets },
+  )
+  const redactedFront = parseRetrospectiveFrontMatter(envelope.markdown)
   validateFeedbackEnvelope(envelope)
   const report = await runValidator({
     ...policy,
@@ -134,10 +155,10 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
       markdown: envelope.markdown,
       sourceEventId,
       metadata: {
-        date: front.date,
-        issues: front.issues,
-        prs: front.prs,
-        description: front.description,
+        date: redactedFront.date,
+        issues: redactedFront.issues,
+        prs: redactedFront.prs,
+        description: redactedFront.description,
       },
     },
   })
