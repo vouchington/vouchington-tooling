@@ -22,8 +22,14 @@ export function checkFrontMatter(
   if (front.workOutcome !== undefined && front.workOutcome !== args.workOutcome)
     mismatches.push('work_outcome does not match workOutcome')
   if (front.feedbackCoverage !== undefined) {
+    // Field by field, so the document's JSON key order does not matter; sources stay ordered.
     const { status, sources, droppedCount } = args.feedbackCoverage
-    if (!same(front.feedbackCoverage, { status, sources, droppedCount }))
+    const given = front.feedbackCoverage
+    if (
+      given.status !== status ||
+      given.droppedCount !== droppedCount ||
+      !same(given.sources, sources)
+    )
       mismatches.push('feedback_coverage does not match feedbackCoverage')
   }
   if (

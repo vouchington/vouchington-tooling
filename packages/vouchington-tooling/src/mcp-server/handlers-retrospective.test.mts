@@ -341,6 +341,18 @@ describe('retrospective_save redaction and event ids', () => {
     expect(JSON.stringify(h.fake.stored)).not.toContain(TOKEN)
   })
 
+  it('passes the policy the redacted feedback coverage, not the raw argument', async () => {
+    declarePolicy()
+    const p = policy(accept)
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, env })
+    const markdown = FRONT.replace(/^feedback_coverage: .*\n/m, '')
+    const feedbackCoverage = { status: 'partial', sources: [`log ${TOKEN}`], droppedCount: 0 }
+    const result = await h.call('retrospective_save', { ...SAVE, markdown, feedbackCoverage })
+    expect(result.isError).toBeUndefined()
+    const policyInput = p.requests.find((r) => r.name === 'validateRetrospective')!.input
+    expect(JSON.stringify(policyInput)).not.toContain(TOKEN)
+  })
+
   it('redacts the token and caller values from a composed document before the policy', async () => {
     declarePolicy()
     const p = policy(accept)

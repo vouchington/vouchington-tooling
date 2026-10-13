@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   FACTS_TIMEOUT_MS,
   composeFromArgs,
@@ -48,6 +48,23 @@ describe('worktreeExecutor', () => {
     const result = await run('node', ['-e', 'setInterval(() => {}, 1000)'])
     expect(result).toMatchObject({ ok: false, exitCode: null })
     expect(result.stderr).toContain('timed out after 100 ms')
+  })
+
+  it('kills a helper the command left running, and caps its output', async () => {
+    const pidFile = join(directory, 'helper.pid')
+    const script = `
+      const { spawn } = require('node:child_process')
+      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+      child.unref()
+      require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(child.pid))
+    `
+    const run = worktreeExecutor(directory, { PATH: process.env.PATH })
+    expect(await run('node', ['-e', script])).toMatchObject({ ok: true, exitCode: 0 })
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
+    const loud = await run('node', ['-e', 'process.stdout.write("x".repeat(10_000_001))'])
+    expect(loud).toMatchObject({ ok: false, exitCode: null })
+    expect(loud.stderr).toContain('node wrote more than 10000000 bytes')
   })
 
   it('never passes the blackboard credentials, NODE_OPTIONS, or GIT_* to the command', async () => {

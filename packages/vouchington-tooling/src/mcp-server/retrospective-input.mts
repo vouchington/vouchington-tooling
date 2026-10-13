@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import {
   composeRetrospective,
   type FeedbackCoverage,
@@ -8,6 +7,7 @@ import {
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import { rejectUnknown, type Args } from './args.mts'
 import { serverJournalLoader } from './journal-read.mts'
+import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
 const COMPOSE_KEYS = [
   'narrative',
@@ -27,6 +27,7 @@ const FACTS_KEYS = ['pr', 'branch', 'noPr', 'repo', 'status', 'reason']
 const TRANSCRIPT_KEYS = ['sessionId', 'status', 'reason']
 /** The longest a facts subprocess may run before it is killed. */
 export const FACTS_TIMEOUT_MS = 120_000
+const MAX_OUTPUT_BYTES = 10_000_000
 
 type ComposeBase = {
   sessionId: string
@@ -63,33 +64,32 @@ export function worktreeExecutor(
         name !== 'NODE_OPTIONS',
     ),
   )
-  return (command: string, args: string[]) =>
-    new Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number | null }>(
-      (resolve) =>
-        execFile(
-          command,
-          args,
-          {
-            cwd: worktree,
-            env: safe,
-            maxBuffer: 10_000_000,
-            timeout: timeoutMs,
-            killSignal: 'SIGKILL',
-          },
-          (error, stdout, stderr) =>
-            resolve({
-              ok: error === null,
-              stdout,
-              stderr:
-                error === null
-                  ? stderr
-                  : error.killed === true
-                    ? `${stderr}${command} timed out after ${timeoutMs} ms`
-                    : stderr || error.message,
-              exitCode: error === null ? 0 : typeof error.code === 'number' ? error.code : null,
-            }),
-        ),
-    )
+  // Each command runs in its own process group, killed whole when it exits or times out, so a
+  // helper that git or gh starts cannot outlive the call with an inherited GH_TOKEN.
+  return async (command: string, args: string[]) => {
+    let outcome: PolicyOutcome
+    try {
+      outcome = await spawnPolicy({
+        command,
+        args,
+        cwd: worktree,
+        env: safe,
+        input: '',
+        timeoutMs,
+        maxOutputBytes: MAX_OUTPUT_BYTES,
+      })
+    } catch (error) {
+      return { ok: false, stdout: '', stderr: (error as Error).message, exitCode: null }
+    }
+    const { stdout, stderr, exitCode, timedOut, overflowed } = outcome
+    if (timedOut || overflowed) {
+      const reason = timedOut
+        ? `timed out after ${timeoutMs} ms`
+        : `wrote more than ${MAX_OUTPUT_BYTES} bytes`
+      return { ok: false, stdout, stderr: `${stderr}${command} ${reason}`, exitCode: null }
+    }
+    return { ok: exitCode === 0, stdout, stderr, exitCode }
+  }
 }
 
 /** The caller's `compose.knownSensitiveValues` plus the server's blackboard token, when set. */

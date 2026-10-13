@@ -150,7 +150,8 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
       parentSessionId: identity.parentSessionId,
       mode,
       workOutcome,
-      feedbackCoverage,
+      // The envelope's copy, which is redacted like the markdown.
+      feedbackCoverage: envelope.feedbackCoverage,
       repositories,
       markdown: envelope.markdown,
       sourceEventId,
