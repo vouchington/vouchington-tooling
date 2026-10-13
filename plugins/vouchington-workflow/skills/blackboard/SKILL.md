@@ -38,18 +38,36 @@ Every call may take `worktree`, the absolute path of a worktree of the current r
 launch worktree by default). Writing or retrying an entry needs no provider skill, temporary file,
 `--file` flag, or replay command.
 Search for `journal_append` (by bare name, so every prefix matches) before concluding the server is
-unavailable; a deferred harness lists the tool only on request. If the search finds no such tool
-because the server is not registered or not connected, use the supported CLI fallback below.
-Tell the human that MCP is unavailable and which CLI is being used. Record the fallback reason,
-entrypoint, affected operations, and observed delivery status in the caller's journal before
-continuing primary work. Do not treat a permission denial as tool unavailability or bypass a host
-approval requirement through the CLI. If neither path persists the note, stop and report the blocker.
+unavailable; a deferred harness lists the tool only on request. A tool error is not
+unavailability: act on its message and retry through MCP.
+
+## When the server is unavailable
+
+MCP is the supported journaling path. If the search finds no such tool, stop journaling and tell the
+human which case applies before continuing:
+
+- Not registered: the machine's agent configuration must register it; follow the consumer's
+  registration and diagnosis steps.
+- Registered but disconnected: reconnect it through the harness's MCP controls, or restart the
+  harness.
+- Automated runs with no human to ask: report "journaling unavailable" in the final report.
+
+Prefer restoring MCP over the CLI fallback below, and use the fallback only when the human asks or
+MCP cannot be restored for this session. Harness sandboxes commonly withhold
+`AGENT_BLACKBOARD_TOKEN` from shell commands, so the fallback usually cannot deliver there. Never
+request an unsandboxed run only to obtain the token. When the fallback is used, record its reason,
+entrypoint, affected operations, and observed delivery status in the caller's journal. Do not treat
+a permission denial as tool unavailability or bypass a host approval requirement through the CLI.
+If neither path persists the note, stop and report the blocker.
 
 ## CLI fallback
 
+Deprecated and being phased out: the MCP tools replace it, and retrospective and PR writers are
+moving to MCP tools as well.
+
 Use a trusted machine-installed `vouchington` executable at a verified absolute path outside the
 consumer worktree. Resolve its symlinks and verify the installation's source and version before
-using credentials or requesting an unsandboxed run; its runtime dependencies must also belong to
+using credentials; its runtime dependencies must also belong to
 that trusted installation. The CLI resolves its client relative to its own installation; installing
 `agent-blackboard` only in the consumer worktree is insufficient for CLI fallback. Do not resolve the executable through the consumer's `node_modules/.bin`,
 `pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
@@ -93,13 +111,9 @@ explicit coverage sources when assessed. Omit `--timestamp` so the writer owns t
 mode omits `--outbox-directory` and still requires fresh online admission plus readback.
 For session-only or snapshot operations not exposed by this CLI, use the upstream
 `agent-blackboard` CLI under its skill's operation contract; preserve exact identities and tags.
-A sandboxed fallback may only write the outbox: the machine's harness sandbox can withhold
-`AGENT_BLACKBOARD_TOKEN`, so it cannot deliver or read back. If delivery or readback needs the
-credentials and the sandbox withholds them, run that one command unsandboxed through the harness's
-normal approval path for running one command outside the sandbox, with each such run approved
-individually. Never read, print, copy, or export the token
-to work around the sandbox. If approval is denied, leave the record pending in the outbox, report
-`pendingCount`, and tell the human.
+A sandboxed fallback may only write the outbox: without `AGENT_BLACKBOARD_TOKEN` it cannot deliver
+or read back. Leave the record pending, report `pendingCount`, and deliver it with `outbox_flush`
+once MCP is restored. Never read, print, copy, or export the token to work around the sandbox.
 Return to MCP when available and journal recovery. Never silently downgrade envelope validation,
 retention, or delivery checks because the transport changed.
 

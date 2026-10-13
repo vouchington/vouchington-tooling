@@ -54,9 +54,9 @@ This repository adopts Agent Blackboard for durable agent-session notes. The `vo
 journaling skills call the tools of the [`vouchington mcp` server](packages/vouchington-tooling/docs/mcp-server.md),
 which vouchington-machines registers once per machine as `vouchington-tooling` in each harness,
 not per repository; it also disables the upstream `agent-blackboard` plugin machine-wide (decision
-vouchington#1019). This repository carries no MCP, Claude settings, or Codex config for it. Credential-management commands remain CLI-only. When MCP is unavailable,
-the journaling skill permits the supported CLI fallback and requires both a journal entry and a
-human-facing notice.
+vouchington#1019). This repository carries no MCP, Claude settings, or Codex config for it. Credential-management commands remain CLI-only. MCP is the supported path.
+When it is unavailable, the journaling skill has agents tell the human how to restore it; its CLI
+fallback is a last resort and requires both a journal entry and a human-facing notice.
 
 ### Install (opt-in)
 

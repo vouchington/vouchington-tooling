@@ -40,8 +40,10 @@ environment. The server never searches for, prints, or mints them.
 
 ## CLI fallback
 
-If MCP is unavailable, use `vouchington agent-blackboard journal append|entries|flush|status` as described
-in the blackboard skill. Record the fallback and delivery status in the journal and tell the human. The CLI resolves its
+MCP is the supported path. If it is unavailable, restore it first as the blackboard skill describes.
+As a last resort, use `vouchington agent-blackboard journal append|entries|flush|status` as described
+there; sandboxed Claude Code and Codex withhold the token, so it can only retain records in the
+outbox the server later flushes. Record the fallback and delivery status in the journal and tell the human. The CLI resolves its
 client from its own installation, so install `agent-blackboard` alongside that trusted CLI.
 Run the script with a verified absolute `node` and a cleared environment (`env -i`), never through
 its `#!/usr/bin/env node` line, which takes `node` from a possibly repository-controlled `PATH`.

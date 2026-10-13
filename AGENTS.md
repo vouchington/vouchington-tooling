@@ -51,8 +51,11 @@ and delivery through `outbox_flush`. Failed persistence or
 identity/content conflicts block capture. Autonomous work requires fresh online append/readback
 before admission and acknowledged terminal reporting; missing or rejected credentials block it.
 Never substitute an ad hoc local journal file or use an outbox to authorize autonomous work.
-When MCP is unavailable, use the supported CLI fallback in the blackboard skill, journal the
-fallback and delivery result, and notify the human. Host permission denials still require approval.
+MCP is the supported path: when it is unavailable, stop journaling and tell the human how to
+restore it: run vouchington-machines' `./configure-agents.sh`, then `./diagnose-agents.sh`, when it
+is not registered, and reconnect it (`/mcp` in Claude Code, or restart Codex) when it is
+disconnected. Its CLI fallback is a last resort, never a reason to
+request an unsandboxed run for the token. Host permission denials still require approval.
 The machine-registered server runs its own installation and loads no code from this checkout, but
 the source CLI here still sees the blackboard credentials when run with them, so review untrusted
 branches with the credentials unset.
