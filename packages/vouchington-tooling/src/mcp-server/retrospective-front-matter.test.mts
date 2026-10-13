@@ -40,6 +40,12 @@ describe('parseRetrospectiveFrontMatter', () => {
     ).toEqual([1, 'a/b#2'])
   })
 
+  it('accepts CRLF line endings', () => {
+    const parsed = parseRetrospectiveFrontMatter(doc(...REQUIRED).replaceAll('\n', '\r\n'))
+    expect(parsed.date).toBe('2026-01-01')
+    expect(parsed.prs).toEqual([1, 'a/b#2'])
+  })
+
   it('accepts a block at the very end of the document', () => {
     expect(parseRetrospectiveFrontMatter(`---\n${REQUIRED.join('\n')}\n---`).date).toBe(
       '2026-01-01',

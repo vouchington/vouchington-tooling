@@ -7,6 +7,7 @@ import { policyEnvironment, spawnPolicy } from './policy-spawn.mts'
 
 const POLICY = `export function validateRetrospective(input: { markdown: string }) {
   console.log('noise on stdout')
+  process.stdout.write('direct noise on stdout')
   return {
     errors: input.markdown.includes('bad') ? ['contains bad'] : [],
     warnings: [process.cwd(), String(process.env.AGENT_BLACKBOARD_TOKEN), String(process.env.NODE_OPTIONS)],

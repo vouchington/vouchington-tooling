@@ -34,13 +34,24 @@ describe('worktreeExecutor', () => {
     expect(result.stderr).toContain('ENOENT')
   })
 
-  it('never passes the blackboard credentials to the command', async () => {
+  it('never passes the blackboard credentials, NODE_OPTIONS, or GIT_* to the command', async () => {
     const run = worktreeExecutor(directory, {
       PATH: process.env.PATH,
+      HOME: '/home/agent',
       AGENT_BLACKBOARD_URL: 'https://example.test',
       AGENT_BLACKBOARD_TOKEN: 'secret',
+      NODE_OPTIONS: '--max-old-space-size=64',
+      GIT_DIR: '/elsewhere',
     })
-    const result = await run('node', ['-p', 'String(process.env.AGENT_BLACKBOARD_TOKEN)'])
-    expect(result.stdout.trim()).toBe('undefined')
+    const names = [
+      'AGENT_BLACKBOARD_URL',
+      'AGENT_BLACKBOARD_TOKEN',
+      'NODE_OPTIONS',
+      'GIT_DIR',
+      'HOME',
+    ]
+    const script = `console.log(${JSON.stringify(names)}.map((n) => String(process.env[n])).join(','))`
+    const result = await run('node', ['-e', script])
+    expect(result.stdout.trim()).toBe('undefined,undefined,undefined,undefined,/home/agent')
   })
 })

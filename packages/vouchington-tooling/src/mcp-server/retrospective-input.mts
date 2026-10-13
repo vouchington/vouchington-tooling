@@ -51,9 +51,19 @@ function section(compose: Args, name: string, keys: string[]): Args {
   return value as Args
 }
 
-/** Facts commands run in the worktree and never see the blackboard credentials. */
+/**
+ * Facts commands run in the worktree and never see the blackboard credentials, NODE_OPTIONS, or
+ * GIT_* overrides that could point git away from the validated worktree.
+ */
 export function worktreeExecutor(worktree: string, env: NodeJS.ProcessEnv) {
-  const { AGENT_BLACKBOARD_URL: _url, AGENT_BLACKBOARD_TOKEN: _token, ...safe } = env
+  const safe = Object.fromEntries(
+    Object.entries(env).filter(
+      ([name]) =>
+        !name.startsWith('AGENT_BLACKBOARD_') &&
+        !name.startsWith('GIT_') &&
+        name !== 'NODE_OPTIONS',
+    ),
+  )
   return (command: string, args: string[]) =>
     new Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number | null }>(
       (resolve) =>

@@ -76,7 +76,7 @@ function coverageOf(coverage: RawCoverage): RetrospectiveFrontMatter['feedbackCo
  * and `date`, `issues`, and `prs` are required.
  */
 export function parseRetrospectiveFrontMatter(markdown: string): RetrospectiveFrontMatter {
-  const block = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(markdown)?.[1]
+  const block = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(markdown.replaceAll('\r\n', '\n'))?.[1]
   if (block === undefined)
     fail(
       'the document must start with a block between two "---" lines, as composeRetrospective writes',
