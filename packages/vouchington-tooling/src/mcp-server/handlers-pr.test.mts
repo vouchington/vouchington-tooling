@@ -244,7 +244,12 @@ describe('pr_create', () => {
         : { labels: ['a', 'b'], milestone: 'M1', project: 'P1' },
     )
     const gh = fakeGh()
-    const env = { PATH: '/bin', AGENT_BLACKBOARD_URL: 'u', AGENT_BLACKBOARD_TOKEN: 't', KEEP: '1' }
+    const env = {
+      PATH: '/bin',
+      AGENT_BLACKBOARD_URL: 'u',
+      AGENT_BLACKBOARD_TOKEN: 'tok-1',
+      KEEP: '1',
+    }
     const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device, env })
     const result = jsonOf(await h.call('pr_create', args()))
     expect(result).toEqual({
