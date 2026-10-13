@@ -74,11 +74,18 @@ export async function runPolicyExport(run: PolicyRun): Promise<PolicyResult> {
 
 const CREDENTIAL_NAMES = ['AGENT_BLACKBOARD_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'] as const
 
-/** Credential values held by the server, longest first, ignoring values too short to redact. */
+/**
+ * Credential values held by the server, longest first. A value too short to redact without
+ * mangling every output fails closed: the policy never runs rather than risk echoing it.
+ */
 function credentialValues(env: NodeJS.ProcessEnv): string[] {
-  const values = CREDENTIAL_NAMES.map((name) => env[name]).filter(
-    (value): value is string => value !== undefined && value.length >= 4,
+  const values = CREDENTIAL_NAMES.map((name) => env[name]).filter((value): value is string =>
+    Boolean(value),
   )
+  if (values.some((value) => value.length < 4))
+    throw new Error(
+      `a credential (${CREDENTIAL_NAMES.join(', ')}) is too short to redact: policy tools refuse to run`,
+    )
   return [...new Set(values)].sort((a, b) => b.length - a.length)
 }
 

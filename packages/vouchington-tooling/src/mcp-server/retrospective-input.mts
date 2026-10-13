@@ -6,6 +6,7 @@ import {
 } from '../agent-blackboard/index.mts'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import { rejectUnknown, type Args } from './args.mts'
+import { SESSION_ID } from '../retrospective-transcript/resolve-transcript-file.mts'
 import { serverJournalLoader } from './journal-read.mts'
 import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
@@ -24,7 +25,7 @@ const COMPOSE_KEYS = [
 const COMPOSE_REQUIRED = COMPOSE_KEYS.filter((key) => key !== 'knownSensitiveValues')
 const FACTS_KEYS = ['pr', 'branch', 'noPr', 'repo', 'status', 'reason']
 /** No path overrides: the server reads the session's transcript from its own default roots. */
-const TRANSCRIPT_KEYS = ['sessionId', 'status', 'reason']
+const TRANSCRIPT_KEYS = ['sessionId', 'harnessSessionId', 'status', 'reason']
 /** The longest a facts subprocess may run before it is killed. */
 export const FACTS_TIMEOUT_MS = 120_000
 const MAX_OUTPUT_BYTES = 10_000_000
@@ -109,19 +110,29 @@ export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEn
 
 /**
  * The transcript collector input: the server's worktree and default session roots only. A caller
- * may name the session (it must be this one) or report the transcript as unassessed.
+ * may name the session (it must be this one), give the harness's own UUID session id when the
+ * blackboard session id is not one, or report the transcript as unassessed.
  */
 function transcriptInput(transcript: Args, base: ComposeBase): Args {
   if ('status' in transcript) {
-    if ('sessionId' in transcript)
-      throw new Error('compose.transcript: sessionId and status are exclusive')
+    if ('sessionId' in transcript || 'harnessSessionId' in transcript)
+      throw new Error(
+        'compose.transcript: sessionId and harnessSessionId are exclusive with status',
+      )
     return transcript
   }
   // A reason without a status is malformed, not a request to read the transcript.
   if ('reason' in transcript) throw new Error('compose.transcript.reason requires a status')
   if (transcript.sessionId !== undefined && transcript.sessionId !== base.sessionId)
     throw new Error('compose.transcript.sessionId must equal the sessionId of the call')
-  return { sessionId: base.sessionId, cwd: base.worktree }
+  const harnessId = transcript.harnessSessionId ?? base.sessionId
+  // Transcripts are found by the harness's UUID; never let a lookup fail into "unavailable".
+  if (typeof harnessId !== 'string' || !SESSION_ID.test(harnessId))
+    throw new Error(
+      'compose.transcript needs a UUID session id: pass harnessSessionId (the harness session ' +
+        'UUID) or { status, reason }',
+    )
+  return { sessionId: harnessId, cwd: base.worktree }
 }
 
 /** Facts are either `{ status, reason }` (unassessed) or a live collection selector, never both. */

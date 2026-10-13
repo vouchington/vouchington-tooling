@@ -245,6 +245,17 @@ describe('retrospective_save with markdown', () => {
     )
   })
 
+  it('refuses policy tools on Windows, where descendants cannot be reaped by group', async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      const result = await harness(fixture()).call('retrospective_save', SAVE)
+      expect(textOf(result)).toContain('policy tools are not supported on Windows')
+    } finally {
+      Object.defineProperty(process, 'platform', platform)
+    }
+  })
+
   it('surfaces a same-event conflict when changed content reuses the sourceEventId', async () => {
     const h = harness(fixture())
     await h.call('retrospective_save', SAVE)
@@ -306,11 +317,19 @@ describe('retrospective_save with compose', () => {
     const compose = {
       ...COMPOSE,
       facts: { noPr: true, branch: 'linked' },
-      transcript: { sessionId: 'native:owner' },
+      transcript: {
+        sessionId: 'native:owner',
+        harnessSessionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      },
     }
     const result = await h.call('retrospective_save', { ...args(compose), dryRun: true })
     expect(result.isError).toBeUndefined()
     expect(jsonOf(result).markdown).toContain('Verifiable Facts')
+    // A non-UUID blackboard session id without a harness id fails instead of "unavailable".
+    const bare = { ...compose, transcript: { sessionId: 'native:owner' } }
+    expect(textOf(await h.call('retrospective_save', args(bare)))).toContain(
+      'compose.transcript needs a UUID session id',
+    )
   })
 
   it('rejects unknown, missing, and mistyped compose keys', async () => {

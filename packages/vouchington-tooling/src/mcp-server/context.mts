@@ -48,6 +48,9 @@ export function readIdentity(args: Args, sessionId: string): FeedbackIdentity {
 
 /** Policy modules run only for a server whose launch repository bounds the worktrees it acts on. */
 export function assertPolicyAllowed(context: { launchRoot: string | undefined }): void {
+  // Policy and facts children are reaped by Unix process group; Windows has no equivalent here.
+  if (process.platform === 'win32')
+    throw new Error('policy tools are not supported on Windows: run the server on macOS or Linux')
   if (context.launchRoot === undefined)
     throw new Error(
       'policy tools require the server to be launched inside a repository worktree: relaunch ' +

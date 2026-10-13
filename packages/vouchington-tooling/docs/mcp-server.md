@@ -177,8 +177,10 @@ timestamp; a `timestamp` argument is rejected). The document comes from `markdow
 `compose`, the input of `composeRetrospective` (`narrative`, `date`, `issues`, `prs`,
 `description`, `facts`, `transcript`, `tools`, `architecture`, optional `knownSensitiveValues`;
 unknown keys are rejected, and the journal audit reads through the server's own client).
-`compose.transcript` accepts only `{ sessionId }` (which must equal the call's `sessionId`) or
-`{ status, reason }` for an unassessed transcript; `jsonlPath`, `projectsDir`, `codexSessionsDir`,
+`compose.transcript` accepts only `{ sessionId?, harnessSessionId? }` (`sessionId` must equal the
+call's `sessionId`) or `{ status, reason }` for an unassessed transcript. The transcript is found by
+`harnessSessionId`, the harness's own session UUID, else by the call's `sessionId` when that is a
+UUID; otherwise the call fails rather than reporting the transcript unavailable; `jsonlPath`, `projectsDir`, `codexSessionsDir`,
 `grokSessionsDir`, and `cwd` are rejected, and the server reads the transcript from the worktree
 and its default session roots. The server's blackboard token, and any `knownSensitiveValues`, are
 redacted from the document before the policy sees it or the envelope is stored. Facts commands
@@ -204,7 +206,10 @@ save is retained in the outbox, deliver it with `outbox_flush`.
 The consumer's root `package.json` may declare
 `"vouchington-tooling": { "policy": "dev/agent-policy.mts" }`. The path must be relative and, after
 resolving symlinks, stay inside the worktree. Without a declaration the policy checks are skipped.
-Policy tools also require a server launched inside a repository worktree. Each call runs one named
+Policy tools also require a server launched inside a repository worktree on macOS or Linux (they
+refuse to run on Windows, where the server cannot reap a policy's descendants by process group),
+and refuse to run when `AGENT_BLACKBOARD_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set to a value
+shorter than four characters, which could not be redacted from policy output. Each call runs one named
 export in a fresh child process (`bin/policy-runner.mjs`, started with the server's own Node), never
 inside the server, with the worktree as its working directory and an environment of only `HOME`,
 `PATH` (`/usr/bin`, `/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, the Node directory, and the

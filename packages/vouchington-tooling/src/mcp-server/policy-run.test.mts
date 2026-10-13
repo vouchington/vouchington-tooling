@@ -97,7 +97,7 @@ describe('runPolicyExport', () => {
     const spawn = vi.fn<PolicySpawner>().mockResolvedValue(outcome())
     const env = {
       HOME: '/home/x',
-      GH_TOKEN: 'gh',
+      GH_TOKEN: 'gh-token',
       AGENT_BLACKBOARD_TOKEN: 'secret',
       AGENT_BLACKBOARD_URL: 'u',
       NODE_OPTIONS: '--inspect',
@@ -153,7 +153,6 @@ describe('runPolicyExport', () => {
       GH_TOKEN: 'ghp_secretvalue',
       // A prefix of GH_TOKEN: longest-first redaction must not leave "[REDACTED]value".
       GITHUB_TOKEN: 'ghp_secret',
-      AGENT_BLACKBOARD_TOKEN: 'abc',
     }
     const withEnv = (stub: PolicyOutcome) =>
       runPolicyExport({
@@ -170,12 +169,12 @@ describe('runPolicyExport', () => {
     await expect(
       withEnv(outcome({ exitCode: 1, stderr: 'token=ghp_secretvalue' })),
     ).rejects.toThrow('exited with code 1: token=[REDACTED]')
-    const result = { errors: ['bad ghp_secretvalue "quoted"'], warnings: ['abc stays: too short'] }
+    const result = { errors: ['bad ghp_secretvalue "quoted"'], warnings: ['ok'] }
     await expect(
       withEnv(outcome({ stdout: JSON.stringify({ ok: true, result }) })),
     ).resolves.toEqual({
       status: 'ok',
-      result: { errors: ['bad [REDACTED] "quoted"'], warnings: ['abc stays: too short'] },
+      result: { errors: ['bad [REDACTED] "quoted"'], warnings: ['ok'] },
     })
     await expect(
       runPolicyExport({
@@ -186,6 +185,16 @@ describe('runPolicyExport', () => {
         spawn: async () => outcome(),
       }),
     ).resolves.toEqual({ status: 'ok', result: { errors: [] } })
+  })
+
+  it('refuses to run, never spawning, when a credential is too short to redact', async () => {
+    declare('policy.mts', 'policy.mts')
+    const spawn = vi.fn<PolicySpawner>()
+    for (const env of [{ AGENT_BLACKBOARD_TOKEN: 'abc' }, { GH_TOKEN: 'x', GITHUB_TOKEN: '' }])
+      await expect(
+        runPolicyExport({ worktree: root, export: 'validateRetrospective', input: 1, env, spawn }),
+      ).rejects.toThrow('too short to redact: policy tools refuse to run')
+    expect(spawn).not.toHaveBeenCalled()
   })
 
   it('treats a missing export as skipped', async () => {

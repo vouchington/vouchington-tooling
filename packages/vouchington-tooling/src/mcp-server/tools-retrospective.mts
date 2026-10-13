@@ -30,8 +30,9 @@ export const RETROSPECTIVE_TOOLS: readonly ToolDefinition[] = [
       'each line key: <JSON>; any that repeat an argument must equal it) or compose (the retrospective ' +
       'composer input: narrative, date, issues, prs, description, facts, transcript, tools, ' +
       'architecture, optional knownSensitiveValues; the server adds the rest). compose.transcript ' +
-      'takes only { sessionId } (the call sessionId; the server reads the transcript from its ' +
-      'own default session roots in the worktree) or { status, reason } to report it ' +
+      'takes only { sessionId?, harnessSessionId? } (sessionId must be the call sessionId; the ' +
+      'transcript is found by harnessSessionId, the harness session UUID, else by sessionId when ' +
+      'that is a UUID, in the default session roots of the worktree) or { status, reason } to report it ' +
       'unassessed; any path override is rejected. The server redacts its blackboard token ' +
       'from the document before the policy sees it. dryRun returns ' +
       '{ markdown, policy: { warnings } } and writes nothing. The worktree package.json may ' +
