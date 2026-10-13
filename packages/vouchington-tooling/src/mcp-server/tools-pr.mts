@@ -73,8 +73,9 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
     'Creates a draft pull request from the worktree branch. ' +
       RENDERING +
       'Validation errors block creation. The policy pullRequestDefaults export may add labels, a ' +
-      'milestone and a project. The branch must already be pushed and current. Returns ' +
-      '{ number, url, warnings }.',
+      'milestone and a project. The branch must already be pushed and current. It sees no stack ' +
+      'membership, so a policy may reject a non-default base; create stacked layers with the ' +
+      "repository's stack tooling. Returns { number, url, warnings }.",
     ADDITIVE,
     FIELDS,
     REQUIRED,
