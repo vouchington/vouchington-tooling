@@ -66,12 +66,32 @@ describe('gh access', () => {
     }
   })
 
-  it('falls back to absolute locations, else fails with the install hint', async () => {
-    const attempt = await locateGh({}).catch((error: Error) => error)
-    if (attempt instanceof Error)
-      expect(attempt.message).toBe(
+  it('falls back to an absolute location when PATH has no gh', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'vouchington-gh-'))
+    try {
+      const fallback = join(root, 'gh')
+      writeFileSync(fallback, '#!/bin/sh\n')
+      chmodSync(fallback, 0o755)
+      expect(await locateGh({ PATH: join(root, 'missing') }, [join(root, 'nope'), fallback])).toBe(
+        fallback,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('skips non-executable and missing candidates, else fails with the install hint', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'vouchington-gh-'))
+    try {
+      const plain = join(root, 'gh')
+      writeFileSync(plain, 'not executable')
+      chmodSync(plain, 0o644)
+      await expect(locateGh({ PATH: root }, [join(root, 'absent')])).rejects.toThrow(
         "gh CLI not found on PATH; install gh or add it to the server's PATH",
       )
-    else expect(attempt).toMatch(/\/gh$/)
+      await expect(locateGh({}, [])).rejects.toThrow('gh CLI not found on PATH')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

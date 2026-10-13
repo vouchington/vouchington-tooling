@@ -24,12 +24,15 @@ async function isExecutableFile(path: string): Promise<boolean> {
 }
 
 /** `gh` on the server's PATH, else a common absolute location. */
-export async function locateGh(env: NodeJS.ProcessEnv): Promise<string> {
+export async function locateGh(
+  env: NodeJS.ProcessEnv,
+  fallbacks: readonly string[] = FALLBACKS,
+): Promise<string> {
   const onPath = (env.PATH ?? '')
     .split(delimiter)
     .filter(Boolean)
     .map((directory) => join(directory, 'gh'))
-  for (const candidate of [...onPath, ...FALLBACKS])
+  for (const candidate of [...onPath, ...fallbacks])
     if (await isExecutableFile(candidate)) return candidate
   throw new Error("gh CLI not found on PATH; install gh or add it to the server's PATH")
 }

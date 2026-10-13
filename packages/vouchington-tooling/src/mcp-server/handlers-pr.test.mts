@@ -1,3 +1,6 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { harness, jsonOf, textOf, useRepoFixture } from './harness.test-helpers.mts'
 import {
@@ -116,6 +119,20 @@ describe('pr_validate', () => {
     expect(gh.calls.map((call) => call.args)).toEqual([
       ['pr', 'view', '5', '--json', 'body,headRefName'],
     ])
+  })
+
+  it('locates the real gh on the server PATH when no runner is injected', async () => {
+    const bin = mkdtempSync(join(tmpdir(), 'vouchington-gh-'))
+    try {
+      const gh = join(bin, 'gh')
+      writeFileSync(gh, `#!/bin/sh\necho '{"body":"live body","headRefName":"linked"}'\n`)
+      chmodSync(gh, 0o755)
+      const h = harness(fixture(), { device, env: { PATH: bin } })
+      const result = jsonOf(await h.call('pr_validate', args({ pr: 5 })))
+      expect(result.body).toBe(BODY)
+    } finally {
+      rmSync(bin, { recursive: true, force: true })
+    }
   })
 
   it('rejects a live pull request on another branch or an unusable view', async () => {
