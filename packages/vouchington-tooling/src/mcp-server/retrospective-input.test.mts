@@ -168,8 +168,18 @@ describe('composeFromArgs transcript', () => {
     ).rejects.toThrow('compose.facts: status is exclusive with pr, noPr')
     for (const [facts, message] of [
       [{ noPr: 'false' }, 'compose.facts.noPr must be a boolean'],
-      [{ pr: 1 }, 'compose.facts.pr must be a string'],
-      [{ branch: null }, 'compose.facts.branch must be a string'],
+      [{ pr: 1 }, 'compose.facts.pr must be a pull request number string'],
+      [
+        { pr: 'https://github.com/other/private/pull/1' },
+        'compose.facts.pr must be a pull request number string',
+      ],
+      [{ branch: null }, 'compose.facts.branch must be a branch name'],
+      [
+        { branch: 'https://github.com/other/private/pull/123' },
+        'compose.facts.branch must be a branch name',
+      ],
+      [{ branch: '--repo=x' }, 'compose.facts.branch must be a branch name'],
+      [{ branch: 'a..b' }, 'compose.facts.branch must be a branch name'],
     ] as const)
       await expect(composeFromArgs(withFacts(facts), base)).rejects.toThrow(message)
     // Facts never query another repository with the server's GitHub token.

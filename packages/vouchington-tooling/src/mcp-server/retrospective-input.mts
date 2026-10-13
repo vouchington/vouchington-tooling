@@ -11,11 +11,11 @@ import {
   selectHarnessSession,
 } from '../agent-harness-identity/index.mts'
 import { SESSION_ID } from '../retrospective-transcript/resolve-transcript-file.mts'
-
-const HARNESSES = ['codex', 'claude', 'cursor', 'grok'] as const
 import { serverJournalLoader } from './journal-read.mts'
+import { checkFactsInput } from './retrospective-facts-input.mts'
 import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
+const HARNESSES = ['codex', 'claude', 'cursor', 'grok'] as const
 const COMPOSE_KEYS = [
   'narrative',
   'date',
@@ -155,22 +155,10 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
   return { sessionId: harnessId, cwd: base.worktree }
 }
 
-/** Facts are either `{ status, reason }` (unassessed) or a live collection selector, never both. */
 function factsInput(facts: Args, base: ComposeBase): Args {
-  const selectors = ['pr', 'branch', 'noPr'].filter((key) => key in facts)
-  if ('status' in facts) {
-    if (selectors.length)
-      throw new Error(`compose.facts: status is exclusive with ${selectors.join(', ')}`)
-    return facts
-  }
-  if ('reason' in facts) throw new Error('compose.facts.reason requires a status')
-  // The collector trusts these types; a string "false" must not read as noPr: true.
-  for (const key of ['pr', 'branch'])
-    if (key in facts && typeof facts[key] !== 'string')
-      throw new Error(`compose.facts.${key} must be a string`)
-  if ('noPr' in facts && typeof facts.noPr !== 'boolean')
-    throw new Error('compose.facts.noPr must be a boolean')
-  return { ...facts, execute: worktreeExecutor(base.worktree, base.env) }
+  return checkFactsInput(facts)
+    ? { ...facts, execute: worktreeExecutor(base.worktree, base.env) }
+    : facts
 }
 
 /** Builds the retrospective markdown with `composeRetrospective`, rejecting unknown input keys. */

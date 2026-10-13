@@ -169,6 +169,16 @@ describe('runPolicyExport', () => {
     await expect(
       withEnv(outcome({ exitCode: 1, stderr: 'token=ghp_secretvalue' })),
     ).rejects.toThrow('exited with code 1: token=[REDACTED]')
+    // A credential with JSON-special characters, printed JSON-escaped to stderr.
+    await expect(
+      runPolicyExport({
+        worktree: root,
+        export: 'validateRetrospective',
+        input: 1,
+        env: { GH_TOKEN: 'gh"p\\tok' },
+        spawn: async () => outcome({ exitCode: 1, stderr: '{"token":"gh\\"p\\\\tok"}' }),
+      }),
+    ).rejects.toThrow('exited with code 1: {"token":"[REDACTED]"}')
     const result = { errors: ['bad ghp_secretvalue "quoted"'], warnings: ['ok'] }
     await expect(
       withEnv(outcome({ stdout: JSON.stringify({ ok: true, result }) })),

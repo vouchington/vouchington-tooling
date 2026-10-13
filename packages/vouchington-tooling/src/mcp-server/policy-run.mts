@@ -68,7 +68,10 @@ export async function runPolicyExport(run: PolicyRun): Promise<PolicyResult> {
   } catch (error) {
     // A policy can echo a credential it was given (GH_TOKEN) in a stack, stderr, or result; the
     // caller of an MCP tool must never receive one.
-    throw new Error(scrubText((error as Error).message, secrets), { cause: error })
+    // Diagnostics may carry a credential JSON-escaped (a policy printing JSON to stderr) too.
+    const escaped = secrets.map((secret) => JSON.stringify(secret).slice(1, -1))
+    const forms = [...new Set([...escaped, ...secrets])].sort((a, b) => b.length - a.length)
+    throw new Error(scrubText((error as Error).message, forms), { cause: error })
   }
 }
 
