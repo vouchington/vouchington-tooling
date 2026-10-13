@@ -146,7 +146,12 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
   // When the harness that launched the server names its session, no other transcript is read.
   const own = selectHarnessSession(inspectHarnessEnvironment(base.env), HARNESSES)?.sessionId
   if (own !== undefined && own.toLowerCase() !== harnessId.toLowerCase())
-    throw new Error('compose.transcript may read only the harness session that launched the server')
+    // A server can outlive its session (Claude Code /clear, a Codex thread switch).
+    throw new Error(
+      'compose.transcript may read only the harness session that launched the server: if the ' +
+        'session changed since (/clear, a thread switch), reconnect the server (/mcp in Claude ' +
+        'Code, or restart Codex), or pass { status, reason }',
+    )
   return { sessionId: harnessId, cwd: base.worktree }
 }
 
