@@ -108,7 +108,7 @@ export function deliveryResponse(
 
 // `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose
 // text order is time order. An entry without a usable `createdAt` sorts first rather than throwing.
-export function createdAtOf(entry: unknown): string {
+function createdAtOf(entry: unknown): string {
   const createdAt = (entry as { createdAt?: unknown } | null)?.createdAt
   return typeof createdAt === 'string' ? createdAt : ''
 }

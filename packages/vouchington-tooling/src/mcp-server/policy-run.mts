@@ -14,9 +14,9 @@ export const POLICY_TIMEOUTS_MS = {
   pullRequestDefaults: 120_000,
 } as const
 
-export type PolicyExport = keyof typeof POLICY_TIMEOUTS_MS
+type PolicyExport = keyof typeof POLICY_TIMEOUTS_MS
 
-export const POLICY_MAX_OUTPUT_BYTES = 1_000_000
+const POLICY_MAX_OUTPUT_BYTES = 1_000_000
 const STDERR_EXCERPT_BYTES = 2_000
 
 const RUNNER = fileURLToPath(new URL('../../bin/policy-runner.mjs', import.meta.url))

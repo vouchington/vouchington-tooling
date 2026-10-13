@@ -6,8 +6,8 @@ a tool argument; there is no temp file, `--file`, or replay command. The server 
 existing `vouchington-tooling/agent-blackboard` exports and adds no provider protocol.
 
 Phase 1 of [vouchington-tooling#324](https://github.com/vouchington/vouchington-tooling/issues/324)
-covers the journal, outbox, session, and snapshot tools below. Retrospective and pull request tools
-are later phases.
+covers the journal, outbox, session, and snapshot tools below. Phase 2 adds the retrospective tools
+and the policy contract they run. Pull request tools are a later phase.
 
 ## Install
 
@@ -82,15 +82,17 @@ Every tool takes an explicit `sessionId` (`^[A-Za-z0-9._:-]+$`, at most 256 char
 server never infers, and an optional `worktree`. Unknown arguments are rejected. Failures come back
 as MCP tool errors (`isError: true`) with an actionable message rather than crashing the server.
 
-| Tool              | Arguments besides `sessionId` and `worktree`                                                                                                                                       | Returns                                                                                                                                          |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `journal_append`  | `parentSessionId`, `agent`, `version`, `mode` (`interactive` or `autonomous`), `markdown`, `sourceEventId`, `workOutcome`, `repositories`, `feedbackCoverage`, optional `category` | `sessionId`, `timestamp`, delivery `status` (`delivered` with a verified receipt, or `pending`), `pendingCount`, `worktreePendingCount`          |
-| `journal_entries` | none                                                                                                                                                                               | `sessionId` and `entries`, every entry oldest first                                                                                              |
-| `outbox_status`   | none                                                                                                                                                                               | `sessionId`, `status`, `pendingCount`, `worktreePendingCount`, `rejectedCount`, `worktreeRejectedCount`                                          |
-| `outbox_flush`    | none                                                                                                                                                                               | `sessionId`, `status`, `pendingCount`, `worktreePendingCount`, `rejectedCount`, `worktreeRejectedCount`, `deliveredCount`, `rejected` (when any) |
-| `session_ensure`  | `parentSessionId`, `agent`, `version`                                                                                                                                              | `sessionId`, `status` (`created` or `exists`), `archived`                                                                                        |
-| `snapshot_export` | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                    | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
-| `session_archive` | none                                                                                                                                                                               | `sessionId`, `archived: true`                                                                                                                    |
+| Tool                  | Arguments besides `sessionId` and `worktree`                                                                                                                                             | Returns                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `journal_append`      | `parentSessionId`, `agent`, `version`, `mode` (`interactive` or `autonomous`), `markdown`, `sourceEventId`, `workOutcome`, `repositories`, `feedbackCoverage`, optional `category`       | `sessionId`, `timestamp`, delivery `status` (`delivered` with a verified receipt, or `pending`), `pendingCount`, `worktreePendingCount`          |
+| `journal_entries`     | none                                                                                                                                                                                     | `sessionId` and `entries`, every entry oldest first                                                                                              |
+| `outbox_status`       | none                                                                                                                                                                                     | `sessionId`, `status`, `pendingCount`, `worktreePendingCount`, `rejectedCount`, `worktreeRejectedCount`                                          |
+| `outbox_flush`        | none                                                                                                                                                                                     | `sessionId`, `status`, `pendingCount`, `worktreePendingCount`, `rejectedCount`, `worktreeRejectedCount`, `deliveredCount`, `rejected` (when any) |
+| `session_ensure`      | `parentSessionId`, `agent`, `version`                                                                                                                                                    | `sessionId`, `status` (`created` or `exists`), `archived`                                                                                        |
+| `retrospective_check` | optional `sourceEventId`                                                                                                                                                                 | `sessionId`, `saved`, `entries` (`sourceEventId`, `timestamp`, `issues`, `prs` of each retrospective, oldest first)                              |
+| `retrospective_save`  | `parentSessionId`, `agent`, `version`, `mode`, `workOutcome`, `feedbackCoverage`, exactly one of `markdown` or `compose`, optional `repositories`, `sourceEventId`, `category`, `dryRun` | as `journal_append` plus `policy.warnings`; with `dryRun`, `markdown` and `policy.warnings`                                                      |
+| `snapshot_export`     | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                          | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
+| `session_archive`     | none                                                                                                                                                                                     | `sessionId`, `archived: true`                                                                                                                    |
 
 `journal_append` validates the whole feedback envelope with `validateFeedbackEnvelope` before
 anything is written, so a missing required field writes nothing. It returns the verified read-back
@@ -163,20 +165,70 @@ is unavailable.
 The server sends the same list in its MCP `instructions`, so a harness that surfaces server
 instructions shows it to the agent.
 
+## Retrospective tools and the policy contract
+
+`retrospective_check` reads the session through the same client as `journal_entries` and reports the
+entries whose envelope `type` is `retrospective`. A session that was never created (the blackboard
+answers 404) reports `saved: false`.
+
+`retrospective_save` builds a `retrospective` envelope and writes it exactly as `journal_append`
+does (same receipt, `pendingCount`, `worktreePendingCount`, outbox rules, and server-owned
+timestamp; a `timestamp` argument is rejected). The document comes from `markdown` or from
+`compose`, the input of `composeRetrospective` (`narrative`, `date`, `issues`, `prs`,
+`description`, `facts`, `transcript`, `tools`, `architecture`, optional `knownSensitiveValues`;
+unknown keys are rejected, and the journal audit reads through the server's own client). `dryRun`
+runs every check and returns the document without writing.
+
+The document must open with the front matter `composeRetrospective` writes: lines of
+`key: <JSON value>` between two `---` lines. Recognized keys are `date`, `issues`, `prs` (required),
+`session_id`, `description`, `work_outcome`, `feedback_coverage` (`status`, `sources`,
+`droppedCount`), and `repositories`; anything else, a duplicate, or a malformed line is rejected.
+`session_id`, `work_outcome`, `feedback_coverage`, and `repositories` must equal the arguments when
+present. `repositories` resolves from the argument, else the front matter, else the policy's
+`pullRequestDefaults()` result, else an error, and is stored sorted, deduplicated, and lowercase.
+The default `sourceEventId` is `retrospective-<sessionId>`. Re-saving identical content returns the
+stored receipt and timestamp. Changed content under the same `sourceEventId` is an
+`event-conflict`; a revision needs a new `sourceEventId`.
+
+### Policy module
+
+The consumer's root `package.json` may declare
+`"vouchington-tooling": { "policy": "dev/agent-policy.mts" }`. The path must be relative and, after
+resolving symlinks, stay inside the worktree. Without a declaration the policy checks are skipped.
+Policy tools also require a server launched inside a repository worktree. Each call runs one named
+export in a fresh child process (`bin/policy-runner.mjs`, started with the server's own Node), never
+inside the server, with the worktree as its working directory and an environment of only `HOME`,
+`PATH` (`/usr/bin:/bin` plus the Node directory), and `GH_TOKEN` / `GITHUB_TOKEN` when the server has
+them. Blackboard credentials and `NODE_OPTIONS` are not passed. The runner reads
+`{ policyVersion: 1, export, input }` on stdin and writes `{ ok: true, result }` (or
+`{ ok: false, error }`) on stdout; a missing export is skipped.
+
+| Export                  | Input                                                                                                                                                                       | Result                                      | Timeout |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------- |
+| `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }` | 30 s    |
+| `pullRequestDefaults`   | `{}`                                                                                                                                                                        | `{ repositories: string[] }`                | 120 s   |
+| `validatePullRequest`   | reserved for the pull request tools                                                                                                                                         | `{ errors: string[], warnings?: string[] }` | 120 s   |
+
+Any `errors` reject the save and write nothing. A non-zero exit, a timeout (reported as
+`policy <export> timed out after <N>s`), output over 1 MB, malformed JSON, or a result of the wrong
+shape is an error, never a pass.
+
 ## Worktree validation
 
 `worktree` is checked on every call. It must be an absolute path that, after resolving symlinks,
 equals the top level of a git worktree, that is, what `git rev-parse --show-toplevel` prints when
-run in it. Any git worktree on the machine is accepted, including one of a repository unrelated to
-the launch directory, so the tools can act on every checkout the user can reach. Worktrees created
-after launch are accepted and removed ones are refused. Rejected: a subdirectory of a worktree, a
+run in it. When the server was launched inside a repository, the real path must also equal one of
+the `worktree` entries of `git worktree list --porcelain` run in the launch root (the primary
+worktree or a linked one), so an unrelated repository is refused. A server launched outside any
+repository accepts the top level of any git worktree for the journal tools, but refuses the policy
+tools. Worktrees created after launch are accepted and removed ones are refused. Rejected: a subdirectory of a worktree, a
 relative or nonexistent path, and a directory that is not in a git worktree. Git runs without
 `GIT_*` variables, so `GIT_DIR` cannot redirect the check, and with `LC_ALL=C` and no `LANGUAGE`, so
 its "not a git repository" diagnostic is never translated.
 
 `worktree` only chooses where the outbox lives. It is not a trust boundary for loading code: the
-server never imports modules from it, and a tool that needs to must first get a repository allowlist
-from the machine registration.
+server never imports modules from it. The policy tools run the declared module only in a child
+process without blackboard credentials, as described above.
 
 When `worktree` is omitted, the launch directory's worktree top level is used if the launch
 directory is inside one, and it is validated like any explicit path. If the server was launched

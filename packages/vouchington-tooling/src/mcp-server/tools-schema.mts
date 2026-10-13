@@ -19,13 +19,13 @@ export type ToolDefinition = {
 
 export const ID_PATTERN = '^[A-Za-z0-9._:-]+$'
 
-export const SESSION_ID: JsonSchema = {
+const SESSION_ID: JsonSchema = {
   type: 'string',
   pattern: ID_PATTERN,
   maxLength: 256,
   description: 'Explicit session id (URL-safe). Never inferred by the server.',
 }
-export const WORKTREE: JsonSchema = {
+const WORKTREE: JsonSchema = {
   type: 'string',
   description:
     'Absolute path of the top level of a git worktree (`git rev-parse --show-toplevel`), not a ' +
@@ -50,13 +50,7 @@ export const OUTCOMES = [
   'policy-refusal',
   'unknown',
 ]
-export const COVERAGE_STATUSES = [
-  'complete',
-  'partial',
-  'unavailable',
-  'not-assessed',
-  'not-started',
-]
+const COVERAGE_STATUSES = ['complete', 'partial', 'unavailable', 'not-assessed', 'not-started']
 
 export const COVERAGE: JsonSchema = {
   type: 'object',
@@ -75,7 +69,7 @@ export const ADDITIVE = flags(false, false, false)
 export const IDEMPOTENT_ADDITIVE = flags(false, false, true)
 export const MUTATING = flags(false, true, true)
 
-export function flags(readOnly: boolean, destructive: boolean, idempotent: boolean) {
+function flags(readOnly: boolean, destructive: boolean, idempotent: boolean) {
   return {
     readOnlyHint: readOnly,
     destructiveHint: destructive,

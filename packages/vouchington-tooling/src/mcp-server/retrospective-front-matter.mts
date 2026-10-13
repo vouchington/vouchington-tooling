@@ -55,8 +55,9 @@ function parseLines(block: string): Map<string, unknown> {
   return values
 }
 
-function coverageOf(value: unknown): RetrospectiveFrontMatter['feedbackCoverage'] {
-  const coverage = value as { status?: unknown; sources?: unknown; droppedCount?: unknown } | null
+type RawCoverage = { status?: unknown; sources?: unknown; droppedCount?: unknown } | null
+
+function coverageOf(coverage: RawCoverage): RetrospectiveFrontMatter['feedbackCoverage'] {
   if (
     typeof coverage !== 'object' ||
     coverage === null ||
@@ -105,7 +106,7 @@ export function parseRetrospectiveFrontMatter(markdown: string): RetrospectiveFr
     sessionId: text('session_id'),
     description: text('description'),
     workOutcome: text('work_outcome'),
-    feedbackCoverage: coverage === undefined ? undefined : coverageOf(coverage),
+    feedbackCoverage: coverage === undefined ? undefined : coverageOf(coverage as RawCoverage),
     repositories: repositories as string[] | undefined,
   }
   return Object.fromEntries(
