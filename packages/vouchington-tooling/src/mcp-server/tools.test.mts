@@ -7,6 +7,8 @@ const EXPECTED = [
   'outbox_status',
   'outbox_flush',
   'session_ensure',
+  'retrospective_check',
+  'retrospective_save',
   'snapshot_export',
   'session_archive',
 ]
@@ -18,7 +20,7 @@ const byName = (name: string) => {
 }
 
 describe('tool contract', () => {
-  it('lists exactly the Phase 1 tools', () => {
+  it('lists exactly the journal and retrospective tools', () => {
     expect(TOOLS.map((tool) => tool.name)).toEqual(EXPECTED)
     expect(new Set(TOOLS.map((tool) => tool.name)).size).toBe(TOOLS.length)
   })
@@ -82,7 +84,7 @@ describe('tool contract', () => {
 
   it('marks reads read-only and archive as the only destructive tool', () => {
     const readOnly = TOOLS.filter((tool) => tool.annotations.readOnlyHint).map((tool) => tool.name)
-    expect(readOnly).toEqual(['journal_entries', 'outbox_status'])
+    expect(readOnly).toEqual(['journal_entries', 'outbox_status', 'retrospective_check'])
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
     expect(destructive.map((tool) => tool.name)).toEqual(['session_archive'])
     for (const tool of TOOLS) expect(tool.annotations.openWorldHint).toBe(false)

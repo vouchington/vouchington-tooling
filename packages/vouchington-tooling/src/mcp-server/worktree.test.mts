@@ -2,7 +2,13 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
-import { isolatedGitEnv, launchWorktreeRoot, resolveWorktree, runIsolatedGit } from './worktree.mts'
+import {
+  isolatedGitEnv,
+  launchWorktreeRoot,
+  parseWorktreeList,
+  resolveWorktree,
+  runIsolatedGit,
+} from './worktree.mts'
 
 let fixture: RepoFixture
 beforeAll(() => {
@@ -112,8 +118,22 @@ describe('resolveWorktree', () => {
     await expect(resolve(fixture.main, fixture.linked)).resolves.toBe(fixture.main)
   })
 
-  it('accepts the worktree of an unrelated repository, whatever the launch worktree', async () => {
-    await expect(resolve(fixture.outside)).resolves.toBe(fixture.outside)
+  it('rejects an unrelated repository when the server has a launch repository', async () => {
+    await expect(resolve(fixture.outside)).rejects.toThrow(
+      `worktree ${fixture.outside} is not a worktree of the repository this server was launched in`,
+    )
+    await expect(resolve(fixture.outside, fixture.linked)).rejects.toThrow('was launched in')
+  })
+
+  it('accepts a linked worktree made with git worktree add, launched from either side', async () => {
+    const extra = join(fixture.root, 'extra')
+    fixture.git(fixture.main, 'worktree', 'add', '--quiet', '-b', 'extra', extra)
+    await expect(resolve(extra)).resolves.toBe(extra)
+    await expect(resolve(fixture.main, extra)).resolves.toBe(fixture.main)
+    fixture.git(fixture.main, 'worktree', 'remove', '--force', extra)
+  })
+
+  it('keeps accepting any worktree when the server was launched outside a repository', async () => {
     await expect(resolve(fixture.outside, undefined)).resolves.toBe(fixture.outside)
   })
 
@@ -162,5 +182,22 @@ describe('resolveWorktree', () => {
   it('rejects relative and nonexistent paths', async () => {
     await expect(resolve('main')).rejects.toThrow('worktree must be an absolute path')
     await expect(resolve(join(fixture.root, 'missing'))).rejects.toThrow('not the top level')
+  })
+})
+
+describe('parseWorktreeList', () => {
+  it('reads NUL-separated records, so a newline in a path cannot forge one', () => {
+    const output = [
+      'worktree /repo/evil\nworktree /x',
+      'HEAD abc',
+      'branch refs/heads/main',
+      '',
+      'worktree /repo/two',
+      'HEAD def',
+      'detached',
+      '',
+      '',
+    ].join('\0')
+    expect(parseWorktreeList(output)).toEqual(['/repo/evil\nworktree /x', '/repo/two'])
   })
 })

@@ -14,7 +14,8 @@ local `AGENTS.md`, and journal guidance first.
 
 1. Read the agent's own journal oldest-first and check for an existing retrospective. Capture a
    material new observation before filing a follow-up issue. Preserve entry-level repository tags.
-2. Generate routine repository and transcript facts with the approved composer. Keep exact factual
+2. Generate routine repository and transcript facts with the approved composer: pass `compose` to
+   the `retrospective_save` MCP tool and preview the composition with `dryRun`, never a CLI. Keep exact factual
    section markers generated, preserve unavailable counts, and never replace missing evidence with
    invented zero statistics. Do not paste raw collectors' output or manually reconstruct facts.
 3. Record work outcome, feedback coverage, and delivery independently. Success, failure,
@@ -30,7 +31,9 @@ local `AGENTS.md`, and journal guidance first.
 5. Keep the top five findings or improvements in the human prose. The bounded durable evidence can
    retain additional relevant findings; a prose limit is not permission to silently discard them.
    Separate recurring root causes from one-off noise and preserve existing issue references.
-6. Save through the shared validated writer. Interactive outages use the approved bounded private
+6. Check for an existing retrospective with the `retrospective_check` MCP tool and save with
+   `retrospective_save`, never a CLI. A revision of changed content needs a new `sourceEventId`.
+   Interactive outages use the approved bounded private
    outbox with visible pending count; failed persistence blocks capture. Autonomous reporting stays
    online and never uses that outbox to authorize an attempt or completion. Report the acknowledged
    record/receipt, or the actual pending/blocked state and next replay action.

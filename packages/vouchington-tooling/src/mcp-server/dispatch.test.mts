@@ -94,16 +94,16 @@ describe('worktree gate', () => {
     expect(existsSync(outboxPath(fixture().linked))).toBe(true)
   })
 
-  it('accepts the worktree of a second, unrelated repository', async () => {
+  it('rejects the worktree of an unrelated repository and writes nothing there', async () => {
     const h = harness(fixture())
     const result = await h.call('journal_append', {
       ...JOURNAL_ARGS,
       mode: 'interactive',
       worktree: fixture().outside,
     })
-    expect(jsonOf(result).status).toBe('delivered')
-    expect(existsSync(outboxPath(fixture().outside))).toBe(true)
-    expect(existsSync(outboxPath(fixture().main))).toBe(false)
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('not a worktree of the repository this server was launched in')
+    expect(existsSync(outboxPath(fixture().outside))).toBe(false)
   })
 
   it('works from a non-git launch directory with an explicit worktree', async () => {
@@ -181,7 +181,7 @@ describe('worktree gate', () => {
       resolveFrom: join(installation, 'server.mjs'),
     }
     const args = { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' }
-    for (const worktree of [undefined, fixture().main, fixture().linked, fixture().outside]) {
+    for (const worktree of [undefined, fixture().main, fixture().linked]) {
       const result = await callTool(
         'session_ensure',
         worktree === undefined ? args : { ...args, worktree },

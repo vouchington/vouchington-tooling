@@ -126,7 +126,8 @@ agent-blackboard snapshot partition --snapshot PATH --checksum SHA256 --counts '
 agent-blackboard snapshot cleanup [--snapshot PATH] [--partition-directory PATH --receipt JSON]
 mcp
   (no args)              Serve journal_append, journal_entries, outbox_status, outbox_flush,
-                         session_ensure, snapshot_export, and session_archive over stdio.
+                         session_ensure, retrospective_check, retrospective_save,
+                         snapshot_export, and session_archive over stdio.
                          Needs the optional @modelcontextprotocol/sdk peer (and zod).
                          Launch it from inside the repository's git worktree.
 `

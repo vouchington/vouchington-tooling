@@ -67,11 +67,34 @@ export async function launchWorktreeRoot(
 }
 
 /**
+ * The worktree paths in `git worktree list --porcelain -z` output: NUL-terminated fields, an empty
+ * field ending each record, so a path containing a newline cannot forge a record.
+ */
+export function parseWorktreeList(output: string): string[] {
+  return output
+    .split('\0')
+    .filter((field) => field.startsWith('worktree '))
+    .map((field) => field.slice('worktree '.length))
+}
+
+/**
+ * The real paths of every worktree of the repository containing `root` (the primary worktree and
+ * each linked one).
+ */
+async function repositoryWorktrees(root: string, runGit: RunTextCommand): Promise<Set<string>> {
+  const output = await runGit(['-C', root, 'worktree', 'list', '--porcelain', '-z'])
+  const paths = parseWorktreeList(output).map(canonical)
+  return new Set((await Promise.all(paths)).filter((path) => path !== undefined))
+}
+
+/**
  * Resolves the worktree a tool call may act on. It must be an absolute path that, after
- * resolving symlinks, is exactly the top level of a git worktree (of any repository on the
- * machine). A subdirectory, a relative or nonexistent path, and a non-git directory are rejected.
- * Git is asked on every call, so worktrees created after the server started are accepted and
- * removed ones are not. Without `requested`, the launch worktree is used when there is one.
+ * resolving symlinks, is exactly the top level of a git worktree. A subdirectory, a relative or
+ * nonexistent path, and a non-git directory are rejected. When the server was launched inside a
+ * repository, the path must also be one of that repository's worktrees (primary or linked), so an
+ * unrelated `git init` directory is refused. A server launched outside any repository accepts the
+ * top level of any worktree. Git is asked on every call, so worktrees created after the server
+ * started are accepted and removed ones are not. Without `requested`, the launch worktree is used.
  */
 export async function resolveWorktree(input: {
   launchRoot: string | undefined
@@ -87,7 +110,14 @@ export async function resolveWorktree(input: {
   const path = requested ?? (launchRoot as string)
   if (!isAbsolute(path)) throw new Error('worktree must be an absolute path to a git worktree')
   const target = await canonical(path)
-  if (target !== undefined && (await launchWorktreeRoot(target, runGit)) === target) return target
+  if (target !== undefined && (await launchWorktreeRoot(target, runGit)) === target) {
+    if (launchRoot === undefined || (await repositoryWorktrees(launchRoot, runGit)).has(target))
+      return target
+    throw new Error(
+      `worktree ${path} is not a worktree of the repository this server was launched in ` +
+        `(${launchRoot}); \`git worktree list\` there names the worktrees it may act on`,
+    )
+  }
   throw new Error(
     `worktree ${path} is not the top level of a git worktree: it must exist and be the ` +
       'directory `git rev-parse --show-toplevel` reports, not a subdirectory of it',
