@@ -6,7 +6,13 @@ import {
 } from '../agent-blackboard/index.mts'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import { rejectUnknown, type Args } from './args.mts'
+import {
+  inspectHarnessEnvironment,
+  selectHarnessSession,
+} from '../agent-harness-identity/index.mts'
 import { SESSION_ID } from '../retrospective-transcript/resolve-transcript-file.mts'
+
+const HARNESSES = ['codex', 'claude', 'cursor', 'grok'] as const
 import { serverJournalLoader } from './journal-read.mts'
 import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
@@ -106,10 +112,11 @@ export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEn
   const credentials = [env.AGENT_BLACKBOARD_TOKEN, env.GH_TOKEN, env.GITHUB_TOKEN].filter(
     (value): value is string => Boolean(value),
   )
+  const values = [...((given as string[] | undefined) ?? []), ...credentials]
+  // The composer JSON-escapes structured fields, so each value is also redacted in that form.
+  const escaped = values.map((value) => JSON.stringify(value).slice(1, -1))
   // Longest first, so a shorter value that is a prefix of a credential cannot break its match.
-  return [...new Set([...((given as string[] | undefined) ?? []), ...credentials])].sort(
-    (a, b) => b.length - a.length,
-  )
+  return [...new Set([...values, ...escaped])].sort((a, b) => b.length - a.length)
 }
 
 /**
@@ -136,6 +143,10 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
       'compose.transcript needs a UUID session id: pass harnessSessionId (the harness session ' +
         'UUID) or { status, reason }',
     )
+  // When the harness that launched the server names its session, no other transcript is read.
+  const own = selectHarnessSession(inspectHarnessEnvironment(base.env), HARNESSES)?.sessionId
+  if (own !== undefined && own.toLowerCase() !== harnessId.toLowerCase())
+    throw new Error('compose.transcript may read only the harness session that launched the server')
   return { sessionId: harnessId, cwd: base.worktree }
 }
 

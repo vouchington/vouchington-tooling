@@ -180,7 +180,7 @@ unknown keys are rejected, and the journal audit reads through the server's own 
 `compose.transcript` accepts only `{ sessionId?, harnessSessionId? }` (`sessionId` must equal the
 call's `sessionId`) or `{ status, reason }` for an unassessed transcript. The transcript is found by
 `harnessSessionId`, the harness's own session UUID, else by the call's `sessionId` when that is a
-UUID; otherwise the call fails rather than reporting the transcript unavailable; `jsonlPath`, `projectsDir`, `codexSessionsDir`,
+UUID; otherwise the call fails rather than reporting the transcript unavailable. When the server's environment names its harness session (`CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, and so on), only that session's transcript is read; `jsonlPath`, `projectsDir`, `codexSessionsDir`,
 `grokSessionsDir`, and `cwd` are rejected, and the server reads the transcript from the worktree
 and its default session roots. The server's blackboard token, and any `knownSensitiveValues`, are
 redacted from the document before the policy sees it or the envelope is stored. Facts commands

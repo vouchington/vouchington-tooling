@@ -102,6 +102,11 @@ describe('sensitiveValues', () => {
         { AGENT_BLACKBOARD_TOKEN: 'abb_sk_secret', GH_TOKEN: 'ghub', GITHUB_TOKEN: 'ghub-2' },
       ),
     ).toEqual(['abb_sk_secret', 'ghub-2', 'abb_', 'ghub'])
+    // JSON-escaped forms are redacted too, since the composer escapes structured fields.
+    expect(sensitiveValues({ knownSensitiveValues: ['a"b\\c'] }, {})).toEqual([
+      'a\\"b\\\\c',
+      'a"b\\c',
+    ])
     expect(() => sensitiveValues({ knownSensitiveValues: ['abc'] }, {})).toThrow(
       'entries must be at least 4 characters',
     )
@@ -147,6 +152,10 @@ describe('composeFromArgs transcript', () => {
     await expect(composeFromArgs(compose({ reason: 'not inspected' }), base)).rejects.toThrow(
       'compose.transcript.reason requires a status',
     )
+    const own = { ...base, env: { CLAUDE_CODE_SESSION_ID: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } }
+    await expect(
+      composeFromArgs(compose({ harnessSessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }), own),
+    ).rejects.toThrow('may read only the harness session that launched the server')
   })
 
   it('treats facts as an exclusive union of unassessed status and live selectors', async () => {
