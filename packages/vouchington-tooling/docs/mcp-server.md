@@ -225,11 +225,11 @@ whole process group is killed, so nothing it started outlives the call. The runn
 `{ policyVersion: 1, export, input }` on stdin and writes `{ ok: true, result }` (or
 `{ ok: false, error }`) on stdout; a missing export is skipped.
 
-| Export                  | Input                                                                                                                                                                       | Result                                      | Timeout |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------- |
-| `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }` | 30 s    |
-| `pullRequestDefaults`   | `{}`                                                                                                                                                                        | `{ repositories: string[] }`                | 120 s   |
-| `validatePullRequest`   | reserved for the pull request tools                                                                                                                                         | `{ errors: string[], warnings?: string[] }` | 120 s   |
+| Export                  | Input                                                                                                                                                                       | Result                                                         | Timeout |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------- |
+| `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }`                    | 30 s    |
+| `pullRequestDefaults`   | `{}` from `retrospective_save`; `{ title, base, relatedIssues }` from `pr_create`                                                                                           | `{ repositories?, labels?, milestone?, project? }` (an object) | 120 s   |
+| `validatePullRequest`   | `title`, `body`, `base`, `head`, `mode`, and `pr` for an update                                                                                                             | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
 
 Any `errors` reject the save and write nothing. A non-zero exit, a timeout (reported as
 `policy <export> timed out after <N>s`), output over 1 MB, malformed JSON, or a result of the wrong
@@ -248,19 +248,19 @@ input: `title` (single line, at most 256 characters), `summary`, `impact`, `rela
 ### Rendering
 
 ```
-### Summary
+## Summary
 
 <summary>
 
-### Impact
+## Impact
 
 <impact>
 
-### Related issues
+## Related issues
 
 - Closes #N — <reason>      (or "Refs #N"; "- None" when empty)
 
-### Details
+## Details
 
 <details joined by blank lines>
 
@@ -291,10 +291,14 @@ base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With 
   Journal (a `<details><summary>Shepherd Journal</summary>` block, or a legacy `## Shepherd Journal`
   section to the next H2 or the end; examples in fenced code blocks are ignored), validates with
   `pr` set (errors block), then runs `gh pr edit <pr> --title --body-file`. More than one journal
-  in the live body, or one in the rendered fields, is rejected rather than guessed. Nothing else is
-  carried over from the live body. Returns `{ number, url, warnings }`.
+  in the live body, one in the rendered fields, an unclosed journal, or rendered fields that leave
+  a code fence open are rejected rather than guessed. Just before the edit the live body is read
+  again, and the update aborts if its journal changed meanwhile. Nothing else is carried over from
+  the live body. Returns `{ number, url, warnings }`.
 
-Every field is redacted of the server's blackboard token before rendering, the policy, or `gh`.
+Every field is redacted of `AGENT_BLACKBOARD_TOKEN`, `GH_TOKEN`, and `GITHUB_TOKEN` before
+rendering, the policy, or `gh`; a worktree branch name containing one is rejected. `title` and
+`workspaceSetup` must be single lines, and the title is limited to 256 characters after redaction.
 
 ### gh access
 
@@ -302,7 +306,8 @@ Every field is redacted of the server's blackboard token before rendering, the p
 since they would resolve inside the target worktree), else at `/opt/homebrew/bin/gh`, `/usr/local/bin/gh` or
 `/usr/bin/gh`; otherwise the tool fails with "gh CLI not found on PATH; install gh or add it to the
 server's PATH". It runs with the worktree as its working directory and the server environment
-without `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`.
+without `AGENT_BLACKBOARD_URL`, `AGENT_BLACKBOARD_TOKEN`, and `GH_REPO` (which would point it at
+another repository), and each call is killed after 120 seconds.
 
 ## Worktree validation
 

@@ -13,6 +13,8 @@ export type GhRunner = (
 
 const FALLBACKS = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh']
 const MAX_BUFFER_BYTES = 16_000_000
+/** The longest one gh call may run before it is killed. */
+const GH_TIMEOUT_MS = 120_000
 
 async function isExecutableFile(path: string): Promise<boolean> {
   try {
@@ -40,9 +42,17 @@ export async function locateGh(
   throw new Error("gh CLI not found on PATH; install gh or add it to the server's PATH")
 }
 
-/** The environment gh runs in: the server's, without the blackboard credentials. */
+/**
+ * The environment gh runs in: the server's, without the blackboard credentials, and without
+ * GH_REPO, which would point gh at a repository other than the validated worktree's.
+ */
 export function ghEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const { AGENT_BLACKBOARD_URL: _url, AGENT_BLACKBOARD_TOKEN: _token, ...rest } = env
+  const {
+    AGENT_BLACKBOARD_URL: _url,
+    AGENT_BLACKBOARD_TOKEN: _token,
+    GH_REPO: _repo,
+    ...rest
+  } = env
   return rest
 }
 
@@ -58,6 +68,8 @@ export function createGhRunner(
       cwd: options.cwd,
       env: options.env,
       maxBuffer: MAX_BUFFER_BYTES,
+      timeout: GH_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     })
     return stdout
   }

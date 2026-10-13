@@ -19,9 +19,27 @@ describe('worktreeLabel', () => {
 })
 
 describe('Shepherd Journal', () => {
-  it('finds a details block with nested details, and an unterminated one is ignored', () => {
+  it('finds a details block with nested details, and fails closed on an unterminated one', () => {
     expect(findShepherdJournal(`intro\n\n${DETAILS}\ntail`)).toBe(DETAILS)
-    expect(findShepherdJournal('<details>\n<summary>Shepherd Journal</summary>\nx')).toBeUndefined()
+    expect(() => findShepherdJournal('<details>\n<summary>Shepherd Journal</summary>\nx')).toThrow(
+      'never closed',
+    )
+  })
+
+  it('tracks nesting outside fences, needs a real H2 and a bare closing fence', () => {
+    const fenced = '<details>\n<summary>Shepherd Journal</summary>\n```\n<details>\n```\n</details>'
+    expect(findShepherdJournal(fenced)).toBe(fenced)
+    expect(findShepherdJournal('## Shepherd Journal\nx\n##not-a-heading\ny')).toBe(
+      '## Shepherd Journal\nx\n##not-a-heading\ny',
+    )
+    // "```js" inside a fence does not close it, so the journal-shaped line stays hidden.
+    expect(findShepherdJournal('```\n```js\n## Shepherd Journal\n```')).toBeUndefined()
+  })
+
+  it('refuses to append the journal after a code fence the fields left open', () => {
+    expect(() => preserveShepherdJournal('new\n```\ncode', '## Shepherd Journal\nz')).toThrow(
+      'leave a code fence open',
+    )
   })
 
   it('finds a legacy section to the next H2 or the end', () => {
@@ -58,9 +76,14 @@ describe('Shepherd Journal', () => {
 })
 
 describe('gh access', () => {
-  it('drops blackboard credentials from the environment', () => {
+  it('drops blackboard credentials and GH_REPO from the environment', () => {
     expect(
-      ghEnvironment({ A: '1', AGENT_BLACKBOARD_URL: 'u', AGENT_BLACKBOARD_TOKEN: 't' }),
+      ghEnvironment({
+        A: '1',
+        AGENT_BLACKBOARD_URL: 'u',
+        AGENT_BLACKBOARD_TOKEN: 't',
+        GH_REPO: 'o/r',
+      }),
     ).toEqual({ A: '1' })
   })
 

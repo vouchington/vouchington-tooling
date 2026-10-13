@@ -7,6 +7,11 @@ import {
   tool,
 } from './tools-schema.mts'
 
+/** These tools read or write GitHub, outside the server's own state. */
+const openWorld = (annotations: ToolDefinition['annotations']) => ({
+  ...annotations,
+  openWorldHint: true,
+})
 const text = (description: string): JsonSchema => ({ type: 'string', minLength: 1, description })
 const PR_NUMBER: JsonSchema = { type: 'integer', minimum: 1, description: 'Pull request number.' }
 
@@ -64,7 +69,7 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
       RENDERING +
       'Pass pr to validate an update of that pull request: the live body is read and its Shepherd ' +
       'Journal preserved. Returns { body, errors, warnings }.',
-    READ_ONLY,
+    openWorld(READ_ONLY),
     { ...FIELDS, pr: PR_NUMBER },
     REQUIRED,
   ),
@@ -76,7 +81,7 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
       'milestone and a project. The branch must already be pushed and current. It sees no stack ' +
       'membership, so a policy may reject a non-default base; create stacked layers with the ' +
       "repository's stack tooling. Returns { number, url, warnings }.",
-    ADDITIVE,
+    openWorld(ADDITIVE),
     FIELDS,
     REQUIRED,
   ),
@@ -87,7 +92,7 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
       "The pull request's head branch must be the worktree branch. The live Shepherd Journal is " +
       'preserved and nothing else is carried over from the live body. Validation errors block ' +
       'the update. Returns { number, url, warnings }.',
-    MUTATING,
+    openWorld(MUTATING),
     { ...FIELDS, pr: PR_NUMBER },
     [...REQUIRED, 'pr'],
   ),

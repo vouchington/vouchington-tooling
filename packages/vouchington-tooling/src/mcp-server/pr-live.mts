@@ -1,4 +1,5 @@
 import type { RunTextCommand } from '../gh-cli/exec.mts'
+import { findShepherdJournal } from './pr-journal.mts'
 
 export type LivePullRequest = {
   body: string
@@ -33,9 +34,36 @@ export function liveBase(pr: number, live: LivePullRequest, given: string | unde
   return live.baseRefName
 }
 
-/** Replaces the server's blackboard token in every string of a JSON-shaped value. */
-export function redactToken<T>(value: T, token: string | undefined): T {
-  if (value === undefined || token === undefined || token.length < 4) return value
-  const escaped = JSON.stringify(token).slice(1, -1)
-  return JSON.parse(JSON.stringify(value).split(escaped).join('[REDACTED]')) as T
+/**
+ * Re-reads the live pull request just before the edit and aborts if its Shepherd Journal changed
+ * since the body was prepared, so an entry appended in between is never overwritten.
+ */
+export async function assertJournalUnchanged(
+  gh: RunTextCommand,
+  pr: number,
+  preparedFrom: string,
+): Promise<void> {
+  const now = await livePullRequest(gh, pr)
+  if (findShepherdJournal(now.body) !== findShepherdJournal(preparedFrom))
+    throw new Error(
+      `the Shepherd Journal of pull request ${pr} changed meanwhile; run pr_update again`,
+    )
+}
+
+/** The server's credential values that must never reach the policy or GitHub, longest first. */
+export function credentials(env: NodeJS.ProcessEnv): string[] {
+  const values = [env.AGENT_BLACKBOARD_TOKEN, env.GH_TOKEN, env.GITHUB_TOKEN].filter(
+    (value): value is string => value !== undefined && value.length >= 4,
+  )
+  return [...new Set(values)].sort((a, b) => b.length - a.length)
+}
+
+/** Replaces every server credential in every string of a JSON-shaped value. */
+export function redactCredentials<T>(value: T, secrets: string[]): T {
+  if (value === undefined || secrets.length === 0) return value
+  const json = secrets.reduce(
+    (text, secret) => text.split(JSON.stringify(secret).slice(1, -1)).join('[REDACTED]'),
+    JSON.stringify(value),
+  )
+  return JSON.parse(json) as T
 }

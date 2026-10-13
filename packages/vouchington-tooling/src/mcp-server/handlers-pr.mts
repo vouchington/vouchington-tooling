@@ -1,6 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { hostname, tmpdir, userInfo } from 'node:os'
-import { join } from 'node:path'
+import { hostname, userInfo } from 'node:os'
 import { validateGitHubBodyLength } from '../gh-cli/body-length.mts'
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import { createPullRequest } from '../gh-cli/pr-create.mts'
@@ -8,11 +6,23 @@ import type { Args } from './args.mts'
 import { assertPolicyAllowed, type ToolContext, type ToolHandler } from './context.mts'
 import { runValidator, type PolicyRun } from './policy-run.mts'
 import { renderPullRequestBody, worktreeLabel } from './pr-body.mts'
+import { pullRequestNumber, withBodyFile } from './pr-body-file.mts'
 import { pullRequestDefaults } from './pr-defaults.mts'
 import { createGhRunner, ghEnvironment } from './pr-gh.mts'
-import { positiveInteger, readPullRequestInput, type PullRequestInput } from './pr-input.mts'
+import {
+  checkTitleLength,
+  positiveInteger,
+  readPullRequestInput,
+  type PullRequestInput,
+} from './pr-input.mts'
 import { preserveShepherdJournal } from './pr-journal.mts'
-import { liveBase, livePullRequest, redactToken } from './pr-live.mts'
+import {
+  assertJournalUnchanged,
+  credentials,
+  liveBase,
+  livePullRequest,
+  redactCredentials,
+} from './pr-live.mts'
 import { parseWorktreeList } from './worktree.mts'
 
 type Prepared = {
@@ -21,6 +31,8 @@ type Prepared = {
   body: string
   errors: string[]
   warnings: string[]
+  /** The live body the update was prepared from. */
+  liveBody?: string
 }
 
 function gitIn(context: ToolContext): RunTextCommand {
@@ -64,12 +76,16 @@ async function prepare(
   pr: number | undefined,
 ): Promise<Prepared> {
   assertPolicyAllowed(context)
-  // The server's token must reach neither the policy nor gh, whatever the caller wrote: every
-  // field is redacted before anything is rendered or forwarded.
-  const token = context.env.AGENT_BLACKBOARD_TOKEN
-  const given = redactToken(readPullRequestInput(args), token)
+  // No server credential may reach the policy or gh, whatever the caller wrote: every field is
+  // redacted before anything is rendered or forwarded.
+  const secrets = credentials(context.env)
+  const given = redactCredentials(readPullRequestInput(args), secrets)
+  checkTitleLength(given.title)
   const git = gitIn(context)
   const head = await currentBranch(git)
+  // The branch name comes from the repository and is passed to gh as is, so it cannot be redacted.
+  if (secrets.some((secret) => head.includes(secret)))
+    throw new Error('the worktree branch name contains a server credential: rename the branch')
   const live = pr === undefined ? undefined : await livePullRequest(ghIn(context), pr)
   if (live !== undefined && live.headRefName !== head)
     throw new Error(
@@ -78,7 +94,7 @@ async function prepare(
   const base =
     live === undefined
       ? given.base
-      : liveBase(pr as number, live, redactToken(args.base as string | undefined, token))
+      : liveBase(pr as number, live, redactCredentials(args.base as string | undefined, secrets))
   const input = { ...given, base }
   if (head === base) throw new Error(`head branch ${head} must differ from base ${base}`)
   const device = (context.device ?? (() => ({ user: userInfo().username, host: hostname() })))()
@@ -88,7 +104,7 @@ async function prepare(
     worktree: await label(context, git),
   })
   if (live !== undefined) body = preserveShepherdJournal(body, live.body)
-  body = redactToken(body, token)
+  body = redactCredentials(body, secrets)
   const length = validateGitHubBodyLength(body)
   if (!length.ok)
     throw new Error(
@@ -107,30 +123,20 @@ async function prepare(
     },
   })
   const errors = 'errors' in report ? report.errors : []
-  return { input, head, body, errors, warnings: 'warnings' in report ? report.warnings : [] }
+  const warnings = 'warnings' in report ? report.warnings : []
+  return {
+    input,
+    head,
+    body,
+    errors,
+    warnings,
+    ...(live === undefined ? {} : { liveBody: live.body }),
+  }
 }
 
 function rejectErrors(prepared: Prepared): void {
   if (prepared.errors.length)
     throw new Error(`policy rejected the pull request:\n- ${prepared.errors.join('\n- ')}`)
-}
-
-/** Writes the body to a private temp file for the duration of `use`, then removes it. */
-async function withBodyFile<T>(body: string, use: (file: string) => Promise<T>): Promise<T> {
-  const directory = await mkdtemp(join(tmpdir(), 'vouchington-pr-'))
-  try {
-    const file = join(directory, 'body.md')
-    await writeFile(file, body, { mode: 0o600 })
-    return await use(file)
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
-}
-
-function pullRequestNumber(url: string): number {
-  const match = /\/pull\/(\d+)\s*$/.exec(url)
-  if (!match) throw new Error(`could not read the pull request number from: ${url}`)
-  return Number(match[1])
 }
 
 export const handlePrValidate: ToolHandler = async (args, context) => {
@@ -165,6 +171,7 @@ export const handlePrUpdate: ToolHandler = async (args, context) => {
   const pr = readPr(args, true) as number
   const prepared = await prepare(args, context, pr)
   rejectErrors(prepared)
+  await assertJournalUnchanged(ghIn(context), pr, prepared.liveBody as string)
   const url = await withBodyFile(prepared.body, async (bodyFile) =>
     (
       await ghIn(context)([

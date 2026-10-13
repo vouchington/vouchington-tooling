@@ -56,12 +56,22 @@ function readDetails(args: Args): string[] {
   return details
 }
 
-/** Reads and validates the structured pull request fields shared by the three pr_* tools. */
-export function readPullRequestInput(args: Args): PullRequestInput {
-  const title = requiredString(args, 'title')
-  if (/[\r\n]/.test(title)) throw new Error('title must be a single line')
+/** Rechecked after redaction, which can lengthen a title. */
+export function checkTitleLength(title: string): void {
   if (Array.from(title).length > MAX_TITLE_CHARACTERS)
     throw new Error(`title must be at most ${MAX_TITLE_CHARACTERS} characters`)
+}
+
+function singleLine(args: Args, key: string): string {
+  const value = requiredString(args, key)
+  if (/[\r\n]/.test(value)) throw new Error(`${key} must be a single line`)
+  return value
+}
+
+/** Reads and validates the structured pull request fields shared by the three pr_* tools. */
+export function readPullRequestInput(args: Args): PullRequestInput {
+  const title = singleLine(args, 'title')
+  checkTitleLength(title)
   const model = optionalString(args, 'model')
   return {
     title,
@@ -73,6 +83,7 @@ export function readPullRequestInput(args: Args): PullRequestInput {
     agent: requiredString(args, 'agent'),
     ...(model === undefined ? {} : { model }),
     mode: requiredChoice(args, 'mode', PR_MODES),
-    workspaceSetup: requiredString(args, 'workspaceSetup'),
+    // It renders on its own provenance line; a newline would forge the lines after it.
+    workspaceSetup: singleLine(args, 'workspaceSetup'),
   }
 }

@@ -26,6 +26,8 @@ export async function pullRequestDefaults(
   })
   if (outcome.status !== 'ok') return { labels: [] }
   const result = (outcome.result ?? {}) as Record<string, unknown>
+  if (typeof result !== 'object' || Array.isArray(result))
+    throw new Error('policy pullRequestDefaults must return an object')
   const labels = result.labels ?? []
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== 'string' || !label.trim()))
     throw new Error('policy pullRequestDefaults labels must be an array of non-empty strings')

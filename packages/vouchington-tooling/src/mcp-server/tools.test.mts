@@ -95,6 +95,8 @@ describe('tool contract', () => {
     ])
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
     expect(destructive.map((tool) => tool.name)).toEqual(['pr_update', 'session_archive'])
-    for (const tool of TOOLS) expect(tool.annotations.openWorldHint).toBe(false)
+    // Only the pull request tools reach outside the server, to GitHub.
+    const openWorld = TOOLS.filter((tool) => tool.annotations.openWorldHint)
+    expect(openWorld.map((tool) => tool.name)).toEqual(['pr_validate', 'pr_create', 'pr_update'])
   })
 })
