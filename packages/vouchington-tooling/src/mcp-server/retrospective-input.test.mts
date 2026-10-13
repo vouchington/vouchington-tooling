@@ -94,11 +94,14 @@ describe('sensitiveValues', () => {
     expect(sensitiveValues(undefined, {})).toEqual([])
     expect(
       sensitiveValues({ knownSensitiveValues: ['a'] }, { AGENT_BLACKBOARD_TOKEN: 'tok' }),
-    ).toEqual(['a', 'tok'])
-    expect(sensitiveValues(undefined, { GH_TOKEN: 'gh', GITHUB_TOKEN: 'ghub' })).toEqual([
-      'gh',
-      'ghub',
-    ])
+    ).toEqual(['tok', 'a'])
+    // Deduplicated and longest first, so a caller's prefix of a credential cannot split it.
+    expect(
+      sensitiveValues(
+        { knownSensitiveValues: ['abb_', 'gh'] },
+        { AGENT_BLACKBOARD_TOKEN: 'abb_sk_secret', GH_TOKEN: 'gh', GITHUB_TOKEN: 'ghub' },
+      ),
+    ).toEqual(['abb_sk_secret', 'abb_', 'ghub', 'gh'])
     expect(() => sensitiveValues({ knownSensitiveValues: 'a' }, {})).toThrow('array of strings')
     expect(() => sensitiveValues({ knownSensitiveValues: [1] }, {})).toThrow('array of strings')
   })
@@ -141,5 +144,15 @@ describe('composeFromArgs transcript', () => {
     await expect(composeFromArgs(compose({ reason: 'not inspected' }), base)).rejects.toThrow(
       'compose.transcript.reason requires a status',
     )
+  })
+
+  it('treats facts as an exclusive union of unassessed status and live selectors', async () => {
+    const withFacts = (facts: unknown) => ({ ...compose(unassessed), facts })
+    await expect(composeFromArgs(withFacts({ reason: 'x' }), base)).rejects.toThrow(
+      'compose.facts.reason requires a status',
+    )
+    await expect(
+      composeFromArgs(withFacts({ ...unassessed, noPr: true, repo: 'o/r' }), base),
+    ).rejects.toThrow('compose.facts: status is exclusive with noPr, repo')
   })
 })

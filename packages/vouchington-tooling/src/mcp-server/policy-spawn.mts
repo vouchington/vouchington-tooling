@@ -103,11 +103,14 @@ export const spawnPolicy: PolicySpawner = (request) =>
       clearTimeout(timer)
       reject(error)
     })
-    child.on('close', (exitCode) => {
+    // Reap anything the policy left running in its group as soon as the runner exits: a descendant
+    // would otherwise keep the GitHub token it inherited, and one holding an inherited pipe would
+    // delay `close` until the timeout.
+    child.on('exit', () => {
       clearTimeout(timer)
-      // Reap anything the policy left running in its group, even after a normal exit: a detached
-      // descendant would otherwise keep the GitHub token it inherited.
       killGroup()
+    })
+    child.on('close', (exitCode) => {
       const text = (name: 'stdout' | 'stderr') => Buffer.concat(chunks[name]).toString('utf8')
       resolve({ exitCode, stdout: text('stdout'), stderr: text('stderr'), timedOut, overflowed })
     })

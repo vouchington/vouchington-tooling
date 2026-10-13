@@ -101,7 +101,10 @@ export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEn
   const credentials = [env.AGENT_BLACKBOARD_TOKEN, env.GH_TOKEN, env.GITHUB_TOKEN].filter(
     (value): value is string => Boolean(value),
   )
-  return [...((given as string[] | undefined) ?? []), ...credentials]
+  // Longest first, so a shorter value that is a prefix of a credential cannot break its match.
+  return [...new Set([...((given as string[] | undefined) ?? []), ...credentials])].sort(
+    (a, b) => b.length - a.length,
+  )
 }
 
 /**
@@ -121,6 +124,18 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
   return { sessionId: base.sessionId, cwd: base.worktree }
 }
 
+/** Facts are either `{ status, reason }` (unassessed) or a live collection selector, never both. */
+function factsInput(facts: Args, base: ComposeBase): Args {
+  const selectors = ['pr', 'branch', 'noPr', 'repo'].filter((key) => key in facts)
+  if ('status' in facts) {
+    if (selectors.length)
+      throw new Error(`compose.facts: status is exclusive with ${selectors.join(', ')}`)
+    return facts
+  }
+  if ('reason' in facts) throw new Error('compose.facts.reason requires a status')
+  return { ...facts, execute: worktreeExecutor(base.worktree, base.env) }
+}
+
 /** Builds the retrospective markdown with `composeRetrospective`, rejecting unknown input keys. */
 export async function composeFromArgs(compose: Args, base: ComposeBase): Promise<string> {
   rejectUnknown(compose, COMPOSE_KEYS)
@@ -134,8 +149,7 @@ export async function composeFromArgs(compose: Args, base: ComposeBase): Promise
     repositories: base.repositories,
     workOutcome: base.workOutcome,
     feedbackCoverage: base.feedbackCoverage,
-    facts:
-      'status' in facts ? facts : { ...facts, execute: worktreeExecutor(base.worktree, base.env) },
+    facts: factsInput(facts, base),
     transcript: transcriptInput(transcript, base),
     knownSensitiveValues: sensitiveValues(compose, base.env),
     journal: { journalLoader: serverJournalLoader(base.env, base.dependencies) },

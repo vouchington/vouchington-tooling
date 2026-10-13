@@ -150,6 +150,19 @@ describe('spawnPolicy', () => {
     await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
   })
 
+  it('reaps a grandchild holding the inherited pipes as soon as the runner exits', async () => {
+    const script = `
+      const { spawn } = require('node:child_process')
+      spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' }).unref()
+      process.stdout.write('done')
+      process.exit(0)
+    `
+    const started = Date.now()
+    const result = await spawnPolicy(request(script, { timeoutMs: 5000 }))
+    expect(result).toMatchObject({ exitCode: 0, timedOut: false, stdout: 'done' })
+    expect(Date.now() - started).toBeLessThan(4000)
+  })
+
   it('kills a process that writes too much', async () => {
     const result = await spawnPolicy(
       request('process.stdout.write("x".repeat(5000)); setInterval(() => {}, 1000)'),
