@@ -1,0 +1,64 @@
+import { basename } from 'node:path'
+import type { PullRequestInput, RelatedIssue } from './pr-input.mts'
+
+export type PullRequestProvenance = {
+  sessionId: string
+  /** The operating system user name. */
+  user: string
+  /** The host name; lowercased when rendered. */
+  host: string
+  /** The checkout label, see {@link worktreeLabel}. */
+  worktree: string
+}
+
+function relatedLine(issue: RelatedIssue): string {
+  const verb = issue.relation === 'closes' ? 'Closes' : 'Refs'
+  return `- ${verb} #${issue.number} — ${issue.reason}`
+}
+
+/**
+ * The pull request body: the Summary, Impact, Related issues and Details sections followed by the
+ * provenance lines. Pure; the caller supplies the device and worktree facts.
+ */
+export function renderPullRequestBody(
+  input: PullRequestInput,
+  provenance: PullRequestProvenance,
+): string {
+  const related = input.relatedIssues.length ? input.relatedIssues.map(relatedLine) : ['- None']
+  const agent = input.model === undefined ? input.agent : `${input.agent} (${input.model})`
+  return [
+    '## Summary',
+    '',
+    input.summary,
+    '',
+    '## Impact',
+    '',
+    input.impact,
+    '',
+    '## Related issues',
+    '',
+    ...related,
+    '',
+    '## Details',
+    '',
+    input.details.join('\n\n'),
+    '',
+    `Workspace setup: ${input.workspaceSetup}`,
+    `Agent: ${agent} session ${provenance.sessionId}`,
+    `Device: ${provenance.user}@${provenance.host.toLowerCase()}`,
+    `Worktree: ${provenance.worktree}`,
+    '',
+  ].join('\n')
+}
+
+const MARKER = '/worktrees/'
+
+/**
+ * The worktree label: the path after `/worktrees/` when present, `main` for the repository's main
+ * worktree, else the directory name.
+ */
+export function worktreeLabel(worktree: string, mainWorktree: string | undefined): string {
+  const marker = worktree.indexOf(MARKER)
+  if (marker !== -1) return worktree.slice(marker + MARKER.length)
+  return worktree === mainWorktree ? 'main' : basename(worktree)
+}

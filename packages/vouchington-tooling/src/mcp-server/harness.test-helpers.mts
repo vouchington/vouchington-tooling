@@ -8,6 +8,7 @@ import {
   type FakeOptions,
 } from './fake-blackboard.test-helpers.mts'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
+import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
 import { runIsolatedGit } from './worktree.mts'
 
@@ -37,15 +38,20 @@ export function harness(
     env?: NodeJS.ProcessEnv
     launchRoot?: string | undefined
     spawnPolicy?: PolicySpawner
+    runGit?: ServerEnvironment['runGit']
+    runGh?: GhRunner
+    device?: () => { user: string; host: string }
   } = {},
 ): Harness {
   const fake = fakeBlackboard(options)
   const environment: ServerEnvironment = {
     launchRoot: 'launchRoot' in options ? options.launchRoot : fixture.main,
     env: options.env ?? BLACKBOARD_ENV,
-    runGit: runIsolatedGit,
+    runGit: options.runGit ?? runIsolatedGit,
     blackboard: fake.dependencies,
     ...(options.spawnPolicy === undefined ? {} : { spawnPolicy: options.spawnPolicy }),
+    ...(options.runGh === undefined ? {} : { runGh: options.runGh }),
+    ...(options.device === undefined ? {} : { device: options.device }),
   }
   return { fake, call: (name, args) => callTool(name, args, environment) }
 }

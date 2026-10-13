@@ -3,6 +3,8 @@ import { assertSessionId } from '../agent-blackboard/session-id.mts'
 import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import { validateFeedbackIdentity } from '../agent-blackboard/feedback-identity.mts'
 import type { FeedbackIdentity } from '../agent-blackboard/feedback-types.mts'
+import type { RunTextCommand } from '../gh-cli/exec.mts'
+import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
 import { requiredNullableString, requiredString, type Args } from './args.mts'
 
@@ -16,6 +18,12 @@ export type ToolContext = {
   launchRoot: string | undefined
   /** Test seam: replaces the child process a policy export runs in. */
   spawnPolicy?: PolicySpawner
+  /** Runs git with the isolated environment; callers add their own `-C <worktree>`. */
+  runGit: RunTextCommand
+  /** Test seam: replaces locating and running gh. */
+  runGh?: GhRunner
+  /** Test seam: replaces the operating system user and host name. */
+  device?: () => { user: string; host: string }
 }
 
 export type ToolHandler = (args: Args, context: ToolContext) => Promise<Record<string, unknown>>

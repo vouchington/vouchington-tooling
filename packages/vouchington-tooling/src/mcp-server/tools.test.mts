@@ -9,6 +9,9 @@ const EXPECTED = [
   'session_ensure',
   'retrospective_check',
   'retrospective_save',
+  'pr_validate',
+  'pr_create',
+  'pr_update',
   'snapshot_export',
   'session_archive',
 ]
@@ -82,11 +85,16 @@ describe('tool contract', () => {
     }
   })
 
-  it('marks reads read-only and archive as the only destructive tool', () => {
+  it('marks reads read-only and only pr_update and archive as destructive', () => {
     const readOnly = TOOLS.filter((tool) => tool.annotations.readOnlyHint).map((tool) => tool.name)
-    expect(readOnly).toEqual(['journal_entries', 'outbox_status', 'retrospective_check'])
+    expect(readOnly).toEqual([
+      'journal_entries',
+      'outbox_status',
+      'retrospective_check',
+      'pr_validate',
+    ])
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
-    expect(destructive.map((tool) => tool.name)).toEqual(['session_archive'])
+    expect(destructive.map((tool) => tool.name)).toEqual(['pr_update', 'session_archive'])
     for (const tool of TOOLS) expect(tool.annotations.openWorldHint).toBe(false)
   })
 })

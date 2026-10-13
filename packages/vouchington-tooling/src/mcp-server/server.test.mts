@@ -61,6 +61,9 @@ describe('in-process client and server round trip', () => {
       'session_ensure',
       'retrospective_check',
       'retrospective_save',
+      'pr_validate',
+      'pr_create',
+      'pr_update',
       'snapshot_export',
       'session_archive',
     ])
