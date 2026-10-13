@@ -52,7 +52,7 @@ function section(compose: Args, name: string, keys: string[]): Args {
 }
 
 /** Facts commands run in the worktree and never see the blackboard credentials. */
-function worktreeExecutor(worktree: string, env: NodeJS.ProcessEnv) {
+export function worktreeExecutor(worktree: string, env: NodeJS.ProcessEnv) {
   const { AGENT_BLACKBOARD_URL: _url, AGENT_BLACKBOARD_TOKEN: _token, ...safe } = env
   return (command: string, args: string[]) =>
     new Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number | null }>(

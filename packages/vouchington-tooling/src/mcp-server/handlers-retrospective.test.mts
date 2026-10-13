@@ -109,6 +109,12 @@ describe('retrospective_save with markdown', () => {
     })
   })
 
+  it('stores the optional category when given', async () => {
+    const h = harness(fixture())
+    await h.call('retrospective_save', { ...SAVE, category: 'tooling' })
+    expect(h.fake.stored[0]!.data).toMatchObject({ type: 'retrospective', category: 'tooling' })
+  })
+
   it('uses an interactive outbox only in interactive mode', async () => {
     declarePolicy()
     const h = harness(fixture(), { spawnPolicy: policy(accept).spawnPolicy })
@@ -257,6 +263,15 @@ describe('retrospective_save with compose', () => {
     expect(h.fake.calls.get.length).toBeGreaterThan(0)
   })
 
+  it('composes when the blackboard has no journal for the session yet', async () => {
+    const h = harness(fixture(), {
+      entriesError: Object.assign(new Error('nf'), { status: 404 }),
+    })
+    const result = await h.call('retrospective_save', { ...args(COMPOSE), dryRun: true })
+    expect(result.isError).toBeUndefined()
+    expect(jsonOf(result).markdown).toContain('We did the work.')
+  })
+
   it('saves a composed document', async () => {
     const h = harness(fixture())
     const result = jsonOf(await h.call('retrospective_save', args(COMPOSE)))
@@ -290,9 +305,14 @@ describe('retrospective_save with compose', () => {
 })
 
 describe('retrospective_check', () => {
-  const retrospective = (sourceEventId: string, createdAt: string, issues?: number[]) => ({
+  const retrospective = (
+    sourceEventId: string,
+    createdAt: string,
+    issues?: number[],
+    prs: number[] | undefined = [],
+  ) => ({
     createdAt,
-    data: { type: 'retrospective', sourceEventId, timestamp: createdAt, issues, prs: [] },
+    data: { type: 'retrospective', sourceEventId, timestamp: createdAt, issues, prs },
   })
 
   it('reports saved: false for a session that was never created', async () => {
@@ -314,7 +334,10 @@ describe('retrospective_check', () => {
         retrospective('b', '2026-01-02T00:00:00.000Z', [4]),
         { createdAt: '2026-01-01T00:00:00.000Z', data: { type: 'journal', sourceEventId: 'j' } },
         { createdAt: '2026-01-01T00:00:00.000Z' } as never,
-        retrospective('a', '2026-01-01T12:00:00.000Z'),
+        {
+          ...retrospective('a', '2026-01-01T12:00:00.000Z'),
+          data: { type: 'retrospective', sourceEventId: 'a' },
+        },
       ],
     })
     const all = jsonOf(await h.call('retrospective_check', { sessionId: 's' }))
@@ -324,6 +347,7 @@ describe('retrospective_check', () => {
       'b',
     ])
     expect((all.entries as Array<{ issues: unknown }>)[0]!.issues).toEqual([])
+    expect((all.entries as Array<{ prs: unknown }>)[0]!.prs).toEqual([])
     const narrowed = jsonOf(
       await h.call('retrospective_check', { sessionId: 's', sourceEventId: 'b' }),
     )
