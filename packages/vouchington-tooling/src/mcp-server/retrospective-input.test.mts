@@ -93,15 +93,18 @@ describe('sensitiveValues', () => {
   it('adds the server token to the caller values and validates them', () => {
     expect(sensitiveValues(undefined, {})).toEqual([])
     expect(
-      sensitiveValues({ knownSensitiveValues: ['a'] }, { AGENT_BLACKBOARD_TOKEN: 'tok' }),
-    ).toEqual(['tok', 'a'])
+      sensitiveValues({ knownSensitiveValues: ['abcd'] }, { AGENT_BLACKBOARD_TOKEN: 'token' }),
+    ).toEqual(['token', 'abcd'])
     // Deduplicated and longest first, so a caller's prefix of a credential cannot split it.
     expect(
       sensitiveValues(
-        { knownSensitiveValues: ['abb_', 'gh'] },
-        { AGENT_BLACKBOARD_TOKEN: 'abb_sk_secret', GH_TOKEN: 'gh', GITHUB_TOKEN: 'ghub' },
+        { knownSensitiveValues: ['abb_', 'ghub'] },
+        { AGENT_BLACKBOARD_TOKEN: 'abb_sk_secret', GH_TOKEN: 'ghub', GITHUB_TOKEN: 'ghub-2' },
       ),
-    ).toEqual(['abb_sk_secret', 'abb_', 'ghub', 'gh'])
+    ).toEqual(['abb_sk_secret', 'ghub-2', 'abb_', 'ghub'])
+    expect(() => sensitiveValues({ knownSensitiveValues: ['abc'] }, {})).toThrow(
+      'entries must be at least 4 characters',
+    )
     expect(() => sensitiveValues({ knownSensitiveValues: 'a' }, {})).toThrow('array of strings')
     expect(() => sensitiveValues({ knownSensitiveValues: [1] }, {})).toThrow('array of strings')
   })

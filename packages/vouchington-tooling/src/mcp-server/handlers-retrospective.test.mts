@@ -341,6 +341,10 @@ describe('retrospective_save with compose', () => {
     expect(await call({ ...COMPOSE, facts: undefined, tools: undefined })).toContain(
       'compose is missing: facts, tools',
     )
+    for (const narrative of [null, {}, ' '])
+      expect(await call({ ...COMPOSE, narrative })).toContain(
+        'compose.narrative must be a non-empty string',
+      )
     expect(await call({ ...COMPOSE, facts: [] })).toContain('compose.facts must be an object')
   })
 })
