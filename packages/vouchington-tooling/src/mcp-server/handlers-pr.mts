@@ -171,7 +171,7 @@ export const handlePrUpdate: ToolHandler = async (args, context) => {
   const pr = readPr(args, true) as number
   const prepared = await prepare(args, context, pr)
   rejectErrors(prepared)
-  await assertJournalUnchanged(ghIn(context), pr, prepared.liveBody as string)
+  await assertJournalUnchanged(ghIn(context), pr, prepared.liveBody as string, prepared.input.base)
   const url = await withBodyFile(prepared.body, async (bodyFile) =>
     (
       await ghIn(context)([

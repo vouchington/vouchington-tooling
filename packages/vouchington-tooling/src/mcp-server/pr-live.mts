@@ -35,15 +35,19 @@ export function liveBase(pr: number, live: LivePullRequest, given: string | unde
 }
 
 /**
- * Re-reads the live pull request just before the edit and aborts if its Shepherd Journal changed
- * since the body was prepared, so an entry appended in between is never overwritten.
+ * Re-reads the live pull request just before the edit and aborts if its Shepherd Journal or base
+ * changed since the body was prepared and validated, so an entry appended in between is never
+ * overwritten and a retargeted PR never gets a body validated against its old base.
  */
 export async function assertJournalUnchanged(
   gh: RunTextCommand,
   pr: number,
   preparedFrom: string,
+  base: string,
 ): Promise<void> {
   const now = await livePullRequest(gh, pr)
+  if (now.baseRefName !== base)
+    throw new Error(`pull request ${pr} was retargeted to ${now.baseRefName}; run pr_update again`)
   if (findShepherdJournal(now.body) !== findShepherdJournal(preparedFrom))
     throw new Error(
       `the Shepherd Journal of pull request ${pr} changed meanwhile; run pr_update again`,

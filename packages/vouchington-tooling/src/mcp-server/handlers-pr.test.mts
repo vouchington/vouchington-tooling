@@ -424,5 +424,11 @@ describe('pr_update', () => {
     const h = harness(fixture(), { runGh, device })
     expect(textOf(await h.call('pr_update', args({ pr: 5 })))).toContain('changed meanwhile')
     expect(calls.map((call) => call[1])).toEqual(['view', 'view'])
+    const bases = ['trunk', 'other']
+    const retargeted = async () => JSON.stringify({ ...live, baseRefName: bases.shift() })
+    const moved = harness(fixture(), { runGh: retargeted, device })
+    expect(textOf(await moved.call('pr_update', args({ pr: 5 })))).toContain(
+      'was retargeted to other',
+    )
   })
 })
