@@ -20,6 +20,8 @@ const args = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
+const LIVE = { body: 'x', headRefName: 'linked', baseRefName: 'trunk', state: 'OPEN' }
+
 const BODY = [
   '## Summary',
   '',
@@ -110,14 +112,14 @@ describe('pr_validate', () => {
   it('validates an update: reads the live body, keeps its journal and passes pr', async () => {
     declarePolicy(fixture())
     const journal = '<details>\n<summary>Shepherd Journal</summary>\n\nnote\n\n</details>'
-    const gh = fakeGh({ view: { body: `old\n\n${journal}\n`, headRefName: 'linked' } })
+    const gh = fakeGh({ view: { ...LIVE, body: `old\n\n${journal}\n` } })
     const p = policy(() => ({ errors: [] }))
     const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device })
-    const result = jsonOf(await h.call('pr_validate', args({ pr: 5 })))
+    const result = jsonOf(await h.call('pr_validate', args({ pr: 5, base: undefined })))
     expect(result.body).toBe(`${BODY}\n${journal}\n`)
     expect(p.requests[0]!.input).toMatchObject({ pr: 5 })
     expect(gh.calls.map((call) => call.args)).toEqual([
-      ['pr', 'view', '5', '--json', 'body,headRefName'],
+      ['pr', 'view', '5', '--json', 'body,headRefName,baseRefName,state'],
     ])
   })
 
@@ -125,10 +127,13 @@ describe('pr_validate', () => {
     const bin = mkdtempSync(join(tmpdir(), 'vouchington-gh-'))
     try {
       const gh = join(bin, 'gh')
-      writeFileSync(gh, `#!/bin/sh\necho '{"body":"live body","headRefName":"linked"}'\n`)
+      writeFileSync(
+        gh,
+        `#!/bin/sh\necho '{"body":"live body","headRefName":"linked","baseRefName":"trunk","state":"OPEN"}'\n`,
+      )
       chmodSync(gh, 0o755)
       const h = harness(fixture(), { device, env: { PATH: bin } })
-      const result = jsonOf(await h.call('pr_validate', args({ pr: 5 })))
+      const result = jsonOf(await h.call('pr_validate', args({ pr: 5, base: undefined })))
       expect(result.body).toBe(BODY)
     } finally {
       rmSync(bin, { recursive: true, force: true })
@@ -136,18 +141,43 @@ describe('pr_validate', () => {
   })
 
   it('rejects a live pull request on another branch or an unusable view', async () => {
-    const other = fakeGh({ view: { body: 'x', headRefName: 'other' } })
+    const other = fakeGh({ view: { ...LIVE, headRefName: 'other' } })
     const h = harness(fixture(), { runGh: other.runGh, device })
     expect(textOf(await h.call('pr_validate', args({ pr: 5 })))).toContain(
       'pull request 5 has head other, not the worktree branch linked',
     )
     const broken = harness(fixture(), { runGh: fakeGh({ view: { body: 1 } }).runGh, device })
     expect(textOf(await broken.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return a body and headRefName',
+      'did not return body, headRefName, baseRefName, state',
     )
     const empty = harness(fixture(), { runGh: fakeGh({ view: null }).runGh, device })
     expect(textOf(await empty.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return a body and headRefName',
+      'did not return body, headRefName, baseRefName, state',
+    )
+  })
+
+  it('validates an existing pull request against its live base and rejects a closed one', async () => {
+    declarePolicy(fixture())
+    const p = policy(() => ({ errors: [] }))
+    const stacked = fakeGh({ view: { ...LIVE, baseRefName: 'parent' } })
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: stacked.runGh, device })
+    jsonOf(await h.call('pr_validate', args({ pr: 5, base: undefined })))
+    expect(p.requests[0]!.input.base).toBe('parent')
+    expect(textOf(await h.call('pr_validate', args({ pr: 5, base: 'main' })))).toContain(
+      'pull request 5 targets parent, not main',
+    )
+    const closed = fakeGh({ view: { ...LIVE, state: 'MERGED' } })
+    const old = harness(fixture(), { runGh: closed.runGh, device })
+    expect(textOf(await old.call('pr_update', args({ pr: 5 })))).toContain(
+      'pull request 5 is MERGED, not OPEN',
+    )
+    expect(closed.calls).toHaveLength(1)
+  })
+
+  it('rejects an empty details entry', async () => {
+    const h = harness(fixture(), { device })
+    expect(textOf(await h.call('pr_validate', args({ details: ['ok', ' '] })))).toContain(
+      'details[1] must not be empty',
     )
   })
 
@@ -191,9 +221,15 @@ describe('pr_create', () => {
     const gh = fakeGh()
     const env = { PATH: '/bin', AGENT_BLACKBOARD_TOKEN: 'sh0rt-tok' }
     const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device, env })
-    const leaky = args({ title: 'Fix sh0rt-tok leak', summary: 'Saw sh0rt-tok in logs.' })
+    const leaky = args({
+      title: 'Fix sh0rt-tok leak',
+      summary: 'Saw sh0rt-tok in logs.',
+      base: 'main-sh0rt-tok',
+      relatedIssues: [{ number: 7, relation: 'refs', reason: 'leaks sh0rt-tok' }],
+    })
     const result = await h.call('pr_create', leaky)
     expect(result.isError).toBeUndefined()
+    expect(p.requests[0]!.input.base).toBe('main-[REDACTED]')
     expect(JSON.stringify(p.requests)).not.toContain('sh0rt-tok')
     expect(JSON.stringify(gh.calls)).not.toContain('sh0rt-tok')
     expect(gh.calls[0]!.body).toContain('Saw [REDACTED] in logs.')
@@ -307,7 +343,7 @@ describe('pr_create', () => {
 })
 
 describe('pr_update', () => {
-  const live = { body: 'old', headRefName: 'linked' }
+  const live = { ...LIVE, body: 'old' }
 
   it('replaces the title and body, preserving only the live journal', async () => {
     declarePolicy(fixture())

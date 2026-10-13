@@ -285,16 +285,21 @@ base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With 
   and `project`. It checks the head is pushed and current, writes the body to a mode 0600 temp file
   (removed afterwards) and runs `gh pr create --draft` with the labels, `--milestone` and
   `--project`. Returns `{ number, url, warnings }`.
-- `pr_update` (mutating): reads `gh pr view <pr> --json body,headRefName`, rejects a head other
-  than the worktree branch, renders, preserves the live Shepherd Journal (a
-  `<details><summary>Shepherd Journal</summary>` block, or a legacy `## Shepherd Journal` section to
-  the next H2 or the end) when the new body has none, validates with `pr` set (errors block), then
-  runs `gh pr edit <pr> --title --body-file`. Nothing else is carried over from the live body.
-  Returns `{ number, url, warnings }`.
+- `pr_update` (mutating): reads `gh pr view <pr> --json body,headRefName,baseRefName,state`,
+  rejects a pull request that is not `OPEN` or whose head is not the worktree branch, and validates
+  against the live base (an explicit `base` must equal it). It renders, appends the live Shepherd
+  Journal (a `<details><summary>Shepherd Journal</summary>` block, or a legacy `## Shepherd Journal`
+  section to the next H2 or the end; examples in fenced code blocks are ignored), validates with
+  `pr` set (errors block), then runs `gh pr edit <pr> --title --body-file`. More than one journal
+  in the live body, or one in the rendered fields, is rejected rather than guessed. Nothing else is
+  carried over from the live body. Returns `{ number, url, warnings }`.
+
+Every field is redacted of the server's blackboard token before rendering, the policy, or `gh`.
 
 ### gh access
 
-`gh` is found on the server's `PATH`, else at `/opt/homebrew/bin/gh`, `/usr/local/bin/gh` or
+`gh` is found in the absolute directories of the server's `PATH` (relative entries are skipped,
+since they would resolve inside the target worktree), else at `/opt/homebrew/bin/gh`, `/usr/local/bin/gh` or
 `/usr/bin/gh`; otherwise the tool fails with "gh CLI not found on PATH; install gh or add it to the
 server's PATH". It runs with the worktree as its working directory and the server environment
 without `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN`.

@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { worktreeLabel } from './pr-body.mts'
 import { createGhRunner, ghEnvironment, locateGh } from './pr-gh.mts'
@@ -32,11 +32,28 @@ describe('Shepherd Journal', () => {
     expect(findShepherdJournal('nothing')).toBeUndefined()
   })
 
-  it('appends the live journal only when the rendered body has none', () => {
+  it('appends the live journal, and rejects rendered fields that carry their own', () => {
     expect(preserveShepherdJournal('new\n', `old\n${DETAILS}\n`)).toBe(`new\n\n${DETAILS}\n`)
     expect(preserveShepherdJournal('new\n', 'old')).toBe('new\n')
-    const own = `new\n${DETAILS}\n`
-    expect(preserveShepherdJournal(own, '## Shepherd Journal\nz')).toBe(own)
+    expect(() => preserveShepherdJournal(`new\n${DETAILS}\n`, '## Shepherd Journal\nz')).toThrow(
+      'the pull request fields contain a Shepherd Journal',
+    )
+  })
+
+  it('ignores examples in fenced code and fails closed on more than one journal', () => {
+    const example = (fence: string) => `${fence}md\n## Shepherd Journal\nfake\n${fence}`
+    const body = `${example('```')}\n${example('~~~~')}\n\n${DETAILS}\n`
+    expect(findShepherdJournal(body)).toBe(DETAILS)
+    expect(preserveShepherdJournal(`new\n${example('```')}\n`, body)).toBe(
+      `new\n${example('```')}\n\n${DETAILS}\n`,
+    )
+    expect(findShepherdJournal('## Shepherd Journal\nx\n```\n## not a heading\n```\ny')).toBe(
+      '## Shepherd Journal\nx\n```\n## not a heading\n```\ny',
+    )
+    expect(findShepherdJournal('```\nunterminated\n## Shepherd Journal\n')).toBeUndefined()
+    expect(() => findShepherdJournal(`${DETAILS}\n\n## Shepherd Journal\nx`)).toThrow(
+      'more than one Shepherd Journal',
+    )
   })
 })
 
@@ -58,6 +75,10 @@ describe('gh access', () => {
       writeFileSync(gh, '#!/bin/sh\necho "$@"\n')
       chmodSync(gh, 0o755)
       expect(await locateGh({ PATH: `${dirGh}:${bin}` })).toBe(gh)
+      // A relative entry is never trusted, even when it names a real gh.
+      await expect(locateGh({ PATH: relative(process.cwd(), bin) }, [])).rejects.toThrow(
+        'gh CLI not found',
+      )
       const run = createGhRunner({ PATH: bin })
       expect((await run(['pr', 'view'], { cwd: root, env: {} })).trim()).toBe('pr view')
       expect((await run(['again'], { cwd: root, env: {} })).trim()).toBe('again')

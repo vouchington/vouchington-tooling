@@ -12,6 +12,7 @@ import { pullRequestDefaults } from './pr-defaults.mts'
 import { createGhRunner, ghEnvironment } from './pr-gh.mts'
 import { positiveInteger, readPullRequestInput, type PullRequestInput } from './pr-input.mts'
 import { preserveShepherdJournal } from './pr-journal.mts'
+import { liveBase, livePullRequest, redactToken } from './pr-live.mts'
 import { parseWorktreeList } from './worktree.mts'
 
 type Prepared = {
@@ -43,16 +44,6 @@ async function label(context: ToolContext, git: RunTextCommand): Promise<string>
   return worktreeLabel(context.worktree, parseWorktreeList(listing)[0])
 }
 
-type LivePullRequest = { body: string; headRefName: string }
-
-async function livePullRequest(gh: RunTextCommand, pr: number): Promise<LivePullRequest> {
-  const output = await gh(['pr', 'view', String(pr), '--json', 'body,headRefName'])
-  const live = JSON.parse(output) as Partial<LivePullRequest> | null
-  if (typeof live?.body !== 'string' || typeof live.headRefName !== 'string')
-    throw new Error(`gh pr view ${pr} did not return a body and headRefName`)
-  return { body: live.body, headRefName: live.headRefName }
-}
-
 function readPr(args: Args, required: boolean): number | undefined {
   if (args.pr === undefined && !required) return undefined
   return positiveInteger(args.pr, 'pr')
@@ -73,31 +64,31 @@ async function prepare(
   pr: number | undefined,
 ): Promise<Prepared> {
   assertPolicyAllowed(context)
-  // The server's token must reach neither the policy nor gh, whatever the caller wrote.
+  // The server's token must reach neither the policy nor gh, whatever the caller wrote: every
+  // field is redacted before anything is rendered or forwarded.
   const token = context.env.AGENT_BLACKBOARD_TOKEN
-  const redact = (text: string) =>
-    token !== undefined && token.length >= 4 ? text.split(token).join('[REDACTED]') : text
-  const given = readPullRequestInput(args)
-  const input = { ...given, title: redact(given.title) }
+  const given = redactToken(readPullRequestInput(args), token)
   const git = gitIn(context)
   const head = await currentBranch(git)
-  if (head === input.base)
-    throw new Error(`head branch ${head} must differ from base ${input.base}`)
+  const live = pr === undefined ? undefined : await livePullRequest(ghIn(context), pr)
+  if (live !== undefined && live.headRefName !== head)
+    throw new Error(
+      `pull request ${pr} has head ${live.headRefName}, not the worktree branch ${head}`,
+    )
+  const base =
+    live === undefined
+      ? given.base
+      : liveBase(pr as number, live, redactToken(args.base as string | undefined, token))
+  const input = { ...given, base }
+  if (head === base) throw new Error(`head branch ${head} must differ from base ${base}`)
   const device = (context.device ?? (() => ({ user: userInfo().username, host: hostname() })))()
   let body = renderPullRequestBody(input, {
     sessionId: context.sessionId,
     ...device,
     worktree: await label(context, git),
   })
-  if (pr !== undefined) {
-    const live = await livePullRequest(ghIn(context), pr)
-    if (live.headRefName !== head)
-      throw new Error(
-        `pull request ${pr} has head ${live.headRefName}, not the worktree branch ${head}`,
-      )
-    body = preserveShepherdJournal(body, live.body)
-  }
-  body = redact(body)
+  if (live !== undefined) body = preserveShepherdJournal(body, live.body)
+  body = redactToken(body, token)
   const length = validateGitHubBodyLength(body)
   if (!length.ok)
     throw new Error(

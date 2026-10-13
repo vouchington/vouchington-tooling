@@ -48,6 +48,14 @@ function readRelatedIssues(args: Args): RelatedIssue[] {
   })
 }
 
+function readDetails(args: Args): string[] {
+  const details = requiredStringArray(args, 'details')
+  details.forEach((detail, index) => {
+    if (!detail.trim()) throw new Error(`details[${index}] must not be empty`)
+  })
+  return details
+}
+
 /** Reads and validates the structured pull request fields shared by the three pr_* tools. */
 export function readPullRequestInput(args: Args): PullRequestInput {
   const title = requiredString(args, 'title')
@@ -60,7 +68,7 @@ export function readPullRequestInput(args: Args): PullRequestInput {
     summary: requiredString(args, 'summary'),
     impact: requiredString(args, 'impact'),
     relatedIssues: readRelatedIssues(args),
-    details: requiredStringArray(args, 'details'),
+    details: readDetails(args),
     base: optionalString(args, 'base') ?? 'main',
     agent: requiredString(args, 'agent'),
     ...(model === undefined ? {} : { model }),

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, stat } from 'node:fs/promises'
-import { delimiter, join } from 'node:path'
+import { delimiter, isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -23,14 +23,17 @@ async function isExecutableFile(path: string): Promise<boolean> {
   }
 }
 
-/** `gh` on the server's PATH, else a common absolute location. */
+/**
+ * `gh` on the server's PATH, else a common absolute location. Relative PATH entries are skipped:
+ * gh runs with the target worktree as cwd, where a relative path could name a checkout file.
+ */
 export async function locateGh(
   env: NodeJS.ProcessEnv,
   fallbacks: readonly string[] = FALLBACKS,
 ): Promise<string> {
   const onPath = (env.PATH ?? '')
     .split(delimiter)
-    .filter(Boolean)
+    .filter((directory) => isAbsolute(directory))
     .map((directory) => join(directory, 'gh'))
   for (const candidate of [...onPath, ...fallbacks])
     if (await isExecutableFile(candidate)) return candidate
