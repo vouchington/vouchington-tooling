@@ -207,7 +207,8 @@ resolving symlinks, stay inside the worktree. Without a declaration the policy c
 Policy tools also require a server launched inside a repository worktree. Each call runs one named
 export in a fresh child process (`bin/policy-runner.mjs`, started with the server's own Node), never
 inside the server, with the worktree as its working directory and an environment of only `HOME`,
-`PATH` (`/usr/bin:/bin` plus the Node directory), and `GH_TOKEN` / `GITHUB_TOKEN` when the server has
+`PATH` (`/usr/bin`, `/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, the Node directory, and the
+directory of the first `gh` on the server's `PATH`, deduplicated), and `GH_TOKEN` / `GITHUB_TOKEN` when the server has
 them. Blackboard credentials and `NODE_OPTIONS` are not passed. The child still runs as the
 server's user, so this is not a sandbox: on Linux it could read the server's environment from
 `/proc/<server pid>/environ`. Treat the policy module as trusted code. After the runner exits, its
