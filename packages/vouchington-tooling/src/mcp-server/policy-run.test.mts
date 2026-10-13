@@ -35,7 +35,7 @@ describe('resolvePolicyModule', () => {
     await expect(resolvePolicyModule(root)).resolves.toBeUndefined()
     writeFileSync(join(root, 'package.json'), '{}')
     await expect(resolvePolicyModule(root)).resolves.toBeUndefined()
-    writeFileSync(join(root, 'package.json'), '{"vouchington-tooling":null}')
+    writeFileSync(join(root, 'package.json'), 'null')
     await expect(resolvePolicyModule(root)).resolves.toBeUndefined()
   })
 
@@ -63,6 +63,15 @@ describe('resolvePolicyModule', () => {
     declare(7)
     await expect(resolvePolicyModule(root)).rejects.toThrow('non-empty string')
     rmSync(outside, { recursive: true, force: true })
+  })
+
+  it('rejects a malformed vouchington-tooling section instead of skipping the policy', async () => {
+    for (const section of ['dev/agent-policy.mts', ['x'], null, 7]) {
+      writeFileSync(join(root, 'package.json'), JSON.stringify({ 'vouchington-tooling': section }))
+      await expect(resolvePolicyModule(root)).rejects.toThrow('must be an object')
+    }
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ 'vouchington-tooling': {} }))
+    await expect(resolvePolicyModule(root)).resolves.toBeUndefined()
   })
 
   it('rejects a package.json that is not JSON', async () => {
@@ -136,6 +145,47 @@ describe('runPolicyExport', () => {
     await expect(
       run(async () => outcome({ stdout: JSON.stringify({ ok: false, error: 'Error: bad' }) })),
     ).rejects.toThrow('failed: Error: bad')
+  })
+
+  it('scrubs server credentials from policy errors, stderr, and results', async () => {
+    declare('policy.mts', 'policy.mts')
+    const env = {
+      GH_TOKEN: 'ghp_secretvalue',
+      // A prefix of GH_TOKEN: longest-first redaction must not leave "[REDACTED]value".
+      GITHUB_TOKEN: 'ghp_secret',
+      AGENT_BLACKBOARD_TOKEN: 'abc',
+    }
+    const withEnv = (stub: PolicyOutcome) =>
+      runPolicyExport({
+        worktree: root,
+        export: 'validateRetrospective',
+        input: 1,
+        env,
+        spawn: async () => stub,
+      })
+    const thrown = { ok: false, error: 'Error: leaked ghp_secretvalue' }
+    await expect(withEnv(outcome({ stdout: JSON.stringify(thrown) }))).rejects.toThrow(
+      'failed: Error: leaked [REDACTED]',
+    )
+    await expect(
+      withEnv(outcome({ exitCode: 1, stderr: 'token=ghp_secretvalue' })),
+    ).rejects.toThrow('exited with code 1: token=[REDACTED]')
+    const result = { errors: ['bad ghp_secretvalue "quoted"'], warnings: ['abc stays: too short'] }
+    await expect(
+      withEnv(outcome({ stdout: JSON.stringify({ ok: true, result }) })),
+    ).resolves.toEqual({
+      status: 'ok',
+      result: { errors: ['bad [REDACTED] "quoted"'], warnings: ['abc stays: too short'] },
+    })
+    await expect(
+      runPolicyExport({
+        worktree: root,
+        export: 'validateRetrospective',
+        input: 1,
+        env: {},
+        spawn: async () => outcome(),
+      }),
+    ).resolves.toEqual({ status: 'ok', result: { errors: [] } })
   })
 
   it('treats a missing export as skipped', async () => {

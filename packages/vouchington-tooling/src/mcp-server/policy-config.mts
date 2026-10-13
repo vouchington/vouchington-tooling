@@ -9,7 +9,11 @@ function packagePolicy(worktree: string, text: string): string | undefined {
     throw new Error(`${join(worktree, 'package.json')} is not valid JSON`)
   }
   const section = (manifest as Record<string, unknown> | null)?.['vouchington-tooling']
-  const policy = (section as { policy?: unknown } | null | undefined)?.policy
+  if (section === undefined) return undefined
+  // A malformed section must not read as "no policy declared", which would skip validation.
+  if (section === null || typeof section !== 'object' || Array.isArray(section))
+    throw new Error('package.json "vouchington-tooling" must be an object')
+  const policy = (section as { policy?: unknown }).policy
   if (policy === undefined) return undefined
   if (typeof policy !== 'string' || !policy.trim())
     throw new Error('package.json "vouchington-tooling".policy must be a non-empty string path')

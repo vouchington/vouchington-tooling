@@ -59,6 +59,41 @@ function parseReply(name: PolicyExport, outcome: PolicyOutcome): PolicyResult {
  * a failed policy is never a pass.
  */
 export async function runPolicyExport(run: PolicyRun): Promise<PolicyResult> {
+  const secrets = credentialValues(run.env)
+  try {
+    const result = await runUnscrubbed(run)
+    return result.status === 'ok'
+      ? { status: 'ok', result: scrubValue(result.result, secrets) }
+      : result
+  } catch (error) {
+    // A policy can echo a credential it was given (GH_TOKEN) in a stack, stderr, or result; the
+    // caller of an MCP tool must never receive one.
+    throw new Error(scrubText((error as Error).message, secrets), { cause: error })
+  }
+}
+
+const CREDENTIAL_NAMES = ['AGENT_BLACKBOARD_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'] as const
+
+/** Credential values held by the server, longest first, ignoring values too short to redact. */
+function credentialValues(env: NodeJS.ProcessEnv): string[] {
+  const values = CREDENTIAL_NAMES.map((name) => env[name]).filter(
+    (value): value is string => value !== undefined && value.length >= 4,
+  )
+  return [...new Set(values)].sort((a, b) => b.length - a.length)
+}
+
+function scrubText(text: string, secrets: string[]): string {
+  return secrets.reduce((scrubbed, secret) => scrubbed.replaceAll(secret, '[REDACTED]'), text)
+}
+
+function scrubValue(value: unknown, secrets: string[]): unknown {
+  if (secrets.length === 0 || value === undefined) return value
+  // Each secret is matched in its JSON-escaped form so the round trip stays valid JSON.
+  const escaped = secrets.map((secret) => JSON.stringify(secret).slice(1, -1))
+  return JSON.parse(scrubText(JSON.stringify(value), escaped))
+}
+
+async function runUnscrubbed(run: PolicyRun): Promise<PolicyResult> {
   const { export: name } = run
   const module = await resolvePolicyModule(run.worktree)
   if (module === undefined) return { status: 'no-policy' }
