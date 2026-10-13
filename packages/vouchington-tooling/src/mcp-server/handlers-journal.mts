@@ -2,6 +2,7 @@ import {
   appendJournalMarkdown,
   readJournal,
   type FeedbackCoverage,
+  type FeedbackDeliveryResult,
   type WorkOutcome,
 } from '../agent-blackboard/index.mts'
 import {
@@ -13,11 +14,11 @@ import {
   rejectUnknown,
   type Args,
 } from './args.mts'
-import { outboxDirectory, readIdentity, type ToolHandler } from './context.mts'
+import { outboxDirectory, readIdentity, type ToolContext, type ToolHandler } from './context.mts'
 import { outboxCounts } from './handlers-outbox.mts'
 
-const MODES = ['interactive', 'autonomous'] as const
-const OUTCOMES: readonly WorkOutcome[] = [
+export const MODES = ['interactive', 'autonomous'] as const
+export const OUTCOMES: readonly WorkOutcome[] = [
   'in-progress',
   'success',
   'failure',
@@ -35,7 +36,7 @@ const COVERAGE_STATUSES: readonly FeedbackCoverage['status'][] = [
   'not-started',
 ]
 
-function readCoverage(args: Args): FeedbackCoverage {
+export function readCoverage(args: Args): FeedbackCoverage {
   const coverage = optionalRecord(args, 'feedbackCoverage')
   if (coverage === undefined) throw new Error('feedbackCoverage is required')
   rejectUnknown(coverage, ['status', 'sources', 'droppedCount'])
@@ -75,11 +76,21 @@ export const journalAppend: ToolHandler = async (args, context) => {
     env: context.env,
     dependencies: context.dependencies,
   })
-  // The server owns the timestamp: a first append takes the current time, and a retry of the same
-  // event (same session, sourceEventId, and content) reports the one already stored or retained.
+  return deliveryResponse(result, context, mode)
+}
+
+/**
+ * The tool result for a write: the delivery result plus the server-owned timestamp (a first
+ * append takes the current time; a retry of the same event reports the one already stored or
+ * retained) and the outbox counts. Autonomous delivery never uses an outbox, so it has nothing
+ * pending; interactive delivery reports the outbox as it is after delivery.
+ */
+export function deliveryResponse(
+  result: FeedbackDeliveryResult,
+  context: ToolContext,
+  mode: (typeof MODES)[number],
+): Record<string, unknown> {
   const timestamp = result.status === 'delivered' ? result.receipt.timestamp : result.timestamp
-  // Autonomous delivery never uses an outbox, so it has nothing pending. Interactive delivery
-  // reports the outbox as it is after delivery, split into the caller's session and the worktree.
   const counts =
     mode === 'interactive'
       ? outboxCounts(context.worktree, context.sessionId)
@@ -97,12 +108,12 @@ export const journalAppend: ToolHandler = async (args, context) => {
 
 // `Entries.get` documents no order, and `createdAt` is a service-generated ISO 8601 UTC time whose
 // text order is time order. An entry without a usable `createdAt` sorts first rather than throwing.
-function createdAtOf(entry: unknown): string {
+export function createdAtOf(entry: unknown): string {
   const createdAt = (entry as { createdAt?: unknown } | null)?.createdAt
   return typeof createdAt === 'string' ? createdAt : ''
 }
 
-function byCreatedAt(left: unknown, right: unknown): number {
+export function byCreatedAt(left: unknown, right: unknown): number {
   const leftAt = createdAtOf(left)
   const rightAt = createdAtOf(right)
   if (leftAt === rightAt) return 0

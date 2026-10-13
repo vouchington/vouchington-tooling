@@ -59,6 +59,8 @@ describe('in-process client and server round trip', () => {
       'outbox_status',
       'outbox_flush',
       'session_ensure',
+      'retrospective_check',
+      'retrospective_save',
       'snapshot_export',
       'session_archive',
     ])

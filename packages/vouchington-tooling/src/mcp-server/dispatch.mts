@@ -4,8 +4,10 @@ import type { RunTextCommand } from '../gh-cli/exec.mts'
 import { optionalString, rejectUnknown, requireObject } from './args.mts'
 import { readSessionId, type ToolHandler } from './context.mts'
 import { journalAppend, journalEntries } from './handlers-journal.mts'
+import { retrospectiveCheck, retrospectiveSave } from './handlers-retrospective.mts'
 import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
 import { sessionArchive, sessionEnsure, snapshotExport } from './handlers-session.mts'
+import type { PolicySpawner } from './policy-spawn.mts'
 import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
 
@@ -18,6 +20,8 @@ export type ServerEnvironment = {
   resolveFrom?: string | URL
   /** Test seam: replaces how the consumer's `agent-blackboard` client is loaded. */
   blackboard?: BlackboardClientDependencies
+  /** Test seam: replaces the child process a policy export runs in. */
+  spawnPolicy?: PolicySpawner
 }
 
 export type ToolCallResult = {
@@ -31,6 +35,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   outbox_status: outboxStatus,
   outbox_flush: outboxFlush,
   session_ensure: sessionEnsure,
+  retrospective_check: retrospectiveCheck,
+  retrospective_save: retrospectiveSave,
   snapshot_export: snapshotExport,
   session_archive: sessionArchive,
 }
@@ -82,6 +88,8 @@ export async function callTool(
       sessionId,
       worktree,
       env: environment.env,
+      launchRoot: environment.launchRoot,
+      ...(environment.spawnPolicy === undefined ? {} : { spawnPolicy: environment.spawnPolicy }),
       // The client resolves from this package's install, like the SDK, never from the worktree.
       dependencies: {
         ...environment.blackboard,

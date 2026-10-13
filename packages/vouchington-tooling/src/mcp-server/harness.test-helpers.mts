@@ -8,6 +8,7 @@ import {
   type FakeOptions,
 } from './fake-blackboard.test-helpers.mts'
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
+import type { PolicySpawner } from './policy-spawn.mts'
 import { runIsolatedGit } from './worktree.mts'
 
 /** A fresh pair of real repositories for every test. */
@@ -32,7 +33,11 @@ export type Harness = {
 /** Calls tools against a repository fixture with the blackboard client faked. */
 export function harness(
   fixture: RepoFixture,
-  options: FakeOptions & { env?: NodeJS.ProcessEnv; launchRoot?: string | undefined } = {},
+  options: FakeOptions & {
+    env?: NodeJS.ProcessEnv
+    launchRoot?: string | undefined
+    spawnPolicy?: PolicySpawner
+  } = {},
 ): Harness {
   const fake = fakeBlackboard(options)
   const environment: ServerEnvironment = {
@@ -40,6 +45,7 @@ export function harness(
     env: options.env ?? BLACKBOARD_ENV,
     runGit: runIsolatedGit,
     blackboard: fake.dependencies,
+    ...(options.spawnPolicy === undefined ? {} : { spawnPolicy: options.spawnPolicy }),
   }
   return { fake, call: (name, args) => callTool(name, args, environment) }
 }
