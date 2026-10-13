@@ -12,6 +12,7 @@ import { pullRequestDefaults } from './pr-defaults.mts'
 import { createGhRunner, ghEnvironment } from './pr-gh.mts'
 import { positiveInteger, readPullRequestInput, type PullRequestInput } from './pr-input.mts'
 import { preserveShepherdJournal } from './pr-journal.mts'
+import { parseWorktreeList } from './worktree.mts'
 
 type Prepared = {
   input: PullRequestInput
@@ -38,9 +39,8 @@ async function currentBranch(git: RunTextCommand): Promise<string> {
 }
 
 async function label(context: ToolContext, git: RunTextCommand): Promise<string> {
-  const listing = await git(['worktree', 'list', '--porcelain'])
-  const first = listing.split('\n').find((line) => line.startsWith('worktree '))
-  return worktreeLabel(context.worktree, first?.slice('worktree '.length))
+  const listing = await git(['worktree', 'list', '--porcelain', '-z'])
+  return worktreeLabel(context.worktree, parseWorktreeList(listing)[0])
 }
 
 type LivePullRequest = { body: string; headRefName: string }
@@ -73,7 +73,12 @@ async function prepare(
   pr: number | undefined,
 ): Promise<Prepared> {
   assertPolicyAllowed(context)
-  const input = readPullRequestInput(args)
+  // The server's token must reach neither the policy nor gh, whatever the caller wrote.
+  const token = context.env.AGENT_BLACKBOARD_TOKEN
+  const redact = (text: string) =>
+    token !== undefined && token.length >= 4 ? text.split(token).join('[REDACTED]') : text
+  const given = readPullRequestInput(args)
+  const input = { ...given, title: redact(given.title) }
   const git = gitIn(context)
   const head = await currentBranch(git)
   if (head === input.base)
@@ -92,6 +97,7 @@ async function prepare(
       )
     body = preserveShepherdJournal(body, live.body)
   }
+  body = redact(body)
   const length = validateGitHubBodyLength(body)
   if (!length.ok)
     throw new Error(

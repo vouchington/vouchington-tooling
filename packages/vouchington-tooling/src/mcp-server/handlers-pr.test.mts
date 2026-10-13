@@ -185,6 +185,21 @@ describe('pr_validate', () => {
 describe('pr_create', () => {
   usePushedRemote(fixture)
 
+  it('redacts the blackboard token from the title and body before the policy and gh', async () => {
+    declarePolicy(fixture())
+    const p = policy(() => ({ errors: [] }))
+    const gh = fakeGh()
+    const env = { PATH: '/bin', AGENT_BLACKBOARD_TOKEN: 'sh0rt-tok' }
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device, env })
+    const leaky = args({ title: 'Fix sh0rt-tok leak', summary: 'Saw sh0rt-tok in logs.' })
+    const result = await h.call('pr_create', leaky)
+    expect(result.isError).toBeUndefined()
+    expect(JSON.stringify(p.requests)).not.toContain('sh0rt-tok')
+    expect(JSON.stringify(gh.calls)).not.toContain('sh0rt-tok')
+    expect(gh.calls[0]!.body).toContain('Saw [REDACTED] in logs.')
+    expect(gh.calls[0]!.args).toContain('Fix [REDACTED] leak')
+  })
+
   it('creates a draft pull request with a private body file, labels, milestone and project', async () => {
     declarePolicy(fixture())
     const p = policy((name) =>
