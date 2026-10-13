@@ -15,6 +15,7 @@ type GeneratedArbiterRoot =
         | 'literal'
         | 'binary'
         | 'unary'
+        | 'array'
         | 'case'
         | 'subquery'
         | 'other'
