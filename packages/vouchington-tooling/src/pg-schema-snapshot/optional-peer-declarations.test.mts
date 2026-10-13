@@ -29,7 +29,16 @@ it('typechecks snapshot consumers with no optional parser peer and library check
       `import { buildSchemaSnapshot, projectGeneratedArbiterInput } from 'vouchington-tooling/pg-schema-snapshot'
 export const build = buildSchemaSnapshot
 export const projected = projectGeneratedArbiterInput({
-  target: { kind: 'omitted' }, predicate: null, action: { kind: 'doNothing' },
+  target: { kind: 'expressions', expressions: [{
+    columns: [], root: { kind: 'parenthesized', expression: { kind: 'array' } },
+    childrenComplete: true,
+  }] },
+  predicate: { columns: [], root: { kind: 'array' }, childrenComplete: true },
+  action: { kind: 'doUpdate', assignments: [{
+    columns: [{ parts: [{ identity: 'source' }] }],
+    expression: { columns: [], root: { kind: 'array' }, childrenComplete: true },
+    complete: true,
+  }] },
 })`,
     )
     const program = ts.createProgram([consumer], {
