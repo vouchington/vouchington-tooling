@@ -278,7 +278,7 @@ with the repository's stack tooling instead.
 ### Tools
 
 - `pr_validate` (read-only): renders the body, runs the policy `validatePullRequest({ title, body,
-base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With `pr`, the live
+  base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With `pr`, the live
   body is read (never written) so its Shepherd Journal is preserved as in `pr_update`.
 - `pr_create` (additive): renders and validates (errors block), then calls the policy
   `pullRequestDefaults({ title, base, relatedIssues })` export for optional `labels`, `milestone`
