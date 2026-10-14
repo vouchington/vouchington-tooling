@@ -45,8 +45,8 @@ importers:
         specifier: ^7.0.2003
         version: 7.0.2003
       pr-shepherd:
-        specifier: ^0.56.5
-        version: 0.56.5(supports-color@7.2.0)
+        specifier: ^0.57.1
+        version: 0.57.1(supports-color@7.2.0)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2142,9 +2142,9 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  pr-shepherd@0.56.5:
-    resolution: {integrity: sha512-d9C3qfgI4I76sd4kL5TwymtkhIr4UYKqzqUcHB3d1Jx9rjAgOwsM70Y+ixGV9sySNtU6+0p1PcNYFBvLG+zOug==}
-    engines: {node: '>=22.18.0'}
+  pr-shepherd@0.57.1:
+    resolution: {integrity: sha512-TajLZs3HQgs3FJsZmHFRVRHmLVLepMQvY/YgEE9D5YoBc/049xcPD+2Sbxpt1JpgJ6bBN2TmTNIFJjHhKseL8Q==}
+    engines: {node: '>=22.19.0'}
     hasBin: true
 
   prelude-ls@1.2.1:
@@ -2390,6 +2390,10 @@ packages:
 
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
+  undici@8.11.2:
+    resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
+    engines: {node: '>=22.19.0'}
 
   unified@11.0.5:
     resolution: {integrity: sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA==}
@@ -4419,10 +4423,11 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  pr-shepherd@0.56.5(supports-color@7.2.0):
+  pr-shepherd@0.57.1(supports-color@7.2.0):
     dependencies:
-      '@modelcontextprotocol/sdk': 1.31.0(supports-color@7.2.0)(zod@4.6.5)
+      '@modelcontextprotocol/sdk': 1.32.0(supports-color@7.2.0)(zod@4.6.5)
       picomatch: 4.0.7
+      undici: 8.11.2
       yaml: 2.9.1
       zod: 4.6.5
     transitivePeerDependencies:
@@ -4728,6 +4733,8 @@ snapshots:
   unbash@4.0.11: {}
 
   undici-types@8.9.0: {}
+
+  undici@8.11.2: {}
 
   unified@11.0.5:
     dependencies:
