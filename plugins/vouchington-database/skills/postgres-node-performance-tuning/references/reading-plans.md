@@ -2,12 +2,13 @@
 
 Run `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT JSON)` at representative cardinality, in a transaction you
 roll back when the statement writes. `ANALYZE` executes the statement, and a rollback does not
-undo non-transactional effects such as sequence advancement from `nextval()`; use a disposable
-database for statements with those. A glance at the top node hides most of the problems below;
+undo non-transactional effects such as sequence advancement from `nextval()`. Calls that reach
+outside the database (requests, messages) still happen even in a disposable database, so use plain
+`EXPLAIN` for statements that trigger them, or disable the integrations first. A glance at the top node hides most of the problems below;
 walk every node. `VERBOSE` adds each node's `Output` expressions, which is where a select-list
-function call shows. In JSON, `Actual Rows`, `Rows Removed by Filter`, and
-`Rows Removed by Join Filter` are per-loop averages, so multiply each by `Actual Loops` for the
-total.
+function call shows. In JSON, `Actual Rows`, `Actual Startup Time`, `Actual Total Time`,
+`Rows Removed by Filter`, `Rows Removed by Join Filter`, and `Rows Removed by Index Recheck` are
+per-loop averages, so multiply each by `Actual Loops` for the total.
 
 ## Red flags
 
@@ -15,7 +16,8 @@ total.
 
 A node that reads far more rows than it passes up is doing hidden work. Compare
 `Actual Rows` x `Actual Loops` with the rows the parent keeps, and read `Rows Removed by Filter`
-and `Rows Removed by Join Filter` (also x `Actual Loops`). Millions removed to return tens means the predicate is not an
+`Rows Removed by Join Filter`, and `Rows Removed by Index Recheck` (lossy GiST, BRIN, Bloom, or
+bitmap pages; `Actual Rows` is counted after the recheck), each x `Actual Loops`. Millions removed to return tens means the predicate is not an
 index condition, the index has the wrong leading columns, or a join filters after it multiplies.
 Fix the index or the predicate shape, or filter before joining.
 
