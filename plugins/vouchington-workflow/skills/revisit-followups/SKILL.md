@@ -37,7 +37,8 @@ issue policy, and review-record conventions first.
 - Search merged and closed work with `--limit 500`. A full page is truncation, not exhaustion: split
   the date range at its midpoint, retaining both bounds for interior chunks; only the top-level
   final chunk may be open-ended.
-- A same-day full result cannot shrink further: report its truncation and stop splitting.
+- Keep splitting a full single day by timestamp (search dates accept ISO-8601 times); report
+  truncation only when the smallest timestamp bucket is still full.
 - Use an OS-temp scratch directory with separate candidate and verdict files; each delegated
   collector gets its own file, and never append concurrently. Do not print fetched bodies outside
   scratch files, and remove all scratch files after collection.
