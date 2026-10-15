@@ -46,7 +46,9 @@ a stack, and who may authorize a merge.
   layer. Put each fix on the lowest layer that owns it. A bottom layer that reaches ready early
   frees the ready prefix above it to merge in one command.
 - Before a command that adds layers to a stack, such as `gh stack add` or `gh stack link`, add the
-  forge's open-layer count to every layer the command would add. Above the layer cap (default 10),
+  forge's open-layer count, plus every locally tracked layer not yet submitted, to every layer the
+  command would add. `gh stack add` creates only a local branch, so repeated adds before a submit
+  are invisible to the forge count. Above the layer cap (default 10),
   open independent work as its own pull request on the default branch and hold dependent work
   until the bottom layers merge.
 - A ready, mergeable, or queued lower layer blocks only an operation that would rewrite that
