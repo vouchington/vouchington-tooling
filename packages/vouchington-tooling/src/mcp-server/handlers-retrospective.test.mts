@@ -152,7 +152,11 @@ describe('retrospective_save with markdown', () => {
     declarePolicy()
     const h = harness(fixture(), { spawnPolicy: policy(accept).spawnPolicy })
     const result = jsonOf(await h.call('retrospective_save', { ...SAVE, dryRun: true }))
-    expect(result).toEqual({ markdown: FRONT, policy: { warnings: [] } })
+    expect(result).toEqual({
+      markdown: FRONT,
+      previewToken: expect.any(String),
+      policy: { warnings: [] },
+    })
     expect(h.fake.calls.append).toEqual([])
   })
 

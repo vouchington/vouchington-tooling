@@ -15,7 +15,9 @@ local `AGENTS.md`, and journal guidance first.
 1. Read the agent's own journal oldest-first and check for an existing retrospective. Capture a
    material new observation before filing a follow-up issue. Preserve entry-level repository tags.
 2. Generate routine repository and transcript facts with the approved composer: pass `compose` to
-   the `retrospective_save` MCP tool and preview the composition with `dryRun`, never a CLI. Keep exact factual
+   the `retrospective_save` MCP tool and preview the composition with `dryRun`, never a CLI. Save the preview by passing its
+   `previewToken` to `retrospective_save` (no markdown); put sensitive values only in
+   `compose.knownSensitiveValues`, or `knownSensitiveValues` for a markdown save. Keep exact factual
    section markers generated, preserve unavailable counts, and never replace missing evidence with
    invented zero statistics. Do not paste raw collectors' output or manually reconstruct facts.
 3. Record work outcome, feedback coverage, and delivery independently. Success, failure,

@@ -104,10 +104,10 @@ export function worktreeExecutor(
 export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEnv): string[] {
   const given = compose?.knownSensitiveValues
   if (given !== undefined && (!Array.isArray(given) || given.some((v) => typeof v !== 'string')))
-    throw new Error('compose.knownSensitiveValues must be an array of strings')
+    throw new Error('knownSensitiveValues must be an array of strings')
   // Redaction ignores values under four characters, so promising to redact one would be false.
   if ((given as string[] | undefined)?.some((value) => value.length < 4))
-    throw new Error('compose.knownSensitiveValues entries must be at least 4 characters')
+    throw new Error('knownSensitiveValues entries must be at least 4 characters')
   // Facts commands inherit the GitHub tokens, so their output is redacted of those values too.
   const credentials = [env.AGENT_BLACKBOARD_TOKEN, env.GH_TOKEN, env.GITHUB_TOKEN].filter(
     (value): value is string => Boolean(value),
