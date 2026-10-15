@@ -12,6 +12,7 @@ export const POLICY_TIMEOUTS_MS = {
   validateRetrospective: 30_000,
   validatePullRequest: 120_000,
   pullRequestDefaults: 120_000,
+  renderNoSourceIssue: 30_000,
 } as const
 
 type PolicyExport = keyof typeof POLICY_TIMEOUTS_MS

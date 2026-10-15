@@ -16,13 +16,23 @@ function optionalName(value: unknown, field: string): string | undefined {
  */
 export async function pullRequestDefaults(
   policy: Omit<PolicyRun, 'export' | 'input'>,
-  input: { title: string; base: string; relatedIssues: RelatedIssue[] },
+  input: {
+    title: string
+    base: string
+    relatedIssues: RelatedIssue[]
+    noSourceIssue?: { reason: string }
+  },
 ): Promise<PullRequestDefaults> {
-  const { title, base, relatedIssues } = input
+  const { title, base, relatedIssues, noSourceIssue } = input
   const outcome = await runPolicyExport({
     ...policy,
     export: 'pullRequestDefaults',
-    input: { title, base, relatedIssues },
+    input: {
+      title,
+      base,
+      relatedIssues,
+      ...(noSourceIssue === undefined ? {} : { noSourceIssue }),
+    },
   })
   if (outcome.status !== 'ok') return { labels: [] }
   const result = (outcome.result ?? {}) as Record<string, unknown>

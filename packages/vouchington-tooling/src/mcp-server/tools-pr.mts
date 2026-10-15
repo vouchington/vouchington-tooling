@@ -21,7 +21,9 @@ const FIELDS: Record<string, JsonSchema> = {
   impact: text('Who or what is affected, as markdown.'),
   relatedIssues: {
     type: 'array',
-    description: 'Issues this pull request closes or refs; may be empty.',
+    description:
+      'Issues this pull request closes or refs. Empty when it has none; with no source issue ' +
+      'at all, give noSourceIssue as well (it is rejected beside a non-empty list).',
     items: {
       type: 'object',
       properties: {
@@ -33,6 +35,16 @@ const FIELDS: Record<string, JsonSchema> = {
       additionalProperties: false,
     },
   },
+  noSourceIssue: {
+    type: 'object',
+    description:
+      'Declares a pull request with no source issue, mutually exclusive with a non-empty ' +
+      'relatedIssues. Rendered inside Related issues (the policy may supply the wording) and ' +
+      'passed to the policy, which may allow it only in interactive mode.',
+    properties: { reason: text('Single-line reason there is no source issue.') },
+    required: ['reason'],
+    additionalProperties: false,
+  },
   details: {
     type: 'array',
     minItems: 1,
@@ -42,7 +54,13 @@ const FIELDS: Record<string, JsonSchema> = {
   base: { type: 'string', minLength: 1, description: 'Base branch. Default: main.' },
   agent: text('Agent name for the Agent line.'),
   model: text('Optional model name, rendered in parentheses after the agent.'),
-  mode: { enum: ['interactive', 'autonomous'], description: 'Delivery mode, given to the policy.' },
+  mode: {
+    enum: ['interactive', 'autonomous'],
+    description:
+      'Optional. The server derives the mode from its own launch environment and fails closed: ' +
+      'an automation marker (CI, GITHUB_ACTIONS and similar) means autonomous. This argument ' +
+      'can only narrow interactive to autonomous, never widen it.',
+  },
   workspaceSetup: text('Text for the Workspace setup line, such as how the worktree was prepared.'),
 }
 const REQUIRED = [
@@ -52,7 +70,6 @@ const REQUIRED = [
   'relatedIssues',
   'details',
   'agent',
-  'mode',
   'workspaceSetup',
 ]
 
@@ -68,7 +85,9 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
     'Renders the pull request body and validates it with the checkout policy; writes nothing. ' +
       RENDERING +
       'Pass pr to validate an update of that pull request: the live body is read and its Shepherd ' +
-      'Journal preserved. Returns { body, errors, warnings }.',
+      'Journal preserved; the pull request may be in any state and on any head (the head given to ' +
+      'the policy is its own, and no liveness check applies, unlike pr_update). Returns ' +
+      '{ body, errors, warnings }.',
     openWorld(READ_ONLY),
     { ...FIELDS, pr: PR_NUMBER },
     REQUIRED,
