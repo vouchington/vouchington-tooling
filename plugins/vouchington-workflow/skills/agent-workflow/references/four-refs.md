@@ -42,13 +42,15 @@ local policy declares.
 
 ## Unstacked
 
-After every move onto `origin/<branch>`, run `git merge-base --is-ancestor origin/main HEAD`. Exit 0
+Before any move and after every move onto `origin/<branch>`, including when HEAD already equals it
+(`0 0`) but `origin/main` has advanced, run `git merge-base --is-ancestor origin/main HEAD`. Exit 0
 means the branch already contains `origin/main`; nonzero means rebase onto `origin/main`, then lease
 push.
 
 | Left/right                                                                                                                                                         | Action                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `0 0`, `origin/main` already an ancestor                                                                                                                           | Stop.                                                                                                                                                                                                                                                                                                                                                   |
+| `0 0`, `origin/main` not an ancestor                                                                                                                               | Rebase onto `origin/main`, then lease push.                                                                                                                                                                                                                                                                                                             |
 | `0 N`                                                                                                                                                              | `git merge --ff-only origin/<branch>`, then the ancestor check.                                                                                                                                                                                                                                                                                         |
 | `N 0`                                                                                                                                                              | Read `git log --oneline origin/<branch>..HEAD`: those commits are what a push adds, including a remote rewind to an ancestor. Own unpushed work with `origin/main` an ancestor: `git push origin <branch>`. Otherwise rebase onto `origin/main`, then lease push. A rewind you did not make: stop and ask.                                              |
 | Diverged, local-only commits are rewritten copies (every local-only commit has cherry `-`; matching subjects alone do not prove equivalence), no unique local work | Clean tree, `git reset --hard origin/<branch>`, then the ancestor check.                                                                                                                                                                                                                                                                                |
@@ -61,7 +63,9 @@ rewrite an unstacked branch the same way.
 
 - On a diverged layer, adopt `origin/<branch>` with `git reset --hard` when the layer is checked
   out, or `git branch -f` when it is not, if the left-right log shows pre-rebase copies: the same
-  layer subjects on both sides and old parent subjects only on the left.
+  layer subjects on both sides and old parent subjects only on the left. Require `git cherry`
+  patch equivalence (`-`) for every local layer commit first; matching subjects alone do not
+  prove it, and a `+` commit is unique local work.
 - Never `git rebase origin/<branch>` on a stack layer: it replays parent commits onto the layer.
 - Never run the plain rebase-onto-main procedure on a mid-stack branch; use its stack-aware form.
 - If the layer has unpushed commits that are not the old parent and not already on origin under a
