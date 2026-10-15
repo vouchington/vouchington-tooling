@@ -118,8 +118,9 @@ difference is a conflicting payload and stays quarantined.
   disposition. Inspectors hand-read only journal-only and retrospective sessions; every other shape
   is determined structurally.
 - Keep the verified snapshot until the last `session_archive`, because the archival check reads it.
-  Then remove the snapshot and its partitions with the cleanup capability returned at export, in a
-  cleanup path that runs even when no session is archived.
+  Then remove the snapshot with the cleanup capability returned at export, and any partitions with
+  the separate receipt returned when they were created (the export capability cannot remove them),
+  in a cleanup path that runs even when no session is archived.
 - Report reviewed, fixed, duplicate, deferred, quarantined, actionable, created, updated,
   not-yet-eligible, entry-type-unresolved, and archived counts with reasons, splitting eligible
   sessions into retrospective and stale (checkpoint-only, journal-only, zero-entry child, and
