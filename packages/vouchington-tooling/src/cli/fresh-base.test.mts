@@ -4,6 +4,7 @@ vi.mock('../fresh-base/index.mts', () => ({ checkFreshBase: vi.fn() }))
 
 import { checkFreshBase } from '../fresh-base/index.mts'
 import { runFreshBase } from './commands/fresh-base.mts'
+import { runCli } from './index.mts'
 import { parseCli } from './parse.mts'
 
 describe('fresh-base command', () => {
@@ -39,10 +40,16 @@ describe('fresh-base command', () => {
     })
   })
 
+  it('dispatches from the CLI entry point', () => {
+    vi.mocked(checkFreshBase).mockReturnValueOnce(null)
+    expect(runCli(['node', 'vouchington', 'fresh-base', '--skip-fetch'])).toBe(0)
+    expect(checkFreshBase).toHaveBeenCalledWith(expect.objectContaining({ skipFetch: true }))
+  })
+
   it('prints the JSON report, nothing outside a repository, and git-name errors', () => {
     vi.mocked(checkFreshBase).mockReturnValueOnce({ status: 'behind' } as never)
     expect(runFreshBase({ skipFetch: true })).toBe(0)
-    expect(checkFreshBase).toHaveBeenCalledWith({ skipFetch: true })
+    expect(checkFreshBase).toHaveBeenCalledWith(expect.objectContaining({ skipFetch: true }))
     expect(stdout).toHaveBeenCalledWith('{"status":"behind"}\n')
     stdout.mockClear()
     vi.mocked(checkFreshBase).mockReturnValueOnce(null)
