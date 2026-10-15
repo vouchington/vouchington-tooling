@@ -60,6 +60,19 @@ entrypoint, affected operations, and observed delivery status in the caller's jo
 a permission denial as tool unavailability or bypass a host approval requirement through the CLI.
 If neither path persists the note, stop and report the blocker.
 
+## Automated runs
+
+An automated run (scheduled, shepherd, or other unattended session) may lack the server. Then it
+continues its primary work and does not stop at the first journal trigger; "stop and report the
+blocker" and "continue primary work only after persistence succeeds" apply to attended sessions.
+
+Report in the final report, not as a failure of the task:
+
+- that journaling was unavailable and why (server not connected, or delivery or readback failed);
+- any pending outbox state, with `pendingCount` and `worktreePendingCount`, or that none was
+  written (autonomous mode has no outbox, so a failed delivery is an error to report, not retry);
+- each finding that would have been journaled, one line each, so the caller can journal it.
+
 ## CLI fallback
 
 Deprecated and being phased out: the MCP tools replace it, and retrospective and PR writers are
@@ -175,6 +188,35 @@ Never search for, print, invent, or mint credentials. Durable entries and outbox
 bounded structured facts or sanitized summaries, never raw command output, transcript content,
 environment dumps, provider payloads, or secrets. Known-secret redaction supplements the author's
 minimization responsibility; it cannot prove arbitrary prose contains no undisclosed secret.
+
+## Credential failures
+
+- Never search shell profiles, `env`, or `.env*` files for a credential; never print, inline, export,
+  or probe its value. Check presence only with `[ -n "${VAR+x}" ] && echo SET || echo UNSET`.
+- A sandbox denial is expected and is not a recovery target. Never read, print, copy, or export the
+  token to get around the sandbox.
+- A missing or stale credential blocks hosted delivery. In interactive mode the writer retains
+  sanitized feedback in its durable outbox, visibly pending: do not silently drop it or invent
+  another fallback. Ask the human to refresh the connection when needed, then restart the MCP client
+  or call `outbox_flush`.
+- Saturation and persistence failure require reporting the concrete blocker.
+- An automated run reports instead of asking (see Automated runs).
+
+## Child identity for spawned agents
+
+- Pass the parent's own session id in the assignment prompt at spawn time.
+- A spawned child resolves its own session id from its runtime environment through the consumer's
+  identity policy, then calls `session_ensure` with that `sessionId`, the `parentSessionId` it was
+  given, its own `agent` name, and its version before any blackboard-aware or substantive work.
+- If the runtime supplies no session identity, or the ensure fails, the child stops and reports the
+  blocker rather than guessing an id or substituting its task path.
+- A resolved id must satisfy the plain-token grammar the server enforces; never pass a path, URL, or
+  synthesized value to `session_ensure`.
+- Exception: a harness subagent that shares its parent's session id (no distinct id of its own) must
+  never call `session_ensure` with that inherited id as a new child. That reuses the parent's id as
+  both `sessionId` and `parentSessionId`, which the parent's root session rejects. Its activity is
+  already captured under the parent, so it journals only by asking the parent to append for it, or
+  treats this protocol as inapplicable.
 
 Consumer wrappers own service configuration, server registration and approval rules, trusted mode
 selection, issue routing, and archival authorization. The server fixes the outbox location.
