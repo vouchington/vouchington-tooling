@@ -10,6 +10,7 @@ import {
 import { createRepoFixture, type RepoFixture } from './git-fixture.test-helpers.mts'
 import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
+import type { SnapshotRegistry } from './snapshot-registry.mts'
 import { runIsolatedGit } from './worktree.mts'
 
 /** A fresh pair of real repositories for every test. */
@@ -41,6 +42,7 @@ export function harness(
     runGit?: ServerEnvironment['runGit']
     runGh?: GhRunner
     device?: () => { user: string; host: string }
+    snapshots?: SnapshotRegistry
   } = {},
 ): Harness {
   const fake = fakeBlackboard(options)
@@ -52,6 +54,7 @@ export function harness(
     ...(options.spawnPolicy === undefined ? {} : { spawnPolicy: options.spawnPolicy }),
     ...(options.runGh === undefined ? {} : { runGh: options.runGh }),
     ...(options.device === undefined ? {} : { device: options.device }),
+    ...(options.snapshots === undefined ? {} : { snapshots: options.snapshots }),
   }
   return { fake, call: (name, args) => callTool(name, args, environment) }
 }
