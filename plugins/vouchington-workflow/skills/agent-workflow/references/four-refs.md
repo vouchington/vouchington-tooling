@@ -3,6 +3,9 @@
 Use before any rebase or lease push of a branch other agents or humans may also write. Publish this
 branch; do not open a replacement pull request.
 
+`origin` and `main` below stand for the consumer's remote and default branch; substitute the names
+local policy declares.
+
 ## Setup
 
 - Run `git fetch origin main <branch>` as its own command. Never chain the fetch with a rebase,
@@ -31,7 +34,8 @@ branch; do not open a replacement pull request.
 
 - Capture `<sha>` with `git rev-parse origin/<branch>` after the fetch and before any rewrite. Push
   a non-fast-forward with `git push --force-with-lease=<branch>:<sha>`. With concurrent writers,
-  capture before fetching so a later fetch cannot silently widen the lease.
+  capture right after the setup fetch and before any later fetch, so a later fetch cannot silently
+  widen the lease.
 - If HEAD equals that SHA, do not push.
 - If a lease or non-force push is rejected, fetch again and re-read. It is still this branch.
 

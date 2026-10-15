@@ -14,15 +14,15 @@ Use when completed retrospectives or journals should become durable follow-up wo
 
 1. Enumerate only completed, eligible session records with the `snapshot_export` tool of the
    `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
-   `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
+   `data` fields, and `dataArrayContains`. It exports non-archived sessions to a
    private local file and returns the path, counts, checksum, and manifest, never the records.
    Before exporting, call `outbox_flush` and then `outbox_status` for every worktree that
    `git worktree list` reports, passing each path as `worktree`, and stop if any reports a
    `worktreePendingCount` above 0. Use the worktree count, never `pendingCount` or `status`, which
    cover only the caller's own session: the sessions to distill belong to other agents, and an
    archived session refuses later delivery, so a retained record would never be distilled. Outboxes
-   in removed worktrees or on other machines cannot be drained this way, so select with
-   `inactiveForHours` to give them time to deliver. Leave in-progress sessions intact. If a search
+   in removed worktrees or on other machines cannot be drained this way, so apply the age cutoffs under
+   [session shapes](#session-shapes-and-eligibility) to give them time to deliver. Leave in-progress sessions intact. If a search
    for `snapshot_export` (the tool names carry a harness prefix, see the
    [blackboard skill](../blackboard/SKILL.md)) finds no server, stop and report it; do not fall back
    to a CLI command.

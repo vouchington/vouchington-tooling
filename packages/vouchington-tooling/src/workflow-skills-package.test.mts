@@ -90,8 +90,10 @@ describe('workflow skills package contract', () => {
         manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
       )
       expect(prerequisites.get('agent-workflow')).toEqual([
+        'blackboard',
         'github-issue',
         'pr-description',
+        'retrospective',
         'review-ci-logs',
       ])
       expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
@@ -102,8 +104,15 @@ describe('workflow skills package contract', () => {
       for (const [name, required, closure = required] of [
         [
           'agent-workflow',
-          ['github-issue', 'pr-description', 'review-ci-logs'],
-          ['github-issue', 'pr-description', 'review-ci-logs', 'github-actions-checklist'],
+          ['blackboard', 'github-issue', 'pr-description', 'retrospective', 'review-ci-logs'],
+          [
+            'blackboard',
+            'github-issue',
+            'pr-description',
+            'retrospective',
+            'review-ci-logs',
+            'github-actions-checklist',
+          ],
         ],
         [
           'backend-vitest-test-authoring',
