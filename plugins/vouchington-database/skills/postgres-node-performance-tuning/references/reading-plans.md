@@ -53,7 +53,10 @@ SELECT funcname, calls FROM pg_stat_xact_user_functions;
 ROLLBACK;
 ```
 
-Inlined functions are not counted, so a function missing from the view was inlined. Tested on
+A positive call count proves the function was not inlined. Inlined functions are not counted, but
+a missing row is only suggestive: a query that returns no rows or short-circuits the predicate also
+never calls the function, so confirm the function body shape before concluding it was inlined.
+Tested on
 PostgreSQL 18.6: an `EXISTS`-bodied function was counted 90 times for 90 rows, and a
 plain-expression function was inlined and not counted. `track_functions = 'pl'` skips
 SQL-language functions; use `'all'`. See
@@ -61,8 +64,8 @@ SQL-language functions; use `'all'`. See
 
 ### Text join and index conditions
 
-`Hash Cond`, `Merge Cond`, `Join Filter`, or `Index Cond` comparing `text` or `varchar` columns
-(often shown with `::text` casts) means the key is compared under collation and stored in every
+`Hash Cond`, `Merge Cond`, `Join Filter`, or a join's `Index Cond` comparing `text` or `varchar`
+columns (often shown with `::text` casts) means the key is compared under collation and stored in every
 referencing row and index. Join on ids and keep the string in a unique column; see
 [join on ids](../../postgres-schema-design/references/relations.md#join-on-ids-never-on-text).
 
@@ -78,11 +81,14 @@ and compare `EXPLAIN (ANALYZE, BUFFERS) EXECUTE` for the same skewed value under
 
 ### Large sequential scans and bad estimates
 
-A `Seq Scan` over a large table that returns few rows is usually a missing or unusable index. A
-sequential scan on a small table, or one that returns most rows, is fine. Compare `Plan Rows`
+A `Seq Scan` over a large table that returns few rows and reads many buffers or removes many rows
+by filter is usually a missing or unusable index. A sequential scan on a small table, one that
+returns most rows, or one a parent `LIMIT` or `EXISTS` stops early (check the buffers) is fine. Compare `Plan Rows`
 with `Actual Rows` on every node that decides a join (scan inputs and join outputs): an estimate
 off by 10x or more can pick the wrong join type or order. Run `ANALYZE`, then consider a higher
-statistics target or extended statistics for correlated columns before changing the query.
+statistics target, or extended statistics for correlated columns within one table; extended
+statistics do not improve join selectivity, so for a join misestimate look at the join keys'
+statistics, the filters feeding the join, or the query shape before changing the query.
 
 ## Checklist
 

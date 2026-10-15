@@ -53,7 +53,8 @@ CREATE TABLE orders (id uuid PRIMARY KEY, account_id uuid NOT NULL REFERENCES ac
 
 Resolve the string to an id once at the boundary, then join `orders.account_id = accounts.id`.
 Values matched as text by nature, such as free-form tags, are the exception; document them. Text
-in a `Hash Cond` or `Index Cond` is a plan red flag; see
+in a join's `Hash Cond` or `Index Cond` is a plan red flag; the single lookup of the unique code
+at the boundary is expected and fine. See
 [reading plans](../../postgres-node-performance-tuning/references/reading-plans.md#text-join-and-index-conditions).
 
 Generic enforcement in `jonathanong/no-mistakes`: `postgres-column-naming`,

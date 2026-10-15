@@ -81,7 +81,7 @@ Put per-row logic in the query as a join or `EXISTS`, or keep the function a pla
 
 PostgreSQL expands a view into the calling query, and a simple view lets the outer filter push
 down into its base tables. A view that cannot be flattened (aggregation, `DISTINCT`, `LIMIT`,
-volatile or non-inlined functions, per-row subqueries, a security barrier) is built for every
+set operations, window functions, volatile target-list expressions, a security barrier) is built for every
 candidate row before a filter, sort, page, or count on its own columns applies. Confirm from the
 plan (large `Actual Rows` and `Actual Loops` inside the view's nodes), then choose the ids from the
 base tables first and read the view by its key, as a correlated `LATERAL` lookup so the page
