@@ -71,11 +71,6 @@
       "default": "./dist/agent-blackboard/index.mjs"
     },
     "./mcp-server/bin": "./bin/vouchington-mcp.mjs",
-    "./session-friction": {
-      "types": "./dist/session-friction/index.d.mts",
-      "import": "./dist/session-friction/index.mjs",
-      "default": "./dist/session-friction/index.mjs"
-    },
     "./sql-ast": {
       "types": "./dist/sql-ast/index.d.mts",
       "import": "./dist/sql-ast/index.mjs",

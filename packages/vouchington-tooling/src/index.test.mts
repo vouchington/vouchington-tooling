@@ -12,7 +12,7 @@ import {
   pruneDeployedRuntimeDeps,
   SCC_COMPLEXITY_LIMIT,
   CHECKPOINT_MARKER,
-  classifyFrictionObservation,
+  isConformingCiFailureBlock,
   INSTALL_TERMINATION_FAILED,
   isReleaseAgeViolation,
   isRunnerReservedPort,
@@ -75,7 +75,7 @@ describe('package exports', () => {
     expect(typeof pruneDeployedRuntimeDeps).toBe('function')
     expect(SCC_COMPLEXITY_LIMIT).toBe(50)
     expect(CHECKPOINT_MARKER).toBe('pr-checkpoint:v1')
-    expect(typeof classifyFrictionObservation).toBe('function')
+    expect(typeof isConformingCiFailureBlock).toBe('function')
     expect(
       selectHarnessSession(inspectHarnessEnvironment({ CODEX_THREAD_ID: 'root-session' }), [
         'codex',

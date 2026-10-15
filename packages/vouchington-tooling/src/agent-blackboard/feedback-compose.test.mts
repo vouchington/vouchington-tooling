@@ -1,7 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { recordFriction } from '../session-friction/index.mts'
 import { expect, it } from 'vitest'
 import { composeRetrospective, type RetrospectiveCompositionInput } from './index.mts'
 const input = (): RetrospectiveCompositionInput => ({
@@ -72,7 +71,7 @@ it('rejects mismatched assessments and unbounded unavailable reasons', async () 
     composeRetrospective({ ...input(), facts: { status: 'unavailable', reason: '' } }),
   ).rejects.toThrow(/reason/)
 })
-it('generates real collector output and uses typed friction coverage for complete versus partial assessment', async () => {
+it('generates real collector output and uses typed journal coverage for complete versus partial assessment', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'feedback-composition-'))
   try {
     const transcript = join(directory, 'transcript.jsonl')
@@ -80,7 +79,6 @@ it('generates real collector output and uses typed friction coverage for complet
       transcript,
       JSON.stringify({ type: 'event_msg', payload: { type: 'user_message' } }) + '\n',
     )
-    recordFriction('native:owner', { type: 'tool-result', command: 'echo clean' }, { directory })
     const current: RetrospectiveCompositionInput = {
       ...input(),
       facts: {
@@ -101,12 +99,12 @@ it('generates real collector output and uses typed friction coverage for complet
         }),
       },
       transcript: { jsonlPath: transcript },
-      friction: { directory, journalLoader: () => ({ status: 'not-found' }) },
+      journal: { journalLoader: () => ({ status: 'ok', entries: [] }) },
       tools: { status: 'none-observed', reason: 'inspected tool results' },
       architecture: { status: 'none-observed', reason: 'inspected changed service' },
       feedbackCoverage: {
         status: 'complete',
-        sources: ['repository', 'transcript', 'journal', 'friction'],
+        sources: ['repository', 'transcript', 'journal'],
         droppedCount: 0,
       },
     }
@@ -129,42 +127,12 @@ it('generates real collector output and uses typed friction coverage for complet
         transcript: { jsonlPath: join(directory, 'missing.jsonl') },
       }),
     ).rejects.toThrow(/complete feedback coverage/)
-    recordFriction(
-      'native:owner',
-      { type: 'permission-request', command: 'git push' },
-      { directory, maxEvents: 1 },
-    )
-    recordFriction(
-      'native:owner',
-      { type: 'permission-request', command: 'git push' },
-      { directory, maxEvents: 1 },
-    )
     await expect(
-      composeRetrospective({ ...current, friction: { ...current.friction!, maxEvents: 1 } }),
-    ).rejects.toThrow(/complete feedback coverage/)
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
-})
-it('rejects aggregate drop counts below observed friction drops without double counting', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'feedback-composition-drops-'))
-  try {
-    const options = { directory, maxEvents: 1 }
-    recordFriction('native:owner', { type: 'permission-request', command: 'git push' }, options)
-    recordFriction('native:owner', { type: 'permission-request', command: 'git push' }, options)
-    const current = {
-      ...input(),
-      friction: { ...options, journalLoader: () => ({ status: 'not-found' as const }) },
-    }
-    await expect(composeRetrospective(current)).rejects.toThrow(/observed friction drops/)
-    for (const droppedCount of [1, 2]) {
-      const markdown = await composeRetrospective({
+      composeRetrospective({
         ...current,
-        feedbackCoverage: { ...current.feedbackCoverage, droppedCount },
-      })
-      expect(markdown).toContain(`Feedback coverage: partial\nDropped records: ${droppedCount}`)
-      expect(markdown).toContain('Status: partial\nDropped records: 1')
-    }
+        journal: { journalLoader: () => ({ status: 'not-found' }) },
+      }),
+    ).rejects.toThrow(/complete feedback coverage/)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

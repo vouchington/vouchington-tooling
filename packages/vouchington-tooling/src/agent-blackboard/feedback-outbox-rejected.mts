@@ -1,6 +1,6 @@
 import { readdirSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
-import { withFileLock } from '../session-friction/lock.mts'
+import { withFileLock } from '../private-files/lock.mts'
 import { canonicalFeedback } from './feedback-canonical.mts'
 import { ensureOutboxDirectory } from './feedback-outbox-directory.mts'
 import {

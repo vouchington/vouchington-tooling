@@ -141,6 +141,7 @@ function removeStaleLock(lockPath: string): boolean {
       unlinkSync(lockPath)
       return true
     } catch {
+      /* v8 ignore next -- requires an unexpected filesystem failure during stale-lock recovery. */
       return false
     }
   })
@@ -177,7 +178,7 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
         /* v8 ignore next -- requires an unexpected lstat failure during the same race. */
         throw statusError
       }
-      if (!lockStatus.isFile()) throw new Error('session-friction log lock must be a regular file')
+      if (!lockStatus.isFile()) throw new Error('log lock must be a regular file')
       if (removeStaleLock(lockPath)) continue
       waitForLock()
       continue
@@ -190,5 +191,5 @@ export function withFileLock<Result>(path: string, action: () => Result): Result
       unlinkSync(lockPath)
     }
   }
-  throw new Error(`could not acquire session-friction log lock for ${basename(path)}`)
+  throw new Error(`could not acquire file lock for ${basename(path)}`)
 }

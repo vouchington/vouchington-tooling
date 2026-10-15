@@ -1,7 +1,7 @@
-import type { FrictionLogReadResult, JournalEntry } from './types.mts'
+import type { JournalEntry } from './types.mts'
 import { conformingBlocks, matchAuditBlock } from './audit-block.mts'
 import type { AuditRender } from './audit-fit.mts'
-import { markdownAuditText, type AuditRedactor } from './text.mts'
+import type { AuditRedactor } from './text.mts'
 
 const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$/
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
@@ -23,7 +23,6 @@ const CI_SECTION_MAX_BYTES = 4_000
 // Field order: header, Evidence, Root diagnostic, Disposition. Cut Root diagnostic first and
 // Evidence last, so the run URL and commit SHA survive longest.
 const SHRINK_ORDER = [2, 3, 0, 1]
-const SESSION_ID_MAX_BYTES = 120
 
 function matchBlock(markdown: string, render: AuditRender = {}): string | null {
   return matchAuditBlock(
@@ -74,17 +73,7 @@ export function incompleteCiSection(markdownBlocks: string[]): string {
   ].join('\n\n')
 }
 
-export function buildCiFailuresSection(
-  sessionId: string,
-  journal:
-    | { status: 'ok'; markdownBlocks: string[]; truncated: boolean }
-    | { status: 'unreachable'; diagnostic: string },
-  frictionStatus: FrictionLogReadResult['status'] | 'journal-only',
-): string {
-  if (journal.status === 'unreachable')
-    return `${CI_FAILURES_HEADER}\nStatus: unavailable (blackboard unreachable)`
-  if (journal.markdownBlocks.length === 0 && frictionStatus === 'absent')
-    return `${CI_FAILURES_HEADER}\nStatus: unavailable (no friction log for session ${markdownAuditText(sessionId, undefined, SESSION_ID_MAX_BYTES)})`
-  if (journal.markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`
-  return `${CI_FAILURES_HEADER}\nStatus: failures observed\n\n${journal.markdownBlocks.join('\n\n')}`
+export function buildCiFailuresSection(markdownBlocks: string[]): string {
+  if (markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`
+  return `${CI_FAILURES_HEADER}\nStatus: failures observed\n\n${markdownBlocks.join('\n\n')}`
 }

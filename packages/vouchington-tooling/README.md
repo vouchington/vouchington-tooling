@@ -315,7 +315,6 @@ import {
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
-import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 import { GITHUB_BODY_MAX_CHARACTERS, validateGitHubBodyLength } from 'vouchington-tooling'
 import { createPullRequest, processDiffCommand, runGh, runGit } from 'vouchington-tooling/gh-cli'
 import {
@@ -475,189 +474,6 @@ audit finishes, when the process receives SIGINT, SIGTERM, or SIGHUP, and on the
 previous process died first, including SIGKILL. Each workspace records its owner's PID so a later
 audit can delete directories whose owner is gone.
 
-`session-friction` is an opt-in capture and reporting library. Callers supply the session id,
-absolute log directory, host-independent observation, and journal loader; it does not inspect host
-environment variables, install hooks, or connect to a journal service by itself. Invoking
-`recordFriction` touches the session log even when no event is classified, preserving the
-difference between an observed clean session and missing evidence. Report markdown keeps backend
-diagnostics separate from its paste-safe output. Capture stores at most 500 events per session and counts rejected captures in a fixed-size atomic
-sidecar under the same session lock for either the event or byte limit, with visible `truncated`/`droppedCount` metadata. Saturated
-capture reads only the bounded counter; reports also preserve historical overflow markers.
-Interrupted or inconsistent counter updates make coverage unavailable. Malformed records also make the scan partial. It
-truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
-when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
-Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
-Report liveness inherits the caller-supplied journal loader, which must bound its own I/O and yields.
-Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
-and rendered audit fields are kept whole: composition loads the journal and friction log once, redacts each field from its raw text before Markdown escaping (a caller-supplied redactor runs first, then the built-in one), then renders the CI and sandbox sections, measures the real envelope against its 12,000-byte markdown and 16,384-byte envelope limits, and shrinks them in a few bounded attempts. A block shrinks Root diagnostic first and Evidence last, cutting only at token boundaries (never inside a URL or SHA) with a trailing `…`; groups that still cannot fit are omitted and counted in an explicit conforming group that points at the journal. The final attempt keeps only that omission note (about 300 bytes), so an input within roughly 300 bytes of the limit can still fail to compose. A caller-supplied `budgets` cap limits rendered groups only; the omission note is exempt from it. Permission requests record requested outcomes; explicit result observations may record approved
-or denied outcomes. A decision and simultaneous tool failure are both retained and counted in
-the report. Escalation detail without a decision remains unknown. Localhost connection
-refusal is an ambiguous failure and does not establish a sandbox cause. The supplied log directory must be dedicated
-to session-friction; existing directories must already be owner-only, while newly created
-directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
-buffer that can detect growth one byte beyond the documented 2 MB cap.
-Ownership checks require POSIX effective-user IDs (Linux and macOS); session-friction throws on
-Windows and other platforms where those IDs are unavailable.
-Root-owned system symlink ancestors are supported for paths such as macOS `/var`; callers must not
-allow the directory chain to be mutated while it is being validated.
-Command-prefix normalization recognizes simple shell
-segments with single or double quotes; it does not evaluate substitutions or implement a full shell
-grammar. Normalization attempts limited redaction of obvious credential patterns but is not a secret
-scrubber; callers must ensure credentials are never included in captured commands.
-Failure classification inspects at most 100,000 structured-stderr characters, split evenly between
-the beginning and end when input exceeds that bound.
-Cooperating log readers and writers are serialized, including the initial clean-session
-touch. Recording and report log reads are synchronous: on contention they block the caller's
-event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
-
-The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
-boundaries. Neutral review posting lives in `gha-post-review` and requires a caller-supplied GitHub
-token. Claude App OIDC is an explicitly selected `gha-claude-post-review` adapter; the legacy
-token-source router remains deprecated for one release line.
-
-`vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
-filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
-native frame symbols. Both structured reads and text rendering have hard report-count limits.
-
-Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
-main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
-update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct
-`createVitestWorkerExitDiagnosticsReporter({ recordDirectory })` in the Vitest reporter list
-before workers start. The reporter clears stale records at construction, preserves them across
-watch reruns, and prints an attribution summary only for abnormal worker exits. The worker writes
-a synchronous stderr line and one JSONL file per PID; a start record without an exit record
-identifies a fork killed before its handler could run. `createForkLeakDetector` accepts tracked
-resource names and warmup, threshold, and sustained-growth settings; the caller supplies each
-checkpoint's resource counts. Use a caller-owned run directory: the reporter clears only regular
-numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
-Application metrics and CI artifact handling stay with the caller.
-
-`browser-session-runner` supervises caller-created browser-test processes. Callers supply command
-construction, line classification, retry/outcome policy, and budgets; the library owns process-group
-termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
-The returned process must identify a dedicated process group, such as a child spawned with
-`detached: true`; its `processGroupId` is signalled without assuming the child PID is a group ID.
-Stall exits use the caller's `classifyExit` policy, while parent signals and shared-deadline expiration
-are terminal. Output is decoded independently per stream; unfinished lines are classified at close and
-`diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
-The runner uses monotonic elapsed time, rejects timer budgets above Node's maximum delay, and waits for
-the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.
-`isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
-process-group probe and bounded-drain semantics outside a browser session.
-
-### Generated arbiter input
-
-The `pg-schema-snapshot` export also provides `projectGeneratedArbiterInput(conflict)` for
-`PostgresSqlConflict` facts from `no-mistakes@0.83.0` or newer. It projects normalized key and
-partial-predicate column identities, ordered assignment columns, direct non-EXCLUDED references,
-and assignment indirection. Named constraints and unresolved expression keys have undefined
-`keyColumns`; missing or incomplete expression coverage sets `complete` to false. Callers must
-reject incomplete projections and retain their own snapshot-dependent replay verdict. The adapter
-loads no optional parser peer at runtime and implements no replay-safety policy. Its public
-`GeneratedArbiterConflict` contract is structural, so importing snapshot declarations does not
-require the optional peer either.
-
-### Contract schema type queries
-
-`getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
-`contract-schema` subpath. Every request must also pass `typescript`, the same TypeScript compiler
-API instance that created that `Program`. The source-file recognition check is a compatibility
-guard, and callers remain responsible for pairing the same compiler instance; the query uses the
-supplied API for compiler operations. Pass the exact `SourceFile.fileName`, an exported name or exact call
-expression text, and only the property names and exported comparison types the consumer needs.
-Facts include the displayed type, whether it is `any`, requested property displays, and requested
-assignability booleans. `defaultTypeParameterIndex` selects an exported generic default;
-direct defaults and direct references to preceding defaults are supported. Dependent composite
-defaults and uninstantiated generic type declarations used as assignability targets fail with an
-instruction to export and select a named instantiated type. Generic function values remain valid
-compiler-backed comparison targets. Default lookup uses an outer class, interface, or type-alias
-parameter list when present; otherwise it uses the first checker-visible call or construct
-signature, never a hidden implementation or a later overload.
-`rowSource: 'typeArgument'` selects a call's explicit type argument, while
-`rowSource: 'awaitedRows'` selects `Awaited<ReturnType>.rows[number]`.
-Call results are source ordered and include one-based line and column. An absent call returns an
-empty array so the consumer can enforce its own cardinality; a selected call missing its requested
-row type fails with a descriptive error. The package does not choose source files, expected
-properties, or contract policy.
-
-## Workflow skills outside plugins
-
-The package ships a flat union of canonical workflow, testing, and database skills at
-`skills/<skill>/SKILL.md`. This stable installed path supports agents that do not load Claude or
-Codex plugins. The package build materializes plugin source trees without hand-copying skill content
-and writes sorted schema-v1 provenance to `skills/manifest.json`.
-Each manifest entry may declare its ordered `prerequisites`; ordinary Markdown links remain
-cross-references and never cause additional skills to be linked.
-Prerequisites ensure installation closure; they do not require eagerly reading every installed
-skill. Follow the invoked skill's conditional instructions for the current task.
-
-Canonical entrypoints direct agents to applicable local instructions and adapters before using
-portable policy. Local `AGENTS.md` may name an adapter alias; an already-read canonical skill or
-adapter is not loaded again. `linkSkill` still links files only: it does not load instructions,
-resolve local aliases, or execute a workflow. Validate observed agent loading separately from
-installation and packaged-resource checks.
-
-Use `readSkillManifest(skillsRoot)` to discover installed skills or
-`linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The
-CLI equivalent is `vouchington link-skill <name> --source-root <skills-dir> --target-root <dir>`.
-When `sourceRoot` contains `manifest.json`, linking validates the packaged inventory and recursively
-links declared prerequisites. Without a manifest, it links the conventional
-`<sourceRoot>/<name>/SKILL.md` repository-local skill. It rejects missing or unsafe sources, paths
-outside either root, and existing non-matching destinations.
-`targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
-rejected.
-
-## Validated feedback and delivery
-
-Import `createFeedbackEnvelope`, `validateFeedbackEnvelope`, `writeFeedback`, `verifyFreshFeedback`,
-`composeRetrospective`, `feedbackOutboxStatus`, and `flushFeedbackOutbox` from the existing
-`vouchington-tooling/agent-blackboard` subpath. Consumers must run Node 24 or newer and install `agent-blackboard@^0.6.0` explicitly alongside
-`vouchington-tooling`; the provider is not installed by this package. Missing provider installation
-returns `client-unavailable`; missing or invalid connection configuration returns
-`configuration-invalid`, separately from transport outages and authentication rejection.
-The upstream `agent-blackboard` client still owns the
-service protocol; this integration adds no provider schema or service. Supply consumer module
-context through `dependencies.resolveFrom` or inject the client loader at the transport boundary.
-
-The version-one envelope retains canonical `markdown` and storage `type: journal | retrospective`.
-It requires exact canonical repositories, stable URL-safe `sourceEventId`, ISO timestamp, explicit
-`workOutcome`, and `feedbackCoverage` with status, sources, and dropped count. Optional category is
-context only. Retrospectives retain valid date and integer/string issue/PR references. Markdown is
-capped at 12 KB and the envelope at 16 KB. Known credentials are redacted; authors remain responsible
-for minimizing summaries and excluding raw logs, transcripts, environment dumps, and undisclosed
-secrets. A bound violation fails visibly without clipping findings.
-
-`writeFeedback({identity, envelope, mode, ...})` accepts an exact caller-owned session identity and
-never manufactures native agent identities. Interactive mode requires an absolute outbox
-directory. Ancestor ownership and permissions are not checked; existing directory and record modes
-are accepted. New directories and files default to `0700` and `0600`. The outbox itself must be a
-real directory, and records must be regular files. The writer persists before transport with atomic
-rename, file/directory fsync, and a stable record path. The outbox holds at most 128 records and 2 MB. Saturation,
-corruption, or persistence failure blocks capture and preserves unsent records. Delivered records
-are removed only after matching readback. Pending state includes count and a safe diagnostic;
-interactive CLI exit zero means durable retention, and callers must inspect the printed status to
-know whether delivery was acknowledged. Autonomous errors and unpersisted writes fail nonzero.
-Identity, content, and archived-session conflicts fail in either mode while preserving the unsent
-record; they are not reported as transient pending delivery. Replay retains permanently conflicted
-records and continues to deliver unrelated pending records; transient failures stop that replay.
-Verified delivery retains its receipt when local cleanup fails, returning
-`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is
-safe to replay: an event is identified by session, `sourceEventId`, and content, and a duplicate that
-differs only in `timestamp` is the same event, so it reports the stored record's `timestamp` and
-receipt and the retained duplicate is removed.
-Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
-records after connectivity returns.
-
-Autonomous mode prohibits the filesystem outbox. `verifyFreshFeedback` requires a fresh source-event
-write plus readback of its own append receipt and rejects visible duplicate source records. This
-is fresh online reporting evidence, not a distributed execution lease: eventually consistent
-provider reads cannot establish source uniqueness. Trusted controllers
-supply a unique new authorization-probe source ID, preserve their authoritative run/session
-lineage, and atomically claim and revalidate the attempt before execution. Terminal writes keep work outcome separate from coverage and returned delivery state.
-The delivered result includes a verified receipt with session ID, source-event ID and creation time.
-Controllers require this online result together with atomically established attempt ownership
-before execution.
-
 Delivery is at least once. Replays pre-read matching source identity/content, accept equivalent
 persistent duplicates, and reject conflicting reuse. Equality ignores object property order while
 preserving array order. Each online operation has a 20-second deadline (`timeoutMs` can shorten it);
@@ -669,31 +485,25 @@ replay the identical envelope and source ID to verify its actual persistence.
 generates required sections and markers. Tool and architectural assessments preserve observation,
 evidence, disposition and tracking reference. None-observed and unassessed states need a scoped
 reason. Complete coverage is rejected when required sources are unavailable or capture is partial.
-Typed collector reports expose availability independently of rendered text. Composition rejects
-aggregate dropped counts below observed friction drops and retains larger caller aggregates without
-double counting. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
+Typed collector reports expose availability independently of rendered text. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
 for consumers to preserve or reject conflicting explicit overrides; trusted mode stays external.
 Human top-five summaries do not authorize dropping additional durable findings.
 
 The `## CI Failures` and `## Sandbox & Permission Audit` sections come from one optional audit
-source; the two inputs are mutually exclusive and supplying both throws before any collector runs.
-`friction: {directory, journalLoader, ...}` keeps reading the session-friction log together with the
-journal and is unchanged. `journal: {journalLoader}` needs no friction directory or log: both
-sections are assessed from the session's journal entries alone, and the report carries
-`coverage.frictionStatus: 'journal-only'` (in place of `empty` or `events`) so the text states that
-no log was observed. `feedbackCoverage.status: 'complete'` accepts either source. It is rejected
-when neither is supplied (the error names the missing source), and a journal-only audit does not
-count as assessed when the loader reports `not-found` (there is no log to establish that the session
-was observed), throws, or is truncated by the scan bounds.
+source, `journal: {journalLoader}`: both sections are assessed from the session's journal entries
+alone, with the text stating `journal entries only`. `feedbackCoverage.status: 'complete'` is
+rejected when no journal source is supplied (the error names the missing source), and a journal
+audit does not count as assessed when the loader reports `not-found` (nothing else establishes that
+the session was observed), throws, or is truncated by the scan bounds.
 
 ```ts
 await composeRetrospective({ ...input, journal: { journalLoader } })
 ```
 
-`journalLoader` is the session-friction `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
+`journalLoader` is a `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
 `JournalEntry`, and `JournalAuditOptions` are exported as types from
-`vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar and its three status
-lines (`failures observed`, `none observed`, `unavailable (<reason>)`) are the same for both sources.
+`vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar has three status
+lines (`failures observed`, `none observed`, `unavailable (<reason>)`).
 Journal-only sandbox and permission entries are journal Markdown entries that hold exactly one
 block, escaped and length-bounded like CI failures, and other entries are ignored:
 
@@ -709,7 +519,7 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 
 `ambiguous-failure` takes the same shape as `sandbox-failure`. The section reports
 `Status: none observed` or `Status: events observed`, each followed by
-`(journal entries only; no friction log observed)`; a truncated scan reports
+`(journal entries only)`; a truncated scan reports
 `unavailable (journal scan incomplete)` with the entries read so far.
 
 ## Basic Auth exemption facts

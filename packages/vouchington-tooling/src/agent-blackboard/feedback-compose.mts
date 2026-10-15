@@ -6,9 +6,7 @@ import {
   runRetrospectiveTranscriptReport,
   type ResolveOptions,
 } from '../retrospective-transcript/index.mts'
-import type { SessionFrictionReportOptions } from '../session-friction/index.mts'
 import {
-  assertSingleAuditSource,
   auditAssessed,
   loadAuditInputs,
   renderAuditReport,
@@ -57,9 +55,7 @@ export type RetrospectiveCompositionInput = {
   narrative: string
   facts: Omit<RetrospectiveFactsOptions, 'raw'> | Unassessed
   transcript: ResolveOptions | Unassessed
-  /** CI failures and sandbox audit from a friction log plus journal. Exclusive with `journal`. */
-  friction?: SessionFrictionReportOptions
-  /** CI failures and sandbox audit from journal entries alone (`frictionStatus: 'journal-only'`). */
+  /** CI failures and sandbox audit from the session journal's entries. */
   journal?: JournalAuditOptions
   tools: FeedbackAssessment
   architecture: FeedbackAssessment
@@ -98,7 +94,6 @@ function unavailable(marker: string, input: Unassessed): string {
   return `${marker}\nStatus: ${input.status.replaceAll('-', ' ')} (${input.reason})`
 }
 export async function composeRetrospective(input: RetrospectiveCompositionInput): Promise<string> {
-  assertSingleAuditSource(input)
   const unavailableFacts =
     'status' in input.facts
       ? {
@@ -161,7 +156,7 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
   let audit: AuditReport
   let markdown: string
   for (let attempt = 1; ; attempt++) {
-    audit = renderAuditReport(input.sessionId, boundedAuditSource(input, caps), loaded)
+    audit = renderAuditReport(boundedAuditSource(input, caps), loaded)
     markdown = assemble(audit.markdown)
     const overflow = feedbackOverflowBytes(envelopeFor(markdown))
     if (!overflow || attempt === AUDIT_ATTEMPTS) break
@@ -181,7 +176,5 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
       !auditAssessed(audit))
   )
     throw completeCoverageError(input)
-  if ((audit.coverage.droppedCount ?? 0) > input.feedbackCoverage.droppedCount)
-    throw new Error('feedback coverage dropped count must include observed friction drops')
   return createFeedbackEnvelope(envelopeFor(markdown)).markdown
 }

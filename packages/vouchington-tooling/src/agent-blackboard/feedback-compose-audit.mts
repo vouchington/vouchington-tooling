@@ -40,21 +40,13 @@ export function boundedAuditSource(input: AuditInput, caps: AuditCaps): AuditSou
     ciBytes: Math.min(caller?.ciBytes ?? Infinity, caps.ciBytes),
     sandboxBytes: Math.min(caller?.sandboxBytes ?? Infinity, caps.sandboxBytes),
   })
-  return input.friction
+  return input.journal
     ? {
-        friction: {
-          ...input.friction,
-          redact: redactionFor(input.friction.redact),
-          budgets: clamp(input.friction.budgets),
+        journal: {
+          ...input.journal,
+          redact: redactionFor(input.journal.redact),
+          budgets: clamp(input.journal.budgets),
         },
       }
-    : input.journal
-      ? {
-          journal: {
-            ...input.journal,
-            redact: redactionFor(input.journal.redact),
-            budgets: clamp(input.journal.budgets),
-          },
-        }
-      : {}
+    : {}
 }

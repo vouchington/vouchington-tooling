@@ -1,8 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
-import { recordFriction } from '../session-friction/index.mts'
+import { describe, expect, it } from 'vitest'
 import {
   composeRetrospective,
   type JournalEntry,
@@ -18,8 +14,6 @@ const GRAMMAR = [
   /^ {2}- Root diagnostic: .*[^\s]$/,
   /^ {2}- Disposition: .*[^\s]$/,
 ]
-const directories: string[] = []
-afterAll(() => Promise.all(directories.map((value) => rm(value, { recursive: true, force: true }))))
 
 type Overrides = Partial<RetrospectiveCompositionInput> & {
   redact?: (value: string) => string
@@ -43,15 +37,11 @@ const compose = (markdown: string[], overrides: Overrides = {}): Promise<string>
     transcript: { status: 'not-assessed', reason: 'no transcript selected' },
     tools: { status: 'none-observed', reason: 'inspected tool results' },
     architecture: { status: 'none-observed', reason: 'inspected changed service' },
-    ...(rest.friction
-      ? {}
-      : {
-          journal: {
-            journalLoader: () => ({ status: 'ok', entries: entries(...markdown) }),
-            ...(redact ? { redact } : {}),
-            ...(budgets ? { budgets } : {}),
-          },
-        }),
+    journal: {
+      journalLoader: () => ({ status: 'ok', entries: entries(...markdown) }),
+      ...(redact ? { redact } : {}),
+      ...(budgets ? { budgets } : {}),
+    },
     knownSensitiveValues: [SECRET],
     ...rest,
   })
@@ -182,34 +172,6 @@ describe('audit size fitting', () => {
     expect(markdown).toContain('further failure groups omitted')
   })
 
-  it('reports omitted sandbox events when 100 long events overflow', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'feedback-fit-events-'))
-    directories.push(directory)
-    for (let index = 0; index < 100; index++)
-      recordFriction(
-        'native:owner',
-        {
-          type: 'tool-result',
-          command: `git push origin branch-${index}`,
-          permissionOutcome: 'approved',
-          escalationDetail: `network write ${index} blocked ${'because proxy denied '.repeat(45)}`,
-        },
-        { directory },
-      )
-    const markdown = await compose([], {
-      friction: { directory, journalLoader: () => ({ status: 'not-found' }) },
-      narrative: 'n'.repeat(5_000),
-    })
-    expectLimits(markdown)
-    const lines = section(markdown, 'Sandbox & Permission Audit')
-    expect(lines[1]).toBe('Events observed: 100')
-    const count = Number(/- omitted \((\d+)\)/.exec(lines.join('\n'))![1])
-    const events = lines.filter((line) => line.startsWith('  - git push'))
-    expect(events.length).toBeGreaterThanOrEqual(1)
-    expect(events.length + count).toBe(100)
-    expect(lines.join('\n')).toContain(`  - see journal — ${count} events omitted`)
-  })
-
   it('fits 25 issue and 25 PR references plus several long CI blocks', async () => {
     const reference = (kind: string, index: number): string =>
       `https://example.com/${kind}/${index}/${'x'.repeat(100)}`.slice(0, 130)
@@ -225,19 +187,6 @@ describe('audit size fitting', () => {
     expect(groups.length).toBeGreaterThanOrEqual(1)
     for (const group of groups)
       group.forEach((line, index) => expect(line).toMatch(GRAMMAR[index]!))
-  })
-
-  it('bounds a long session id when no journal or friction log exists', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'feedback-fit-session-'))
-    directories.push(directory)
-    const markdown = await compose([], {
-      sessionId: '-'.repeat(4_000),
-      friction: { directory, journalLoader: () => ({ status: 'not-found' }) },
-    })
-    expectLimits(markdown)
-    const status = section(markdown, 'CI Failures')[1]!
-    expect(status).toMatch(/^Status: unavailable \(no friction log for session .+…\)$/)
-    expect(Buffer.byteLength(status)).toBeLessThan(200)
   })
 
   it('never exceeds a caller-supplied cap and says what was omitted', async () => {

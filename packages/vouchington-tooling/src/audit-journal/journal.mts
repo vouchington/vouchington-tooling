@@ -56,7 +56,7 @@ async function collectEntries(
   return { entries: result, truncated }
 }
 
-export function errorMessage(error: unknown): string {
+function errorMessage(error: unknown): string {
   try {
     return error instanceof Error ? error.message : String(error)
   } catch {

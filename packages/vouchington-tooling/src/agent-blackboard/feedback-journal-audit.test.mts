@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JournalEntry } from '../session-friction/types.mts'
+import type { JournalEntry } from '../audit-journal/types.mts'
 import { buildJournalAuditReport } from './feedback-journal-audit.mts'
 import { getConformingSandboxBlocks } from './feedback-journal-sandbox.mts'
 
@@ -21,8 +21,8 @@ const failure = [
   '  - Disposition: moved output under TMPDIR',
 ].join('\n')
 const ambiguous = failure.replace('sandbox-failure', 'ambiguous-failure')
-const NONE = 'Status: none observed (journal entries only; no friction log observed)'
-const EVENTS = 'Status: events observed (journal entries only; no friction log observed)'
+const NONE = 'Status: none observed (journal entries only)'
+const EVENTS = 'Status: events observed (journal entries only)'
 
 const entry = (markdown: unknown, type = 'journal'): JournalEntry =>
   ({ data: { type, markdown } }) as JournalEntry
@@ -36,7 +36,6 @@ describe('journal-only audit report', () => {
     const result = await report([])
     expect(result.coverage).toEqual({
       journalStatus: 'complete',
-      frictionStatus: 'journal-only',
       truncated: false,
     })
     expect(result.markdown).toBe(
@@ -86,7 +85,6 @@ describe('journal-only audit report', () => {
     })
     expect(result.coverage).toEqual({
       journalStatus: 'unavailable',
-      frictionStatus: 'journal-only',
       truncated: false,
     })
     expect(result.markdown).toBe(
@@ -118,7 +116,6 @@ describe('journal-only audit report', () => {
     )
     expect(result.coverage).toEqual({
       journalStatus: 'partial',
-      frictionStatus: 'journal-only',
       truncated: false,
     })
     expect(result.markdown).toBe(

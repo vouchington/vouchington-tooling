@@ -2,7 +2,6 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { recordFriction } from '../session-friction/index.mts'
 import {
   composeRetrospective,
   type JournalEntry,
@@ -84,7 +83,7 @@ const assessed = (): RetrospectiveCompositionInput => ({
 })
 
 describe('journal-only composition', () => {
-  it('reaches complete coverage from journal entries with no friction log', async () => {
+  it('reaches complete coverage from journal entries alone', async () => {
     const markdown = await composeRetrospective({
       ...assessed(),
       journal: { journalLoader: loader() },
@@ -93,7 +92,7 @@ describe('journal-only composition', () => {
     expect(markdown).toContain('Feedback coverage: complete')
     expect(markdown).toContain('## CI Failures\nStatus: none observed\n\n')
     expect(markdown).toContain(
-      '## Sandbox & Permission Audit\nStatus: none observed (journal entries only; no friction log observed)',
+      '## Sandbox & Permission Audit\nStatus: none observed (journal entries only)',
     )
     expect(markdown).not.toContain('not assessed')
   })
@@ -105,7 +104,7 @@ describe('journal-only composition', () => {
     })
     expect(markdown).toContain(`\n\n## CI Failures\nStatus: failures observed\n\n${ciFailure}\n\n`)
     expect(markdown).toContain(
-      `\n\n## Sandbox & Permission Audit\nStatus: events observed (journal entries only; no friction log observed)\n\n${escalation}\n\n`,
+      `\n\n## Sandbox & Permission Audit\nStatus: events observed (journal entries only)\n\n${escalation}\n\n`,
     )
     expect(markdown.indexOf('## Transcript Facts')).toBeLessThan(markdown.indexOf('## CI Failures'))
     expect(markdown.indexOf('## Sandbox & Permission Audit')).toBeLessThan(
@@ -162,31 +161,10 @@ describe('journal-only composition', () => {
 })
 
 describe('audit source selection', () => {
-  it('rejects supplying both a friction and a journal source before running collectors', async () => {
-    let calls = 0
-    const current = assessed()
-    await expect(
-      composeRetrospective({
-        ...current,
-        facts: {
-          repo: 'owner/repo',
-          pr: '1',
-          execute: async () => {
-            calls++
-            return { ok: false, stdout: '', stderr: '' }
-          },
-        },
-        friction: { directory, journalLoader: loader() },
-        journal: { journalLoader: loader() },
-      }),
-    ).rejects.toThrow('either a friction or a journal audit source, not both')
-    expect(calls).toBe(0)
-  })
-
   it('names the missing source when complete coverage is requested with neither', async () => {
     await expect(composeRetrospective(assessed())).rejects.toThrow(COMPLETE_ERROR)
     await expect(composeRetrospective(assessed())).rejects.toThrow(
-      /no friction or journal source supplied for CI failures and sandbox audit/,
+      /no journal source supplied for CI failures and sandbox audit/,
     )
   })
 
@@ -195,22 +173,5 @@ describe('audit source selection', () => {
     expect(markdown).toContain(
       '## CI Failures\nStatus: unavailable (not assessed)\n\n## Sandbox & Permission Audit\nStatus: unavailable (not assessed)',
     )
-  })
-
-  it('leaves the friction input behaviour unchanged', async () => {
-    const options = { directory }
-    recordFriction('native:owner', { type: 'permission-request', command: 'git push' }, options)
-    const friction = { ...options, journalLoader: loader(ciFailure) }
-    const markdown = await composeRetrospective({ ...assessed(), friction })
-    expect(markdown).toContain('feedback_coverage: {"status":"complete"')
-    expect(markdown).toContain(`## CI Failures\nStatus: failures observed\n\n${ciFailure}`)
-    expect(markdown).toContain('## Sandbox & Permission Audit\nEvents observed: 1')
-    expect(markdown).not.toContain('journal entries only')
-    await expect(
-      composeRetrospective({
-        ...assessed(),
-        friction: { directory: join(directory, 'missing'), journalLoader: loader() },
-      }),
-    ).rejects.toThrow(COMPLETE_ERROR)
   })
 })
