@@ -203,67 +203,76 @@ describe('createPullRequest', () => {
 // suite proves the real `git branch --show-current` / `git ls-remote --heads` subcommand syntax
 // is correct against an actual repository and a local bare "remote" — not just that a fake echoes
 // back canned output.
+//
+// Every git call names its repository through `cwd` instead of `process.chdir`. A test that times
+// out keeps running after `afterEach`, and with a restored process cwd its remaining git commands
+// (`checkout -b`, `push`, `commit`) would land in the checkout running the suite.
 describe('createPullRequest — real git integration', () => {
-  const previousCwd = process.cwd()
+  const timeout = 30_000
   const testDirs: string[] = []
 
   afterEach(async () => {
-    process.chdir(previousCwd)
     await Promise.all(testDirs.splice(0).map((dir) => rm(dir, { force: true, recursive: true })))
   })
 
-  async function realRunGit(args: string[]): Promise<string> {
-    const { stdout } = await execFileAsync('git', args)
-    return stdout
+  function gitIn(cwd: string): RunTextCommand {
+    return async (args) => (await execFileAsync('git', args, { cwd })).stdout
   }
 
-  async function createRepoWithRemote(): Promise<void> {
+  async function createRepoWithRemote(): Promise<RunTextCommand> {
     const repoDir = await mkdtemp(join(tmpdir(), 'gh-cli-pr-create-repo-'))
     const remoteDir = await mkdtemp(join(tmpdir(), 'gh-cli-pr-create-remote-'))
     testDirs.push(repoDir, remoteDir)
 
-    process.chdir(remoteDir)
-    await execFileAsync('git', ['init', '--bare'])
-
-    process.chdir(repoDir)
-    await execFileAsync('git', ['init', '-b', 'main'])
-    await execFileAsync('git', ['config', 'user.email', 'gh-cli-test@example.com'])
-    await execFileAsync('git', ['config', 'user.name', 'gh-cli test'])
-    await execFileAsync('git', ['commit', '--allow-empty', '-m', 'initial commit'])
-    await execFileAsync('git', ['remote', 'add', 'origin', remoteDir])
+    await gitIn(remoteDir)(['init', '--bare'])
+    const git = gitIn(repoDir)
+    await git(['init', '-b', 'main'])
+    await git(['config', 'user.email', 'gh-cli-test@example.com'])
+    await git(['config', 'user.name', 'gh-cli test'])
+    await git(['commit', '--allow-empty', '-m', 'initial commit'])
+    await git(['remote', 'add', 'origin', remoteDir])
+    return git
   }
 
-  it('resolves and confirms a pushed branch against a real remote', async () => {
-    await createRepoWithRemote()
-    await execFileAsync('git', ['checkout', '-b', 'feature/real'])
-    await execFileAsync('git', ['push', '-u', 'origin', 'feature/real'])
+  it(
+    'resolves and confirms a pushed branch against a real remote',
+    async () => {
+      const git = await createRepoWithRemote()
+      await git(['checkout', '-b', 'feature/real'])
+      await git(['push', '-u', 'origin', 'feature/real'])
 
-    const branch = await resolveHeadBranch(realRunGit)
-    expect(branch).toBe('feature/real')
-    await expect(assertHeadPushed(realRunGit, { branch })).resolves.toBeUndefined()
-  })
+      const branch = await resolveHeadBranch(git)
+      expect(branch).toBe('feature/real')
+      await expect(assertHeadPushed(git, { branch })).resolves.toBeUndefined()
+    },
+    timeout,
+  )
 
-  it('fails assertHeadPushed against a real remote when the branch was never pushed', async () => {
-    await createRepoWithRemote()
-    await execFileAsync('git', ['checkout', '-b', 'feature/unpushed'])
+  it(
+    'fails assertHeadPushed against a real remote when the branch was never pushed',
+    async () => {
+      const git = await createRepoWithRemote()
+      await git(['checkout', '-b', 'feature/unpushed'])
 
-    const branch = await resolveHeadBranch(realRunGit)
-    expect(branch).toBe('feature/unpushed')
-    await expect(assertHeadPushed(realRunGit, { branch })).rejects.toBeInstanceOf(
-      HeadNotPushedError,
-    )
-  })
+      const branch = await resolveHeadBranch(git)
+      expect(branch).toBe('feature/unpushed')
+      await expect(assertHeadPushed(git, { branch })).rejects.toBeInstanceOf(HeadNotPushedError)
+    },
+    timeout,
+  )
 
-  it('fails assertHeadPushed against a real remote when the local branch has an unpushed commit', async () => {
-    await createRepoWithRemote()
-    await execFileAsync('git', ['checkout', '-b', 'feature/stale'])
-    await execFileAsync('git', ['push', '-u', 'origin', 'feature/stale'])
-    await execFileAsync('git', ['commit', '--allow-empty', '-m', 'a newer local commit'])
+  it(
+    'fails assertHeadPushed against a real remote when the local branch has an unpushed commit',
+    async () => {
+      const git = await createRepoWithRemote()
+      await git(['checkout', '-b', 'feature/stale'])
+      await git(['push', '-u', 'origin', 'feature/stale'])
+      await git(['commit', '--allow-empty', '-m', 'a newer local commit'])
 
-    const branch = await resolveHeadBranch(realRunGit)
-    expect(branch).toBe('feature/stale')
-    await expect(assertHeadPushed(realRunGit, { branch })).rejects.toBeInstanceOf(
-      HeadOutOfDateError,
-    )
-  })
+      const branch = await resolveHeadBranch(git)
+      expect(branch).toBe('feature/stale')
+      await expect(assertHeadPushed(git, { branch })).rejects.toBeInstanceOf(HeadOutOfDateError)
+    },
+    timeout,
+  )
 })
