@@ -20,5 +20,6 @@ export async function noSourceStatement(
   if (outcome.status !== 'ok') return undefined
   if (typeof outcome.result !== 'string' || !outcome.result.trim())
     throw new Error('policy renderNoSourceIssue must return a non-empty string')
-  return outcome.result.trim()
+  // Only blank lines around the statement go; the first line's indentation is significant Markdown.
+  return outcome.result.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd()
 }

@@ -105,7 +105,9 @@ export async function prepare(
       ? given.base
       : liveBase(pr as number, live, redactCredentials(args.base as string | undefined, secrets))
   const input = { ...given, base }
-  if (head === base) throw new Error(`head branch ${head} must differ from base ${base}`)
+  // A live pull request may come from a fork whose branch shares the base's name.
+  if (head === base && !(kind === 'validate' && live !== undefined))
+    throw new Error(`head branch ${head} must differ from base ${base}`)
   const device = (context.device ?? (() => ({ user: userInfo().username, host: hostname() })))()
   const statement = await noSourceStatement(policyFor(context), input)
   let body = renderPullRequestBody(

@@ -87,6 +87,13 @@ describe('noSourceIssue', () => {
     expect(jsonOf(await h.call('pr_validate', args(extra))).body).toContain(
       '## Related issues\n\n- Marker: r\n\n## Details',
     )
+    const indented = policy((name) =>
+      name === 'renderNoSourceIssue' ? '\n  \n    - nested\n\n' : { errors: [] },
+    )
+    const i = harness(fixture(), { spawnPolicy: indented.spawnPolicy, device })
+    expect(jsonOf(await i.call('pr_validate', args(extra))).body).toContain(
+      '## Related issues\n\n    - nested\n\n## Details',
+    )
     for (const result of [' ', 7]) {
       const bad = policy((name) => (name === 'renderNoSourceIssue' ? result : { errors: [] }))
       const b = harness(fixture(), { spawnPolicy: bad.spawnPolicy, device })
@@ -149,17 +156,25 @@ describe('pr_validate is read-only', () => {
     jsonOf(await h.call('pr_validate', args({ pr: 5, base: undefined })))
   })
 
-  it('still rejects a credential head and a head equal to the base', async () => {
+  it('accepts a fork head named like the base, but still rejects a credential head', async () => {
+    declarePolicy(fixture())
+    const p = policy(() => ({ errors: [] }))
     const view = { ...LIVE, headRefName: 'trunk' }
-    const h = harness(fixture(), { runGh: fakeGh({ view }).runGh, device })
-    expect(textOf(await h.call('pr_validate', args({ pr: 5 })))).toContain('must differ from base')
-    const env = { PATH: '/bin', GH_TOKEN: 'other' }
+    const h = harness(fixture(), {
+      spawnPolicy: p.spawnPolicy,
+      runGh: fakeGh({ view }).runGh,
+      device,
+    })
+    jsonOf(await h.call('pr_validate', args({ pr: 5 })))
+    expect(p.requests[0]!.input).toMatchObject({ head: 'trunk', base: 'trunk' })
     const named = harness(fixture(), {
       runGh: fakeGh({ view: { ...LIVE, headRefName: 'other' } }).runGh,
       device,
-      env,
+      env: { PATH: '/bin', GH_TOKEN: 'other' },
     })
     expect(textOf(await named.call('pr_validate', args({ pr: 5 })))).toContain('server credential')
+    const update = harness(fixture(), { runGh: fakeGh({ view }).runGh, device })
+    expect(textOf(await update.call('pr_update', args({ pr: 5 })))).toContain('has head trunk')
   })
 
   it('keeps pr_update strict about state and head', async () => {
