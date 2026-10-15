@@ -8,12 +8,14 @@ never the agent's own decision.
 
 1. Resolve the stack from `pulls/<any-layer>.stack`, and record whether the field was present. A
    stack object supplies its number; an explicit `null` means no registered stack. A missing
-   preview field leaves membership unknown. Do not treat an empty `.stack.number` alone as proof
+   preview field: query `stacks?pull_request=<N>`, where one result is the stack and zero means
+   unstacked. Do not treat an empty `.stack.number` alone as proof
    that a pull request is unstacked.
 2. Read topology from `repos/{owner}/{repo}/stacks/<n>`, ordered bottom to top. A
    `closed && merged_at == null` layer below an open one means the stack is broken. Report it to
    the human, and never merge across it.
-3. Partition by ownership, using that topology read. Shepherd only owned pull requests. Never
+3. Partition by ownership, using that topology read plus each member's body from `pulls/<N>` (the
+   stack response has no bodies). Shepherd only owned pull requests. Never
    poll, fix, rebase, or push the others, but list them in every report. Owned means this session
    opened the pull request, or a human named it in this session.
    - The opened-by-me half is a durable remote fact when the repository's pull request description
@@ -136,7 +138,8 @@ session-filtered:
 ```bash
 # Reconcile, unfiltered: it finds stacks this session did not create.
 gh api --paginate repos/{owner}/{repo}/stacks --jq '.[] | select(.open)'   # 30 per page
-gh pr list --state open --limit 100 --json number,title,author,body   # the default limit is 30
+gh api --paginate "repos/{owner}/{repo}/pulls?state=open&per_page=100" \
+  --jq '.[] | {number, title, user: .user.login, body}'
 # Partition: apply the ownership check from Establish scope to that output.
 ```
 

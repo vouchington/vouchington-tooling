@@ -40,7 +40,8 @@ Use only non-interactive forms:
 - `gh stack sync` fetches, fast-forwards the trunk, cascade-rebases every layer onto its updated
   parent, and pushes all branches with `--force-with-lease --atomic`. It rewrites every layer's
   head, so treat it like a rebase: stop the poll first, never run it over a queued layer, and
-  expect reviewed heads to change. Do not check out the default branch.
+  expect reviewed heads to change. Do not check out the default branch. Run it without a TTY (a
+  TTY prompts on local/remote divergence; without one it aborts) and without `--prune`.
 - `gh stack push`.
 - `gh stack up <n>`, `gh stack down <n>`, `gh stack top`, `gh stack bottom`, for movement only.
 - `gh stack merge <pr> --yes --squash`, or the repository's merge strategy. The pull request number
@@ -75,8 +76,9 @@ or pushing a layer, including when a shepherd instruction says to, import the st
    matching stack it only switches branches, so remote-tracking refs can be stale.
 2. gh-stack keeps existing local layer branches as they are, so a stale one makes the next rebase
    start from stale commits. Run `git fetch origin`, then for each unmerged layer branch `<b>` run
-   `git rev-list --left-right --count <b>...origin/<b>` (left: local-only commits; right: commits
-   only on the pull request head):
+   `git rev-list --left-right --count "$b...origin/$b"` (left: local-only commits; right: commits
+   only on the pull request head). Branch names may contain shell metacharacters: pass each as a
+   quoted variable, never paste it into a command line, and skip names that start with `-`:
    - `0 0`: up to date.
    - `0 N`: fast-forward. Use `git merge --ff-only origin/<b>` on the checked-out layer and
      `git branch -f <b> origin/<b>` on any other.
