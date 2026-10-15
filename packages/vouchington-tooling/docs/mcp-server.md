@@ -293,7 +293,7 @@ Worktree: <path after "/worktrees/", "main" for the main worktree, else the dire
 ```
 
 The head branch is the worktree's current branch (for `pr_validate` with `pr`, the live pull
-request's head); a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
+request's head, which may equal `base` for a fork); otherwise a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
 so a consumer policy may reject any `base` other than the default branch; create stacked layers
 with the repository's stack tooling instead.
 
