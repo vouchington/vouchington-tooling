@@ -97,6 +97,20 @@ describe('runDistillClassify duplicate reporting', () => {
   })
 })
 
+describe('classifySession newest retrospective', () => {
+  it('keeps the newest retrospective when an older one is listed after it', () => {
+    const fresh = '2026-08-20T00:00:00.000Z'
+    const stale = '2026-07-01T00:00:00.000Z'
+    const session = sessionFixture({ id: 's1', createdAt: stale, lastEntryAt: fresh })
+    const entries = [
+      entryFixture({ sessionId: 's1', createdAt: fresh, data: { type: 'retrospective' } }),
+      entryFixture({ sessionId: 's1', createdAt: stale, data: { type: 'retrospective' } }),
+    ]
+    const cutoffs = { retroCutoff: '2026-08-01T00:00:00.000Z', sessionCutoff: stale }
+    expect(distill.classifySession(session, entries, cutoffs).eligible).toBe(false)
+  })
+})
+
 describe('public surface', () => {
   it('exports the classifier, parsers, and runner', () => {
     expect(Object.keys(distill).toSorted()).toEqual([
