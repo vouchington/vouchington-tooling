@@ -30,6 +30,7 @@ import {
   astGrepExamplesArguments,
   astGrepPackPaths,
   gitleaksDirectoryScanArguments,
+  classifyFreshBase,
   requireUpToDate,
   buildGhPrCreateArgs,
   createPullRequest,
@@ -84,6 +85,9 @@ describe('package exports', () => {
     expect(typeof waitForProcessGroupExit).toBe('function')
     expect(typeof checkGhaWorkspacePolicy).toBe('function')
     expect(typeof requireUpToDate).toBe('function')
+    expect(classifyFreshBase({ ahead: 0, behind: 0, tree: 'clean', fetch: 'fresh' }).status).toBe(
+      'up-to-date',
+    )
     expect(gitleaksDirectoryScanArguments({ config: '.gitleaks.toml' })).toContain('--config')
     expect(astGrepExamplesArguments({ rules: 'rules', config: 'sgconfig.yml' })).toContain('test')
     expect(astGrepPackPaths().config).toMatch(/sgconfig\.yml$/)

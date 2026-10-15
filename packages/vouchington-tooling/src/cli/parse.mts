@@ -4,6 +4,7 @@ import {
 } from './parse-gha-artifacts-cleanup.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
 import { parseForwardedCommand } from './parse-forwarded-commands.mts'
+import { parseFreshBase } from './parse-fresh-base.mts'
 import { commandNames } from './usage.mts'
 import {
   parseAstGrepExamples,
@@ -39,6 +40,7 @@ export type ParsedCli =
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
+  | { kind: 'fresh-base'; remote?: string; branch?: string; skipFetch: boolean }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }
   | { kind: 'ast-grep-examples'; rules: string; config: string }
   | { kind: 'ast-grep-pack' }
@@ -115,6 +117,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'http-origin') return parseHttpOrigin(rest)
   if (command === 'link-skill') return parseLinkSkill(rest)
   if (command === 'require-up-to-date') return parseRequireUpToDate(rest)
+  if (command === 'fresh-base') return parseFreshBase(rest)
   if (command === 'gitleaks-directory-scan') return parseGitleaksDirectoryScan(rest)
   if (command === 'ast-grep-examples') return parseAstGrepExamples(rest)
   if (command === 'ast-grep-pack') return parseAstGrepPack(rest)

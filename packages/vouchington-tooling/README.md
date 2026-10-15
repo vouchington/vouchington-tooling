@@ -138,7 +138,13 @@ one, prints `download failed artifact=<name> exit=<n>`, exits non-zero (a downlo
 reported as 1 so it cannot be mistaken for absence), and writes no `availability` output.
 
 `require-up-to-date` fetches the requested remote branch and fails unless its fetched tip is an
-ancestor of `HEAD`. `gitleaks-directory-scan` builds and scans isolated staged-index and current
+ancestor of `HEAD`. `fresh-base` refreshes `<remote>/<branch>` (default `origin/main`, 8 s fetch timeout, `--skip-fetch`
+to compare the cached ref) and prints a JSON report classifying the worktree as `up-to-date`,
+`ahead`, `behind`, `diverged`, `dirty` (matches the base but has uncommitted changes),
+`fetch-failed` (a failed refresh outranks every other status), or `unknown`. It prints nothing
+outside a Git repository. Unlike `require-up-to-date` it never fails on staleness; callers decide
+what to do with the status.
+`gitleaks-directory-scan` builds and scans isolated staged-index and current
 nonignored-working-tree mirrors with an explicit config; `--directory` selects the repository root.
 `ast-grep-examples` runs native `ast-grep test`, then validates each scoped rule's `files:` and
 `ignores:` examples with project `languageGlobs` replay from its root `--config`.
@@ -292,6 +298,7 @@ import {
 } from 'vouchington-tooling/dependency-license-policy'
 import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-policy'
 import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
+import { checkFreshBase, classifyFreshBase } from 'vouchington-tooling/fresh-base'
 import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
 import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
 import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
