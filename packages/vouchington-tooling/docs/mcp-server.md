@@ -168,7 +168,9 @@ instructions shows it to the agent.
 ## Retrospective tools and the policy contract
 
 `retrospective_check` reads the session through the same client as `journal_entries` and reports the
-entries whose envelope `type` is `retrospective`. A session that was never created (the blackboard
+entries whose envelope `type` is `retrospective`. A schema-versioned entry counts only when its
+envelope passes `validateFeedbackEnvelope`; a malformed one is not saved, while an unversioned legacy
+entry is still accepted. A session that was never created (the blackboard
 answers 404) reports `saved: false`.
 
 `retrospective_save` builds a `retrospective` envelope and writes it exactly as `journal_append`
