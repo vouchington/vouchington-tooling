@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util'
-import type { Session, SessionEntry } from 'agent-blackboard'
+import type { Session, SessionEntry } from './session-types.mts'
 
 import { validateFeedbackEnvelope } from '../agent-blackboard/index.mts'
 import { isCheckpointEntry } from './checkpoint-entry.mts'
@@ -8,8 +8,7 @@ import { isRetrospectiveEntry } from './retrospective-entry.mts'
 /**
  * Session shape taxonomy and distillation eligibility.
  *
- * This code is the source of truth for both. The retrospective-distill skill
- * (plugins/vouchington-workflow/skills/retrospective-distill/SKILL.md) is the canonical
+ * This code is the source of truth for both. The retrospective-distill skill is the canonical
  * human-facing description; when an inspector's hand classification and this output disagree on
  * the same session, fix the skill to match this code, not the other way around.
  *

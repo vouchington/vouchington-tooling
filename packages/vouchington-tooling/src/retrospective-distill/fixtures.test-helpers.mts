@@ -1,4 +1,4 @@
-import type { Session, SessionEntry } from 'agent-blackboard'
+import type { Session, SessionEntry } from './session-types.mts'
 
 export function sessionFixture(overrides: Partial<Session> = {}): Session {
   return {

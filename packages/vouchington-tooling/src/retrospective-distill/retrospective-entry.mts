@@ -1,4 +1,4 @@
-import type { SessionEntry } from 'agent-blackboard'
+import type { SessionEntry } from './session-types.mts'
 
 /** Whether a journal entry was written as a session retrospective. */
 export function isRetrospectiveEntry(entry: SessionEntry): boolean {

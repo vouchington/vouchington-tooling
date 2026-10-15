@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import type { Session, SessionEntry } from 'agent-blackboard'
+import type { Session, SessionEntry } from './session-types.mts'
 
 export type PartitionData = {
   sessions: Session[]

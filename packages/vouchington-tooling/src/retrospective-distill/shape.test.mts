@@ -1,4 +1,4 @@
-import type { Session } from 'agent-blackboard'
+import type { Session } from './session-types.mts'
 import { createFeedbackEnvelope } from '../agent-blackboard/index.mts'
 import { describe, expect, it } from 'vitest'
 

@@ -1,4 +1,4 @@
-import type { SessionEntry } from 'agent-blackboard'
+import type { SessionEntry } from './session-types.mts'
 
 // Historic hook-written journal entries stay in the journal until they are archived, even though
 // no hook appends them anymore: agents write their own journal entries. They kept
