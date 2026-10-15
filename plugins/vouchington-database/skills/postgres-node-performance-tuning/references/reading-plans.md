@@ -1,7 +1,9 @@
 # Reading plans
 
 Run `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT JSON)` at representative cardinality, in a transaction you
-roll back when the statement writes. A glance at the top node hides most of the problems below;
+roll back when the statement writes. `ANALYZE` executes the statement, and a rollback does not
+undo non-transactional effects such as sequence advancement from `nextval()`; use a disposable
+database for statements with those. A glance at the top node hides most of the problems below;
 walk every node. `VERBOSE` adds each node's `Output` expressions, which is where a select-list
 function call shows. In JSON, `Actual Rows`, `Rows Removed by Filter`, and
 `Rows Removed by Join Filter` are per-loop averages, so multiply each by `Actual Loops` for the
@@ -103,4 +105,5 @@ statistics, the filters feeding the join, or the query shape before changing the
 6. Generic versus custom plan for prepared statements.
 7. Estimate versus actual on join-deciding nodes.
 8. `Buffers` shared hit plus read totals against the rows returned; the split separates cache
-   pressure from physical I/O.
+   pressure from reads that missed PostgreSQL's shared buffers; use OS or storage metrics
+   to judge physical I/O, since the OS cache may serve a shared read.

@@ -82,11 +82,15 @@ Put per-row logic in the query as a join or `EXISTS`, or keep the function a pla
 
 PostgreSQL expands a view into the calling query, and a simple view lets the outer filter push
 down into its base tables. A view that cannot be flattened (aggregation, `DISTINCT`, `LIMIT`,
-set operations, window functions, volatile target-list expressions, a security barrier) is built for every
-candidate row before a filter, sort, page, or count on its own columns applies. Confirm from the
+set operations, window functions, volatile target-list expressions, a security barrier) is built
+before a filter on a value it derives (such as an aggregate) applies, and before a sort, page, or
+count over its output. A restriction on a grouping column can still be pushed below an aggregate,
+so let the plan decide. Confirm from the
 plan (large `Actual Rows` and `Actual Loops` inside the view's nodes), then choose the ids from the
 base tables first and read the view by its key, as a correlated `LATERAL` lookup so the page
-restriction reaches inside the view. A plain join to the page is a join clause, not a restriction
+restriction can reach inside the view. This works for an aggregate or `GROUP BY` view whose key is
+a grouping column; a `LIMIT` in the view blocks pushdown of any qual, so rewrite that view's query
+against the base tables instead. A plain join to the page is a join clause, not a restriction
 inside the view, so the planner can still build the whole aggregate first.
 
 ```sql
