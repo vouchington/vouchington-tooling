@@ -58,9 +58,10 @@ SELECT id FROM events WHERE id >= $1;
 
 PostgreSQL inlines a simple scalar SQL function into the calling query, so its body is planned
 with the outer query and its predicates can become index conditions. A SQL function whose body
-contains a subquery (for example `EXISTS`) is never inlined. Volatile functions, functions with
-`SECURITY DEFINER` or a `SET` clause, and PL/pgSQL functions are not inlined either. The plan then
-shows only `fn_x(col)` in a `Filter` or output, and none of the queries it runs per row.
+contains a subquery (for example `EXISTS`) is never inlined. Functions with `SECURITY DEFINER` or
+a `SET` clause, and PL/pgSQL functions, are not inlined either, nor is a body that is not a single
+simple expression. When the function is not inlined, the plan shows only `fn_x(col)` in a `Filter`
+or output, and none of the queries it runs per row.
 
 ```sql
 -- not inlined: the EXISTS runs once per orders row
@@ -83,7 +84,9 @@ down into its base tables. A view that cannot be flattened (aggregation, `DISTIN
 volatile or non-inlined functions, per-row subqueries, a security barrier) is built for every
 candidate row before a filter, sort, page, or count on its own columns applies. Confirm from the
 plan (large `Actual Rows` and `Actual Loops` inside the view's nodes), then choose the ids from the
-base tables first and read the view by its key.
+base tables first and read the view by its key, as a correlated `LATERAL` lookup so the page
+restriction reaches inside the view. A plain join to the page is a join clause, not a restriction
+inside the view, so the planner can still build the whole aggregate first.
 
 ```sql
 -- order_summaries aggregates events, so event_count is built for every order, then filtered
@@ -95,11 +98,16 @@ WITH page AS (
   ORDER BY o.id LIMIT 50
 )
 SELECT s.id, s.total_cents, s.event_count
-FROM order_summaries s JOIN page USING (id) ORDER BY s.id;
+FROM page
+CROSS JOIN LATERAL (
+  SELECT * FROM order_summaries WHERE id = page.id
+) s
+ORDER BY s.id;
 ```
 
 Filter and sort on indexed base-table columns, and read only the view columns the page needs.
-Confirm with `Actual Loops` on the view's inner nodes.
+Confirm in the plan that the view's inner nodes run with `Actual Loops` equal to the page size and
+read only that page's rows.
 
 ## Round trips
 

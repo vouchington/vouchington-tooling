@@ -47,7 +47,7 @@ so those queries run per row and stay invisible. Count the calls in one transact
 
 ```sql
 BEGIN;
-SET LOCAL track_functions = 'all';  -- superuser-only setting
+SET LOCAL track_functions = 'all';  -- needs superuser or a granted SET privilege
 SELECT count(*) FROM orders WHERE fn_is_visible(orders.id);
 SELECT funcname, calls FROM pg_stat_xact_user_functions;
 ROLLBACK;
