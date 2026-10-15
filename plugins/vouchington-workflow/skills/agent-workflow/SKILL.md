@@ -22,9 +22,29 @@ evidence record.
 - Before handoff, use [evidence sweep](references/evidence-sweep.md).
 - For review, use [review](references/review.md).
 - For surfaced feedback, use [review response](references/review-response.md).
+- Before any rebase or lease push, use [four refs](references/four-refs.md).
 
 Load only the references required by the current phase. Keep scope changes explicit; a discovered
 blocker or follow-up does not authorize widening the task.
+
+## Close-out
+
+This section is the single home for the hand-off retrospective and merge-note rules.
+
+- Report actual validation, open pull requests, and remaining blockers.
+- **Hand-off retrospective.** When you hand a pull request to the human as ready, write one
+  [retrospective](../retrospective/SKILL.md) from the session that did the work, which reads that
+  session's transcripts and journal. A native stack gets one retrospective when the stack is handed
+  off, covering every layer; never one per layer or for an intermediate commit.
+- Give each hand-off its own `sourceEventId`, such as `handoff-pr<number>` (a stack uses its top
+  pull request's number), on both `retrospective_check` and `retrospective_save`. The default ID
+  fits only the first hand-off in a session; a second would be mistaken for it.
+- **Merge note.** If you are still running when the merge happens and it changes the outcome, such
+  as a merge-queue ejection and its fix, a follow-up push, or review comments addressed after
+  hand-off, append one short note with the [blackboard skill](../blackboard/SKILL.md). Name the
+  pull request and the retrospective's source event, and give the note its own `sourceEventId` (for
+  example `merge-pr<number>`): the writer rejects the retrospective's ID reused for different
+  content. Never write a second retrospective.
 
 ## Parallel by default
 
