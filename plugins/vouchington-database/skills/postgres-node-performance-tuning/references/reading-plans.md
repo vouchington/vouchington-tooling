@@ -1,9 +1,11 @@
 # Reading plans
 
-Run `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` at representative cardinality, in a transaction you
+Run `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, FORMAT JSON)` at representative cardinality, in a transaction you
 roll back when the statement writes. A glance at the top node hides most of the problems below;
-walk every node. In JSON, `Actual Rows` is the per-loop average, so multiply by `Actual Loops` for
-the total.
+walk every node. `VERBOSE` adds each node's `Output` expressions, which is where a select-list
+function call shows. In JSON, `Actual Rows`, `Rows Removed by Filter`, and
+`Rows Removed by Join Filter` are per-loop averages, so multiply each by `Actual Loops` for the
+total.
 
 ## Red flags
 
@@ -11,15 +13,16 @@ the total.
 
 A node that reads far more rows than it passes up is doing hidden work. Compare
 `Actual Rows` x `Actual Loops` with the rows the parent keeps, and read `Rows Removed by Filter`
-and `Rows Removed by Join Filter`. Millions removed to return tens means the predicate is not an
+and `Rows Removed by Join Filter` (also x `Actual Loops`). Millions removed to return tens means the predicate is not an
 index condition, the index has the wrong leading columns, or a join filters after it multiplies.
 Fix the index or the predicate shape, or filter before joining.
 
 ### SubPlans whose loops equal the outer row count
 
 A node with `"Parent Relationship": "SubPlan"` and `Actual Loops` equal to the outer row count
-runs once per outer row. Correlated subqueries in the select list or in a `Filter`, and
-non-inlined functions (below), look like this. Rewrite as a join, a `LATERAL` with a limit, or a
+runs once per outer row. Correlated subqueries in the select list or in a `Filter` look like
+this. The statements inside a non-inlined function do not appear as SubPlans; see opaque function
+calls below. Rewrite as a join, a `LATERAL` with a limit, or a
 set-based aggregate computed once. An uncorrelated `InitPlan` runs once and is fine.
 
 ### `Filter` where an `Index Cond` was expected
@@ -30,8 +33,10 @@ function wrapping the column, a type or collation mismatch, or a column outside 
 leading keys. See
 [volatile functions in predicates](performance-patterns.md#volatile-functions-in-predicates).
 
-A partitioned parent whose plan lists every child and shows no `Subplans Removed` was not pruned.
-Constrain the partition key with a constant, a parameter, or a once-per-statement stable
+A partitioned parent whose plan lists every child and shows no `Subplans Removed` may not have
+been pruned at plan or executor start. Pruning on an execution-time parameter, such as a value
+from the outer side of a nested loop, keeps every child in the plan; check the children's loops,
+where pruned children show zero loops or `(never executed)`. Constrain the partition key with a constant, a parameter, or a once-per-statement stable
 expression; the bound must not be a volatile call.
 
 ### Opaque function calls
@@ -65,8 +70,10 @@ referencing row and index. Join on ids and keep the string in a unique column; s
 
 A prepared statement can switch to a generic plan after several executions, planned without the
 parameter values. If a statement is fast in `psql` with literals but slow from the application,
-compare `EXPLAIN (GENERIC_PLAN) SELECT ... WHERE account_id = $1` with the plan for a real value.
-When the generic plan is much worse, fix the statistics or query shape first; set
+compare `EXPLAIN (GENERIC_PLAN)` for the statement with the plan for a real value. Estimates alone
+can hide the problem, and `GENERIC_PLAN` cannot be combined with `ANALYZE`; prepare the statement
+and compare `EXPLAIN (ANALYZE, BUFFERS) EXECUTE` for the same skewed value under
+`plan_cache_mode = force_generic_plan` and `force_custom_plan`. When the generic plan is much worse, fix the statistics or query shape first; set
 `plan_cache_mode = force_custom_plan` for that statement or role only with measured evidence.
 
 ### Large sequential scans and bad estimates
@@ -86,4 +93,5 @@ statistics target or extended statistics for correlated columns before changing 
 5. Text keys in join and index conditions.
 6. Generic versus custom plan for prepared statements.
 7. Estimate versus actual on join-deciding nodes.
-8. `Buffers: shared read` totals against the rows returned.
+8. `Buffers` shared hit plus read totals against the rows returned; the split separates cache
+   pressure from physical I/O.

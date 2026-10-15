@@ -78,16 +78,21 @@ Put per-row logic in the query as a join or `EXISTS`, or keep the function a pla
 
 ## Reading views by key
 
-A view filtered, sorted, paged, or counted on its own columns is built for every candidate row
-before the filter applies, including any per-row subqueries or non-inlined functions in its
-definition. Choose the ids from the base tables first, then read the view by its key.
+PostgreSQL expands a view into the calling query, and a simple view lets the outer filter push
+down into its base tables. A view that cannot be flattened (aggregation, `DISTINCT`, `LIMIT`,
+volatile or non-inlined functions, per-row subqueries, a security barrier) is built for every
+candidate row before a filter, sort, page, or count on its own columns applies. Confirm from the
+plan (large `Actual Rows` and `Actual Loops` inside the view's nodes), then choose the ids from the
+base tables first and read the view by its key.
 
 ```sql
--- builds order_summaries for every order, then filters
+-- order_summaries aggregates events, so event_count is built for every order, then filtered
 SELECT * FROM order_summaries WHERE event_count > 3 ORDER BY id LIMIT 50;
--- choose ids from base tables, then read the view by key
+-- choose ids from base tables with an equivalent predicate, then read the view by key
 WITH page AS (
-  SELECT id FROM orders WHERE status = 'open' ORDER BY id LIMIT 50
+  SELECT o.id FROM orders o
+  WHERE (SELECT count(*) FROM events e WHERE e.order_id = o.id) > 3
+  ORDER BY o.id LIMIT 50
 )
 SELECT s.id, s.total_cents, s.event_count
 FROM order_summaries s JOIN page USING (id) ORDER BY s.id;
