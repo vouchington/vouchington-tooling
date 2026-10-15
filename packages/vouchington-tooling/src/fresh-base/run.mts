@@ -45,6 +45,11 @@ function validateName(value: string, option: string): void {
 }
 
 function countsOf(git: GitRunner, ref: string, cwd?: string) {
+  // A shallow history can hide the ancestry that connects HEAD and the base.
+  const shallow = git(['rev-parse', '--is-shallow-repository'], cwd)
+  if (shallow.status !== 0 || shallow.stdout.trim() !== 'false') {
+    return { ahead: null, behind: null }
+  }
   const counts = git(['rev-list', '--left-right', '--count', `${ref}...HEAD`], cwd)
   const [behind, ahead] = counts.stdout.trim().split(/\s+/u).map(Number)
   if (counts.status !== 0 || !Number.isInteger(behind) || !Number.isInteger(ahead)) {
@@ -65,12 +70,15 @@ export function checkFreshBase(options: FreshBaseOptions = {}): FreshBaseReport 
   const git = options.git ?? defaultGit
   const { cwd } = options
   if (git(['rev-parse', '--git-dir'], cwd).status !== 0) return null
+  if (git(['check-ref-format', '--branch', branch], cwd).status !== 0) {
+    throw new Error('branch must be a valid Git branch name')
+  }
 
   const ref = `refs/remotes/${remote}/${branch}`
   let fetch: FreshBaseFetch = 'skipped'
   if (options.skipFetch !== true) {
     const timeout = options.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS
-    const fetched = git(['fetch', remote, `+${branch}:${ref}`, '--quiet'], cwd, timeout)
+    const fetched = git(['fetch', remote, `+refs/heads/${branch}:${ref}`, '--quiet'], cwd, timeout)
     fetch = fetched.status === 0 ? 'fresh' : 'failed'
   }
 

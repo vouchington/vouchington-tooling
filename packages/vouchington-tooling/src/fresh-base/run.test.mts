@@ -14,6 +14,8 @@ interface Script {
   ref?: number
   counts?: GitResult
   repo?: number
+  shallow?: string
+  refFormat?: number
 }
 
 function fakeGit(script: Script, calls: string[][] = []): GitRunner {
@@ -22,8 +24,13 @@ function fakeGit(script: Script, calls: string[][] = []): GitRunner {
     const ok = { status: 0, stdout: '' }
     switch (args[0]) {
       case 'rev-parse':
+        if (args[1] === '--is-shallow-repository') {
+          return { status: 0, stdout: script.shallow ?? 'false\n' }
+        }
         if (args[1] === '--git-dir') return { status: script.repo ?? 0, stdout: '' }
         return { status: script.ref ?? 0, stdout: '' }
+      case 'check-ref-format':
+        return { status: script.refFormat ?? 0, stdout: '' }
       case 'fetch':
         return { status: script.fetch ?? 0, stdout: '' }
       case 'branch':
@@ -49,10 +56,10 @@ describe('checkFreshBase', () => {
       ahead: 0,
       behind: 0,
     })
-    expect(calls[1]).toEqual([
+    expect(calls.find((call) => call[0] === 'fetch')).toEqual([
       'fetch',
       'origin',
-      '+main:refs/remotes/origin/main',
+      '+refs/heads/main:refs/remotes/origin/main',
       '--quiet',
       'timeout=8000',
     ])
@@ -68,10 +75,10 @@ describe('checkFreshBase', () => {
     const calls: string[][] = []
     const options = { remote: 'upstream', branch: 'trunk', git: fakeGit({}, calls) }
     checkFreshBase({ ...options, fetchTimeoutMs: 50 })
-    expect(calls[1]).toEqual([
+    expect(calls.find((call) => call[0] === 'fetch')).toEqual([
       'fetch',
       'upstream',
-      '+trunk:refs/remotes/upstream/trunk',
+      '+refs/heads/trunk:refs/remotes/upstream/trunk',
       '--quiet',
       'timeout=50',
     ])
@@ -124,6 +131,20 @@ describe('checkFreshBase', () => {
     )
     expect(checkFreshBase({ git: fakeGit({ status: { status: 128, stdout: '' } }) })).toMatchObject(
       { tree: 'unknown', status: 'unknown' },
+    )
+  })
+
+  it('reports unknown counts for shallow history instead of guessing', () => {
+    expect(checkFreshBase({ git: fakeGit({ shallow: 'true\n' }) })).toMatchObject({
+      status: 'unknown',
+      ahead: null,
+      behind: null,
+    })
+  })
+
+  it('rejects branch names Git does not accept, such as wildcards', () => {
+    expect(() => checkFreshBase({ branch: '*', git: fakeGit({ refFormat: 128 }) })).toThrow(
+      'valid Git branch name',
     )
   })
 
