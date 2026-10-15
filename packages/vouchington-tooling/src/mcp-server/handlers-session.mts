@@ -65,9 +65,9 @@ export const snapshotExport: ToolHandler = async (args, context) => {
     env: context.env,
     dependencies: context.dependencies,
   })
-  // The client's own token is dropped: the server records the export and mints a token bound to
+  // The client's own token stays server-side: the server records the export and mints a token bound to
   // the caller's sessionId and worktree, which `snapshot_cleanup` checks before touching disk.
-  const { cleanupToken: _clientToken, ...reported } = outcome
+  const { cleanupToken: clientToken, ...reported } = outcome
   return {
     sessionId: context.sessionId,
     ...reported,
@@ -75,6 +75,7 @@ export const snapshotExport: ToolHandler = async (args, context) => {
       sessionId: context.sessionId,
       worktree: context.worktree,
       path: outcome.path,
+      ...(typeof clientToken === 'string' ? { clientToken } : {}),
       ...recordedPartitions(outcome),
     }),
   }

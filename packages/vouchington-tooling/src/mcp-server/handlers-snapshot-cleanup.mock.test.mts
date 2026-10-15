@@ -16,9 +16,16 @@ beforeEach(() => {
   cleanup.mockReset()
 })
 
-async function exportToken(exportResult: unknown, extra: Record<string, unknown> = {}) {
-  const h = harness(fixture(), { snapshots: createSnapshotRegistry(), exportResult })
-  const result = jsonOf(await h.call('snapshot_export', { sessionId: OWNER, ...extra }))
+async function exportToken(
+  exportResult: unknown,
+  clientCleanup?: (options: unknown) => Promise<void>,
+) {
+  const h = harness(fixture(), {
+    snapshots: createSnapshotRegistry(),
+    exportResult,
+    ...(clientCleanup === undefined ? {} : { clientCleanup }),
+  })
+  const result = jsonOf(await h.call('snapshot_export', { sessionId: OWNER }))
   return { h, result, cleanupToken: result.cleanupToken as string }
 }
 
@@ -65,5 +72,52 @@ describe('snapshot_cleanup partitions', () => {
     const retried = await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
     expect(retried.isError).toBeUndefined()
     expect(cleanup).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('snapshot_cleanup with a capability-aware client', () => {
+  const path = '/tmp/agent-blackboard-snapshot-x.jsonl'
+
+  it('cleans through the client with its own token, never returning that token', async () => {
+    const clientCleanup = vi.fn(async () => undefined)
+    const { h, result, cleanupToken } = await exportToken(
+      { path, directory: '/tmp/agent-blackboard-partitions-abc', cleanupToken: 'client-secret' },
+      clientCleanup,
+    )
+    expect(cleanupToken).not.toBe('client-secret')
+    expect(JSON.stringify(result)).not.toContain('client-secret')
+    await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
+    expect(clientCleanup).toHaveBeenCalledExactlyOnceWith({
+      path,
+      cleanupToken: 'client-secret',
+    })
+    expect(cleanup).not.toHaveBeenCalled()
+  })
+
+  it('passes a recorded directory and keeps the token valid when the client fails', async () => {
+    const clientCleanup = vi.fn().mockRejectedValueOnce(new Error('marker busy'))
+    clientCleanup.mockResolvedValue(undefined)
+    const { h, cleanupToken } = await exportToken(
+      { path, directory: '/tmp/d', cleanupReceipt: receipt, cleanupToken: 'client-secret' },
+      clientCleanup,
+    )
+    const failed = await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
+    expect(textOf(failed)).toContain('marker busy')
+    expect((await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })).isError).toBe(
+      undefined,
+    )
+    expect(clientCleanup).toHaveBeenLastCalledWith({
+      path,
+      directory: '/tmp/d',
+      cleanupToken: 'client-secret',
+    })
+  })
+
+  it('falls back to the in-tree cleanup when the export carried no client token', async () => {
+    const clientCleanup = vi.fn(async () => undefined)
+    const { h, cleanupToken } = await exportToken({ path }, clientCleanup)
+    await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
+    expect(clientCleanup).not.toHaveBeenCalled()
+    expect(cleanup).toHaveBeenCalledExactlyOnceWith({ path })
   })
 })

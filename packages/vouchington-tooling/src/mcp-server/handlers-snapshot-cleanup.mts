@@ -1,4 +1,5 @@
 import { cleanupSnapshotPartitions } from '../agent-blackboard/index.mts'
+import { loadClient } from '../agent-blackboard/client.mts'
 import { requiredString } from './args.mts'
 import type { ToolHandler } from './context.mts'
 
@@ -12,11 +13,21 @@ export const snapshotCleanup: ToolHandler = async (args, context) => {
   // Taking the record is synchronous, so a concurrent second call finds the token already spent.
   const record = context.snapshots.take(token, context.sessionId, context.worktree)
   try {
-    await cleanupSnapshotPartitions({
-      path: record.path,
-      ...(record.directory === undefined ? {} : { directory: record.directory }),
-      ...(record.receipt === undefined ? {} : { receipt: record.receipt }),
-    })
+    const client = await loadClient(context.dependencies)
+    // A client that wrote an ownership marker must clean with its own capability, or the marker
+    // outlives the file. Older clients fall back to the in-tree receipt-based cleanup.
+    if (client.cleanupSnapshotPartitions && record.clientToken !== undefined)
+      await client.cleanupSnapshotPartitions({
+        path: record.path,
+        ...(record.directory === undefined ? {} : { directory: record.directory }),
+        cleanupToken: record.clientToken,
+      })
+    else
+      await cleanupSnapshotPartitions({
+        path: record.path,
+        ...(record.directory === undefined ? {} : { directory: record.directory }),
+        ...(record.receipt === undefined ? {} : { receipt: record.receipt }),
+      })
   } catch (error) {
     context.snapshots.restore(token, record)
     const reason = error instanceof Error ? error.message : String(error)

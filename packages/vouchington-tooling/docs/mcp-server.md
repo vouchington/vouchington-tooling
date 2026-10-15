@@ -157,8 +157,10 @@ failure.
 
 - **No caller-chosen path.** The tool takes only `cleanupToken` (`path`, `directory`, and `receipt`
   are unsupported arguments). The server records the export's file path itself, plus a partition
-  directory and its signed receipt when the client reports both, and cleans exactly that record
-  through `cleanupSnapshotPartitions`.
+  directory and its signed receipt when the client reports both, and cleans exactly that record.
+  When the client's export carried its own cleanup capability, the server keeps it (never
+  returning it) and cleans through the client's `cleanupSnapshotPartitions`, so the client's
+  ownership marker goes with the file; otherwise it uses the in-tree `cleanupSnapshotPartitions`.
 - **Server-minted, bound token.** `snapshot_export` replaces the client's `cleanupToken` with 32
   random bytes the server generates, recorded with the caller's `sessionId` and resolved `worktree`.
   The binding is checked before any filesystem call.

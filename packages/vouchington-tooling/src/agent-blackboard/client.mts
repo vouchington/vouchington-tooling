@@ -31,6 +31,12 @@ export type BlackboardClientModule = {
   Snapshots?: new (connection: BlackboardConnection) => {
     export(options?: unknown): Promise<unknown>
   }
+  /** Newer clients own the ownership markers of their exports and clean them with a capability. */
+  cleanupSnapshotPartitions?: (options: {
+    path?: string
+    directory?: string
+    cleanupToken?: string
+  }) => Promise<void>
 }
 type BlackboardClientLoader = () => Promise<BlackboardClientModule>
 export type BlackboardClientDependencies = {

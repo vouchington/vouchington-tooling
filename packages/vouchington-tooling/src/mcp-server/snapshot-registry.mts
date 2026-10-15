@@ -6,6 +6,8 @@ export type SnapshotRecord = {
   sessionId: string
   worktree: string
   path: string
+  /** The exporting client's own capability; kept server-side and never returned to a caller. */
+  clientToken?: string
   directory?: string
   receipt?: SnapshotCleanupReceipt
 }
