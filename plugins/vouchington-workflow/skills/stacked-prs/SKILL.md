@@ -1,6 +1,6 @@
 ---
 name: stacked-prs
-description: Drain native GitHub stacks from the bottom ready layer; a ready lower layer does not freeze later work.
+description: Work native GitHub stacks bottom-up and merge the ready prefix in one command; a ready lower layer does not freeze later work.
 ---
 
 # Stacked pull requests
@@ -12,6 +12,13 @@ Local policy overrides these defaults; do not reload an already-read adapter or 
 Use when a change is a chain of native GitHub stacked pull requests. Read local `AGENTS.md` and
 `AGENTS.md` first. They own whether this repository stacks, which tool creates, rebases, and merges
 a stack, and who may authorize a merge.
+
+- [gh-stack mechanics](references/gh-stack.md): commands, import, submit and verify, the forge as
+  the only truth.
+- [Drain and keep track](references/drain.md): ownership, shepherding, ready-prefix merge checks,
+  and reconciling the ledger.
+
+## Shape
 
 - Each pull request except the bottom one targets the pull request below it. The bottom pull
   request targets the default branch.
@@ -25,27 +32,16 @@ a stack, and who may authorize a merge.
   report. Local stack metadata is stale after a rebase, relink, or manual recovery.
 - The bottom layer's base must be the default branch. Otherwise merge that base or re-root the
   stack onto the default branch before draining.
-- Merge the bottom-most ready layer as soon as it is ready. Do not wait for layers above it.
-  Nothing in the stack merges on its own.
-- Name that bottom-most unmerged layer as the merge target. Naming a higher layer merges more than
-  this step when everything below is also ready, and is unavailable when it is not.
-- After a merge, GitHub retargets the next unmerged layer onto the default branch. That layer is
-  the new bottom.
-- On a stall, or when a layer closes without merging, stop if the bottom layer is otherwise ready.
-  Report every layer and ask before merging that bottom layer.
-- A stall blocks only layers that depend on it. Ready the others. Pause the whole drain only when
-  nothing further can be readied without the blocked layer.
-- Act only on layers assigned to you. Report the other layers; do not change them.
-- One worker per native stack implements that stack and runs its shepherd poll. The parent does
-  not poll. It reconciles stacks, starts a worker, and carries merge questions to the human.
-- Start shepherding when the first owned pull request exists.
+
+## Work bottom-up
+
+- Work bottom-up. Write layers in stack order, and never start a layer before the one below it is
+  in decent shape.
 - A lower layer is in decent shape when it is committed, its local checks have passed, its pull
   request is open with an updated body, and shepherding has started. Decent shape does not mean
   green CI, ready for review, or merged.
 - Start the next dependent layer once the lower layer is in decent shape. Do not wait for merge,
   a ready-delay, or green CI.
-- Work bottom-up. Write layers in stack order, and never start a layer before the one below it is
-  in decent shape.
 - On each shepherd result, act on the lowest owned layer that is not ready before any higher
   layer. Put each fix on the lowest layer that owns it. A bottom layer that reaches ready early
   frees the ready prefix above it to merge in one command.
@@ -55,10 +51,34 @@ a stack, and who may authorize a merge.
   until the bottom layers merge.
 - A ready, mergeable, or queued lower layer blocks only an operation that would rewrite that
   layer. Keep readying every other owned layer.
+
+## Merge the ready prefix
+
+- Do not merge one layer at a time, and do not wait for the whole stack. Layers accumulate rebase
+  surface, CI cost, and review context, and drift against the default branch.
+- The ready prefix is the bottom-most open layer plus every consecutive layer above it that is
+  also ready and inside the human's approval. As soon as the bottom layer is ready, merge the ready
+  prefix with one command whose target is the prefix's top layer. When every layer is ready and
+  approved, the target is the top of the stack.
+- Nothing in the stack merges on its own. Run the merge checks in
+  [Drain and keep track](references/drain.md#merge-the-ready-prefix) before each merge.
+- After a merge, GitHub retargets the next unmerged layer onto the default branch. That layer is
+  the new bottom.
+- On a stall, or when a layer closes without merging, stop if the bottom layers are otherwise
+  ready. Report every layer and ask before merging that ready prefix.
+- A stall blocks only layers that depend on it. Ready the others. Pause the whole drain only when
+  nothing further can be readied without the blocked layer.
+
+## Ownership and workers
+
+- Act only on layers assigned to you. Report the other layers; do not change them.
+- One worker per native stack implements that stack and runs its shepherd poll. The parent does
+  not poll. It reconciles stacks, starts a worker, and carries merge questions to the human.
+- Start shepherding when the first owned pull request exists.
 - Independent stacks run at the same time, one worker each. Dependent unmerged work is another
   layer of the same stack, not a second stack whose base is an unmerged head.
 - At most one poll process per stack. The parent does not run a second poll for the same stack.
 - This skill does not grant a merge. Merge authorization stays with the consumer.
 
 Consumer wrapper owns: default branch, stacking tool and commands, merge-selector syntax, layer cap,
-and merge authorization.
+pull request description tool, ownership stamp format, and merge authorization.
