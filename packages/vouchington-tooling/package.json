@@ -136,6 +136,11 @@
       "import": "./dist/shared-context/index.mjs",
       "default": "./dist/shared-context/index.mjs"
     },
+    "./retrospective-distill": {
+      "types": "./dist/retrospective-distill/index.d.mts",
+      "import": "./dist/retrospective-distill/index.mjs",
+      "default": "./dist/retrospective-distill/index.mjs"
+    },
     "./source-module-graph": {
       "types": "./dist/source-module-graph/index.d.mts",
       "import": "./dist/source-module-graph/index.mjs",
