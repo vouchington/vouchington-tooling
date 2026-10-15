@@ -36,7 +36,7 @@
     "agent-blackboard": "^0.6.1",
     "dependency-cruiser": "^18.5.0",
     "eslint": "^10.12.0",
-    "eslint-plugin-no-mistakes": "^0.68.0",
+    "eslint-plugin-no-mistakes": "^0.78.1",
     "github-actionlint": "^1.7.12",
     "jscpd": "5.4.0",
     "knip": "^6.40.0",
