@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { PreviewRegistry, type Preview } from './preview-registry.mts'
+import { PreviewRegistry, type Preview, type PreviewScope } from './preview-registry.mts'
 
 const preview = (sourceEventId: string): Preview => ({
   sessionId: 's',
+  parentSessionId: null,
+  mode: 'autonomous',
   worktree: '/w',
   sourceEventId,
   envelope: {} as Preview['envelope'],
   warnings: [],
 })
-const scope = (sourceEventId: string) => ({ sessionId: 's', worktree: '/w', sourceEventId })
+const scope = (sourceEventId: string): PreviewScope => ({
+  sessionId: 's',
+  parentSessionId: null,
+  mode: 'autonomous',
+  worktree: '/w',
+  sourceEventId,
+})
 
 describe('PreviewRegistry', () => {
   it('mints 32-byte base64url tokens that are taken once', () => {
@@ -26,6 +34,8 @@ describe('PreviewRegistry', () => {
     expect(registry.take(token, scope('b'))).toBeUndefined()
     expect(registry.take(token, { ...scope('a'), sessionId: 'x' })).toBeUndefined()
     expect(registry.take(token, { ...scope('a'), worktree: '/x' })).toBeUndefined()
+    expect(registry.take(token, { ...scope('a'), parentSessionId: 'p' })).toBeUndefined()
+    expect(registry.take(token, { ...scope('a'), mode: 'interactive' })).toBeUndefined()
     expect(registry.take(token, scope('a'))).toBeDefined()
   })
 
@@ -37,7 +47,9 @@ describe('PreviewRegistry', () => {
     expect(registry.take(first, scope('a'))).toBeUndefined()
     const taken = registry.take(second, scope('b'))!
     registry.restore(second, taken)
-    expect(registry.take(second, scope('b'))).toBeDefined()
+    registry.put(preview('d'))
+    registry.put(preview('e'))
+    expect(registry.take(second, scope('b'))).toBeUndefined()
     registry.clear()
     expect(registry.take(third, scope('c'))).toBeUndefined()
   })

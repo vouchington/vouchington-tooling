@@ -151,6 +151,8 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
   if (args.dryRun === true) {
     const previewToken = previewRegistry.put({
       sessionId: context.sessionId,
+      parentSessionId: identity.parentSessionId,
+      mode,
       worktree: context.worktree,
       sourceEventId,
       envelope,

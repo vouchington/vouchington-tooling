@@ -195,9 +195,9 @@ runs every check and returns the document without writing, plus a `previewToken`
 redacts the markdown, `category` and `feedbackCoverage` just as `compose.knownSensitiveValues`
 does; with `compose`, pass it inside `compose`. The `previewToken` is 32 random bytes (base64url),
 opaque, single use, and held only in server memory: a restart drops every token, and the registry
-keeps the 32 most recent. It is bound to the `sessionId`, the resolved worktree, the `sourceEventId`
+keeps the 32 most recent. It is bound to the `sessionId`, `parentSessionId`, `mode`, the resolved worktree, the `sourceEventId`
 and the exact redacted content. Save it by calling `retrospective_save` again with the identity,
-`mode`, the same `sourceEventId` and `previewToken`, and none of `markdown`, `compose`,
+the same `parentSessionId`, `mode`, `sourceEventId` and `previewToken`, and none of `markdown`, `compose`,
 `workOutcome`, `feedbackCoverage`, `repositories`, `category`, `knownSensitiveValues` or `dryRun`.
 The server stores exactly the previewed content (so a sensitive value never has to be sent
 again), mints a new timestamp, and does not run the policy again. An unknown, spent, restarted or

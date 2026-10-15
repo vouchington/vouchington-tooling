@@ -54,6 +54,8 @@ export async function saveFromPreview(
   const token = requiredString(args, 'previewToken')
   const preview = previewRegistry.take(token, {
     sessionId: context.sessionId,
+    parentSessionId: identity.parentSessionId,
+    mode,
     worktree: context.worktree,
     sourceEventId,
   })

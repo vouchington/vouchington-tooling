@@ -116,6 +116,8 @@ describe('retrospective_save previewToken', () => {
       h.call('retrospective_save', { ...TOKEN_SAVE, previewToken: token, ...extra })
     for (const extra of [
       { sessionId: 'native:other' },
+      { parentSessionId: 'native:parent' },
+      { mode: 'interactive' },
       { worktree: fixture().linked },
       { sourceEventId: 'other-event' },
     ])
