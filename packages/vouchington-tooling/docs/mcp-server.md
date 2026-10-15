@@ -252,7 +252,10 @@ The mode the policy sees is derived by the server from its own launch environmen
 caller. It fails closed: when any automation marker is set to something other than an empty
 string, `0` or `false` (`CI`, `GITHUB_ACTIONS`, `GITLAB_CI`, `BUILDKITE`, `CIRCLECI`,
 `JENKINS_URL`, `TF_BUILD`, `CODEBUILD_BUILD_ID`, `VOUCHINGTON_AUTOMATION`), the mode is
-`autonomous` whatever the caller passes. Otherwise it is `interactive`. The optional `mode`
+`autonomous` whatever the caller passes. `CLAUDE_CODE_SESSION_ATTENDED` set to exactly `0` (Claude
+Code's marker for an unattended `claude -p` run, inherited by MCP servers) also means `autonomous`;
+a missing value or `1` never does. This list is a superset of the downstream check it replaces,
+which was exactly `GITHUB_ACTIONS === 'true' || CI === 'true'`. Otherwise the mode is `interactive`. The optional `mode`
 argument can only narrow `interactive` to `autonomous` (it never widens), so an autonomous run
 cannot unlock an interactive-only policy exception. The policy child receives no env markers, so it
 relies on this value.

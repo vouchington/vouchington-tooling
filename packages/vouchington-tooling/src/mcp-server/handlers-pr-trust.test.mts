@@ -43,6 +43,14 @@ describe('trusted mode', () => {
     expect(await modeSeen({ PATH: '/bin', CI: '1' }, { mode: undefined })).toBe('autonomous')
   })
 
+  it('treats CLAUDE_CODE_SESSION_ATTENDED=0 as autonomous and 1 or unset as interactive', async () => {
+    const attended = (value: string) => ({ PATH: '/bin', CLAUDE_CODE_SESSION_ATTENDED: value })
+    expect(await modeSeen(attended('0'), { mode: 'interactive' })).toBe('autonomous')
+    expect(await modeSeen(attended('1'), { mode: 'interactive' })).toBe('interactive')
+    expect(await modeSeen(attended(''), { mode: undefined })).toBe('interactive')
+    expect(await modeSeen({ PATH: '/bin' }, { mode: 'interactive' })).toBe('interactive')
+  })
+
   it('ignores markers that are empty, 0 or false', async () => {
     for (const value of ['', ' ', '0', 'false', 'FALSE'])
       expect(await modeSeen({ PATH: '/bin', CI: value }, { mode: 'interactive' })).toBe(

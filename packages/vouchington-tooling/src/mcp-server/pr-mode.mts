@@ -18,6 +18,9 @@ const AUTOMATION_MARKERS = [
 
 /** Whether the server's own launch environment carries an automation marker. */
 function isAutomationContext(env: NodeJS.ProcessEnv): boolean {
+  // Claude Code sets this to exactly '0' for unattended runs; a missing or other value never
+  // means autonomous, so it can only narrow.
+  if (env.CLAUDE_CODE_SESSION_ATTENDED === '0') return true
   return AUTOMATION_MARKERS.some((name) => {
     const value = env[name]?.trim().toLowerCase()
     return value !== undefined && value !== '' && value !== '0' && value !== 'false'
