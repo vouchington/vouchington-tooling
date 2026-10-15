@@ -70,6 +70,7 @@ describe('formatReferenceKey', () => {
     expect(formatReferenceKey({ number: 3 })).toBe('#3')
     expect(formatReferenceKey({ number: 3, owner: 'a' })).toBe('#3')
     expect(formatReferenceKey({ number: 3, owner: 'a', repo: 'b' })).toBe('a/b#3')
+    expect(formatReferenceKey({ number: 3, owner: 'Acme', repo: 'Widgets' })).toBe('acme/widgets#3')
   })
 })
 
