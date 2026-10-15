@@ -58,7 +58,8 @@ SELECT id FROM events WHERE id >= $1;
 
 PostgreSQL inlines a simple scalar SQL function into the calling query, so its body is planned
 with the outer query and its predicates can become index conditions. A SQL function whose body
-contains a subquery (for example `EXISTS`) is never inlined. Functions with `SECURITY DEFINER` or
+contains a subquery (for example `EXISTS`) is never inlined as a scalar call; a set-returning SQL
+function in `FROM` follows a separate inlining path. Functions with `SECURITY DEFINER` or
 a `SET` clause, and PL/pgSQL functions, are not inlined either, nor is a body that is not a single
 simple expression. When the function is not inlined, the plan shows only `fn_x(col)` in a `Filter`
 or output, and none of the queries it runs per row.

@@ -23,7 +23,8 @@ A node with `"Parent Relationship": "SubPlan"` and `Actual Loops` equal to the o
 runs once per outer row. Correlated subqueries in the select list or in a `Filter` look like
 this. The statements inside a non-inlined function do not appear as SubPlans; see opaque function
 calls below. Rewrite as a join, a `LATERAL` with a limit, or a
-set-based aggregate computed once. An uncorrelated `InitPlan` runs once and is fine.
+set-based aggregate computed once. An uncorrelated `InitPlan` runs once, but check its own time, rows, and buffers: one large scan,
+sort, or expensive call can still dominate the statement.
 
 ### `Filter` where an `Index Cond` was expected
 
@@ -36,13 +37,14 @@ leading keys. See
 A partitioned parent whose plan lists every child and shows no `Subplans Removed` may not have
 been pruned at plan or executor start. Pruning on an execution-time parameter, such as a value
 from the outer side of a nested loop, keeps every child in the plan; check the children's loops,
-where pruned children show zero loops or `(never executed)`. Constrain the partition key with a constant, a parameter, or a once-per-statement stable
-expression; the bound must not be a volatile call.
+where children pruned every time show `(never executed)`, and children visited only sometimes
+show loops lower than the containing loop count. Constrain the partition key with a constant, a
+parameter, or a once-per-statement stable expression; the bound must not be a volatile call.
 
 ### Opaque function calls
 
 A plan shows `fn_x(col)` in a `Filter` or output column and nothing about the queries the
-function runs. A SQL function whose body contains a subquery, such as `EXISTS`, is never inlined,
+function runs. A scalar SQL function whose body contains a subquery, such as `EXISTS`, is never inlined,
 so those queries run per row and stay invisible. Count the calls in one transaction:
 
 ```sql
@@ -84,7 +86,8 @@ and compare `EXPLAIN (ANALYZE, BUFFERS) EXECUTE` for the same skewed value under
 A `Seq Scan` over a large table that returns few rows and reads many buffers or removes many rows
 by filter is usually a missing or unusable index. A sequential scan on a small table, one that
 returns most rows, or one a parent `LIMIT` or `EXISTS` stops early (check the buffers) is fine. Compare `Plan Rows`
-with `Actual Rows` on every node that decides a join (scan inputs and join outputs): an estimate
+with `Actual Rows` on every executed node (`Actual Loops` above zero; a never-executed node has no
+observed cardinality) that decides a join (scan inputs and join outputs): an estimate
 off by 10x or more can pick the wrong join type or order. Run `ANALYZE`, then consider a higher
 statistics target, or extended statistics for correlated columns within one table; extended
 statistics do not improve join selectivity, so for a join misestimate look at the join keys'
