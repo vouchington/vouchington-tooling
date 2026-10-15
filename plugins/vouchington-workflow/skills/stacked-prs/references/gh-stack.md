@@ -29,20 +29,26 @@ Use only non-interactive forms:
   [Import a stack](#import-a-stack-before-acting-on-it).
 - `gh stack submit --auto` creates drafts. Immediately update each new pull request's title and
   body with the repository's pull request description tool; auto titles and bodies are not
-  sufficient.
+  sufficient, and an unstamped body fails the ownership check in [drain.md](drain.md).
+- `gh stack link <branch-or-pr>...` (bottom to top) registers a stack without local tracking. It
+  pushes the branches and creates a draft pull request for any branch without one. Update each
+  pull request it created the same way as after `submit --auto`.
 - `gh stack view --json` is for acting only. Never use it, or `gh stack bottom`, to decide
   topology, ownership, or bottom-ness.
 - `gh stack rebase`, `gh stack rebase --upstack`, `gh stack rebase --continue`,
   `gh stack rebase --abort`.
-- `gh stack sync` fast-forwards against the remote default branch. Do not check out the default
-  branch.
+- `gh stack sync` fetches, fast-forwards the trunk, cascade-rebases every layer onto its updated
+  parent, and pushes all branches with `--force-with-lease --atomic`. It rewrites every layer's
+  head, so treat it like a rebase: stop the poll first, never run it over a queued layer, and
+  expect reviewed heads to change. Do not check out the default branch.
 - `gh stack push`.
 - `gh stack up <n>`, `gh stack down <n>`, `gh stack top`, `gh stack bottom`, for movement only.
 - `gh stack merge <pr> --yes --squash`, or the repository's merge strategy. The pull request number
   is required. `--yes` skips a prompt that a non-interactive runner cannot answer.
-- `gh stack unstack <branch>` and `gh stack delete <branch>` recover a mis-rooted stack. Both
-  remove tracking only. Pull requests and local branches survive, and a merged, merging, or queued
-  pull request cannot be removed.
+- `gh stack unstack [<stack-number>]` (alias `delete`) recovers a mis-rooted stack. With no
+  argument it targets the active stack. It unstacks on GitHub and removes local tracking; add
+  `--local` to remove only local tracking. Pull requests and branches survive. GitHub leaves
+  queued or auto-merge pull requests stacked, and then keeps the stack.
 
 Never run the interactive forms: `gh stack submit` without `--auto`, `gh stack modify`, bare
 `gh stack checkout`, `gh stack switch`, or bare `gh stack merge` (a TUI that lands the whole
@@ -119,7 +125,7 @@ merge retargets it.
 ```bash
 gh api "repos/{owner}/{repo}/pulls/<N>" --jq '{stackPresent: has("stack"), stack: .stack}'
 gh api "repos/{owner}/{repo}/stacks/<n>"   # layers bottom to top, with head.sha and author
-gh api "repos/{owner}/{repo}/stacks" --jq '[.[] | select(.open)]'   # open stacks; state is null
+gh api --paginate "repos/{owner}/{repo}/stacks" --jq '.[] | select(.open)'   # state is null
                                                                     # and ?state=open is ignored
 ```
 

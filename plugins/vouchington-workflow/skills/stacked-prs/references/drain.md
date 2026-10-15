@@ -31,6 +31,10 @@ never the agent's own decision.
 
 Run one stack shepherd poll for the assigned stack, and follow its printed instructions.
 
+- A shepherd's own "owned" mark can mean only that the author login equals the authenticated
+  viewer. Several sessions often share one account, so filter every printed row against the
+  ownership partition above before acting. Never start a per-pull-request session, fix, or push
+  for a row outside it, even when the shepherd marks it owned.
 - Apply code fixes, rebases, pushes, and review mutations to owned layers only. Report work
   surfaced on an unowned layer to the human.
 - Fix on the owning layer. Commit there, rebase the layers above it (`gh stack rebase --upstack`),
@@ -131,7 +135,7 @@ session-filtered:
 
 ```bash
 # Reconcile, unfiltered: it finds stacks this session did not create.
-gh api repos/{owner}/{repo}/stacks --jq '[.[] | select(.open)]'
+gh api --paginate repos/{owner}/{repo}/stacks --jq '.[] | select(.open)'   # 30 per page
 gh pr list --state open --limit 100 --json number,title,author,body   # the default limit is 30
 # Partition: apply the ownership check from Establish scope to that output.
 ```
