@@ -44,6 +44,15 @@ a stack, and who may authorize a merge.
   green CI, ready for review, or merged.
 - Start the next dependent layer once the lower layer is in decent shape. Do not wait for merge,
   a ready-delay, or green CI.
+- Work bottom-up. Write layers in stack order, and never start a layer before the one below it is
+  in decent shape.
+- On each shepherd result, act on the lowest owned layer that is not ready before any higher
+  layer. Put each fix on the lowest layer that owns it. A bottom layer that reaches ready early
+  frees the ready prefix above it to merge in one command.
+- Before a command that adds layers to a stack, such as `gh stack add` or `gh stack link`, add the
+  forge's open-layer count to every layer the command would add. Above the layer cap (default 10),
+  open independent work as its own pull request on the default branch and hold dependent work
+  until the bottom layers merge.
 - A ready, mergeable, or queued lower layer blocks only an operation that would rewrite that
   layer. Keep readying every other owned layer.
 - Independent stacks run at the same time, one worker each. Dependent unmerged work is another
@@ -51,5 +60,5 @@ a stack, and who may authorize a merge.
 - At most one poll process per stack. The parent does not run a second poll for the same stack.
 - This skill does not grant a merge. Merge authorization stays with the consumer.
 
-Consumer wrapper owns: default branch, stacking tool and commands, merge-selector syntax, and
-merge authorization.
+Consumer wrapper owns: default branch, stacking tool and commands, merge-selector syntax, layer cap,
+and merge authorization.
