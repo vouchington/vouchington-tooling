@@ -38,6 +38,64 @@ recipient-keyed fan-out rows. Verify actual pruning with EXPLAIN.
 Generic `jonathanong/no-mistakes` checks include `postgres-no-offset`; inspect available rules
 and configure reviewed cross-partition exceptions rather than treating a rule as plan evidence.
 
+## Volatile functions in predicates
+
+`uuidv7(interval)` and `random()` are volatile: PostgreSQL evaluates them for every row, so
+`WHERE id >= uuidv7(INTERVAL '-30 days')` is a `Filter`, cannot be an `Index Cond`, and blocks
+partition pruning. Compute the bound once per statement and compare against that. A bind
+parameter works, as does a stable expression such as `now() - INTERVAL '30 days'` fed to a stable
+or immutable bound helper. A stable bound can be an index condition, and a partitioned table
+prunes at executor start. Confirm `Index Cond` and `Subplans Removed` in the plan.
+
+```sql
+-- evaluated per row
+SELECT id FROM events WHERE id >= uuidv7(INTERVAL '-30 days');
+-- bound computed once by the caller
+SELECT id FROM events WHERE id >= $1;
+```
+
+## Function inlining
+
+PostgreSQL inlines a simple scalar SQL function into the calling query, so its body is planned
+with the outer query and its predicates can become index conditions. A SQL function whose body
+contains a subquery (for example `EXISTS`) is never inlined. Volatile functions, functions with
+`SECURITY DEFINER` or a `SET` clause, and PL/pgSQL functions are not inlined either. The plan then
+shows only `fn_x(col)` in a `Filter` or output, and none of the queries it runs per row.
+
+```sql
+-- not inlined: the EXISTS runs once per orders row
+CREATE FUNCTION fn_has_events(order_id uuid) RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT EXISTS (SELECT 1 FROM events e WHERE e.order_id = $1) $$;
+SELECT id FROM orders WHERE fn_has_events(id);
+-- plannable: write the semi-join in the query
+SELECT o.id FROM orders o WHERE EXISTS (SELECT 1 FROM events e WHERE e.order_id = o.id);
+```
+
+Tell from the plan: a function name in `Filter` or output with no matching scan nodes. Count calls
+with `SET LOCAL track_functions = 'all'` and `pg_stat_xact_user_functions` in the same transaction;
+inlined functions are not counted. See [reading plans](reading-plans.md#opaque-function-calls).
+Put per-row logic in the query as a join or `EXISTS`, or keep the function a plain expression.
+
+## Reading views by key
+
+A view filtered, sorted, paged, or counted on its own columns is built for every candidate row
+before the filter applies, including any per-row subqueries or non-inlined functions in its
+definition. Choose the ids from the base tables first, then read the view by its key.
+
+```sql
+-- builds order_summaries for every order, then filters
+SELECT * FROM order_summaries WHERE event_count > 3 ORDER BY id LIMIT 50;
+-- choose ids from base tables, then read the view by key
+WITH page AS (
+  SELECT id FROM orders WHERE status = 'open' ORDER BY id LIMIT 50
+)
+SELECT s.id, s.total_cents, s.event_count
+FROM order_summaries s JOIN page USING (id) ORDER BY s.id;
+```
+
+Filter and sort on indexed base-table columns, and read only the view columns the page needs.
+Confirm with `Actual Loops` on the view's inner nodes.
+
 ## Round trips
 
 Sequential queries can add network round trips when the client waits between statements, and planning
