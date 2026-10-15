@@ -22,3 +22,11 @@ export type {
   CreatePullRequestExecutors,
   CreatePullRequestOptions,
 } from './pr-create.mts'
+
+export {
+  formatReferenceKey,
+  hasClosingIssueReference,
+  parseClosingIssueReferences,
+} from './closing-refs.mts'
+export type { ClosingIssueReference } from './closing-refs.mts'
+export { parseNonClosingRefs } from './non-closing-refs.mts'

@@ -333,6 +333,30 @@ at most one file block (which can itself be large), preserves preambles and line
 a bounded stderr tail for typed command failures. Blocks are provisional until the returned promise
 resolves: callers must discard accumulated results if the command later exits nonzero or is signaled.
 
+`vouchington-tooling/gh-cli` also parses pull request body references.
+`parseClosingIssueReferences` finds GitHub closing keywords (`close`/`closes`/`closed`,
+`fix`/`fixes`/`fixed`, `resolve`/`resolves`/`resolved`) followed by `#N`, `owner/repo#N` or an issue
+URL, deduplicated by key (`#N` or lowercased `owner/repo#N`, see `formatReferenceKey`).
+`parseNonClosingRefs` collects `Ref`, `Refs` and `Part of` keys from text the caller has already
+scoped, such as a "Related issues" section.
+
+`vouchington-tooling/pull-request-diff` counts added and deleted lines in unified-diff text
+(`countDiffLineChanges`, excluding `+++`/`---` headers) and compares them with caller-supplied
+`LargeDiffThresholds` through `exceedsLargeDiffThreshold`. `DEFAULT_LARGE_DIFF_THRESHOLDS`
+(5,000 added, 20,000 deleted) is only an example default.
+
+```ts
+import {
+  countDiffLineChanges,
+  exceedsLargeDiffThreshold,
+} from 'vouchington-tooling/pull-request-diff'
+
+exceedsLargeDiffThreshold(countDiffLineChanges(diffText), {
+  addedLines: 5000,
+  deletedLines: 20_000,
+})
+```
+
 `sql-ast` requires the optional dependency `@libpg-query/parser`. `sql-scanner` does not.
 `dockerfile-parse` uses `dockerfile-ast`.
 

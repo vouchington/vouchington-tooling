@@ -543,3 +543,16 @@ export type {
   CreatePullRequestExecutors,
   CreatePullRequestOptions,
 } from './gh-cli/index.mts'
+export {
+  formatReferenceKey,
+  hasClosingIssueReference,
+  parseClosingIssueReferences,
+  parseNonClosingRefs,
+} from './gh-cli/index.mts'
+export type { ClosingIssueReference } from './gh-cli/index.mts'
+export {
+  countDiffLineChanges,
+  DEFAULT_LARGE_DIFF_THRESHOLDS,
+  exceedsLargeDiffThreshold,
+} from './pull-request-diff/index.mts'
+export type { DiffLineChanges, LargeDiffThresholds } from './pull-request-diff/index.mts'
