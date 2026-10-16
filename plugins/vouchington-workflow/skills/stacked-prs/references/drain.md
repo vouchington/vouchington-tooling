@@ -42,6 +42,9 @@ Run one stack shepherd poll for the assigned stack, and follow its printed instr
 - Fix on the owning layer. Commit there, rebase the layers above it (`gh stack rebase --upstack`),
   `gh stack sync` when there are no local stack commits, `gh stack push` once, then rerun the
   shepherd.
+  `rebase --upstack` and `push` act through the top of the stack. When an unowned layer sits above
+  an owned one, stop at that layer: do not rebase or push it, and hand the remaining rebase and
+  push to its owner.
 - Start the shepherd with the first pull request. While the poll is in a pure wait and the
   worktree is clean, commit the next layer once the lower layer is in decent shape. On a
   fix-code result, finish it on the owning layer before more upper edits. A ready-delay schedules
@@ -113,7 +116,10 @@ Immediately before each approved merge, run these checks in order:
 5. Do not `gh stack sync` here. Return to step 2 of [Establish scope](#establish-scope) and
    re-read topology remotely: rebasing right after a merge can replay already-landed commits from
    a stale local base ref. Keep shepherding the layers above. When the new bottom is ready, merge
-   the next ready prefix the same way. The drain is complete when no unmerged owned layer remains.
+   the next ready prefix the same way. Before any local edit, rebase, or push on a remaining
+   layer, rerun the fetch and ahead/behind check in
+   [Import a stack](gh-stack.md#import-a-stack-before-acting-on-it): GitHub rebases the next
+   layer remotely, so local upper branches are stale until fast-forwarded. The drain is complete when no unmerged owned layer remains.
 
 The window between the last head read and the merge cannot be closed, because `gh stack merge`
 has no head-SHA pin. Branch protection and rulesets are evaluated when the merge runs, and stacks

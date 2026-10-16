@@ -21,7 +21,11 @@ Official docs (do not copy): [About](https://docs.github.com/en/pull-requests/ge
 
 ## Agent commands
 
-Use only non-interactive forms:
+Use only non-interactive forms, and run every `gh stack` command without a TTY. Run
+`git config rerere.enabled true` before the first `init`, which otherwise prompts. An explicit
+`checkout` prompts when local and remote compositions differ, and `submit --auto` prompts to
+create ordinary pull requests when stacks are disabled; without a TTY these fail instead, so treat
+a failure as the exit-9 recovery above rather than answering a prompt.
 
 - `gh stack init <branch>`, rooted on the default branch only.
 - `gh stack add <branch>`, after the layer cap check in [SKILL.md](../SKILL.md#work-bottom-up).
@@ -74,7 +78,9 @@ or pushing a layer, including when a shepherd instruction says to, import the st
 1. `gh stack checkout <stack-number>`, with the number from `pulls/<N>.stack.number`. It records
    the stack and checks out the top-most unmerged layer. When the worktree already tracks a
    matching stack it only switches branches, so remote-tracking refs can be stale.
-2. gh-stack keeps existing local layer branches as they are, so a stale one makes the next rebase
+2. Resolve the remote gh-stack uses once (`remote.pushDefault` when set, else the only remote,
+   else `origin`), and read `origin` below as that remote.
+3. gh-stack keeps existing local layer branches as they are, so a stale one makes the next rebase
    start from stale commits. Run `git fetch origin`, then for each unmerged layer branch `<b>` run
    `git rev-list --left-right --count "$b...origin/$b"` (left: local-only commits; right: commits
    only on the pull request head). Branch names may contain shell metacharacters: pass each as a
