@@ -331,6 +331,11 @@
       "import": "./dist/compiler-build/index.mjs",
       "default": "./dist/compiler-build/index.mjs"
     },
+    "./pull-request-diff": {
+      "types": "./dist/pull-request-diff/index.d.mts",
+      "import": "./dist/pull-request-diff/index.mjs",
+      "default": "./dist/pull-request-diff/index.mjs"
+    },
     "./github-projects": {
       "types": "./dist/github-projects/index.d.mts",
       "import": "./dist/github-projects/index.mjs",

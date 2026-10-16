@@ -42,6 +42,10 @@ import {
   runGit,
   GITHUB_BODY_MAX_CHARACTERS,
   validateGitHubBodyLength,
+  parseClosingIssueReferences,
+  parseNonClosingRefs,
+  countDiffLineChanges,
+  exceedsLargeDiffThreshold,
   inspectHarnessEnvironment,
   selectHarnessSession,
   evaluatePnpmLicenseReport,
@@ -99,6 +103,11 @@ describe('package exports', () => {
       'DiffCommandError',
     )
     expect(typeof processDiffCommand).toBe('function')
+    expect(parseClosingIssueReferences('Closes #1')).toHaveLength(1)
+    expect(parseNonClosingRefs('Refs #1')).toEqual(new Set(['#1']))
+    expect(
+      exceedsLargeDiffThreshold(countDiffLineChanges('+a'), { addedLines: 0, deletedLines: 0 }),
+    ).toBe(true)
     expect(typeof evaluatePnpmLicenseReport).toBe('function')
     expect(new HeadNotPushedError('x', 'origin').name).toBe('HeadNotPushedError')
     expect(new HeadOutOfDateError('x', 'origin').name).toBe('HeadOutOfDateError')

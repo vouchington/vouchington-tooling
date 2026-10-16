@@ -338,6 +338,30 @@ await processDiffCommand({ executable: 'git', args: ['diff', 'origin/main...HEAD
 // Use changedFileCount only after processDiffCommand resolves.
 ```
 
+`vouchington-tooling/gh-cli` also parses pull request body references.
+`parseClosingIssueReferences` finds GitHub closing keywords (`close`/`closes`/`closed`,
+`fix`/`fixes`/`fixed`, `resolve`/`resolves`/`resolved`) followed by `#N`, `owner/repo#N` or an issue
+URL, deduplicated by key (`#N` or lowercased `owner/repo#N`, see `formatReferenceKey`).
+`parseNonClosingRefs` collects `Ref`, `Refs` and `Part of` keys from text the caller has already
+scoped, such as a "Related issues" section.
+
+`vouchington-tooling/pull-request-diff` counts added and deleted lines in unified-diff text
+(`countDiffLineChanges`, excluding `+++`/`---` headers) and compares them with caller-supplied
+`LargeDiffThresholds` through `exceedsLargeDiffThreshold`. `DEFAULT_LARGE_DIFF_THRESHOLDS`
+(5,000 added, 20,000 deleted) is only an example default.
+
+```ts
+import {
+  countDiffLineChanges,
+  exceedsLargeDiffThreshold,
+} from 'vouchington-tooling/pull-request-diff'
+
+exceedsLargeDiffThreshold(countDiffLineChanges(diffText), {
+  addedLines: 5000,
+  deletedLines: 20_000,
+})
+```
+
 This breaking minor removes `getDiffAgainstBase`; migrate callers to `processDiffCommand` and pass
 the command they need to run.
 
