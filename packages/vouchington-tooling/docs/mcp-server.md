@@ -242,7 +242,7 @@ whole process group is killed, so nothing it started outlives the call. The runn
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------- |
 | `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }`                    | 30 s    |
 | `pullRequestDefaults`   | `{}` from `retrospective_save`; `{ title, base, relatedIssues }` from `pr_create`                                                                                           | `{ repositories?, labels?, milestone?, project? }` (an object) | 120 s   |
-| `validatePullRequest`   | `title`, `body`, `base`, `head`, `mode`, and `pr` for an update                                                                                                             | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
+| `validatePullRequest`   | `title`, `body`, `base`, `head`, the trusted `mode`, `noSourceIssue` when given, and `pr` when set                                                                          | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
 
 Any `errors` reject the save and write nothing. A non-zero exit, a timeout (reported as
 `policy <export> timed out after <N>s`), output over 1 MB, malformed JSON, or a result of the wrong
@@ -254,9 +254,33 @@ shape is an error, never a pass.
 retrospective tools. All three take `sessionId` (required) and `worktree` (optional), need a server
 launched inside a repository worktree (they run the checkout policy), and share this structured
 input: `title` (single line, at most 256 characters), `summary`, `impact`, `relatedIssues`
-(`[{ number, relation: "closes" | "refs", reason }]`, may be empty), `details` (string array),
-`base` (default `main`), `agent`, optional `model`, `mode` (`interactive` | `autonomous`) and
-`workspaceSetup`. `pr_update` also requires `pr`; `pr_validate` accepts an optional `pr`.
+(`[{ number, relation: "closes" | "refs", reason }]`, may be empty), optional `noSourceIssue`
+(`{ reason }`, see below), `details` (string array), `base` (default `main`), `agent`, optional
+`model`, optional `mode` (`interactive` | `autonomous`) and `workspaceSetup`. `pr_update` also
+requires `pr`; `pr_validate` accepts an optional `pr`.
+
+### Trusted mode
+
+The mode the policy sees is derived by the server from its own launch environment, never from the
+caller. It fails closed: when any automation marker is set to something other than an empty
+string, `0` or `false` (`CI`, `GITHUB_ACTIONS`, `GITLAB_CI`, `BUILDKITE`, `CIRCLECI`,
+`JENKINS_URL`, `TF_BUILD`, `CODEBUILD_BUILD_ID`, `VOUCHINGTON_AUTOMATION`), the mode is
+`autonomous` whatever the caller passes. `CLAUDE_CODE_SESSION_ATTENDED` set to exactly `0` (Claude
+Code's marker for an unattended `claude -p` run, inherited by MCP servers) also means `autonomous`;
+a missing value or `1` never does. This list is a superset of the downstream check it replaces,
+which was exactly `GITHUB_ACTIONS === 'true' || CI === 'true'`. Otherwise the mode is `interactive`. The optional `mode`
+argument can only narrow `interactive` to `autonomous` (it never widens), so an autonomous run
+cannot unlock an interactive-only policy exception. The policy child receives no env markers, so it
+relies on this value.
+
+### Pull requests with no source issue
+
+Pass `noSourceIssue: { reason }` (a single line) with an empty `relatedIssues`; a non-empty
+`relatedIssues` beside it is rejected. The Related issues section then holds the generic statement
+`- No source issue — <reason>` instead of `- None`. A policy may replace the statement by
+exporting `renderNoSourceIssue({ reason })`, returning a non-empty string (30 s). The field also
+reaches `validatePullRequest` (with the trusted `mode`, so the policy can apply an interactive-only
+rule) and `pullRequestDefaults`.
 
 ### Rendering
 
@@ -271,7 +295,8 @@ input: `title` (single line, at most 256 characters), `summary`, `impact`, `rela
 
 ## Related issues
 
-- Closes #N — <reason>      (or "Refs #N"; "- None" when empty)
+- Closes #N — <reason>      (or "Refs #N"; "- None" when empty;
+                             "- No source issue — <reason>" for noSourceIssue)
 
 ## Details
 
@@ -283,18 +308,20 @@ Device: <os user>@<lowercased hostname>
 Worktree: <path after "/worktrees/", "main" for the main worktree, else the directory name>
 ```
 
-The head branch is the worktree's current branch; a detached HEAD, or a head equal to `base`, is
-rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
+The head branch is the worktree's current branch (for `pr_validate` with `pr`, the live pull
+request's head, which may equal `base` for a fork); otherwise a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
 so a consumer policy may reject any `base` other than the default branch; create stacked layers
 with the repository's stack tooling instead.
 
 ### Tools
 
 - `pr_validate` (read-only): renders the body, runs the policy `validatePullRequest({ title, body,
-  base, head, mode, pr? })` export and returns `{ body, errors, warnings }`. With `pr`, the live
-  body is read (never written) so its Shepherd Journal is preserved as in `pr_update`.
+  base, head, mode, noSourceIssue?, pr? })` export and returns `{ body, errors, warnings }`. With
+  `pr`, the live body is read (never written) so its Shepherd Journal is preserved as in
+  `pr_update`. The liveness checks of `pr_update` do not apply: any state (merged or closed
+  included) and any head are accepted, and the policy sees the pull request's own head and base.
 - `pr_create` (additive): renders and validates (errors block), then calls the policy
-  `pullRequestDefaults({ title, base, relatedIssues })` export for optional `labels`, `milestone`
+  `pullRequestDefaults({ title, base, relatedIssues, noSourceIssue? })` export for optional `labels`, `milestone`
   and `project`. It checks the head is pushed and current, writes the body to a mode 0600 temp file
   (removed afterwards) and runs `gh pr create --draft` with the labels, `--milestone` and
   `--project`. Returns `{ number, url, warnings }`.

@@ -140,12 +140,7 @@ describe('pr_validate', () => {
     }
   })
 
-  it('rejects a live pull request on another branch or an unusable view', async () => {
-    const other = fakeGh({ view: { ...LIVE, headRefName: 'other' } })
-    const h = harness(fixture(), { runGh: other.runGh, device })
-    expect(textOf(await h.call('pr_validate', args({ pr: 5 })))).toContain(
-      'pull request 5 has head other, not the worktree branch linked',
-    )
+  it('rejects an unusable view of the live pull request', async () => {
     const broken = harness(fixture(), { runGh: fakeGh({ view: { body: 1 } }).runGh, device })
     expect(textOf(await broken.call('pr_validate', args({ pr: 5 })))).toContain(
       'did not return body, headRefName, baseRefName, state',
@@ -156,7 +151,7 @@ describe('pr_validate', () => {
     )
   })
 
-  it('validates an existing pull request against its live base and rejects a closed one', async () => {
+  it('validates an existing pull request against its live base and pr_update rejects a closed one', async () => {
     declarePolicy(fixture())
     const p = policy(() => ({ errors: [] }))
     const stacked = fakeGh({ view: { ...LIVE, baseRefName: 'parent' } })

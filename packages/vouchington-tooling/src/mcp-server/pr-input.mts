@@ -7,6 +7,7 @@ import {
   requiredStringArray,
   type Args,
 } from './args.mts'
+import { trustedMode, type PullRequestMode } from './pr-mode.mts'
 
 const PR_MODES = ['interactive', 'autonomous'] as const
 const RELATIONS = ['closes', 'refs'] as const
@@ -19,11 +20,14 @@ export type PullRequestInput = {
   summary: string
   impact: string
   relatedIssues: RelatedIssue[]
+  /** Set instead of relatedIssues when the pull request has no source issue. */
+  noSourceIssue?: { reason: string }
   details: string[]
   base: string
   agent: string
   model?: string
-  mode: (typeof PR_MODES)[number]
+  /** The trusted mode, see {@link trustedMode}; never the caller's word alone. */
+  mode: PullRequestMode
   workspaceSetup: string
 }
 
@@ -48,6 +52,15 @@ function readRelatedIssues(args: Args): RelatedIssue[] {
   })
 }
 
+function readNoSourceIssue(args: Args, related: RelatedIssue[]): { reason: string } | undefined {
+  if (args.noSourceIssue === undefined) return undefined
+  const value = requireObject(args.noSourceIssue)
+  rejectUnknown(value, ['reason'])
+  if (related.length)
+    throw new Error('noSourceIssue and a non-empty relatedIssues are mutually exclusive')
+  return { reason: singleLine(value, 'reason') }
+}
+
 function readDetails(args: Args): string[] {
   const details = requiredStringArray(args, 'details')
   details.forEach((detail, index) => {
@@ -68,21 +81,28 @@ function singleLine(args: Args, key: string): string {
   return value
 }
 
-/** Reads and validates the structured pull request fields shared by the three pr_* tools. */
-export function readPullRequestInput(args: Args): PullRequestInput {
+/**
+ * Reads and validates the structured pull request fields shared by the three pr_* tools. The mode
+ * comes from the server's `env`; the caller's optional `mode` can only narrow it.
+ */
+export function readPullRequestInput(args: Args, env: NodeJS.ProcessEnv): PullRequestInput {
   const title = singleLine(args, 'title')
   checkTitleLength(title)
   const model = args.model === undefined ? undefined : singleLine(args, 'model')
+  const relatedIssues = readRelatedIssues(args)
+  const noSourceIssue = readNoSourceIssue(args, relatedIssues)
+  const requested = args.mode === undefined ? undefined : requiredChoice(args, 'mode', PR_MODES)
   return {
     title,
     summary: requiredString(args, 'summary'),
     impact: requiredString(args, 'impact'),
-    relatedIssues: readRelatedIssues(args),
+    relatedIssues,
+    ...(noSourceIssue === undefined ? {} : { noSourceIssue }),
     details: readDetails(args),
     base: optionalString(args, 'base') ?? 'main',
     agent: singleLine(args, 'agent'),
     ...(model === undefined ? {} : { model }),
-    mode: requiredChoice(args, 'mode', PR_MODES),
+    mode: trustedMode(env, requested),
     // It renders on its own provenance line; a newline would forge the lines after it.
     workspaceSetup: singleLine(args, 'workspaceSetup'),
   }

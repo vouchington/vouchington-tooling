@@ -10,11 +10,20 @@ export type LivePullRequest = {
 
 const FIELDS = ['body', 'headRefName', 'baseRefName', 'state'] as const
 
-/** The live pull request as gh reports it, rejected unless it is open. */
-export async function livePullRequest(gh: RunTextCommand, pr: number): Promise<LivePullRequest> {
+/** The live pull request as gh reports it, whatever its state. */
+export async function readLivePullRequest(
+  gh: RunTextCommand,
+  pr: number,
+): Promise<LivePullRequest> {
   const output = await gh(['pr', 'view', String(pr), '--json', FIELDS.join(',')])
   const live = JSON.parse(output) as Partial<Record<(typeof FIELDS)[number], unknown>> | null
   if (!isLive(live)) throw new Error(`gh pr view ${pr} did not return ${FIELDS.join(', ')}`)
+  return live
+}
+
+/** The live pull request, rejected unless it is open. */
+export async function livePullRequest(gh: RunTextCommand, pr: number): Promise<LivePullRequest> {
+  const live = await readLivePullRequest(gh, pr)
   // A closed or merged PR can share a reused branch name; its history must not be rewritten.
   if (live.state !== 'OPEN') throw new Error(`pull request ${pr} is ${live.state}, not OPEN`)
   return live

@@ -16,15 +16,29 @@ function relatedLine(issue: RelatedIssue): string {
   return `- ${verb} #${issue.number} — ${issue.reason}`
 }
 
+/** The default no-source statement; a policy `renderNoSourceIssue` export may replace it. */
+function defaultNoSourceStatement(reason: string): string {
+  return `- No source issue — ${reason}`
+}
+
 /**
  * The pull request body: the Summary, Impact, Related issues and Details sections followed by the
- * provenance lines. Pure; the caller supplies the device and worktree facts.
+ * provenance lines. With `noSourceIssue` the Related issues section holds `noSourceStatement`
+ * (default {@link defaultNoSourceStatement}) instead of `- None`. Pure; the caller supplies the
+ * device and worktree facts.
  */
 export function renderPullRequestBody(
   input: PullRequestInput,
   provenance: PullRequestProvenance,
+  noSourceStatement?: string,
 ): string {
-  const related = input.relatedIssues.length ? input.relatedIssues.map(relatedLine) : ['- None']
+  const related = input.relatedIssues.length
+    ? input.relatedIssues.map(relatedLine)
+    : [
+        input.noSourceIssue === undefined
+          ? '- None'
+          : (noSourceStatement ?? defaultNoSourceStatement(input.noSourceIssue.reason)),
+      ]
   const agent = input.model === undefined ? input.agent : `${input.agent} (${input.model})`
   return [
     '## Summary',

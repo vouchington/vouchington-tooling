@@ -121,10 +121,11 @@ describe('runPolicyExport', () => {
     expect(request.timeoutMs).toBe(30_000)
   })
 
-  it('gives the pull request exports 120 seconds', () => {
+  it('gives the pull request exports their timeouts', () => {
     expect(POLICY_TIMEOUTS_MS).toEqual({
       validateRetrospective: 30_000,
       validatePullRequest: 120_000,
+      renderNoSourceIssue: 30_000,
       pullRequestDefaults: 120_000,
     })
   })
