@@ -24,7 +24,7 @@ export function parseClosingIssueReferences(body: string): ClosingIssueReference
 
   for (const match of body.matchAll(CLOSING_ISSUE_RE)) {
     const number = Number(match.groups?.number ?? match.groups?.urlNumber)
-    if (!Number.isSafeInteger(number)) continue
+    if (!Number.isSafeInteger(number) || number < 1) continue
 
     const repoRef = (match.groups?.repo ?? match.groups?.urlRepo)?.toLowerCase()
     const [owner, repo] = repoRef?.split('/') ?? [undefined, undefined]

@@ -56,6 +56,13 @@ describe('parseClosingIssueReferences', () => {
   it('skips numbers that are not safe integers', () => {
     expect(parseClosingIssueReferences(`Closes #${'9'.repeat(30)}`)).toEqual([])
   })
+
+  it('skips zero, which is never an issue number', () => {
+    expect(parseClosingIssueReferences('Closes #0\nFixes https://github.com/a/b/issues/0')).toEqual(
+      [],
+    )
+    expect(hasClosingIssueReference('Closes #0')).toBe(false)
+  })
 })
 
 describe('hasClosingIssueReference', () => {
@@ -98,6 +105,10 @@ describe('parseNonClosingRefs', () => {
 
   it('skips numbers that are not safe integers', () => {
     expect(parseNonClosingRefs(`Refs #${'9'.repeat(30)}`)).toEqual(new Set())
+  })
+
+  it('skips zero, which is never an issue number', () => {
+    expect(parseNonClosingRefs('Refs #0\nPart of a/b#0')).toEqual(new Set())
   })
 
   it('returns an empty set for empty text', () => {

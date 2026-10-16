@@ -17,7 +17,7 @@ export function parseNonClosingRefs(referenceText: string): Set<string> {
   const keys = new Set<string>()
   for (const match of referenceText.matchAll(NON_CLOSING_REF_RE)) {
     const number = Number(match.groups?.number)
-    if (!Number.isSafeInteger(number)) continue
+    if (!Number.isSafeInteger(number) || number < 1) continue
     const ownerRepo = match.groups?.ownerRepo?.toLowerCase()
     const [owner, repo] = ownerRepo?.split('/') ?? [undefined, undefined]
     keys.add(formatReferenceKey({ number, owner, repo }))
