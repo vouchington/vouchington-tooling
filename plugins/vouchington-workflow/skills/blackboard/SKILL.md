@@ -50,7 +50,10 @@ human which case applies before continuing:
   registration and diagnosis steps.
 - Registered but disconnected: reconnect it through the harness's MCP controls, or restart the
   harness.
-- Automated runs with no human to ask: report "journaling unavailable" in the final report.
+- Automated runs with no human to ask: an unattended `interactive` run continues its primary work,
+  while an `autonomous` run keeps its admission gate below. The final report states why journaling
+  was unavailable, the `pendingCount` and `worktreePendingCount` (or that none was written), and
+  each unjournaled finding.
 
 Prefer restoring MCP over the CLI fallback below, and use the fallback only when the human asks or
 MCP cannot be restored for this session. Harness sandboxes commonly withhold
@@ -175,6 +178,23 @@ Never search for, print, invent, or mint credentials. Durable entries and outbox
 bounded structured facts or sanitized summaries, never raw command output, transcript content,
 environment dumps, provider payloads, or secrets. Known-secret redaction supplements the author's
 minimization responsibility; it cannot prove arbitrary prose contains no undisclosed secret.
+
+## Credential failures
+
+- Never search shell profiles, `env`, or `.env*` files for a credential. Check presence only with
+  `[ -n "${VAR+x}" ] && echo SET || echo UNSET`; never copy the token around a sandbox denial.
+- A missing or stale credential blocks hosted delivery. In interactive mode the outbox keeps the
+  record visibly pending: do not drop it or invent a fallback. Ask the human to refresh the
+  connection, then restart the MCP client or call `outbox_flush`; an automated run reports.
+
+## Child identity for spawned agents
+
+- Pass the parent's own session id in the assignment prompt. The child resolves its own id from its
+  runtime through the consumer's identity policy, then calls `session_ensure` with it, the given
+  `parentSessionId`, its `agent`, and its version before other work. With no id or a failed ensure,
+  it stops and reports the blocker; never guess an id or pass a path, URL, or synthesized value.
+- A subagent sharing its parent's id must not `session_ensure` it as a child. It asks the parent
+  to append, or skips this protocol.
 
 Consumer wrappers own service configuration, server registration and approval rules, trusted mode
 selection, issue routing, and archival authorization. The server fixes the outbox location.

@@ -26,5 +26,22 @@ issue policy, and review-record conventions first.
    duplicate repository or label authorization. Then clean up temporary collection artifacts and
    report skipped, covered, and created items.
 
+## Scope and collection
+
+- Accept a duration (`1w`, `2d`, `1m`) or ISO date. If absent, ask, proposing a one-week default,
+  then compute a date-only cutoff and fetch the base remote.
+- Treat comments on changes and issues as opt-in sources; bodies are the default.
+- Collect bodies first: for closed issues, unchecked boxes and partial numbered work lists are
+  candidates, and comments are fetched only for body candidates unless comments were requested. Do
+  not exclude a whole plan issue or rely on a fixed heading allowlist.
+- Search merged and closed work with `--limit 500`. A full page is truncation, not exhaustion: split
+  the date range at its midpoint, retaining both bounds for interior chunks; only the top-level
+  final chunk may be open-ended.
+- Keep splitting a full single day by timestamp (search dates accept ISO-8601 times); report
+  truncation only when the smallest timestamp bucket is still full.
+- Use an OS-temp scratch directory with separate candidate and verdict files; each delegated
+  collector gets its own file, and never append concurrently. Do not print fetched bodies outside
+  scratch files, and remove all scratch files after collection.
+
 Consumer wrapper owns: review journal format, default lookback, hosting provider, repository,
 issue taxonomy, and confirmation mechanism.

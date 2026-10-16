@@ -99,5 +99,11 @@ For a batch, preflight every entry before writing any issue. One invalid entry f
 batch. A partial transport failure stops further creation and reports every issue already created.
 Do not retry an entry that succeeded.
 
+## Bounded output
+
+- A search returns at most five `#N: title -- url` lines.
+- A near-duplicate returns `Duplicate of #N: <url>`.
+- A mutation returns the action, URL, labels, and verification, plus milestone and project when set.
+
 Consumer wrapper owns: repository allowlist, taxonomy, issue template, credential, and CLI wrapper.
 It may tighten this gate and may not weaken it.
