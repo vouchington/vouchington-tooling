@@ -14,21 +14,25 @@ Use when completed retrospectives or journals should become durable follow-up wo
 
 1. Enumerate only completed, eligible session records with the `snapshot_export` tool of the
    `vouchington-tooling` MCP server, narrowing by `agent`, `version`, `parentSessionId`, exact
-   `data` fields, `dataArrayContains`, and `inactiveForHours`. It exports non-archived sessions to a
+   `data` fields, and `dataArrayContains`. It exports non-archived sessions to a
    private local file and returns the path, counts, checksum, and manifest, never the records.
    Before exporting, call `outbox_flush` and then `outbox_status` for every worktree that
    `git worktree list` reports, passing each path as `worktree`, and stop if any reports a
    `worktreePendingCount` above 0. Use the worktree count, never `pendingCount` or `status`, which
    cover only the caller's own session: the sessions to distill belong to other agents, and an
    archived session refuses later delivery, so a retained record would never be distilled. Outboxes
-   in removed worktrees or on other machines cannot be drained this way, so select with
-   `inactiveForHours` to give them time to deliver. Leave in-progress sessions intact. If a search
+   in removed worktrees or on other machines cannot be drained this way, so apply the age cutoffs under
+   [session shapes](#session-shapes-and-eligibility) to give them time to deliver. Leave in-progress sessions intact. If a search
    for `snapshot_export` (the tool names carry a harness prefix, see the
    [blackboard skill](../blackboard/SKILL.md)) finds no server, stop and report it; do not fall back
    to a CLI command.
 2. Before using any record, verify the file against the returned checksum, counts, and terminal
    manifest with the consumer's approved snapshot reader, and stop on a mismatch rather than
-   treating missing records as absent. Read full records, with their storage type, repository
+   treating missing records as absent. Require `manifest.schemaVersion` to be 1, `manifest.status`
+   to be `"complete"`, a nonempty `cleanupToken`, and manifest counts that exactly match the export
+   counts, including the terminal manifest record. Hand subagents only read-only partitions of the
+   verified file, never the original snapshot, and give each partition its own bounded session and
+   byte limits. Read full records, with their storage type, repository
    tags, source identity, coverage, and outcomes, from that file. Do not distill from
    `journal_entries`: it reads one session at a time and has no checksum or manifest to show that
    the read is complete. For repository-scoped work, filter sessions by
@@ -41,6 +45,8 @@ Use when completed retrospectives or journals should become durable follow-up wo
    by exact session/source identity and reject conflicting duplicate content. Records that differ
    only in their server-assigned `timestamp` are one event. Retain coverage,
    dropped counts, requested versus observed outcomes, and useful resolved findings.
+   Classify each session by [shape](#session-shapes-and-eligibility) and skip any that is not yet
+   eligible, with a reason.
 4. Cluster findings by root cause. Prefer a few broad actionable themes over many narrow issues.
    Treat a finding already linked to an open tracker as context, not a duplicate.
 5. Verify each candidate against the current base. Search existing issues and open changes before
@@ -62,6 +68,63 @@ Use when completed retrospectives or journals should become durable follow-up wo
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and
    actionable dispositions with reasons. Keep the top five themes in human prose without dropping
    underlying findings or unresolved records.
+
+## Session shapes and eligibility
+
+Classify by each entry's `type`, never by rendered text. Deduplicate by session and `sourceEventId`
+first. Entries that differ only in the server-assigned `timestamp` are one event; any other
+difference is a conflicting payload and stays quarantined.
+
+| Shape                 | Definition                                                                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry-type-unresolved | At least one entry has a missing type, a type other than `journal` or `retrospective`, or a feedback envelope that fails the shared validator, even if the session also has a retrospective. |
+| Retrospective         | Has a retrospective entry and no unresolved entry.                                                                                                                                           |
+| Checkpoint-only       | Has entries, no retrospective, and every entry is a historic hook-written checkpoint, identified by a structural checkpoint field.                                                           |
+| Journal-only          | Has entries, no retrospective, and at least one entry is not a checkpoint.                                                                                                                   |
+| Zero-entry child      | No entries and a non-null `parentSessionId`.                                                                                                                                                 |
+| Zero-entry root       | No entries and a null `parentSessionId`.                                                                                                                                                     |
+
+- The zero-entry split names session topology, not completion. A delegated child that died
+  mid-task looks identical to one that finished cleanly; never read it as "completed normally".
+- Report entry-type-unresolved sessions separately. Give them no issue-filing pass or archival this
+  run, whatever their age; do not treat an untyped entry as journal evidence.
+- Compute `retroAt` as the newest retrospective entry's `createdAt`, and `lastActive` as the newest
+  normalized entry's `createdAt`, falling back to the session's `createdAt` when it has no
+  entries. An identical replay does not advance activity; a new source event does.
+- Compute `retroCutoff = now - retroDays` and `sessionCutoff = now - sessionDays` once, from
+  caller-supplied non-negative finite day counts, and share both with every inspector so none reads
+  its own clock. Reject a negative or non-numeric count before exporting: it makes the cutoff
+  lie in the future or every comparison false, and these values gate archival.
+- Every shape except entry-type-unresolved is eligible when
+  `(has a retrospective AND retroAt < retroCutoff) OR (lastActive < sessionCutoff)`. Session age
+  alone makes a stale checkpoint-only, journal-only, or zero-entry session eligible, so a
+  retrospective-only gate cannot strand it. Everything else is not yet eligible; skip it with a
+  reason.
+- Export unfiltered rather than with `inactiveForHours`: a zero-entry session has no last entry and
+  never matches that filter, which would hide the feedback gaps this pass exists to sweep up.
+  Derive age from the cutoffs above; they supply the delay for outboxes in removed worktrees or on
+  other machines.
+- Journal-only and zero-entry evidence get full issue-filing rights, subject to the same duplicate,
+  current-state, and dependency checks as retrospective evidence, plus redaction: never quote a
+  journal entry's raw command string or stderr in an issue body, since a journal entry can carry
+  unredacted secrets.
+- Skip archival for sessions that contributed to a theme whose issue mutation failed this run, and
+  for sessions whose only themes were deferred, since deferral promises re-evaluation. Keep a theme
+  tied to a closed-without-merge issue or change eligible; do not treat open state alone as
+  conclusive. Preserve each theme's contributing session IDs through merging and deduplication.
+- Delegate partitions only to read-only inspectors, which must not call MCP, create issues, archive
+  sessions, edit files, or keep a copy of a partition. Have each return a compact disposition
+  summary: partition index, deduplicated themes with their session IDs, and each session's
+  disposition. Inspectors hand-read only journal-only and retrospective sessions; every other shape
+  is determined structurally.
+- Keep the verified snapshot until the last `session_archive`, because the archival check reads it.
+  Then remove the snapshot with the cleanup capability returned at export, and any partitions with
+  the separate receipt returned when they were created (the export capability cannot remove them),
+  in a cleanup path that runs even when no session is archived.
+- Report reviewed, fixed, duplicate, deferred, quarantined, actionable, created, updated,
+  not-yet-eligible, entry-type-unresolved, and archived counts with reasons, splitting eligible
+  sessions into retrospective and stale (checkpoint-only, journal-only, zero-entry child, and
+  zero-entry root).
 
 Use source records only for local verification and leave them in the repository's approved journal
 or retention system. Public issue bodies contain only the minimum bounded facts or redacted

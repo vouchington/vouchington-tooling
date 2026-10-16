@@ -6,7 +6,13 @@
       "plugin": "vouchington-workflow",
       "pluginVersion": "0.12.0",
       "path": "agent-workflow/SKILL.md",
-      "prerequisites": ["github-issue", "pr-description", "review-ci-logs"]
+      "prerequisites": [
+        "blackboard",
+        "github-issue",
+        "pr-description",
+        "retrospective",
+        "review-ci-logs"
+      ]
     },
     {
       "name": "backend-vitest-test-authoring",

@@ -72,6 +72,7 @@ describe('domain skill plugins', () => {
       readSkill('vouchington-workflow', 'agent-workflow/references/implementation.md'),
       readSkill('vouchington-workflow', 'agent-workflow/references/review.md'),
       readSkill('vouchington-workflow', 'agent-workflow/references/evidence-sweep.md'),
+      readSkill('vouchington-workflow', 'agent-workflow/references/four-refs.md'),
       readSkill('vouchington-testing', 'vitest-test-authoring/references/mock-boundaries.md'),
       readSkill(
         'vouchington-testing',
