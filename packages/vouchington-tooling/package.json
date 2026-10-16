@@ -101,6 +101,11 @@
       "import": "./dist/require-up-to-date/index.mjs",
       "default": "./dist/require-up-to-date/index.mjs"
     },
+    "./fresh-base": {
+      "types": "./dist/fresh-base/index.d.mts",
+      "import": "./dist/fresh-base/index.mjs",
+      "default": "./dist/fresh-base/index.mjs"
+    },
     "./gitleaks-directory-scan": {
       "types": "./dist/gitleaks-directory-scan/index.d.mts",
       "import": "./dist/gitleaks-directory-scan/index.mjs",

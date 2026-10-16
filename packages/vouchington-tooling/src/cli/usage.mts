@@ -5,6 +5,7 @@ Commands:
   with-host-lock       Run a command under a host-wide lock
   gha-runtime-audit             Audit successful GitHub Actions job runtimes
   require-up-to-date            Require HEAD to include a fetched remote branch
+  fresh-base                    Classify the worktree against a remote base branch
   gitleaks-directory-scan       Scan a directory with Gitleaks
   ast-grep-examples             Run AST-grep rule examples
   ast-grep-pack                 Print shipped unconditional AST-grep pack paths as JSON
@@ -74,6 +75,7 @@ gha-runtime-audit
   --push-workflow <name|/regex/>   Repeatable
 
 require-up-to-date --remote <name> --branch <name>
+fresh-base [--remote <name>] [--branch <name>] [--skip-fetch]
 gitleaks-directory-scan --config <path> [--directory <path>]
 ast-grep-examples --rules <directory> --config <path>
 ast-grep-pack

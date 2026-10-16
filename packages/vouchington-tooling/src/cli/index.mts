@@ -21,6 +21,7 @@ import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
+import { runFreshBase } from './commands/fresh-base.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
 import { runAstGrepExamplesCommand } from './commands/ast-grep-examples.mts'
 import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
@@ -137,6 +138,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runMcpCommand(parsed.args)
     case 'require-up-to-date':
       return runRequireUpToDate(parsed)
+    case 'fresh-base':
+      return runFreshBase(parsed)
     case 'gitleaks-directory-scan':
       return runScript('bash', packageScriptPath('scripts/gitleaks-directory-scan.sh'), [
         '--config',

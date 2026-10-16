@@ -124,6 +124,19 @@ export type {
 } from './gha-runtime-audit/index.mts'
 export { checkGhaWorkspacePolicy } from './gha-workspace-policy/index.mts'
 export type { GhaWorkspacePolicyOptions } from './gha-workspace-policy/index.mts'
+export { checkFreshBase, classifyFreshBase, relationOf } from './fresh-base/index.mts'
+export type {
+  FreshBaseClassification,
+  FreshBaseFetch,
+  FreshBaseInput,
+  FreshBaseOptions,
+  FreshBaseRelation,
+  FreshBaseReport,
+  FreshBaseStatus,
+  FreshBaseTree,
+  GitResult,
+  GitRunner,
+} from './fresh-base/index.mts'
 export { requireUpToDate } from './require-up-to-date/index.mts'
 export type { GitExecutor, RequireUpToDateOptions } from './require-up-to-date/index.mts'
 export {
