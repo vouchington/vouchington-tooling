@@ -707,6 +707,19 @@ reexports, and literal dynamic/require loads. Missing or incomplete facts for a 
 throw; external specifiers resolve to `null`. The default file inventory limit is 10,000
 files and can be reduced with `maxFiles`.
 
+## Retrospective distill classifier
+
+`vouchington-tooling/retrospective-distill` exports `classifySession(session, entries, cutoffs)`,
+which assigns a session one of `retrospective`, `entry-type-unresolved`, `checkpoint-only`,
+`journal-only`, `zero-entry-child`, or `zero-entry-root` and decides distillation eligibility
+against caller-supplied `retroCutoff` and `sessionCutoff` timestamps. It deduplicates replayed
+source events, quarantines unknown entry types, invalid feedback envelopes, and conflicting source
+events, and never marks an `entry-type-unresolved` session eligible. `readPartitionRecords(path)`
+reads a local agent-blackboard partition JSONL file; `parseDistillClassifyArgs` and
+`runDistillClassify` wrap both behind `<partition.jsonl> --retro-cutoff <iso> --session-cutoff
+<iso>` and print one tab-separated line per session. The code is the source of truth for the
+taxonomy; the retrospective-distill skill is its human-facing description.
+
 ## Static schema-allowlist pairs
 
 `extractStaticStringPairs(source)` from `pg-schema-snapshot` collects the first two string literals
