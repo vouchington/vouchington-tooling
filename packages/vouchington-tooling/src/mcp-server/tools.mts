@@ -104,6 +104,18 @@ export const TOOLS: readonly ToolDefinition[] = [
     },
   ),
   tool(
+    'snapshot_cleanup',
+    'Deletes the snapshot file (and partition directory, when one was recorded) that ' +
+      'snapshot_export produced. Takes only the cleanupToken it returned: the server resolves the ' +
+      'paths from its own record, never from the caller. The token is bound to the sessionId and ' +
+      'worktree that exported, is single-use, and is forgotten when the server restarts (the ' +
+      'file is then left for the OS to reap). A failed cleanup keeps the token valid and names ' +
+      'any retained tombstone so the same call can retry. Call it as a finally step.',
+    { ...MUTATING, idempotentHint: false },
+    { cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' } },
+    ['cleanupToken'],
+  ),
+  tool(
     'session_archive',
     'Marks a session as distilled. Its metadata becomes immutable; entries stay appendable.',
     MUTATING,

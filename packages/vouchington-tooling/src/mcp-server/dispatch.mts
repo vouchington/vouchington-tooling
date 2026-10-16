@@ -7,10 +7,12 @@ import { journalAppend, journalEntries } from './handlers-journal.mts'
 import { retrospectiveSave } from './handlers-retrospective.mts'
 import { retrospectiveCheck } from './retrospective-check.mts'
 import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
+import { snapshotCleanup } from './handlers-snapshot-cleanup.mts'
 import { sessionArchive, sessionEnsure, snapshotExport } from './handlers-session.mts'
 import { handlePrCreate, handlePrUpdate, handlePrValidate } from './handlers-pr.mts'
 import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
+import { createSnapshotRegistry, type SnapshotRegistry } from './snapshot-registry.mts'
 import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
 
@@ -29,7 +31,11 @@ export type ServerEnvironment = {
   runGh?: GhRunner
   /** Test seam: replaces the operating system user and host name. */
   device?: () => { user: string; host: string }
+  /** Test seam: a fresh registry stands in for a server restart. Defaults to the process's own. */
+  snapshots?: SnapshotRegistry
 }
+
+const PROCESS_SNAPSHOTS = createSnapshotRegistry()
 
 export type ToolCallResult = {
   content: Array<{ type: 'text'; text: string }>
@@ -48,6 +54,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   pr_create: handlePrCreate,
   pr_update: handlePrUpdate,
   snapshot_export: snapshotExport,
+  snapshot_cleanup: snapshotCleanup,
   session_archive: sessionArchive,
 }
 
@@ -100,6 +107,7 @@ export async function callTool(
       env: environment.env,
       launchRoot: environment.launchRoot,
       runGit: environment.runGit,
+      snapshots: environment.snapshots ?? PROCESS_SNAPSHOTS,
       ...(environment.runGh === undefined ? {} : { runGh: environment.runGh }),
       ...(environment.device === undefined ? {} : { device: environment.device }),
       ...(environment.spawnPolicy === undefined ? {} : { spawnPolicy: environment.spawnPolicy }),

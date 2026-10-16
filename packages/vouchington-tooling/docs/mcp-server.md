@@ -92,6 +92,7 @@ as MCP tool errors (`isError: true`) with an actionable message rather than cras
 | `retrospective_check` | optional `sourceEventId`                                                                                                                                                                                                                                                                      | `sessionId`, `saved`, `entries` (`sourceEventId`, `timestamp`, `issues`, `prs` of each retrospective, oldest first)                              |
 | `retrospective_save`  | `parentSessionId`, `agent`, `version`, `mode`, `workOutcome`, `feedbackCoverage`, exactly one of `markdown` or `compose`, optional `repositories`, `sourceEventId`, `category`, `dryRun`, `knownSensitiveValues` (markdown only); or `previewToken` with identity, `mode` and `sourceEventId` | as `journal_append` plus `policy.warnings`; with `dryRun`, `markdown`, `previewToken` and `policy.warnings`                                      |
 | `snapshot_export`     | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                                                                                                                               | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
+| `snapshot_cleanup`    | `cleanupToken`                                                                                                                                                                                                                                                                                | `sessionId`, `cleaned: true`                                                                                                                     |
 | `session_archive`     | none                                                                                                                                                                                                                                                                                          | `sessionId`, `archived: true`                                                                                                                    |
 
 `journal_append` validates the whole feedback envelope with `validateFeedbackEnvelope` before
@@ -145,6 +146,35 @@ corrected retry with the same `sourceEventId` is accepted. `outbox_flush` also r
 outbox does not create the directory. `snapshot_export` never accepts a destination: the
 `agent-blackboard` client chooses a private file and returns its path. `session_archive` is the one
 destructive tool; archived metadata is immutable, while entries stay appendable.
+
+### Snapshot cleanup
+
+`snapshot_export` writes a private file in the OS temp directory, and `snapshot_cleanup` is the only
+way to delete it through the server. It was chosen over cleanup inside `session_archive` because
+the exporting session and the archived sessions differ during distillation, and cleanup must run
+whether or not archiving happened. Call it as a finally step after processing, on success and on
+failure.
+
+- **No caller-chosen path.** The tool takes only `cleanupToken` (`path`, `directory`, and `receipt`
+  are unsupported arguments). The server records the export's file path itself, plus a partition
+  directory and its signed receipt when the client reports both, and cleans exactly that record.
+  When the client's export carried its own cleanup capability, the server keeps it (never
+  returning it) and cleans through the client's `cleanupSnapshotPartitions`, so the client's
+  ownership marker goes with the file; otherwise it uses the in-tree `cleanupSnapshotPartitions`.
+- **Server-minted, bound token.** `snapshot_export` replaces the client's `cleanupToken` with 32
+  random bytes the server generates, recorded with the caller's `sessionId` and resolved `worktree`.
+  The binding is checked before any filesystem call.
+- **Single use.** A successful cleanup spends the token; a repeat fails as unknown and deletes
+  nothing. The record is taken synchronously, so concurrent calls cannot both clean.
+- **Failure modes.** An unknown, forged (including a path used as a token), spent, other-session, or
+  other-worktree token fails with one message and deletes nothing; a mismatched caller does not spend
+  the owner's token. If the cleanup itself fails, the token stays valid and the error carries the
+  reason, including the retained tombstone path when a partition directory was half removed, so the
+  same call can retry. A file that is already gone counts as cleaned.
+- **Server restart.** Bindings are in memory only. After a restart every earlier token is unknown, so
+  the file is left for the operating system to reap from its temp directory; run the distill pass
+  again to export a fresh snapshot. The registry also remembers at most 256 exports and forgets the
+  oldest first.
 
 The outbox lives at `<worktree>/.local/blackboard-outbox` and is used only in interactive mode.
 Autonomous mode forbids a filesystem outbox, so a failed delivery is an error.

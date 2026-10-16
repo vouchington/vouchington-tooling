@@ -88,7 +88,7 @@ describe('snapshot_export', () => {
       sessionId: 'native:owner',
       path: '/private/snapshots/export.jsonl',
       counts: { sessions: 1, entries: 2, records: 3, bytes: 4 },
-      cleanupToken: 'token',
+      cleanupToken: expect.any(String),
     })
     expect(h.fake.calls.export).toEqual([{}])
   })

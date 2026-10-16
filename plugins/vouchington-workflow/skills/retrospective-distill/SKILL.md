@@ -126,6 +126,11 @@ difference is a conflicting payload and stays quarantined.
   sessions into retrospective and stale (checkpoint-only, journal-only, zero-entry child, and
   zero-entry root).
 
+Cleanup, as a finally step: whether processing succeeded or failed, call `snapshot_cleanup` with
+the `cleanupToken` from `snapshot_export`, with the same `sessionId` and `worktree`, once the
+snapshot is no longer needed. The token is single-use and server-restart-scoped; if cleanup fails,
+retry the same call.
+
 Use source records only for local verification and leave them in the repository's approved journal
 or retention system. Public issue bodies contain only the minimum bounded facts or redacted
 summaries needed to establish the problem, proposed work, relevant areas, and validation. Never

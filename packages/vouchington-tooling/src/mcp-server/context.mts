@@ -6,6 +6,7 @@ import type { FeedbackIdentity } from '../agent-blackboard/feedback-types.mts'
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
+import type { SnapshotRegistry } from './snapshot-registry.mts'
 import { requiredNullableString, requiredString, type Args } from './args.mts'
 
 /** What a handler may rely on: every field here was validated before the handler ran. */
@@ -18,6 +19,8 @@ export type ToolContext = {
   launchRoot: string | undefined
   /** Test seam: replaces the child process a policy export runs in. */
   spawnPolicy?: PolicySpawner
+  /** The server's record of its own exports, which `snapshot_cleanup` is bound to. */
+  snapshots: SnapshotRegistry
   /** Runs git with the isolated environment; callers add their own `-C <worktree>`. */
   runGit: RunTextCommand
   /** Test seam: replaces locating and running gh. */

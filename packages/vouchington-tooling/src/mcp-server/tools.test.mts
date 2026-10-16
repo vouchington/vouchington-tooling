@@ -13,6 +13,7 @@ const EXPECTED = [
   'pr_create',
   'pr_update',
   'snapshot_export',
+  'snapshot_cleanup',
   'session_archive',
 ]
 
@@ -85,7 +86,7 @@ describe('tool contract', () => {
     }
   })
 
-  it('marks reads read-only and only pr_update and archive as destructive', () => {
+  it('marks reads read-only and pr_update, cleanup and archive as destructive', () => {
     const readOnly = TOOLS.filter((tool) => tool.annotations.readOnlyHint).map((tool) => tool.name)
     expect(readOnly).toEqual([
       'journal_entries',
@@ -94,7 +95,11 @@ describe('tool contract', () => {
       'pr_validate',
     ])
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
-    expect(destructive.map((tool) => tool.name)).toEqual(['pr_update', 'session_archive'])
+    expect(destructive.map((tool) => tool.name)).toEqual([
+      'pr_update',
+      'snapshot_cleanup',
+      'session_archive',
+    ])
     // Only the pull request tools reach outside the server, to GitHub.
     const openWorld = TOOLS.filter((tool) => tool.annotations.openWorldHint)
     expect(openWorld.map((tool) => tool.name)).toEqual(['pr_validate', 'pr_create', 'pr_update'])
