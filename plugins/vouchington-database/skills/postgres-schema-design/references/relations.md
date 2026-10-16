@@ -39,6 +39,24 @@ validation, then use URL FKs. Keep exact external protocol identifiers, capabili
 evidence snapshots unchanged when their contract requires it; document the exception.
 Do not duplicate a child collection into a parent column unless a trigger maintains the projection.
 
+## Join on ids, never on text
+
+Keys are ids. A key compared as text runs under collation, and its string is copied into every
+referencing row and index. Keep the string as a unique column on the owning table and reference
+the row by id:
+
+```sql
+-- avoid: orders.account_code text REFERENCES accounts (code)
+CREATE TABLE accounts (id uuid PRIMARY KEY, code text NOT NULL UNIQUE);
+CREATE TABLE orders (id uuid PRIMARY KEY, account_id uuid NOT NULL REFERENCES accounts (id));
+```
+
+Resolve the string to an id once at the boundary, then join `orders.account_id = accounts.id`.
+Values matched as text by nature, such as free-form tags, are the exception; document them. Text
+in a join's `Hash Cond` or `Index Cond` is a plan red flag; the single lookup of the unique code
+at the boundary is expected and fine. See
+[reading plans](../../postgres-node-performance-tuning/references/reading-plans.md#text-join-and-index-conditions).
+
 Generic enforcement in `jonathanong/no-mistakes`: `postgres-column-naming`,
 `postgres-array-columns`, `postgres-table-shape`, `postgres-fk-index`, and
 `postgres-require-fk-on-delete`. These cover naming, configured shapes, and FK mechanics;

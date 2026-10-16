@@ -86,6 +86,10 @@ describe('domain skill plugins', () => {
       ),
       readSkill(
         'vouchington-database',
+        'postgres-node-performance-tuning/references/reading-plans.md',
+      ),
+      readSkill(
+        'vouchington-database',
         'postgres-partitioning-uuid-v7/references/partition-lifecycle.md',
       ),
       readSkill('vouchington-database', 'postgres-schema-design/SKILL.md'),
@@ -101,6 +105,25 @@ describe('domain skill plugins', () => {
     for (const resource of resources) {
       expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
     }
+  })
+
+  it('teaches reading plans and links them from the performance skill', async () => {
+    const dir = 'postgres-node-performance-tuning'
+    const [skill, plans, patterns, relations] = await Promise.all([
+      readSkill('vouchington-database', `${dir}/SKILL.md`),
+      readSkill('vouchington-database', `${dir}/references/reading-plans.md`),
+      readSkill('vouchington-database', `${dir}/references/performance-patterns.md`),
+      readSkill('vouchington-database', 'postgres-schema-design/references/relations.md'),
+    ])
+    expect(skill).toContain('references/reading-plans.md')
+    expect(plans).toMatch(/Rows Removed by Join Filter/)
+    expect(plans).toMatch(/pg_stat_xact_user_functions/)
+    expect(plans).toMatch(/Subplans Removed/)
+    expect(plans).toMatch(/plan_cache_mode/)
+    expect(patterns).toMatch(/## Volatile functions in predicates/)
+    expect(patterns).toMatch(/## Function inlining/)
+    expect(patterns).toMatch(/## Reading views by key/)
+    expect(relations).toMatch(/## Join on ids, never on text/)
   })
 
   it('keeps raw retrospective evidence out of durable records', async () => {
