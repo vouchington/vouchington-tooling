@@ -43,6 +43,25 @@ describe('ghcr-package-retention', () => {
     expect(runRetention(['pkg'], { KEEP_MIN: 'nope' }, 'exit 99').status).toBe(2)
   })
 
+  it('supports --dry-run and GHCR_PACKAGES', () => {
+    const result = runRetention(
+      ['--dry-run'],
+      { KEEP_MIN: '0', GHCR_PACKAGES: 'one two' },
+      `
+if [[ "$*" == *"-X DELETE"* ]]; then
+  echo "unexpected delete" >&2
+  exit 1
+fi
+printf '%s\\n' '{"id":9,"metadata":{"container":{"tags":["sha-cccc"]}}}'
+`,
+    )
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('=== Processing one ===')
+    expect(result.stdout).toContain('=== Processing two ===')
+    expect(result.stdout).toContain('would delete: version 9')
+    expect(runRetention(['--nope'], {}, 'exit 99').stderr).toContain('unknown argument')
+  })
+
   it('keeps protected and recent versions then deletes the rest', () => {
     const result = runRetention(
       ['example%2Fapi'],
