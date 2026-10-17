@@ -160,6 +160,7 @@ describe('vouchington-workflow plugin', () => {
       'revisit-followups',
       'stacked-prs',
       'static-analysis-checklist',
+      'triage-prs',
     ])
     const [codex, claude, readme, manifests, skills] = await Promise.all([
       readJson(join(root, '.agents/plugins/marketplace.json')),

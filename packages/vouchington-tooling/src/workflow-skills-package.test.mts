@@ -47,7 +47,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(31)
+      expect(packaged).toHaveLength(32)
       expect(packaged).toEqual(canonical)
       const resources = pluginRoots
         .flatMap((root) => skillPaths(root, root, false))
@@ -132,6 +132,18 @@ describe('workflow skills package contract', () => {
         ['revisit-followups', ['github-issue']],
         ['review-ci-logs', ['github-actions-checklist', 'pr-description']],
         ['static-analysis-checklist', ['github-actions-checklist']],
+        [
+          'triage-prs',
+          ['pr-description', 'retrospective', 'review-ci-logs', 'github-issue', 'stacked-prs'],
+          [
+            'pr-description',
+            'retrospective',
+            'review-ci-logs',
+            'github-issue',
+            'stacked-prs',
+            'github-actions-checklist',
+          ],
+        ],
       ] as const) {
         expect(prerequisites.get(name)).toEqual(required)
         const targetRoot = join(output, name)
