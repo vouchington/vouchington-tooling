@@ -1,0 +1,265 @@
+name: Harness Dispatch
+
+# Reusable workflow that creates (or resumes) one Auto Harness session and returns. Callers pin
+# it by tag or SHA, for example:
+#   uses: <owner>/<repo>/.github/workflows/harness-dispatch.yml@<tag-or-sha>
+# Repository variables read from the caller: HARNESS_DISPATCH_ENABLED, HARNESS_REPOSITORY_ID,
+# HARNESS_URL, HARNESS_TARGET, HARNESS_FALLBACKS and the variable named by surface-gate.
+on:
+  workflow_call:
+    inputs:
+      prompt: { type: string, required: true }
+      agent-ref: { type: string, required: true }
+      expected-head-sha: { type: string, required: true }
+      concurrency-id: { type: string, required: true }
+      slack-source: { type: string, required: false, default: '' }
+      completion-mode: { type: string, required: false, default: pr }
+      publish-contract: { type: string, required: false, default: none }
+      publish-base-ref: { type: string, required: false, default: '' }
+      publish-target-pr-number: { type: string, required: false, default: '' }
+      publish-title-prefix: { type: string, required: false, default: '' }
+      publish-title-suffix: { type: string, required: false, default: '' }
+      publish-duplicate-key: { type: string, required: false, default: '' }
+      publish-related-candidates: { type: string, required: false, default: '[]' }
+      existing-issue-maintenance: { type: boolean, required: false, default: false }
+      issue-number: { type: string, required: false, default: '' }
+      trigger-comment-id: { type: string, required: false, default: '' }
+      allow-duplicate-issue-completion: { type: boolean, required: false, default: false }
+      pr-label: { type: string, required: false, default: '' }
+      pr-shepherd-version: { type: string, required: false, default: '' }
+      resume-session-id: { type: string, required: false, default: '' }
+      checkpoint-issue-number: { type: string, required: false, default: '' }
+      source-run-id: { type: string, required: false, default: '' }
+      source-run-attempt: { type: string, required: false, default: '' }
+      source-run-conclusion: { type: string, required: false, default: '' }
+      surface-gate:
+        type: string
+        required: true
+        description: 'Name of the repository variable that must equal true for this surface to dispatch'
+      additional-gate:
+        type: string
+        required: false
+        default: ''
+        description: 'Optional second repository variable that must also equal true. The fix-main surface must pass HARNESS_AGENT_DISPATCH_ENABLED'
+      target-variable:
+        type: string
+        required: false
+        default: ''
+        description: 'Repository variable holding the target JSON. Empty derives it from surface-gate: HARNESS_PLAN_ENABLED uses HARNESS_TARGET_PLAN, anything else HARNESS_TARGET. An unset variable falls back to HARNESS_TARGET'
+      fallbacks-variable:
+        type: string
+        required: false
+        default: ''
+        description: 'Repository variable holding the fallbacks JSON. Empty derives it from surface-gate: HARNESS_PLAN_ENABLED uses HARNESS_FALLBACKS_PLAN, anything else HARNESS_FALLBACKS. An unset variable falls back to HARNESS_FALLBACKS'
+      dispatch-ref:
+        type: string
+        required: false
+        default: refs/heads/main
+        description: 'Only this caller ref may start the credential-bearing job'
+      environment:
+        type: string
+        required: false
+        default: auto-harness
+        description: 'GitHub Environment that holds the branch policy for the dispatch job'
+      runs-on: { type: string, required: false, default: ubuntu-slim }
+      priority: { type: string, required: false, default: '20' }
+      queue-ttl-seconds: { type: string, required: false, default: '3600' }
+      timeout-seconds: { type: string, required: false, default: '6300' }
+      required-labels: { type: string, required: false, default: '[]' }
+    secrets:
+      HARNESS_API_KEY:
+        required: true
+        description: 'Repository secret explicitly forwarded by each caller; the Environment stays branch-policy only'
+    outputs:
+      session-id:
+        value: ${{ jobs.dispatch.outputs.session-id }}
+      session-url:
+        value: ${{ jobs.dispatch.outputs.session-url }}
+      created:
+        value: ${{ jobs.dispatch.outputs.created }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-dispatch-${{ inputs.concurrency-id }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch Auto Harness session
+    # This job only creates a session and returns. The Harness scheduler keeps it queued until a
+    # host has capacity: the priority input orders that queue and queue-ttl-seconds bounds the
+    # wait. GitHub adds no global cap.
+    if: >-
+      github.ref == inputs.dispatch-ref && github.run_attempt == 1 &&
+      vars.HARNESS_DISPATCH_ENABLED == 'true' &&
+      vars[inputs.surface-gate] == 'true' &&
+      (inputs.additional-gate == '' || vars[inputs.additional-gate] == 'true')
+    # GitHub, not branch-controlled workflow YAML, enforces that only the permitted branch can
+    # start this credential-bearing job. Configure the Environment's branch policy accordingly.
+    environment: ${{ inputs.environment }}
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 7
+    outputs:
+      session-id: ${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}
+      session-url: ${{ steps.dispatch.outputs.session-url || steps.resume.outputs.session-url }}
+      created: ${{ steps.dispatch.outputs.created || steps.resume.outputs.created }}
+    steps:
+      - name: Validate inputs and build metadata
+        id: prepare
+        timeout-minutes: 1
+        env:
+          AGENT_REF: ${{ inputs.agent-ref }}
+          ALLOW_DUPLICATE_ISSUE_COMPLETION: ${{ inputs.allow-duplicate-issue-completion }}
+          CHECKPOINT_ISSUE_NUMBER: ${{ inputs.checkpoint-issue-number }}
+          COMPLETION_MODE: ${{ inputs.completion-mode }}
+          EXISTING_ISSUE_MAINTENANCE: ${{ inputs.existing-issue-maintenance }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected-head-sha }}
+          HARNESS_PROMPT: ${{ inputs.prompt }}
+          HARNESS_URL: ${{ vars.HARNESS_URL }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+          PR_LABEL: ${{ inputs.pr-label }}
+          PR_SHEPHERD_VERSION: ${{ inputs.pr-shepherd-version }}
+          PUBLISH_BASE_REF: ${{ inputs.publish-base-ref }}
+          PUBLISH_CONTRACT: ${{ inputs.publish-contract }}
+          PUBLISH_DUPLICATE_KEY: ${{ inputs.publish-duplicate-key }}
+          PUBLISH_RELATED_CANDIDATES: ${{ inputs.publish-related-candidates }}
+          PUBLISH_TARGET_PR_NUMBER: ${{ inputs.publish-target-pr-number }}
+          PUBLISH_TITLE_PREFIX: ${{ inputs.publish-title-prefix }}
+          PUBLISH_TITLE_SUFFIX: ${{ inputs.publish-title-suffix }}
+          RESUME_SESSION_ID: ${{ inputs.resume-session-id }}
+          SLACK_SOURCE: ${{ inputs.slack-source }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source-run-attempt }}
+          SOURCE_RUN_CONCLUSION: ${{ inputs.source-run-conclusion }}
+          SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+          TRIGGER_COMMENT_ID: ${{ inputs.trigger-comment-id }}
+        run: |
+          set -euo pipefail
+          if ! command -v jq >/dev/null; then
+            echo "::error::jq is required on the runner (preinstalled on ubuntu-slim and ubuntu-latest)."
+            exit 1
+          fi
+          if [[ ! "$HARNESS_URL" =~ ^https:// ]]; then
+            echo "::error::vars.HARNESS_URL must be an https:// URL."
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+            echo "::error::expected-head-sha must be a full commit SHA."
+            exit 1
+          fi
+          if [[ "$(printf '%s' "$HARNESS_PROMPT" | wc -c)" -gt 65536 ]]; then
+            echo "::error::The prompt exceeds 65536 bytes."
+            exit 1
+          fi
+          if [[ -n "$RESUME_SESSION_ID" && ! "$RESUME_SESSION_ID" =~ ^sess-[0-9a-f]{8}$ ]]; then
+            echo "::error::resume-session-id is not a valid session id."
+            exit 1
+          fi
+          related="${PUBLISH_RELATED_CANDIDATES:-[]}"
+          if ! jq -e 'type == "array"' <<<"$related" >/dev/null; then
+            echo "::error::publish-related-candidates must be a JSON array."
+            exit 1
+          fi
+          fields="$(
+            jq -cn \
+              --arg agentRef "$AGENT_REF" \
+              --arg expectedHeadSha "$EXPECTED_HEAD_SHA" \
+              --arg completionMode "$COMPLETION_MODE" \
+              --arg issueNumber "$ISSUE_NUMBER" \
+              --arg triggerCommentId "$TRIGGER_COMMENT_ID" \
+              --arg publishContract "$PUBLISH_CONTRACT" \
+              --arg publishBaseRef "$PUBLISH_BASE_REF" \
+              --arg publishTargetPrNumber "$PUBLISH_TARGET_PR_NUMBER" \
+              --arg publishTitlePrefix "$PUBLISH_TITLE_PREFIX" \
+              --arg publishTitleSuffix "$PUBLISH_TITLE_SUFFIX" \
+              --arg publishDuplicateKey "$PUBLISH_DUPLICATE_KEY" \
+              --arg existingIssueMaintenance "$EXISTING_ISSUE_MAINTENANCE" \
+              --arg allowDuplicateIssueCompletion "$ALLOW_DUPLICATE_ISSUE_COMPLETION" \
+              --arg prLabel "$PR_LABEL" \
+              --arg prShepherdVersion "$PR_SHEPHERD_VERSION" \
+              --arg checkpointIssueNumber "$CHECKPOINT_ISSUE_NUMBER" \
+              --arg slackSource "$SLACK_SOURCE" \
+              --arg sourceRunId "$SOURCE_RUN_ID" \
+              --arg sourceRunAttempt "$SOURCE_RUN_ATTEMPT" \
+              --arg sourceRunConclusion "$SOURCE_RUN_CONCLUSION" \
+              '$ARGS.named | with_entries(select(.value != ""))'
+          )"
+          too_long="$(jq -r 'to_entries[] | select(.value | length > 512) | .key' <<<"$fields")"
+          if [[ -n "$too_long" ]]; then
+            echo "::error::Metadata field exceeds 512 characters: ${too_long}"
+            exit 1
+          fi
+          if [[ "$(jq 'length' <<<"$related")" -gt 0 ]]; then
+            serialized="$(jq -c . <<<"$related")"
+            bytes="$(printf '%s' "$serialized" | wc -c | tr -d ' ')"
+            if [[ "$bytes" -le 512 ]]; then
+              fields="$(jq -c --arg related "$serialized" '. + {publishRelatedCandidates: $related}' <<<"$fields")"
+            else
+              echo "::warning::publish-related-candidates dropped: ${bytes} bytes exceeds the 512-byte non-gating limit."
+            fi
+          fi
+          echo "metadata=${fields}" >> "$GITHUB_OUTPUT"
+      - name: Dispatch session
+        id: dispatch
+        if: inputs.resume-session-id == ''
+        timeout-minutes: 2
+        uses: jonathanong/auto-harness/actions/dispatch@77caf36363b74987ea5c7d48a3b71b4f87f27fe5 # v1.0.1
+        with:
+          server-url: ${{ vars.HARNESS_URL }}
+          api-key: ${{ secrets.HARNESS_API_KEY }}
+          repository-id: ${{ vars.HARNESS_REPOSITORY_ID }}
+          prompt: ${{ inputs.prompt }}
+          concurrency-id: ${{ inputs.concurrency-id }}
+          # The host daemon's worktree pool is a plain clone: a branch ref only exists under
+          # refs/remotes/origin/* there, so checkout of any branch but the one already checked
+          # out fails. The SHA always resolves; agent-ref still reaches session metadata.
+          ref: ${{ inputs.expected-head-sha }}
+          target: ${{ vars[inputs.target-variable || (inputs.surface-gate == 'HARNESS_PLAN_ENABLED' && 'HARNESS_TARGET_PLAN' || 'HARNESS_TARGET')] || vars.HARNESS_TARGET }}
+          fallbacks: ${{ vars[inputs.fallbacks-variable || (inputs.surface-gate == 'HARNESS_PLAN_ENABLED' && 'HARNESS_FALLBACKS_PLAN' || 'HARNESS_FALLBACKS')] || vars.HARNESS_FALLBACKS }}
+          timeout: ${{ inputs.timeout-seconds }}
+          priority: ${{ inputs.priority }}
+          queue-ttl-seconds: ${{ inputs.queue-ttl-seconds }}
+          required-labels: ${{ inputs.required-labels }}
+          metadata: ${{ steps.prepare.outputs.metadata }}
+          source: webhook
+      - name: Resume session
+        id: resume
+        if: inputs.resume-session-id != ''
+        timeout-minutes: 2
+        uses: jonathanong/auto-harness/actions/dispatch@77caf36363b74987ea5c7d48a3b71b4f87f27fe5 # v1.0.1
+        with:
+          operation: resume
+          server-url: ${{ vars.HARNESS_URL }}
+          api-key: ${{ secrets.HARNESS_API_KEY }}
+          session-id: ${{ inputs.resume-session-id }}
+          prompt: ${{ inputs.prompt }}
+          concurrency-id: ${{ inputs.concurrency-id }}
+          timeout: ${{ inputs.timeout-seconds }}
+          priority: ${{ inputs.priority }}
+      - name: Summarize session
+        id: summary
+        timeout-minutes: 1
+        env:
+          CONCURRENCY_ID: ${{ inputs.concurrency-id }}
+          CREATED: ${{ steps.dispatch.outputs.created || steps.resume.outputs.created }}
+          RESUMED: ${{ inputs.resume-session-id != '' }}
+          SESSION_ID: ${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}
+          SESSION_URL: ${{ steps.dispatch.outputs.session-url || steps.resume.outputs.session-url }}
+        run: |
+          set -euo pipefail
+          if [[ "$RESUMED" == "true" ]]; then
+            state="resumed"
+          elif [[ "$CREATED" == "false" ]]; then
+            state="existing session reused"
+          else
+            state="created"
+          fi
+          echo "::notice title=Harness session::${SESSION_URL}"
+          {
+            echo "### Harness session"
+            echo
+            echo "- Session: [\`${SESSION_ID}\`](${SESSION_URL})"
+            echo "- State: ${state}"
+            echo "- Concurrency id: \`${CONCURRENCY_ID}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

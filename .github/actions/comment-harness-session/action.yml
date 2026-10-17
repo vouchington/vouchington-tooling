@@ -1,0 +1,54 @@
+name: Comment Auto Harness session
+description: >
+  Post one idempotent session-link comment on an existing issue or pull request.
+  Points the acknowledgement at the Auto Harness session instead of the workflow run
+  that only dispatched it.
+inputs:
+  target:
+    description: Issue or pull request number
+    required: true
+  session-id:
+    description: Auto Harness session id
+    required: true
+  session-url:
+    description: Auto Harness session URL
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Comment session link
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SESSION_ID: ${{ inputs.session-id }}
+        SESSION_URL: ${{ inputs.session-url }}
+        TARGET: ${{ inputs.target }}
+      run: |
+        set -euo pipefail
+        if [[ ! "$TARGET" =~ ^[1-9][0-9]*$ ]]; then
+          echo "::error::Refusing to comment on a non-numeric issue or pull request."
+          exit 1
+        fi
+        if [[ ! "$SESSION_ID" =~ ^sess-[0-9a-f]{8}$ ]]; then
+          echo "::error::Refusing to comment with an unexpected Auto Harness session id."
+          exit 1
+        fi
+        URL_PATTERN="^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*/sessions/${SESSION_ID}\$"
+        if [[ ! "$SESSION_URL" =~ $URL_PATTERN ]]; then
+          echo "::error::Refusing to comment with an unexpected Auto Harness session URL."
+          exit 1
+        fi
+
+        MARKER="<!-- auto-harness-session:${SESSION_ID} -->"
+        COUNT="$(
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${TARGET}/comments?per_page=100" \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"${MARKER}\")))] | length" \
+            | awk '{ sum += $1 } END { print sum + 0 }'
+        )"
+        if [[ "$COUNT" != "0" ]]; then
+          echo "Session comment already exists on #${TARGET}."
+          exit 0
+        fi
+
+        BODY="👀 [View the Auto Harness session](${SESSION_URL})."$'\n\n'"${MARKER}"
+        gh issue comment "$TARGET" --repo "$GITHUB_REPOSITORY" --body "$BODY"
