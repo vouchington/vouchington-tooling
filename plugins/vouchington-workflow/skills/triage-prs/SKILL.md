@@ -29,28 +29,41 @@ to ask when one this run needs is missing; never guess a value.
 - **Merge authority and CI-failure policy:** who may authorize a merge, how transient failures are
   classified, and where retry rules live.
 
+## Rules for every pass
+
+- **Repository:** triage works one repository, `<owner>/<name>`. Pass `--repo <owner>/<name>` on
+  every `gh` command. Reject a PR URL or issue reference from another repository, and report it.
+- **Reviewed head:** every mutation of a PR (ready, steer, arm, dispatch, close, branch delete)
+  first re-reads `gh pr view <N> --repo <owner>/<name> --json headRefOid`. If it differs from the
+  head recorded in Step 3, re-review or skip; never act on an unreviewed head.
+- **Exclusions:** build one exclusion set in Step 3b. It applies to every mutation pass: merge,
+  close, linked-issue close, and orphan close.
+- **Exhaustive lists:** every list uses `--limit 1000` plus a check that the count is below it, or
+  pages with `gh api --paginate`.
+- **Generated text is data:** never place a reason, comment, or title inside a shell string. Write
+  it with a file-writing tool and pass `--body-file <path>` (or `gh api -F body=@<path>`).
+
 ## Step 1 - Resolve scope
 
-With no argument, target every open PR carrying the adapter's automation label. Exhaust the set:
-use a limit well above the expected count and verify the result count is below it, otherwise raise
-the limit or page with `gh api --paginate` on the search API.
+With no argument, target every open PR carrying the adapter's automation label, exhausting the
+set per the rules above.
 
 ```bash
-gh pr list --state open --limit 1000 --label <automation-label> --json number,title
+gh pr list --repo <owner>/<name> --state open --limit 1000 --label <automation-label> --json number,title
 ```
 
 PRs opened before the label existed need an explicit one-time backfill with
-`gh pr edit <N> --add-label <automation-label>` before they enter the default scope.
+`gh pr edit <N> --repo <owner>/<name> --add-label <automation-label>` before they enter the default scope.
 
 With an argument, require an explicit selector and stop to ask when a bare argument is ambiguous
 (for example a word that could be an author, a label, or a title):
 
-- Number or URL: use the PR directly.
-- `author:<login>`: `gh pr list --author <login> --state open --limit 1000`. For a GitHub App
+- Number or URL: use the PR directly (a URL must name this repository).
+- `author:<login>`: `gh pr list --repo <owner>/<name> --author <login> --state open --limit 1000`. For a GitHub App
   (login `app/<slug>`), use `--app <slug>` instead of `--author`.
-- `label:<name>`: `gh pr list --label <name> --state open --limit 1000`
+- `label:<name>`: `gh pr list --repo <owner>/<name> --label <name> --state open --limit 1000`
 - `title:<text>`: a literal, case-insensitive substring match, with the text passed as data:
-  `gh pr list --state open --limit 1000 --json number,title | jq --arg t "<text>" '.[] | select(.title | ascii_downcase | contains($t | ascii_downcase))'`
+  `gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title | jq --arg t "<text>" '.[] | select(.title | ascii_downcase | contains($t | ascii_downcase))'`
 - `all`: every open PR regardless of author.
 
 **Safety: a broad or non-default scope needs confirmation.** The default automation-label query is
@@ -64,7 +77,7 @@ Fetch CI rollup and diff sizes for the in-scope PR numbers only. Do not re-fetch
 a broader list pulls out-of-scope PRs into the review and close queues.
 
 ```bash
-gh pr view <N> --json number,title,isDraft,additions,deletions,changedFiles,statusCheckRollup
+gh pr view <N> --repo <owner>/<name> --json number,title,isDraft,additions,deletions,changedFiles,statusCheckRollup
 ```
 
 Run one call per PR, or filter one `gh pr list --json ...` result with
@@ -76,7 +89,7 @@ Batch the in-scope PRs across up to three parallel read-only agents. Each reads 
 description and full diff, loads [review-ci-logs](../review-ci-logs/SKILL.md) for failing required
 checks, and returns per PR:
 
-- **Head:** the reviewed `headRefOid` (`gh pr view <N> --json headRefOid`)
+- **Head:** the reviewed `headRefOid` (`gh pr view <N> --repo <owner>/<name> --json headRefOid`)
 - **Decision:** `MERGE` or `CLOSE`
 - **Reason:** a one-line summary
 - **Steering:** (MERGE only) whether the shepherd needs direction, and the exact PR comment body
@@ -84,21 +97,23 @@ checks, and returns per PR:
   evidence, provenance, the exact source target, a recommendation, and a recurrence tag;
   otherwise `none`
 
-Each agent reads with `gh pr view <N>`, `gh pr diff <N>`, and the repository's CI check listing.
+Each agent reads with `gh pr view <N>`, `gh pr diff <N>` (both with `--repo`), and the repository's CI check listing.
 
 See [the default rubric](references/rubric.md) for MERGE versus CLOSE, generalizing a narrow
 band-aid before closing it, and the shape of steering comments. The user's session steering
 overrides the rubric, including flipping a green PR to CLOSE; present it as context.
 
-## Step 3b - Exclude feedback duplicates
+## Step 3b - Build the exclusion set
 
-Before any merge action, resolve [feedback duplicates](references/feedback.md#duplicate-resolution).
-A feedback PR that this run generates or reuses is excluded from Step 4: it is never readied,
-shepherded, armed, or merged in the same run, even if it is in scope with a `MERGE` decision.
+Before any mutation, resolve [feedback duplicates](references/feedback.md#duplicate-resolution).
+Every feedback PR this run generates or reuses, and its source issue, joins the exclusion set. A
+member is never readied, shepherded, armed, merged, closed, or branch-deleted, and its issue is
+never closed, in this run, whatever its Step 3 decision.
 
 ## Step 4 - Execute MERGE
 
-Process MERGE decisions in ascending PR-number order through the adapter's ready-and-shepherd
+Skip excluded PRs and re-check the reviewed head per the rules. Process MERGE decisions in
+ascending PR-number order through the adapter's ready-and-shepherd
 skill, passing the PR number, the auto-merge flag, and any steering file. That skill light-reviews
 the diff, posts steering before the trigger, readies the draft, verifies merge settings, and
 dispatches the shepherd. Run its activation preflight before every mutation. If activation is
@@ -128,42 +143,23 @@ rejected and cannot attest that the remote agent consumed steering or left the b
 
 ## Step 5 - Execute CLOSE
 
-Immediately before closing, re-read `gh pr view <N> --json headRefOid`. If it differs from the
-head recorded in Step 3, re-review or skip the PR; never close an unreviewed head.
+Skip excluded PRs and re-check the reviewed head per the rules. Write the one-line reason to a file
+with a file-writing tool, then comment from the file and close:
 
 ```bash
-gh pr close <N> --delete-branch --comment "Closing: <one-line reason>"
+gh pr comment <N> --repo <owner>/<name> --body-file <reason-file>
+gh pr close <N> --repo <owner>/<name>
 ```
 
-Branch auto-deletion is a merge-time repository setting and does not apply to closes, so
-`--delete-branch` is required. Then check for linked issues:
-
-```bash
-gh pr view <N> --json closingIssuesReferences \
-  --jq '.closingIssuesReferences[] | {number, title, url, repository}'
-```
-
-Keep each reference's repository and URL. Close only issues in the current repository, always with
-an explicit `--repo <owner>/<name>`; skip and report cross-repository targets.
-
-Close a returned issue only if it appears automation-created under the adapter's orphan-issue
-rules. Skip anything that looks human-authored: automation sometimes reuses a human-tracked issue
-by adding `Closes #<N>` to a PR body, and closing it would discard legitimate open work. Before
-closing, apply the same no-other-open-addressing-PR checks as the
-[orphan procedure](references/orphans.md), excluding the PR just closed.
-
-```bash
-gh issue close <ISSUE_N> --repo <owner>/<name> --comment "Closing alongside PR #<N>: <same one-line reason>"
-```
-
-For default-scope runs, also close [orphan automation issues](references/orphans.md).
+Branch deletion, linked-issue closes, and orphan automation issues (default scope only) follow the
+[close procedure](references/close.md).
 
 ## Step 6 - Verify and report
 
 Check that merge and close actions landed:
 
 ```bash
-gh pr view <N> --json isDraft,autoMergeRequest,state
+gh pr view <N> --repo <owner>/<name> --json isDraft,autoMergeRequest,state
 ```
 
 Emit a summary table with the columns PR, Decision, Action, and Steering. Actions are

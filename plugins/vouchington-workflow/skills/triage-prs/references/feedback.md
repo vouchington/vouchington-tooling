@@ -9,6 +9,10 @@ For the current batch, combine every qualifying finding, including `one-off` fin
 feedback issue and one draft feedback PR. Record the proportional plan in that issue; it is the
 sole closing source for the PR. Reviewed PRs are evidence only and are never closing references.
 
+Every feedback PR and source issue created or reused here joins the run's exclusion set, which
+applies to the merge, close, linked-issue, and orphan passes. Verify its head before updating it.
+Pass generated titles, bodies, and comments to `gh` only through files (`--body-file`).
+
 Before publication, verify at action time:
 
 - The PR is verified agent-authored, the source target is an exact prompt-source path, and the
@@ -35,8 +39,8 @@ not ready, shepherd, auto-merge, or merge a generated or reused feedback PR in t
 
 ## Retrospective disposition
 
-- `disposition: published`: record `Disposition: preauthorized-pr #N` after a successful create or
-  exact-match reuse.
+- `disposition: published`: record `Disposition: preauthorized-pr #N` after a successful create,
+  exact-match reuse, or `same-paths-new-feedback` update of the canonical PR and issue.
 - `disposition: deferred`: record `deferred` with the concrete blocker after a failed, partial, or
   ambiguous publication. Do not ask the user or claim the feedback was handled.
 - `disposition: user-choice`: keep non-prompt feedback in the normal human follow-up flow.
