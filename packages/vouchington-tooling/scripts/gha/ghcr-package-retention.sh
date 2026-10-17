@@ -12,6 +12,10 @@
 # - An attachment: untagged or tagged only sha256-*. Attestations and their referrer indexes are
 #   pushed after their image, and platform manifests moments before it, so an attachment created
 #   over a day before the oldest surviving image, and idle for the same age, belongs to none.
+# Before deleting, the manifests of every surviving image are read from the registry (GH_TOKEN or
+# GITHUB_TOKEN, else gh auth token) and anything they reference through manifests[] or subject is
+# kept; if one cannot be read, the package is left untouched. The registry namespace is GHCR_OWNER,
+# else GITHUB_REPOSITORY_OWNER (required for user-owned packages too).
 # Packages that do not exist (HTTP 404) are skipped. Defaults to a dry run; pass --apply to delete.
 #
 # Packages come from the arguments, or from GHCR_PACKAGES (space separated) when none are given.

@@ -5,12 +5,14 @@
 # shellcheck source=/dev/null
 . "$(dirname "${BASH_SOURCE[0]}")/ghcr-referenced-digests.sh"
 
-# The registry namespace: the org, or the authenticated user for user-owned packages.
-gh_owner() {
-  if [ -n "${GHCR_OWNER:-}" ]; then echo "$GHCR_OWNER"; else gh api user --jq .login; fi
-}
-
 prune_main_history() {
+  # The registry namespace of the packages: GHCR_OWNER, else the workflow's repository owner.
+  local owner="${GHCR_OWNER:-${GITHUB_REPOSITORY_OWNER:-}}"
+  if [ -z "$owner" ]; then
+    echo '::error::ghcr-package-retention: GHCR_OWNER is required with --main-history' >&2
+    exit 2
+  fi
+
   # A zero keep count would delete every main image in one run.
   case "$keep_main" in
     '' | *[!0-9]*) keep_main=0 ;;
@@ -85,8 +87,8 @@ prune_main_history() {
     referenced='[]'
     if [ "$(jq '.candidates | length' "$work/plan")" -gt 0 ]; then
       jq -r '.roots[]' "$work/plan" > "$work/roots"
-      image="$(gh_owner)/$(printf '%b' "${package//%/\\x}")"
-      resolved=$(resolve_referenced "$image" "$work" "$work/roots") || exit 1
+      image="$owner/$(printf '%b' "${package//%/\\x}")"
+      resolved=$(resolve_referenced "$image" "$owner" "$work" "$work/roots") || exit 1
       referenced=$(printf '%s\n' "$resolved" | jq -R . | jq -s .)
     fi
     deletions=$(jq -r --argjson referenced "$referenced" "$filter" "$work/plan")

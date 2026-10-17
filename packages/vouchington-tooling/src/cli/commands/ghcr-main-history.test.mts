@@ -88,7 +88,7 @@ function setup(
     join(bin, 'gh'),
     `#!/usr/bin/env bash
 set -euo pipefail
-if [ "$1" = auth ]; then echo test-token; exit 0; fi
+if [ "$1" = auth ]; then [ -z "\${FAKE_NO_AUTH:-}" ] || exit 1; echo test-token; exit 0; fi
 if [ "$1" = api ] && [ "$2" = user ]; then echo octocat; exit 0; fi
 if [ "$1" = api ] && [ "$2" = --method ]; then
   echo "$4" >> "${deletes}"
@@ -106,15 +106,36 @@ jq -r --arg package "$package" '.[$package] | if type == "string" then . else "[
     join(bin, 'curl'),
     `#!/usr/bin/env bash
 set -euo pipefail
-cat > /dev/null
+config=$(cat)
 url=\${!#}
-echo "$url" >> "${fetches}"
-jq -e --arg digest "$(basename "$url")" '.[$digest] // {}' "${join(root, 'registry.json')}" > "${join(root, 'manifest.out')}"
-if jq -e 'type == "string"' "${join(root, 'manifest.out')}" > /dev/null; then
-  jq -r . "${join(root, 'manifest.out')}" >&2
-  exit 22
+key=$(basename "$url")
+case "$url" in
+  */token\\?*)
+    key=__token
+    case "$config" in
+      'user = "'*:*'"') echo "$url basic-user=\${config%%:*}" >> "${fetches}" ;;
+      *) echo 'token request without basic auth' >&2; exit 22 ;;
+    esac
+    default='{"token":"reg-token"}'
+    ;;
+  *)
+    case "$config" in
+      *'Bearer reg-token'*) echo "$url" >> "${fetches}" ;;
+      *) echo 'manifest request without the exchanged bearer token' >&2; exit 22 ;;
+    esac
+    default='{}'
+    ;;
+esac
+out="${join(root, 'manifest.out')}"
+jq -e --arg key "$key" --argjson default "$default" '.[$key] // $default' "${join(root, 'registry.json')}" > "$out"
+if jq -e 'type == "string"' "$out" > /dev/null; then
+  case "$(jq -r . "$out")" in
+    RAW:*) jq -r . "$out" | cut -c5- ;;
+    *) jq -r . "$out" >&2; exit 22 ;;
+  esac
+  exit 0
 fi
-cat "${join(root, 'manifest.out')}"
+cat "$out"
 `,
   )
   chmodSync(join(bin, 'curl'), 0o755)
@@ -260,16 +281,61 @@ describe('ghcr-package-retention --main-history', { timeout: 60_000 }, () => {
       expect(deleted(context)).toEqual([])
     })
 
-    it('resolves the owner of user packages and url-decodes nested package names', () => {
+    it('exchanges the token once per package and uses the owner env for user packages', () => {
       const context = prepare('team%2Fapi')
       const result = run(context, ['team%2Fapi'], {
         GHCR_KEEP_MAIN: '1',
         GHCR_OWNER_TYPE: 'user',
         GHCR_OWNER: '',
+        GITHUB_REPOSITORY_OWNER: 'octocat',
         GH_TOKEN: 'secret',
       })
       expect(result.status).toBe(0)
-      expect(readFileSync(context.fetches, 'utf8')).toContain('/v2/octocat/team/api/manifests/')
+      const fetched = readFileSync(context.fetches, 'utf8')
+      expect(fetched).toContain('/v2/octocat/team/api/manifests/')
+      expect(fetched.match(/\/token\?scope=repository:octocat\/team\/api:pull/g)).toHaveLength(1)
+      expect(fetched).toContain('basic-user=user = "octocat')
+      expect(fetched).not.toContain('secret')
+    })
+
+    it('requires an owner', () => {
+      const context = prepare('api')
+      const result = run(context, ['api'], { GHCR_OWNER_TYPE: 'user', GHCR_OWNER: '' })
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('::error::ghcr-package-retention: GHCR_OWNER is required')
+    })
+
+    it('deletes nothing when the token exchange fails or has no token', () => {
+      for (const token of ['HTTP 401', { nothing: true }]) {
+        const context = prepare('api', { __token: token })
+        const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+        expect(result.status).toBe(1)
+        expect(result.stderr).toMatch(/Could not get a registry token|had no token/)
+        expect(deleted(context)).toEqual([])
+      }
+    })
+
+    it('falls back to gh auth token and fails when there is none', () => {
+      const context = prepare('api')
+      expect(
+        run(context, ['api'], { GHCR_KEEP_MAIN: '1', GH_TOKEN: '', GITHUB_TOKEN: '' }).status,
+      ).toBe(0)
+      const result = run(context, ['api'], {
+        GHCR_KEEP_MAIN: '1',
+        GH_TOKEN: '',
+        GITHUB_TOKEN: '',
+        FAKE_NO_AUTH: '1',
+      })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('gh auth token failed')
+    })
+
+    it('deletes nothing when a kept manifest is malformed JSON', () => {
+      const context = prepare('api', { [digest(2)]: 'RAW:{not json' })
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('::error::Could not parse manifest')
+      expect(deleted(context)).toEqual([])
     })
 
     it('deletes nothing when a kept manifest cannot be read', () => {
