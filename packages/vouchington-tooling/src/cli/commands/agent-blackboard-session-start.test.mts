@@ -86,6 +86,27 @@ describe('agent-blackboard session-start', () => {
     await expect(runSessionStart(['--nope', 'x'])).rejects.toThrow('unknown option: --nope')
   })
 
+  it('rejects an invalid --timeout-ms', async () => {
+    await expect(runSessionStart(['--timeout-ms', '0'])).rejects.toThrow('positive integer')
+    await expect(runSessionStart(['--timeout-ms', 'abc'])).rejects.toThrow('positive integer')
+  })
+
+  it('passes the deadline and forces exit after a timed-out probe', async () => {
+    insideRepo(true)
+    stdin('{}')
+    vi.useFakeTimers()
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    vi.mocked(probeBlackboard).mockImplementation(() => new Promise<void>(() => {}))
+    const run = runSessionStart(['--timeout-ms', '10', '--restore-hint', 'x'])
+    await vi.advanceTimersByTimeAsync(10)
+    expect(await run).toBe(0)
+    expect(String(stdout.mock.calls[0]?.[0])).toContain('timed out after 10ms')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(exit).toHaveBeenCalledWith(0)
+    exit.mockRestore()
+    vi.useRealTimers()
+  })
+
   it('is reachable as an agent-blackboard subcommand', async () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     expect(await runAgentBlackboardCommand(['session-start', '--nope', 'x'])).toBe(2)

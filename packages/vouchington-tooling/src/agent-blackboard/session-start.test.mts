@@ -42,6 +42,28 @@ describe('probeAdvisory', () => {
     expect(probe).not.toHaveBeenCalled()
   })
 
+  it('points at the restoration path in a sandbox, with a parameterized hint', async () => {
+    const env = { SANDBOX_RUNTIME: '1' }
+    expect(await probeAdvisory({ payload: {}, env })).toContain('`/mcp`')
+    expect(
+      await probeAdvisory({ payload: {}, env, restoreHint: 'run the setup script' }),
+    ).toContain('run the setup script')
+  })
+
+  it('aborts a hung probe at the deadline and reports it', async () => {
+    const onTimeout = vi.fn()
+    const probe = vi.fn(() => new Promise<void>(() => {}))
+    const text = await probeAdvisory({ payload: {}, env: {}, probe, timeoutMs: 5, onTimeout })
+    expect(text).toContain('sessions list probe failed: timed out after 5ms')
+    expect(onTimeout).toHaveBeenCalledOnce()
+  })
+
+  it('does not call onTimeout when the probe settles first', async () => {
+    const onTimeout = vi.fn()
+    await probeAdvisory({ payload: {}, env: {}, probe: async () => {}, onTimeout })
+    expect(onTimeout).not.toHaveBeenCalled()
+  })
+
   it('stays silent when the probe succeeds and forwards the environment', async () => {
     const env = { AGENT_BLACKBOARD_URL: 'u' }
     expect(await probeAdvisory({ payload: {}, env, probe: healthy })).toBeUndefined()

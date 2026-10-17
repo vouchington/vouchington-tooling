@@ -91,7 +91,7 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
     .join('\n\n')
 }
 
-export { resolveBlackboardConnection } from './client.mts'
+export { BlackboardNotInstalledError, resolveBlackboardConnection } from './client.mts'
 export type {
   BlackboardConnection,
   BlackboardClientModule,

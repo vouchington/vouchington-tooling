@@ -20,6 +20,12 @@ export type SessionStartOptions = {
   setupHint?: string
   /** Appended to the outage advisory: where this repository documents the deployment. */
   docsPath?: string
+  /** How this repository restores a missing journal server; appended to the sandbox advisory. */
+  restoreHint?: string
+  /** Deadline for the probe in milliseconds. Defaults to 5000. */
+  timeoutMs?: number
+  /** Called when the probe deadline passes, so a caller can force exit past a hung request. */
+  onTimeout?: () => void
   dependencies?: BlackboardClientDependencies
   /** Defaults to listing one session with the installed client. */
   probe?: (env?: NodeJS.ProcessEnv, dependencies?: BlackboardClientDependencies) => Promise<void>
@@ -52,6 +58,27 @@ async function listOneSession(
   await new Sessions(resolveBlackboardConnection(env)).list({ limit: 1 })
 }
 
+/** Rejects when the promise has not settled by the deadline; the timer never holds the process. */
+async function withDeadline(
+  work: Promise<void>,
+  timeoutMs: number,
+  onTimeout?: () => void,
+): Promise<void> {
+  let timer: NodeJS.Timeout | undefined
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      onTimeout?.()
+      reject(new Error(`timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+    timer.unref()
+  })
+  try {
+    await Promise.race([work, deadline])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -65,12 +92,20 @@ export async function probeAdvisory(options: SessionStartOptions): Promise<strin
   // cannot tell "the deployment is down" from "I was never given the credential to check".
   if (env.SANDBOX_RUNTIME)
     return (
-      'agent-blackboard probe skipped: it ran inside the Claude Code sandbox, which unsets ' +
-      'AGENT_BLACKBOARD_TOKEN and blocks egress to the deployment. This is NOT an outage and ' +
-      'NOT a reason to stop work. Re-run unsandboxed to actually verify the deployment.'
+      'agent-blackboard probe skipped: it ran inside a sandbox, which withholds the deployment ' +
+      'credential and egress. This is NOT an outage and NOT a reason to stop work. Do not rerun ' +
+      'outside the sandbox to check. Journal through the journal server; search for ' +
+      '`journal_append`. If it is not connected, ' +
+      (options.restoreHint ??
+        'reconnect it from the harness (`/mcp` in Claude Code, or restart Codex)') +
+      ', and tell the user.'
     )
   try {
-    await (options.probe ?? listOneSession)(env, options.dependencies)
+    await withDeadline(
+      (options.probe ?? listOneSession)(env, options.dependencies),
+      options.timeoutMs ?? 5000,
+      options.onTimeout,
+    )
   } catch (error) {
     const message = `sessions list probe failed: ${describe(error)}`
     if (error instanceof BlackboardNotInstalledError)

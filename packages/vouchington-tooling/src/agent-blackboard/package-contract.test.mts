@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
+import * as barrel from './index.mts'
+import { BlackboardNotInstalledError } from './client.mts'
+
 interface PackageManifest {
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
@@ -20,5 +23,9 @@ describe('Agent Blackboard package contract', () => {
     expect(manifest.optionalDependencies?.['agent-blackboard']).toBeUndefined()
     expect(manifest.peerDependencies?.['agent-blackboard']).toBeUndefined()
     expect(manifest.peerDependenciesMeta?.['agent-blackboard']).toBeUndefined()
+  })
+
+  it('exports the missing-client error from the barrel', () => {
+    expect(barrel.BlackboardNotInstalledError).toBe(BlackboardNotInstalledError)
   })
 })
