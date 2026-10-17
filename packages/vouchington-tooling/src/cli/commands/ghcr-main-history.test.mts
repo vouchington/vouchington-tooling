@@ -142,12 +142,15 @@ cat "$out"
   return { repository, bin, deletes, fetches, revisions }
 }
 
+// Ambient CI variables the scripts read, which must not leak into a test unless it sets them.
+const ambient = /^(GH_TOKEN|GITHUB_TOKEN|GITHUB_REPOSITORY_OWNER|GHCR_.*|KEEP_MIN|PROTECTED_.*)$/
+
 function run(context: ReturnType<typeof setup>, args: string[], extraEnv: NodeJS.ProcessEnv = {}) {
   return spawnSync('bash', [script, '--main-history', ...args], {
     cwd: context.repository,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !ambient.test(name))),
       PATH: `${context.bin}:${process.env.PATH ?? ''}`,
       GHCR_OWNER_TYPE: 'org',
       GHCR_OWNER: 'acme',
