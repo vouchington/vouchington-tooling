@@ -150,6 +150,58 @@ check out or execute pull-request code.
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
 
+### Harness dispatch workflow and session comment
+
+`.github/workflows/harness-dispatch.yml` is a reusable `workflow_call` workflow that creates (or
+resumes) one Auto Harness session through the pinned `jonathanong/auto-harness` `dispatch` action
+and returns `session-id`, `session-url`, and `created`. Callers pin it by release tag or by commit
+SHA, and forward only the one secret by name (never `secrets: inherit`):
+
+```yaml
+jobs:
+  dispatch:
+    uses: vouchington/vouchington-tooling/.github/workflows/harness-dispatch.yml@vouchington-tooling/vX.Y.Z # or @<40-character-commit-sha>
+    with:
+      prompt: ${{ needs.render.outputs.prompt }}
+      agent-ref: main
+      expected-head-sha: ${{ github.sha }}
+      concurrency-id: fix-${{ github.sha }}
+      surface-gate: HARNESS_FIX_ISSUE_ENABLED # repository variable that must equal true
+    secrets:
+      HARNESS_API_KEY: ${{ secrets.HARNESS_API_KEY }}
+  comment:
+    needs: dispatch
+    runs-on: ubuntu-slim
+    permissions: { issues: write, pull-requests: write }
+    steps:
+      - uses: vouchington/vouchington-tooling/.github/actions/comment-harness-session@<40-character-commit-sha> # vX.Y.Z
+        with:
+          target: ${{ github.event.issue.number }}
+          session-id: ${{ needs.dispatch.outputs.session-id }}
+          session-url: ${{ needs.dispatch.outputs.session-url }}
+```
+
+A tag is mutable, so prefer the SHA for the credential-bearing workflow. The caller repository
+supplies the variables `HARNESS_DISPATCH_ENABLED`, `HARNESS_REPOSITORY_ID`, `HARNESS_URL`,
+`HARNESS_TARGET` and optionally `HARNESS_FALLBACKS`, plus the variable named by `surface-gate`. The
+job runs only for `github.run_attempt == 1` on `dispatch-ref` (default `refs/heads/main`) in the
+`environment` input (default `auto-harness`), whose branch policy should allow only that ref.
+Optional inputs keep the original contract (`completion-mode`, `publish-*`, `issue-number`,
+`trigger-comment-id`, `pr-label`, `resume-session-id`, `source-run-*`, and so on) and add
+`additional-gate`, `target-variable`, `fallbacks-variable` (for example, a plan surface that reads
+`HARNESS_TARGET_PLAN`), `dispatch-ref`, `environment`, `runs-on`, `priority`, `queue-ttl-seconds`,
+`timeout-seconds`, and `required-labels`.
+
+The `environment` branch policy only guards this reusable job. It does not scope a repository-level
+`HARNESS_API_KEY` secret to that environment, so restrict which branches and workflows in the caller
+repository can read that secret.
+
+`comment-harness-session` posts one idempotent session-link comment on an issue or pull request,
+keyed by a hidden marker in a `github-actions[bot]` comment so reruns do not duplicate it. The
+check and post are not atomic, so give the comment job a caller-level `concurrency` group per target
+if duplicate deliveries are possible. It validates the target number, session id
+(`sess-` plus eight hex digits), and an `https://.../sessions/<id>` URL before commenting.
+
 ### Required-result gate
 
 Pin `ci-required-result-gate` by its full 40-character commit SHA to give a required fan-in job a strict, compact
