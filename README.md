@@ -193,9 +193,8 @@ Optional inputs keep the original contract (`completion-mode`, `publish-*`, `iss
 `timeout-seconds`, and `required-labels`.
 
 The `environment` branch policy only guards this reusable job. It does not scope a repository-level
-`HARNESS_API_KEY` secret to that environment, so restrict who can run workflows that can read the
-secret (or keep the key an environment secret and forward it from a caller job that uses the same
-environment).
+`HARNESS_API_KEY` secret to that environment, so restrict which branches and workflows in the caller
+repository can read that secret.
 
 `comment-harness-session` posts one idempotent session-link comment on an issue or pull request,
 keyed by a hidden marker in a `github-actions[bot]` comment so reruns do not duplicate it. The
