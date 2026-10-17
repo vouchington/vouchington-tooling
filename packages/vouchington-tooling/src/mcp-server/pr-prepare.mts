@@ -113,6 +113,9 @@ export async function prepare(
   // A read-only validation of an existing pull request judges the head that pull request has.
   const worktreeHead =
     live !== undefined && kind === 'validate' ? undefined : await currentBranch(git)
+  // The local branch is checked before any diagnostic or alias resolution can echo or drop it.
+  if (worktreeHead !== undefined && secrets.some((secret) => worktreeHead.includes(secret)))
+    throw new Error('the worktree branch name contains a server credential: rename the branch')
   const head = await headFor(kind, git, live, pr, worktreeHead)
   // Branch names are refs passed to gh as is: redacting one would name a branch that does not exist.
   if (secrets.some((secret) => head.includes(secret)))

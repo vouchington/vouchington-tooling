@@ -210,6 +210,17 @@ describe('pr_validate is read-only', () => {
     )
   })
 
+  it('rejects a credential-bearing worktree branch before resolving an alias', async () => {
+    const h = harness(fixture(), {
+      runGh: fakeGh({ view: { ...LIVE, headRefName: 'other' } }).runGh,
+      device,
+      env: { PATH: '/bin', GH_TOKEN: 'linked' },
+    })
+    const text = textOf(await h.call('pr_update', args({ pr: 5 })))
+    expect(text).toContain('worktree branch name contains a server credential')
+    expect(text).not.toContain(`at ${SHA}`)
+  })
+
   it('accepts an alias branch at the live head commit and uses the live head name', async () => {
     declarePolicy(fixture())
     const oid = execFileSync('git', ['-C', fixture().linked, 'rev-parse', 'HEAD'], {
