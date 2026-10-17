@@ -30,6 +30,13 @@ const FIELDS: Record<string, JsonSchema> = {
         number: { type: 'integer', minimum: 1 },
         relation: { enum: ['closes', 'refs'] },
         reason: text('Why the issue is related.'),
+        repository: {
+          type: 'string',
+          pattern: '^[\\w.-]+/[\\w.-]+$',
+          description:
+            'Optional owner/name (lowercased) of the issue repository, rendered as ' +
+            'owner/name#N; omit for an issue in this repository. Allowed for closes and refs.',
+        },
       },
       required: ['number', 'relation', 'reason'],
       additionalProperties: false,
