@@ -25,6 +25,16 @@ export function globFrom(root: string, pattern: string): string[] {
   return globSync(pattern, { cwd: root }).map((path) => join(root, path))
 }
 
+/**
+ * Canonical transcript resolution for consumers.
+ *
+ * - Session ids are validated as UUIDs and lowercased (`invalid session id format` otherwise).
+ * - Roots honor `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `GROK_HOME` from `options.env`
+ *   (default `process.env`), unless an explicit `*SessionsDir`/`projectsDir` is given.
+ * - Returns `{ error }` when more than one transcript matches a session, rather than
+ *   picking the first match, and when none matches.
+ * - An explicit `jsonlPath` skips discovery.
+ */
 export function resolveTranscriptFile(options: ResolveOptions): TranscriptResolution {
   if (options.sessionId && !SESSION_ID.test(options.sessionId))
     return { error: 'invalid session id format' }

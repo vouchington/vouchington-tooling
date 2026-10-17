@@ -24,6 +24,11 @@ export { codexChildren, codexIdentity } from './codex.mts'
 export { formatTranscriptFacts, formatUnavailable } from './format.mts'
 export type { ResolveOptions } from './resolve-transcript-file.mts'
 export { resolveTranscriptFile } from './resolve-transcript-file.mts'
+export { asRecord } from './shared.mts'
+export { asArray } from './as-array.mts'
+export { normalizeCommandPrefix } from './command-prefix.mts'
+export { isPackageRunner, splitCommandSegments } from './command-segments.mts'
+export { DEFAULT_MAX_RECORD_BYTES, openTranscriptLines } from './transcript-lines.mts'
 const MALFORMED_INTERIOR = 'malformed interior transcript record'
 type CapturedSegment = CodexSegment & { partial: boolean }
 function partialCapture(lines: string[]): boolean {

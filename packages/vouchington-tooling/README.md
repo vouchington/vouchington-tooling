@@ -165,7 +165,11 @@ pass `--root`, `--workflow-directory`, or `--action-directory` for consumer-owne
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
 layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discovery at a nondefault
 Grok session root. Without `--session-id`, it reads those session identities from the host
-environment.
+environment. `resolveTranscriptFile` is the canonical resolver: it lowercases and UUID-validates
+session ids, honors `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `GROK_HOME`, and errors when more than one
+transcript matches. The subpath also exports `normalizeCommandPrefix`, `splitCommandSegments`,
+`isPackageRunner`, `asRecord`, `asArray` and `openTranscriptLines(path, { maxRecordBytes })`, which
+streams lines (2 MiB per record by default) and throws from the iterable on an oversized record.
 
 `retrospective-facts` keeps local Git evidence separate from GitHub PR data. `Commits ahead of
 origin/main` is populated only from a local ancestry range; GitHub responses instead populate
