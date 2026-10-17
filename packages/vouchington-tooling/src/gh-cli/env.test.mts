@@ -13,6 +13,12 @@ describe('ghSpawnEnv', () => {
     expect(ghSpawnEnv({ A: '1' })).toEqual({ A: '1' })
   })
 
+  it('matches the name case-insensitively only on Windows', () => {
+    const input = { clicolor_force: '1', Clicolor_Force: '1', A: '1' }
+    expect(ghSpawnEnv(input, 'win32')).toEqual({ A: '1' })
+    expect(ghSpawnEnv(input, 'linux')).toEqual(input)
+  })
+
   it('defaults to the current process environment', () => {
     expect(ghSpawnEnv()).not.toHaveProperty('CLICOLOR_FORCE')
   })

@@ -23,7 +23,8 @@ export type ExecFileText = (
  */
 export function createCommandRunner(
   command: string,
-  exec: ExecFileText = (cmd, args, options) => execFileAsync(cmd, args, { ...options, encoding: 'utf8' }),
+  exec: ExecFileText = (cmd, args, options) =>
+    execFileAsync(cmd, args, { ...options, encoding: 'utf8' }),
   buildEnv: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv = (env) => env,
 ): RunTextCommand {
   return async (args) => {

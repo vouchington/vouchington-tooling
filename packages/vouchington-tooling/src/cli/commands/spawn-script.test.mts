@@ -24,6 +24,19 @@ describe('script dispatch', () => {
     expect(runScript('bash', 'script.sh', [], () => ({ status: null }))).toBe(1)
   })
 
+  it('spawns scripts without CLICOLOR_FORCE and keeps other variables', () => {
+    vi.stubEnv('CLICOLOR_FORCE', '1')
+    vi.stubEnv('VOUCHINGTON_PASSTHROUGH', 'kept')
+    const seen: Array<NodeJS.ProcessEnv> = []
+    runScript('bash', 'script.sh', [], (_command, _args, options) => {
+      seen.push(options.env)
+      return { status: 0 }
+    })
+    vi.unstubAllEnvs()
+    expect(seen[0]).not.toHaveProperty('CLICOLOR_FORCE')
+    expect(seen[0]).toMatchObject({ VOUCHINGTON_PASSTHROUGH: 'kept' })
+  })
+
   it('surfaces spawn errors', () => {
     expect(() =>
       runScript('bash', 'script.sh', [], () => ({
