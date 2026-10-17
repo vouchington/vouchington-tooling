@@ -105,6 +105,20 @@ python3 extracted/package/scripts/allocate-browser-safe-ports.py <count> [--poli
 straddles the cutoff. CI jobs without an install should fetch the tarball instead. Tests enforce
 that the script stays stdlib-only and reads only its two sibling JSON files.
 
+### Configuring `ghcr-package-retention`
+
+Packages come from the arguments, or from `GHCR_PACKAGES` (space separated) when none are given.
+`GHCR_OWNER_TYPE` (`user` default, or `org` with `GHCR_OWNER`) picks the API root.
+
+- Default strategy: keep the newest `KEEP_MIN` (10) versions that carry no tag starting with
+  `PROTECTED_TAG_PREFIX` (`latest`) or containing `PROTECTED_TAG_CONTAINS` (`buildcache`). It
+  deletes unless `--dry-run` is passed.
+- `--main-history`: for images tagged `sha-<40 hex>`. Run from a full-history checkout. Deletes
+  images past the newest `GHCR_KEEP_MAIN` (30) commits reachable from `HEAD`, unreachable images
+  idle for `GHCR_UNMERGED_MIN_AGE_DAYS` (7) days, and attestation/platform attachments that
+  outlive every surviving image. A package that does not exist (HTTP 404) is skipped. This mode
+  is a dry run unless `--apply` is passed.
+
 For persistent `pnpm-install`, v5 metadata tracks structural inputs separately from the
 `--install-scripts` policy. A warm scripts-enabled tree can therefore toggle
 `true → false → true` without forced reconciliation; a tree first installed with scripts disabled
