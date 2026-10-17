@@ -13,6 +13,7 @@ export type OpenTranscriptLinesResult = { lines: AsyncIterable<string> } | { err
  * Opens a transcript for streaming, one line at a time, with `String.split('\n')`
  * semantics (a trailing newline yields a final empty line, `\r` is preserved).
  *
+ * A `maxRecordBytes` that is not a non-negative safe integer rejects with `RangeError`.
  * An open failure resolves to `{ error }`. An oversized record is NOT skipped or
  * reported inline: the returned async iterable throws
  * `transcript record exceeds <maxRecordBytes> byte limit` when it reaches the
@@ -23,6 +24,8 @@ export async function openTranscriptLines(
   path: string,
   { maxRecordBytes = DEFAULT_MAX_RECORD_BYTES }: OpenTranscriptLinesOptions = {},
 ): Promise<OpenTranscriptLinesResult> {
+  if (!Number.isSafeInteger(maxRecordBytes) || maxRecordBytes < 0)
+    throw new RangeError('maxRecordBytes must be a non-negative integer')
   const stream = createReadStream(path)
   try {
     await new Promise<void>((resolve, reject) => {

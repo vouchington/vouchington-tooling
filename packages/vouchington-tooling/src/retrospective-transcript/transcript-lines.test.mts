@@ -72,6 +72,12 @@ describe('openTranscriptLines', () => {
     await expect(iterator.next()).rejects.toThrow('transcript record exceeds 5 byte limit')
   })
 
+  it('rejects an invalid record limit before opening the file', async () => {
+    const path = await fileWith('x')
+    for (const limit of [Number.NaN, -1, 1.5, Infinity])
+      await expect(openTranscriptLines(path, { maxRecordBytes: limit })).rejects.toThrow(RangeError)
+  })
+
   it('rejects an oversized record that ends in a newline within one chunk', async () => {
     await expect(collect(await fileWith('abcdef\n'), 5)).rejects.toThrow('exceeds 5 byte limit')
   })
