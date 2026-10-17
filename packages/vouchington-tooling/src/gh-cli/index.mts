@@ -1,4 +1,5 @@
 export { createCommandRunner, runGh, runGit } from './exec.mts'
+export { ghSpawnEnv } from './env.mts'
 export type { ExecFileText, RunTextCommand } from './exec.mts'
 
 export { DiffCommandError, processDiffCommand } from './diff.mts'

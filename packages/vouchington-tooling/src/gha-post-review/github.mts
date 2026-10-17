@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
+import { ghSpawnEnv } from '../gh-cli/env.mts'
 import { ReviewPayloadError } from '../gha-review-payload/index.mts'
 import { readRegularReviewPayload } from '../gha-review-payload/index.mts'
 import { createActionsClaudeTokenIo, withClaudeAppToken } from './claude-token.mts'
@@ -20,7 +21,7 @@ export function createGhExec(exec: typeof execFileSync = execFileSync): GhExec {
     exec('gh', [...args], {
       encoding: 'utf8',
       input: options?.input,
-      env: options?.env ?? process.env,
+      env: ghSpawnEnv(options?.env ?? process.env),
     }).trim()
 }
 
