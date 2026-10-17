@@ -1,6 +1,5 @@
+import { HARNESS_SESSION_PRECEDENCE } from 'agent-blackboard'
 import { inspectHarnessEnvironment, type HarnessId } from '../agent-harness-identity/index.mts'
-
-const PRECEDENCE: readonly HarnessId[] = ['codex', 'claude', 'cursor', 'grok']
 
 /**
  * The harness that launched this server, from the launch environment first and the MCP client's
@@ -14,10 +13,10 @@ export function deriveAgent(env: NodeJS.ProcessEnv, clientName?: string): Harnes
     cursor: found.cursor.agentMarker || Boolean(found.cursor.sessionId),
     grok: found.grok.agentMarker || found.grok.hookEvent || Boolean(found.grok.sessionId),
   }
-  const fromEnv = PRECEDENCE.find((id) => present[id])
+  const fromEnv = HARNESS_SESSION_PRECEDENCE.find((id) => present[id])
   if (fromEnv !== undefined) return fromEnv
   const name = clientName?.toLowerCase() ?? ''
-  return PRECEDENCE.find((id) => name.includes(id))
+  return HARNESS_SESSION_PRECEDENCE.find((id) => name.includes(id))
 }
 
 /**
