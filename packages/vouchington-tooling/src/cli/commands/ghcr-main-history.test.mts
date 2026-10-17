@@ -17,19 +17,27 @@ afterEach(() => {
 })
 
 const sha = (n: number) => String(n).padStart(40, '0')
+const digest = (n: number) => `sha256:${String(n).padStart(64, '0')}`
 const old = '2020-01-01T00:00:00Z'
 const days = (n: number) =>
   new Date(Date.now() - n * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z')
 
 interface Version {
   id: number
+  name: string
   created_at: string
   updated_at: string
   metadata: { container: { tags: string[] } }
 }
 
 function version(id: number, tags: string[], created = old, updated = created): Version {
-  return { id, created_at: created, updated_at: updated, metadata: { container: { tags } } }
+  return {
+    id,
+    name: digest(id),
+    created_at: created,
+    updated_at: updated,
+    metadata: { container: { tags } },
+  }
 }
 
 function shell(cwd: string, command: string, args: string[]) {
@@ -37,7 +45,12 @@ function shell(cwd: string, command: string, args: string[]) {
   expect(result.status).toBe(0)
 }
 
-function setup(pages: Record<string, Version[] | string>, commits = 3, shallow = false) {
+function setup(
+  pages: Record<string, Version[] | string>,
+  commits = 3,
+  shallow = false,
+  registry: Record<string, unknown> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'ghcr-history-'))
   temporaryDirectories.push(root)
   const repository = join(root, 'repo')
@@ -68,10 +81,15 @@ function setup(pages: Record<string, Version[] | string>, commits = 3, shallow =
   const deletes = join(root, 'deletes')
   writeFileSync(deletes, '')
   writeFileSync(join(root, 'pages.json'), JSON.stringify(pages))
+  writeFileSync(join(root, 'registry.json'), JSON.stringify(registry))
+  const fetches = join(root, 'fetches')
+  writeFileSync(fetches, '')
   writeFileSync(
     join(bin, 'gh'),
     `#!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = auth ]; then echo test-token; exit 0; fi
+if [ "$1" = api ] && [ "$2" = user ]; then echo octocat; exit 0; fi
 if [ "$1" = api ] && [ "$2" = --method ]; then
   echo "$4" >> "${deletes}"
   exit 0
@@ -84,7 +102,23 @@ jq -r --arg package "$package" '.[$package] | if type == "string" then . else "[
 `,
   )
   chmodSync(join(bin, 'gh'), 0o755)
-  return { repository, bin, deletes, revisions }
+  writeFileSync(
+    join(bin, 'curl'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+cat > /dev/null
+url=\${!#}
+echo "$url" >> "${fetches}"
+jq -e --arg digest "$(basename "$url")" '.[$digest] // {}' "${join(root, 'registry.json')}" > "${join(root, 'manifest.out')}"
+if jq -e 'type == "string"' "${join(root, 'manifest.out')}" > /dev/null; then
+  jq -r . "${join(root, 'manifest.out')}" >&2
+  exit 22
+fi
+cat "${join(root, 'manifest.out')}"
+`,
+  )
+  chmodSync(join(bin, 'curl'), 0o755)
+  return { repository, bin, deletes, fetches, revisions }
 }
 
 function run(context: ReturnType<typeof setup>, args: string[], extraEnv: NodeJS.ProcessEnv = {}) {
@@ -172,5 +206,78 @@ describe('ghcr-package-retention --main-history', { timeout: 60_000 }, () => {
     expect(run(context, ['--bogus']).stderr).toContain('unknown argument')
     const shallow = setup({ api: [] }, 2, true)
     expect(run(shallow, ['api']).stderr).toContain('full main history')
+  })
+
+  describe('referenced manifests', () => {
+    // 1 is the old main image, 2 the kept one; 10 and 11 are its platform manifests, 12 is
+    // referenced as a subject, and 13 is a true orphan. All attachments predate the kept image.
+    const index = {
+      [digest(2)]: { manifests: [{ digest: digest(10) }, { digest: digest(11) }] },
+      [digest(10)]: { subject: { digest: digest(12) } },
+    }
+
+    function prepare(
+      pages: string,
+      registry: Record<string, unknown> = index,
+    ): ReturnType<typeof setup> {
+      const context = setup({ [pages]: [] }, 3, false, registry)
+      const [first, second] = context.revisions as [string, string, string]
+      writeFileSync(
+        join(context.bin, '..', 'pages.json'),
+        JSON.stringify({
+          [pages]: [
+            version(1, [`sha-${first}`], days(30)),
+            version(2, [`sha-${second}`], days(20)),
+            version(10, [], days(60)),
+            version(11, [], days(60)),
+            version(12, ['sha256-abc'], days(60)),
+            version(13, [], days(60)),
+          ],
+        }),
+      )
+      return context
+    }
+
+    it('keeps platform manifests and subjects of a kept index but deletes true orphans', () => {
+      const context = prepare('api')
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(0)
+      expect(deleted(context)).toEqual([
+        'orgs/acme/packages/container/api/versions/1',
+        'orgs/acme/packages/container/api/versions/13',
+      ])
+      expect(readFileSync(context.fetches, 'utf8')).toContain(
+        `https://ghcr.io/v2/acme/api/manifests/${digest(10)}`,
+      )
+    })
+
+    it('reports the same plan in a dry run without deleting', () => {
+      const context = prepare('api')
+      const result = run(context, ['api'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.stdout).toContain('would delete 13 <untagged> (orphan)')
+      expect(result.stdout).not.toMatch(/delete 1[012] /)
+      expect(result.stdout).toContain('Dry run: 2 version(s) would be deleted.')
+      expect(deleted(context)).toEqual([])
+    })
+
+    it('resolves the owner of user packages and url-decodes nested package names', () => {
+      const context = prepare('team%2Fapi')
+      const result = run(context, ['team%2Fapi'], {
+        GHCR_KEEP_MAIN: '1',
+        GHCR_OWNER_TYPE: 'user',
+        GHCR_OWNER: '',
+        GH_TOKEN: 'secret',
+      })
+      expect(result.status).toBe(0)
+      expect(readFileSync(context.fetches, 'utf8')).toContain('/v2/octocat/team/api/manifests/')
+    })
+
+    it('deletes nothing when a kept manifest cannot be read', () => {
+      const context = prepare('api', { [digest(2)]: 'HTTP 500' })
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('::error::Could not read manifest')
+      expect(deleted(context)).toEqual([])
+    })
   })
 })

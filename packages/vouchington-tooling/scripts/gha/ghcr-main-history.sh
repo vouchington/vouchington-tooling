@@ -2,6 +2,14 @@
 # Sourced by ghcr-package-retention.sh for --main-history. Expects package_root, packages, apply,
 # keep_main and min_age_days from the caller.
 
+# shellcheck source=/dev/null
+. "$(dirname "${BASH_SOURCE[0]}")/ghcr-referenced-digests.sh"
+
+# The registry namespace: the org, or the authenticated user for user-owned packages.
+gh_owner() {
+  if [ -n "${GHCR_OWNER:-}" ]; then echo "$GHCR_OWNER"; else gh api user --jq .login; fi
+}
+
 prune_main_history() {
   # A zero keep count would delete every main image in one run.
   case "$keep_main" in
@@ -49,10 +57,13 @@ prune_main_history() {
       | min) as $oldest_image
     | ($versions | map(select(attachment and idle and $oldest_image != null
         and created < $oldest_image - 86400) | . + {reason: "orphan"})) as $orphans
-    | ($old_main + $unmerged + $orphans)[]
-    | "\(.id) \(tags | if length == 0 then "<untagged>" else join(",") end) \(.reason)"'
+    | {roots: ($versions | map(select((attachment | not) and (.id | IN($doomed[]) | not)) | .name)),
+       candidates: ($old_main + $unmerged + $orphans | map({id, name, reason,
+         tags: (tags | if length == 0 then "<untagged>" else join(",") end)}))}'
+  local filter='.candidates | map(select(.name | IN($referenced[]) | not))[]
+    | "\(.id) \(.tags) \(.reason)"'
 
-  local deleted_total=0 package path error deletions id tags reason
+  local deleted_total=0 package path error deletions id tags reason referenced image resolved
   for package in "${packages[@]}"; do
     path="$package_root/$package/versions"
     if ! error=$(gh api --paginate "$path?per_page=100" 2>&1 > "$work/pages"); then
@@ -67,8 +78,18 @@ prune_main_history() {
       exit 1
     fi
 
-    deletions=$(jq -r -s --rawfile revisions "$work/main-revisions" --argjson keep "$keep_main" \
-      --argjson cutoff "$cutoff" "$plan" "$work/pages")
+    jq -s --rawfile revisions "$work/main-revisions" --argjson keep "$keep_main" \
+      --argjson cutoff "$cutoff" "$plan" "$work/pages" > "$work/plan"
+    # Never delete a digest that a kept image or index still references (platform manifests,
+    # attestations, subjects). An unreadable kept manifest aborts rather than risk a delete.
+    referenced='[]'
+    if [ "$(jq '.candidates | length' "$work/plan")" -gt 0 ]; then
+      jq -r '.roots[]' "$work/plan" > "$work/roots"
+      image="$(gh_owner)/$(printf '%b' "${package//%/\\x}")"
+      resolved=$(resolve_referenced "$image" "$work" "$work/roots") || exit 1
+      referenced=$(printf '%s\n' "$resolved" | jq -R . | jq -s .)
+    fi
+    deletions=$(jq -r --argjson referenced "$referenced" "$filter" "$work/plan")
     echo "· $package: $(jq -s 'add // [] | length' "$work/pages") version(s)"
     while read -r id tags reason; do
       [ -n "$id" ] || continue
