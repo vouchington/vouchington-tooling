@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process'
+import { ghSpawnEnv } from '../gh-cli/env.mts'
 import type { CommandExecutor, CommandResult } from './shared.mts'
 
 export const shell: CommandExecutor = (command, args) =>
   new Promise((resolve) => {
-    const child = spawn(command, args)
+    const child =
+      command === 'gh' ? spawn(command, args, { env: ghSpawnEnv() }) : spawn(command, args)
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')

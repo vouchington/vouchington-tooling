@@ -89,6 +89,13 @@ describe('gh access', () => {
     ).toEqual({ A: '1' })
   })
 
+  it('drops CLICOLOR_FORCE so gh --json output stays uncolored', () => {
+    expect(ghEnvironment({ A: '1', CLICOLOR_FORCE: '1', NO_COLOR: '1' })).toEqual({
+      A: '1',
+      NO_COLOR: '1',
+    })
+  })
+
   it('locates gh on PATH, skipping directories, and runs it once located', async () => {
     const root = mkdtempSync(join(tmpdir(), 'vouchington-gh-'))
     try {

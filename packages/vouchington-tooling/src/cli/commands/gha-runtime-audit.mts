@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 
+import { ghSpawnEnv } from '../../gh-cli/env.mts'
 import { auditCiJobRuntime, type GhApiExecutor } from '../../gha-runtime-audit/index.mts'
 import type { ParsedGhaRuntimeAudit } from '../parse-gha-runtime-audit.mts'
 
@@ -9,6 +10,7 @@ function defaultGhApiExecutor(): GhApiExecutor {
     JSON.parse(
       execFileSync('gh', ['api', request.endpoint, '--jq', request.jq], {
         encoding: 'utf8',
+        env: ghSpawnEnv(),
         maxBuffer: 16 * 1024 * 1024,
       }),
     ) as unknown

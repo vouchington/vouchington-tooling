@@ -4,6 +4,8 @@ import { access, stat } from 'node:fs/promises'
 import { delimiter, isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { ghSpawnEnv } from '../gh-cli/env.mts'
+
 const execFileAsync = promisify(execFile)
 
 export type GhRunner = (
@@ -52,7 +54,7 @@ export function ghEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     AGENT_BLACKBOARD_TOKEN: _token,
     GH_REPO: _repo,
     ...rest
-  } = env
+  } = ghSpawnEnv(env)
   return rest
 }
 

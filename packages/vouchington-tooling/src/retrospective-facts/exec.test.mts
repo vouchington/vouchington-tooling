@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join } from 'node:path'
+
+import { describe, expect, it, vi } from 'vitest'
 import { rawBlock, shell } from './exec.mts'
 
 describe('retrospective command execution', () => {
@@ -31,6 +35,27 @@ describe('retrospective command execution', () => {
     ])
     expect(result).toMatchObject({ ok: true, stdout: '€', stderr: 'é', exitCode: 0 })
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'spawns gh without CLICOLOR_FORCE and keeps other variables',
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'vouchington-gh-shell-'))
+      try {
+        writeFileSync(
+          join(dir, 'gh'),
+          '#!/bin/sh\nprintf "%s|%s" "${CLICOLOR_FORCE-unset}" "$VOUCHINGTON_PASSTHROUGH"\n',
+        )
+        chmodSync(join(dir, 'gh'), 0o755)
+        vi.stubEnv('PATH', `${dir}${delimiter}${process.env.PATH ?? ''}`)
+        vi.stubEnv('CLICOLOR_FORCE', '1')
+        vi.stubEnv('VOUCHINGTON_PASSTHROUGH', 'kept')
+        await expect(shell('gh', [])).resolves.toMatchObject({ ok: true, stdout: 'unset|kept' })
+      } finally {
+        vi.unstubAllEnvs()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
   it('formats raw blocks with optional stderr separation', () => {
     expect(rawBlock('git', ['status'], { ok: true, stdout: 'clean', stderr: '' })).toBe(

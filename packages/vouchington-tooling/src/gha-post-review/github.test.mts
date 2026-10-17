@@ -309,6 +309,20 @@ describe('github review adapter', () => {
     expect(exec(['api', 'ok'])).toBe('value')
     expect(typeof createGhExec()).toBe('function')
   })
+
+  it('spawns gh without CLICOLOR_FORCE and keeps other variables', () => {
+    const seen: Array<NodeJS.ProcessEnv | undefined> = []
+    const exec = createGhExec(((
+      _command: string,
+      _args: readonly string[],
+      options: { env?: NodeJS.ProcessEnv },
+    ) => {
+      seen.push(options.env)
+      return ''
+    }) as typeof import('node:child_process').execFileSync)
+    exec(['api', 'ok'], { env: { CLICOLOR_FORCE: '1', GH_TOKEN: 't', NO_COLOR: '1' } })
+    expect(seen[0]).toEqual({ GH_TOKEN: 't', NO_COLOR: '1' })
+  })
 })
 
 describe('postReviewFromEnv', () => {
