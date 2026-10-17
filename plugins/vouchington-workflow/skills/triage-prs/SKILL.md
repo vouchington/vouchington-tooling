@@ -58,11 +58,12 @@ PRs opened before the label existed need an explicit one-time backfill with
 With an argument, require an explicit selector and stop to ask when a bare argument is ambiguous
 (for example a word that could be an author, a label, or a title):
 
-- Number or URL: use the PR directly (a URL must name this repository).
+- Number or URL: it must resolve to an open PR in this repository (`gh pr view <N> --repo
+  <owner>/<name> --json state`); otherwise stop and report.
 - `author:<login>`: `gh pr list --repo <owner>/<name> --author <login> --state open --limit 1000`. For a GitHub App
   (login `app/<slug>`), use `--app <slug>` instead of `--author`.
 - `label:<name>`: `gh pr list --repo <owner>/<name> --label <name> --state open --limit 1000`
-- `title:<text>`: a literal, case-insensitive substring match, with the text passed as data:
+- `title:<text>`: a literal, ASCII-case-insensitive substring match (no Unicode case folding), with the text passed as data:
   `gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title | jq --arg t "<text>" '.[] | select(.title | ascii_downcase | contains($t | ascii_downcase))'`
 - `all`: every open PR regardless of author.
 
@@ -112,7 +113,9 @@ never closed, in this run, whatever its Step 3 decision.
 
 ## Step 4 - Execute MERGE
 
-Skip excluded PRs and re-check the reviewed head per the rules. Process MERGE decisions in
+Skip excluded PRs and re-check the reviewed head per the rules. Carry each root-cause follow-up
+from the [rubric](references/rubric.md) (an issue to file, link, or re-scope) into this pass and
+the Step 6 report so it is not dropped. Process MERGE decisions in
 ascending PR-number order through the adapter's ready-and-shepherd
 skill, passing the PR number, the auto-merge flag, and any steering file. That skill light-reviews
 the diff, posts steering before the trigger, readies the draft, verifies merge settings, and
@@ -151,7 +154,7 @@ gh pr comment <N> --repo <owner>/<name> --body-file <reason-file>
 gh pr close <N> --repo <owner>/<name>
 ```
 
-Branch deletion, linked-issue closes, and orphan automation issues (default scope only) follow the
+Report every close that kept its branch, with the reason. Branch deletion, linked-issue closes, and orphan automation issues (default scope only) follow the
 [close procedure](references/close.md).
 
 ## Step 6 - Verify and report

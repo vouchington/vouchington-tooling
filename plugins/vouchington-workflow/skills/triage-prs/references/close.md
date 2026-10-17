@@ -6,16 +6,19 @@ exhaustive lists, and generated text passed only from files.
 ## Delete the branch
 
 `gh pr close` does not delete the branch unless asked, and merge-time auto-deletion does not apply
-to closes. Before deleting, list open PRs whose base is the branch:
+to closes. Read the head branch name as data (`gh pr view <N> --repo <owner>/<name> --json
+headRefName`) and pass it to `jq --arg`, never into a shell string. Before deleting, list open PRs
+that use the branch as a base or share it as their head:
 
 ```bash
-gh pr list --repo <owner>/<name> --state open --base <head-branch> --limit 1000 --json number,title
+gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title,baseRefName,headRefName \
+  | jq --arg b "$BRANCH" '.[] | select(.baseRefName == $b or .headRefName == $b)'
 ```
 
-If any exist, do not delete the branch: deleting a base closes its dependent PRs, including layers
-that were out of scope or never reviewed. Close without deleting and report the dependents. If none
-exist, close with `gh pr close <N> --repo <owner>/<name> --delete-branch` in place of the plain
-close in Step 5 (after the comment).
+Ignore the PR being closed. If any other PR remains, do not delete the branch: deleting a base
+closes its dependents, including unreviewed layers, and deleting a shared head breaks the others.
+Close without deleting and report the PR and why the branch was kept. Otherwise close with
+`gh pr close <N> --repo <owner>/<name> --delete-branch` in place of the plain close in Step 5.
 
 ## Linked issues
 
@@ -28,6 +31,8 @@ Keep each reference's repository and URL. Close only issues in this repository; 
 cross-repository targets. Close an issue only if it appears automation-created under the adapter's
 orphan-issue rules. Skip anything that looks human-authored: automation sometimes reuses a
 human-tracked issue by adding `Closes #<N>` to a PR body. Skip excluded issues. Before closing,
+re-read the issue (`gh issue view <ISSUE_N> --repo <owner>/<name> --json state,labels,title`) and
+confirm it is still open and still classified as automation-created; then
 apply the [no-open-PR checks](#no-open-pr-checks), excluding the PR just closed.
 
 Write the comment (`Closing alongside PR #<N>: <reason>`) to a file, then:
@@ -68,6 +73,6 @@ gh search prs --state open --limit 1000 "<issue-url>" --json url,repository
 ```
 
 Keep the same-repository `#<ISSUE_N>` form alongside the qualified and URL forms, since each only
-matches the text it contains. Close the issue only if every check finds no open PR, in this or any
+matches the text it contains. Re-read the issue as above. Close it only if every check finds no open PR, in this or any
 other repository, using the comment and close commands above with the text
 `Closing: orphaned - no open PR is addressing this issue.`

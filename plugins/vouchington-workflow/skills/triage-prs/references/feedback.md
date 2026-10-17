@@ -25,6 +25,8 @@ Compare the marker, the normalized set of exact source paths, and the normalized
 recommendation or root-cause identity on open feedback PRs:
 
 - `duplicate: zero-overlap`: create one feedback issue and one draft PR.
+- Before reusing or updating a canonical PR or issue, re-read it: both must still be open and
+  unchanged since the comparison (same head and body); otherwise re-run the comparison.
 - `duplicate: exact-match`: the path set and the recommendation or root-cause identity both match
   one canonical PR. Reuse that PR and its source issue; create neither.
 - `duplicate: same-paths-new-feedback`: the path set matches but the recommendation differs.
