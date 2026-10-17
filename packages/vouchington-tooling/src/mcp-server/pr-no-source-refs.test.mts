@@ -46,4 +46,24 @@ describe('noSourceIssue beside refs-only relatedIssues', () => {
       'noSourceIssue cannot be combined with a relatedIssues entry that closes',
     )
   })
+
+  it('rejects a refs reason that smuggles a closing reference', async () => {
+    const h = harness(fixture(), { device })
+    const reason = 'context; Closes #123'
+    const relatedIssues = [REFS[0], { number: 8, relation: 'refs', reason }]
+    expect(textOf(await h.call('pr_validate', args({ ...extra, relatedIssues })))).toContain(
+      'relatedIssues[1].reason must not contain a closing reference beside noSourceIssue',
+    )
+    const plain = [{ number: 8, relation: 'refs', reason: 'Closes #123' }]
+    expect(textOf(await h.call('pr_validate', args({ ...extra, relatedIssues: plain })))).toContain(
+      'closing reference',
+    )
+  })
+
+  it('allows a closing reference in a refs reason without noSourceIssue', async () => {
+    const h = harness(fixture(), { device })
+    const relatedIssues = [{ number: 8, relation: 'refs', reason: 'Closes #123' }]
+    const out = jsonOf(await h.call('pr_validate', args({ relatedIssues })))
+    expect(out).toHaveProperty('body')
+  })
 })

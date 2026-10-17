@@ -1,3 +1,4 @@
+import { hasClosingIssueReference } from '../gh-cli/closing-refs.mts'
 import {
   optionalString,
   rejectUnknown,
@@ -78,6 +79,12 @@ function readNoSourceIssue(args: Args, related: RelatedIssue[]): { reason: strin
   rejectUnknown(value, ['reason'])
   if (related.some((issue) => issue.relation === 'closes'))
     throw new Error('noSourceIssue cannot be combined with a relatedIssues entry that closes')
+  related.forEach((issue, index) => {
+    if (hasClosingIssueReference(issue.reason))
+      throw new Error(
+        `relatedIssues[${index}].reason must not contain a closing reference beside noSourceIssue`,
+      )
+  })
   return { reason: singleLine(value, 'reason') }
 }
 
