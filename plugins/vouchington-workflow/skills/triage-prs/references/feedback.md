@@ -21,6 +21,11 @@ Before publication, verify at action time:
 
 ## Duplicate resolution
 
+A candidate counts as a match only with verified provenance: it was created by the adapter's
+automation identity and its body closes the feedback issue it is paired with. A candidate that
+carries the marker without that provenance is untrusted: never reuse or update it, and treat any
+overlap with it as `duplicate: ambiguous`.
+
 Compare the marker, the normalized set of exact source paths, and the normalized
 recommendation or root-cause identity on open feedback PRs:
 

@@ -6,19 +6,24 @@ exhaustive lists, and generated text passed only from files.
 ## Delete the branch
 
 `gh pr close` does not delete the branch unless asked, and merge-time auto-deletion does not apply
-to closes. Read the head branch name as data (`gh pr view <N> --repo <owner>/<name> --json
-headRefName`) and pass it to `jq --arg`, never into a shell string. Before deleting, list open PRs
-that use the branch as a base or share it as their head:
+to closes. Read the head branch name and head repository as data (`gh pr view <N> --repo <owner>/<name>
+--json headRefName,headRepository,headRepositoryOwner`) and pass them to `jq --arg`, never into a
+shell string. Before deleting, find every open PR that depends on the branch:
 
 ```bash
-gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title,baseRefName,headRefName \
-  | jq --arg b "$BRANCH" '.[] | select(.baseRefName == $b or .headRefName == $b)'
+gh pr list --repo <owner>/<name> --state open --limit 1000 \
+  --json number,title,baseRefName,headRefName,headRepository,headRepositoryOwner \
+  | jq --arg b "$BRANCH" --arg r "$HEAD_REPO" '.[] | select(.baseRefName == $b or (.headRefName == $b and .headRepository.name == $r))'
+gh search prs --state open --limit 1000 --owner <owner> --head "$BRANCH" --json url,repository
 ```
 
-Ignore the PR being closed. If any other PR remains, do not delete the branch: deleting a base
-closes its dependents, including unreviewed layers, and deleting a shared head breaks the others.
-Close without deleting and report the PR and why the branch was kept. Otherwise close with
-`gh pr close <N> --repo <owner>/<name> --delete-branch` in place of the plain close in Step 5.
+The first query includes PRs from forks that target this branch (they appear under `--repo`), and
+PRs sharing the head. The second finds PRs in other repositories that use this branch as their
+head. Ignore the PR being closed. If any other PR remains, or cross-repository reuse cannot be ruled
+out, do not delete the branch: deleting a base closes its dependents, including unreviewed layers,
+and deleting a shared head closes the others. Close without deleting and report the PR and why the
+branch was kept. Otherwise close with `gh pr close <N> --repo <owner>/<name> --delete-branch` in
+place of the plain close in Step 5.
 
 ## Linked issues
 

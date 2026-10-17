@@ -63,8 +63,9 @@ With an argument, require an explicit selector and stop to ask when a bare argum
 - `author:<login>`: `gh pr list --repo <owner>/<name> --author <login> --state open --limit 1000`. For a GitHub App
   (login `app/<slug>`), use `--app <slug>` instead of `--author`.
 - `label:<name>`: `gh pr list --repo <owner>/<name> --label <name> --state open --limit 1000`
-- `title:<text>`: a literal, ASCII-case-insensitive substring match (no Unicode case folding), with the text passed as data:
-  `gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title | jq --arg t "<text>" '.[] | select(.title | ascii_downcase | contains($t | ascii_downcase))'`
+- `title:<text>`: a literal, ASCII-case-insensitive substring match (no Unicode case folding).
+  Write the text to a file with a file-writing tool and read it as data, never in the shell string:
+  `gh pr list --repo <owner>/<name> --state open --limit 1000 --json number,title | jq --rawfile t <text-file> '($t | rtrimstr("\n") | ascii_downcase) as $q | .[] | select(.title | ascii_downcase | contains($q))'`
 - `all`: every open PR regardless of author.
 
 **Safety: a broad or non-default scope needs confirmation.** The default automation-label query is
@@ -90,7 +91,9 @@ Batch the in-scope PRs across up to three parallel read-only agents. Each reads 
 description and full diff, loads [review-ci-logs](../review-ci-logs/SKILL.md) for failing required
 checks, and returns per PR:
 
-- **Head:** the reviewed `headRefOid` (`gh pr view <N> --repo <owner>/<name> --json headRefOid`)
+- **Head:** the reviewed `headRefOid`, bound to the diff: read `gh pr view <N> --repo <owner>/<name>
+  --json headRefOid` before and after fetching the diff, and accept the review only when both
+  values match; otherwise repeat it
 - **Decision:** `MERGE` or `CLOSE`
 - **Reason:** a one-line summary
 - **Steering:** (MERGE only) whether the shepherd needs direction, and the exact PR comment body
