@@ -192,8 +192,15 @@ Optional inputs keep the original contract (`completion-mode`, `publish-*`, `iss
 `HARNESS_TARGET_PLAN`), `dispatch-ref`, `environment`, `runs-on`, `priority`, `queue-ttl-seconds`,
 `timeout-seconds`, and `required-labels`.
 
+The `environment` branch policy only guards this reusable job. It does not scope a repository-level
+`HARNESS_API_KEY` secret to that environment, so restrict who can run workflows that can read the
+secret (or keep the key an environment secret and forward it from a caller job that uses the same
+environment).
+
 `comment-harness-session` posts one idempotent session-link comment on an issue or pull request,
-keyed by a hidden marker so reruns do not duplicate it. It validates the target number, session id
+keyed by a hidden marker in a `github-actions[bot]` comment so reruns do not duplicate it. The
+check and post are not atomic, so give the comment job a caller-level `concurrency` group per target
+if duplicate deliveries are possible. It validates the target number, session id
 (`sess-` plus eight hex digits), and an `https://.../sessions/<id>` URL before commenting.
 
 ### Required-result gate

@@ -179,12 +179,20 @@ describe('harness-dispatch prepare step', () => {
     expect(large.stdout).toContain('publish-related-candidates dropped')
   })
 
-  it('rejects invalid input', () => {
-    expect(run({ HARNESS_URL: 'http://harness.example' }).stdout).toContain('https://')
-    expect(run({ HARNESS_PROMPT: 'x'.repeat(65_537) }).stdout).toContain('65536 bytes')
-    expect(run({ RESUME_SESSION_ID: 'nope' }).stdout).toContain('not a valid session id')
-    expect(run({ PUBLISH_RELATED_CANDIDATES: '{}' }).stdout).toContain('must be a JSON array')
-    expect(run({ PUBLISH_BASE_REF: 'x'.repeat(513) }).stdout).toContain('publishBaseRef')
+  it('rejects invalid input with a failing exit status', () => {
+    const cases: Array<[Record<string, string>, string]> = [
+      [{ HARNESS_URL: 'http://harness.example' }, 'https://'],
+      [{ EXPECTED_HEAD_SHA: 'main' }, 'full commit SHA'],
+      [{ HARNESS_PROMPT: 'x'.repeat(65_537) }, '65536 bytes'],
+      [{ RESUME_SESSION_ID: 'nope' }, 'not a valid session id'],
+      [{ PUBLISH_RELATED_CANDIDATES: '{}' }, 'must be a JSON array'],
+      [{ PUBLISH_BASE_REF: 'x'.repeat(513) }, 'publishBaseRef'],
+    ]
+    for (const [overrides, message] of cases) {
+      const result = run(overrides)
+      expect(result.status).toBe(1)
+      expect(result.stdout).toContain(message)
+    }
     expect(run({ RESUME_SESSION_ID: 'sess-0123abcd' }).status).toBe(0)
   })
 })

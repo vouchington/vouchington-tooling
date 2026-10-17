@@ -140,6 +140,10 @@ jobs:
             echo "::error::vars.HARNESS_URL must be an https:// URL."
             exit 1
           fi
+          if [[ ! "$EXPECTED_HEAD_SHA" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+            echo "::error::expected-head-sha must be a full commit SHA."
+            exit 1
+          fi
           if [[ "$(printf '%s' "$HARNESS_PROMPT" | wc -c)" -gt 65536 ]]; then
             echo "::error::The prompt exceeds 65536 bytes."
             exit 1
