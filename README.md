@@ -215,6 +215,21 @@ check and post are not atomic, so give the comment job a caller-level `concurren
 if duplicate deliveries are possible. It validates the target number, session id
 (`sess-` plus eight hex digits), and an `https://.../sessions/<id>` URL before commenting.
 
+### Setup and coverage actions
+
+Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
+
+- `setup-node-pnpm` runs `actions/setup-node` from `node-version-file` (default `.nvmrc`), then
+  `pnpm/action-setup` with `version: latest-12`, restores the pnpm store cache keyed on
+  `pnpm-lock.yaml`, and runs a frozen install. `install-scripts: 'false'` adds `--ignore-scripts`.
+  The caller runs `actions/checkout` first.
+- `fetch-base-ref` fetches the pull request base branch as `refs/remotes/origin/<base>` and unshallows
+  the clone so merge-base and diff tools can resolve it. Run it after `actions/checkout`.
+- `upload-full-lcov` validates a lowercase hyphen-delimited `suite` and uploads `path` (default
+  `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
+- `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
+  `id-token: write`.
+
 ### Required-result gate
 
 Pin `ci-required-result-gate` by its full 40-character commit SHA to give a required fan-in job a strict, compact

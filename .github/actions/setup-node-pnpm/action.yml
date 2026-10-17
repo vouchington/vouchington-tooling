@@ -1,0 +1,53 @@
+name: Setup Node.js and pnpm
+description: >
+  Sets up Node.js from a version file and pnpm 12, then installs the full workspace
+  against a restored pnpm store cache.
+  The caller must run actions/checkout before invoking this action.
+  Set timeout-minutes on the calling step to cap the combined operations.
+inputs:
+  install-scripts:
+    description: 'Set false when dependency lifecycle scripts are intentionally deferred'
+    default: 'true'
+  node-version-file:
+    description: 'Version file, relative to the workspace root, that selects the Node.js version'
+    default: '.nvmrc'
+runs:
+  using: composite
+  steps:
+    # setup-node must precede pnpm/action-setup: the action picks its pnpm
+    # bootstrap from the Node on PATH, and pnpm's shims run that Node.
+    - uses: actions/setup-node@363be39a57dfa5801e05c6e0c549d622a376cf15 # v7
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: false
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      with:
+        version: latest-12
+    - name: Resolve pnpm store path
+      id: pnpm-store
+      shell: bash
+      run: |
+        echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "lockfile-hash=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        else
+          echo "lockfile-hash=$(shasum -a 256 pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Cache pnpm store
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm-store.outputs.lockfile-hash }}
+        restore-keys: |
+          pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+    # --loglevel=warn drops the progress bar and package summary but still prints warnings and
+    # errors. From pnpm 12.8.0 (pnpm/pnpm#16076) it also keeps a failed lifecycle script's full
+    # output and a failed supply-chain verdict, so the quiet log stays diagnosable.
+    - name: pnpm install
+      if: inputs.install-scripts != 'false'
+      shell: bash
+      run: pnpm install --frozen-lockfile --loglevel=warn
+    - name: pnpm install without lifecycle scripts
+      if: inputs.install-scripts == 'false'
+      shell: bash
+      run: pnpm install --frozen-lockfile --ignore-scripts --loglevel=warn
