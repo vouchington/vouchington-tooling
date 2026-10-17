@@ -24,7 +24,8 @@ export type PullRequestInput = {
   noSourceIssue?: { reason: string }
   details: string[]
   base: string
-  agent: string
+  /** The caller's claim only; the rendered Agent line comes from `agentLabel`. */
+  agent?: string
   model?: string
   /** The trusted mode, see {@link trustedMode}; never the caller's word alone. */
   mode: PullRequestMode
@@ -100,7 +101,7 @@ export function readPullRequestInput(args: Args, env: NodeJS.ProcessEnv): PullRe
     ...(noSourceIssue === undefined ? {} : { noSourceIssue }),
     details: readDetails(args),
     base: optionalString(args, 'base') ?? 'main',
-    agent: singleLine(args, 'agent'),
+    ...(args.agent === undefined ? {} : { agent: singleLine(args, 'agent') }),
     ...(model === undefined ? {} : { model }),
     mode: trustedMode(env, requested),
     // It renders on its own provenance line; a newline would forge the lines after it.

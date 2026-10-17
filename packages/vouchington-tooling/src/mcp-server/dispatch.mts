@@ -29,6 +29,8 @@ export type ServerEnvironment = {
   spawnPolicy?: PolicySpawner
   /** Test seam: replaces locating and running gh. */
   runGh?: GhRunner
+  /** The connected MCP client's `clientInfo.name`, once `initialize` has completed. */
+  clientName?: () => string | undefined
   /** Test seam: replaces the operating system user and host name. */
   device?: () => { user: string; host: string }
   /** Test seam: a fresh registry stands in for a server restart. Defaults to the process's own. */
@@ -109,6 +111,7 @@ export async function callTool(
       runGit: environment.runGit,
       snapshots: environment.snapshots ?? PROCESS_SNAPSHOTS,
       ...(environment.runGh === undefined ? {} : { runGh: environment.runGh }),
+      ...(environment.clientName === undefined ? {} : { clientName: environment.clientName }),
       ...(environment.device === undefined ? {} : { device: environment.device }),
       ...(environment.spawnPolicy === undefined ? {} : { spawnPolicy: environment.spawnPolicy }),
       // The client resolves from this package's install, like the SDK, never from the worktree.

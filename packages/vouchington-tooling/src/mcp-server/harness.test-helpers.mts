@@ -43,6 +43,7 @@ export function harness(
     runGh?: GhRunner
     device?: () => { user: string; host: string }
     snapshots?: SnapshotRegistry
+    clientName?: () => string | undefined
   } = {},
 ): Harness {
   const fake = fakeBlackboard(options)
@@ -55,6 +56,7 @@ export function harness(
     ...(options.runGh === undefined ? {} : { runGh: options.runGh }),
     ...(options.device === undefined ? {} : { device: options.device }),
     ...(options.snapshots === undefined ? {} : { snapshots: options.snapshots }),
+    ...(options.clientName === undefined ? {} : { clientName: options.clientName }),
   }
   return { fake, call: (name, args) => callTool(name, args, environment) }
 }

@@ -25,6 +25,8 @@ export type ToolContext = {
   runGit: RunTextCommand
   /** Test seam: replaces locating and running gh. */
   runGh?: GhRunner
+  /** The connected MCP client's `clientInfo.name`, once `initialize` has completed. */
+  clientName?: () => string | undefined
   /** Test seam: replaces the operating system user and host name. */
   device?: () => { user: string; host: string }
 }
