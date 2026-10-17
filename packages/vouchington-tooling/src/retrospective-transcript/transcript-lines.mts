@@ -29,7 +29,15 @@ export async function openTranscriptLines(
       stream.once('open', () => resolve())
       stream.once('error', reject)
     })
-    return { lines: streamTranscriptLines(stream, maxRecordBytes) }
+    const lines = streamTranscriptLines(stream, maxRecordBytes)
+    const release = lines.return.bind(lines)
+    // The file is already open, so cancelling before the first next() must still close it;
+    // an unstarted generator never reaches its own finally block.
+    lines.return = (value) => {
+      stream.destroy()
+      return release(value)
+    }
+    return { lines }
   } catch (err) {
     stream.destroy()
     return { error: (err as Error).message }

@@ -114,6 +114,11 @@ describe('normalizeCommandPrefix', () => {
     expect(normalizeCommandPrefix(command)).toBe('…')
   })
 
+  it('redacts a short assignment-only segment instead of leaking its value', () => {
+    expect(normalizeCommandPrefix('PASSWORD=hunter2')).toBe('…')
+    expect(normalizeCommandPrefix('A=1 B=2')).toBe('…')
+  })
+
   it('redacts a path-qualified package-runner token that exceeds the redaction threshold', () => {
     const command = '/very/long/nested/path/to/node_modules/.bin/pnpm run build --filter web'
     const prefix = normalizeCommandPrefix(command)

@@ -82,6 +82,9 @@ function stripGitGlobalOptions(tokens: string[]): string[] {
 function normalizeSegment(segment: string[]): string {
   const [first, ...rest] = segment
   if (!first) return ''
+  // A segment that is only assignments (stripEnvPrefix left it intact) has no command;
+  // its value may be a secret of any length, so always redact it.
+  if (ENV_ASSIGNMENT_PATTERN.test(first)) return REDACTED_TOKEN
   if (isPackageRunner(first) && (rest[0] === 'run' || rest[0] === 'exec') && rest[1]) {
     return `${redactOverlongToken(first)} ${rest[0]} ${redactOverlongToken(rest[1])}`
   }
