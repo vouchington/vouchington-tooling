@@ -40,17 +40,17 @@ on:
         type: string
         required: false
         default: ''
-        description: 'Optional second repository variable that must also equal true'
+        description: 'Optional second repository variable that must also equal true. The fix-main surface must pass HARNESS_AGENT_DISPATCH_ENABLED'
       target-variable:
         type: string
         required: false
-        default: HARNESS_TARGET
-        description: 'Repository variable holding the target JSON; falls back to HARNESS_TARGET when unset'
+        default: ''
+        description: 'Repository variable holding the target JSON. Empty derives it from surface-gate: HARNESS_PLAN_ENABLED uses HARNESS_TARGET_PLAN, anything else HARNESS_TARGET. An unset variable falls back to HARNESS_TARGET'
       fallbacks-variable:
         type: string
         required: false
-        default: HARNESS_FALLBACKS
-        description: 'Repository variable holding the fallbacks JSON; falls back to HARNESS_FALLBACKS when unset'
+        default: ''
+        description: 'Repository variable holding the fallbacks JSON. Empty derives it from surface-gate: HARNESS_PLAN_ENABLED uses HARNESS_FALLBACKS_PLAN, anything else HARNESS_FALLBACKS. An unset variable falls back to HARNESS_FALLBACKS'
       dispatch-ref:
         type: string
         required: false
@@ -136,6 +136,10 @@ jobs:
           TRIGGER_COMMENT_ID: ${{ inputs.trigger-comment-id }}
         run: |
           set -euo pipefail
+          if ! command -v jq >/dev/null; then
+            echo "::error::jq is required on the runner (preinstalled on ubuntu-slim and ubuntu-latest)."
+            exit 1
+          fi
           if [[ ! "$HARNESS_URL" =~ ^https:// ]]; then
             echo "::error::vars.HARNESS_URL must be an https:// URL."
             exit 1
@@ -211,8 +215,8 @@ jobs:
           # refs/remotes/origin/* there, so checkout of any branch but the one already checked
           # out fails. The SHA always resolves; agent-ref still reaches session metadata.
           ref: ${{ inputs.expected-head-sha }}
-          target: ${{ vars[inputs.target-variable] || vars.HARNESS_TARGET }}
-          fallbacks: ${{ vars[inputs.fallbacks-variable] || vars.HARNESS_FALLBACKS }}
+          target: ${{ vars[inputs.target-variable || (inputs.surface-gate == 'HARNESS_PLAN_ENABLED' && 'HARNESS_TARGET_PLAN' || 'HARNESS_TARGET')] || vars.HARNESS_TARGET }}
+          fallbacks: ${{ vars[inputs.fallbacks-variable || (inputs.surface-gate == 'HARNESS_PLAN_ENABLED' && 'HARNESS_FALLBACKS_PLAN' || 'HARNESS_FALLBACKS')] || vars.HARNESS_FALLBACKS }}
           timeout: ${{ inputs.timeout-seconds }}
           priority: ${{ inputs.priority }}
           queue-ttl-seconds: ${{ inputs.queue-ttl-seconds }}
@@ -233,3 +237,29 @@ jobs:
           concurrency-id: ${{ inputs.concurrency-id }}
           timeout: ${{ inputs.timeout-seconds }}
           priority: ${{ inputs.priority }}
+      - name: Summarize session
+        id: summary
+        timeout-minutes: 1
+        env:
+          CONCURRENCY_ID: ${{ inputs.concurrency-id }}
+          CREATED: ${{ steps.dispatch.outputs.created || steps.resume.outputs.created }}
+          RESUMED: ${{ inputs.resume-session-id != '' }}
+          SESSION_ID: ${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}
+          SESSION_URL: ${{ steps.dispatch.outputs.session-url || steps.resume.outputs.session-url }}
+        run: |
+          set -euo pipefail
+          if [[ "$RESUMED" == "true" ]]; then
+            state="resumed"
+          elif [[ "$CREATED" == "false" ]]; then
+            state="existing session reused"
+          else
+            state="created"
+          fi
+          echo "::notice title=Harness session::${SESSION_URL}"
+          {
+            echo "### Harness session"
+            echo
+            echo "- Session: [\`${SESSION_ID}\`](${SESSION_URL})"
+            echo "- State: ${state}"
+            echo "- Concurrency id: \`${CONCURRENCY_ID}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

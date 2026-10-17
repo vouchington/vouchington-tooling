@@ -45,6 +45,11 @@ const job = workflow.jobs.dispatch
 const prepare = job.steps.find((step) => step.id === 'prepare')
 const dispatch = job.steps.find((step) => step.id === 'dispatch')
 const resume = job.steps.find((step) => step.id === 'resume')
+const planDefault = (plan: string, plain: string) =>
+  `\${{ vars[inputs.${plan === 'HARNESS_TARGET_PLAN' ? 'target' : 'fallbacks'}-variable || ` +
+  `(inputs.surface-gate == 'HARNESS_PLAN_ENABLED' && '${plan}' || '${plain}')] || vars.${plain} }}`
+const targetExpression = planDefault('HARNESS_TARGET_PLAN', 'HARNESS_TARGET')
+const fallbacksExpression = planDefault('HARNESS_FALLBACKS_PLAN', 'HARNESS_FALLBACKS')
 const sha = /^jonathanong\/auto-harness\/actions\/dispatch@[0-9a-f]{40}$/u
 
 describe('harness-dispatch reusable workflow contract', () => {
@@ -77,8 +82,8 @@ describe('harness-dispatch reusable workflow contract', () => {
     expect(inputs.environment?.default).toBe('auto-harness')
     expect(inputs['dispatch-ref']?.default).toBe('refs/heads/main')
     expect(inputs['runs-on']?.default).toBe('ubuntu-slim')
-    expect(inputs['target-variable']?.default).toBe('HARNESS_TARGET')
-    expect(inputs['fallbacks-variable']?.default).toBe('HARNESS_FALLBACKS')
+    expect(inputs['target-variable']?.default).toBe('')
+    expect(inputs['fallbacks-variable']?.default).toBe('')
     expect(inputs.priority?.default).toBe('20')
     expect(inputs['queue-ttl-seconds']?.default).toBe('3600')
     expect(inputs['timeout-seconds']?.default).toBe('6300')
@@ -113,8 +118,8 @@ describe('harness-dispatch reusable workflow contract', () => {
       'repository-id': '${{ vars.HARNESS_REPOSITORY_ID }}',
       'server-url': '${{ vars.HARNESS_URL }}',
       ref: '${{ inputs.expected-head-sha }}',
-      target: '${{ vars[inputs.target-variable] || vars.HARNESS_TARGET }}',
-      fallbacks: '${{ vars[inputs.fallbacks-variable] || vars.HARNESS_FALLBACKS }}',
+      target: targetExpression,
+      fallbacks: fallbacksExpression,
       metadata: '${{ steps.prepare.outputs.metadata }}',
       source: 'webhook',
     })
@@ -126,6 +131,61 @@ describe('harness-dispatch reusable workflow contract', () => {
     expect(job.outputs['session-id']).toBe(
       '${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}',
     )
+  })
+})
+
+describe('harness-dispatch plan-surface defaults', () => {
+  it('derives the plan variables from the plan surface gate unless overridden', () => {
+    expect(targetExpression).toContain("'HARNESS_TARGET_PLAN' || 'HARNESS_TARGET'")
+    expect(fallbacksExpression).toContain("'HARNESS_FALLBACKS_PLAN' || 'HARNESS_FALLBACKS'")
+    expect(dispatch?.with?.target?.startsWith('${{ vars[inputs.target-variable ||')).toBe(true)
+    expect(dispatch?.with?.fallbacks?.startsWith('${{ vars[inputs.fallbacks-variable ||')).toBe(
+      true,
+    )
+  })
+})
+
+describe('harness-dispatch summary step', () => {
+  const summary = job.steps.find((step) => step.id === 'summary')
+
+  function run(env: Record<string, string>) {
+    const dir = mkdtempSync(join(tmpdir(), 'harness-summary-'))
+    const file = join(dir, 'summary.md')
+    const result = spawnSync('bash', ['-c', summary?.run ?? ''], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: file, ...env },
+    })
+    return { ...result, text: result.status === 0 ? readFileSync(file, 'utf8') : '' }
+  }
+
+  const base = {
+    CONCURRENCY_ID: 'fix-1',
+    CREATED: 'true',
+    RESUMED: 'false',
+    SESSION_ID: 'sess-0123abcd',
+    SESSION_URL: 'https://harness.example/sessions/sess-0123abcd',
+  }
+
+  it('runs last and passes values through env, never inline expressions', () => {
+    expect(job.steps.at(-1)).toBe(summary)
+    expect(summary?.run).not.toContain('${{')
+    expect(Object.keys(summary?.env ?? {}).sort()).toEqual(Object.keys(base).sort())
+  })
+
+  it('writes the link, state, and concurrency id plus a notice', () => {
+    const created = run(base)
+    expect(created.status).toBe(0)
+    expect(created.stdout).toContain(`::notice title=Harness session::${base.SESSION_URL}`)
+    expect(created.text).toContain(`[\`sess-0123abcd\`](${base.SESSION_URL})`)
+    expect(created.text).toContain('State: created')
+    expect(created.text).toContain('`fix-1`')
+    expect(run({ ...base, RESUMED: 'true' }).text).toContain('State: resumed')
+    expect(run({ ...base, CREATED: 'false' }).text).toContain('State: existing session reused')
+  })
+
+  it('does not execute shell metacharacters in values', () => {
+    const result = run({ ...base, CONCURRENCY_ID: '$(touch pwned) `id`' })
+    expect(result.text).toContain('$(touch pwned) `id`')
   })
 })
 

@@ -188,9 +188,22 @@ job runs only for `github.run_attempt == 1` on `dispatch-ref` (default `refs/hea
 `environment` input (default `auto-harness`), whose branch policy should allow only that ref.
 Optional inputs keep the original contract (`completion-mode`, `publish-*`, `issue-number`,
 `trigger-comment-id`, `pr-label`, `resume-session-id`, `source-run-*`, and so on) and add
-`additional-gate`, `target-variable`, `fallbacks-variable` (for example, a plan surface that reads
-`HARNESS_TARGET_PLAN`), `dispatch-ref`, `environment`, `runs-on`, `priority`, `queue-ttl-seconds`,
+`additional-gate`, `target-variable`, `fallbacks-variable`, `dispatch-ref`, `environment`, `runs-on`, `priority`, `queue-ttl-seconds`,
 `timeout-seconds`, and `required-labels`.
+
+When `target-variable` and `fallbacks-variable` are empty (the default), they derive from
+`surface-gate`: `HARNESS_PLAN_ENABLED` reads `HARNESS_TARGET_PLAN` and `HARNESS_FALLBACKS_PLAN`, any
+other gate reads `HARNESS_TARGET` and `HARNESS_FALLBACKS`. Explicit inputs override, and an unset
+variable still falls back to the plain one. After dispatch or resume, the workflow writes the session
+link, the created or resumed state and the concurrency id to the step summary and emits a
+`::notice::` with the session URL. The workflow needs `jq`, which `ubuntu-slim` (Ubuntu 24.04, jq 1.7)
+preinstalls; the prepare step fails with a clear error on a `runs-on` image without it.
+
+Migration note for vouchington callers: the fix-main caller must pass
+`additional-gate: HARNESS_AGENT_DISPATCH_ENABLED` (with its own `surface-gate`), because the old
+`ci/harness-session-dispatch*.mts` gate checked that variable for that surface. The plan caller
+only needs `surface-gate: HARNESS_PLAN_ENABLED` and can drop any explicit `target-variable` and
+`fallbacks-variable`.
 
 The `environment` branch policy only guards this reusable job. It does not scope a repository-level
 `HARNESS_API_KEY` secret to that environment, so restrict which branches and workflows in the caller
