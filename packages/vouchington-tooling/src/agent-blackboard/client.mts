@@ -54,6 +54,9 @@ export function resolveBlackboardConnection(
   return { baseUrl, token, readRetry: {} }
 }
 
+/** The upstream client package could not be resolved: a workspace-setup problem, not an outage. */
+export class BlackboardNotInstalledError extends Error {}
+
 export async function loadClient(
   dependencies: BlackboardClientDependencies = {},
 ): Promise<BlackboardClientModule> {
@@ -62,7 +65,7 @@ export async function loadClient(
     return await loader()
   } catch (error) {
     if (isMissingModuleError(error))
-      throw new Error(
+      throw new BlackboardNotInstalledError(
         'agent-blackboard is not installed; install it alongside vouchington-tooling to use this integration',
         { cause: error },
       )

@@ -118,6 +118,7 @@ retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] 
 link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>  Link a packaged or repository-local skill
 retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]
 agent-blackboard probe
+agent-blackboard session-start [--skip-env NAME] [--setup-hint TEXT] [--docs-path PATH] [--restore-hint TEXT] [--timeout-ms N]  (SessionStart hook; payload on stdin)
 agent-blackboard journal append --mode interactive|autonomous --source-event-id ID --work-outcome OUTCOME --coverage-status STATUS --session-id UUID --agent NAME --version VERSION --file PATH --repository OWNER/NAME [--repository OWNER/NAME ...] [--parent-session-id UUID] [--timestamp ISO8601] [--coverage-source SOURCE,...] [--dropped-count N] [--outbox-directory PATH]
 agent-blackboard journal entries --session-id UUID
 agent-blackboard journal status --session-id UUID --outbox-directory PATH

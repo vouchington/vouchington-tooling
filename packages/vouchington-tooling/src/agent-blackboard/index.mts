@@ -10,6 +10,13 @@ import { assertSessionId } from './session-id.mts'
 
 export { cleanupSnapshotPartitions, partitionSnapshot } from './snapshot.mts'
 export { assertSessionId } from './session-id.mts'
+export {
+  payloadSessionId,
+  probeAdvisory,
+  sessionStartContext,
+  sessionStartOutput,
+} from './session-start.mts'
+export type { SessionStartOptions } from './session-start.mts'
 export { appendJournalMarkdown } from './journal.mts'
 export type { JournalInput } from './journal.mts'
 export {
@@ -84,7 +91,7 @@ export function formatJournalEntries(sessionId: string, entries: unknown[]): str
     .join('\n\n')
 }
 
-export { resolveBlackboardConnection } from './client.mts'
+export { BlackboardNotInstalledError, resolveBlackboardConnection } from './client.mts'
 export type {
   BlackboardConnection,
   BlackboardClientModule,
