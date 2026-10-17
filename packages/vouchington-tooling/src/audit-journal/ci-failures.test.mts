@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildCiFailuresSection, getConformingGroups } from './ci-failures.mts'
+import {
+  buildCiFailuresSection,
+  getConformingGroups,
+  isConformingCiFailureBlock,
+} from './ci-failures.mts'
+import type { JournalEntry } from './types.mts'
 
 const FAILURE_GROUP_HEADER = /^- `(recurring|one-off)` — `(.+?)` — .*[^\s]$/
 const RUN_URL = 'https://github.com/vouchington/vouchington/actions/runs/1234567890/job/9876543210'
 const SHA = '15fa2d3a1b2c3d4e5f60718293a4b5c6d7e8f901'
+
+const conforming = [
+  '- `one-off` — `GitHub Actions` — build cache failure',
+  '  - Evidence: CI run 123 failed',
+  '  - Root diagnostic: cache corruption',
+  '  - Disposition: rebuilt cache',
+].join('\n')
 
 describe('CI failure block composition', () => {
   it('keeps long headers and evidence whole with no trailing whitespace', () => {
@@ -22,11 +34,7 @@ describe('CI failure block composition', () => {
 
     const groups = getConformingGroups([{ data: { type: 'journal', markdown } }])
     expect(groups).toHaveLength(1)
-    const section = buildCiFailuresSection(
-      'session',
-      { status: 'ok', markdownBlocks: groups, truncated: false },
-      'events',
-    )
+    const section = buildCiFailuresSection(groups)
     const lines = section.split('\n')
     for (const line of lines) expect(line).toBe(line.trimEnd())
     const headerLine = lines.find((line) => line.startsWith('- `'))
@@ -71,11 +79,51 @@ describe('CI failure block composition', () => {
     expect(lines[0]).toContain(
       '2 further failure groups omitted to fit the size limit; see journal',
     )
-    const section = buildCiFailuresSection(
-      'session',
-      { status: 'ok', markdownBlocks: groups, truncated: false },
-      'events',
-    )
+    const section = buildCiFailuresSection(groups)
     expect(section).toContain('Status: failures observed')
+  })
+})
+
+describe('CI failure grammar', () => {
+  it('accepts the complete block and rejects partial/trailing content', () => {
+    expect(isConformingCiFailureBlock(conforming)).toBe(true)
+    expect(isConformingCiFailureBlock(`\n\n${conforming.replaceAll('\n', '\r\n')}\n`)).toBe(true)
+    expect(isConformingCiFailureBlock(`${conforming}\nextra`)).toBe(false)
+    expect(isConformingCiFailureBlock(conforming.split('\n').slice(0, 2).join('\n'))).toBe(false)
+    expect(isConformingCiFailureBlock(`${conforming} `)).toBe(false)
+    expect(isConformingCiFailureBlock(`${conforming}${'x'.repeat(10_000)}`)).toBe(false)
+    expect(isConformingCiFailureBlock(`${conforming}${'é'.repeat(5_000)}`)).toBe(false)
+    expect(isConformingCiFailureBlock(conforming.replace('cache corruption', '\ud800'))).toBe(false)
+    expect(
+      getConformingGroups([
+        {
+          data: {
+            type: 'journal',
+            markdown: conforming.replace('cache corruption', '~~hidden~~'),
+          },
+        },
+      ])[0],
+    ).toContain('\\~\\~hidden\\~\\~')
+    expect(
+      getConformingGroups([
+        { data: { type: 'journal', markdown: conforming.replace('cache corruption', '&nbsp;') } },
+      ])[0],
+    ).toContain('\\&nbsp;')
+    expect(
+      isConformingCiFailureBlock(
+        conforming.replace('build cache failure', '\u202e').replace('CI run 123 failed', '\u202e'),
+      ),
+    ).toBe(false)
+    expect(
+      isConformingCiFailureBlock(
+        conforming
+          .replace('build cache failure', '\u200b')
+          .replace('CI run 123 failed', '\u200b')
+          .replace('cache corruption', '\u200b')
+          .replace('rebuilt cache', '\u200b'),
+      ),
+    ).toBe(false)
+    expect(getConformingGroups([{ data: { type: 'journal', markdown: 42 } }])).toEqual([])
+    expect(getConformingGroups([null] as unknown as JournalEntry[])).toEqual([])
   })
 })

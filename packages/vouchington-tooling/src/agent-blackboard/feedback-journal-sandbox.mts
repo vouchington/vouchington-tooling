@@ -1,10 +1,10 @@
-import { conformingBlocks, matchAuditBlock } from '../session-friction/audit-block.mts'
-import type { AuditRender } from '../session-friction/audit-fit.mts'
-import type { AuditRedactor } from '../session-friction/text.mts'
-import type { JournalEntry } from '../session-friction/types.mts'
+import { conformingBlocks, matchAuditBlock } from '../audit-journal/audit-block.mts'
+import type { AuditRender } from '../audit-journal/audit-fit.mts'
+import type { AuditRedactor } from '../audit-journal/text.mts'
+import type { JournalEntry } from '../audit-journal/types.mts'
 
 const SANDBOX_SECTION_HEADER = '## Sandbox & Permission Audit'
-const SOURCE = 'journal entries only; no friction log observed'
+const SOURCE = 'journal entries only'
 
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
 const DISPOSITION = /^ {2}- Disposition: .*[^\s]$/

@@ -1,4 +1,4 @@
-import { isWellFormedUnicode } from '../session-friction/text.mts'
+import { isWellFormedUnicode } from '../audit-journal/text.mts'
 import { assertSessionId } from './session-id.mts'
 import { isObject } from './snapshot-partition-guards.mts'
 import type { FeedbackIdentity } from './feedback-types.mts'

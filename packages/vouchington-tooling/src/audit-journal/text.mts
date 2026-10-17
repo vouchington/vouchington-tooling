@@ -5,17 +5,6 @@ export function normalizeAuditText(value: string): string {
   return value.replace(CONTROL_CHARACTERS, ' ').trim()
 }
 
-export function boundedText(value: string, maximum: number): string {
-  let end = Math.min(value.length, maximum)
-  if (
-    end < value.length &&
-    /[\uD800-\uDBFF]/.test(value[end - 1]!) &&
-    /[\uDC00-\uDFFF]/.test(value[end]!)
-  )
-    end--
-  return value.slice(0, end)
-}
-
 export function isWellFormedUnicode(value: string): boolean {
   for (let index = 0; index < value.length; index++) {
     const code = value.charCodeAt(index)
@@ -26,15 +15,6 @@ export function isWellFormedUnicode(value: string): boolean {
     } else if (code >= 0xdc00 && code <= 0xdfff) return false
   }
   return true
-}
-
-export function isSafeAuditText(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value !== '' &&
-    isWellFormedUnicode(value) &&
-    value === normalizeAuditText(value)
-  )
 }
 
 export type AuditRedactor = (value: string) => string
@@ -59,7 +39,7 @@ const WHITESPACE = /^\s$/u
  * Joins escaped units whole, or, when over `maxBytes`, keeps only complete whitespace-separated
  * tokens (so URLs and SHAs are never split) and marks the cut. Never ends in whitespace.
  */
-export function fitUnits(units: string[], maxBytes: number, atTokens = true): string {
+export function fitUnits(units: string[], maxBytes: number): string {
   const whole = units.join('')
   if (Buffer.byteLength(whole) <= maxBytes) return whole
   const room = maxBytes - Buffer.byteLength(` ${CUT_MARKER}`)
@@ -68,17 +48,8 @@ export function fitUnits(units: string[], maxBytes: number, atTokens = true): st
   for (const [index, unit] of units.entries()) {
     used += Buffer.byteLength(unit)
     if (used > room) break
-    if (!atTokens || WHITESPACE.test(unit)) boundary = atTokens ? index : index + 1
+    if (WHITESPACE.test(unit)) boundary = index
   }
   const kept = units.slice(0, boundary).join('').trimEnd()
-  return kept ? `${kept}${atTokens ? ' ' : ''}${CUT_MARKER}` : CUT_MARKER
-}
-
-export function markdownAuditText(
-  value: string,
-  redact?: AuditRedactor,
-  maxBytes = Infinity,
-): string {
-  // Used for identifiers, which have no token boundaries to cut at.
-  return fitUnits(markdownAuditUnits(value, redact), maxBytes, false)
+  return kept ? `${kept} ${CUT_MARKER}` : CUT_MARKER
 }

@@ -1,4 +1,4 @@
-import { isWellFormedUnicode } from '../session-friction/text.mts'
+import { isWellFormedUnicode } from '../audit-journal/text.mts'
 import type { FeedbackReference } from './feedback-types.mts'
 export function validateFeedbackText(
   value: unknown,

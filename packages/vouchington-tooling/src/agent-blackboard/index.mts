@@ -102,6 +102,6 @@ export { feedbackOutboxStatus, readFeedbackOutbox } from './feedback-outbox.mts'
 export { composeRetrospective } from './feedback-compose.mts'
 export type { RetrospectiveCompositionInput, FeedbackAssessment } from './feedback-compose.mts'
 export type { JournalAuditOptions } from './feedback-journal-audit.mts'
-export type { JournalEntry, JournalLoader, JournalLoadResult } from '../session-friction/types.mts'
+export type { JournalEntry, JournalLoader, JournalLoadResult } from '../audit-journal/types.mts'
 
 export { feedbackOutboxCounts } from './feedback-outbox-counts.mts'

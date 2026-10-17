@@ -59,29 +59,8 @@ export type {
   SnapshotSelection,
 } from './agent-blackboard/index.mts'
 
-export {
-  buildSessionFrictionReport,
-  classifyFrictionObservation,
-  FRICTION_LOG_MAX_EVENTS,
-  isConformingCiFailureBlock,
-  normalizeCommandPrefix,
-  readFrictionLog,
-  recordFriction,
-} from './session-friction/index.mts'
-export type {
-  FrictionEvent,
-  FrictionEventKind,
-  FrictionLogOptions,
-  FrictionLogReadResult,
-  FrictionObservation,
-  JournalEntry,
-  JournalLoader,
-  JournalLoadResult,
-  PermissionRequestObservation,
-  SessionFrictionReport,
-  SessionFrictionReportOptions,
-  ToolResultObservation,
-} from './session-friction/index.mts'
+export { isConformingCiFailureBlock } from './audit-journal/ci-failures.mts'
+export type { JournalEntry, JournalLoader, JournalLoadResult } from './audit-journal/types.mts'
 
 export {
   EphemeralListenerAttemptsExhaustedError,

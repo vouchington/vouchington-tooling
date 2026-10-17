@@ -315,7 +315,6 @@ import {
 } from 'vouchington-tooling/vitest-diagnostics'
 import { runRetrospectiveTranscript } from 'vouchington-tooling/retrospective-transcript'
 import { appendJournal, probeBlackboard } from 'vouchington-tooling/agent-blackboard'
-import { buildSessionFrictionReport, recordFriction } from 'vouchington-tooling/session-friction'
 import { GITHUB_BODY_MAX_CHARACTERS, validateGitHubBodyLength } from 'vouchington-tooling'
 import { createPullRequest, processDiffCommand, runGh, runGit } from 'vouchington-tooling/gh-cli'
 import {
@@ -474,41 +473,6 @@ can authenticate to the same registries. The workspace and its package store are
 audit finishes, when the process receives SIGINT, SIGTERM, or SIGHUP, and on the next audit if the
 previous process died first, including SIGKILL. Each workspace records its owner's PID so a later
 audit can delete directories whose owner is gone.
-
-`session-friction` is an opt-in capture and reporting library. Callers supply the session id,
-absolute log directory, host-independent observation, and journal loader; it does not inspect host
-environment variables, install hooks, or connect to a journal service by itself. Invoking
-`recordFriction` touches the session log even when no event is classified, preserving the
-difference between an observed clean session and missing evidence. Report markdown keeps backend
-diagnostics separate from its paste-safe output. Capture stores at most 500 events per session and counts rejected captures in a fixed-size atomic
-sidecar under the same session lock for either the event or byte limit, with visible `truncated`/`droppedCount` metadata. Saturated
-capture reads only the bounded counter; reports also preserve historical overflow markers.
-Interrupted or inconsistent counter updates make coverage unavailable. Malformed records also make the scan partial. It
-truncates event detail to 1,000 characters, and consumes up to 500 entries from the journal loader
-when building a report, stopping earlier when its aggregate 1 MB inspected-byte budget is reached.
-Bounded journal scans that stop before exhaustion are reported as incomplete rather than clean.
-Report liveness inherits the caller-supplied journal loader, which must bound its own I/O and yields.
-Log reads are capped at 2 MB, journal Markdown at 10,000 bytes per entry,
-and rendered audit fields are kept whole: composition loads the journal and friction log once, redacts each field from its raw text before Markdown escaping (a caller-supplied redactor runs first, then the built-in one), then renders the CI and sandbox sections, measures the real envelope against its 12,000-byte markdown and 16,384-byte envelope limits, and shrinks them in a few bounded attempts. A block shrinks Root diagnostic first and Evidence last, cutting only at token boundaries (never inside a URL or SHA) with a trailing `…`; groups that still cannot fit are omitted and counted in an explicit conforming group that points at the journal. The final attempt keeps only that omission note (about 300 bytes), so an input within roughly 300 bytes of the limit can still fail to compose. A caller-supplied `budgets` cap limits rendered groups only; the omission note is exempt from it. Permission requests record requested outcomes; explicit result observations may record approved
-or denied outcomes. A decision and simultaneous tool failure are both retained and counted in
-the report. Escalation detail without a decision remains unknown. Localhost connection
-refusal is an ambiguous failure and does not establish a sandbox cause. The supplied log directory must be dedicated
-to session-friction; existing directories must already be owner-only, while newly created
-directories and log files are enforced as owner-only when recording. Reads use a fixed bounded
-buffer that can detect growth one byte beyond the documented 2 MB cap.
-Ownership checks require POSIX effective-user IDs (Linux and macOS); session-friction throws on
-Windows and other platforms where those IDs are unavailable.
-Root-owned system symlink ancestors are supported for paths such as macOS `/var`; callers must not
-allow the directory chain to be mutated while it is being validated.
-Command-prefix normalization recognizes simple shell
-segments with single or double quotes; it does not evaluate substitutions or implement a full shell
-grammar. Normalization attempts limited redaction of obvious credential patterns but is not a secret
-scrubber; callers must ensure credentials are never included in captured commands.
-Failure classification inspects at most 100,000 structured-stderr characters, split evenly between
-the beginning and end when input exceeds that bound.
-Cooperating log readers and writers are serialized, including the initial clean-session
-touch. Recording and report log reads are synchronous: on contention they block the caller's
-event loop for up to one second before failing explicitly. Avoid these APIs on hot request paths.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
 boundaries. Neutral review posting lives in `gha-post-review` and requires a caller-supplied GitHub
@@ -669,31 +633,25 @@ replay the identical envelope and source ID to verify its actual persistence.
 generates required sections and markers. Tool and architectural assessments preserve observation,
 evidence, disposition and tracking reference. None-observed and unassessed states need a scoped
 reason. Complete coverage is rejected when required sources are unavailable or capture is partial.
-Typed collector reports expose availability independently of rendered text. Composition rejects
-aggregate dropped counts below observed friction drops and retains larger caller aggregates without
-double counting. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
+Typed collector reports expose availability independently of rendered text. Generated frontmatter carries validated `work_outcome` and `feedback_coverage`
 for consumers to preserve or reject conflicting explicit overrides; trusted mode stays external.
 Human top-five summaries do not authorize dropping additional durable findings.
 
 The `## CI Failures` and `## Sandbox & Permission Audit` sections come from one optional audit
-source; the two inputs are mutually exclusive and supplying both throws before any collector runs.
-`friction: {directory, journalLoader, ...}` keeps reading the session-friction log together with the
-journal and is unchanged. `journal: {journalLoader}` needs no friction directory or log: both
-sections are assessed from the session's journal entries alone, and the report carries
-`coverage.frictionStatus: 'journal-only'` (in place of `empty` or `events`) so the text states that
-no log was observed. `feedbackCoverage.status: 'complete'` accepts either source. It is rejected
-when neither is supplied (the error names the missing source), and a journal-only audit does not
-count as assessed when the loader reports `not-found` (there is no log to establish that the session
-was observed), throws, or is truncated by the scan bounds.
+source, `journal: {journalLoader}`: both sections are assessed from the session's journal entries
+alone, with the text stating `journal entries only`. `feedbackCoverage.status: 'complete'` is
+rejected when no journal source is supplied (the error names the missing source), and a journal
+audit does not count as assessed when the loader reports `not-found` (nothing else establishes that
+the session was observed), throws, or is truncated by the scan bounds.
 
 ```ts
 await composeRetrospective({ ...input, journal: { journalLoader } })
 ```
 
-`journalLoader` is the session-friction `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
+`journalLoader` is a `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
 `JournalEntry`, and `JournalAuditOptions` are exported as types from
-`vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar and its three status
-lines (`failures observed`, `none observed`, `unavailable (<reason>)`) are the same for both sources.
+`vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar has three status
+lines (`failures observed`, `none observed`, `unavailable (<reason>)`).
 Journal-only sandbox and permission entries are journal Markdown entries that hold exactly one
 block, escaped and length-bounded like CI failures, and other entries are ignored:
 
@@ -709,7 +667,7 @@ block, escaped and length-bounded like CI failures, and other entries are ignore
 
 `ambiguous-failure` takes the same shape as `sandbox-failure`. The section reports
 `Status: none observed` or `Status: events observed`, each followed by
-`(journal entries only; no friction log observed)`; a truncated scan reports
+`(journal entries only)`; a truncated scan reports
 `unavailable (journal scan incomplete)` with the entries read so far.
 
 ## Basic Auth exemption facts
