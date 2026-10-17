@@ -1,4 +1,5 @@
 import { basename } from 'node:path'
+import { formatReferenceKey } from '../gh-cli/closing-refs.mts'
 import type { PullRequestInput, RelatedIssue } from './pr-input.mts'
 
 export type PullRequestProvenance = {
@@ -15,7 +16,8 @@ export type PullRequestProvenance = {
 
 function relatedLine(issue: RelatedIssue): string {
   const verb = issue.relation === 'closes' ? 'Closes' : 'Refs'
-  return `- ${verb} #${issue.number} — ${issue.reason}`
+  const [owner, repo] = issue.repository?.split('/') ?? []
+  return `- ${verb} ${formatReferenceKey({ number: issue.number, owner, repo })} — ${issue.reason}`
 }
 
 /** The default no-source statement; a policy `renderNoSourceIssue` export may replace it. */

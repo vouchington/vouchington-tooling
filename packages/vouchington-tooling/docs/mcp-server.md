@@ -286,8 +286,10 @@ shape is an error, never a pass.
 retrospective tools. All three take `sessionId` (required) and `worktree` (optional), need a server
 launched inside a repository worktree (they run the checkout policy), and share this structured
 input: `title` (single line, at most 256 characters), `summary`, `impact`, `relatedIssues`
-(`[{ number, relation: "closes" | "refs", reason }]`, may be empty), optional `noSourceIssue`
-(`{ reason }`, see below), `details` (string array), `base` (default `main`), optional `agent`, optional
+(`[{ number, relation: "closes" | "refs", reason, repository? }]`, may be empty; the optional
+`repository` is a single `owner/name` and renders the line as lowercase `owner/name#N`), optional
+`noSourceIssue` (`{ reason }`, see below), `details` (string array), `base` (default `main`),
+optional `agent`, optional
 `model`, optional `mode` (`interactive` | `autonomous`) and `workspaceSetup`. `pr_update` also
 requires `pr`; `pr_validate` accepts an optional `pr`.
 
@@ -339,7 +341,7 @@ rule) and `pullRequestDefaults`.
 
 ## Related issues
 
-- Closes #N — <reason>      (or "Refs #N"; "- None" when empty;
+- Closes #N — <reason>      (or "Refs #N"; owner/name#N with `repository`; "- None" when empty;
                              "- No source issue — <reason>" for noSourceIssue)
 
 ## Details

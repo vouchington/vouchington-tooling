@@ -13,7 +13,13 @@ const PR_MODES = ['interactive', 'autonomous'] as const
 const RELATIONS = ['closes', 'refs'] as const
 const MAX_TITLE_CHARACTERS = 256
 
-export type RelatedIssue = { number: number; relation: 'closes' | 'refs'; reason: string }
+export type RelatedIssue = {
+  number: number
+  relation: 'closes' | 'refs'
+  reason: string
+  /** `owner/name` of a cross-repository issue (rendered lowercase); absent for this repository. */
+  repository?: string
+}
 
 export type PullRequestInput = {
   title: string
@@ -39,16 +45,29 @@ export function positiveInteger(value: unknown, label: string): number {
   return value
 }
 
+// The owner is a GitHub login: alphanumerics and single hyphens, at most 39 characters.
+const REPOSITORY_RE = /^(?=[^/]{1,39}\/)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\/[\w.-]+$/
+
+function readRepository(issue: Args, label: string): string | undefined {
+  if (issue.repository === undefined) return undefined
+  // Not lowercased here: redaction runs on this value first, and rendering lowercases it.
+  const value = singleLine(issue, 'repository')
+  if (!REPOSITORY_RE.test(value)) throw new Error(`${label} must be a single owner/name`)
+  return value
+}
+
 function readRelatedIssues(args: Args): RelatedIssue[] {
   const value = args.relatedIssues
   if (!Array.isArray(value)) throw new Error('relatedIssues is required and must be an array')
   return value.map((item: unknown, index) => {
     const issue = requireObject(item)
-    rejectUnknown(issue, ['number', 'relation', 'reason'])
+    rejectUnknown(issue, ['number', 'relation', 'reason', 'repository'])
+    const repository = readRepository(issue, `relatedIssues[${index}].repository`)
     return {
       number: positiveInteger(issue.number, `relatedIssues[${index}].number`),
       relation: requiredChoice(issue, 'relation', RELATIONS),
       reason: requiredString(issue, 'reason'),
+      ...(repository === undefined ? {} : { repository }),
     }
   })
 }
