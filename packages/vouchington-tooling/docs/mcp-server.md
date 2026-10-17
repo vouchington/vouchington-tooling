@@ -287,7 +287,7 @@ retrospective tools. All three take `sessionId` (required) and `worktree` (optio
 launched inside a repository worktree (they run the checkout policy), and share this structured
 input: `title` (single line, at most 256 characters), `summary`, `impact`, `relatedIssues`
 (`[{ number, relation: "closes" | "refs", reason, repository? }]`, may be empty; the optional
-`repository` is a single `owner/name`, lowercased, and renders the line as `owner/name#N`), optional
+`repository` is a single `owner/name` and renders the line as lowercase `owner/name#N`), optional
 `noSourceIssue` (`{ reason }`, see below), `details` (string array), `base` (default `main`),
 optional `agent`, optional
 `model`, optional `mode` (`interactive` | `autonomous`) and `workspaceSetup`. `pr_update` also

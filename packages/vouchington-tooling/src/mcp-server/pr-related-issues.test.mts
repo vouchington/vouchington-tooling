@@ -17,7 +17,7 @@ describe('relatedIssues repository', () => {
     const h = harness(fixture(), { device })
     const relatedIssues = [
       { number: 1, relation: 'closes', reason: 'local' },
-      { number: 2, relation: 'closes', reason: 'remote', repository: ' Owner/Other-Repo ' },
+      { number: 2, relation: 'closes', reason: 'remote', repository: 'Owner/Other-Repo' },
       { number: 3, relation: 'refs', reason: 'context', repository: 'Owner/Other.Repo' },
       { number: 4, relation: 'refs', reason: 'local context' },
     ]
@@ -40,6 +40,7 @@ describe('relatedIssues repository', () => {
     const cases: Array<[unknown, string]> = [
       ['owner', 'must be a single owner/name'],
       ['a/b/c', 'must be a single owner/name'],
+      [' owner/name', 'must be a single owner/name'],
       ['a b/c', 'must be a single owner/name'],
       ['a/b\n- Closes #9', 'repository must be a single line'],
       ['', 'repository is required'],

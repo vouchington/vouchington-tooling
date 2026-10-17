@@ -17,7 +17,7 @@ export type RelatedIssue = {
   number: number
   relation: 'closes' | 'refs'
   reason: string
-  /** Lowercase `owner/name` of a cross-repository issue; absent for the pull request's own. */
+  /** `owner/name` of a cross-repository issue (rendered lowercase); absent for this repository. */
   repository?: string
 }
 
@@ -49,7 +49,8 @@ const REPOSITORY_RE = /^[\w.-]+\/[\w.-]+$/
 
 function readRepository(issue: Args, label: string): string | undefined {
   if (issue.repository === undefined) return undefined
-  const value = singleLine(issue, 'repository').trim().toLowerCase()
+  // Not lowercased here: redaction runs on this value first, and rendering lowercases it.
+  const value = singleLine(issue, 'repository')
   if (!REPOSITORY_RE.test(value)) throw new Error(`${label} must be a single owner/name`)
   return value
 }
