@@ -17,11 +17,14 @@ Before publication, verify at action time:
 
 ## Duplicate resolution
 
-Compare the marker and the normalized set of exact source paths on open feedback PRs:
+Compare the marker, the normalized set of exact source paths, and the normalized
+recommendation or root-cause identity on open feedback PRs:
 
 - `duplicate: zero-overlap`: create one feedback issue and one draft PR.
-- `duplicate: exact-match`: reuse the one canonical matching PR and its source issue; create
-  neither.
+- `duplicate: exact-match`: the path set and the recommendation or root-cause identity both match
+  one canonical PR. Reuse that PR and its source issue; create neither.
+- `duplicate: same-paths-new-feedback`: the path set matches but the recommendation differs.
+  Update the canonical PR and its issue with the new feedback; create neither.
 - `duplicate: ambiguous`: fail closed. Any partial overlap, more than one exact match, or any
   uncertain provenance or source set creates nothing.
 

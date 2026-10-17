@@ -208,7 +208,13 @@
       "plugin": "vouchington-workflow",
       "pluginVersion": "0.13.0",
       "path": "triage-prs/SKILL.md",
-      "prerequisites": ["pr-description", "retrospective", "review-ci-logs", "github-issue"]
+      "prerequisites": [
+        "pr-description",
+        "retrospective",
+        "review-ci-logs",
+        "github-issue",
+        "stacked-prs"
+      ]
     },
     {
       "name": "vitest-test-authoring",

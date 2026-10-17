@@ -31,22 +31,27 @@ to ask when one this run needs is missing; never guess a value.
 
 ## Step 1 - Resolve scope
 
-With no argument, target every open PR carrying the adapter's automation label:
+With no argument, target every open PR carrying the adapter's automation label. Exhaust the set:
+use a limit well above the expected count and verify the result count is below it, otherwise raise
+the limit or page with `gh api --paginate` on the search API.
 
 ```bash
-gh pr list --state open --limit 100 --label <automation-label> --json number,title
+gh pr list --state open --limit 1000 --label <automation-label> --json number,title
 ```
 
 PRs opened before the label existed need an explicit one-time backfill with
 `gh pr edit <N> --add-label <automation-label>` before they enter the default scope.
 
-With an argument, interpret it as the scope:
+With an argument, require an explicit selector and stop to ask when a bare argument is ambiguous
+(for example a word that could be an author, a label, or a title):
 
-- Explicit PR numbers: use them directly.
-- Author: `gh pr list --author <login> --state open --limit 100`
-- Label: `gh pr list --label <name> --state open --limit 100`
+- Number or URL: use the PR directly.
+- `author:<login>`: `gh pr list --author <login> --state open --limit 1000`. For a GitHub App
+  (login `app/<slug>`), use `--app <slug>` instead of `--author`.
+- `label:<name>`: `gh pr list --label <name> --state open --limit 1000`
+- `title:<text>`: a literal, case-insensitive substring match, with the text passed as data:
+  `gh pr list --state open --limit 1000 --json number,title | jq --arg t "<text>" '.[] | select(.title | ascii_downcase | contains($t | ascii_downcase))'`
 - `all`: every open PR regardless of author.
-- Title substring: `gh pr list ... | jq 'select(.title | test("<pattern>"; "i"))'`
 
 **Safety: a broad or non-default scope needs confirmation.** The default automation-label query is
 a reliable machine-set signal, so proceed on it directly. For any other scope (`all`, an author, a
@@ -63,7 +68,7 @@ gh pr view <N> --json number,title,isDraft,additions,deletions,changedFiles,stat
 ```
 
 Run one call per PR, or filter one `gh pr list --json ...` result with
-`jq 'select(.number | IN(<N1>,<N2>,...))'` when the set is large.
+`jq '.[] | select(.number | IN(<N1>,<N2>,...))'` when the set is large.
 
 ## Step 3 - Review and steering assessment
 
@@ -71,6 +76,7 @@ Batch the in-scope PRs across up to three parallel read-only agents. Each reads 
 description and full diff, loads [review-ci-logs](../review-ci-logs/SKILL.md) for failing required
 checks, and returns per PR:
 
+- **Head:** the reviewed `headRefOid` (`gh pr view <N> --json headRefOid`)
 - **Decision:** `MERGE` or `CLOSE`
 - **Reason:** a one-line summary
 - **Steering:** (MERGE only) whether the shepherd needs direction, and the exact PR comment body
@@ -83,6 +89,12 @@ Each agent reads with `gh pr view <N>`, `gh pr diff <N>`, and the repository's C
 See [the default rubric](references/rubric.md) for MERGE versus CLOSE, generalizing a narrow
 band-aid before closing it, and the shape of steering comments. The user's session steering
 overrides the rubric, including flipping a green PR to CLOSE; present it as context.
+
+## Step 3b - Exclude feedback duplicates
+
+Before any merge action, resolve [feedback duplicates](references/feedback.md#duplicate-resolution).
+A feedback PR that this run generates or reuses is excluded from Step 4: it is never readied,
+shepherded, armed, or merged in the same run, even if it is in scope with a `MERGE` decision.
 
 ## Step 4 - Execute MERGE
 
@@ -116,6 +128,9 @@ rejected and cannot attest that the remote agent consumed steering or left the b
 
 ## Step 5 - Execute CLOSE
 
+Immediately before closing, re-read `gh pr view <N> --json headRefOid`. If it differs from the
+head recorded in Step 3, re-review or skip the PR; never close an unreviewed head.
+
 ```bash
 gh pr close <N> --delete-branch --comment "Closing: <one-line reason>"
 ```
@@ -124,15 +139,21 @@ Branch auto-deletion is a merge-time repository setting and does not apply to cl
 `--delete-branch` is required. Then check for linked issues:
 
 ```bash
-gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[] | {number, title}'
+gh pr view <N> --json closingIssuesReferences \
+  --jq '.closingIssuesReferences[] | {number, title, url, repository}'
 ```
+
+Keep each reference's repository and URL. Close only issues in the current repository, always with
+an explicit `--repo <owner>/<name>`; skip and report cross-repository targets.
 
 Close a returned issue only if it appears automation-created under the adapter's orphan-issue
 rules. Skip anything that looks human-authored: automation sometimes reuses a human-tracked issue
-by adding `Closes #<N>` to a PR body, and closing it would discard legitimate open work.
+by adding `Closes #<N>` to a PR body, and closing it would discard legitimate open work. Before
+closing, apply the same no-other-open-addressing-PR checks as the
+[orphan procedure](references/orphans.md), excluding the PR just closed.
 
 ```bash
-gh issue close <ISSUE_N> --comment "Closing alongside PR #<N>: <same one-line reason>"
+gh issue close <ISSUE_N> --repo <owner>/<name> --comment "Closing alongside PR #<N>: <same one-line reason>"
 ```
 
 For default-scope runs, also close [orphan automation issues](references/orphans.md).
