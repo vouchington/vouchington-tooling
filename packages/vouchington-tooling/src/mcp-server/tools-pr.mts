@@ -108,7 +108,7 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
     'pr_update',
     "Replaces an open pull request's title and body. " +
       RENDERING +
-      "The pull request's head branch must be the worktree branch. The live Shepherd Journal is " +
+      "The pull request's head must be the worktree branch, or the worktree HEAD must be the pull request's head commit (an alias branch); the live head name is then used. The live Shepherd Journal is " +
       'preserved and nothing else is carried over from the live body. Validation errors block ' +
       'the update. Returns { number, url, warnings }.',
     openWorld(MUTATING),

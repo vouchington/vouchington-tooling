@@ -369,8 +369,10 @@ with the repository's stack tooling instead.
   and `project`. It checks the head is pushed and current, writes the body to a mode 0600 temp file
   (removed afterwards) and runs `gh pr create --draft` with the labels, `--milestone` and
   `--project`. Returns `{ number, url, warnings }`.
-- `pr_update` (mutating): reads `gh pr view <pr> --json body,headRefName,baseRefName,state`,
-  rejects a pull request that is not `OPEN` or whose head is not the worktree branch, and validates
+- `pr_update` (mutating): reads `gh pr view <pr> --json body,headRefName,headRefOid,baseRefName,state`,
+  rejects a pull request that is not `OPEN` or whose head is neither the worktree branch nor the
+  worktree `HEAD` commit (an alias branch at the live head SHA is accepted and the live head name is
+  used), and validates
   against the live base (an explicit `base` must equal it). It renders, appends the live Shepherd
   Journal (a `<details><summary>Shepherd Journal</summary>` block, or a legacy `## Shepherd Journal`
   section to the next H2 or the end; examples in fenced code blocks are ignored), validates with

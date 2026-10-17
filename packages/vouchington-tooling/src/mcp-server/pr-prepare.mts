@@ -11,6 +11,7 @@ import { checkTitleLength, readPullRequestInput, type PullRequestInput } from '.
 import { preserveShepherdJournal } from './pr-journal.mts'
 import {
   credentials,
+  type LivePullRequest,
   liveBase,
   livePullRequest,
   readLivePullRequest,
@@ -73,6 +74,28 @@ async function liveFor(kind: PrepareKind, context: ToolContext, pr: number | und
     : readLivePullRequest(ghIn(context), pr)
 }
 
+/**
+ * The head to validate. An update accepts the worktree branch, or an alias branch whose HEAD is
+ * the live head commit, and then uses the live head name; anything else is rejected.
+ */
+async function headFor(
+  kind: PrepareKind,
+  git: RunTextCommand,
+  live: LivePullRequest | undefined,
+  pr: number | undefined,
+  worktreeHead: string | undefined,
+): Promise<string> {
+  if (worktreeHead === undefined) return (live as LivePullRequest).headRefName
+  if (live === undefined || kind !== 'update' || live.headRefName === worktreeHead)
+    return worktreeHead
+  const sha = (await git(['rev-parse', 'HEAD'])).trim()
+  if (sha !== live.headRefOid)
+    throw new Error(
+      `pull request ${pr} has head ${live.headRefName} at ${live.headRefOid}, not the worktree branch ${worktreeHead} at ${sha}`,
+    )
+  return live.headRefName
+}
+
 /** Renders the body, preserves the live journal for an update, and runs the policy validator. */
 export async function prepare(
   args: Args,
@@ -91,16 +114,15 @@ export async function prepare(
   // A read-only validation of an existing pull request judges the head that pull request has.
   const worktreeHead =
     live !== undefined && kind === 'validate' ? undefined : await currentBranch(git)
-  const head = worktreeHead ?? (live as { headRefName: string }).headRefName
+  // The local branch is checked before any diagnostic or alias resolution can echo or drop it.
+  if (worktreeHead !== undefined && secrets.some((secret) => worktreeHead.includes(secret)))
+    throw new Error('the worktree branch name contains a server credential: rename the branch')
+  const head = await headFor(kind, git, live, pr, worktreeHead)
   // Branch names are refs passed to gh as is: redacting one would name a branch that does not exist.
   if (secrets.some((secret) => head.includes(secret)))
     throw new Error('the worktree branch name contains a server credential: rename the branch')
   if (secrets.some((secret) => (args.base as string | undefined)?.includes(secret)))
     throw new Error('base contains a server credential: use another base branch')
-  if (live !== undefined && kind === 'update' && live.headRefName !== head)
-    throw new Error(
-      `pull request ${pr} has head ${live.headRefName}, not the worktree branch ${head}`,
-    )
   const base =
     live === undefined
       ? given.base

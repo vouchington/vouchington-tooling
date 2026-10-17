@@ -4,11 +4,12 @@ import { findShepherdJournal } from './pr-journal.mts'
 export type LivePullRequest = {
   body: string
   headRefName: string
+  headRefOid: string
   baseRefName: string
   state: string
 }
 
-const FIELDS = ['body', 'headRefName', 'baseRefName', 'state'] as const
+const FIELDS = ['body', 'headRefName', 'headRefOid', 'baseRefName', 'state'] as const
 
 /** The live pull request as gh reports it, whatever its state. */
 export async function readLivePullRequest(
