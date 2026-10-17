@@ -40,7 +40,7 @@ const BODY = [
   'First paragraph.\n\n- a bullet',
   '',
   'Workspace setup: fresh worktree',
-  'Agent: codex session native:owner',
+  'Agent: unknown (caller-claimed agent: codex) session native:owner',
   'Device: Jong@laptop.local',
   'Worktree: linked',
   '',
@@ -89,7 +89,9 @@ describe('pr_validate', () => {
       ),
     )
     expect(result.body).toContain('- Refs #3 — context')
-    expect(result.body).toContain('Agent: codex (opus) session native:owner')
+    expect(result.body).toContain(
+      'Agent: unknown (caller-claimed agent: codex; caller-claimed model: opus) session native:owner',
+    )
     expect(result.body).toContain('Worktree: main')
     const none = jsonOf(await h.call('pr_validate', args({ relatedIssues: [] })))
     expect(none.body).toContain('## Related issues\n\n- None\n')

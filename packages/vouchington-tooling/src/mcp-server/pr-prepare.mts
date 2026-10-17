@@ -4,6 +4,7 @@ import type { RunTextCommand } from '../gh-cli/exec.mts'
 import type { Args } from './args.mts'
 import { assertPolicyAllowed, type ToolContext } from './context.mts'
 import type { PolicyRun } from './policy-run.mts'
+import { agentLabel, deriveAgent } from './pr-agent.mts'
 import { renderPullRequestBody, worktreeLabel } from './pr-body.mts'
 import { createGhRunner, ghEnvironment } from './pr-gh.mts'
 import { checkTitleLength, readPullRequestInput, type PullRequestInput } from './pr-input.mts'
@@ -112,7 +113,12 @@ export async function prepare(
   const statement = await noSourceStatement(policyFor(context), input)
   let body = renderPullRequestBody(
     input,
-    { sessionId: context.sessionId, ...device, worktree: await label(context, git) },
+    {
+      sessionId: context.sessionId,
+      ...device,
+      worktree: await label(context, git),
+      agent: agentLabel(deriveAgent(context.env, context.clientName?.()), input.agent, input.model),
+    },
     statement,
   )
   if (live !== undefined) body = preserveShepherdJournal(body, live.body)

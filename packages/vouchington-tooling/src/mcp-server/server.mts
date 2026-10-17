@@ -25,6 +25,7 @@ export function createMcpServer(
   version: string,
 ): McpServer {
   const mcp = new sdk.McpServer({ name: SERVER_NAME, version }, { instructions: INSTRUCTIONS })
+  environment.clientName ??= () => mcp.server.getClientVersion()?.name
   mcp.server.registerCapabilities({ tools: {} })
   mcp.server.setRequestHandler(sdk.ListToolsRequestSchema, async () => ({ tools: [...TOOLS] }))
   mcp.server.setRequestHandler(sdk.CallToolRequestSchema, async (request) =>

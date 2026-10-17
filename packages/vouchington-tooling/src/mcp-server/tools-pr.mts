@@ -52,8 +52,16 @@ const FIELDS: Record<string, JsonSchema> = {
     description: 'Markdown paragraphs or bullets, joined by blank lines.',
   },
   base: { type: 'string', minLength: 1, description: 'Base branch. Default: main.' },
-  agent: text('Agent name for the Agent line.'),
-  model: text('Optional model name, rendered in parentheses after the agent.'),
+  agent: text(
+    'Optional, and never trusted. The server derives the Agent line from its own launch ' +
+      'environment (harness markers) and the MCP client name; a value that does not name the ' +
+      'derived agent is rendered as "caller-claimed", and with nothing derivable the agent is ' +
+      '"unknown".',
+  ),
+  model: text(
+    'Optional, and never trusted. The server cannot derive the model, so it is rendered as ' +
+      '"caller-claimed model: <model>" in parentheses after the agent.',
+  ),
   mode: {
     enum: ['interactive', 'autonomous'],
     description:
@@ -63,15 +71,7 @@ const FIELDS: Record<string, JsonSchema> = {
   },
   workspaceSetup: text('Text for the Workspace setup line, such as how the worktree was prepared.'),
 }
-const REQUIRED = [
-  'title',
-  'summary',
-  'impact',
-  'relatedIssues',
-  'details',
-  'agent',
-  'workspaceSetup',
-]
+const REQUIRED = ['title', 'summary', 'impact', 'relatedIssues', 'details', 'workspaceSetup']
 
 const RENDERING =
   'The server renders the body from the structured input (Summary, Impact, Related issues, ' +

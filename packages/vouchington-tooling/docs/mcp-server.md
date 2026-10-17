@@ -287,7 +287,7 @@ retrospective tools. All three take `sessionId` (required) and `worktree` (optio
 launched inside a repository worktree (they run the checkout policy), and share this structured
 input: `title` (single line, at most 256 characters), `summary`, `impact`, `relatedIssues`
 (`[{ number, relation: "closes" | "refs", reason }]`, may be empty), optional `noSourceIssue`
-(`{ reason }`, see below), `details` (string array), `base` (default `main`), `agent`, optional
+(`{ reason }`, see below), `details` (string array), `base` (default `main`), optional `agent`, optional
 `model`, optional `mode` (`interactive` | `autonomous`) and `workspaceSetup`. `pr_update` also
 requires `pr`; `pr_validate` accepts an optional `pr`.
 
@@ -304,6 +304,18 @@ which was exactly `GITHUB_ACTIONS === 'true' || CI === 'true'`. Otherwise the mo
 argument can only narrow `interactive` to `autonomous` (it never widens), so an autonomous run
 cannot unlock an interactive-only policy exception. The policy child receives no env markers, so it
 relies on this value.
+
+### Agent provenance
+
+The `Agent:` line is derived by the server, never taken from the caller. The agent is the harness
+that launched the server: `CODEX_THREAD_ID` (codex), `CLAUDECODE=1` or `CLAUDE_CODE_SESSION_ID`
+(claude), `CURSOR_AGENT` or `CURSOR_SESSION_ID` (cursor), `GROK_AGENT`, `GROK_HOOK_EVENT` or
+`GROK_SESSION_ID` (grok), in that order; failing those, the MCP client's `initialize`
+`clientInfo.name` when it contains one of those names. The server has no source for the model.
+`agent` is optional: a value naming the derived agent is ignored, any other value is rendered as
+`(caller-claimed agent: <value>)`, and `model` as `(caller-claimed model: <value>)`. When no agent
+is derivable the line says `unknown`. Making `agent` optional is compatible with existing callers,
+which may keep sending it.
 
 ### Pull requests with no source issue
 
@@ -335,7 +347,7 @@ rule) and `pullRequestDefaults`.
 <details joined by blank lines>
 
 Workspace setup: <workspaceSetup>
-Agent: <agent>[ (<model>)] session <sessionId>
+Agent: <derived agent | unknown>[ (caller-claimed ...)] session <sessionId>
 Device: <os user>@<lowercased hostname>
 Worktree: <path after "/worktrees/", "main" for the main worktree, else the directory name>
 ```

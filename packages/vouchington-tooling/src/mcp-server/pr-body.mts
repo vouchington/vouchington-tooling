@@ -9,6 +9,8 @@ export type PullRequestProvenance = {
   host: string
   /** The checkout label, see {@link worktreeLabel}. */
   worktree: string
+  /** The Agent line text before the session, see `agentLabel`. */
+  agent: string
 }
 
 function relatedLine(issue: RelatedIssue): string {
@@ -39,7 +41,6 @@ export function renderPullRequestBody(
           ? '- None'
           : (noSourceStatement ?? defaultNoSourceStatement(input.noSourceIssue.reason)),
       ]
-  const agent = input.model === undefined ? input.agent : `${input.agent} (${input.model})`
   return [
     '## Summary',
     '',
@@ -58,7 +59,7 @@ export function renderPullRequestBody(
     input.details.join('\n\n'),
     '',
     `Workspace setup: ${input.workspaceSetup}`,
-    `Agent: ${agent} session ${provenance.sessionId}`,
+    `Agent: ${provenance.agent} session ${provenance.sessionId}`,
     `Device: ${provenance.user}@${provenance.host.toLowerCase()}`,
     `Worktree: ${provenance.worktree}`,
     '',
