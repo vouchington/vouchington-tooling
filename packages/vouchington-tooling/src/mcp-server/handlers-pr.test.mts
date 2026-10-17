@@ -20,7 +20,14 @@ const args = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-const LIVE = { body: 'x', headRefName: 'linked', baseRefName: 'trunk', state: 'OPEN' }
+const SHA = '0'.repeat(40)
+const LIVE = {
+  body: 'x',
+  headRefName: 'linked',
+  headRefOid: SHA,
+  baseRefName: 'trunk',
+  state: 'OPEN',
+}
 
 const BODY = [
   '## Summary',
@@ -119,7 +126,7 @@ describe('pr_validate', () => {
     expect(result.body).toBe(`${BODY}\n${journal}\n`)
     expect(p.requests[0]!.input).toMatchObject({ pr: 5 })
     expect(gh.calls.map((call) => call.args)).toEqual([
-      ['pr', 'view', '5', '--json', 'body,headRefName,baseRefName,state'],
+      ['pr', 'view', '5', '--json', 'body,headRefName,headRefOid,baseRefName,state'],
     ])
   })
 
@@ -129,7 +136,7 @@ describe('pr_validate', () => {
       const gh = join(bin, 'gh')
       writeFileSync(
         gh,
-        `#!/bin/sh\necho '{"body":"live body","headRefName":"linked","baseRefName":"trunk","state":"OPEN"}'\n`,
+        `#!/bin/sh\necho '{"body":"live body","headRefName":"linked","headRefOid":"abc","baseRefName":"trunk","state":"OPEN"}'\n`,
       )
       chmodSync(gh, 0o755)
       const h = harness(fixture(), { device, env: { PATH: bin } })
@@ -143,11 +150,11 @@ describe('pr_validate', () => {
   it('rejects an unusable view of the live pull request', async () => {
     const broken = harness(fixture(), { runGh: fakeGh({ view: { body: 1 } }).runGh, device })
     expect(textOf(await broken.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return body, headRefName, baseRefName, state',
+      'did not return body, headRefName, headRefOid, baseRefName, state',
     )
     const empty = harness(fixture(), { runGh: fakeGh({ view: null }).runGh, device })
     expect(textOf(await empty.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return body, headRefName, baseRefName, state',
+      'did not return body, headRefName, headRefOid, baseRefName, state',
     )
   })
 

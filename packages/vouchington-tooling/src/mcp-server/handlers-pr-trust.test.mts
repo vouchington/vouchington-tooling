@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { harness, jsonOf, textOf, useRepoFixture } from './harness.test-helpers.mts'
 import {
@@ -17,7 +18,14 @@ const args = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-const LIVE = { body: 'x', headRefName: 'linked', baseRefName: 'trunk', state: 'OPEN' }
+const SHA = '0'.repeat(40)
+const LIVE = {
+  body: 'x',
+  headRefName: 'linked',
+  headRefOid: SHA,
+  baseRefName: 'trunk',
+  state: 'OPEN',
+}
 
 async function modeSeen(env: NodeJS.ProcessEnv, extra: Record<string, unknown>) {
   declarePolicy(fixture())
@@ -198,7 +206,19 @@ describe('pr_validate is read-only', () => {
       device,
     })
     expect(textOf(await other.call('pr_update', args({ pr: 5 })))).toContain(
-      'pull request 5 has head other, not the worktree branch linked',
+      `pull request 5 has head other at ${SHA}, not the worktree branch linked at`,
     )
+  })
+
+  it('accepts an alias branch at the live head commit and uses the live head name', async () => {
+    declarePolicy(fixture())
+    const oid = execFileSync('git', ['-C', fixture().linked, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim()
+    const p = policy(() => ({ errors: [] }))
+    const gh = fakeGh({ view: { ...LIVE, headRefName: 'upstream-name', headRefOid: oid } })
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device })
+    jsonOf(await h.call('pr_update', args({ pr: 5 })))
+    expect(p.requests[0]!.input).toMatchObject({ head: 'upstream-name', pr: 5 })
   })
 })
