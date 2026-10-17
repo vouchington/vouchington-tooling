@@ -34,7 +34,7 @@ Commands:
   materialize-pr-context        Dump PR title/body/files/diff/comments and #N crawl
   wait-for-apt-locks            Wait until apt/dpkg lock files are free
   install-playwright-chromium-arm64  Install Playwright Chromium from browsers.json
-  ghcr-package-retention        Delete old GHCR package versions past KEEP_MIN
+  ghcr-package-retention        Delete old GHCR package versions (KEEP_MIN or --main-history)
   harness-admission-lane        Compute a GITHUB_RUN_ID admission lane for fleet fan-out
   harness-assert-gates          Fail if any named HARNESS_*_ENABLED gate is enabled
   gha-collaborator-trust        Classify authors as write-access collaborators or not
@@ -106,7 +106,7 @@ lint-links [--offline] [--config PATH] [--glob PATTERN] [files...]
 materialize-pr-context
 wait-for-apt-locks
 install-playwright-chromium-arm64 [name:archive...]
-ghcr-package-retention <url-encoded-package>...
+ghcr-package-retention [--main-history] [--apply|--dry-run] [<url-encoded-package>...]
 harness-admission-lane <lanes>
 harness-assert-gates <gate>...
 gha-collaborator-trust <owner/repo> [--allow-bot <login>]... < authors.json
