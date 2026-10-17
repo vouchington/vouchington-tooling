@@ -17,19 +17,27 @@ afterEach(() => {
 })
 
 const sha = (n: number) => String(n).padStart(40, '0')
+const digest = (n: number) => `sha256:${String(n).padStart(64, '0')}`
 const old = '2020-01-01T00:00:00Z'
 const days = (n: number) =>
   new Date(Date.now() - n * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z')
 
 interface Version {
   id: number
+  name: string
   created_at: string
   updated_at: string
   metadata: { container: { tags: string[] } }
 }
 
 function version(id: number, tags: string[], created = old, updated = created): Version {
-  return { id, created_at: created, updated_at: updated, metadata: { container: { tags } } }
+  return {
+    id,
+    name: digest(id),
+    created_at: created,
+    updated_at: updated,
+    metadata: { container: { tags } },
+  }
 }
 
 function shell(cwd: string, command: string, args: string[]) {
@@ -37,7 +45,12 @@ function shell(cwd: string, command: string, args: string[]) {
   expect(result.status).toBe(0)
 }
 
-function setup(pages: Record<string, Version[] | string>, commits = 3, shallow = false) {
+function setup(
+  pages: Record<string, Version[] | string>,
+  commits = 3,
+  shallow = false,
+  registry: Record<string, unknown> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'ghcr-history-'))
   temporaryDirectories.push(root)
   const repository = join(root, 'repo')
@@ -68,10 +81,15 @@ function setup(pages: Record<string, Version[] | string>, commits = 3, shallow =
   const deletes = join(root, 'deletes')
   writeFileSync(deletes, '')
   writeFileSync(join(root, 'pages.json'), JSON.stringify(pages))
+  writeFileSync(join(root, 'registry.json'), JSON.stringify(registry))
+  const fetches = join(root, 'fetches')
+  writeFileSync(fetches, '')
   writeFileSync(
     join(bin, 'gh'),
     `#!/usr/bin/env bash
 set -euo pipefail
+if [ "$1" = auth ]; then [ -z "\${FAKE_NO_AUTH:-}" ] || exit 1; echo test-token; exit 0; fi
+if [ "$1" = api ] && [ "$2" = user ]; then echo octocat; exit 0; fi
 if [ "$1" = api ] && [ "$2" = --method ]; then
   echo "$4" >> "${deletes}"
   exit 0
@@ -84,15 +102,55 @@ jq -r --arg package "$package" '.[$package] | if type == "string" then . else "[
 `,
   )
   chmodSync(join(bin, 'gh'), 0o755)
-  return { repository, bin, deletes, revisions }
+  writeFileSync(
+    join(bin, 'curl'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+config=$(cat)
+url=\${!#}
+key=$(basename "$url")
+case "$url" in
+  */token\\?*)
+    key=__token
+    case "$config" in
+      'user = "'*:*'"') echo "$url basic-user=\${config%%:*}" >> "${fetches}" ;;
+      *) echo 'token request without basic auth' >&2; exit 22 ;;
+    esac
+    default='{"token":"reg-token"}'
+    ;;
+  *)
+    case "$config" in
+      *'Bearer reg-token'*) echo "$url" >> "${fetches}" ;;
+      *) echo 'manifest request without the exchanged bearer token' >&2; exit 22 ;;
+    esac
+    default='{}'
+    ;;
+esac
+out="${join(root, 'manifest.out')}"
+jq -e --arg key "$key" --argjson default "$default" '.[$key] // $default' "${join(root, 'registry.json')}" > "$out"
+if jq -e 'type == "string"' "$out" > /dev/null; then
+  case "$(jq -r . "$out")" in
+    RAW:*) jq -r . "$out" | cut -c5- ;;
+    *) jq -r . "$out" >&2; exit 22 ;;
+  esac
+  exit 0
+fi
+cat "$out"
+`,
+  )
+  chmodSync(join(bin, 'curl'), 0o755)
+  return { repository, bin, deletes, fetches, revisions }
 }
+
+// Ambient CI variables the scripts read, which must not leak into a test unless it sets them.
+const ambient = /^(GH_TOKEN|GITHUB_TOKEN|GITHUB_REPOSITORY_OWNER|GHCR_.*|KEEP_MIN|PROTECTED_.*)$/
 
 function run(context: ReturnType<typeof setup>, args: string[], extraEnv: NodeJS.ProcessEnv = {}) {
   return spawnSync('bash', [script, '--main-history', ...args], {
     cwd: context.repository,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !ambient.test(name))),
       PATH: `${context.bin}:${process.env.PATH ?? ''}`,
       GHCR_OWNER_TYPE: 'org',
       GHCR_OWNER: 'acme',
@@ -172,5 +230,123 @@ describe('ghcr-package-retention --main-history', { timeout: 60_000 }, () => {
     expect(run(context, ['--bogus']).stderr).toContain('unknown argument')
     const shallow = setup({ api: [] }, 2, true)
     expect(run(shallow, ['api']).stderr).toContain('full main history')
+  })
+
+  describe('referenced manifests', () => {
+    // 1 is the old main image, 2 the kept one; 10 and 11 are its platform manifests, 12 is
+    // referenced as a subject, and 13 is a true orphan. All attachments predate the kept image.
+    const index = {
+      [digest(2)]: { manifests: [{ digest: digest(10) }, { digest: digest(11) }] },
+      [digest(10)]: { subject: { digest: digest(12) } },
+    }
+
+    function prepare(
+      pages: string,
+      registry: Record<string, unknown> = index,
+    ): ReturnType<typeof setup> {
+      const context = setup({ [pages]: [] }, 3, false, registry)
+      const [first, second] = context.revisions as [string, string, string]
+      writeFileSync(
+        join(context.bin, '..', 'pages.json'),
+        JSON.stringify({
+          [pages]: [
+            version(1, [`sha-${first}`], days(30)),
+            version(2, [`sha-${second}`], days(20)),
+            version(10, [], days(60)),
+            version(11, [], days(60)),
+            version(12, ['sha256-abc'], days(60)),
+            version(13, [], days(60)),
+          ],
+        }),
+      )
+      return context
+    }
+
+    it('keeps platform manifests and subjects of a kept index but deletes true orphans', () => {
+      const context = prepare('api')
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(0)
+      expect(deleted(context)).toEqual([
+        'orgs/acme/packages/container/api/versions/1',
+        'orgs/acme/packages/container/api/versions/13',
+      ])
+      expect(readFileSync(context.fetches, 'utf8')).toContain(
+        `https://ghcr.io/v2/acme/api/manifests/${digest(10)}`,
+      )
+    })
+
+    it('reports the same plan in a dry run without deleting', () => {
+      const context = prepare('api')
+      const result = run(context, ['api'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.stdout).toContain('would delete 13 <untagged> (orphan)')
+      expect(result.stdout).not.toMatch(/delete 1[012] /)
+      expect(result.stdout).toContain('Dry run: 2 version(s) would be deleted.')
+      expect(deleted(context)).toEqual([])
+    })
+
+    it('exchanges the token once per package and uses the owner env for user packages', () => {
+      const context = prepare('team%2Fapi')
+      const result = run(context, ['team%2Fapi'], {
+        GHCR_KEEP_MAIN: '1',
+        GHCR_OWNER_TYPE: 'user',
+        GHCR_OWNER: '',
+        GITHUB_REPOSITORY_OWNER: 'octocat',
+        GH_TOKEN: 'secret',
+      })
+      expect(result.status).toBe(0)
+      const fetched = readFileSync(context.fetches, 'utf8')
+      expect(fetched).toContain('/v2/octocat/team/api/manifests/')
+      expect(fetched.match(/\/token\?scope=repository:octocat\/team\/api:pull/g)).toHaveLength(1)
+      expect(fetched).toContain('basic-user=user = "octocat')
+      expect(fetched).not.toContain('secret')
+    })
+
+    it('requires an owner', () => {
+      const context = prepare('api')
+      const result = run(context, ['api'], { GHCR_OWNER_TYPE: 'user', GHCR_OWNER: '' })
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('::error::ghcr-package-retention: GHCR_OWNER is required')
+    })
+
+    it('deletes nothing when the token exchange fails or has no token', () => {
+      for (const token of ['HTTP 401', { nothing: true }]) {
+        const context = prepare('api', { __token: token })
+        const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+        expect(result.status).toBe(1)
+        expect(result.stderr).toMatch(/Could not get a registry token|had no token/)
+        expect(deleted(context)).toEqual([])
+      }
+    })
+
+    it('falls back to gh auth token and fails when there is none', () => {
+      const context = prepare('api')
+      expect(
+        run(context, ['api'], { GHCR_KEEP_MAIN: '1', GH_TOKEN: '', GITHUB_TOKEN: '' }).status,
+      ).toBe(0)
+      const result = run(context, ['api'], {
+        GHCR_KEEP_MAIN: '1',
+        GH_TOKEN: '',
+        GITHUB_TOKEN: '',
+        FAKE_NO_AUTH: '1',
+      })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('gh auth token failed')
+    })
+
+    it('deletes nothing when a kept manifest is malformed JSON', () => {
+      const context = prepare('api', { [digest(2)]: 'RAW:{not json' })
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('::error::Could not parse manifest')
+      expect(deleted(context)).toEqual([])
+    })
+
+    it('deletes nothing when a kept manifest cannot be read', () => {
+      const context = prepare('api', { [digest(2)]: 'HTTP 500' })
+      const result = run(context, ['api', '--apply'], { GHCR_KEEP_MAIN: '1' })
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('::error::Could not read manifest')
+      expect(deleted(context)).toEqual([])
+    })
   })
 })
