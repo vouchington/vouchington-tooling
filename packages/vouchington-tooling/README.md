@@ -474,6 +474,154 @@ audit finishes, when the process receives SIGINT, SIGTERM, or SIGHUP, and on the
 previous process died first, including SIGKILL. Each workspace records its owner's PID so a later
 audit can delete directories whose owner is gone.
 
+The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
+boundaries. Neutral review posting lives in `gha-post-review` and requires a caller-supplied GitHub
+token. Claude App OIDC is an explicitly selected `gha-claude-post-review` adapter; the legacy
+token-source router remains deprecated for one release line.
+
+`vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
+filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw
+native frame symbols. Both structured reads and text rendering have hard report-count limits.
+
+Fork diagnostics use a caller-selected `recordDirectory` in both the worker setup file and the
+main-process reporter. Call `registerForkExitSentinel({ recordDirectory })` once per fork, then
+update `setCurrentForkExitModule` and `setCurrentForkExitProject` around tests. Construct
+`createVitestWorkerExitDiagnosticsReporter({ recordDirectory })` in the Vitest reporter list
+before workers start. The reporter clears stale records at construction, preserves them across
+watch reruns, and prints an attribution summary only for abnormal worker exits. The worker writes
+a synchronous stderr line and one JSONL file per PID; a start record without an exit record
+identifies a fork killed before its handler could run. `createForkLeakDetector` accepts tracked
+resource names and warmup, threshold, and sustained-growth settings; the caller supplies each
+checkpoint's resource counts. Use a caller-owned run directory: the reporter clears only regular
+numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
+Application metrics and CI artifact handling stay with the caller.
+
+`browser-session-runner` supervises caller-created browser-test processes. Callers supply command
+construction, line classification, retry/outcome policy, and budgets; the library owns process-group
+termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
+The returned process must identify a dedicated process group, such as a child spawned with
+`detached: true`; its `processGroupId` is signalled without assuming the child PID is a group ID.
+Stall exits use the caller's `classifyExit` policy, while parent signals and shared-deadline expiration
+are terminal. Output is decoded independently per stream; unfinished lines are classified at close and
+`diagnosticTailBytes` retains a UTF-8-safe tail no larger than its byte budget.
+The runner uses monotonic elapsed time, rejects timer budgets above Node's maximum delay, and waits for
+the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.
+`isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
+process-group probe and bounded-drain semantics outside a browser session.
+
+### Generated arbiter input
+
+The `pg-schema-snapshot` export also provides `projectGeneratedArbiterInput(conflict)` for
+`PostgresSqlConflict` facts from `no-mistakes@0.83.0` or newer. It projects normalized key and
+partial-predicate column identities, ordered assignment columns, direct non-EXCLUDED references,
+and assignment indirection. Named constraints and unresolved expression keys have undefined
+`keyColumns`; missing or incomplete expression coverage sets `complete` to false. Callers must
+reject incomplete projections and retain their own snapshot-dependent replay verdict. The adapter
+loads no optional parser peer at runtime and implements no replay-safety policy. Its public
+`GeneratedArbiterConflict` contract is structural, so importing snapshot declarations does not
+require the optional peer either.
+
+### Contract schema type queries
+
+`getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
+`contract-schema` subpath. Every request must also pass `typescript`, the same TypeScript compiler
+API instance that created that `Program`. The source-file recognition check is a compatibility
+guard, and callers remain responsible for pairing the same compiler instance; the query uses the
+supplied API for compiler operations. Pass the exact `SourceFile.fileName`, an exported name or exact call
+expression text, and only the property names and exported comparison types the consumer needs.
+Facts include the displayed type, whether it is `any`, requested property displays, and requested
+assignability booleans. `defaultTypeParameterIndex` selects an exported generic default;
+direct defaults and direct references to preceding defaults are supported. Dependent composite
+defaults and uninstantiated generic type declarations used as assignability targets fail with an
+instruction to export and select a named instantiated type. Generic function values remain valid
+compiler-backed comparison targets. Default lookup uses an outer class, interface, or type-alias
+parameter list when present; otherwise it uses the first checker-visible call or construct
+signature, never a hidden implementation or a later overload.
+`rowSource: 'typeArgument'` selects a call's explicit type argument, while
+`rowSource: 'awaitedRows'` selects `Awaited<ReturnType>.rows[number]`.
+Call results are source ordered and include one-based line and column. An absent call returns an
+empty array so the consumer can enforce its own cardinality; a selected call missing its requested
+row type fails with a descriptive error. The package does not choose source files, expected
+properties, or contract policy.
+
+## Workflow skills outside plugins
+
+The package ships a flat union of canonical workflow, testing, and database skills at
+`skills/<skill>/SKILL.md`. This stable installed path supports agents that do not load Claude or
+Codex plugins. The package build materializes plugin source trees without hand-copying skill content
+and writes sorted schema-v1 provenance to `skills/manifest.json`.
+Each manifest entry may declare its ordered `prerequisites`; ordinary Markdown links remain
+cross-references and never cause additional skills to be linked.
+Prerequisites ensure installation closure; they do not require eagerly reading every installed
+skill. Follow the invoked skill's conditional instructions for the current task.
+
+Canonical entrypoints direct agents to applicable local instructions and adapters before using
+portable policy. Local `AGENTS.md` may name an adapter alias; an already-read canonical skill or
+adapter is not loaded again. `linkSkill` still links files only: it does not load instructions,
+resolve local aliases, or execute a workflow. Validate observed agent loading separately from
+installation and packaged-resource checks.
+
+Use `readSkillManifest(skillsRoot)` to discover installed skills or
+`linkSkill({ name, sourceRoot, targetRoot })` to link one into an explicit consumer directory. The
+CLI equivalent is `vouchington link-skill <name> --source-root <skills-dir> --target-root <dir>`.
+When `sourceRoot` contains `manifest.json`, linking validates the packaged inventory and recursively
+links declared prerequisites. Without a manifest, it links the conventional
+`<sourceRoot>/<name>/SKILL.md` repository-local skill. It rejects missing or unsafe sources, paths
+outside either root, and existing non-matching destinations.
+`targetRoot` must already exist as a physical directory path: symlinked target roots or ancestors are
+rejected.
+
+## Validated feedback and delivery
+
+Import `createFeedbackEnvelope`, `validateFeedbackEnvelope`, `writeFeedback`, `verifyFreshFeedback`,
+`composeRetrospective`, `feedbackOutboxStatus`, and `flushFeedbackOutbox` from the existing
+`vouchington-tooling/agent-blackboard` subpath. Consumers must run Node 24 or newer and install `agent-blackboard@^0.6.0` explicitly alongside
+`vouchington-tooling`; the provider is not installed by this package. Missing provider installation
+returns `client-unavailable`; missing or invalid connection configuration returns
+`configuration-invalid`, separately from transport outages and authentication rejection.
+The upstream `agent-blackboard` client still owns the
+service protocol; this integration adds no provider schema or service. Supply consumer module
+context through `dependencies.resolveFrom` or inject the client loader at the transport boundary.
+
+The version-one envelope retains canonical `markdown` and storage `type: journal | retrospective`.
+It requires exact canonical repositories, stable URL-safe `sourceEventId`, ISO timestamp, explicit
+`workOutcome`, and `feedbackCoverage` with status, sources, and dropped count. Optional category is
+context only. Retrospectives retain valid date and integer/string issue/PR references. Markdown is
+capped at 12 KB and the envelope at 16 KB. Known credentials are redacted; authors remain responsible
+for minimizing summaries and excluding raw logs, transcripts, environment dumps, and undisclosed
+secrets. A bound violation fails visibly without clipping findings.
+
+`writeFeedback({identity, envelope, mode, ...})` accepts an exact caller-owned session identity and
+never manufactures native agent identities. Interactive mode requires an absolute outbox
+directory. Ancestor ownership and permissions are not checked; existing directory and record modes
+are accepted. New directories and files default to `0700` and `0600`. The outbox itself must be a
+real directory, and records must be regular files. The writer persists before transport with atomic
+rename, file/directory fsync, and a stable record path. The outbox holds at most 128 records and 2 MB. Saturation,
+corruption, or persistence failure blocks capture and preserves unsent records. Delivered records
+are removed only after matching readback. Pending state includes count and a safe diagnostic;
+interactive CLI exit zero means durable retention, and callers must inspect the printed status to
+know whether delivery was acknowledged. Autonomous errors and unpersisted writes fail nonzero.
+Identity, content, and archived-session conflicts fail in either mode while preserving the unsent
+record; they are not reported as transient pending delivery. Replay retains permanently conflicted
+records and continues to deliver unrelated pending records; transient failures stop that replay.
+Verified delivery retains its receipt when local cleanup fails, returning
+`cleanupDiagnostic` with value `"outbox-cleanup-failed"`. A retained or crash-reappearing record is
+safe to replay: an event is identified by session, `sourceEventId`, and content, and a duplicate that
+differs only in `timestamp` is the same event, so it reports the stored record's `timestamp` and
+receipt and the retained duplicate is removed.
+Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
+records after connectivity returns.
+
+Autonomous mode prohibits the filesystem outbox. `verifyFreshFeedback` requires a fresh source-event
+write plus readback of its own append receipt and rejects visible duplicate source records. This
+is fresh online reporting evidence, not a distributed execution lease: eventually consistent
+provider reads cannot establish source uniqueness. Trusted controllers
+supply a unique new authorization-probe source ID, preserve their authoritative run/session
+lineage, and atomically claim and revalidate the attempt before execution. Terminal writes keep work outcome separate from coverage and returned delivery state.
+The delivered result includes a verified receipt with session ID, source-event ID and creation time.
+Controllers require this online result together with atomically established attempt ownership
+before execution.
+
 Delivery is at least once. Replays pre-read matching source identity/content, accept equivalent
 persistent duplicates, and reject conflicting reuse. Equality ignores object property order while
 preserving array order. Each online operation has a 20-second deadline (`timeoutMs` can shorten it);
