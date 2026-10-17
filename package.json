@@ -33,7 +33,7 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@vitest/coverage-v8": "^5.0.3",
-    "agent-blackboard": "^0.6.1",
+    "agent-blackboard": "^0.7.0",
     "dependency-cruiser": "^18.5.0",
     "eslint": "^10.12.0",
     "eslint-plugin-no-mistakes": "^0.83.0",
