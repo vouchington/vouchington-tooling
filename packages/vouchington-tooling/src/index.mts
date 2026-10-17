@@ -501,7 +501,7 @@ export type {
   DiagnosticReportLimitOptions,
   DiagnosticReportSummary,
 } from './vitest-diagnostics/index.mts'
-export { createCommandRunner, runGh, runGit } from './gh-cli/index.mts'
+export { createCommandRunner, ghSpawnEnv, runGh, runGit } from './gh-cli/index.mts'
 export type { ExecFileText, RunTextCommand } from './gh-cli/index.mts'
 export { DiffCommandError, processDiffCommand } from './gh-cli/index.mts'
 export type { DiffBlockCallback, DiffCommand } from './gh-cli/index.mts'

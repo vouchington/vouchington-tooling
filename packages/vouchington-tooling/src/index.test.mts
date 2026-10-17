@@ -40,6 +40,7 @@ import {
   HeadOutOfDateError,
   runGh,
   runGit,
+  ghSpawnEnv,
   GITHUB_BODY_MAX_CHARACTERS,
   validateGitHubBodyLength,
   parseClosingIssueReferences,
@@ -97,6 +98,7 @@ describe('package exports', () => {
     expect(astGrepPackPaths().config).toMatch(/sgconfig\.yml$/)
     expect(typeof runGh).toBe('function')
     expect(typeof runGit).toBe('function')
+    expect(ghSpawnEnv({ CLICOLOR_FORCE: '1', A: '1' })).toEqual({ A: '1' })
     expect(buildGhPrCreateArgs({ title: 't', bodyFile: 'body.md', head: 'x' })).toContain('--head')
     expect(typeof createPullRequest).toBe('function')
     expect(new DiffCommandError({ executable: 'git', args: [] }, { stderr: '' }).name).toBe(
