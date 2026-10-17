@@ -22,8 +22,8 @@ const FIELDS: Record<string, JsonSchema> = {
   relatedIssues: {
     type: 'array',
     description:
-      'Issues this pull request closes or refs. Empty when it has none; with no source issue ' +
-      'at all, give noSourceIssue as well (it is rejected beside a non-empty list).',
+      'Issues this pull request closes or refs. Empty when it has none; with no source issue, ' +
+      'give noSourceIssue as well (beside a non-empty list every entry must be refs).',
     items: {
       type: 'object',
       properties: {
@@ -45,9 +45,10 @@ const FIELDS: Record<string, JsonSchema> = {
   noSourceIssue: {
     type: 'object',
     description:
-      'Declares a pull request with no source issue, mutually exclusive with a non-empty ' +
-      'relatedIssues. Rendered inside Related issues (the policy may supply the wording) and ' +
-      'passed to the policy, which may allow it only in interactive mode.',
+      'Declares a pull request with no source issue; rejected beside a closes relatedIssues ' +
+      'entry, allowed beside refs-only ones. Rendered inside Related issues after any Refs ' +
+      'lines (the policy may supply the wording) and passed to the policy, which may allow it ' +
+      'only in interactive mode.',
     properties: { reason: text('Single-line reason there is no source issue.') },
     required: ['reason'],
     additionalProperties: false,

@@ -128,10 +128,10 @@ describe('noSourceIssue', () => {
     )
   })
 
-  it('is exclusive with related issues and must be a single-line reason', async () => {
+  it('rejects closes beside it and must be a single-line reason', async () => {
     const h = harness(fixture(), { device })
     const cases: Array<[Record<string, unknown>, string]> = [
-      [{ noSourceIssue: { reason: 'r' } }, 'mutually exclusive'],
+      [{ noSourceIssue: { reason: 'r' } }, 'cannot be combined with a relatedIssues entry'],
       [{ relatedIssues: [], noSourceIssue: { reason: 'a\nb' } }, 'reason must be a single line'],
       [{ relatedIssues: [], noSourceIssue: {} }, 'reason is required'],
       [{ relatedIssues: [], noSourceIssue: { reason: 'r', x: 1 } }, 'unsupported'],

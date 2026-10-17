@@ -27,22 +27,19 @@ function defaultNoSourceStatement(reason: string): string {
 
 /**
  * The pull request body: the Summary, Impact, Related issues and Details sections followed by the
- * provenance lines. With `noSourceIssue` the Related issues section holds `noSourceStatement`
- * (default {@link defaultNoSourceStatement}) instead of `- None`. Pure; the caller supplies the
- * device and worktree facts.
+ * provenance lines. With `noSourceIssue` the Related issues section ends with `noSourceStatement`
+ * (default {@link defaultNoSourceStatement}), after any `Refs` lines, instead of `- None`. Pure;
+ * the caller supplies the device and worktree facts.
  */
 export function renderPullRequestBody(
   input: PullRequestInput,
   provenance: PullRequestProvenance,
   noSourceStatement?: string,
 ): string {
-  const related = input.relatedIssues.length
-    ? input.relatedIssues.map(relatedLine)
-    : [
-        input.noSourceIssue === undefined
-          ? '- None'
-          : (noSourceStatement ?? defaultNoSourceStatement(input.noSourceIssue.reason)),
-      ]
+  const related = input.relatedIssues.map(relatedLine)
+  if (input.noSourceIssue !== undefined)
+    related.push(noSourceStatement ?? defaultNoSourceStatement(input.noSourceIssue.reason))
+  if (!related.length) related.push('- None')
   return [
     '## Summary',
     '',

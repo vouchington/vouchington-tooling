@@ -321,9 +321,11 @@ which may keep sending it.
 
 ### Pull requests with no source issue
 
-Pass `noSourceIssue: { reason }` (a single line) with an empty `relatedIssues`; a non-empty
-`relatedIssues` beside it is rejected. The Related issues section then holds the generic statement
-`- No source issue — <reason>` instead of `- None`. A policy may replace the statement by
+Pass `noSourceIssue: { reason }` (a single line) with an empty `relatedIssues`, or with a
+`relatedIssues` whose every entry is `refs`; a `closes` entry beside it is rejected. The Related
+issues section then holds the generic statement `- No source issue — <reason>` instead of `- None`,
+preceded by the `- Refs … — <reason>` lines when there are any (the statement is always the last
+line). A policy may replace the statement by
 exporting `renderNoSourceIssue({ reason })`, returning a non-empty string (30 s). The field also
 reaches `validatePullRequest` (with the trusted `mode`, so the policy can apply an interactive-only
 rule) and `pullRequestDefaults`.
@@ -342,7 +344,8 @@ rule) and `pullRequestDefaults`.
 ## Related issues
 
 - Closes #N — <reason>      (or "Refs #N"; owner/name#N with `repository`; "- None" when empty;
-                             "- No source issue — <reason>" for noSourceIssue)
+                             "- No source issue — <reason>" for noSourceIssue, rendered
+                             after any Refs lines)
 
 ## Details
 

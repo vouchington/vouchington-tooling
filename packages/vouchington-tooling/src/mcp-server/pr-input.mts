@@ -26,7 +26,7 @@ export type PullRequestInput = {
   summary: string
   impact: string
   relatedIssues: RelatedIssue[]
-  /** Set instead of relatedIssues when the pull request has no source issue. */
+  /** Declares no source issue; relatedIssues beside it must all be `refs`. */
   noSourceIssue?: { reason: string }
   details: string[]
   base: string
@@ -76,8 +76,8 @@ function readNoSourceIssue(args: Args, related: RelatedIssue[]): { reason: strin
   if (args.noSourceIssue === undefined) return undefined
   const value = requireObject(args.noSourceIssue)
   rejectUnknown(value, ['reason'])
-  if (related.length)
-    throw new Error('noSourceIssue and a non-empty relatedIssues are mutually exclusive')
+  if (related.some((issue) => issue.relation === 'closes'))
+    throw new Error('noSourceIssue cannot be combined with a relatedIssues entry that closes')
   return { reason: singleLine(value, 'reason') }
 }
 
