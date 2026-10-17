@@ -7,5 +7,5 @@ harness table: `HARNESS_IDS`, `selectHarnessSession`, and the `HarnessId`, `Harn
 and `HarnessSessionIdentity` types are re-exported, and `inspectHarnessEnvironment` keeps its
 `env = process.env` default. The duplicated table is removed, and `deriveAgent` takes its harness
 precedence from agent-blackboard's `HARNESS_SESSION_PRECEDENCE`. Behavior is unchanged.
-`agent-blackboard` is bumped to `^0.7.0` (dev and peer). It remains an optional peer, but
-`agent-harness-identity`, and therefore the package root, now import it, so it must be installed to load them.
+`agent-blackboard` is bumped to `^0.7.0` and moves from an optional peer to a regular dependency,
+because `agent-harness-identity`, and therefore the package root and the CLI, import it statically.

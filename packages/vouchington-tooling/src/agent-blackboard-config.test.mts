@@ -34,11 +34,11 @@ describe('vouchington-tooling MCP repository configuration', () => {
   it('installs the client the server loads from the repository root', () => {
     const root = readJson('package.json') as { devDependencies?: Record<string, string> }
     const tooling = readJson('packages/vouchington-tooling/package.json') as {
-      devDependencies?: Record<string, string>
+      dependencies?: Record<string, string>
     }
 
     expect(root.devDependencies?.['agent-blackboard']).toBe(
-      tooling.devDependencies?.['agent-blackboard'],
+      tooling.dependencies?.['agent-blackboard'],
     )
   })
 
@@ -52,16 +52,16 @@ describe('vouchington-tooling MCP repository configuration', () => {
     )
   })
 
-  it('keeps the integration development-only in the published package', () => {
+  it('ships the integration as a runtime dependency of the published package', () => {
     const packageJson = readJson('packages/vouchington-tooling/package.json') as Record<
       string,
       Record<string, string> | undefined
     >
 
-    expect(packageJson.devDependencies).toHaveProperty('agent-blackboard')
-    expect(packageJson.dependencies?.['agent-blackboard']).toBeUndefined()
+    expect(packageJson.dependencies).toHaveProperty('agent-blackboard')
+    expect(packageJson.devDependencies?.['agent-blackboard']).toBeUndefined()
     expect(packageJson.optionalDependencies?.['agent-blackboard']).toBeUndefined()
-    expect(packageJson.peerDependencies?.['agent-blackboard']).toBeDefined()
-    expect(packageJson.peerDependenciesMeta?.['agent-blackboard']).toEqual({ optional: true })
+    expect(packageJson.peerDependencies?.['agent-blackboard']).toBeUndefined()
+    expect(packageJson.peerDependenciesMeta?.['agent-blackboard']).toBeUndefined()
   })
 })
