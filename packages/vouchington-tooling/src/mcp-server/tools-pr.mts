@@ -32,7 +32,7 @@ const FIELDS: Record<string, JsonSchema> = {
         reason: text('Why the issue is related.'),
         repository: {
           type: 'string',
-          pattern: '^[\\w.-]+/[\\w.-]+$',
+          pattern: '^(?=[^/]{1,39}/)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/[\\w.-]+$',
           description:
             'Optional owner/name (lowercased) of the issue repository, rendered as ' +
             'owner/name#N; omit for an issue in this repository. Allowed for closes and refs.',

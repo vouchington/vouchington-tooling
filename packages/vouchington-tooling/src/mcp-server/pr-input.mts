@@ -45,7 +45,8 @@ export function positiveInteger(value: unknown, label: string): number {
   return value
 }
 
-const REPOSITORY_RE = /^[\w.-]+\/[\w.-]+$/
+// The owner is a GitHub login: alphanumerics and single hyphens, at most 39 characters.
+const REPOSITORY_RE = /^(?=[^/]{1,39}\/)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\/[\w.-]+$/
 
 function readRepository(issue: Args, label: string): string | undefined {
   if (issue.repository === undefined) return undefined
