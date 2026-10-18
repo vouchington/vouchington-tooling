@@ -1,6 +1,6 @@
 ---
 name: stacked-prs
-description: Work native GitHub stacks bottom-up and merge the ready prefix in one command; a ready lower layer does not freeze later work.
+description: Work native GitHub stacks bottom-up and prefer merging the whole stack in one command; drain the ready lower layers first only when the upper layers will clearly take longer.
 ---
 
 # Stacked pull requests
@@ -44,7 +44,8 @@ a stack, and who may authorize a merge.
   a ready-delay, or green CI.
 - On each shepherd result, act on the lowest owned layer that is not ready before any higher
   layer. Put each fix on the lowest layer that owns it. A bottom layer that reaches ready early
-  frees the ready prefix above it to merge in one command.
+  waits for the rest of the stack unless the layers above will clearly take longer; keep readying
+  them.
 - Before a command that adds layers to a stack, such as `gh stack add` or `gh stack link`, add the
   forge's open-layer count, plus every locally tracked layer not yet submitted, to every layer the
   command would add. `gh stack add` creates only a local branch, so repeated adds before a submit
@@ -54,20 +55,25 @@ a stack, and who may authorize a merge.
 - A ready, mergeable, or queued lower layer blocks only an operation that would rewrite that
   layer. Keep readying every other owned layer.
 
-## Merge the ready prefix
+## Merge the whole stack
 
-- Do not merge one layer at a time, and do not wait for the whole stack. Layers accumulate rebase
-  surface, CI cost, and review context, and drift against the default branch.
-- The ready prefix is the bottom-most open layer plus every consecutive layer above it that is
-  also ready and inside the human's approval. As soon as the bottom layer is ready, merge the ready
-  prefix with one command whose target is the prefix's top layer. When every layer is ready and
-  approved, the target is the top of the stack.
+- Prefer merging the whole stack at once: when every layer is ready and inside the human's
+  approval, merge it with one command whose target is the top layer. Never merge one layer at a
+  time, and never merge only the lower layers when every layer is ready.
+- Ready every layer in parallel so the stack reaches ready together. A ready lower layer waits
+  while the layers above are close behind (a poll or a ready-delay away).
+- Drain bottom-up only when the layers above will clearly take longer: a requested change or
+  `FIX_CODE` still open, a pending human review, a blocker, or CI far longer than the wait so far.
+  Then merge the ready lower layers in one command whose target is the highest ready layer, state
+  why in the report, and merge the rest together when it is ready.
+- Re-read every layer's readiness immediately before merging. If the whole stack is ready, the
+  target is the top layer.
 - Nothing in the stack merges on its own. Run the merge checks in
-  [Drain and keep track](references/drain.md#merge-the-ready-prefix) before each merge.
-- After a merge, GitHub retargets the next unmerged layer onto the default branch. That layer is
-  the new bottom.
+  [Drain and keep track](references/drain.md#merge-the-whole-stack) before each merge.
+- After a bottom-up drain, GitHub retargets the next unmerged layer onto the default branch. That
+  layer is the new bottom.
 - On a stall, or when a layer closes without merging, stop if the bottom layers are otherwise
-  ready. Report every layer and ask before merging that ready prefix.
+  ready. Report every layer and ask before draining them.
 - A stall blocks only layers that depend on it. Ready the others. Pause the whole drain only when
   nothing further can be readied without the blocked layer.
 
