@@ -66,8 +66,8 @@ a stack, and who may authorize a merge.
   `FIX_CODE` still open, a pending human review, a blocker, or CI far longer than the wait so far.
   Then merge the ready lower layers in one command whose target is the highest ready layer, state
   why in the report, and merge the rest together when it is ready.
-- Re-read every layer's readiness immediately before merging. If the whole stack is ready, the
-  target is the top layer.
+- Re-read every layer's readiness immediately before merging. If the whole stack is ready and
+  approved, the target is the top layer; never retarget past the approval.
 - Nothing in the stack merges on its own. Run the merge checks in
   [Drain and keep track](references/drain.md#merge-the-whole-stack) before each merge.
 - After a bottom-up drain, GitHub retargets the next unmerged layer onto the default branch. That

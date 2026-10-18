@@ -112,7 +112,9 @@ Immediately before the approved merge, run these checks in order:
    merge every layer of that stack. Stop and ask.
 2. Re-read topology. Confirm every layer from the bottom-most open layer up to the target is open,
    ready, and inside the approval, with nothing broken below. Re-read every layer above the
-   target too: if they are all ready now, retarget to the top of the stack.
+   target too. If those layers are all ready now and the approval covers them, retarget to the
+   highest of them and restart these checks from step 1 for the new target. Never retarget past
+   the approval; report the ready layers above it and ask.
 3. For every layer being merged, capture `pulls/<N>.head.sha` before the final poll and after it.
    They must match. A mismatch means a push landed inside the evaluation window: discard the
    verdict and poll again.
