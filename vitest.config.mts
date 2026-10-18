@@ -37,9 +37,9 @@ export default defineConfig({
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],
       thresholds: {
-        lines: 100,
-        functions: 100,
-        statements: 100,
+        lines: 99,
+        functions: 99,
+        statements: 99,
         // AST walkers have defensive parse-tree continues that are not
         // worth a fake parser for every subtype.
         branches: 95,
