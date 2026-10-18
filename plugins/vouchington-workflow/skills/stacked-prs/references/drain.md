@@ -1,8 +1,8 @@
 # Drain and keep track
 
 Shepherding a layer to ready and merging are different acts. The first covers every pull request
-the worker owns in the stack at once. The second lands the ready prefix in one command, and it is
-never the agent's own decision.
+the worker owns in the stack at once. The second lands the whole stack in one command once every
+layer is ready, and it is never the agent's own decision.
 
 ## Establish scope
 
@@ -89,48 +89,55 @@ When the owned set settles, present the stack bottom to top: each layer's number
 and whether it is ready or blocked and why. Never leave a ready bottom layer under a blocked upper
 layer without saying so.
 
-## Merge the ready prefix
+## Merge the whole stack
 
-The ready prefix is the bottom-most open layer plus every consecutive layer above it that is also
-ready and inside the approval. Its top layer is the merge target. A shepherd that prints a merge
-of its highest ready layer may name a layer above the approved range. Target the highest approved
-layer of the prefix instead; that is still one command.
+Prefer one merge of the whole stack: when every open layer is ready and inside the approval, the
+target is the top layer, and one command lands it and every layer below it. A shepherd that prints
+a merge for a lower layer does not change that; when the whole stack is ready, target the top.
+
+Drain bottom-up only when the layers above will clearly take longer than the ready lower layers:
+an open requested change or `FIX_CODE`, a pending human review, a blocker, or CI far longer than
+the wait so far. A layer a poll or a ready-delay away is not a reason. Then the target is the
+highest layer of the ready, approved run from the bottom, still one command, and the report says
+why the upper layers were left.
 
 Merge only on explicit human approval. The approval names what it covers: one layer, a range, or
-the whole stack. Approving the whole stack also covers the next ready prefix after an earlier
-merge. It does not cover a layer added after the approval. Ask before merging any layer outside
-it.
+the whole stack. Approving the whole stack also covers a bottom-up drain under the rule above. It
+does not cover a layer added after the approval. Ask before merging any layer outside it.
 
-Immediately before each approved merge, run these checks in order:
+Immediately before the approved merge, run these checks in order:
 
 1. `gh api repos/{owner}/{repo}/stacks/<target>` must return 404. `gh stack merge` resolves a bare
    number as a stack number first, then a pull request number. A 200 response means `--yes` would
    merge every layer of that stack. Stop and ask.
 2. Re-read topology. Confirm every layer from the bottom-most open layer up to the target is open,
-   ready, and inside the approval, with nothing broken below.
-3. For every layer in the prefix, capture `pulls/<N>.head.sha` before the final poll and after it.
+   ready, and inside the approval, with nothing broken below. Re-read every layer above the
+   target too. If those layers are all ready now and the approval covers them, retarget to the
+   highest of them and restart these checks from step 1 for the new target. Never retarget past
+   the approval; report the ready layers above it and ask.
+3. For every layer being merged, capture `pulls/<N>.head.sha` before the final poll and after it.
    They must match. A mismatch means a push landed inside the evaluation window: discard the
    verdict and poll again.
 4. `gh stack merge <target> --yes` with the repository's merge strategy. It lands the target and
-   every open layer below it, which is the ready prefix.
+   every open layer below it.
 5. Do not `gh stack sync` here. Return to step 2 of [Establish scope](#establish-scope) and
    re-read topology remotely: rebasing right after a merge can replay already-landed commits from
-   a stale local base ref. Keep shepherding the layers above. When the new bottom is ready, merge
-   the next ready prefix the same way. Before any local edit, rebase, or push on a remaining
-   layer, rerun the fetch and ahead/behind check in
+   a stale local base ref. After a bottom-up drain, keep shepherding the layers above and merge
+   the rest the same way, preferring the whole remainder at once. Before any local edit, rebase, or push
+   on a remaining layer, rerun the fetch and ahead/behind check in
    [Import a stack](gh-stack.md#import-a-stack-before-acting-on-it): GitHub rebases the next
    layer remotely, so local upper branches are stale until fast-forwarded. The drain is complete when no unmerged owned layer remains.
 
 The window between the last head read and the merge cannot be closed, because `gh stack merge`
 has no head-SHA pin. Branch protection and rulesets are evaluated when the merge runs, and stacks
 cannot bypass merge requirements. If the merge is rejected, re-read topology instead of retrying
-blindly. Under a merge queue, a successful `gh stack merge` only enqueues: the prefix queues
+blindly. Under a merge queue, a successful `gh stack merge` only enqueues: the layers queue
 together, and a failing layer is ejected along with the layers above it. The next topology
 re-read handles that.
 
 When you stop or are blocked (an unresolved escalation, an interrupt or pause, repeated fixes with
 no progress, or an external blocker), report each layer's number and state. If the bottom layers
-are ready, ask whether to merge that ready prefix before continuing.
+are ready, ask whether to drain them before continuing.
 
 ## Keep track: derive the ledger
 

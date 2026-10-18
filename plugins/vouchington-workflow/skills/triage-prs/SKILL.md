@@ -137,11 +137,11 @@ Classify the outcome:
 - **Repository auto-merge disabled:** dispatch the shepherd, report that a manual merge is
   required, and leave auto-merge unchanged.
 - **Native GitHub stack:** shepherd the owned layers per
-  [stacked-prs](../stacked-prs/SKILL.md#ownership-and-workers) and merge the ready prefix per
-  [Merge the ready prefix](../stacked-prs/SKILL.md#merge-the-ready-prefix), within explicit human
+  [stacked-prs](../stacked-prs/SKILL.md#ownership-and-workers) and merge the whole stack per
+  [Merge the whole stack](../stacked-prs/SKILL.md#merge-the-whole-stack), within explicit human
   approval and only as far as this run's decisions cover. Resolve the full stack against the Step 1
-  scope and Step 3 decisions first. End the ready prefix below the first layer that is out of scope
-  or not `MERGE`; never shepherd or merge a layer this run did not review. GitHub has no
+  scope and Step 3 decisions first. A bottom-up drain ends below the first layer that is out of
+  scope or not `MERGE`; never shepherd or merge a layer this run did not review. GitHub has no
   auto-merge for stacks, and an armed auto-merge does not authorize the drain on its own.
 
 Do not add a second pass that polls the dispatch workflow. It ends once the session is accepted or
