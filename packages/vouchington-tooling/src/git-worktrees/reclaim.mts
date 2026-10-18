@@ -37,9 +37,7 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   if (reason !== undefined) return keep(reason)
   if (!context.yes) return { path, branch, status: 'would reclaim' }
   const again = assessLocal(worktree)
-  const listed = parseWorktreeList(
-    git(['worktree', 'list', '--porcelain', '-z'], context.runtime) ?? '',
-  )
+  const listed = parseWorktreeList(git(['worktree', 'list', '--porcelain', '-z'], context.runtime))
   const same = listed.some((entry) => entry.path === path && entry.branch === branch)
   if ('reason' in again || again.head !== local.head || !same) return keep('changed since check')
   if (git(['worktree', 'remove', path], context.mainRun) === undefined) {
@@ -52,7 +50,7 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
 export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimReport {
   const listing = git(['worktree', 'list', '--porcelain', '-z'], runtime)
   const self = git(['rev-parse', '--show-toplevel'], runtime)?.replace(/\n$/, '')
-  const [main, ...others] = parseWorktreeList(listing ?? '')
+  const [main, ...others] = parseWorktreeList(listing)
   if (main === undefined || !self) throw new Error('not inside a git worktree')
   const mainRun: RunOptions = { cwd: main.path, env: runtime.env }
   const context: Context = {

@@ -268,6 +268,22 @@ describe('applying', () => {
   })
 })
 
+describe('inherited git environment', () => {
+  it('lets cwd choose the repository even when GIT_DIR and GIT_WORK_TREE point elsewhere', () => {
+    const other = fx.addWorktree('other', { push: true })
+    fx.setPrs('other', [merged])
+    const env = {
+      ...fx.env,
+      GIT_DIR: join(fx.main, '.git'),
+      GIT_WORK_TREE: fx.main,
+      GIT_INDEX_FILE: join(fx.main, '.git', 'index'),
+    }
+    const report = reclaim(true, env)
+    expect(report.worktrees.map((e) => [e.path, e.status])).toEqual([[other, 'reclaimed']])
+    expect(existsSync(fx.caller)).toBe(true)
+  })
+})
+
 describe('paths', () => {
   it('keeps path whitespace intact for the caller and candidates', () => {
     const spaced = fx.addWorktree('spaced', { push: true, dir: 'spaced ' })

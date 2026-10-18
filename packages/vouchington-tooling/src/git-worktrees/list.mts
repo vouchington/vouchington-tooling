@@ -24,10 +24,10 @@ function parseRecord(fields: readonly string[]): WorktreeRecord | undefined {
 }
 
 /** Parses `git worktree list --porcelain -z` (NUL fields, an empty field ends each record). */
-export function parseWorktreeList(porcelain: string): WorktreeRecord[] {
+export function parseWorktreeList(porcelain: string | undefined): WorktreeRecord[] {
   const records: WorktreeRecord[] = []
   let fields: string[] = []
-  for (const field of [...porcelain.split('\0'), '']) {
+  for (const field of [...(porcelain ?? '').split('\0'), '']) {
     if (field !== '') {
       fields.push(field)
       continue
