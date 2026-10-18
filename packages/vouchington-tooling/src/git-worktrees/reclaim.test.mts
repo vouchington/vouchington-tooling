@@ -62,13 +62,12 @@ describe('finished worktrees', () => {
     expect(fx.git(fx.main, 'branch', '--list', 'done')).toContain('done')
   })
 
-  it('treats a commit that is on any remote ref as pushed after the branch is deleted', () => {
-    const path = fx.addWorktree('squashed', { push: true })
-    fx.setPrs('squashed', [merged])
-    fx.git(path, 'push', 'origin', 'HEAD:refs/heads/main-copy')
+  it('reclaims a squash-merged branch deleted on the remote when the PR head is HEAD', () => {
+    fx.addWorktree('squashed', { push: true })
     fx.git(fx.main, 'push', 'origin', '--delete', 'squashed')
     fx.git(fx.main, 'fetch', '--prune', 'origin')
-    expect(only(reclaim()).status).toBe('would reclaim')
+    fx.setPrs('squashed', [merged])
+    expect(only(reclaim(true)).status).toBe('reclaimed')
   })
 
   it('ignores PR head-repository case when matching this repository', () => {
@@ -117,10 +116,18 @@ describe('kept worktrees', () => {
     expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
   })
 
-  it('keeps a worktree with unpushed commits', () => {
-    fx.addWorktree('local')
+  it('keeps a worktree with commits newer than the finished PR head', () => {
+    const path = fx.addWorktree('local')
     fx.setPrs('local', [merged])
-    expect(only(reclaim())).toEqual(kept('unpushed commits'))
+    fx.git(path, 'commit', '--allow-empty', '-m', 'newer')
+    expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
+  })
+
+  it.each([['open'], ['all']])('keeps a worktree when the %s PR query fills its page', (state) => {
+    fx.addWorktree('busy', { push: true })
+    fx.setPrs('busy', [merged])
+    const env = { ...fx.env, [`FAKE_GH_PAD_${state.toUpperCase()}`]: '1000' }
+    expect(only(reclaim(false, env))).toEqual(kept('cannot read PR state'))
   })
 
   it('keeps a worktree with untracked files, including inside new directories', () => {
@@ -176,7 +183,6 @@ describe('kept worktrees', () => {
     ['status --porcelain', 'cannot read status'],
     ['ls-files -v', 'cannot read index'],
     ['rev-parse HEAD', 'cannot read HEAD'],
-    ['rev-list HEAD', 'cannot read unpushed commits'],
   ])('keeps a worktree when git %s fails', (command, reason) => {
     fx.addWorktree('flaky', { push: true })
     fx.setPrs('flaky', [merged])
@@ -241,7 +247,7 @@ describe('applying', () => {
     const path = fx.addWorktree('racy', { push: true })
     fx.setPrs('racy', [merged])
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_TOUCH: join(path, 'late.txt') }))
-    expect(entry).toMatchObject({ status: 'kept', reason: 'changed before removal' })
+    expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
   })
 
@@ -249,8 +255,29 @@ describe('applying', () => {
     const path = fx.addWorktree('moving', { push: true })
     fx.setPrs('moving', [merged])
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_ADVANCE: path }))
-    expect(entry).toMatchObject({ status: 'kept', reason: 'changed before removal' })
+    expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
+  })
+
+  it('keeps a worktree switched to another branch at the same commit', () => {
+    const path = fx.addWorktree('switchy', { push: true })
+    fx.setPrs('switchy', [merged])
+    const entry = only(reclaim(true, { ...fx.env, FAKE_GH_SWITCH: path }))
+    expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
+    expect(existsSync(path)).toBe(true)
+  })
+})
+
+describe('paths', () => {
+  it('keeps path whitespace intact for the caller and candidates', () => {
+    const spaced = fx.addWorktree('spaced', { push: true, dir: 'spaced ' })
+    const other = fx.addWorktree('other', { push: true, dir: 'other ' })
+    fx.setPrs('spaced', [merged])
+    fx.setPrs('other', [merged])
+    const report = reclaim(true, fx.env, spaced)
+    expect(report.worktrees.map((e) => [e.path, e.status])).toContainEqual([other, 'reclaimed'])
+    expect(report.worktrees.map((e) => e.branch)).not.toContain('spaced')
+    expect(existsSync(spaced)).toBe(true)
   })
 })
 

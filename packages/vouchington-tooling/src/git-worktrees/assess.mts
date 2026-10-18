@@ -33,7 +33,7 @@ export function readRepository(main: RunOptions): string | undefined {
   return repo?.nameWithOwner?.toLowerCase()
 }
 
-/** Clean status, no hidden index entries, and nothing unpushed. Returns the HEAD commit or a reason. */
+/** Clean status and no hidden index entries. Returns the HEAD commit or a reason. */
 export function assessLocal(worktree: RunOptions): Assessment {
   const status = git(
     ['status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'],
@@ -49,13 +49,22 @@ export function assessLocal(worktree: RunOptions): Assessment {
   const headOutput = git(['rev-parse', 'HEAD'], worktree)
   if (headOutput === undefined) return { reason: 'cannot read HEAD' }
   const head = headOutput.trim()
-  const unpushed = git(['rev-list', 'HEAD', '--not', '--remotes'], worktree)
-  if (unpushed === undefined) return { reason: 'cannot read unpushed commits' }
-  if (unpushed.trim() !== '') return { reason: 'unpushed commits' }
   return { head }
 }
 
-/** Needs a merged or closed same-repository PR for this branch whose head is exactly HEAD. */
+const PAGE = 1000
+
+function listPulls(branch: string, state: string, main: RunOptions): PullRequest[] | undefined {
+  const fields = 'state,headRefOid,isCrossRepository,headRepository,headRepositoryOwner'
+  const args = ['pr', 'list', '--head', branch, '--state', state, '--limit', String(PAGE)]
+  const listed = parseJson(runGh([...args, '--json', fields], main))
+  return Array.isArray(listed) && listed.length < PAGE ? (listed as PullRequest[]) : undefined
+}
+
+/**
+ * Needs a merged or closed same-repository PR for this branch whose head is exactly HEAD. That
+ * also proves HEAD is published on GitHub, so deleted branches (squash merges) need no remote ref.
+ */
 export function assessPullRequest(
   branch: string,
   head: string,
@@ -63,15 +72,11 @@ export function assessPullRequest(
   main: RunOptions,
 ): string | undefined {
   if (repository === undefined) return 'cannot read repository'
-  const fields = 'state,headRefOid,isCrossRepository,headRepository,headRepositoryOwner'
-  const listed = parseJson(
-    runGh(
-      ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '100', '--json', fields],
-      main,
-    ),
-  )
-  if (!Array.isArray(listed)) return 'cannot read PR state'
-  const own = (listed as PullRequest[]).filter(
+  // Open PRs are queried on their own so a long history cannot hide one; a full page is unreadable.
+  const open = listPulls(branch, 'open', main)
+  const all = listPulls(branch, 'all', main)
+  if (open === undefined || all === undefined) return 'cannot read PR state'
+  const own = [...open, ...all].filter(
     (pr) =>
       pr.isCrossRepository === false &&
       `${pr.headRepositoryOwner?.login}/${pr.headRepository?.name}`.toLowerCase() === repository,

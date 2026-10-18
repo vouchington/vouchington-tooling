@@ -19,7 +19,7 @@ export interface ReclaimReport {
 /** Lists finished worktrees and, with `yes`, removes them with a plain (never forced) `git worktree remove`. */
 export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimReport {
   const listing = git(['worktree', 'list', '--porcelain', '-z'], runtime)
-  const self = git(['rev-parse', '--show-toplevel'], runtime)?.trim()
+  const self = git(['rev-parse', '--show-toplevel'], runtime)?.replace(/\n$/, '')
   const [main, ...others] = parseWorktreeList(listing ?? '')
   if (main === undefined || !self) throw new Error('not inside a git worktree')
   const mainRun: RunOptions = { cwd: main.path, env: runtime.env }
@@ -47,7 +47,9 @@ export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimRepo
       continue
     }
     const again = assessLocal(worktree)
-    if ('reason' in again || again.head !== local.head) keep('changed before removal')
+    const listed = parseWorktreeList(git(['worktree', 'list', '--porcelain', '-z'], runtime) ?? '')
+    const same = listed.some((record) => record.path === path && record.branch === branch)
+    if ('reason' in again || again.head !== local.head || !same) keep('changed since check')
     else if (git(['worktree', 'remove', path], mainRun) === undefined) {
       keep('git worktree remove refused')
     } else worktrees.push({ path, branch, status: 'reclaimed' })

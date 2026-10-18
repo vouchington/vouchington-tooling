@@ -17,17 +17,25 @@ if (env.FAKE_GH_GARBAGE) {
   console.log('not json')
   process.exit(0)
 }
+const state = args[args.indexOf('--state') + 1]
 // Simulates a change that lands between the first assessment and the re-check.
-if (env.FAKE_GH_TOUCH) fs.writeFileSync(env.FAKE_GH_TOUCH, 'x')
-if (env.FAKE_GH_ADVANCE) {
+if (state === 'all') {
   const { execFileSync } = require('node:child_process')
-  const opts = { cwd: env.FAKE_GH_ADVANCE, stdio: 'ignore' }
-  execFileSync('git', ['commit', '--allow-empty', '-m', 'late'], opts)
-  execFileSync('git', ['push', 'origin', 'HEAD'], opts)
+  const run = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'ignore' })
+  if (env.FAKE_GH_TOUCH) fs.writeFileSync(env.FAKE_GH_TOUCH, 'x')
+  if (env.FAKE_GH_SWITCH) run(env.FAKE_GH_SWITCH, 'checkout', '-b', 'switched')
+  if (env.FAKE_GH_ADVANCE) {
+    run(env.FAKE_GH_ADVANCE, 'commit', '--allow-empty', '-m', 'late')
+    run(env.FAKE_GH_ADVANCE, 'push', 'origin', 'HEAD')
+  }
 }
 const branch = args[args.indexOf('--head') + 1]
 const file = env.FAKE_GH_DIR + '/' + branch.replaceAll('/', '_') + '.json'
-console.log(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '[]')
+let pulls = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : []
+if (state === 'open') pulls = pulls.filter((pr) => pr.state === 'OPEN')
+const pad = Number(env['FAKE_GH_PAD_' + state.toUpperCase()] || 0)
+for (let i = 0; i < pad; i += 1) pulls.push({ state: 'CLOSED' })
+console.log(JSON.stringify(pulls))
 `
 
 export interface Fixture {
@@ -37,7 +45,7 @@ export interface Fixture {
   readonly env: NodeJS.ProcessEnv
   git(cwd: string, ...args: string[]): string
   /** Adds a worktree on a new branch with one commit; optionally pushes it to origin. */
-  addWorktree(name: string, options?: { push?: boolean }): string
+  addWorktree(name: string, options?: { push?: boolean; dir?: string }): string
   /** Writes the fake `gh pr list` answer; a PR with no head defaults to the branch tip. */
   setPrs(branch: string, prs: object[]): void
   cleanup(): void
@@ -90,7 +98,7 @@ export function createFixture(): Fixture {
     env,
     git,
     addWorktree: (name, options = {}) => {
-      const path = join(root, 'worktrees', name)
+      const path = join(root, 'worktrees', options.dir ?? name)
       git(main, 'worktree', 'add', '-b', name, path)
       writeFileSync(join(path, `${name}.txt`), `${name}\n`)
       git(path, 'add', '.')
