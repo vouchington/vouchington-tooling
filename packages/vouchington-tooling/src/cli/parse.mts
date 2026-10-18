@@ -39,6 +39,7 @@ export type ParsedCli =
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
+  | { kind: 'worktree'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
   | { kind: 'fresh-base'; remote?: string; branch?: string; skipFetch: boolean }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }

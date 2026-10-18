@@ -20,6 +20,7 @@ import { runLinkSkill } from './commands/link-skill.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
+import { runWorktreeCommand } from './commands/worktree.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { runFreshBase } from './commands/fresh-base.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
@@ -136,6 +137,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runAgentBlackboardCommand(parsed.args)
     case 'mcp':
       return runMcpCommand(parsed.args)
+    case 'worktree':
+      return runWorktreeCommand(parsed.args)
     case 'require-up-to-date':
       return runRequireUpToDate(parsed)
     case 'fresh-base':

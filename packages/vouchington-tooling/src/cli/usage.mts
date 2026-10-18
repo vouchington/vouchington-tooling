@@ -47,6 +47,7 @@ Commands:
   retrospective-facts           Gather immutable facts for a retrospective
   agent-blackboard              Probe and journal an Agent Blackboard deployment
   mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
+  worktree                      Reclaim finished git worktrees (dry run unless --yes)
 
 Options:
   -h, --help       Show this help
@@ -134,6 +135,11 @@ mcp
                          snapshot_export, snapshot_cleanup, and session_archive over stdio.
                          Needs the optional @modelcontextprotocol/sdk peer (and zod).
                          Launch it from inside the repository's git worktree.
+
+worktree reclaim [--yes] [--json]
+  Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the
+  branch is merged or closed at exactly HEAD, using git worktree remove (never forced).
+  Skips the main checkout, the current worktree, and locked, bare or detached worktrees.
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {
