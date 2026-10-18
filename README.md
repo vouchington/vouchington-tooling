@@ -194,9 +194,10 @@ Optional inputs keep the original contract (`completion-mode`, `publish-*`, `iss
 When `target-variable` and `fallbacks-variable` are empty (the default), they derive from
 `surface-gate`: `HARNESS_PLAN_ENABLED` reads `HARNESS_TARGET_PLAN` and `HARNESS_FALLBACKS_PLAN`, any
 other gate reads `HARNESS_TARGET` and `HARNESS_FALLBACKS`. Explicit inputs override, and an unset
-variable still falls back to the plain one. After dispatch or resume, the workflow writes the session
-link, the created or resumed state and the concurrency id to the step summary and emits a
-`::notice::` with the session URL. The workflow needs `jq`, which `ubuntu-slim` (Ubuntu 24.04, jq 1.7)
+variable still falls back to the plain one. The pinned `auto-harness/actions/dispatch` v1.0.2 writes
+the session link, created state, provider route and concurrency id to the step summary, emits a
+`::notice::` with the session URL, and retries a 408 or 429 once (and a 5xx, timeout or network
+error once, because `concurrency-id` is always passed). The workflow needs `jq`, which `ubuntu-slim` (Ubuntu 24.04, jq 1.7)
 preinstalls; the prepare step fails with a clear error on a `runs-on` image without it.
 
 Migration note for vouchington callers: the fix-main caller must pass

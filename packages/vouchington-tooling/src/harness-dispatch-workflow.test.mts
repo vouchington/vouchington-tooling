@@ -145,47 +145,18 @@ describe('harness-dispatch plan-surface defaults', () => {
   })
 })
 
-describe('harness-dispatch summary step', () => {
-  const summary = job.steps.find((step) => step.id === 'summary')
+describe('harness-dispatch action pin', () => {
+  const pinned =
+    'jonathanong/auto-harness/actions/dispatch@8325525ec675f738a3969cb92ce20477f38dcf71'
 
-  function run(env: Record<string, string>) {
-    const dir = mkdtempSync(join(tmpdir(), 'harness-summary-'))
-    const file = join(dir, 'summary.md')
-    const result = spawnSync('bash', ['-c', summary?.run ?? ''], {
-      encoding: 'utf8',
-      env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: file, ...env },
-    })
-    return { ...result, text: result.status === 0 ? readFileSync(file, 'utf8') : '' }
-  }
-
-  const base = {
-    CONCURRENCY_ID: 'fix-1',
-    CREATED: 'true',
-    RESUMED: 'false',
-    SESSION_ID: 'sess-0123abcd',
-    SESSION_URL: 'https://harness.example/sessions/sess-0123abcd',
-  }
-
-  it('runs last and passes values through env, never inline expressions', () => {
-    expect(job.steps.at(-1)).toBe(summary)
-    expect(summary?.run).not.toContain('${{')
-    expect(Object.keys(summary?.env ?? {}).sort()).toEqual(Object.keys(base).sort())
+  it('pins dispatch and resume to auto-harness actions v1.0.2', () => {
+    expect(dispatch?.uses).toBe(pinned)
+    expect(resume?.uses).toBe(pinned)
   })
 
-  it('writes the link, state, and concurrency id plus a notice', () => {
-    const created = run(base)
-    expect(created.status).toBe(0)
-    expect(created.stdout).toContain(`::notice title=Harness session::${base.SESSION_URL}`)
-    expect(created.text).toContain(`[\`sess-0123abcd\`](${base.SESSION_URL})`)
-    expect(created.text).toContain('State: created')
-    expect(created.text).toContain('`fix-1`')
-    expect(run({ ...base, RESUMED: 'true' }).text).toContain('State: resumed')
-    expect(run({ ...base, CREATED: 'false' }).text).toContain('State: existing session reused')
-  })
-
-  it('does not execute shell metacharacters in values', () => {
-    const result = run({ ...base, CONCURRENCY_ID: '$(touch pwned) `id`' })
-    expect(result.text).toContain('$(touch pwned) `id`')
+  it('ends with dispatch and resume, leaving the summary and notice to the action', () => {
+    expect(job.steps.slice(-2)).toEqual([dispatch, resume])
+    expect(job.steps.some((step) => step.id === 'summary')).toBe(false)
   })
 })
 

@@ -204,7 +204,7 @@ jobs:
         id: dispatch
         if: inputs.resume-session-id == ''
         timeout-minutes: 2
-        uses: jonathanong/auto-harness/actions/dispatch@77caf36363b74987ea5c7d48a3b71b4f87f27fe5 # v1.0.1
+        uses: jonathanong/auto-harness/actions/dispatch@8325525ec675f738a3969cb92ce20477f38dcf71 # v1.0.2
         with:
           server-url: ${{ vars.HARNESS_URL }}
           api-key: ${{ secrets.HARNESS_API_KEY }}
@@ -227,7 +227,7 @@ jobs:
         id: resume
         if: inputs.resume-session-id != ''
         timeout-minutes: 2
-        uses: jonathanong/auto-harness/actions/dispatch@77caf36363b74987ea5c7d48a3b71b4f87f27fe5 # v1.0.1
+        uses: jonathanong/auto-harness/actions/dispatch@8325525ec675f738a3969cb92ce20477f38dcf71 # v1.0.2
         with:
           operation: resume
           server-url: ${{ vars.HARNESS_URL }}
@@ -237,29 +237,3 @@ jobs:
           concurrency-id: ${{ inputs.concurrency-id }}
           timeout: ${{ inputs.timeout-seconds }}
           priority: ${{ inputs.priority }}
-      - name: Summarize session
-        id: summary
-        timeout-minutes: 1
-        env:
-          CONCURRENCY_ID: ${{ inputs.concurrency-id }}
-          CREATED: ${{ steps.dispatch.outputs.created || steps.resume.outputs.created }}
-          RESUMED: ${{ inputs.resume-session-id != '' }}
-          SESSION_ID: ${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}
-          SESSION_URL: ${{ steps.dispatch.outputs.session-url || steps.resume.outputs.session-url }}
-        run: |
-          set -euo pipefail
-          if [[ "$RESUMED" == "true" ]]; then
-            state="resumed"
-          elif [[ "$CREATED" == "false" ]]; then
-            state="existing session reused"
-          else
-            state="created"
-          fi
-          echo "::notice title=Harness session::${SESSION_URL}"
-          {
-            echo "### Harness session"
-            echo
-            echo "- Session: [\`${SESSION_ID}\`](${SESSION_URL})"
-            echo "- State: ${state}"
-            echo "- Concurrency id: \`${CONCURRENCY_ID}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
