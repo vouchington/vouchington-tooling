@@ -23,6 +23,10 @@ const state = args[args.indexOf('--state') + 1]
 if (state === 'all') {
   const { execFileSync } = require('node:child_process')
   const run = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'ignore' })
+  if (env.FAKE_GH_NEST && !fs.existsSync(env.FAKE_GH_DIR + '/nested')) {
+    fs.writeFileSync(env.FAKE_GH_DIR + '/nested', '')
+    run(env.FAKE_GH_NEST, 'worktree', 'add', '-b', 'kid', 'sub/kid')
+  }
   if (env.FAKE_GH_TOUCH) fs.writeFileSync(env.FAKE_GH_TOUCH, 'x')
   if (env.FAKE_GH_SWITCH) run(env.FAKE_GH_SWITCH, 'checkout', '-b', 'switched')
   if (env.FAKE_GH_ADVANCE) {

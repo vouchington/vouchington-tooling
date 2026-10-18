@@ -1,6 +1,7 @@
 export interface WorktreeRecord {
   readonly path: string
   readonly branch?: string
+  readonly head?: string
   readonly locked: boolean
   readonly bare: boolean
   readonly detached: boolean
@@ -14,12 +15,14 @@ function parseRecord(fields: readonly string[]): WorktreeRecord | undefined {
   const branch = fields
     .find((field) => field.startsWith(BRANCH_PREFIX))
     ?.slice(BRANCH_PREFIX.length)
+  const head = fields.find((field) => field.startsWith('HEAD '))?.slice('HEAD '.length)
   return {
     path,
     locked: fields.some((field) => field === 'locked' || field.startsWith('locked ')),
     bare: fields.includes('bare'),
     detached: fields.includes('detached'),
     ...(branch === undefined ? {} : { branch }),
+    ...(head === undefined ? {} : { head }),
   }
 }
 

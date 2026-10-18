@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process'
 export interface RunOptions {
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
+  /** Milliseconds before a read-only call is killed; 0 for none (worktree removal). */
+  readonly timeout?: number
 }
 
 /** Runs a command without a shell; returns stdout, or undefined when it fails to start or exits non-zero. */
@@ -18,7 +20,7 @@ export function run(
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 120_000,
+      timeout: options.timeout ?? 120_000,
     })
   } catch {
     return undefined
@@ -60,5 +62,5 @@ export function withoutVariables(
 /** git with fsmonitor disabled so a repository config can never execute a hook. */
 export function git(args: readonly string[], options: RunOptions): string | undefined {
   const env = withoutVariables(options.env, LOCAL_ENV)
-  return run('git', ['-c', 'core.fsmonitor=false', ...args], { cwd: options.cwd, env })
+  return run('git', ['-c', 'core.fsmonitor=false', ...args], { ...options, env })
 }

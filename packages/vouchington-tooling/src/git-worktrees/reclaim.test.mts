@@ -277,6 +277,20 @@ describe('rechecks and nesting', () => {
     expect(existsSync(path)).toBe(true)
   })
 
+  it('keeps a worktree that gains a nested worktree before the removal', () => {
+    const path = fx.addWorktree('gaining', { push: true })
+    writeFileSync(join(path, '.gitignore'), 'sub/\n')
+    fx.git(path, 'add', '.gitignore')
+    fx.git(path, 'commit', '-m', 'ignore sub')
+    fx.git(path, 'push', 'origin', 'gaining')
+    fx.setPrs('gaining', [merged])
+    const entry = summary(reclaim(true, { ...fx.env, FAKE_GH_NEST: path })).find(
+      (e) => e[0] === 'gaining',
+    )
+    expect(entry).toEqual(['gaining', 'kept', 'contains another worktree'])
+    expect(existsSync(path)).toBe(true)
+  })
+
   it('keeps a worktree that contains another registered worktree', () => {
     const parent = fx.addWorktree('parent', { push: true })
     fx.setPrs('parent', [merged])
@@ -354,7 +368,7 @@ describe('parseWorktreeList and formatReport', () => {
       '',
     ].join('\0')
     expect(parseWorktreeList(text)).toEqual([
-      { path: '/a\nb', branch: 'x', locked: false, bare: false, detached: false },
+      { path: '/a\nb', branch: 'x', head: '1', locked: false, bare: false, detached: false },
       { path: '/locked', locked: true, bare: false, detached: true },
       { path: '/bare', locked: true, bare: true, detached: false },
     ])

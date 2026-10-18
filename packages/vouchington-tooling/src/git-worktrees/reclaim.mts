@@ -32,8 +32,9 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   if (locked || bare || detached || branch === undefined) return undefined
   if (!existsSync(path) || realpathSync(path) === context.selfReal) return undefined
   const keep = (reason: string): ReclaimEntry => ({ path, branch, status: 'kept', reason })
-  const prefix = path + sep
-  if (context.registered.some((other) => other.startsWith(prefix))) {
+  const nests = (paths: readonly string[]): boolean =>
+    paths.some((other) => other.startsWith(path + sep))
+  if (nests(context.registered)) {
     return keep('contains another worktree')
   }
   const worktree: RunOptions = { cwd: path, env: context.runtime.env }
@@ -45,10 +46,13 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   const again = assessLocal(worktree)
   const pullAgain = assessPullRequest(branch, local.head, context.repository, context.mainRun)
   const listed = parseWorktreeList(git(['worktree', 'list', '--porcelain', '-z'], context.runtime))
-  const same = listed.some((entry) => entry.path === path && entry.branch === branch)
+  const same = listed.some(
+    (entry) => entry.path === path && entry.branch === branch && entry.head === local.head,
+  )
+  if (nests(listed.map((entry) => entry.path))) return keep('contains another worktree')
   if ('reason' in again || again.head !== local.head || pullAgain !== undefined || !same)
     return keep('changed since check')
-  if (git(['worktree', 'remove', path], context.mainRun) === undefined) {
+  if (git(['worktree', 'remove', path], { ...context.mainRun, timeout: 0 }) === undefined) {
     return keep('git worktree remove refused')
   }
   return { path, branch, status: 'reclaimed' }
