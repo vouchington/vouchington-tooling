@@ -1,4 +1,4 @@
-import { git, run, type RunOptions } from './run.mts'
+import { git, LOCAL_ENV, run, withoutVariables, type RunOptions } from './run.mts'
 
 const FINISHED = new Set(['MERGED', 'CLOSED'])
 
@@ -20,9 +20,9 @@ function parseJson(text: string | undefined): unknown {
   }
 }
 
-/** GH_REPO and GH_HOST must not redirect the lookup away from the main checkout's repository. */
+/** Repo-local git variables, GH_REPO and GH_HOST must not redirect the lookup away from the main checkout. */
 function runGh(args: readonly string[], main: RunOptions): string | undefined {
-  const { GH_REPO: _repo, GH_HOST: _host, ...env } = main.env
+  const env = withoutVariables(main.env, [...LOCAL_ENV, 'GH_REPO', 'GH_HOST'])
   return run('gh', args, { cwd: main.cwd, env })
 }
 

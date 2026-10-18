@@ -268,6 +268,35 @@ describe('applying', () => {
   })
 })
 
+describe('rechecks and nesting', () => {
+  it('keeps a worktree whose PR is reopened between the check and the removal', () => {
+    const path = fx.addWorktree('reopened', { push: true })
+    fx.setPrs('reopened', [merged])
+    const entry = only(reclaim(true, { ...fx.env, FAKE_GH_REOPEN: '1' }))
+    expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
+    expect(existsSync(path)).toBe(true)
+  })
+
+  it('keeps a worktree that contains another registered worktree', () => {
+    const parent = fx.addWorktree('parent', { push: true })
+    fx.setPrs('parent', [merged])
+    writeFileSync(join(parent, '.gitignore'), 'nested/\n')
+    fx.git(parent, 'add', '.gitignore')
+    fx.git(parent, 'commit', '-m', 'ignore nested')
+    fx.git(parent, 'push', 'origin', 'parent')
+    fx.setPrs('parent', [merged])
+    const child = join(parent, 'nested', 'child')
+    fx.git(fx.main, 'worktree', 'add', '-b', 'child', child)
+    fx.setPrs('child', [{ state: 'OPEN' }])
+    const report = reclaim(true)
+    expect(summary(report)).toEqual([
+      ['child', 'kept', 'open PR'],
+      ['parent', 'kept', 'contains another worktree'],
+    ])
+    expect(existsSync(child)).toBe(true)
+  })
+})
+
 describe('inherited git environment', () => {
   it('lets cwd choose the repository even when GIT_DIR and GIT_WORK_TREE point elsewhere', () => {
     const other = fx.addWorktree('other', { push: true })
@@ -281,6 +310,15 @@ describe('inherited git environment', () => {
     const report = reclaim(true, env)
     expect(report.worktrees.map((e) => [e.path, e.status])).toEqual([[other, 'reclaimed']])
     expect(existsSync(fx.caller)).toBe(true)
+  })
+})
+
+describe('gh environment', () => {
+  it('strips repo-local git variables from gh calls too', () => {
+    fx.addWorktree('done', { push: true })
+    fx.setPrs('done', [merged])
+    const env = { ...fx.env, FAKE_GH_NO_GIT_DIR: '1', GIT_DIR: join(fx.root, 'nowhere') }
+    expect(only(reclaim(false, env)).status).toBe('would reclaim')
   })
 })
 

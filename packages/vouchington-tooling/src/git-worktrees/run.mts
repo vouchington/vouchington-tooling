@@ -26,7 +26,7 @@ export function run(
 }
 
 // Repo-local overrides (see `git rev-parse --local-env-vars`): the cwd must pick the repository.
-const LOCAL_ENV = [
+export const LOCAL_ENV = [
   'GIT_DIR',
   'GIT_WORK_TREE',
   'GIT_INDEX_FILE',
@@ -47,9 +47,18 @@ const LOCAL_ENV = [
   'GIT_QUARANTINE_PATH',
 ]
 
+/** A copy of `env` without the named variables. */
+export function withoutVariables(
+  env: NodeJS.ProcessEnv,
+  names: readonly string[],
+): NodeJS.ProcessEnv {
+  const copy = { ...env }
+  for (const name of names) delete copy[name]
+  return copy
+}
+
 /** git with fsmonitor disabled so a repository config can never execute a hook. */
 export function git(args: readonly string[], options: RunOptions): string | undefined {
-  const env = { ...options.env }
-  for (const name of LOCAL_ENV) delete env[name]
+  const env = withoutVariables(options.env, LOCAL_ENV)
   return run('git', ['-c', 'core.fsmonitor=false', ...args], { cwd: options.cwd, env })
 }

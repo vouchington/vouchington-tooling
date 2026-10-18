@@ -1,4 +1,5 @@
 import { existsSync, realpathSync } from 'node:fs'
+import { sep } from 'node:path'
 
 import { assessLocal, assessPullRequest, readRepository } from './assess.mts'
 import { parseWorktreeList, type WorktreeRecord } from './list.mts'
@@ -21,6 +22,7 @@ interface Context {
   readonly runtime: RunOptions
   readonly mainRun: RunOptions
   readonly selfReal: string
+  readonly registered: readonly string[]
   readonly repository: string | undefined
 }
 
@@ -30,6 +32,10 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   if (locked || bare || detached || branch === undefined) return undefined
   if (!existsSync(path) || realpathSync(path) === context.selfReal) return undefined
   const keep = (reason: string): ReclaimEntry => ({ path, branch, status: 'kept', reason })
+  const prefix = path + sep
+  if (context.registered.some((other) => other.startsWith(prefix))) {
+    return keep('contains another worktree')
+  }
   const worktree: RunOptions = { cwd: path, env: context.runtime.env }
   const local = assessLocal(worktree)
   if ('reason' in local) return keep(local.reason)
@@ -37,9 +43,11 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   if (reason !== undefined) return keep(reason)
   if (!context.yes) return { path, branch, status: 'would reclaim' }
   const again = assessLocal(worktree)
+  const pullAgain = assessPullRequest(branch, local.head, context.repository, context.mainRun)
   const listed = parseWorktreeList(git(['worktree', 'list', '--porcelain', '-z'], context.runtime))
   const same = listed.some((entry) => entry.path === path && entry.branch === branch)
-  if ('reason' in again || again.head !== local.head || !same) return keep('changed since check')
+  if ('reason' in again || again.head !== local.head || pullAgain !== undefined || !same)
+    return keep('changed since check')
   if (git(['worktree', 'remove', path], context.mainRun) === undefined) {
     return keep('git worktree remove refused')
   }
@@ -58,6 +66,7 @@ export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimRepo
     runtime,
     mainRun,
     selfReal: realpathSync(self),
+    registered: [main, ...others].map((record) => record.path),
     repository: readRepository(mainRun),
   }
   const worktrees: ReclaimEntry[] = []

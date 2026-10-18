@@ -9,6 +9,7 @@ const fs = require('node:fs')
 const args = process.argv.slice(2)
 const env = process.env
 if (env.FAKE_GH_FAIL) process.exit(1)
+if (env.FAKE_GH_NO_GIT_DIR && env.GIT_DIR) process.exit(1)
 if (args[0] === 'repo') {
   console.log(JSON.stringify({ nameWithOwner: env.GH_REPO || 'Acme/Widgets' }))
   process.exit(0)
@@ -36,6 +37,11 @@ if (state === 'open') pulls = pulls.filter((pr) => pr.state === 'OPEN')
 const pad = Number(env['FAKE_GH_PAD_' + state.toUpperCase()] || 0)
 for (let i = 0; i < pad; i += 1) pulls.push({ state: 'CLOSED' })
 console.log(JSON.stringify(pulls))
+// Reopen every PR after the first full answer, as if it changed before the re-check.
+if (state === 'all' && env.FAKE_GH_REOPEN && !fs.existsSync(file + '.reopened')) {
+  fs.writeFileSync(file, JSON.stringify(pulls.map((pr) => ({ ...pr, state: 'OPEN' }))))
+  fs.writeFileSync(file + '.reopened', '')
+}
 `
 
 export interface Fixture {
