@@ -230,6 +230,33 @@ Host-lock environment:
 `git_worktree_canonical_path_hash <path>` helper resolves the physical path and prints a stable
 `d` plus the first 12 lowercase hexadecimal characters of its SHA-256 digest.
 
+## Reclaiming finished worktrees
+
+`vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
+dry run unless `--yes` is passed. It prints one line per worktree (`reclaimed`, `would reclaim`, or
+`kept: <reason>`, control characters escaped), or `{ dryRun, worktrees }` with `--json`.
+
+It skips the main checkout, the caller's own worktree, and locked, bare, detached and missing
+worktrees. Any other worktree is kept, with a reason, unless all of these hold:
+
+- `git status` (untracked files and submodules included) is empty, and no index entry is
+  assume-unchanged or skip-worktree.
+- `gh pr list --head <branch>` has a merged or closed pull request from this repository (not a
+  fork) whose `headRefOid` equals HEAD, and no open pull request from this repository. That PR also
+  proves HEAD is published, so squash merges whose branch was deleted are reclaimed. A `gh` failure,
+  or a query returning 1000 results, keeps the worktree.
+
+With `--yes`, HEAD and cleanliness are checked again right before `git worktree remove <path>` runs.
+It is never forced, and a refusal from git is reported as kept. Ignored files (for example `.env`, `node_modules`, build output) are deleted with the worktree, exactly as `git worktree remove` does; keep anything you need outside ignored paths or commit it. An unexpected error on one worktree is reported as `kept: error: <message>` and the run carries on. There is no `prune`, no branch
+deletion, and git runs with `core.fsmonitor=false`.
+
+Known limitations: git cannot check and remove a worktree atomically, so a worktree that changes in the moment between the final check and `git worktree remove` can still be removed; the final check runs immediately before removal to keep that window small.
+
+This is NOT a security boundary. Run it as a trusted user or agent, and do not grant it as an
+unconditional allow rule. It has no teardown hook: per-worktree resources such as databases and
+containers are reclaimed afterwards by the consumer's own orphan cleanup, because the worktree is
+gone.
+
 ## Library
 
 ```ts

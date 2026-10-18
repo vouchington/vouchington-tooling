@@ -21,8 +21,12 @@ vi.mock('./commands/agent-blackboard.mts', () => ({
 vi.mock('./commands/mcp.mts', () => ({
   runMcpCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/worktree.mts', () => ({
+  runWorktreeCommand: vi.fn(() => 0),
+}))
 
 import { runCli } from './index.mts'
+import { runWorktreeCommand } from './commands/worktree.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
@@ -75,5 +79,10 @@ describe('runCli extract command dispatch', () => {
     expect(runMcpCommand).toHaveBeenCalledWith([])
     await expect(runCli(['node', 'vouchington', 'mcp', 'extra'])).resolves.toBe(0)
     expect(runMcpCommand).toHaveBeenLastCalledWith(['extra'])
+  })
+
+  it('forwards the worktree subcommand and its arguments', () => {
+    expect(runCli(['node', 'vouchington', 'worktree', 'reclaim', '--yes'])).toBe(0)
+    expect(runWorktreeCommand).toHaveBeenCalledWith(['reclaim', '--yes'])
   })
 })
