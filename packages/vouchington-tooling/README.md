@@ -241,11 +241,10 @@ worktrees. Any other worktree is kept, with a reason, unless all of these hold:
 
 - `git status` (untracked files and submodules included) is empty, and no index entry is
   assume-unchanged or skip-worktree.
-- Every commit is on some remote ref (`git rev-list HEAD --not --remotes` is empty), which also
-  covers squash merges whose branch was deleted, provided the PR head was pushed.
-- `gh pr list --head <branch> --state all` has a merged or closed pull request from this repository
-  (not a fork) whose `headRefOid` equals HEAD, and no open pull request from this repository. A `gh`
-  failure keeps the worktree.
+- `gh pr list --head <branch>` has a merged or closed pull request from this repository (not a
+  fork) whose `headRefOid` equals HEAD, and no open pull request from this repository. That PR also
+  proves HEAD is published, so squash merges whose branch was deleted are reclaimed. A `gh` failure,
+  or a query returning 1000 results, keeps the worktree.
 
 With `--yes`, HEAD and cleanliness are checked again right before `git worktree remove <path>` runs.
 It is never forced, and a refusal from git is reported as kept. There is no `prune`, no branch
