@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs'
 
 import { assessLocal, assessPullRequest, readRepository } from './assess.mts'
-import { parseWorktreeList } from './list.mts'
+import { parseWorktreeList, type WorktreeRecord } from './list.mts'
 import { git, type RunOptions } from './run.mts'
 
 interface ReclaimEntry {
@@ -16,6 +16,38 @@ export interface ReclaimReport {
   readonly worktrees: ReclaimEntry[]
 }
 
+interface Context {
+  readonly yes: boolean
+  readonly runtime: RunOptions
+  readonly mainRun: RunOptions
+  readonly selfReal: string
+  readonly repository: string | undefined
+}
+
+/** Assesses (and with `yes` removes) one worktree; undefined means it is not a candidate. */
+function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | undefined {
+  const { path, branch, locked, bare, detached } = record
+  if (locked || bare || detached || branch === undefined) return undefined
+  if (!existsSync(path) || realpathSync(path) === context.selfReal) return undefined
+  const keep = (reason: string): ReclaimEntry => ({ path, branch, status: 'kept', reason })
+  const worktree: RunOptions = { cwd: path, env: context.runtime.env }
+  const local = assessLocal(worktree)
+  if ('reason' in local) return keep(local.reason)
+  const reason = assessPullRequest(branch, local.head, context.repository, context.mainRun)
+  if (reason !== undefined) return keep(reason)
+  if (!context.yes) return { path, branch, status: 'would reclaim' }
+  const again = assessLocal(worktree)
+  const listed = parseWorktreeList(
+    git(['worktree', 'list', '--porcelain', '-z'], context.runtime) ?? '',
+  )
+  const same = listed.some((entry) => entry.path === path && entry.branch === branch)
+  if ('reason' in again || again.head !== local.head || !same) return keep('changed since check')
+  if (git(['worktree', 'remove', path], context.mainRun) === undefined) {
+    return keep('git worktree remove refused')
+  }
+  return { path, branch, status: 'reclaimed' }
+}
+
 /** Lists finished worktrees and, with `yes`, removes them with a plain (never forced) `git worktree remove`. */
 export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimReport {
   const listing = git(['worktree', 'list', '--porcelain', '-z'], runtime)
@@ -23,36 +55,22 @@ export function reclaimWorktrees(yes: boolean, runtime: RunOptions): ReclaimRepo
   const [main, ...others] = parseWorktreeList(listing ?? '')
   if (main === undefined || !self) throw new Error('not inside a git worktree')
   const mainRun: RunOptions = { cwd: main.path, env: runtime.env }
-  const selfReal = realpathSync(self)
-  const repository = readRepository(mainRun)
+  const context: Context = {
+    yes,
+    runtime,
+    mainRun,
+    selfReal: realpathSync(self),
+    repository: readRepository(mainRun),
+  }
   const worktrees: ReclaimEntry[] = []
-  for (const { path, branch, locked, bare, detached } of others) {
-    if (locked || bare || detached || branch === undefined) continue
-    if (!existsSync(path) || realpathSync(path) === selfReal) continue
-    const keep = (reason: string): number =>
-      worktrees.push({ path, branch, status: 'kept', reason })
-    const worktree: RunOptions = { cwd: path, env: runtime.env }
-    const local = assessLocal(worktree)
-    if ('reason' in local) {
-      keep(local.reason)
-      continue
+  for (const record of others) {
+    try {
+      const entry = reclaimOne(record, context)
+      if (entry !== undefined) worktrees.push(entry)
+    } catch (error) {
+      const reason = `error: ${(error as Error).message}`
+      worktrees.push({ path: record.path, branch: record.branch as string, status: 'kept', reason })
     }
-    const reason = assessPullRequest(branch, local.head, repository, mainRun)
-    if (reason !== undefined) {
-      keep(reason)
-      continue
-    }
-    if (!yes) {
-      worktrees.push({ path, branch, status: 'would reclaim' })
-      continue
-    }
-    const again = assessLocal(worktree)
-    const listed = parseWorktreeList(git(['worktree', 'list', '--porcelain', '-z'], runtime) ?? '')
-    const same = listed.some((record) => record.path === path && record.branch === branch)
-    if ('reason' in again || again.head !== local.head || !same) keep('changed since check')
-    else if (git(['worktree', 'remove', path], mainRun) === undefined) {
-      keep('git worktree remove refused')
-    } else worktrees.push({ path, branch, status: 'reclaimed' })
   }
   return { dryRun: !yes, worktrees }
 }

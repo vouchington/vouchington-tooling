@@ -247,7 +247,7 @@ worktrees. Any other worktree is kept, with a reason, unless all of these hold:
   or a query returning 1000 results, keeps the worktree.
 
 With `--yes`, HEAD and cleanliness are checked again right before `git worktree remove <path>` runs.
-It is never forced, and a refusal from git is reported as kept. There is no `prune`, no branch
+It is never forced, and a refusal from git is reported as kept. Ignored files (for example `.env`, `node_modules`, build output) are deleted with the worktree, exactly as `git worktree remove` does; keep anything you need outside ignored paths or commit it. An unexpected error on one worktree is reported as `kept: error: <message>` and the run carries on. There is no `prune`, no branch
 deletion, and git runs with `core.fsmonitor=false`.
 
 This is NOT a security boundary. Run it as a trusted user or agent, and do not grant it as an
