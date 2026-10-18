@@ -1,0 +1,20 @@
+name: Fetch base ref
+description: >
+  Fetches the PR base branch as refs/remotes/origin/<base> and fully unshallows the clone, so tools
+  that diff or merge-base against the base branch (patch coverage provenance, change detection,
+  Vitest test selection) can resolve it. actions/checkout never creates this ref by name, and
+  fetch-depth: 0 alone only deepens the checked-out ref's own ancestry, not a separately-diverged
+  base branch. The caller must run actions/checkout before invoking this action.
+runs:
+  using: composite
+  steps:
+    - name: Fetch base ref
+      shell: bash
+      env:
+        BASE_REF: ${{ github.base_ref || github.event.repository.default_branch || 'main' }}
+      run: |
+        set -euo pipefail
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          git fetch --no-tags --unshallow origin
+        fi
+        git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"

@@ -1,0 +1,25 @@
+name: Configure AWS Credentials
+description: >
+  Wraps aws-actions/configure-aws-credentials. Assumes an OIDC role for the
+  calling job. The caller must have id-token: write in its permissions block.
+
+inputs:
+  role-arn:
+    description: 'IAM role ARN to assume via OIDC'
+    required: true
+  aws-region:
+    description: 'AWS region'
+    default: us-east-1
+  action-timeout-s:
+    description: 'Seconds before the credential exchange is abandoned'
+    default: '90'
+
+runs:
+  using: composite
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+        action-timeout-s: ${{ inputs.action-timeout-s }}
