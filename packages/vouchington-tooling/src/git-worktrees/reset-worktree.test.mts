@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 const exec = promisify(execFile)
 const script = resolve('packages/vouchington-tooling/scripts/worktree/reset-worktree.sh')
 const roots: string[] = []
-const children: Array<{ pid?: number }> = []
+const children: number[] = []
 
 async function git(repo: string, args: string[]) {
   await exec('git', ['-C', repo, ...args])
@@ -34,13 +34,11 @@ function run(root: string, args: string[], env: NodeJS.ProcessEnv = process.env)
 
 describe('reset-worktree.sh', () => {
   afterEach(async () => {
-    for (const child of children.splice(0)) {
-      if (child.pid !== undefined) {
-        try {
-          process.kill(child.pid, 'SIGTERM')
-        } catch {
-          // The child already exited.
-        }
+    for (const pid of children.splice(0)) {
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        // The child already exited.
       }
     }
     await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
@@ -199,7 +197,7 @@ describe('reset-worktree.sh', () => {
         stdio: 'ignore',
       },
     )
-    children.push(first)
+    if (first.pid !== undefined) children.push(first.pid)
     const locked = join(root, 'locked')
     for (let attempt = 0; attempt < 50 && !(await readable(locked)); attempt += 1) {
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 20))
