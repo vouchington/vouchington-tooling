@@ -264,6 +264,31 @@ caller's `.mise.toml`, which must pin both `actionlint` and `zizmor`.
   The caller job needs `contents: read`, `issues: write` (to create missing labels), and
   `pull-requests: write`.
 
+### Maintenance and merge-queue workflows
+
+These are reusable `workflow_call` workflows. The caller owns the schedule or the merge-queue
+event. Pin them by full commit SHA. Do not pass `secrets: inherit`.
+
+- `pnpm-dedupe` checks out the caller with credentials disabled, installs from `node-version-file`
+  (default `.nvmrc`) and pnpm `latest-12`, then runs `pnpm dedupe`. When `pnpm-lock.yaml` changes
+  it force-pushes `branch` (default `chore/pnpm-dedupe`) and opens a pull request against `base`
+  (default `main`) with `title` and `label`. Forward `PUSH_TOKEN` by name. That token needs
+  contents and pull-request write, and it is used only for the push and the pull request.
+- `cleanup-artifacts` checks out the caller patterns file and this repository at `job.workflow_sha`,
+  builds the CLI, and runs `vouchington gha-artifacts-cleanup sweep`. `patterns-file` is required.
+  `older-than-hours` defaults to `6`. The caller workflow needs `actions: write` and `contents: read`,
+  because a called workflow can only narrow the caller's token. The sweep step continues on error so
+  a later schedule retries a failed lookup.
+- `cancel-dequeued-merge-group-runs` cancels active merge-group runs for a dequeued pull request.
+  Call it from `pull_request_target` `dequeued`. `queue-base` (default `main`) is the single branch
+  name in `gh-readonly-queue/<queue-base>/pr-<number>-`. The job needs `actions: write` and
+  `pull-requests: read` from the caller.
+- `cancel-replaced-merge-group-runs` cancels older merge-group runs when a replacement entry's
+  checks are requested. Call it from `merge_group` `checks_requested`. The queue ref is read from
+  the caller event. The job needs `actions: write` from the caller.
+
+Neither cancel workflow checks out repository code, and neither should be a required check.
+
 ### Required-result gate
 
 Pin `ci-required-result-gate` by its full 40-character commit SHA to give a required fan-in job a strict, compact

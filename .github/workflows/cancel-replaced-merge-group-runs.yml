@@ -1,0 +1,103 @@
+name: Cancel Replaced Merge Group Runs
+
+# When the merge queue removes an entry, GitHub rebuilds every entry behind it on a new temporary
+# branch (`gh-readonly-queue/<base>/pr-<N>-<sha>`). The old entry can never merge, but its merge-group
+# runs keep running and hold hosted runners. A pull request has exactly one live queue entry, so a
+# still-active run on an older `pr-<N>-*` branch is dead. This workflow cancels those runs, across
+# every workflow, when the replacement entry's checks are requested.
+#
+# `concurrency:` cannot do this: group keys cannot extract the pull-request number from the queue
+# branch name, and every entry gets a different branch. A run is cancelled only when its branch
+# differs from this entry's and its run id is lower than this run's, so a slow older job never
+# cancels a newer entry.
+#
+# This job is never a required check, so a failure cannot eject a queue entry. It checks out
+# nothing and runs no repository code; the queue ref reaches the script only through `env:`.
+# The caller owns the trigger. The usual event is merge_group checks_requested, and github.event
+# here is that caller event.
+
+on:
+  workflow_call:
+
+concurrency:
+  group: cancel-replaced-merge-group-runs-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cancel:
+    name: Cancel replaced entry runs
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel runs of older entries for this pull request
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_REF" =~ ^refs/heads/(gh-readonly-queue/.+/pr-([0-9]+))-[0-9a-f]+$ ]]; then
+            echo "::error::Unexpected merge group ref: $HEAD_REF"
+            exit 1
+          fi
+          queue_prefix="${BASH_REMATCH[1]}-"
+          pr_number="${BASH_REMATCH[2]}"
+          current_branch="${HEAD_REF#refs/heads/}"
+
+          # The runs API filters on one status at a time, and gh follows every page of each list.
+          candidates="$RUNNER_TEMP/replaced-runs.tsv"
+          : > "$candidates"
+          for status in queued in_progress waiting requested pending; do
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100" |
+              jq -r --arg prefix "$queue_prefix" --arg current "$current_branch" \
+                --argjson run_id "$GITHUB_RUN_ID" '
+                  .workflow_runs[]
+                  | select((.head_branch // "") | startswith($prefix))
+                  | select(.head_branch != $current and .id < $run_id)
+                  | [.id, .name, .head_branch] | @tsv' >> "$candidates"
+          done
+
+          failed=0
+          rows=
+          # A run can change status between two lists, so the same id may appear twice.
+          # HTTP 502, 503, and 504 from the cancel API are retried up to three attempts,
+          # one second apart. A persistent gateway error still fails this run and the job.
+          while IFS=$'\t' read -r id name branch; do
+            for attempt in 1 2 3; do
+              if error=$(gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" 2>&1 >/dev/null); then
+                result=cancelled
+                break
+              elif [[ "$error" == *"HTTP 409"* ]]; then
+                result='already completed'
+                break
+              elif [[ "$attempt" -lt 3 && ( "$error" == *"HTTP 502"* || "$error" == *"HTTP 503"* || "$error" == *"HTTP 504"* ) ]]; then
+                sleep 1
+              else
+                result='failed'
+                failed=1
+                echo "::warning::Could not cancel run $id: $error"
+                break
+              fi
+            done
+            echo "$result: $name run $id on $branch"
+            rows="$rows| $name | [$id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id) | \`$branch\` | $result |"$'\n'
+          done < <(sort -t$'\t' -k1,1n -u "$candidates")
+
+          {
+            echo "### Replaced merge-group runs for PR #$pr_number"
+            echo
+            if [[ -z "$rows" ]]; then
+              echo "No older queue entry of this pull request had an active run."
+            else
+              echo "| Workflow | Run | Queue branch | Result |"
+              echo "| --- | --- | --- | --- |"
+              printf '%s' "$rows"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$failed"
