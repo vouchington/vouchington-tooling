@@ -3,6 +3,7 @@ export const USAGE = `Usage: vouchington <command> [options]
 Commands:
   runner-port-policy   Print or validate a runner port policy
   with-host-lock       Run a command under a host-wide lock
+  host-storage         Check free space on caller-supplied paths
   gha-runtime-audit             Audit successful GitHub Actions job runtimes
   require-up-to-date            Require HEAD to include a fetched remote branch
   fresh-base                    Classify the worktree against a remote base branch
@@ -66,6 +67,8 @@ with-host-lock
   [--failure-diagnostics <absolute-script>]
   [--on-acquire-timeout fail|run-unlocked]
   -- <command> [args...]
+
+host-storage --path <path> [--path <path>...] [--minimum-free-bytes <bytes>] [--pnpm-store] [--docker-root] [--docker-desktop-path <path>] [--discovery-timeout-ms <ms>]
 
 gha-runtime-audit
   [--repository owner/name]   Default GITHUB_REPOSITORY

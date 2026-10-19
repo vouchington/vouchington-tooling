@@ -21,6 +21,7 @@ import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runWorktreeCommand } from './commands/worktree.mts'
+import { runHostStoragePreflightCli } from '../host-storage/cli.mts'
 import { runWithHostLock } from './commands/with-host-lock.mts'
 import { runFreshBase } from './commands/fresh-base.mts'
 import { runRequireUpToDate } from './commands/require-up-to-date.mts'
@@ -101,6 +102,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runRunnerPortPolicy(parsed)
     case 'with-host-lock':
       return runWithHostLock(parsed.args)
+    case 'host-storage':
+      return runHostStoragePreflightCli(parsed.args)
     case 'gha-runtime-audit':
       return runGhaRuntimeAudit(parsed)
     case 'script': {

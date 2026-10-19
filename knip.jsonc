@@ -24,6 +24,7 @@
         "src/gha-selected-files/index.mts!",
         "src/gha-artifacts-cleanup/index.mts!",
         "src/http-origin/index.mts!",
+        "src/host-storage/index.mts!",
         "src/process-line-buffer/index.mts!",
         "src/pg-schema-snapshot/index.mts!",
         "src/openapi-document/index.mts!",

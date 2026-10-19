@@ -223,6 +223,14 @@ Host-lock environment:
 | `HOST_LOCK_PROCESS_GROUP_DRAIN_SECONDS` | `30`                  | Time to wait for the command process group  |
 | `HOST_LOCK_ACTIVE`                      | unset                 | Set while a lock is held; nested locks fail |
 
+`vouchington host-storage --path <path>` checks free space for each path. Paths on the same device
+are measured once. The default floor is 5 GiB (`--minimum-free-bytes`). `--pnpm-store` discovers the
+pnpm store. `--docker-root` checks Docker Desktop's `Docker.raw` on macOS and `docker info` on Linux.
+Discovery waits at most 5 seconds (`--discovery-timeout-ms`). A required path that is missing or low
+fails before optional discovery runs. Optional discovery failures are warnings; low space on a
+discovered filesystem still fails. `inspectHostStorage` and `probeHostStorage` are exported from
+`vouchington-tooling/host-storage`.
+
 ## Sourceable Bash libraries
 
 `scripts/worktree/git-worktrees.sh` is included in the published package. Source it to parse

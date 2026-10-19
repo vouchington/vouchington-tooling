@@ -55,6 +55,11 @@
       "import": "./dist/runner-port-policy/index.mjs",
       "default": "./dist/runner-port-policy/index.mjs"
     },
+    "./host-storage": {
+      "types": "./dist/host-storage/index.d.mts",
+      "import": "./dist/host-storage/index.mjs",
+      "default": "./dist/host-storage/index.mjs"
+    },
     "./retrospective-transcript": {
       "types": "./dist/retrospective-transcript/index.d.mts",
       "import": "./dist/retrospective-transcript/index.mjs",
