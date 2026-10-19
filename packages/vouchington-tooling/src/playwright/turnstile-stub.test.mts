@@ -47,4 +47,19 @@ describe('installTurnstileStub', () => {
     expect(routes[0]?.body).toContain(JSON.stringify('caller-token'))
     expect(routes[0]?.body).toContain(JSON.stringify('data-test-widget'))
   })
+
+  it('retries the route when the first install fails', async () => {
+    let calls = 0
+    const page = {
+      route: vi.fn<() => Promise<void>>(async () => {
+        calls += 1
+        if (calls === 1) throw new Error('route failed')
+      }),
+    } as unknown as Page
+
+    await expect(installTurnstileStub(page)).rejects.toThrow('route failed')
+    await installTurnstileStub(page)
+
+    expect(calls).toBe(2)
+  })
 })

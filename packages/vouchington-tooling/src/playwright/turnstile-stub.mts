@@ -61,7 +61,6 @@ export async function installTurnstileStub(
   options: TurnstileStubOptions = {},
 ): Promise<void> {
   if (stubbedPages.has(page)) return
-  stubbedPages.add(page)
   const token = options.token ?? DEFAULT_TURNSTILE_STUB_TOKEN
   const attributeName = options.attributeName ?? DEFAULT_TURNSTILE_STUB_ATTRIBUTE
   const body = renderTurnstileStubScript(token, attributeName)
@@ -72,4 +71,5 @@ export async function installTurnstileStub(
       body,
     }),
   )
+  stubbedPages.add(page)
 }
