@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -211,15 +211,31 @@ describe('reset-worktree.sh', () => {
     const root = await initRepo()
     const bin = await mkdtemp(join(tmpdir(), 'worktree-reset-bin-'))
     roots.push(bin)
-    for (const command of ['git', 'openssl', 'lockf', 'sed', 'find', 'rm', 'mkdir']) {
+    for (const command of ['bash', 'dirname', 'git', 'openssl', 'sed', 'find', 'rm', 'mkdir', 'env']) {
       const path = spawnSync('bash', ['-lc', `command -v ${command}`], {
         encoding: 'utf8',
       }).stdout.trim()
+      if (path === '') throw new Error(`missing ${command}`)
       await symlink(path, join(bin, command))
     }
+    const lockf = join(bin, 'lockf')
+    await writeFile(
+      lockf,
+      `#!/bin/sh
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -t) shift 2 ;;
+    -*) shift ;;
+    *) shift; break ;;
+  esac
+done
+exec "$@"
+`,
+    )
+    await chmod(lockf, 0o755)
     const result = run(root, ['--base-ref', 'main'], {
       ...process.env,
-      PATH: `${bin}:/usr/bin:/bin`,
+      PATH: bin,
     })
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('reset-branch=reset-')
