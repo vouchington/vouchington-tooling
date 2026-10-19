@@ -24,9 +24,10 @@ export function stripNonShellHeredocBodies(command: string): HeredocScan {
   const bodySubstitutions: string[] = []
   const shellBodies: string[] = []
 
+  const carried: { quote: "'" | '"' | null } = { quote: null }
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!
-    const specs = heredocSpecsFromLine(line)
+    const specs = heredocSpecsFromLine(line, carried)
     textLines.push(line)
     if (specs.length === 0) {
       continue

@@ -4,6 +4,18 @@ import { commandSegmentStart, nextShellCommandSeparatorIndex } from './shell-tok
 
 // Words that close a compound command. Its redirections feed every command inside it.
 const COMPOUND_CLOSERS = new Set(['done', 'esac', 'fi'])
+const EXEC_WRAPPERS = new Set([
+  'chroot',
+  'doas',
+  'ionice',
+  'nice',
+  'setsid',
+  'stdbuf',
+  'su',
+  'sudo',
+  'timeout',
+  'xargs',
+])
 const EXPANSION = /[$`*?[]/
 
 /**
@@ -37,5 +49,6 @@ function segmentMayRunStdin(tokens: string[], start: number, end: number): boole
   if (read === null) return true
   const command = words[read.commandIndex]
   if (command === undefined || EXPANSION.test(command)) return true
+  if (EXEC_WRAPPERS.has(command.slice(command.lastIndexOf('/') + 1))) return true
   return isShellWord(command) && shellScriptOperandIndex(words, read.commandIndex) === undefined
 }

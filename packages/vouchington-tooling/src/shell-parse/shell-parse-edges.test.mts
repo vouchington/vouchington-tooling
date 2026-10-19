@@ -145,6 +145,26 @@ describe('shell parser edges', () => {
     expect(stripGitGlobalOptionsForPolicy('git -c core.hooksPath=/tmp status')).toContain(
       'core.hooksPath',
     )
+    expect(stripGitGlobalOptionsForPolicy('git -c core.hookspath=/dev/null commit')).toContain(
+      'hookspath',
+    )
+    expect(stripGitGlobalOptionsForPolicy('git -c "core.hooksPath=/dev/null" commit')).toContain(
+      'hooksPath',
+    )
+    expect(stripQuotedShellText("echo 'C:\\' && git push --force")).toContain('git push --force')
+    expect(heredocSpecsFromLine('echo hi;# <<EOF')).toEqual([])
+    expect(
+      stripNonShellHeredocBodies("cat <<'EOF'\nfoo\\\nEOF\ngit push --force").textWithoutBodies,
+    ).toContain('git push --force')
+    expect(
+      stripNonShellHeredocBodies('git commit -m "msg\n<<EOF\n"\ngit push --force\nEOF')
+        .textWithoutBodies,
+    ).toContain('git push --force')
+    expect(tokenizeShellWords("'a\\\nb'")).toEqual(['a\\\nb'])
+    const sudo = tokenizeShellWords('sudo bash <<EOF', { splitRedirections: true })
+    expect(shellReadsStdinAt(sudo, sudo.indexOf('<<'))).toBe(true)
+    const xargs = tokenizeShellWords('cat <<EOF | xargs -0 sh', { splitRedirections: true })
+    expect(shellReadsStdinAt(xargs, xargs.indexOf('<<'))).toBe(true)
     expect(plainShellAssignment('FOO+=1')).toBeNull()
     expect(plainShellAssignment('FOO[0]=1')).toBeNull()
     expect(

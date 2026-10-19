@@ -5,10 +5,13 @@ export type HeredocSpec = {
   stripLeadingTabs: boolean
 }
 
-export function heredocSpecsFromLine(line: string): HeredocSpec[] {
+export function heredocSpecsFromLine(
+  line: string,
+  carried?: { quote: "'" | '"' | null },
+): HeredocSpec[] {
   const specs: HeredocSpec[] = []
 
-  let quote: "'" | '"' | null = null
+  let quote: "'" | '"' | null = carried?.quote ?? null
   let escaping = false
   for (let index = 0; index < line.length; index += 1) {
     const char = line[index]!
@@ -69,5 +72,6 @@ export function heredocSpecsFromLine(line: string): HeredocSpec[] {
     }
   }
 
+  if (carried !== undefined) carried.quote = quote
   return specs
 }

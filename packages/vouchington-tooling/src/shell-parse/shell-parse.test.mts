@@ -65,7 +65,7 @@ describe('shell tokenizer', () => {
       'x\n',
     ])
     expect(tokenizeShellWords('a\\\nb; c && d || e | f\ng')).toEqual([
-      'a\nb',
+      'ab',
       ';',
       'c',
       '&&',
