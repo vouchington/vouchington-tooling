@@ -237,8 +237,8 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   the download deadline. It supports Linux and macOS runners. Give the calling step its own
   `timeout-minutes`.
 - `setup-lychee` installs lychee `version` (default `0.24.2`) with checksum verification into the
-  job temporary bin directory and appends that directory to `GITHUB_PATH`. Versions before 0.24.0
-  keep the binary at the archive root.
+  job temporary bin directory and appends that directory to `GITHUB_PATH`. It supports Linux and
+  macOS runners. Versions before 0.24.0 keep the binary at the archive root.
 
 ### Required-result gate
 

@@ -75,7 +75,7 @@ exit "\${next:-0}"
           PATH: `${bin}:${process.env.PATH ?? ''}`,
           FAKE_LOG: log,
           RUN_BOUNDED: join(workspace, 'run-bounded.py'),
-          CHROMIUM_LAUNCH_PROBE: join(workspace, 'chromium-launch-probe.mts'),
+          CHROMIUM_LAUNCH_PROBE: join(workspace, 'chromium-launch-probe.mjs'),
           WAIT_FOR_APT_LOCKS: waitForApt,
           PLAYWRIGHT_BROWSER: 'chromium',
           PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS: '120',
@@ -125,14 +125,14 @@ describe('setup-playwright composite action', () => {
       `${scripts}/run-bounded.py`,
     )
     expect(step('Verify Chromium launches').env?.CHROMIUM_LAUNCH_PROBE).toContain(
-      `${scripts}/chromium-launch-probe.mts`,
+      `${scripts}/chromium-launch-probe.mjs`,
     )
     expect(step('Verify Chromium launches').env?.WAIT_FOR_APT_LOCKS).toContain(
       'scripts/gha/wait-for-apt-locks.sh',
     )
     expect(existsSync(join(repoRoot, scripts, 'run-bounded.py'))).toBe(true)
     expect(existsSync(join(repoRoot, scripts, 'run_bounded_process.py'))).toBe(true)
-    expect(existsSync(join(repoRoot, scripts, 'chromium-launch-probe.mts'))).toBe(true)
+    expect(existsSync(join(repoRoot, scripts, 'chromium-launch-probe.mjs'))).toBe(true)
   })
 })
 
@@ -259,7 +259,7 @@ describe('setup-playwright browser download', () => {
 })
 
 describe('setup-playwright Chromium launch check', () => {
-  const probe = 'node $WS/chromium-launch-probe.mts'
+  const probe = 'node $WS/chromium-launch-probe.mjs'
 
   it('uses no apt when Chromium launches', () => {
     const { status, calls } = runStep('Verify Chromium launches', { node: [0] })

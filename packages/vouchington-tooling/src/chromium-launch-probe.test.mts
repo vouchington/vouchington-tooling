@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { chromiumLaunchProbeExitCode } from '../scripts/chromium-launch-probe.mts'
+import { chromiumLaunchProbeExitCode } from '../scripts/chromium-launch-probe.mjs'
 
 const probeSource = join(
   resolve(dirname(fileURLToPath(import.meta.url)), '..'),
-  'scripts/chromium-launch-probe.mts',
+  'scripts/chromium-launch-probe.mjs',
 )
 
 describe('chromiumLaunchProbeExitCode', () => {
@@ -77,7 +77,7 @@ function runProbe(
   packageName = 'playwright',
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'chromium-launch-probe-'))
-  const script = join(directory, 'ci/playwright/chromium-launch-probe.mts')
+  const script = join(directory, 'ci/playwright/chromium-launch-probe.mjs')
   const packageDirectory = join(directory, 'node_modules', packageName)
   mkdirSync(join(directory, 'ci/playwright'), { recursive: true })
   writeFileSync(join(directory, 'package.json'), '{"name":"probe-fixture"}')
@@ -122,7 +122,7 @@ const recordingChromium = (failOnChannel?: string) => `
   }
 `
 
-describe('chromium-launch-probe.mts process contract', () => {
+describe('chromium-launch-probe.mjs process contract', () => {
   it('exits 0 after launching and closing both Chromium flavors', () => {
     const result = runProbe(recordingChromium())
 
@@ -142,6 +142,22 @@ describe('chromium-launch-probe.mts process contract', () => {
 
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain('missing shared library')
+  })
+
+  it('launches Chrome and Edge through the Chromium channel', () => {
+    for (const browser of ['chrome', 'msedge']) {
+      const result = runProbe(recordingChromium(), { PLAYWRIGHT_BROWSER: browser })
+
+      expect(result.status).toBe(0)
+      expect(result.calls).toEqual([`launch {"channel":"${browser}"}`, 'close'])
+    }
+  })
+
+  it('names a browser Playwright does not export', () => {
+    const result = runProbe(recordingChromium(), { PLAYWRIGHT_BROWSER: 'opera' })
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Playwright has no browser opera')
   })
 
   it('launches the requested browser once when it is not Chromium', () => {

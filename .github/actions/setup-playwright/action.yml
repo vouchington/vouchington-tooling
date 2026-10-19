@@ -102,7 +102,7 @@ runs:
     - name: Verify Chromium launches
       shell: bash
       env:
-        CHROMIUM_LAUNCH_PROBE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/chromium-launch-probe.mts
+        CHROMIUM_LAUNCH_PROBE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/chromium-launch-probe.mjs
         WAIT_FOR_APT_LOCKS: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/wait-for-apt-locks.sh
         PLAYWRIGHT_BROWSER: ${{ inputs.browser }}
       # Host packages are installed only when Chromium cannot start. This

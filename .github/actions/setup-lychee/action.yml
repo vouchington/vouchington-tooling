@@ -1,5 +1,7 @@
 name: Setup lychee
-description: Install a checksum-verified lychee release onto PATH.
+description: >
+  Install a checksum-verified lychee release onto PATH. Supports Linux and
+  macOS runners.
 inputs:
   version:
     description: lychee release version, without the lychee-v tag prefix
@@ -15,6 +17,10 @@ runs:
         INSTALL_GITHUB_RELEASE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/install-github-release.sh
       run: |
         set -euo pipefail
+        case "$(uname -s)" in
+          Linux|Darwin) ;;
+          *) echo "::error::setup-lychee supports Linux and macOS runners"; exit 1 ;;
+        esac
         # Install into the runner's per-job temporary directory rather than relying
         # on mutable binaries under $HOME/.local/bin.
         LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
