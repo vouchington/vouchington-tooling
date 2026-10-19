@@ -90,15 +90,15 @@ export function createHarness(script: string) {
   }
 
   return {
-    setup() {
+    setup: () => {
       directory = mkdtempSync(join(tmpdir(), 'cancel-dequeued-'))
       writeFileSync(join(directory, 'gh'), fakeGh)
       chmodSync(join(directory, 'gh'), 0o755)
     },
-    teardown() {
+    teardown: () => {
       rmSync(directory, { recursive: true, force: true })
     },
-    execute(scenario: Scenario) {
+    execute: (scenario: Scenario) => {
       for (const name of ['cancelled', 'calls', 'summary.md']) {
         rmSync(join(directory, name), { force: true })
       }
