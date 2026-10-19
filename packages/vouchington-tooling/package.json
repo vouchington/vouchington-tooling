@@ -374,7 +374,7 @@
   "dependencies": {
     "@types/mdast": "4.0.4",
     "@types/unist": "3.0.3",
-    "@typescript-eslint/parser": "^8.71.1",
+    "@typescript-eslint/parser": "^8.71.2",
     "agent-blackboard": "^0.7.0",
     "csv-parse": "7.0.3",
     "csv-stringify": "6.9.0",
