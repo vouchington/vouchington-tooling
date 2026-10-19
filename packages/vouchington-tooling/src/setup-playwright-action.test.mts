@@ -283,6 +283,50 @@ describe('setup-playwright browser download', () => {
       rmSync(directory, { recursive: true, force: true })
     }
   })
+
+  it('anchors a relative cache path at the workspace root', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-cache-'))
+    const output = join(directory, 'output')
+    const envFile = join(directory, 'env')
+    writeFileSync(join(directory, 'pnpm-lock.yaml'), 'lock\n')
+    const run = (cachePath: string) => {
+      writeFileSync(output, '')
+      writeFileSync(envFile, '')
+      return spawnSync(
+        'bash',
+        [
+          '--noprofile',
+          '--norc',
+          '-eo',
+          'pipefail',
+          '-c',
+          step('Resolve Playwright cache key').run ?? '',
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            HOME: '/home/runner',
+            GITHUB_WORKSPACE: '/home/runner/work/repo/repo',
+            PLAYWRIGHT_CACHE_PATH: cachePath,
+            GITHUB_OUTPUT: output,
+            GITHUB_ENV: envFile,
+          },
+        },
+      )
+    }
+    try {
+      expect(run('.cache/ms-playwright').status).toBe(0)
+      expect(readFileSync(envFile, 'utf8')).toBe(
+        'PLAYWRIGHT_BROWSERS_PATH=/home/runner/work/repo/repo/.cache/ms-playwright\n',
+      )
+      expect(run('/opt/playwright').status).toBe(0)
+      expect(readFileSync(envFile, 'utf8')).toBe('PLAYWRIGHT_BROWSERS_PATH=/opt/playwright\n')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('setup-playwright Chromium launch check', () => {

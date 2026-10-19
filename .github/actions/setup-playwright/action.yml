@@ -12,7 +12,7 @@ inputs:
     description: Playwright browser passed to install and install-deps
     default: chromium
   cache-path:
-    description: Directory restored by actions/cache
+    description: Directory restored by actions/cache. A relative path is resolved from the workspace root.
     default: ~/.cache/ms-playwright
   timeout-seconds:
     description: Per-attempt deadline for the browser download
@@ -37,7 +37,16 @@ runs:
         case "$PLAYWRIGHT_CACHE_PATH" in
           '~') resolved="$HOME" ;;
           '~/'*) resolved="$HOME/${PLAYWRIGHT_CACHE_PATH#"~/"}" ;;
-          *) resolved="$PLAYWRIGHT_CACHE_PATH" ;;
+          /*) resolved="$PLAYWRIGHT_CACHE_PATH" ;;
+          *)
+            if [ -z "${GITHUB_WORKSPACE:-}" ]; then
+              echo "::error::a relative cache-path needs GITHUB_WORKSPACE"
+              exit 2
+            fi
+            # Keep the exported path absolute so a later step with another
+            # working-directory does not resolve it again.
+            resolved="${GITHUB_WORKSPACE%/}/${PLAYWRIGHT_CACHE_PATH#./}"
+            ;;
         esac
         echo "cache-path=$resolved" >> "$GITHUB_OUTPUT"
         echo "PLAYWRIGHT_BROWSERS_PATH=$resolved" >> "$GITHUB_ENV"
