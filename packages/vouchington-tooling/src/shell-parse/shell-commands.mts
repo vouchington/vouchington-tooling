@@ -30,9 +30,7 @@ export function commandsToInspectForGitPolicy(command: string): string[] {
 
 /** Same command list as the regex scan, with quoted refs still readable by the tokenizer. */
 export function commandsToInspectPreservingQuotes(command: string): string[] {
-  const { bodySubstitutions, shellBodies, textWithoutBodies } = stripNonShellHeredocBodies(
-    command.replace(/\\\n/g, ' '),
-  )
+  const { bodySubstitutions, shellBodies, textWithoutBodies } = stripNonShellHeredocBodies(command)
   return [textWithoutBodies, ...shellBodies, ...bodySubstitutions].flatMap((script) => {
     const normalizedScript = stripGitGlobalOptionsForPolicy(script.replace(/\\\n/g, ' '))
     return [
