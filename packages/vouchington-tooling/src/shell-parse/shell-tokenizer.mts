@@ -27,7 +27,9 @@ export function tokenizeShellWordsDetailed(
   for (let index = 0; index < commandWithoutComments.length; index += 1) {
     const char = commandWithoutComments[index]!
     if (escaping) {
-      if (quote === '"' && !DOUBLE_QUOTE_ESCAPE_CHARS.has(char!)) {
+      if (char === '\n') {
+        // Line continuation: bash removes `\<newline>` unquoted and in double quotes.
+      } else if (quote === '"' && !DOUBLE_QUOTE_ESCAPE_CHARS.has(char!)) {
         token += `\\${char}`
       } else {
         token += char
