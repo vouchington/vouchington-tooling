@@ -123,6 +123,39 @@ describe('waitForBelowFoldHydration', () => {
     expect(evaluate).toHaveBeenCalledTimes(3)
   })
 
+  it('restarts when the destroyed context is not an Error', async () => {
+    const evaluate = vi.fn<(callback: () => Promise<void>) => Promise<void>>((callback) =>
+      callback(),
+    )
+    evaluate.mockRejectedValueOnce('Execution context was destroyed')
+    const page = {
+      evaluate,
+      waitForLoadState: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    } as unknown as Page
+    vi.stubGlobal('window', {
+      requestIdleCallback: (callback: () => void) => callback(),
+    })
+
+    await waitForBelowFoldHydration(page)
+
+    expect(evaluate).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores a late animation frame after the wait already resolved', async () => {
+    vi.useFakeTimers()
+    const page = createEvaluatePage()
+    const requestAnimationFrame = vi.fn<(callback: () => void) => number>((callback) => {
+      callback()
+      return 1
+    })
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
+
+    const waitPromise = waitForBelowFoldHydration(page)
+    await vi.advanceTimersByTimeAsync(50)
+    await waitPromise
+  })
+
   it('does not re-wait for an error that is not a destroyed context', async () => {
     const { page, evaluate, waitForLoadState } = createRedirectingPage(0)
     vi.mocked(evaluate).mockRejectedValueOnce(new Error('page.evaluate: boom'))

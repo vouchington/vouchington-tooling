@@ -4,6 +4,7 @@ import { retryOnConnectionLost } from './retry-on-connection-lost.mts'
 describe('retryOnConnectionLost', () => {
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('returns value without retry when fn resolves on first call', async () => {
@@ -213,9 +214,9 @@ describe('retryOnConnectionLost', () => {
 
   it('stops retrying when an attempt exceeds the remaining budget', async () => {
     vi.useFakeTimers()
-    let completeAttempt!: () => void
-    const slowAttempt = new Promise<void>((resolve) => {
-      completeAttempt = resolve
+    let failAttempt!: (error: Error) => void
+    const slowAttempt = new Promise<void>((_resolve, reject) => {
+      failAttempt = reject
     })
     const fn = vi.fn<() => Promise<unknown>>().mockReturnValue(slowAttempt)
 
@@ -232,7 +233,7 @@ describe('retryOnConnectionLost', () => {
       },
     )
     await vi.advanceTimersByTimeAsync(4000)
-    completeAttempt()
+    failAttempt(new Error('late'))
     await rejection
     expect(fn).toHaveBeenCalledTimes(1)
   })
@@ -258,5 +259,50 @@ describe('retryOnConnectionLost', () => {
 
     await expect(retryOnConnectionLost(fn, { maxRetries: 10 })).rejects.toBe(error)
     expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry a timeout whose target is not a URL', async () => {
+    const error = new Error(
+      'page.goto: Timeout 30000ms exceeded\n  - navigating to "not a url", waiting until "load"',
+    )
+    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
+
+    await expect(retryOnConnectionLost(fn, { backoffMs: 50, maxRetries: 2 })).rejects.toBe(error)
+    expect(fn).toHaveBeenCalledOnce()
+  })
+
+  it('retries when the failure is not an Error instance', async () => {
+    vi.useFakeTimers()
+    const fn = vi.fn<() => Promise<unknown>>()
+    fn.mockRejectedValueOnce('net::ERR_CONNECTION_REFUSED')
+    fn.mockResolvedValueOnce('ok')
+
+    const promise = retryOnConnectionLost(fn, { backoffMs: 50, maxRetries: 1 })
+    await vi.runAllTimersAsync()
+
+    await expect(promise).resolves.toBe('ok')
+  })
+
+  it('fails immediately when the deadline is already past', async () => {
+    vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(10_000)
+    const fn = vi.fn<() => Promise<unknown>>().mockResolvedValue('ok')
+
+    await expect(
+      retryOnConnectionLost(fn, { backoffMs: 50, maxDurationMs: 1_000, maxRetries: 1 }),
+    ).rejects.toThrow('retryOnConnectionLost: connection retry budget exceeded')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('rethrows the connection error when no budget remains after the attempt', async () => {
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValueOnce(0)
+    now.mockReturnValueOnce(0)
+    now.mockReturnValue(5_000)
+    const error = new Error('net::ERR_CONNECTION_REFUSED')
+    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
+
+    await expect(
+      retryOnConnectionLost(fn, { backoffMs: 50, maxDurationMs: 5_000, maxRetries: 3 }),
+    ).rejects.toBe(error)
   })
 })

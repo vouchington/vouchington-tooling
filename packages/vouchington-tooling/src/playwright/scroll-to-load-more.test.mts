@@ -10,7 +10,10 @@ function createPage(options: {
   counts: number[]
   boxes: Array<typeof BELOW_FOLD_BOX | typeof IN_VIEW_BOX | null>
   boxThrows?: boolean
+  freezeScroll?: boolean
+  missingScrollingElement?: boolean
   remountOnWait?: boolean
+  viewport?: null
 }): {
   getByTestId: ReturnType<typeof vi.fn<(id: string) => unknown>>
   page: Page
@@ -41,14 +44,16 @@ function createPage(options: {
   }
   const getByTestId = vi.fn<(id: string) => typeof sentinel>(() => sentinel)
   const wheel = vi.fn<(x: number, y: number) => Promise<void>>(async (_x, y) => {
-    scrollTop += y
+    if (!options.freezeScroll) scrollTop += y
   })
 
   return {
     getByTestId,
     page: {
       getByTestId,
-      viewportSize: vi.fn<() => typeof VIEWPORT | null>(() => VIEWPORT),
+      viewportSize: vi.fn<() => typeof VIEWPORT | null>(() =>
+        options.viewport === null ? null : VIEWPORT,
+      ),
       mouse: {
         move: vi.fn<(x: number, y: number) => Promise<void>>().mockResolvedValue(undefined),
         wheel,
@@ -62,7 +67,7 @@ function createPage(options: {
           configurable: true,
           value: {
             documentElement: { scrollHeight: 4000 },
-            scrollingElement: { scrollTop },
+            scrollingElement: options.missingScrollingElement ? null : { scrollTop },
           },
         })
         Object.defineProperty(globalThis, 'window', {
@@ -138,27 +143,77 @@ describe('scrollToLoadMore', () => {
     expect(waitFor).toHaveBeenCalledOnce()
   })
 
+  it('moves the pointer when the viewport size is unknown', async () => {
+    const { page } = createPage({
+      boxes: [null, IN_VIEW_BOX],
+      counts: [1, 1],
+      viewport: null,
+    })
+
+    await expect(scrollToLoadMore(page)).rejects.toThrow(/did not enter the viewport/)
+  })
+
+  it('reports a document that never scrolled', async () => {
+    const { page } = createPage({
+      boxes: [],
+      counts: [0],
+      freezeScroll: true,
+      missingScrollingElement: true,
+    })
+
+    await expect(scrollToLoadMore(page)).rejects.toThrow(/document never scrolled/)
+  })
+
+  it('reports mixed sentinel states when the sentinel stays below the fold', async () => {
+    const { page } = createPage({
+      boxes: [BELOW_FOLD_BOX],
+      counts: [1],
+    })
+
+    await expect(scrollToLoadMore(page)).rejects.toThrow(/below-fold/)
+  })
+
   it('installs a style that makes main taller than the viewport', async () => {
     const installed: Array<{ id: string; textContent: string }> = []
     const style = { id: '', textContent: '' }
-    const document = {
-      addEventListener: vi.fn(),
-      createElement: () => style,
-      documentElement: {
-        append: (node: { id: string; textContent: string }) => installed.push(node),
+    const documents = [
+      {
+        addEventListener: vi.fn(),
+        createElement: () => style,
+        documentElement: {
+          append: (node: { id: string; textContent: string }) => installed.push(node),
+        },
+        getElementById: () => null,
+        head: null,
+        readyState: 'complete',
       },
-      getElementById: () => null,
-      head: null,
-      readyState: 'loading',
-    }
+      {
+        addEventListener: (_type: string, listener: () => void) => listener(),
+        createElement: () => style,
+        documentElement: { append: () => undefined },
+        getElementById: (id: string) => (style.id === id ? style : null),
+        head: { append: () => undefined },
+        readyState: 'loading',
+      },
+      {
+        addEventListener: vi.fn(),
+        createElement: () => style,
+        documentElement: null,
+        getElementById: () => null,
+        head: null,
+        readyState: 'complete',
+      },
+    ]
     const page = {
       addInitScript: async (script: () => void) => {
-        const previous = (globalThis as { document?: unknown }).document
-        Object.defineProperty(globalThis, 'document', { configurable: true, value: document })
-        try {
-          script()
-        } finally {
-          Object.defineProperty(globalThis, 'document', { configurable: true, value: previous })
+        for (const document of documents) {
+          const previous = (globalThis as { document?: unknown }).document
+          Object.defineProperty(globalThis, 'document', { configurable: true, value: document })
+          try {
+            script()
+          } finally {
+            Object.defineProperty(globalThis, 'document', { configurable: true, value: previous })
+          }
         }
       },
     }
