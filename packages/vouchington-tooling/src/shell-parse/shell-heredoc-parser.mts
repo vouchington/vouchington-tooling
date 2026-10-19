@@ -39,7 +39,7 @@ export function heredocSpecsFromLine(line: string): HeredocSpec[] {
       continue
     }
 
-    if (char === '#' && (index === 0 || /\s/.test(line[index - 1]!))) {
+    if (char === '#' && (index === 0 || /[\s;&|()]/.test(line[index - 1]!))) {
       break
     }
 
