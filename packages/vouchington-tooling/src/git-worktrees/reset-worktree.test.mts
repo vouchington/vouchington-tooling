@@ -160,7 +160,7 @@ describe('reset-worktree.sh', () => {
     expect(escaped.status).toBe(2)
     expect(await readFile(outside, 'utf8')).toBe('keep\n')
 
-    const result = run(root, ['--base-ref', 'refs/heads/main', '--cache', 'dist'])
+    const result = run(root, ['--base-ref', 'refs/heads/main', '--cache', './dist'])
     expect(result.status).toBe(0)
     await expect(readFile(join(root, 'dist', 'out.js'), 'utf8')).rejects.toThrow()
     await expect(readFile(join(root, 'pkg', '.cache', 'x'), 'utf8')).rejects.toThrow()
@@ -207,6 +207,14 @@ describe('reset-worktree.sh', () => {
 
     const lockCache = run(root, ['--base-ref', 'main', '--cache', '.local'])
     expect(lockCache.status).toBe(2)
+    expect(await readFile(join(root, '.local', 'reset-worktree.lock'), 'utf8')).toBe('')
+
+    for (const cache of ['./.git', './.local', '.']) {
+      const aliased = run(root, ['--base-ref', 'main', '--cache', cache])
+      expect(aliased.status).toBe(2)
+    }
+    expect(await readFile(join(root, '.git', 'HEAD'), 'utf8')).toContain('ref:')
+    expect(await readFile(join(root, 'README'), 'utf8')).toBe('one\n')
     expect(await readFile(join(root, '.local', 'reset-worktree.lock'), 'utf8')).toBe('')
   })
 

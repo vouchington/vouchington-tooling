@@ -108,13 +108,32 @@ fetch_base_ref() {
 }
 
 validate_caches() {
-  local cache
+  local cache segment normalized
+  local -a segments
   if [ "${#CACHES[@]}" -eq 0 ]; then
     return 0
   fi
   for cache in "${CACHES[@]}"; do
     case "$cache" in
-      ''|/*|..|../*|*/..|*/../*|.git|.git/*|.local|.local/*)
+      ''|/*)
+        echo "Error: cache path must stay inside the worktree: $cache" >&2
+        exit 2
+        ;;
+    esac
+    normalized=
+    IFS=/ read -r -a segments <<< "$cache"
+    for segment in "${segments[@]}"; do
+      case "$segment" in
+        ''|.) ;;
+        ..)
+          echo "Error: cache path must stay inside the worktree: $cache" >&2
+          exit 2
+          ;;
+        *) normalized="${normalized:+$normalized/}$segment" ;;
+      esac
+    done
+    case "$normalized" in
+      ''|.git|.git/*|.local|.local/*)
         echo "Error: cache path must stay inside the worktree: $cache" >&2
         exit 2
         ;;
