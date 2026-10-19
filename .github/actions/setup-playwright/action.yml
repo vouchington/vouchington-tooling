@@ -84,7 +84,12 @@ runs:
           exit 2
         fi
         case "$PLAYWRIGHT_BROWSER" in
-          chrome|chrome-beta|chrome-dev|chrome-canary|msedge|msedge-beta|msedge-dev|msedge-canary)
+          chrome-dev|chrome-canary|msedge-canary)
+            # Playwright registers these channels without an installer.
+            echo "::error::setup-playwright cannot install ${PLAYWRIGHT_BROWSER}; Playwright provides no installer for that channel"
+            exit 1
+            ;;
+          chrome|chrome-beta|msedge|msedge-beta|msedge-dev)
             # These channels install a system browser. On Linux that runs apt
             # as root, which run-bounded cannot stop. The caller's step timeout
             # bounds this install, and it is not retried over a live apt.

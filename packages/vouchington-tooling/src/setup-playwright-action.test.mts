@@ -91,7 +91,7 @@ exit "\${next:-0}"
       .split('\n')
       .filter(Boolean)
       .map((call) => call.replaceAll(workspace, '$WS'))
-    return { status: result.status, calls }
+    return { status: result.status, stdout: result.stdout, calls }
   } finally {
     rmSync(directory, { recursive: true })
   }
@@ -149,6 +149,19 @@ describe('setup-playwright browser download', () => {
 
     expect(status).toBe(0)
     expect(calls).toEqual(['pnpm exec playwright install chrome'])
+  })
+
+  it('rejects a channel Playwright cannot install', () => {
+    const { status, stdout, calls } = runStep('Install Playwright browsers', {
+      browser: 'chrome-canary',
+    })
+
+    expect(status).toBe(1)
+    expect(stdout).toContain('Playwright provides no installer')
+    expect(calls).toEqual([])
+    expect(step('Install Playwright browsers').run).toContain(
+      'chrome-dev|chrome-canary|msedge-canary',
+    )
   })
 
   it('downloads Chromium under the input bound and never installs host packages', () => {
