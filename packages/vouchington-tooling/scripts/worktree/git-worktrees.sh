@@ -2,13 +2,17 @@
 # Helpers for parsing `git worktree list --porcelain` and identifying worktree paths.
 
 git_worktree_list_porcelain() {
-  local repo_root=${1:-}
-
-  if [ -n "$repo_root" ]; then
-    (git -C "$repo_root" worktree list --porcelain 2>/dev/null)
+  if [ -n "${1:-}" ]; then
+    git -C "$1" worktree list --porcelain
   else
-    (git worktree list --porcelain 2>/dev/null)
+    git worktree list --porcelain
   fi
+}
+
+_git_worktree_records() {
+  local porcelain
+  porcelain=$(git_worktree_list_porcelain "${1:-}") || return 1
+  printf '%s\n' "$porcelain" | git_worktree_records_from_porcelain
 }
 
 worktree_dir_from_path() {
@@ -60,52 +64,51 @@ git_worktree_records_from_porcelain() {
 }
 
 git_worktree_live_paths() {
-  local repo_root=${1:-}
-  local path prunable
+  local records path prunable
+  records=$(_git_worktree_records "${1:-}") || return 1
 
   while IFS=$'\t' read -r path prunable; do
     [ -n "$path" ] || continue
     if [ "$prunable" = 0 ] && [ -d "$path" ]; then
       printf '%s\n' "$path"
     fi
-  done < <(git_worktree_list_porcelain "$repo_root" | git_worktree_records_from_porcelain)
+  done <<<"$records"
 }
 
 git_worktree_prunable_paths() {
-  local repo_root=${1:-}
-  local path prunable
+  local records path prunable
+  records=$(_git_worktree_records "${1:-}") || return 1
 
   while IFS=$'\t' read -r path prunable; do
     [ -n "$path" ] || continue
     if [ "$prunable" = 1 ]; then
       printf '%s\n' "$path"
     fi
-  done < <(git_worktree_list_porcelain "$repo_root" | git_worktree_records_from_porcelain)
+  done <<<"$records"
 }
 
 git_worktree_main_path() {
-  local repo_root=${1:-}
-  local path prunable
+  local records path prunable
+  records=$(_git_worktree_records "${1:-}") || return 1
 
   while IFS=$'\t' read -r path prunable; do
     [ -n "$path" ] || continue
     printf '%s' "$path"
     return 0
-  done < <(git_worktree_list_porcelain "$repo_root" | git_worktree_records_from_porcelain)
+  done <<<"$records"
+  return 1
 }
 
 git_worktree_path_is_registered() {
-  local repo_root=$1
-  local target_path=$2
-  local path prunable
+  local records path prunable
+  records=$(_git_worktree_records "$1") || return 1
 
   while IFS=$'\t' read -r path prunable; do
     [ -n "$path" ] || continue
-    if [ "$path" = "$target_path" ]; then
+    if [ "$path" = "$2" ]; then
       return 0
     fi
-  done < <(git_worktree_list_porcelain "$repo_root" | git_worktree_records_from_porcelain)
-
+  done <<<"$records"
   return 1
 }
 

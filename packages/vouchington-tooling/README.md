@@ -226,9 +226,12 @@ Host-lock environment:
 ## Sourceable Bash libraries
 
 `scripts/worktree/git-worktrees.sh` is included in the published package. Source it to parse
-`git worktree list --porcelain` with `git_worktree_*` helpers. Its
+`git worktree list --porcelain` with `git_worktree_*` helpers. Path queries fail when git fails,
+and `git_worktree_main_path` fails when git reports no worktree. Its
 `git_worktree_canonical_path_hash <path>` helper resolves the physical path and prints a stable
 `d` plus the first 12 lowercase hexadecimal characters of its SHA-256 digest.
+`scripts/worktree/git-index-lock.sh` removes only a 0-byte `index.lock`. A non-empty lock is left
+in place.
 
 ## Reclaiming finished worktrees
 
