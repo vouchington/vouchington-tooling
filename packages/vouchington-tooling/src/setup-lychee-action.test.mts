@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,7 +31,9 @@ describe('setup-lychee action', () => {
       'packages/vouchington-tooling/scripts/gha/install-github-release.sh',
     )
     expect(source).toContain('--repo lycheeverse/lychee')
-    expect(source).toContain("--asset 'lychee-{platform}.tar.gz'")
+    expect(source).toContain("asset='lychee-{platform}.tar.gz'")
+    expect(source).toContain('lychee-lychee-v{version}-{platform}.tar.gz')
+    expect(source).toContain('--asset "$asset"')
     expect(source).toContain("--tag-prefix 'lychee-v'")
     expect(source).toContain('--bin lychee')
     expect(source).toContain('--bin-dir "$LYCHEE_BIN_DIR"')
@@ -76,7 +86,7 @@ describe('setup-lychee action', () => {
     expect(source).not.toContain('/tmp/lychee.tar.gz')
   })
 
-  it('strips no components for archives before 0.24.0', () => {
+  it('selects the checksummed archive for 0.24.0 and later', () => {
     const directory = mkdtempSync(join(tmpdir(), 'setup-lychee-'))
     const bin = join(directory, 'bin')
     const log = join(directory, 'log')
@@ -106,10 +116,19 @@ printf '%s\\n' "$*" > "$INSTALL_LOG"
         },
       )
     try {
-      expect(run('0.23.0').status).toBe(0)
-      expect(readFileSync(log, 'utf8')).toContain('--strip-components 0')
-      expect(run('0.24.2').status).toBe(0)
+      const rejected = run('0.23.0')
+      expect(rejected.status).toBe(1)
+      expect(rejected.stdout).toContain('older releases have no checksum file')
+      expect(existsSync(log)).toBe(false)
+      expect(run('0.24.0').status).toBe(0)
+      expect(readFileSync(log, 'utf8')).toContain(
+        '--asset lychee-lychee-v{version}-{platform}.tar.gz',
+      )
       expect(readFileSync(log, 'utf8')).toContain('--strip-components 1')
+      expect(run('0.24.2').status).toBe(0)
+      expect(readFileSync(log, 'utf8')).toContain('--asset lychee-{platform}.tar.gz')
+      expect(readFileSync(log, 'utf8')).toContain('--strip-components 1')
+      expect(source).not.toContain('--no-checksum')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

@@ -111,6 +111,52 @@ describe('run-bounded', () => {
     }
   })
 
+  it('kills a TERM-resistant descendant when the wrapper receives SIGTERM', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'run-bounded-signal-'))
+    const pidFile = join(dir, 'child-pid')
+    const groupPidFile = join(dir, 'group-pid')
+    const child = [
+      'import os, signal',
+      'signal.signal(signal.SIGTERM, signal.SIG_IGN)',
+      'open(os.environ["PID_FILE"], "w").write(str(os.getpid()))',
+      'signal.pause()',
+    ].join('; ')
+    const parent = [
+      'import os, signal, subprocess, sys',
+      'open(os.environ["GROUP_PID_FILE"], "w").write(str(os.getpid()))',
+      `subprocess.Popen([sys.executable, "-c", ${JSON.stringify(child)}], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)`,
+      'signal.pause()',
+    ].join('; ')
+    const wrapper = spawn('python3', [script, '30', 'python3', '-c', parent], {
+      env: { ...process.env, PID_FILE: pidFile, GROUP_PID_FILE: groupPidFile },
+      stdio: 'ignore',
+    })
+    try {
+      const started = Date.now()
+      while (!existsSync(pidFile)) {
+        if (wrapper.exitCode !== null) throw new Error(`wrapper exited early: ${wrapper.exitCode}`)
+        if (Date.now() - started > 3000) throw new Error('descendant did not start')
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      wrapper.kill('SIGTERM')
+      const status = await new Promise<number | null>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('wrapper did not exit')), 15000)
+        wrapper.once('close', (code) => {
+          clearTimeout(timer)
+          resolve(code)
+        })
+      })
+      expect(status).toBe(143)
+      const pid = Number(readFileSync(pidFile, 'utf8').trim())
+      const state = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+      expect(state.stdout.trim() === '' || state.stdout.trim().startsWith('Z')).toBe(true)
+    } finally {
+      wrapper.kill('SIGKILL')
+      killProcessGroup(groupPidFile)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('kills a TERM-resistant child even when its parent exits on TERM', () => {
     const dir = mkdtempSync(join(tmpdir(), 'run-bounded-'))
     const pidFile = join(dir, 'child-pid')

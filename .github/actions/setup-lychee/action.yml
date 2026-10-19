@@ -28,22 +28,31 @@ runs:
         # fresh install — the skip branch exits early and must still expose
         # the verified temp binary to the lint-links step that follows.
         echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
-        # Archives before 0.24.0 keep the binary at the archive root. Stripping
-        # one component drops that member. 0.24.0 and later use a directory.
-        strip_components=1
-        if awk -v version="$LYCHEE_VERSION" 'BEGIN {
+        # 0.24.0 names archives lychee-lychee-v0.24.0-<platform>.tar.gz.
+        # 0.24.1 and later use lychee-<platform>.tar.gz. Both publish a
+        # .sha256 sidecar and keep the binary in one directory. Earlier
+        # releases have no checksum file, so they are rejected.
+        if ! awk -v version="$LYCHEE_VERSION" 'BEGIN {
           n = split(version, parts, ".")
-          if (n < 2) exit 1
-          if ((parts[1] + 0) == 0 && (parts[2] + 0) < 24) exit 0
+          if (n != 3) exit 1
+          for (i = 1; i <= 3; i++) if (parts[i] !~ /^[0-9]+$/) exit 1
+          major = parts[1] + 0
+          minor = parts[2] + 0
+          if (major > 0 || minor >= 24) exit 0
           exit 1
         }'; then
-          strip_components=0
+          echo "::error::setup-lychee accepts lychee 0.24.0 and newer; older releases have no checksum file"
+          exit 1
+        fi
+        asset='lychee-{platform}.tar.gz'
+        if [ "$LYCHEE_VERSION" = 0.24.0 ]; then
+          asset='lychee-lychee-v{version}-{platform}.tar.gz'
         fi
         bash "$INSTALL_GITHUB_RELEASE" \
           --repo lycheeverse/lychee \
           --version "$LYCHEE_VERSION" \
-          --asset 'lychee-{platform}.tar.gz' \
+          --asset "$asset" \
           --bin lychee \
           --tag-prefix 'lychee-v' \
-          --strip-components "$strip_components" \
+          --strip-components 1 \
           --bin-dir "$LYCHEE_BIN_DIR"

@@ -238,7 +238,9 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   `timeout-minutes`.
 - `setup-lychee` installs lychee `version` (default `0.24.2`) with checksum verification into the
   job temporary bin directory and appends that directory to `GITHUB_PATH`. It supports Linux and
-  macOS runners. Versions before 0.24.0 keep the binary at the archive root.
+  macOS runners and lychee 0.24.0 or newer. The 0.24.0 archives use a `lychee-lychee-v0.24.0-`
+  prefix; later releases use `lychee-<platform>.tar.gz`. Older releases are rejected because they
+  publish no checksum file.
 
 ### Required-result gate
 

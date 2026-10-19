@@ -9,6 +9,10 @@ import sys
 import tempfile
 import threading
 
+if sys.version_info < (3, 11):
+    sys.stderr.write('run-bounded-backpressure.py requires Python 3.11 or newer\n')
+    raise SystemExit(1)
+
 command = '''
 import array, os, socket, sys
 control = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
