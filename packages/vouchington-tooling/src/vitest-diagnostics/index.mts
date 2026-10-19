@@ -21,17 +21,40 @@ export {
 export {
   createForkLeakDetector,
   formatForkLeakDiagnostics,
+  getForkLeakDetector,
   waitForResourceCloseCallbacks,
 } from './vitest-fork-leak-detection.mts'
+export {
+  checkAndRestoreFakeTimers,
+  formatFakeTimerLeakDiagnostics,
+} from './vitest-fake-timer-guard.mts'
+export type { FakeTimerController } from './vitest-fake-timer-guard.mts'
+export {
+  consumeTestNetworkAllowlistViolation,
+  installTestNetworkAllowlist,
+} from './vitest-network-allowlist.mts'
+export type { TestNetworkAllowlistOptions } from './vitest-network-allowlist.mts'
+export {
+  getRegisteredPoolMetrics,
+  getRegisteredPoolSocketHandles,
+} from './vitest-fork-leak-diagnostics.mts'
+export {
+  FORK_LEAK_HANDSHAKE_MAX_TURNS,
+  FORK_LEAK_HANDSHAKE_STABLE_OBSERVATIONS,
+  formatActiveResources,
+  formatProcessResources,
+  formatResourceCounts,
+  waitForForkLeakHandshakeSettle,
+} from './vitest-fork-leak-handshake.mts'
+export type { ForkLeakHandshakeSettlement } from './vitest-fork-leak-handshake.mts'
+export type { PoolMetrics, PoolSocketHandles } from './vitest-fork-leak-handshake-samples.mts'
 export type {
   ForkLeakDetector,
   ForkLeakDetectorOptions,
   ForkLeakVerdict,
 } from './vitest-fork-leak-detection.mts'
-
 import { isDiagnosticReportDirectoryCurrent, readDiagnosticReportDirectory } from './directory.mts'
 import { readBoundedRegularFile } from './read-file.mts'
-
 export { MAX_DIAGNOSTIC_REPORT_BYTES } from './read-file.mts'
 
 export const DEFAULT_MAX_DIAGNOSTIC_REPORTS = 100

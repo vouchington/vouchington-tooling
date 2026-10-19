@@ -537,7 +537,14 @@ watch reruns, and prints an attribution summary only for abnormal worker exits. 
 a synchronous stderr line and one JSONL file per PID; a start record without an exit record
 identifies a fork killed before its handler could run. `createForkLeakDetector` accepts tracked
 resource names and warmup, threshold, and sustained-growth settings; the caller supplies each
-checkpoint's resource counts. Use a caller-owned run directory: the reporter clears only regular
+checkpoint's resource counts. `getForkLeakDetector` keeps one detector for the process.
+`formatForkLeakDiagnostics` stays a one-line summary unless resource counts are passed, in which
+case it prints the multi-line report and optional pool metrics. `waitForForkLeakHandshakeSettle`
+waits for a caller-supplied pool snapshot to settle. `installTestNetworkAllowlist` takes the
+allowed hosts, an exempt predicate, and the state key. `checkAndRestoreFakeTimers` restores real
+timers and returns a diagnostic when a test left fake timers installed.
+
+Use a caller-owned run directory: the reporter clears only regular
 numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
 Application metrics and CI artifact handling stay with the caller.
 

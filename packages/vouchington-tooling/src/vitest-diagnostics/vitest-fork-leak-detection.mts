@@ -53,6 +53,19 @@ export type ForkLeakDetector = {
   record(counts: ReadonlyMap<string, number>, testFile?: string | null): ForkLeakVerdict[]
 }
 
+const FORK_LEAK_DETECTOR_KEY = Symbol.for('vitest-fork-leak-detector')
+
+type GlobalWithForkLeakDetector = typeof globalThis & {
+  [FORK_LEAK_DETECTOR_KEY]?: ForkLeakDetector
+}
+
+// Vitest re-evaluates a fork's setup files on every file while reusing the process.
+// A module-scope detector would reset every file and never leave the warmup window.
+export function getForkLeakDetector(options: ForkLeakDetectorOptions = {}): ForkLeakDetector {
+  return ((globalThis as GlobalWithForkLeakDetector)[FORK_LEAK_DETECTOR_KEY] ??=
+    createForkLeakDetector(options))
+}
+
 export function waitForResourceCloseCallbacks(): Promise<void> {
   return new Promise((resolve) => realSetTimeout(resolve, 0))
 }
