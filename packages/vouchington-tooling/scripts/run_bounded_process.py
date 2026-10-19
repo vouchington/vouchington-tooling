@@ -85,8 +85,10 @@ def reap_terminated_group(proc: subprocess.Popen[bytes], signum: int) -> int:
     try:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        signal_group(proc.pid, signal.SIGKILL)
-        proc.wait()
+        pass
+    # A TERM-resistant descendant can outlive the parent; finish the group.
+    signal_group(proc.pid, signal.SIGKILL)
+    proc.wait()
     return 128 + signum
 
 
