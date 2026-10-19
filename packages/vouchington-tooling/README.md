@@ -541,6 +541,12 @@ checkpoint's resource counts. Use a caller-owned run directory: the reporter cle
 numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
 Application metrics and CI artifact handling stay with the caller.
 
+`vitest-effective-timeout` exports `effectiveTimeoutCap`. The plugin rejects a project whose effective
+`testTimeout` or `hookTimeout` is missing, non-finite, non-positive, or above the caller-supplied cap
+(default 30 seconds). The plugin name, the expected root config filename, and the profile scratch
+directory are parameters. `checkFiniteTimeoutProfiles` writes one scratch project per admission
+profile and can take a caller-supplied runner.
+
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
