@@ -60,6 +60,11 @@
       "import": "./dist/host-storage/index.mjs",
       "default": "./dist/host-storage/index.mjs"
     },
+    "./shell-parse": {
+      "types": "./dist/shell-parse/index.d.mts",
+      "import": "./dist/shell-parse/index.mjs",
+      "default": "./dist/shell-parse/index.mjs"
+    },
     "./retrospective-transcript": {
       "types": "./dist/retrospective-transcript/index.d.mts",
       "import": "./dist/retrospective-transcript/index.mjs",
