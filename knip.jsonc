@@ -34,6 +34,7 @@
         "src/api-fixtures/index.mts!",
         "src/vitest-diagnostics/index.mts!",
         "src/vitest-effective-timeout/index.mts!",
+        "src/playwright/index.mts!",
         "src/config-inventory/index.mts!",
         "src/finite-enum-ripple/index.mts!",
         "src/coverage-transport/index.mts!",

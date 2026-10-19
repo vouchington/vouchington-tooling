@@ -573,6 +573,14 @@ there at construction and leaves the directory and other files alone. Applicatio
 directory are parameters. `checkFiniteTimeoutProfiles` writes one scratch project per admission
 profile and can take a caller-supplied runner.
 
+`playwright` monitors browser console errors, web errors, dialogs, page crashes, and failed
+requests during Playwright tests. `@playwright/test` is an optional peer. `createBrowserTest` and
+`withMonitoredPage` install the generic telemetry blocks (Google Tag Manager, Google Analytics, and
+DoubleClick) and fail the test when an unallowlisted issue remains. Pass host-specific block rules
+and request-failure allowlist entries, a warning pattern, and a timeout checker; the default warning
+pattern records React hydration and render warnings. The fixture does not import a product timeout
+guard: pass `assertTimeout` when the caller owns the timeout cap.
+
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
