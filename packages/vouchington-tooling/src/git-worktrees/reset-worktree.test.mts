@@ -211,7 +211,17 @@ describe('reset-worktree.sh', () => {
     const root = await initRepo()
     const bin = await mkdtemp(join(tmpdir(), 'worktree-reset-bin-'))
     roots.push(bin)
-    for (const command of ['bash', 'dirname', 'git', 'openssl', 'sed', 'find', 'rm', 'mkdir', 'env']) {
+    for (const command of [
+      'bash',
+      'dirname',
+      'git',
+      'openssl',
+      'sed',
+      'find',
+      'rm',
+      'mkdir',
+      'env',
+    ]) {
       const path = spawnSync('bash', ['-lc', `command -v ${command}`], {
         encoding: 'utf8',
       }).stdout.trim()
