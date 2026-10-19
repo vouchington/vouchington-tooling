@@ -2,9 +2,10 @@ name: Setup Playwright
 description: >
   Install a Playwright browser into an actions/cache path and export that
   directory as PLAYWRIGHT_BROWSERS_PATH. The cache key includes the browser,
-  OS, architecture, and pnpm lockfile hash, with no fallback key. Host
-  packages are installed only when that browser fails to launch. Chromium
-  checks both the headless shell and channel chromium.
+  OS, architecture, and pnpm lockfile hash, with no fallback key. Chrome and
+  Edge install globally, so they skip this cache. Host packages are installed
+  only when that browser fails to launch. Chromium checks both the headless
+  shell and channel chromium.
 
 inputs:
   browser:
@@ -46,6 +47,7 @@ runs:
           echo "lockfile-hash=$(shasum -a 256 pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
         fi
     - name: Cache Playwright browsers
+      if: ${{ !contains(',chrome,chrome-beta,chrome-dev,chrome-canary,msedge,msedge-beta,msedge-dev,msedge-canary,', format(',{0},', inputs.browser)) }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.playwright-cache-key.outputs.cache-path }}
@@ -81,6 +83,15 @@ runs:
           echo "::error::timeout-seconds and attempts must be positive"
           exit 2
         fi
+        case "$PLAYWRIGHT_BROWSER" in
+          chrome|chrome-beta|chrome-dev|chrome-canary|msedge|msedge-beta|msedge-dev|msedge-canary)
+            # These channels install a system browser. On Linux that runs apt
+            # as root, which run-bounded cannot stop. The caller's step timeout
+            # bounds this install, and it is not retried over a live apt.
+            pnpm exec playwright install "$PLAYWRIGHT_BROWSER"
+            exit 0
+            ;;
+        esac
         attempt=1
         install_status=0
         while [ "$attempt" -le "$PLAYWRIGHT_INSTALL_ATTEMPTS" ]; do

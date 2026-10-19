@@ -104,7 +104,8 @@ describe('run-bounded', () => {
       expect(elapsedMs).toBeLessThan(8000)
       const pid = Number(readFileSync(pidFile, 'utf8').trim())
       expect(Number.isInteger(pid)).toBe(true)
-      expect(spawnSync('kill', ['-0', String(pid)]).status).not.toBe(0)
+      const state = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+      expect(state.stdout.trim() === '' || state.stdout.trim().startsWith('Z')).toBe(true)
     } finally {
       killProcessGroup(groupPidFile)
       rmSync(dir, { recursive: true, force: true })

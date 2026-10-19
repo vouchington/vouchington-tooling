@@ -19,6 +19,7 @@ type Step = {
   name?: string
   run?: string
   uses?: string
+  if?: string
   env?: Record<string, string>
   with?: Record<string, string>
 }
@@ -37,7 +38,10 @@ function step(name: string): Step {
   return found
 }
 
-function runStep(name: string, statuses: { node?: number[]; python3?: number[] } = {}) {
+function runStep(
+  name: string,
+  statuses: { node?: number[]; python3?: number[]; browser?: string } = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-'))
   const bin = join(directory, 'bin')
   const workspace = join(directory, 'workspace')
@@ -77,7 +81,7 @@ exit "\${next:-0}"
           RUN_BOUNDED: join(workspace, 'run-bounded.py'),
           CHROMIUM_LAUNCH_PROBE: join(workspace, 'chromium-launch-probe.mjs'),
           WAIT_FOR_APT_LOCKS: waitForApt,
-          PLAYWRIGHT_BROWSER: 'chromium',
+          PLAYWRIGHT_BROWSER: statuses.browser ?? 'chromium',
           PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS: '120',
           PLAYWRIGHT_INSTALL_ATTEMPTS: '2',
         },
@@ -114,6 +118,9 @@ describe('setup-playwright composite action', () => {
       path: '${{ steps.playwright-cache-key.outputs.cache-path }}',
       key: 'playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}',
     })
+    expect(cache?.if).toContain(',chrome,')
+    expect(cache?.if).toContain(',msedge,')
+    expect(cache?.if).toContain("format(',{0},', inputs.browser)")
     expect(step('Resolve Playwright cache key').run).toContain('PLAYWRIGHT_BROWSERS_PATH=$resolved')
     expect(step('Resolve Playwright cache key').run).toContain('sha256sum pnpm-lock.yaml')
     expect(step('Resolve Playwright cache key').run).toContain('shasum -a 256 pnpm-lock.yaml')
@@ -137,6 +144,13 @@ describe('setup-playwright composite action', () => {
 })
 
 describe('setup-playwright browser download', () => {
+  it('installs Chrome outside the bounded download', () => {
+    const { status, calls } = runStep('Install Playwright browsers', { browser: 'chrome' })
+
+    expect(status).toBe(0)
+    expect(calls).toEqual(['pnpm exec playwright install chrome'])
+  })
+
   it('downloads Chromium under the input bound and never installs host packages', () => {
     const { status, calls } = runStep('Install Playwright browsers')
 
