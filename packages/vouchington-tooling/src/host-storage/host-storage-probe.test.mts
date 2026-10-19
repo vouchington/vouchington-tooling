@@ -127,7 +127,6 @@ describe('host storage probe', () => {
     const dir = await mkdtemp(join(tmpdir(), 'host-storage-'))
     try {
       const result = await inspectHostStorage({
-        discoverPnpmStore: true,
         minimumFreeBytes: 0n,
         paths: [requiredPath('directory', dir)],
       })
