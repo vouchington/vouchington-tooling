@@ -16,6 +16,7 @@ import {
 } from './check.mts'
 
 export const HOST_STORAGE_DISCOVERY_TIMEOUT_MS = 5_000
+export const MAX_DISCOVERY_TIMEOUT_MS = 2_147_483_647
 export const DOCKER_DESKTOP_STORAGE_RELATIVE_PATH =
   'Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw'
 
@@ -78,6 +79,16 @@ async function discoverCommandPath(
   }
 }
 
+function resolveDiscoveryTimeout(timeoutMs: number | undefined): number {
+  const timeout = timeoutMs ?? HOST_STORAGE_DISCOVERY_TIMEOUT_MS
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > MAX_DISCOVERY_TIMEOUT_MS) {
+    throw new Error(
+      `discoveryTimeoutMs requires an integer from 1 through ${MAX_DISCOVERY_TIMEOUT_MS}`,
+    )
+  }
+  return timeout
+}
+
 function dockerDesktopCandidate(path: string): StorageCandidate {
   return {
     label: 'Docker Desktop storage',
@@ -94,7 +105,7 @@ async function discoverOptionalStorage(
 ): Promise<{ candidates: StorageCandidate[]; issues: HostStorageIssue[] }> {
   const candidates: StorageCandidate[] = []
   const issues: HostStorageIssue[] = []
-  const timeoutMs = options.discoveryTimeoutMs ?? HOST_STORAGE_DISCOVERY_TIMEOUT_MS
+  const timeoutMs = resolveDiscoveryTimeout(options.discoveryTimeoutMs)
   if (options.discoverPnpmStore) {
     const result = await discoverCommandPath(
       'pnpm',

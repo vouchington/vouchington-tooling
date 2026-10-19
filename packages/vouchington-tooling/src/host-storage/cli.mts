@@ -1,6 +1,7 @@
 import { formatGiB, HOST_STORAGE_MINIMUM_FREE_BYTES, errorMessage } from './check.mts'
 import {
   inspectHostStorage,
+  MAX_DISCOVERY_TIMEOUT_MS,
   type HostStorageDependencies,
   type HostStorageInspectOptions,
 } from './preflight.mts'
@@ -70,13 +71,13 @@ function readFlagValue(args: string[], index: number, flag: string): string {
   return value
 }
 
-const MAX_TIMER_MS = 2_147_483_647
-
 function parsePositiveInteger(value: string, flag: string): number {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`${flag} requires a positive integer`)
   const parsed = Number(value)
-  if (!Number.isSafeInteger(parsed) || parsed > MAX_TIMER_MS) {
-    throw new Error(`${flag} requires a positive integer no greater than ${MAX_TIMER_MS}`)
+  if (!Number.isSafeInteger(parsed) || parsed > MAX_DISCOVERY_TIMEOUT_MS) {
+    throw new Error(
+      `${flag} requires a positive integer no greater than ${MAX_DISCOVERY_TIMEOUT_MS}`,
+    )
   }
   return parsed
 }

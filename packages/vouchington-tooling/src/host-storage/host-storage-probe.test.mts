@@ -188,6 +188,23 @@ describe('host storage discovery', () => {
     expect(commandCalls[0]?.timeout).toBe(25)
   })
 
+  it('rejects a discovery timeout outside the Node timer range', async () => {
+    const filesystems = new Map([['/repo', { availableBytes: ENOUGH, device: 1n }]])
+    const { commandCalls, dependencies } = makeDependencies({ filesystems })
+    const paths = [requiredPath('worktree', '/repo')]
+
+    await expect(
+      inspectHostStorage({ discoveryTimeoutMs: 1.5, paths }, dependencies),
+    ).rejects.toThrow('1 through 2147483647')
+    await expect(
+      inspectHostStorage({ discoveryTimeoutMs: 0, paths }, dependencies),
+    ).rejects.toThrow('1 through 2147483647')
+    await expect(
+      inspectHostStorage({ discoveryTimeoutMs: 2_147_483_648, paths }, dependencies),
+    ).rejects.toThrow('1 through 2147483647')
+    expect(commandCalls).toEqual([])
+  })
+
   it('warns on optional probe failures but blocks when a discovered filesystem is low', async () => {
     const low = HOST_STORAGE_MINIMUM_FREE_BYTES - 1n
     const filesystems = new Map([

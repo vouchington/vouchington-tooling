@@ -12,6 +12,7 @@ export {
 export {
   DOCKER_DESKTOP_STORAGE_RELATIVE_PATH,
   HOST_STORAGE_DISCOVERY_TIMEOUT_MS,
+  MAX_DISCOVERY_TIMEOUT_MS,
   inspectHostStorage,
   type HostStorageDependencies,
   type HostStorageInspectOptions,
