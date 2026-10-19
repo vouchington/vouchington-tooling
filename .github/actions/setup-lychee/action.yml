@@ -1,0 +1,31 @@
+name: Setup lychee
+description: Install a checksum-verified lychee release onto PATH.
+inputs:
+  version:
+    description: lychee release version, without the lychee-v tag prefix
+    # renovate: datasource=github-releases depName=lycheeverse/lychee extractVersion=^lychee-v(?<version>.*)$
+    default: '0.24.2'
+runs:
+  using: composite
+  steps:
+    - name: Install lychee
+      shell: bash
+      env:
+        LYCHEE_VERSION: ${{ inputs.version }}
+        INSTALL_GITHUB_RELEASE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/install-github-release.sh
+      run: |
+        set -euo pipefail
+        # Install into the runner's per-job temporary directory rather than relying
+        # on mutable binaries under $HOME/.local/bin.
+        LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
+        # Add to PATH before the version-skip check below, not just after a
+        # fresh install — the skip branch exits early and must still expose
+        # the verified temp binary to the lint-links step that follows.
+        echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
+        bash "$INSTALL_GITHUB_RELEASE" \
+          --repo lycheeverse/lychee \
+          --version "$LYCHEE_VERSION" \
+          --asset 'lychee-{platform}.tar.gz' \
+          --bin lychee \
+          --tag-prefix 'lychee-v' \
+          --bin-dir "$LYCHEE_BIN_DIR"

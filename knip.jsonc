@@ -4,7 +4,8 @@
   // agent-blackboard: resolved from the repository root by this repository's `vouchington mcp`.
   "ignoreDependencies": ["agent-blackboard", "pr-shepherd"],
   // mise installs the pinned scc binary. It is not an npm package.
-  "ignoreBinaries": ["mise"],
+  // playwright is installed into the caller workspace by setup-playwright, not a repo dependency.
+  "ignoreBinaries": ["mise", "playwright"],
   "workspaces": {
     "packages/vouchington-tooling": {
       // Loaded from the consumer package boundary only when the opt-in integration runs.
