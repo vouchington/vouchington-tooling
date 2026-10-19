@@ -62,8 +62,6 @@ jobs:
           repository: ${{ steps.tooling.outputs.repository }}
           ref: ${{ job.workflow_sha }}
           path: .tooling
-          sparse-checkout: packages/vouchington-tooling/scripts/gha
-          sparse-checkout-cone-mode: true
           fetch-depth: 1
 
       - name: Install lychee
