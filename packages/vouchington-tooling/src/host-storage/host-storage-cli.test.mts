@@ -97,6 +97,14 @@ describe('host storage cli', () => {
         output,
       ),
     ).resolves.toBe(2)
+    await expect(
+      runHostStoragePreflightCli(
+        ['--path', '/repo', '--discovery-timeout-ms', '2147483648'],
+        dependencies,
+        output,
+      ),
+    ).resolves.toBe(2)
+    expect(messages.at(-1)).toContain('2147483647')
 
     messages.length = 0
     await expect(
