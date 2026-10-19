@@ -167,7 +167,7 @@ export function stripQuotedShellText(command: string): string {
       continue
     }
 
-    if (char === '\\') {
+    if (char === '\\' && quote !== "'") {
       result += quote === null ? char : ' '
       escaping = true
       continue
