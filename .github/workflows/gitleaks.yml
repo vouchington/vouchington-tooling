@@ -1,0 +1,146 @@
+name: Gitleaks
+
+# Reusable git-history scan. This runs gitleaks git over the caller event range.
+# gitleaks-directory-scan remains the separate directory mode.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: gitleaks release version, without the v prefix
+        type: string
+        default: 8.30.1
+      config:
+        description: Path to the gitleaks config in the caller repository
+        type: string
+        default: .gitleaks.toml
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-slim
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gitleaks:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tooling repository
+        id: tooling
+        shell: bash
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          file_ref="${WORKFLOW_REF%%@*}"
+          repository="${file_ref%%/.github/*}"
+          case "$repository" in
+            */*) ;;
+            *) echo "::error::cannot resolve the called workflow repository"; exit 1 ;;
+          esac
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tooling scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.tooling.outputs.repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .tooling
+          sparse-checkout: packages/vouchington-tooling/scripts/gha
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - name: Determine Gitleaks scan range
+        timeout-minutes: 2
+        id: gitleaks_scan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            MERGE_BASE=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")
+            LOG_OPTS="${MERGE_BASE}..${PR_HEAD_SHA}"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            LOG_OPTS="${MERGE_GROUP_BASE_SHA}..${MERGE_GROUP_HEAD_SHA}"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            LOG_OPTS="--all"
+          else
+            echo "::error::Unsupported Gitleaks event: $EVENT_NAME"
+            exit 1
+          fi
+          echo "log-opts=$LOG_OPTS" >> "$GITHUB_OUTPUT"
+
+      - name: Install gitleaks
+        timeout-minutes: 2
+        env:
+          GITLEAKS_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          case "$GITLEAKS_VERSION" in
+            ''|*[!0-9A-Za-z._-]*) echo "::error::version must be a single token"; exit 2 ;;
+          esac
+          : "${RUNNER_TEMP:?RUNNER_TEMP must be set by GitHub Actions}"
+          case "$(uname -s)-$(uname -m)" in
+            Darwin-arm64) PLATFORM=darwin_arm64 ;;
+            Darwin-x86_64) PLATFORM=darwin_x64 ;;
+            Linux-aarch64|Linux-arm64) PLATFORM=linux_arm64 ;;
+            Linux-x86_64) PLATFORM=linux_x64 ;;
+            *)
+              echo "Unsupported platform: $(uname -s)-$(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+          export PLATFORM
+          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
+            --repo gitleaks/gitleaks \
+            --version "$GITLEAKS_VERSION" \
+            --asset 'gitleaks_{version}_{platform}.tar.gz' \
+            --bin gitleaks \
+            --tag-prefix v \
+            --checksums-asset 'gitleaks_{version}_checksums.txt' \
+            --version-flag version \
+            --bin-dir "$RUNNER_TEMP/bin" \
+            --strip-components 0
+
+      - name: Scan git history
+        timeout-minutes: 3
+        env:
+          LOG_OPTS: ${{ steps.gitleaks_scan.outputs.log-opts }}
+          GITLEAKS_CONFIG: ${{ inputs.config }}
+        run: |
+          set -euo pipefail
+          case "$GITLEAKS_CONFIG" in
+            ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
+          esac
+          gitleaks git \
+            --config "$GITLEAKS_CONFIG" \
+            --log-opts "$LOG_OPTS" \
+            --redact=100 \
+            --report-format=json \
+            --report-path=gitleaks-report.json \
+            .
+
+      - name: Upload redacted gitleaks report
+        timeout-minutes: 2
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
+        with:
+          overwrite: true
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+          retention-days: 1

@@ -1,0 +1,58 @@
+name: GitHub Actions Static Analysis
+
+# Reusable workflow. Callers choose when it runs. Tool versions come from the
+# caller's .mise.toml. zizmor thresholds are inputs.
+on:
+  workflow_call:
+    inputs:
+      min-severity:
+        description: zizmor --min-severity value
+        type: string
+        default: high
+      min-confidence:
+        description: zizmor --min-confidence value
+        type: string
+        default: high
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-slim
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  actionlint:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 1
+      - name: Install CI tools via mise
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          cache: false
+        timeout-minutes: 3
+
+      - name: Run actionlint
+        timeout-minutes: 5
+        run: actionlint
+
+      - name: Audit GitHub Actions security
+        timeout-minutes: 2
+        env:
+          ZIZMOR_MIN_SEVERITY: ${{ inputs.min-severity }}
+          ZIZMOR_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
+        run: |
+          set -euo pipefail
+          case "$ZIZMOR_MIN_SEVERITY" in
+            ''|*[!A-Za-z0-9_-]*) echo "::error::min-severity must be a single token"; exit 2 ;;
+          esac
+          case "$ZIZMOR_MIN_CONFIDENCE" in
+            ''|*[!A-Za-z0-9_-]*) echo "::error::min-confidence must be a single token"; exit 2 ;;
+          esac
+          zizmor --offline --min-severity "$ZIZMOR_MIN_SEVERITY" --min-confidence "$ZIZMOR_MIN_CONFIDENCE" .

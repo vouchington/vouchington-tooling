@@ -1,0 +1,120 @@
+name: Lint Links
+
+# Reusable link check. The caller owns the schedule. Exclusion probe URLs are
+# inputs so the workflow does not embed a repository's allowlist.
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: lychee config path in the caller repository
+        type: string
+        default: lychee.toml
+      lychee-version:
+        description: lychee release version passed to setup-lychee
+        type: string
+        default: '0.24.2'
+      excluded-urls:
+        description: Newline-separated URLs the config must exclude. Empty skips the probe.
+        type: string
+        default: ''
+      checked-urls:
+        description: Newline-separated URLs the config must still check. Empty skips the probe.
+        type: string
+        default: ''
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-slim
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint-links:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 1
+
+      - name: Resolve tooling repository
+        id: tooling
+        shell: bash
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          file_ref="${WORKFLOW_REF%%@*}"
+          repository="${file_ref%%/.github/*}"
+          case "$repository" in
+            */*) ;;
+            *) echo "::error::cannot resolve the called workflow repository"; exit 1 ;;
+          esac
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tooling scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.tooling.outputs.repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .tooling
+          sparse-checkout: packages/vouchington-tooling/scripts/gha
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - name: Install lychee
+        timeout-minutes: 3
+        env:
+          LYCHEE_VERSION: ${{ inputs.lychee-version }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_VERSION" in
+            ''|*[!0-9A-Za-z._-]*) echo "::error::lychee-version must be a single token"; exit 2 ;;
+          esac
+          LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
+          echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
+          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
+            --repo lycheeverse/lychee \
+            --version "$LYCHEE_VERSION" \
+            --asset 'lychee-{platform}.tar.gz' \
+            --bin lychee \
+            --tag-prefix 'lychee-v' \
+            --bin-dir "$LYCHEE_BIN_DIR"
+
+      - name: Verify link exclusions
+        if: ${{ inputs.excluded-urls != '' || inputs.checked-urls != '' }}
+        timeout-minutes: 1
+        shell: bash
+        env:
+          LYCHEE_CONFIG: ${{ inputs.config }}
+          EXCLUDED_URLS: ${{ inputs.excluded-urls }}
+          CHECKED_URLS: ${{ inputs.checked-urls }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_CONFIG" in
+            ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
+          esac
+          actual="$(
+            printf '%s\n%s\n' "$EXCLUDED_URLS" "$CHECKED_URLS" | sed '/^$/d' \
+              | lychee --dump --cache=false --config "$LYCHEE_CONFIG" - \
+              | sort
+          )"
+          expected="$(printf '%s\n' "$CHECKED_URLS" | sed '/^$/d' | sort)"
+          test "$actual" = "$expected"
+
+      - name: Check links
+        timeout-minutes: 5
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LYCHEE_CONFIG: ${{ inputs.config }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_CONFIG" in
+            ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
+          esac
+          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/lint-links.sh" \
+            --config "$LYCHEE_CONFIG"

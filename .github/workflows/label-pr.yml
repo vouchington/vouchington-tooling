@@ -1,0 +1,30 @@
+name: Label PRs
+
+# Reusable pull-request labeler. The caller grants pull-requests: write.
+on:
+  workflow_call:
+    inputs:
+      configuration-path:
+        description: Path to the labeler config in the caller repository
+        type: string
+        default: .github/labeler.yml
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-slim
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: ${{ inputs.configuration-path }}
