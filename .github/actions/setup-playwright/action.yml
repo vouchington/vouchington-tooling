@@ -35,7 +35,7 @@ runs:
         esac
         case "$PLAYWRIGHT_CACHE_PATH" in
           '~') resolved="$HOME" ;;
-          '~/'*) resolved="$HOME/${PLAYWRIGHT_CACHE_PATH#~/}" ;;
+          '~/'*) resolved="$HOME/${PLAYWRIGHT_CACHE_PATH#"~/"}" ;;
           *) resolved="$PLAYWRIGHT_CACHE_PATH" ;;
         esac
         echo "cache-path=$resolved" >> "$GITHUB_OUTPUT"
@@ -64,6 +64,10 @@ runs:
       # values and are quoted, so they are not interpolated into the shell.
       run: |
         set -euo pipefail
+        case "$(uname -s)" in
+          Linux|Darwin) ;;
+          *) echo "::error::setup-playwright supports Linux and macOS runners"; exit 1 ;;
+        esac
         case "$PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS" in
           ''|*[!0-9]*) echo "::error::timeout-seconds must be a positive integer"; exit 2 ;;
         esac

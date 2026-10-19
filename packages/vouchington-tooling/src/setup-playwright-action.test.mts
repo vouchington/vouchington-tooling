@@ -183,6 +183,79 @@ describe('setup-playwright browser download', () => {
     expect(result.status).toBe(2)
     expect(result.stdout).toContain('timeout-seconds must be a positive integer')
   })
+
+  it('rejects Windows before installing a browser', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-'))
+    const bin = join(directory, 'bin')
+    mkdirSync(bin)
+    writeFileSync(join(bin, 'uname'), "#!/bin/bash\nprintf '%s\\n' Windows\n")
+    chmodSync(join(bin, 'uname'), 0o755)
+    try {
+      const result = spawnSync(
+        'bash',
+        [
+          '--noprofile',
+          '--norc',
+          '-eo',
+          'pipefail',
+          '-c',
+          step('Install Playwright browsers').run ?? '',
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            RUN_BOUNDED: 'run-bounded.py',
+            PLAYWRIGHT_BROWSER: 'chromium',
+            PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS: '120',
+            PLAYWRIGHT_INSTALL_ATTEMPTS: '2',
+          },
+        },
+      )
+      expect(result.status).toBe(1)
+      expect(result.stdout).toContain('Linux and macOS')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('expands a literal tilde cache path under HOME', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-cache-'))
+    const output = join(directory, 'output')
+    const envFile = join(directory, 'env')
+    writeFileSync(join(directory, 'pnpm-lock.yaml'), 'lock\n')
+    try {
+      const result = spawnSync(
+        'bash',
+        [
+          '--noprofile',
+          '--norc',
+          '-eo',
+          'pipefail',
+          '-c',
+          step('Resolve Playwright cache key').run ?? '',
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            HOME: '/home/runner',
+            PLAYWRIGHT_CACHE_PATH: '~/.cache/ms-playwright',
+            GITHUB_OUTPUT: output,
+            GITHUB_ENV: envFile,
+          },
+        },
+      )
+      expect(result.status).toBe(0)
+      expect(readFileSync(envFile, 'utf8')).toBe(
+        'PLAYWRIGHT_BROWSERS_PATH=/home/runner/.cache/ms-playwright\n',
+      )
+      expect(readFileSync(output, 'utf8')).toContain('cache-path=/home/runner/.cache/ms-playwright')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('setup-playwright Chromium launch check', () => {

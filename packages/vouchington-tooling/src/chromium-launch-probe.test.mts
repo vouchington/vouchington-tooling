@@ -71,16 +71,23 @@ describe('chromiumLaunchProbeExitCode', () => {
 // Runs a copy of the real entrypoint beside a fake `playwright` package, so the exit status is the
 // one the workflow step sees without downloading or starting a browser. The fake appends one line
 // per launch (the JSON launch options) and one per close to a `calls` file next to itself.
-function runProbe(fakePlaywright?: string, env?: Record<string, string>) {
+function runProbe(
+  fakePlaywright?: string,
+  env?: Record<string, string>,
+  packageName = 'playwright',
+) {
   const directory = mkdtempSync(join(tmpdir(), 'chromium-launch-probe-'))
   const script = join(directory, 'ci/playwright/chromium-launch-probe.mts')
-  const packageDirectory = join(directory, 'node_modules/playwright')
+  const packageDirectory = join(directory, 'node_modules', packageName)
   mkdirSync(join(directory, 'ci/playwright'), { recursive: true })
   writeFileSync(join(directory, 'package.json'), '{"name":"probe-fixture"}')
   cpSync(probeSource, script)
   if (fakePlaywright !== undefined) {
     mkdirSync(packageDirectory, { recursive: true })
-    writeFileSync(join(packageDirectory, 'package.json'), '{"name":"playwright","main":"index.js"}')
+    writeFileSync(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({ name: packageName, main: 'index.js' }),
+    )
     writeFileSync(join(packageDirectory, 'index.js'), fakePlaywright)
   }
   try {
@@ -154,6 +161,13 @@ describe('chromium-launch-probe.mts process contract', () => {
 
     expect(result.status).toBe(0)
     expect(result.calls).toEqual(['firefox', 'close'])
+  })
+
+  it('loads Chromium from @playwright/test when playwright is not installed', () => {
+    const result = runProbe(recordingChromium(), undefined, '@playwright/test')
+
+    expect(result.status).toBe(0)
+    expect(result.calls).toEqual(['launch {}', 'close', 'launch {"channel":"chromium"}', 'close'])
   })
 
   it('exits non-zero when Playwright cannot be resolved', () => {

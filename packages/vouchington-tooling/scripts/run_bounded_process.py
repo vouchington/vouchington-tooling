@@ -23,6 +23,8 @@ def output_sinks():
                 if err.errno != errno.EBADF:
                     raise
                 targets.append(None)  # Absent at entry, before Popen allocates source pipes.
+                # Keep the closed number occupied so a child pipe cannot become stderr.
+                occupy_closed_fd(fd)
         yield targets
     except BaseException as err:
         primary = err
@@ -44,6 +46,16 @@ class WrapperSignal(BaseException):
     def __init__(self, signum: int) -> None:
         super().__init__(signum)
         self.signum = signum
+
+
+def occupy_closed_fd(fd: int) -> None:
+    null = os.open(os.devnull, os.O_WRONLY)
+    try:
+        if null != fd:
+            os.dup2(null, fd)
+    finally:
+        if null != fd:
+            os.close(null)
 
 
 def exit_status(code: int) -> int:

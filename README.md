@@ -234,7 +234,8 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   key, exports that directory as `PLAYWRIGHT_BROWSERS_PATH`, and installs `browser` (default
   `chromium`) under `timeout-seconds` and `attempts`. The cache key includes the browser. Host
   packages are installed only when that browser fails to launch, and that apt step stays outside
-  the download deadline. Give the calling step its own `timeout-minutes`.
+  the download deadline. It supports Linux and macOS runners. Give the calling step its own
+  `timeout-minutes`.
 - `setup-lychee` installs lychee `version` (default `0.24.2`) with checksum verification into the
   job temporary bin directory and appends that directory to `GITHUB_PATH`. Versions before 0.24.0
   keep the binary at the archive root.

@@ -7,6 +7,7 @@
 
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 export interface LaunchedBrowser {
   close(): Promise<void>
@@ -48,15 +49,34 @@ function probeLaunches(
   return [() => browser.launch()]
 }
 
+function hasCode(err: unknown, code: string): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === code
+}
+
+async function loadPlaywright(workspace: string): Promise<PlaywrightBrowsers> {
+  const require = createRequire(join(workspace, 'package.json'))
+  let missing: unknown
+  for (const specifier of ['playwright', '@playwright/test']) {
+    try {
+      return require(specifier) as PlaywrightBrowsers
+    } catch (err) {
+      if (hasCode(err, 'ERR_REQUIRE_ESM')) {
+        return (await import(pathToFileURL(require.resolve(specifier)).href)) as PlaywrightBrowsers
+      }
+      if (!hasCode(err, 'MODULE_NOT_FOUND')) throw err
+      missing = err
+    }
+  }
+  throw missing
+}
+
 if (import.meta.main) {
   const browserName = process.env.PLAYWRIGHT_BROWSER ?? 'chromium'
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd()
   let exitCode: 0 | 1 | 2 = 1
   try {
     // Resolve from the caller workspace. The script itself lives in the action checkout.
-    const playwright = createRequire(join(workspace, 'package.json'))(
-      'playwright',
-    ) as PlaywrightBrowsers
+    const playwright = await loadPlaywright(workspace)
     const launches = probeLaunches(browserName, playwright)
     exitCode = typeof launches === 'string' ? 1 : await chromiumLaunchProbeExitCode(launches)
     if (typeof launches === 'string') process.stderr.write(`${launches}\n`)
