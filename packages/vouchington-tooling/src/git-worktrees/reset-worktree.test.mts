@@ -187,6 +187,64 @@ describe('reset-worktree.sh', () => {
     await expect(readFile(join(gitdir, 'index.lock'), 'utf8')).rejects.toThrow()
   })
 
+  it('treats a stat-dirty file and a slashed local branch as clean', async () => {
+    const root = await initRepo()
+    await exec('touch', [join(root, 'README')])
+    await git(root, ['branch', 'release/1.2'])
+
+    const result = run(root, ['--base-ref', 'release/1.2'])
+
+    expect(result.status).toBe(0)
+    expect(await readFile(join(root, 'README'), 'utf8')).toBe('one\n')
+  })
+
+  it('refuses cache paths that name git metadata or the reset lock directory', async () => {
+    const root = await initRepo()
+
+    const gitCache = run(root, ['--base-ref', 'main', '--cache', '.git'])
+    expect(gitCache.status).toBe(2)
+    expect(await readFile(join(root, '.git', 'HEAD'), 'utf8')).toContain('ref:')
+
+    const lockCache = run(root, ['--base-ref', 'main', '--cache', '.local'])
+    expect(lockCache.status).toBe(2)
+    expect(await readFile(join(root, '.local', 'reset-worktree.lock'), 'utf8')).toBe('')
+  })
+
+  it('keeps the reset lock when --force cleans untracked files', async () => {
+    const root = await initRepo()
+    await writeFile(join(root, 'extra.txt'), 'extra\n')
+
+    const result = run(root, ['--base-ref', 'main', '--force'])
+
+    expect(result.status).toBe(0)
+    await expect(readFile(join(root, 'extra.txt'), 'utf8')).rejects.toThrow()
+    expect(await readFile(join(root, '.local', 'reset-worktree.lock'), 'utf8')).toBe('')
+  })
+
+  it('refuses a non-empty lock when the gitdir path is relative', async () => {
+    const root = await initRepo()
+    const linked = join(root, 'linked')
+    roots.push(linked)
+    await exec('git', ['-C', root, 'worktree', 'add', linked, '-b', 'linked'])
+    const gitFile = join(linked, '.git')
+    const absolute = (await readFile(gitFile, 'utf8')).replace(/^gitdir: */, '').trim()
+    const { stdout } = await exec('git', [
+      '-C',
+      linked,
+      'rev-parse',
+      '--path-format=relative',
+      '--git-dir',
+    ])
+    await writeFile(gitFile, `gitdir: ${stdout.trim()}\n`)
+    await writeFile(join(absolute, 'index.lock'), 'busy\n')
+
+    const busy = run(linked, ['--base-ref', 'linked', '--pre', 'touch pre-ran'])
+
+    expect(busy.status).toBe(1)
+    expect(busy.stderr).toContain('non-empty')
+    await expect(readFile(join(linked, 'pre-ran'), 'utf8')).rejects.toThrow()
+  })
+
   it('refuses a second reset while the lock is held', async () => {
     const root = await initRepo()
     const first = spawn(
@@ -199,9 +257,10 @@ describe('reset-worktree.sh', () => {
     )
     if (first.pid !== undefined) children.push(first.pid)
     const locked = join(root, 'locked')
-    for (let attempt = 0; attempt < 50 && !(await readable(locked)); attempt += 1) {
+    for (let attempt = 0; attempt < 250 && !(await readable(locked)); attempt += 1) {
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 20))
     }
+    expect(await readable(locked)).toBe(true)
     const second = run(root, ['--base-ref', 'main'])
     expect(second.status).toBe(1)
     expect(second.stderr).toContain('another worktree reset is running')

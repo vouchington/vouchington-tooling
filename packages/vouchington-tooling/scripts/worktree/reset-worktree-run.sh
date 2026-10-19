@@ -67,6 +67,7 @@ refuse_dirty() {
   if $FORCE; then
     return 0
   fi
+  git -C "$ROOT" update-index -q --refresh >/dev/null 2>&1 || true
   if ! git -C "$ROOT" diff-index --quiet HEAD -- 2>/dev/null; then
     echo "Error: uncommitted changes detected." >&2
     echo "Commit, stash, or discard them first, or rerun with --force to discard." >&2
@@ -81,27 +82,28 @@ refuse_dirty() {
 }
 
 clear_index_lock() {
-  local git_ref="$ROOT/.git"
-  local git_dir
-  if [ -f "$git_ref" ]; then
-    git_dir=$(sed 's/^gitdir: *//' "$git_ref")
-  else
-    git_dir=$git_ref
-  fi
-  if [ -f "$git_dir/index.lock" ] && [ -s "$git_dir/index.lock" ]; then
-    echo "Error: $git_dir/index.lock is non-empty -- a git process is mid-write." >&2
+  local index_lock
+  index_lock=$(cd "$ROOT" && git rev-parse --path-format=absolute --git-path index.lock)
+  if [ -s "$index_lock" ]; then
+    echo "Error: $index_lock is non-empty -- a git process is mid-write." >&2
     echo "Wait for it to finish, then rerun the reset." >&2
     exit 1
   fi
-  if [ -f "$git_dir/index.lock" ]; then
-    rm -f "$git_dir/index.lock"
+  if [ -f "$index_lock" ]; then
+    rm -f "$index_lock"
   fi
 }
 
 fetch_base_ref() {
+  local remote
   case "$BASE_REF" in
     refs/*) ;;
-    */*) git -C "$ROOT" fetch "${BASE_REF%%/*}" "${BASE_REF#*/}" >/dev/null ;;
+    */*)
+      remote=${BASE_REF%%/*}
+      if git -C "$ROOT" remote | grep -Fqx -- "$remote"; then
+        git -C "$ROOT" fetch "$remote" "${BASE_REF#*/}" >/dev/null
+      fi
+      ;;
   esac
 }
 
@@ -112,7 +114,7 @@ validate_caches() {
   fi
   for cache in "${CACHES[@]}"; do
     case "$cache" in
-      ''|/*|..|../*|*/..|*/../*)
+      ''|/*|..|../*|*/..|*/../*|.git|.git/*|.local|.local/*)
         echo "Error: cache path must stay inside the worktree: $cache" >&2
         exit 2
         ;;
@@ -153,7 +155,7 @@ reset_worktree() {
   new_branch="reset-${slug}"
   if $FORCE; then
     git -C "$ROOT" checkout -B "$new_branch" --force >/dev/null
-    git -C "$ROOT" clean -fd >/dev/null
+    git -C "$ROOT" clean -fd -e /.local/reset-worktree.lock >/dev/null
   else
     git -C "$ROOT" checkout -B "$new_branch" >/dev/null
   fi
