@@ -40,6 +40,48 @@ function killProcessGroup(pidFile: string) {
 }
 
 describe('run-bounded', () => {
+  it('reports 128 plus the signal when the command dies from a signal', () => {
+    const { result } = runBounded('5', [
+      'python3',
+      '-c',
+      'import os, signal; os.kill(os.getpid(), signal.SIGTERM)',
+    ])
+
+    expect(result.status).toBe(143)
+  })
+
+  it('kills the command group when the wrapper receives SIGTERM', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'run-bounded-signal-'))
+    const pidFile = join(dir, 'child-pid')
+    const child = spawn(
+      'python3',
+      [script, '30', 'bash', '-c', 'echo $$ > "$PID_FILE"; exec sleep 30'],
+      { env: { ...process.env, PID_FILE: pidFile }, stdio: 'ignore' },
+    )
+    try {
+      const started = Date.now()
+      while (!existsSync(pidFile)) {
+        if (child.exitCode !== null) throw new Error(`wrapper exited early: ${child.exitCode}`)
+        if (Date.now() - started > 3000) throw new Error('child did not start')
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      child.kill('SIGTERM')
+      const status = await new Promise<number | null>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('wrapper did not exit')), 5000)
+        child.once('close', (code) => {
+          clearTimeout(timer)
+          resolve(code)
+        })
+      })
+      expect(status).toBe(143)
+      const pid = readFileSync(pidFile, 'utf8').trim()
+      expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0)
+    } finally {
+      child.kill('SIGKILL')
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('returns the command status when the command finishes inside the deadline', () => {
     const { result, elapsedMs } = runBounded('5', ['python3', '-c', 'raise SystemExit(3)'])
 

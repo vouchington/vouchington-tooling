@@ -111,9 +111,10 @@ describe('setup-playwright composite action', () => {
     )
     expect(cache?.uses).toBe('actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9')
     expect(cache?.with).toEqual({
-      path: '${{ inputs.cache-path }}',
-      key: 'playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}',
+      path: '${{ steps.playwright-cache-key.outputs.cache-path }}',
+      key: 'playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}',
     })
+    expect(step('Resolve Playwright cache key').run).toContain('PLAYWRIGHT_BROWSERS_PATH=$resolved')
     expect(step('Resolve Playwright cache key').run).toContain('sha256sum pnpm-lock.yaml')
     expect(step('Resolve Playwright cache key').run).toContain('shasum -a 256 pnpm-lock.yaml')
   })

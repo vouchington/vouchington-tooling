@@ -22,10 +22,22 @@ runs:
         # fresh install — the skip branch exits early and must still expose
         # the verified temp binary to the lint-links step that follows.
         echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
+        # Archives before 0.24.0 keep the binary at the archive root. Stripping
+        # one component drops that member. 0.24.0 and later use a directory.
+        strip_components=1
+        if awk -v version="$LYCHEE_VERSION" 'BEGIN {
+          n = split(version, parts, ".")
+          if (n < 2) exit 1
+          if ((parts[1] + 0) == 0 && (parts[2] + 0) < 24) exit 0
+          exit 1
+        }'; then
+          strip_components=0
+        fi
         bash "$INSTALL_GITHUB_RELEASE" \
           --repo lycheeverse/lychee \
           --version "$LYCHEE_VERSION" \
           --asset 'lychee-{platform}.tar.gz' \
           --bin lychee \
           --tag-prefix 'lychee-v' \
+          --strip-components "$strip_components" \
           --bin-dir "$LYCHEE_BIN_DIR"

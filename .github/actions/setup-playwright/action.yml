@@ -1,11 +1,10 @@
 name: Setup Playwright
 description: >
-  Install a Playwright browser into an actions/cache path. Every job runs on a
-  fresh runner, so the cache key is the pnpm lockfile hash and a miss
-  reinstalls instead of restoring a mismatched browser. Host packages are
-  installed only when the Chromium launch probe
-  fails. The launch probe checks Chromium even when browser names another
-  Playwright browser.
+  Install a Playwright browser into an actions/cache path and export that
+  directory as PLAYWRIGHT_BROWSERS_PATH. The cache key includes the browser,
+  OS, architecture, and pnpm lockfile hash, with no fallback key. Host
+  packages are installed only when that browser fails to launch. Chromium
+  checks both the headless shell and channel chromium.
 
 inputs:
   browser:
@@ -27,7 +26,20 @@ runs:
     - name: Resolve Playwright cache key
       id: playwright-cache-key
       shell: bash
+      env:
+        PLAYWRIGHT_CACHE_PATH: ${{ inputs.cache-path }}
       run: |
+        set -euo pipefail
+        case "$PLAYWRIGHT_CACHE_PATH" in
+          ''|*$'\n'*) echo "::error::cache-path must be a single path"; exit 2 ;;
+        esac
+        case "$PLAYWRIGHT_CACHE_PATH" in
+          '~') resolved="$HOME" ;;
+          '~/'*) resolved="$HOME/${PLAYWRIGHT_CACHE_PATH#~/}" ;;
+          *) resolved="$PLAYWRIGHT_CACHE_PATH" ;;
+        esac
+        echo "cache-path=$resolved" >> "$GITHUB_OUTPUT"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$resolved" >> "$GITHUB_ENV"
         if command -v sha256sum >/dev/null 2>&1; then
           echo "lockfile-hash=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
         else
@@ -36,8 +48,8 @@ runs:
     - name: Cache Playwright browsers
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ inputs.cache-path }}
-        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}
+        path: ${{ steps.playwright-cache-key.outputs.cache-path }}
+        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}
 
     - name: Install Playwright browsers
       shell: bash
@@ -101,10 +113,10 @@ runs:
         if node "$CHROMIUM_LAUNCH_PROBE"; then
           exit 0
         fi
-        echo "::warning::Chromium did not launch; installing its host packages"
+        echo "::warning::${PLAYWRIGHT_BROWSER} did not launch; installing its host packages"
         bash "$WAIT_FOR_APT_LOCKS"
         pnpm exec playwright install-deps "$PLAYWRIGHT_BROWSER"
         if ! node "$CHROMIUM_LAUNCH_PROBE"; then
-          echo "::error::Chromium still cannot launch after installing its host packages"
+          echo "::error::${PLAYWRIGHT_BROWSER} still cannot launch after installing its host packages"
           exit 1
         fi

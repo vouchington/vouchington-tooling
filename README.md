@@ -230,12 +230,14 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
   `id-token: write`.
-- `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`) with no restore-keys
-  fallback, then installs `browser` (default `chromium`) under `timeout-seconds` and `attempts`.
-  Host packages are installed only when the Chromium launch probe fails, and that apt step stays
-  outside the download deadline. Give the calling step its own `timeout-minutes`.
+- `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`) with no fallback
+  key, exports that directory as `PLAYWRIGHT_BROWSERS_PATH`, and installs `browser` (default
+  `chromium`) under `timeout-seconds` and `attempts`. The cache key includes the browser. Host
+  packages are installed only when that browser fails to launch, and that apt step stays outside
+  the download deadline. Give the calling step its own `timeout-minutes`.
 - `setup-lychee` installs lychee `version` (default `0.24.2`) with checksum verification into the
-  job temporary bin directory and appends that directory to `GITHUB_PATH`.
+  job temporary bin directory and appends that directory to `GITHUB_PATH`. Versions before 0.24.0
+  keep the binary at the archive root.
 
 ### Required-result gate
 

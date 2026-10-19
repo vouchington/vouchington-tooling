@@ -1,8 +1,12 @@
 #!/usr/bin/env node
-// Exit 0 when both Chromium launch modes start headless and close cleanly, 1 otherwise.
-// setup-playwright runs this to learn whether the host can run them before it spends an
-// apt download on playwright install-deps. Any failure counts, and the cause is only
+// Exit 0 when the selected browser launches and closes cleanly, 1 otherwise.
+// setup-playwright runs this before it spends an apt download on playwright install-deps.
+// Chromium also launches with channel chromium, because that build can need different
+// host libraries than the headless shell. Any failure counts, and the cause is only
 // printed, so the probe never depends on Playwright's error wording.
+
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
 
 export interface LaunchedBrowser {
   close(): Promise<void>
@@ -20,30 +24,44 @@ export async function chromiumLaunchProbeExitCode(
     }
     return 0
   } catch (err) {
-    process.stderr.write(`Chromium failed to launch: ${String(err)}\n`)
+    process.stderr.write(`Browser failed to launch: ${String(err)}\n`)
     return 1
   }
 }
 
+interface PlaywrightBrowsers {
+  [name: string]:
+    | { launch: (options?: { channel: string }) => Promise<LaunchedBrowser> }
+    | undefined
+}
+
+function probeLaunches(
+  browserName: string,
+  playwright: PlaywrightBrowsers,
+): BrowserLauncher[] | string {
+  if (!/^[A-Za-z0-9_-]+$/.test(browserName)) return 'browser must be a single token'
+  const browser = playwright[browserName]
+  if (!browser) return `Playwright has no browser ${browserName}`
+  if (browserName === 'chromium') {
+    return [() => browser.launch(), () => browser.launch({ channel: 'chromium' })]
+  }
+  return [() => browser.launch()]
+}
+
 if (import.meta.main) {
-  // Imported lazily so an unresolvable Playwright is a failed probe, not an unhandled rejection.
-  // The specifier is a widened string so this script does not require Playwright to be installed
-  // where the package is typechecked.
-  const specifier: string = 'playwright'
-  const chromium = async () =>
-    (
-      (await import(specifier)) as {
-        chromium: {
-          launch: (options?: { channel: string }) => Promise<LaunchedBrowser>
-        }
-      }
-    ).chromium
-  // The default launch uses the headless shell. channel chromium launches full Chromium.
-  // Both ship in `playwright install chromium` and can need different host libraries.
-  const launches: BrowserLauncher[] = [
-    async () => (await chromium()).launch(),
-    async () => (await chromium()).launch({ channel: 'chromium' }),
-  ]
-  // Exit explicitly so a leaked browser handle cannot hold the step open until its timeout.
-  process.exit(await chromiumLaunchProbeExitCode(launches))
+  const browserName = process.env.PLAYWRIGHT_BROWSER ?? 'chromium'
+  const workspace = process.env.GITHUB_WORKSPACE || process.cwd()
+  let exitCode: 0 | 1 | 2 = 1
+  try {
+    // Resolve from the caller workspace. The script itself lives in the action checkout.
+    const playwright = createRequire(join(workspace, 'package.json'))(
+      'playwright',
+    ) as PlaywrightBrowsers
+    const launches = probeLaunches(browserName, playwright)
+    exitCode = typeof launches === 'string' ? 1 : await chromiumLaunchProbeExitCode(launches)
+    if (typeof launches === 'string') process.stderr.write(`${launches}\n`)
+  } catch (err) {
+    process.stderr.write(`Browser failed to launch: ${String(err)}\n`)
+  }
+  process.exit(exitCode)
 }

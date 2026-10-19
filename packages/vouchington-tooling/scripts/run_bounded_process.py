@@ -40,6 +40,18 @@ def output_sinks():
             raise RuntimeError('Output descriptor cleanup failed: ' + '; '.join(details)) from (primary or errors[0])
 
 
+class WrapperSignal(BaseException):
+    def __init__(self, signum: int) -> None:
+        super().__init__(signum)
+        self.signum = signum
+
+
+def exit_status(code: int) -> int:
+    if code < 0:
+        return 128 - code
+    return code
+
+
 def signal_group(pid: int, sig: int) -> None:
     try:
         os.killpg(pid, sig)
@@ -47,9 +59,28 @@ def signal_group(pid: int, sig: int) -> None:
         return
 
 
+def arm_termination() -> None:
+    def handle(signum: int, _frame: object) -> None:
+        signal.signal(signum, signal.SIG_DFL)
+        raise WrapperSignal(signum)
+
+    signal.signal(signal.SIGTERM, handle)
+    signal.signal(signal.SIGINT, handle)
+
+
+def reap_terminated_group(proc: subprocess.Popen[bytes], signum: int) -> int:
+    signal_group(proc.pid, signal.SIGTERM)
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        signal_group(proc.pid, signal.SIGKILL)
+        proc.wait()
+    return 128 + signum
+
+
 def run(proc: subprocess.Popen[bytes], seconds: int) -> int:
     try:
-        return proc.wait(timeout=seconds)
+        return exit_status(proc.wait(timeout=seconds))
     except subprocess.TimeoutExpired:
         signal_group(proc.pid, signal.SIGTERM)
         try:

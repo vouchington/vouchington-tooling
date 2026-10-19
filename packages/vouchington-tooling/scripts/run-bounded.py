@@ -14,7 +14,15 @@ import threading
 import termios
 import time
 
-from run_bounded_process import command_outputs, output_sinks, run, signal_group
+from run_bounded_process import (
+    WrapperSignal,
+    arm_termination,
+    command_outputs,
+    output_sinks,
+    reap_terminated_group,
+    run,
+    signal_group,
+)
 
 RELAY_JOIN_SECONDS = 3
 
@@ -138,6 +146,7 @@ def execute(seconds: int, targets: list[int | None]) -> None:
     errors: list[BaseException] = []
     status = 1
     try:
+        arm_termination()
         for stream, fd in zip((proc.stdout, proc.stderr), targets):
             if stream is not None:
                 relays.append(Relay(stream, fd))
@@ -145,6 +154,8 @@ def execute(seconds: int, targets: list[int | None]) -> None:
             thread.start()
             started.append(thread)
         status = run(proc, seconds)
+    except WrapperSignal as err:
+        status = reap_terminated_group(proc, err.signum)
     except BaseException as err:
         errors.append(err)
         for sig in (signal.SIGTERM, signal.SIGKILL):

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -34,5 +36,44 @@ describe('setup-lychee action', () => {
     expect(source).not.toContain('mkdir -p ~/.local/bin')
     expect(source).not.toContain('echo "$HOME/.local/bin" >> "$GITHUB_PATH"')
     expect(source).not.toContain('/tmp/lychee.tar.gz')
+  })
+
+  it('strips no components for archives before 0.24.0', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'setup-lychee-'))
+    const bin = join(directory, 'bin')
+    const log = join(directory, 'log')
+    mkdirSync(bin)
+    writeFileSync(
+      join(bin, 'install-github-release.sh'),
+      `#!/bin/bash
+printf '%s\\n' "$*" > "$INSTALL_LOG"
+`,
+    )
+    chmodSync(join(bin, 'install-github-release.sh'), 0o755)
+    const run = (version: string) =>
+      spawnSync(
+        'bash',
+        ['--noprofile', '--norc', '-eo', 'pipefail', '-c', action.runs.steps[0]?.run ?? ''],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            LYCHEE_VERSION: version,
+            INSTALL_GITHUB_RELEASE: join(bin, 'install-github-release.sh'),
+            INSTALL_LOG: log,
+            GITHUB_PATH: join(directory, 'path'),
+            RUNNER_TEMP: directory,
+          },
+        },
+      )
+    try {
+      expect(run('0.23.0').status).toBe(0)
+      expect(readFileSync(log, 'utf8')).toContain('--strip-components 0')
+      expect(run('0.24.2').status).toBe(0)
+      expect(readFileSync(log, 'utf8')).toContain('--strip-components 1')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

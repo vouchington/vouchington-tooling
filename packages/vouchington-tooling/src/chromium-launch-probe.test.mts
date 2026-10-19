@@ -71,11 +71,12 @@ describe('chromiumLaunchProbeExitCode', () => {
 // Runs a copy of the real entrypoint beside a fake `playwright` package, so the exit status is the
 // one the workflow step sees without downloading or starting a browser. The fake appends one line
 // per launch (the JSON launch options) and one per close to a `calls` file next to itself.
-function runProbe(fakePlaywright?: string) {
+function runProbe(fakePlaywright?: string, env?: Record<string, string>) {
   const directory = mkdtempSync(join(tmpdir(), 'chromium-launch-probe-'))
   const script = join(directory, 'ci/playwright/chromium-launch-probe.mts')
   const packageDirectory = join(directory, 'node_modules/playwright')
   mkdirSync(join(directory, 'ci/playwright'), { recursive: true })
+  writeFileSync(join(directory, 'package.json'), '{"name":"probe-fixture"}')
   cpSync(probeSource, script)
   if (fakePlaywright !== undefined) {
     mkdirSync(packageDirectory, { recursive: true })
@@ -83,7 +84,11 @@ function runProbe(fakePlaywright?: string) {
     writeFileSync(join(packageDirectory, 'index.js'), fakePlaywright)
   }
   try {
-    const result = spawnSync(process.execPath, [script], { cwd: directory, encoding: 'utf8' })
+    const result = spawnSync(process.execPath, [script], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_WORKSPACE: directory, ...env },
+    })
     let calls: string[] = []
     try {
       calls = readFileSync(join(packageDirectory, 'calls'), 'utf8').split('\n').filter(Boolean)
@@ -130,6 +135,25 @@ describe('chromium-launch-probe.mts process contract', () => {
 
     expect(result.status).not.toBe(0)
     expect(result.stderr).toContain('missing shared library')
+  })
+
+  it('launches the requested browser once when it is not Chromium', () => {
+    const result = runProbe(
+      `
+        const { appendFileSync } = require('node:fs')
+        const record = line => appendFileSync(__dirname + '/calls', line + '\\n')
+        exports.firefox = {
+          launch: async () => {
+            record('firefox')
+            return { close: async () => record('close') }
+          },
+        }
+      `,
+      { PLAYWRIGHT_BROWSER: 'firefox' },
+    )
+
+    expect(result.status).toBe(0)
+    expect(result.calls).toEqual(['firefox', 'close'])
   })
 
   it('exits non-zero when Playwright cannot be resolved', () => {
