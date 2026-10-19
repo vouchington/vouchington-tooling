@@ -5,7 +5,7 @@ export function normalizeHost(host: string): string {
   return value
 }
 
-export function isLoopbackHost(host: string): boolean {
+function isLoopbackHost(host: string): boolean {
   if (host === 'localhost' || host.endsWith('.localhost')) return true
   if (host === '::' || host === '::1' || host === '0:0:0:0:0:0:0:1' || host === '0.0.0.0')
     return true
