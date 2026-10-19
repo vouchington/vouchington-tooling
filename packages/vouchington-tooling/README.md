@@ -230,6 +230,15 @@ Host-lock environment:
 `git_worktree_canonical_path_hash <path>` helper resolves the physical path and prints a stable
 `d` plus the first 12 lowercase hexadecimal characters of its SHA-256 digest.
 
+`scripts/worktree/reset-worktree.sh --base-ref <ref>` checks out a new `reset-<hex>` branch and
+hard-resets it to `<ref>`. A `remote/branch` ref is fetched first; `refs/...` and a local ref are
+not. It refuses uncommitted or untracked changes unless `--force` is set, refuses a non-empty
+`index.lock`, and deletes a zero-byte `index.lock`. Repeat `--cache <relative-path>` for caller-owned
+outputs. `--pre` runs after fetch and before the branch switch; `--post` runs after cache removal.
+The script also deletes `.cache` directories and the direct `.cache`, `.vite`, and `.vitest`
+directories inside `node_modules`. It needs `flock` or `lockf` and holds
+`.local/reset-worktree.lock` for the run.
+
 ## Reclaiming finished worktrees
 
 `vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
