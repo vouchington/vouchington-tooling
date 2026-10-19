@@ -2,6 +2,7 @@ import {
   parseGhaArtifactsCleanup,
   type ParsedGhaArtifactsCleanup,
 } from './parse-gha-artifacts-cleanup.mts'
+import { parseStoryCoverage, type ParsedStoryCoverage } from './parse-story-coverage.mts'
 import { parseGhaRuntimeAudit, type ParsedGhaRuntimeAudit } from './parse-gha-runtime-audit.mts'
 import { parseForwardedCommand } from './parse-forwarded-commands.mts'
 import { parseFreshBase } from './parse-fresh-base.mts'
@@ -53,6 +54,7 @@ export type ParsedCli =
     }
   | ParsedGhaRuntimeAudit
   | ParsedGhaArtifactsCleanup
+  | ParsedStoryCoverage
 
 export type ScriptCommand =
   | 'gha-output'
@@ -124,6 +126,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
   if (command === 'ast-grep-pack') return parseAstGrepPack(rest)
   if (command === 'gha-workspace-policy') return parseGhaWorkspacePolicy(rest)
   if (command === 'gha-artifacts-cleanup') return parseGhaArtifactsCleanup(rest)
+  if (command === 'story-coverage') return parseStoryCoverage(rest)
   if (command !== undefined && SCRIPT_COMMANDS.has(command as ScriptCommand)) {
     return { kind: 'script', command: command as ScriptCommand, args: rest }
   }

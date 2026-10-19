@@ -734,6 +734,16 @@ reexports, and literal dynamic/require loads. Missing or incomplete facts for a 
 throw; external specifiers resolve to `null`. The default file inventory limit is 10,000
 files and can be reduced with `maxFiles`.
 
+## Story coverage
+
+`vouchington-tooling/story-coverage` exports `checkStoryCoverage`. It reports component exports
+that no reachable story imports. Callers pass the repository root, component directory, story
+directory, source extensions, component extensions, a marker regular expression, a story-file
+pattern, path aliases, and an optional exclusions map. An empty map is the zero-exclusion
+ratchet: any exclusion key fails the check. Namespace imports of the component directory fail
+the check because coverage cannot see which export was used. `vouchington story-coverage` runs
+the same check and needs the optional `no-mistakes` peer.
+
 ## Retrospective distill classifier
 
 `vouchington-tooling/retrospective-distill` exports `classifySession(session, entries, cutoffs)`,

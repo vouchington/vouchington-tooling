@@ -146,6 +146,11 @@
       "import": "./dist/source-module-graph/index.mjs",
       "default": "./dist/source-module-graph/index.mjs"
     },
+    "./story-coverage": {
+      "types": "./dist/story-coverage/index.d.mts",
+      "import": "./dist/story-coverage/index.mjs",
+      "default": "./dist/story-coverage/index.mjs"
+    },
     "./gha-selected-files": {
       "types": "./dist/gha-selected-files/index.d.mts",
       "import": "./dist/gha-selected-files/index.mjs",
