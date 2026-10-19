@@ -70,10 +70,14 @@ function readFlagValue(args: string[], index: number, flag: string): string {
   return value
 }
 
+const MAX_TIMER_MS = 2_147_483_647
+
 function parsePositiveInteger(value: string, flag: string): number {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`${flag} requires a positive integer`)
   const parsed = Number(value)
-  if (!Number.isSafeInteger(parsed)) throw new Error(`${flag} requires a positive integer`)
+  if (!Number.isSafeInteger(parsed) || parsed > MAX_TIMER_MS) {
+    throw new Error(`${flag} requires a positive integer no greater than ${MAX_TIMER_MS}`)
+  }
   return parsed
 }
 
