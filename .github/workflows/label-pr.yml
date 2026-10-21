@@ -1,6 +1,6 @@
 name: Label PRs
 
-# Reusable pull-request labeler. The caller grants pull-requests: write.
+# Reusable pull-request labeler. The caller grants contents: read, issues: write, and pull-requests: write.
 on:
   workflow_call:
     inputs:
@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
 
 jobs:

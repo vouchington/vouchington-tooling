@@ -29,10 +29,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   lint-links:
     runs-on: ${{ inputs.runs-on }}
@@ -46,9 +42,9 @@ jobs:
       - name: Checkout tooling scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: vouchington/vouchington-tooling
+          repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
-          path: .tooling
+          path: .vouchington-tooling-checkout
           persist-credentials: false
           fetch-depth: 1
 
@@ -78,7 +74,7 @@ jobs:
           fi
           LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
           echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
-          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
+          bash "$GITHUB_WORKSPACE/.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
             --repo lycheeverse/lychee \
             --version "$LYCHEE_VERSION" \
             --asset "$asset" \
@@ -117,5 +113,5 @@ jobs:
           case "$LYCHEE_CONFIG" in
             ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
           esac
-          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/lint-links.sh" \
+          bash "$GITHUB_WORKSPACE/.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/lint-links.sh" \
             --config "$LYCHEE_CONFIG"

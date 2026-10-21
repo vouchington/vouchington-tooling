@@ -21,10 +21,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   gitleaks:
     runs-on: ${{ inputs.runs-on }}
@@ -39,9 +35,9 @@ jobs:
       - name: Checkout tooling scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: vouchington/vouchington-tooling
+          repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
-          path: .tooling
+          path: .vouchington-tooling-checkout
           persist-credentials: false
           fetch-depth: 1
 
@@ -90,7 +86,7 @@ jobs:
               ;;
           esac
           export PLATFORM
-          bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
+          bash "$GITHUB_WORKSPACE/.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
             --repo gitleaks/gitleaks \
             --version "$GITLEAKS_VERSION" \
             --asset 'gitleaks_{version}_{platform}.tar.gz' \

@@ -248,8 +248,9 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
 ### Reusable workflows
 
 Pin these with `uses: vouchington/vouchington-tooling/.github/workflows/<name>.yml@<40-character-sha>`.
-The caller chooses the trigger, including any schedule. Tool versions for `actionlint` come from the
-caller's `.mise.toml`.
+The caller chooses the trigger, including any schedule. Caller jobs need `contents: read` (a called
+workflow cannot exceed the caller's permissions). The `actionlint` workflow installs tools from the
+caller's `.mise.toml`, which must pin both `actionlint` and `zizmor`.
 
 - `actionlint` runs `actionlint`, then `zizmor --offline` at `min-severity` and `min-confidence`
   (both default `high`).
@@ -260,7 +261,8 @@ caller's `.mise.toml`.
   `config` defaults to `lychee.toml`. Pass `excluded-urls` and `checked-urls` to probe that config
   before the scan; leave them empty to skip the probe.
 - `label-pr` applies `actions/labeler` using `configuration-path` (default `.github/labeler.yml`).
-  The caller job needs `pull-requests: write`.
+  The caller job needs `contents: read`, `issues: write` (to create missing labels), and
+  `pull-requests: write`.
 
 ### Required-result gate
 

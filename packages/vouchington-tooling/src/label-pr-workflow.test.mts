@@ -27,7 +27,11 @@ describe('label-pr reusable workflow', () => {
       '.github/labeler.yml',
     )
     expect(workflow.on.workflow_call.inputs['runs-on']?.default).toBe('ubuntu-slim')
-    expect(workflow.permissions).toEqual({ contents: 'read', 'pull-requests': 'write' })
+    expect(workflow.permissions).toEqual({
+      contents: 'read',
+      issues: 'write',
+      'pull-requests': 'write',
+    })
     const step = workflow.jobs.label.steps[0]
     expect(step?.uses).toBe('actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13')
     expect(step?.['continue-on-error']).toBe(true)

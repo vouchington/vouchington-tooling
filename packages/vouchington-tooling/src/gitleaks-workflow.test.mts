@@ -82,7 +82,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(source).not.toMatch(/voucha|filament|storybook|vouchington-machines/iu)
     expect(step('Install gitleaks').env?.GITLEAKS_VERSION).toBe('${{ inputs.version }}')
     expect(step('Install gitleaks').run).toContain(
-      '.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh',
+      '.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/install-github-release.sh',
     )
     expect(step('Install gitleaks').run).toContain('--repo gitleaks/gitleaks')
     expect(step('Install gitleaks').run).toContain('--bin-dir "$RUNNER_TEMP/bin"')
@@ -96,7 +96,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(source).not.toContain('workflow_ref')
     const tooling = steps.find((candidate) => candidate.name === 'Checkout tooling scripts')
     expect(tooling?.with).toMatchObject({
-      repository: 'vouchington/vouchington-tooling',
+      repository: '${{ job.workflow_repository }}',
       ref: '${{ job.workflow_sha }}',
       'persist-credentials': false,
     })
