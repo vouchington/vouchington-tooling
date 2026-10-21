@@ -18,6 +18,7 @@ import {
 export interface BrowserTestOptions {
   allowlist?: readonly BrowserIssueAllowlistEntry[]
   assertTimeout?: (timeout: number, label: string) => void
+  /** Replaces the default GTM/GA/DoubleClick rules; spread BLOCKED_EXTERNAL_NETWORK_RULES to extend them. */
   rules?: readonly BlockedExternalNetworkRule[]
   warningPattern?: RegExp
 }
