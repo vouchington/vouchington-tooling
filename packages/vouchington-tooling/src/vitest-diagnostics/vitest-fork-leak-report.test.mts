@@ -69,27 +69,30 @@ describe('formatForkLeakDiagnostics', () => {
     })
     ;(globalThis as typeof globalThis & Record<symbol, unknown>)[socketsKey] = () => sockets
 
-    const report = formatForkLeakDiagnostics(
-      {
-        type: 'TCPSocketWrap',
-        baseline: 1,
-        current: 2,
-        streak: 1,
-        growthCheckpoints: 0,
-        requiredGrowthCheckpoints: 4,
-        detectedInFile: null,
-        suspectedGrowth: null,
-      },
-      new Map(),
-      getRegisteredPoolMetrics(),
-    )
+    try {
+      const report = formatForkLeakDiagnostics(
+        {
+          type: 'TCPSocketWrap',
+          baseline: 1,
+          current: 2,
+          streak: 1,
+          growthCheckpoints: 0,
+          requiredGrowthCheckpoints: 4,
+          detectedInFile: null,
+          suspectedGrowth: null,
+        },
+        new Map(),
+        getRegisteredPoolMetrics(),
+      )
 
-    expect(getRegisteredPoolSocketHandles()).toBe(sockets)
-    expect(report).toContain('confirmed by continuation in file: unknown')
-    expect(report).toContain('largest growth step: unknown')
-    expect(report.indexOf('read(total=2')).toBeLessThan(report.indexOf('write(total=1'))
-    delete (globalThis as typeof globalThis & Record<symbol, unknown>)[metricsKey]
-    delete (globalThis as typeof globalThis & Record<symbol, unknown>)[socketsKey]
+      expect(getRegisteredPoolSocketHandles()).toBe(sockets)
+      expect(report).toContain('confirmed by continuation in file: unknown')
+      expect(report).toContain('largest growth step: unknown')
+      expect(report.indexOf('read(total=2')).toBeLessThan(report.indexOf('write(total=1'))
+    } finally {
+      delete (globalThis as typeof globalThis & Record<symbol, unknown>)[metricsKey]
+      delete (globalThis as typeof globalThis & Record<symbol, unknown>)[socketsKey]
+    }
     expect(getRegisteredPoolMetrics()).toBeNull()
     expect(getRegisteredPoolSocketHandles()).toBeNull()
   })

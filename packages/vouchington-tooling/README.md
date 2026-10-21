@@ -544,9 +544,8 @@ waits for a caller-supplied pool snapshot to settle. `installTestNetworkAllowlis
 allowed hosts, an exempt predicate, and the state key. `checkAndRestoreFakeTimers` restores real
 timers and returns a diagnostic when a test left fake timers installed.
 
-Use a caller-owned run directory: the reporter clears only regular
-numeric PID `.jsonl` files there at construction and leaves the directory and other files alone.
-Application metrics and CI artifact handling stay with the caller.
+Use a caller-owned run directory: the reporter clears only regular numeric PID `.jsonl` files
+there at construction and leaves the directory and other files alone. Application metrics and CI artifact handling stay with the caller.
 
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group

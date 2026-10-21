@@ -47,6 +47,7 @@ function createDns() {
     return Promise.resolve([
       '198.51.100.20',
       'note',
+      'not-an-ip:80',
       { address: '2001:db8::1' },
       { nope: true },
       ['10.1.1.1'],
@@ -114,7 +115,7 @@ describe('installTestNetworkAllowlist', () => {
       /a connection to "203.0.113.10".*example\.test/,
     )
     expect(() => net.Socket.prototype.connect(443, '203.0.113.50')).toThrow(/203\.0\.113\.50/)
-    const message = consumeTestNetworkAllowlistViolation()
+    const message = consumeTestNetworkAllowlistViolation('test.network-allowlist.block')
     expect(message).toContain('203.0.113.10')
     expect(message).toContain('\n')
     expect(message).toContain('203.0.113.50')
@@ -180,11 +181,16 @@ describe('installTestNetworkAllowlist', () => {
     install('test.network-allowlist.dns', { dns, net }, { allowedHosts: ['example.test'] })
 
     let callbackError: unknown
-    expect(
-      dns.lookup('evil.test', (error: unknown) => {
-        callbackError = error
-      }),
-    ).toBeUndefined()
+    const callbackDone = new Promise<void>((resolve) => {
+      expect(
+        dns.lookup('evil.test', (error: unknown) => {
+          callbackError = error
+          resolve()
+        }),
+      ).toBeUndefined()
+    })
+    expect(callbackError).toBeUndefined()
+    await callbackDone
     expect(callbackError).toBeInstanceOf(Error)
     await expect(dns.promises.lookup('evil.test')).rejects.toThrow(/a DNS lookup for "evil.test"/)
     expect(() => dns.lookup('evil.test')).toThrow(Error)
@@ -236,6 +242,33 @@ describe('installTestNetworkAllowlist', () => {
     expect(bare.builtinCalls).toEqual(['node:dns', 'node:net'])
   })
 
+  it('keeps each install bound to its own state key', () => {
+    const net = createSocket()
+    install('test.network-allowlist.key-a', { dns: createDns(), net }, { allowedHosts: ['a.test'] })
+    install('test.network-allowlist.key-b', { dns: createDns(), net }, { allowedHosts: ['b.test'] })
+    const repeat = install(
+      'test.network-allowlist.key-a',
+      { dns: createDns(), net },
+      { allowedHosts: ['a.test'] },
+    )
+    expect(repeat.builtinCalls).toEqual([])
+    expect(() => net.Socket.prototype.connect(443, 'c.test')).toThrow(
+      /Tests may only reach b\.test/,
+    )
+    expect(consumeTestNetworkAllowlistViolation('test.network-allowlist.key-b')).toContain('c.test')
+    expect(consumeTestNetworkAllowlistViolation('test.network-allowlist.key-a')).toBeNull()
+  })
+
+  it('remembers only real IP addresses from DNS results', async () => {
+    const net = createSocket()
+    const dns = createDns()
+    install('test.network-allowlist.ip-only', { dns, net }, { allowedHosts: ['example.test'] })
+    await dns.promises.reverse('example.test')
+    expect(() => net.Socket.prototype.connect({ host: 'not-an-ip:80', port: 1 })).toThrow(
+      /not-an-ip:80/,
+    )
+  })
+
   it('names the default hosts when the caller does not pass an allowlist', () => {
     const net = createSocket()
     install(undefined, { dns: {}, net })
@@ -249,7 +282,7 @@ describe('installTestNetworkAllowlist', () => {
     Object.defineProperty(process, 'getBuiltinModule', { configurable: true, value: undefined })
     try {
       installTestNetworkAllowlist({ stateKey: 'test.network-allowlist.no-probe' })
-      expect(consumeTestNetworkAllowlistViolation()).toBeNull()
+      expect(consumeTestNetworkAllowlistViolation('test.network-allowlist.no-probe')).toBeNull()
     } finally {
       if (descriptor) Object.defineProperty(process, 'getBuiltinModule', descriptor)
     }

@@ -21,7 +21,7 @@ function wrapDns(original: DnsFn, promises: boolean, hooks: DnsAllowlistHooks): 
     if (host !== null && !hooks.isAllowedHost(host)) {
       const error = hooks.blockDns(host)
       if (!promises && typeof callback === 'function') {
-        call(callback, error)
+        queueMicrotask(() => call(callback, error))
         return undefined
       }
       if (promises) return Promise.reject(error)

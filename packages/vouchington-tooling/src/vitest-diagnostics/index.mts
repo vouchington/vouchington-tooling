@@ -1,5 +1,4 @@
 import { join, posix, win32 } from 'node:path'
-
 export {
   registerForkExitSentinel,
   setCurrentForkExitModule,
@@ -53,6 +52,7 @@ export type {
   ForkLeakDetectorOptions,
   ForkLeakVerdict,
 } from './vitest-fork-leak-detection.mts'
+
 import { isDiagnosticReportDirectoryCurrent, readDiagnosticReportDirectory } from './directory.mts'
 import { readBoundedRegularFile } from './read-file.mts'
 export { MAX_DIAGNOSTIC_REPORT_BYTES } from './read-file.mts'

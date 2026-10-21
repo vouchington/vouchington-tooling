@@ -61,6 +61,7 @@ type GlobalWithForkLeakDetector = typeof globalThis & {
 
 // Vitest re-evaluates a fork's setup files on every file while reusing the process.
 // A module-scope detector would reset every file and never leave the warmup window.
+// Only the first call's options apply; later calls return the existing detector unchanged.
 export function getForkLeakDetector(options: ForkLeakDetectorOptions = {}): ForkLeakDetector {
   return ((globalThis as GlobalWithForkLeakDetector)[FORK_LEAK_DETECTOR_KEY] ??=
     createForkLeakDetector(options))

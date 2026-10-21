@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+
 export function normalizeHost(host: string): string {
   let value = host.trim().toLowerCase()
   if (value.startsWith('[') && value.endsWith(']')) value = value.slice(1, -1)
@@ -35,7 +37,7 @@ export function isAllowedHost(host: string, current: HostAllowlist): boolean {
 export function rememberAddresses(value: unknown, ips: Set<string>): void {
   const visit = (item: unknown): void => {
     if (typeof item === 'string') {
-      if (item.includes(':') || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(item)) ips.add(normalizeHost(item))
+      if (isIP(item) !== 0) ips.add(normalizeHost(item))
       return
     }
     if (Array.isArray(item)) {

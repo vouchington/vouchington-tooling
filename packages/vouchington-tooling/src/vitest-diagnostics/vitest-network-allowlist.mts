@@ -17,7 +17,6 @@ export type TestNetworkAllowlistOptions = {
 
 const DEFAULT_HOSTS = ['example.com', 'example.net', 'example.org']
 const DEFAULT_STATE_KEY = 'test.networkAllowlist'
-let activeStateKey = DEFAULT_STATE_KEY
 
 function defaultExempt(): boolean {
   return false
@@ -33,7 +32,7 @@ type AllowlistState = {
 
 type DnsSurface = { promises?: DnsSurface; Resolver?: { prototype: DnsSurface } }
 
-function state(key = activeStateKey): AllowlistState {
+function state(key = DEFAULT_STATE_KEY): AllowlistState {
   return ((globalThis as unknown as Record<symbol, AllowlistState | undefined>)[Symbol.for(key)] ??=
     {
       installed: false,
@@ -53,17 +52,18 @@ class TestNetworkAllowlistError extends Error {
   }
 }
 
-function block(kind: 'dns' | 'connection', host: string): TestNetworkAllowlistError {
+function block(key: string, kind: 'dns' | 'connection', host: string): TestNetworkAllowlistError {
   const action = kind === 'dns' ? 'a DNS lookup for' : 'a connection to'
-  const allowed = [...state().allowedHosts].toSorted().join(', ')
+  const current = state(key)
+  const allowed = [...current.allowedHosts].toSorted().join(', ')
   const message = `Test network allowlist blocked ${action} "${normalizeHost(host)}". Tests may only reach ${allowed}, and loopback.`
-  state().violations.push(message)
+  current.violations.push(message)
   return new TestNetworkAllowlistError(message)
 }
 
 export function installTestNetworkAllowlist(options: TestNetworkAllowlistOptions = {}): void {
-  activeStateKey = options.stateKey ?? DEFAULT_STATE_KEY
-  const current = state(activeStateKey)
+  const key = options.stateKey ?? DEFAULT_STATE_KEY
+  const current = state(key)
   if (current.installed) return
   current.installed = true
   current.allowedHosts = new Set(options.allowedHosts ?? DEFAULT_HOSTS)
@@ -73,9 +73,9 @@ export function installTestNetworkAllowlist(options: TestNetworkAllowlistOptions
   const net = process.getBuiltinModule('node:net') as NetModule
   if (typeof net.Socket !== 'function') return
   const hooks = {
-    isAllowedHost: (host: string) => isAllowedHost(host, state()),
-    blockDns: (host: string) => block('dns', host),
-    rememberAddresses: (value: unknown) => rememberAddresses(value, state().allowedIps),
+    isAllowedHost: (host: string) => isAllowedHost(host, state(key)),
+    blockDns: (host: string) => block(key, 'dns', host),
+    rememberAddresses: (value: unknown) => rememberAddresses(value, state(key).allowedIps),
   }
   patchDnsSurface(dns, false, hooks)
   patchDnsSurface(dns.promises, true, hooks)
@@ -83,7 +83,7 @@ export function installTestNetworkAllowlist(options: TestNetworkAllowlistOptions
   patchDnsSurface(dns.promises?.Resolver?.prototype, true, hooks)
   patchSocketConnect(net, {
     isAllowedHost: hooks.isAllowedHost,
-    blockConnection: (host: string) => block('connection', host),
+    blockConnection: (host: string) => block(key, 'connection', host),
   })
   const nodeModule = process.getBuiltinModule('node:module') as {
     syncBuiltinESMExports?: () => void
@@ -91,7 +91,7 @@ export function installTestNetworkAllowlist(options: TestNetworkAllowlistOptions
   nodeModule.syncBuiltinESMExports?.()
 }
 
-export function consumeTestNetworkAllowlistViolation(stateKey = activeStateKey): string | null {
+export function consumeTestNetworkAllowlistViolation(stateKey = DEFAULT_STATE_KEY): string | null {
   const violations = state(stateKey).violations
   if (violations.length === 0) return null
   const message = violations.join('\n')
