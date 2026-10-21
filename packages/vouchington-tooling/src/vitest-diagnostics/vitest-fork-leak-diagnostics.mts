@@ -1,7 +1,57 @@
 import type { ForkLeakVerdict } from './vitest-fork-leak-detection.mts'
+import type { PoolConnectionMetrics, PoolMetrics } from './vitest-fork-leak-handshake-samples.mts'
+import { formatResourceCounts } from './vitest-process-resources.mts'
 
-/** Formats a bounded, single-line verdict for a test failure or diagnostic log. */
-export function formatForkLeakDiagnostics(verdict: ForkLeakVerdict): string {
+type ForkLeakGrowthStep = NonNullable<ForkLeakVerdict['suspectedGrowth']>
+type PoolMetricsProvider = () => PoolMetrics
+type PoolSocketHandles = { active: ReadonlySet<object>; owned: ReadonlySet<object> }
+
+const POOL_METRICS_KEY = Symbol.for('vitest-fork-leak-pool-metrics')
+const POOL_SOCKETS_KEY = Symbol.for('vitest-fork-leak-pool-socket-handles')
+
+export function getRegisteredPoolMetrics(): PoolMetrics | null {
+  const provider = (
+    globalThis as typeof globalThis & Record<symbol, PoolMetricsProvider | undefined>
+  )[POOL_METRICS_KEY]
+  return provider?.() ?? null
+}
+
+export function getRegisteredPoolSocketHandles(): PoolSocketHandles | null {
+  const provider = (
+    globalThis as typeof globalThis & Record<symbol, (() => PoolSocketHandles) | undefined>
+  )[POOL_SOCKETS_KEY]
+  return provider?.() ?? null
+}
+
+/** One-line summary, or a multi-line report when resource counts are supplied. */
+export function formatForkLeakDiagnostics(verdict: ForkLeakVerdict): string
+export function formatForkLeakDiagnostics(
+  verdict: ForkLeakVerdict,
+  counts: ReadonlyMap<string, number>,
+  poolMetrics?: PoolMetrics | null,
+): string
+export function formatForkLeakDiagnostics(
+  verdict: ForkLeakVerdict,
+  counts?: ReadonlyMap<string, number>,
+  poolMetrics?: PoolMetrics | null,
+): string {
+  if (counts === undefined) return formatForkLeakSummary(verdict)
+  return [
+    '[vitest-fork-leak]',
+    `type: ${verdict.type}`,
+    `baseline: ${verdict.baseline}`,
+    `current: ${verdict.current} (+${verdict.current - verdict.baseline})`,
+    `candidate evidence span: ${verdict.streak}`,
+    `candidate growth evidence: ${verdict.growthCheckpoints} (required: ${verdict.requiredGrowthCheckpoints})`,
+    `confirmed by continuation in file: ${verdict.detectedInFile ?? 'unknown'}`,
+    `suspected growth file: ${verdict.suspectedGrowth?.testFile ?? 'unknown'}`,
+    `largest growth step: ${formatGrowthStep(verdict.suspectedGrowth)}`,
+    `tracked resource counts: ${formatResourceCounts(counts)}`,
+    `pool metrics: ${formatPoolMetrics(poolMetrics ?? null)}`,
+  ].join('\n')
+}
+
+function formatForkLeakSummary(verdict: ForkLeakVerdict): string {
   const growth = verdict.suspectedGrowth
   const file = growth?.testFile ?? verdict.detectedInFile ?? 'unknown'
   return [
@@ -13,4 +63,20 @@ export function formatForkLeakDiagnostics(verdict: ForkLeakVerdict): string {
     `file=${file.replace(/\s+/g, ' ').slice(0, 240)}`,
     `delta=${growth?.delta ?? 0}`,
   ].join(' ')
+}
+
+function formatPoolMetrics(metrics: PoolMetrics | null): string {
+  if (!metrics) return 'unavailable (pools not initialized)'
+  return Object.entries(metrics)
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([label, pool]) => formatPool(label, pool))
+    .join(' ')
+}
+
+function formatPool(label: string, pool: PoolConnectionMetrics): string {
+  return `${label}(total=${pool.total},idle=${pool.idle},non-idle-or-connecting=${pool.nonIdleOrConnecting},waiting=${pool.waiting})`
+}
+
+function formatGrowthStep(step: ForkLeakGrowthStep | null): string {
+  return step ? `${step.previous} -> ${step.current} (+${step.delta})` : 'unknown'
 }
