@@ -41,26 +41,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Resolve tooling repository
-        id: tooling
-        timeout-minutes: 1
-        env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
-        run: |
-          set -euo pipefail
-          file_ref="${WORKFLOW_REF%%@*}"
-          repository="${file_ref%%/.github/*}"
-          case "$repository" in
-            */*) ;;
-            *) echo "::error::cannot resolve the called workflow repository"; exit 1 ;;
-          esac
-          echo "repository=$repository" >> "$GITHUB_OUTPUT"
-
       - name: Checkout tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 1
         with:
-          repository: ${{ steps.tooling.outputs.repository }}
+          repository: vouchington/vouchington-tooling
           ref: ${{ job.workflow_sha }}
           path: .tooling
           fetch-depth: 1
@@ -97,6 +82,10 @@ jobs:
           fi
           if [[ -z "$PATTERNS_FILE" || "$PATTERNS_FILE" == -* || "$PATTERNS_FILE" == /* || "$PATTERNS_FILE" == *$'\n'* || "$PATTERNS_FILE" == *'..'* ]]; then
             echo "::error::patterns-file must be a repository path"
+            exit 2
+          fi
+          if [[ ! -f "$GITHUB_WORKSPACE/$PATTERNS_FILE" ]]; then
+            echo "::error::patterns-file $PATTERNS_FILE does not exist in the caller repository"
             exit 2
           fi
 

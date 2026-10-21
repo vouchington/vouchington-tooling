@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -74,11 +75,9 @@ describe('cleanup-artifacts reusable workflow', () => {
 
   it('checks out this workflow repository at the called SHA', () => {
     const tooling = steps.find((step) => step.name === 'Checkout tooling')
-    expect(steps.find((step) => step.id === 'tooling')?.env?.WORKFLOW_REF).toBe(
-      '${{ github.workflow_ref }}',
-    )
+    expect(workflowText).not.toContain('workflow_ref')
     expect(tooling?.with).toMatchObject({
-      repository: '${{ steps.tooling.outputs.repository }}',
+      repository: 'vouchington/vouchington-tooling',
       ref: '${{ job.workflow_sha }}',
       path: '.tooling',
       'fetch-depth': 1,
@@ -93,14 +92,22 @@ describe('cleanup-artifacts reusable workflow', () => {
     ).toBe('.tooling')
   })
 
-  it('rejects a sweep threshold or patterns path that is not a repository file', () => {
-    expect(runValidate({ OLDER_THAN_HOURS: '6', PATTERNS_FILE: 'ci/patterns.json' }).status).toBe(0)
-    expect(runValidate({ OLDER_THAN_HOURS: '6a', PATTERNS_FILE: 'ci/patterns.json' }).status).toBe(
-      2,
-    )
-    expect(runValidate({ OLDER_THAN_HOURS: '6', PATTERNS_FILE: '../patterns.json' }).status).toBe(2)
-    expect(runValidate({ OLDER_THAN_HOURS: '6', PATTERNS_FILE: '/tmp/patterns.json' }).status).toBe(
-      2,
-    )
+  it('rejects a sweep threshold or patterns path that is not an existing repository file', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'cleanup-artifacts-'))
+    mkdirSync(join(workspace, 'ci'))
+    writeFileSync(join(workspace, 'ci/patterns.json'), '[]')
+    const run = (hours: string, file: string) =>
+      runValidate({ OLDER_THAN_HOURS: hours, PATTERNS_FILE: file, GITHUB_WORKSPACE: workspace })
+    try {
+      expect(run('6', 'ci/patterns.json').status).toBe(0)
+      expect(run('6a', 'ci/patterns.json').status).toBe(2)
+      expect(run('6', '../patterns.json').status).toBe(2)
+      expect(run('6', '/tmp/patterns.json').status).toBe(2)
+      const missing = run('6', 'ci/missing.json')
+      expect(missing.status).toBe(2)
+      expect(missing.stdout).toContain('::error::patterns-file ci/missing.json does not exist')
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
   })
 })
