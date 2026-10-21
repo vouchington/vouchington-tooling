@@ -311,6 +311,11 @@
       "import": "./dist/vitest-diagnostics/index.mjs",
       "default": "./dist/vitest-diagnostics/index.mjs"
     },
+    "./vitest-effective-timeout": {
+      "types": "./dist/vitest-effective-timeout/index.d.mts",
+      "import": "./dist/vitest-effective-timeout/index.mjs",
+      "default": "./dist/vitest-effective-timeout/index.mjs"
+    },
     "./gh-cli": {
       "types": "./dist/gh-cli/index.d.mts",
       "import": "./dist/gh-cli/index.mjs",
