@@ -1,0 +1,117 @@
+name: Lint Links
+
+# Reusable link check. The caller owns the schedule. Exclusion probe URLs are
+# inputs so the workflow does not embed a repository's allowlist.
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: lychee config path in the caller repository
+        type: string
+        default: lychee.toml
+      lychee-version:
+        description: lychee release version passed to setup-lychee
+        type: string
+        default: '0.24.2'
+      excluded-urls:
+        description: Newline-separated URLs the config must exclude. Empty skips the probe.
+        type: string
+        default: ''
+      checked-urls:
+        description: Newline-separated URLs the config must still check. Empty skips the probe.
+        type: string
+        default: ''
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-slim
+
+permissions:
+  contents: read
+
+jobs:
+  lint-links:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 1
+        with:
+          persist-credentials: false
+
+      - name: Checkout tooling scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .vouchington-tooling-checkout
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install lychee
+        timeout-minutes: 3
+        env:
+          LYCHEE_VERSION: ${{ inputs.lychee-version }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_VERSION" in
+            ''|*[!0-9A-Za-z._-]*) echo "::error::lychee-version must be a single token"; exit 2 ;;
+          esac
+          # lychee 0.24.0 changed asset naming and added .sha256 sidecars; older
+          # releases cannot be checksum-verified.
+          if ! awk -v version="$LYCHEE_VERSION" 'BEGIN {
+            n = split(version, parts, ".")
+            if (n != 3) exit 1
+            for (i = 1; i <= 3; i++) if (parts[i] !~ /^[0-9]+$/) exit 1
+            exit (parts[1] + 0 > 0 || parts[2] + 0 >= 24) ? 0 : 1
+          }'; then
+            echo "::error::lychee-version must be 0.24.0 or newer (X.Y.Z); older releases have no checksum file"
+            exit 2
+          fi
+          asset='lychee-{platform}.tar.gz'
+          if [ "$LYCHEE_VERSION" = 0.24.0 ]; then
+            asset='lychee-lychee-v{version}-{platform}.tar.gz'
+          fi
+          LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
+          echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
+          bash "$GITHUB_WORKSPACE/.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
+            --repo lycheeverse/lychee \
+            --version "$LYCHEE_VERSION" \
+            --asset "$asset" \
+            --bin lychee \
+            --tag-prefix 'lychee-v' \
+            --bin-dir "$LYCHEE_BIN_DIR"
+
+      - name: Verify link exclusions
+        if: ${{ inputs.excluded-urls != '' || inputs.checked-urls != '' }}
+        timeout-minutes: 1
+        shell: bash
+        env:
+          LYCHEE_CONFIG: ${{ inputs.config }}
+          EXCLUDED_URLS: ${{ inputs.excluded-urls }}
+          CHECKED_URLS: ${{ inputs.checked-urls }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_CONFIG" in
+            ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
+          esac
+          actual="$(
+            printf '%s\n%s\n' "$EXCLUDED_URLS" "$CHECKED_URLS" | sed '/^$/d' \
+              | lychee --dump --cache=false --config "$LYCHEE_CONFIG" - \
+              | sort
+          )"
+          expected="$(printf '%s\n' "$CHECKED_URLS" | sed '/^$/d' | sort)"
+          test "$actual" = "$expected"
+
+      - name: Check links
+        timeout-minutes: 5
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LYCHEE_CONFIG: ${{ inputs.config }}
+        run: |
+          set -euo pipefail
+          case "$LYCHEE_CONFIG" in
+            ''|-*) echo "::error::config must be a repository path"; exit 2 ;;
+          esac
+          bash "$GITHUB_WORKSPACE/.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha/lint-links.sh" \
+            --config "$LYCHEE_CONFIG"

@@ -245,6 +245,25 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   prefix; later releases use `lychee-<platform>.tar.gz`. Older releases are rejected because they
   publish no checksum file.
 
+### Reusable workflows
+
+Pin these with `uses: vouchington/vouchington-tooling/.github/workflows/<name>.yml@<40-character-sha>`.
+The caller chooses the trigger, including any schedule. Caller jobs need `contents: read` (a called
+workflow cannot exceed the caller's permissions). The `actionlint` workflow installs tools from the
+caller's `.mise.toml`, which must pin both `actionlint` and `zizmor`.
+
+- `actionlint` runs `actionlint`, then `zizmor --offline` at `min-severity` and `min-confidence`
+  (both default `high`).
+- `gitleaks` runs `gitleaks git` over the caller pull request, merge group, or a full history on
+  `workflow_dispatch`. `version` defaults to `8.30.1` and `config` defaults to `.gitleaks.toml`.
+  This is separate from `gitleaks-directory-scan`.
+- `lint-links` installs lychee `lychee-version` (default `0.24.2`) and checks tracked Markdown.
+  `config` defaults to `lychee.toml`. Pass `excluded-urls` and `checked-urls` to probe that config
+  before the scan; leave them empty to skip the probe.
+- `label-pr` applies `actions/labeler` using `configuration-path` (default `.github/labeler.yml`).
+  The caller job needs `contents: read`, `issues: write` (to create missing labels), and
+  `pull-requests: write`.
+
 ### Required-result gate
 
 Pin `ci-required-result-gate` by its full 40-character commit SHA to give a required fan-in job a strict, compact
