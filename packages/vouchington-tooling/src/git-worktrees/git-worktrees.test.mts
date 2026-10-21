@@ -1,6 +1,15 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -9,6 +18,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const execFileAsync = promisify(execFile)
 const script = resolve('packages/vouchington-tooling/scripts/worktree/git-worktrees.sh')
+const lockScript = resolve('packages/vouchington-tooling/scripts/worktree/git-index-lock.sh')
 const testDirs: string[] = []
 
 async function source(command: string, args: string[] = []) {
@@ -42,9 +52,33 @@ describe('git-worktrees.sh', () => {
   })
 
   it('propagates Git worktree discovery failures', async () => {
+    const missing = '/definitely/not/a/repository'
+    await expect(source('git_worktree_list_porcelain "$1"', [missing])).rejects.toMatchObject({
+      code: 128,
+      stderr: expect.stringMatching(/fatal:/),
+    })
+    for (const query of [
+      'git_worktree_live_paths "$1"',
+      'git_worktree_prunable_paths "$1"',
+      'git_worktree_main_path "$1"',
+      'git_worktree_path_is_registered "$1" "$1"',
+    ]) {
+      await expect(source(query, [missing])).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringMatching(/fatal:/),
+      })
+    }
+  })
+
+  it('fails the main path lookup when git lists no worktree', async () => {
     await expect(
-      source('git_worktree_list_porcelain "$1"', ['/definitely/not/a/repository']),
-    ).rejects.toMatchObject({ code: 128 })
+      execFileAsync('bash', [
+        '-c',
+        'source "$1"; git() { return 0; }; git_worktree_main_path',
+        'bash',
+        script,
+      ]),
+    ).rejects.toMatchObject({ code: 1 })
   })
 
   it('parses live and prunable paths from git porcelain output', async () => {
@@ -96,5 +130,57 @@ describe('git-worktrees.sh', () => {
       'missing=yes',
       'display=one/two',
     ])
+  })
+})
+
+describe('git-index-lock.sh', () => {
+  afterEach(async () => {
+    await Promise.all(testDirs.splice(0).map((dir) => rm(dir, { force: true, recursive: true })))
+  })
+
+  async function clear(gitDir: string) {
+    return execFileAsync('bash', [
+      '-c',
+      'source "$1"; clear_stale_index_lock "$2"',
+      'bash',
+      lockScript,
+      gitDir,
+    ])
+  }
+
+  it('removes only a 0-byte index.lock', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'index-lock-'))
+    testDirs.push(root)
+    const lock = join(root, 'index.lock')
+    await writeFile(lock, '')
+    const sourceText = await readFile(lockScript, 'utf8')
+
+    const { stdout } = await clear(root)
+
+    expect(stdout).toContain(`Cleared stale empty index.lock at ${root}/index.lock`)
+    await expect(access(lock)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(sourceText).not.toMatch(/YELLOW|NC|voucha|docs\/development/)
+  })
+
+  it('leaves a non-empty index.lock in place', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'index-lock-'))
+    testDirs.push(root)
+    const lock = join(root, 'index.lock')
+    await writeFile(lock, 'real-lock-content')
+
+    const { stdout } = await clear(root)
+
+    expect(stdout).toBe('')
+    expect(await readFile(lock, 'utf8')).toBe('real-lock-content')
+  })
+
+  it('does nothing when index.lock is absent and rejects an empty directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'index-lock-'))
+    testDirs.push(root)
+
+    const { stdout } = await clear(root)
+    expect(stdout).toBe('')
+    await expect(access(join(root, 'index.lock'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(clear('')).rejects.toMatchObject({ code: 1 })
   })
 })
