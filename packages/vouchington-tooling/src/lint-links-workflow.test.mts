@@ -103,7 +103,10 @@ done
   describe('lychee version guard', () => {
     function install(version: string) {
       const directory = mkdtempSync(join(tmpdir(), 'lint-links-install-'))
-      const script = join(directory, '.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha')
+      const script = join(
+        directory,
+        '.vouchington-tooling-checkout/packages/vouchington-tooling/scripts/gha',
+      )
       mkdirSync(script, { recursive: true })
       writeFileSync(join(script, 'install-github-release.sh'), 'echo "installer $*"\n')
       try {
