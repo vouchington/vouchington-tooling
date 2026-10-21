@@ -740,7 +740,7 @@ files and can be reduced with `maxFiles`.
 that no reachable story imports. Callers pass the repository root, component directory, story
 directory, source extensions, component extensions, a marker regular expression, a story-file
 pattern, path aliases, and an optional exclusions map. An empty map is the zero-exclusion
-ratchet: any exclusion key fails the check. Namespace imports of the component directory fail
+ratchet: any exclusion entry, even one that matches no component, makes `ok` false. Namespace imports of the component directory fail
 the check because coverage cannot see which export was used. `vouchington story-coverage` runs
 the same check and needs the optional `no-mistakes` peer.
 

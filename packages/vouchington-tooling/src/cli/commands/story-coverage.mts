@@ -3,9 +3,17 @@ import { checkStoryCoverage } from '../../story-coverage/index.mts'
 import type { ParsedStoryCoverage } from '../parse-story-coverage.mts'
 
 export async function runStoryCoverage(parsed: ParsedStoryCoverage): Promise<number> {
-  const marker = compile(parsed.marker, '--marker')
-  const storyFilePattern = compile(parsed.storyPattern, '--story-pattern')
-  const exclusions = parsed.exclusionsFile ? await readExclusions(parsed.exclusionsFile) : {}
+  let marker: RegExp
+  let storyFilePattern: RegExp
+  let exclusions: Record<string, unknown>
+  try {
+    marker = compile(parsed.marker, '--marker')
+    storyFilePattern = compile(parsed.storyPattern, '--story-pattern')
+    exclusions = parsed.exclusionsFile ? await readExclusions(parsed.exclusionsFile) : {}
+  } catch (error) {
+    process.stderr.write(`${(error as Error).message}\n`)
+    return 2
+  }
   const report = await checkStoryCoverage({
     root: parsed.root,
     componentRoot: parsed.componentRoot,

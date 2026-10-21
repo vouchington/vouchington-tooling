@@ -152,6 +152,19 @@ describe('checkStoryCoverage', () => {
     })
   })
 
+  it('ignores duplicate entries in a caller-supplied file list', async () => {
+    root = await writeTree({
+      'ui/components/ok.tsx': `export function Ok() { return <div data-marker="ok" /> }\n`,
+      'ui/stories/ok.stories.tsx': `
+        import { Ok } from '@/components/ok'
+        export const Basic = { render: () => <Ok /> }
+      `,
+    })
+    const files = ['ui/components/ok.tsx', 'ui/stories/ok.stories.tsx']
+    const report = await checkStoryCoverage(request(root), [...files, ...files])
+    expect(report.ok).toBe(true)
+  })
+
   it('fails closed on exclusion keys even when they hide a missing component', async () => {
     root = await writeTree({
       'ui/components/only.tsx': `export function Only() { return <div data-marker="only" /> }\n`,

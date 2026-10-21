@@ -30,6 +30,8 @@ describe('story coverage messages', () => {
     expect(message).toContain('coverage-exclusions.json')
     expect(message).toContain('ui/stories/')
     expect(message).toContain('add a story')
+    expect(message).toContain('imports and uses the component at runtime')
+    expect(message).not.toContain('path alias')
     expect(message).toContain("'default'")
     expect(message).toContain('ui/components/alpha.tsx#Alpha')
     expect(message).toContain('ui/components/layout.tsx#default')

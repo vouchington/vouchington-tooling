@@ -53,38 +53,35 @@ describe('story-coverage command', () => {
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Component story coverage check failed')
   })
 
-  it('rejects invalid patterns and exclusion files', async () => {
+  it('returns usage exit code 2 for invalid patterns and exclusion files', async () => {
     root = await mkdtemp(join(tmpdir(), 'story-cli-bad-'))
     const parsed = parsedFor(root)
-    await expect(runStoryCoverage({ ...parsed, marker: '(' })).rejects.toThrow(
-      '--marker is not a valid regular expression',
-    )
-    await expect(runStoryCoverage({ ...parsed, storyPattern: '(' })).rejects.toThrow(
+    const expectUsageError = async (input: ParsedStoryCoverage, text: string) => {
+      stderr.mockClear()
+      await expect(runStoryCoverage(input)).resolves.toBe(2)
+      expect(String(stderr.mock.calls.at(-1)?.[0])).toContain(text)
+    }
+    await expectUsageError({ ...parsed, marker: '(' }, '--marker is not a valid regular expression')
+    await expectUsageError(
+      { ...parsed, storyPattern: '(' },
       '--story-pattern is not a valid regular expression',
     )
-    await expect(
-      runStoryCoverage({ ...parsed, exclusionsFile: join(root, 'missing.json') }),
-    ).rejects.toThrow('could not read exclusions')
-    const arrayFile = join(root, 'array.json')
-    await writeFile(arrayFile, '[]\n')
-    await expect(runStoryCoverage({ ...parsed, exclusionsFile: arrayFile })).rejects.toThrow(
-      'must be a JSON object',
-    )
-    const textFile = join(root, 'text.json')
-    await writeFile(textFile, '"nope"\n')
-    await expect(runStoryCoverage({ ...parsed, exclusionsFile: textFile })).rejects.toThrow(
-      'must be a JSON object',
-    )
-    const nullFile = join(root, 'null.json')
-    await writeFile(nullFile, 'null\n')
-    await expect(runStoryCoverage({ ...parsed, exclusionsFile: nullFile })).rejects.toThrow(
-      'must be a JSON object',
-    )
-    const broken = join(root, 'broken.json')
-    await writeFile(broken, '{')
-    await expect(runStoryCoverage({ ...parsed, exclusionsFile: broken })).rejects.toThrow(
+    await expectUsageError(
+      { ...parsed, exclusionsFile: join(root, 'missing.json') },
       'could not read exclusions',
     )
+    const arrayFile = join(root, 'array.json')
+    await writeFile(arrayFile, '[]\n')
+    await expectUsageError({ ...parsed, exclusionsFile: arrayFile }, 'must be a JSON object')
+    const textFile = join(root, 'text.json')
+    await writeFile(textFile, '"nope"\n')
+    await expectUsageError({ ...parsed, exclusionsFile: textFile }, 'must be a JSON object')
+    const nullFile = join(root, 'null.json')
+    await writeFile(nullFile, 'null\n')
+    await expectUsageError({ ...parsed, exclusionsFile: nullFile }, 'must be a JSON object')
+    const broken = join(root, 'broken.json')
+    await writeFile(broken, '{')
+    await expectUsageError({ ...parsed, exclusionsFile: broken }, 'could not read exclusions')
     const valid = join(root, 'valid.json')
     await writeFile(valid, '{"ui/components/only.tsx#Only":"later"}\n')
     await expect(runStoryCoverage({ ...parsed, exclusionsFile: valid })).resolves.toBe(1)

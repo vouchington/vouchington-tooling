@@ -15,7 +15,7 @@ export function formatMissingComponentsMessage(
   const lines = [
     `${missingComponents.length} component(s) matching the marker have no story coverage.`,
     '',
-    `For each missing component, add a story under ${config.storyRoot} that imports the component through a configured path alias.`,
+    `For each missing component, add a story under ${config.storyRoot} that imports and uses the component at runtime.`,
     '',
     `Use 'default' for default exports when matching the key reported below.`,
     `The zero-exclusion ratchet rejects entries in ${config.exclusionsLabel}.`,

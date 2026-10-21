@@ -32,7 +32,7 @@ export async function checkStoryCoverage(
   files?: readonly string[],
 ): Promise<StoryCoverageReport> {
   const config = storyCoverageConfig(request)
-  const inventory = [...(files ?? workspaceFiles(config))]
+  const inventory = [...new Set(files ?? workspaceFiles(config))]
   if (inventory.length === 0) return coverageReport(config, [], new Set(), [])
   const analysis = await analyzeStorySources(inventory, config)
   const storyFiles = reachableStoryFiles(inventory, analysis.graph, config)
