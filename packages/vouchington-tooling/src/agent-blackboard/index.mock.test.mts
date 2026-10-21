@@ -25,7 +25,7 @@ vi.mock('agent-blackboard', () => ({
   },
 }))
 
-import { formatJournalEntries, probeBlackboard, readJournal } from './index.mts'
+import { probeBlackboard, readJournal } from './index.mts'
 import type { BlackboardClientModule } from './index.mts'
 
 const env = { AGENT_BLACKBOARD_URL: 'https://blackboard.test', AGENT_BLACKBOARD_TOKEN: 'secret' }
@@ -50,7 +50,7 @@ describe('agent blackboard client', () => {
     expect(client.list).toHaveBeenCalledWith({ limit: 1 })
   })
 
-  it('reads and formats only sorted journal entries', async () => {
+  it('reads every journal entry', async () => {
     client.entries = [
       { createdAt: '2026-01-02T00:00:00.000Z', data: { type: 'journal', markdown: 'later' } },
       { createdAt: '2026-01-01T00:00:00.000Z', data: { type: 'journal', markdown: 'first' } },
@@ -59,12 +59,6 @@ describe('agent blackboard client', () => {
     ]
     const entries = await readJournal(sessionId, env, { resolveFrom: import.meta.url })
     expect(entries).toHaveLength(4)
-    expect(formatJournalEntries(sessionId, entries)).toBe(
-      '## 2026-01-01T00:00:00.000Z\n\nfirst\n\n## 2026-01-02T00:00:00.000Z\n\nlater',
-    )
-    expect(formatJournalEntries(sessionId, [{}])).toBe(
-      `No journal entries found for session ${sessionId}.`,
-    )
   })
 
   it('accepts a typed client loader for all high-level operations', async () => {

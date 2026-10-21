@@ -66,31 +66,6 @@ export async function readJournal(
   return entries
 }
 
-export function formatJournalEntries(sessionId: string, entries: unknown[]): string {
-  const journals = entries.flatMap((entry) => {
-    if (
-      typeof entry !== 'object' ||
-      entry === null ||
-      !('createdAt' in entry) ||
-      !('data' in entry) ||
-      typeof entry.createdAt !== 'string' ||
-      typeof entry.data !== 'object' ||
-      entry.data === null ||
-      !('type' in entry.data) ||
-      !('markdown' in entry.data) ||
-      entry.data.type !== 'journal' ||
-      typeof entry.data.markdown !== 'string'
-    )
-      return []
-    return [{ createdAt: entry.createdAt, markdown: entry.data.markdown }]
-  })
-  if (!journals.length) return `No journal entries found for session ${sessionId}.`
-  return journals
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-    .map(({ createdAt, markdown }) => `## ${createdAt}\n\n${markdown}`)
-    .join('\n\n')
-}
-
 export { BlackboardNotInstalledError, resolveBlackboardConnection } from './client.mts'
 export type {
   BlackboardConnection,

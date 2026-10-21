@@ -19,16 +19,8 @@ describe('runCli', () => {
   it('prints help and version', () => {
     expect(runCli(['node', 'vouchington', '--help'])).toBe(0)
     expect(stdout.mock.calls.at(-1)?.[0]).toBe(USAGE)
-    for (const flag of ['--mode', '--source-event-id', '--work-outcome', '--coverage-status'])
-      expect(
-        USAGE.split('\n').find((line) => line.startsWith('agent-blackboard journal append')),
-      ).toContain(flag)
-    expect(USAGE).toContain(
-      'agent-blackboard journal flush --outbox-directory PATH [--session-id UUID]',
-    )
-    expect(USAGE).toContain(
-      'agent-blackboard journal status --session-id UUID --outbox-directory PATH',
-    )
+    expect(USAGE).not.toContain('journal append')
+    expect(USAGE).toContain('agent-blackboard distill classify <partition.jsonl>')
     expect(runCli(['node', 'vouchington', '--version'])).toBe(0)
     expect(String(stdout.mock.calls.at(-1)?.[0])).toMatch(/^\d+\.\d+\.\d+\n$/)
   })

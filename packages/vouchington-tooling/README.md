@@ -73,8 +73,7 @@ vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington retrospective-facts --pr 49 --repo vouchington/vouchington-infra --raw
 vouchington agent-blackboard probe
-vouchington agent-blackboard journal append --session-id <uuid> --agent codex --version 1 --file note.md --repository owner/repo --mode autonomous --source-event-id event:1 --work-outcome in-progress --coverage-status partial --timestamp 2026-01-01T00:00:00.000Z
-vouchington agent-blackboard journal entries --session-id <uuid>
+vouchington agent-blackboard distill classify <partition.jsonl> --retro-cutoff <iso> --session-cutoff <iso>
 vouchington agent-blackboard snapshot partition --snapshot <snapshot.jsonl> --checksum <sha256> --counts <counts.json>
 vouchington agent-blackboard snapshot cleanup --snapshot <snapshot.jsonl> --partition-directory <partitions-dir> --receipt <receipt-json>
 vouchington mcp
@@ -196,12 +195,10 @@ as not merged to main, and a missing base is unavailable.
 
 Agent Blackboard support is optional: only the `agent-blackboard` subpath and its CLI commands
 need `agent-blackboard@^0.6.0`. Snapshot cleanup accepts only package-generated temporary paths.
-`appendJournal` and the journal CLI now require explicit mode, stable source-event identity, work
+`appendJournal` now requires explicit mode, stable source-event identity, work
 outcome, feedback coverage, and exact repositories. This is a breaking pre-1.0 API change; adopt the
 shared contract before upgrading consumers. `appendJournal` reads a bounded UTF-8 note and delegates
-to `writeFeedback`, returning delivered or pending state rather than a success-shaped message. The CLI accepts one or more
-`--repository owner/name` flags; it records the entry's exact repositories and updates the session's
-cumulative repository list before appending.
+to `writeFeedback`, returning delivered or pending state rather than a success-shaped message.
 Programmatic callers launched from a different workspace directory pass their own module URL as
 `dependencies: { resolveFrom: import.meta.url }`; the CLI defaults to the current package context.
 It captures a target under a private tombstone, validates partition names, permissions, JSONL,
@@ -689,8 +686,7 @@ Verified delivery retains its receipt when local cleanup fails, returning
 safe to replay: an event is identified by session, `sourceEventId`, and content, and a duplicate that
 differs only in `timestamp` is the same event, so it reports the stored record's `timestamp` and
 receipt and the retained duplicate is removed.
-Use `vouchington agent-blackboard journal flush --outbox-directory PATH` to replay unchanged pending
-records after connectivity returns.
+Use the `outbox_flush` MCP tool to replay unchanged pending records after connectivity returns.
 
 Autonomous mode prohibits the filesystem outbox. `verifyFreshFeedback` requires a fresh source-event
 write plus readback of its own append receipt and rejects visible duplicate source records. This

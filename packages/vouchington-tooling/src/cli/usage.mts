@@ -46,7 +46,7 @@ Commands:
   retrospective-transcript      Format facts from Claude-compatible, Codex, or Grok transcripts
   link-skill                    Link one packaged skill into an explicit consumer directory
   retrospective-facts           Gather immutable facts for a retrospective
-  agent-blackboard              Probe and journal an Agent Blackboard deployment
+  agent-blackboard              Probe an Agent Blackboard deployment, classify distill sessions, manage snapshots
   mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
   worktree                      Reclaim finished git worktrees (dry run unless --yes)
   story-coverage                Check component exports are imported by stories
@@ -124,12 +124,7 @@ link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>
 retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]
 agent-blackboard probe
 agent-blackboard session-start [--skip-env NAME] [--setup-hint TEXT] [--docs-path PATH] [--restore-hint TEXT] [--timeout-ms N]  (SessionStart hook; payload on stdin)
-agent-blackboard journal append --mode interactive|autonomous --source-event-id ID --work-outcome OUTCOME --coverage-status STATUS --session-id UUID --agent NAME --version VERSION --file PATH --repository OWNER/NAME [--repository OWNER/NAME ...] [--parent-session-id UUID] [--timestamp ISO8601] [--coverage-source SOURCE,...] [--dropped-count N] [--outbox-directory PATH]
-agent-blackboard journal entries --session-id UUID
-agent-blackboard journal status --session-id UUID --outbox-directory PATH
-agent-blackboard journal flush --outbox-directory PATH [--session-id UUID]
-Interactive journal append requires --outbox-directory PATH.
-agent-blackboard journal is deprecated and being phased out: agents journal through the mcp server.
+agent-blackboard distill classify <partition.jsonl> --retro-cutoff ISO8601 --session-cutoff ISO8601
 agent-blackboard snapshot partition --snapshot PATH --checksum SHA256 --counts '{"sessions":N,"entries":N,"records":N,"bytes":N}'
 agent-blackboard snapshot cleanup [--snapshot PATH] [--partition-directory PATH --receipt JSON]
 mcp
