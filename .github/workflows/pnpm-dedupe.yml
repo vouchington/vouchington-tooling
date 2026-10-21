@@ -1,0 +1,202 @@
+name: pnpm Dedupe
+
+# Reusable lockfile dedupe. The caller owns the schedule. One branch is force-pushed so later
+# runs update the same pull request. Two jobs keep PUSH_TOKEN away from caller code: the dedupe
+# job runs the caller's install and lifecycle scripts without any secret and hands over only
+# pnpm-lock.yaml as an artifact; the publish job holds PUSH_TOKEN, runs nothing from the
+# repository, and applies that file before pushing and opening the pull request.
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: Branch that receives the lockfile commit
+        type: string
+        default: chore/pnpm-dedupe
+      base:
+        description: Pull request base branch
+        type: string
+        default: main
+      title:
+        description: Commit and pull request title
+        type: string
+        default: 'chore(deps): pnpm dedupe'
+      label:
+        description: Label applied when the pull request is opened
+        type: string
+        default: github_actions
+      node-version-file:
+        description: Node version file in the caller repository
+        type: string
+        default: .nvmrc
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-latest
+    secrets:
+      PUSH_TOKEN:
+        required: true
+        description: Contents and pull-request write token used only to push and open the pull request
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pnpm-dedupe-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  dedupe:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 14
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        timeout-minutes: 2
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        timeout-minutes: 2
+        with:
+          version: latest-12
+
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: pnpm install --frozen-lockfile --loglevel=warn
+
+      - name: Run pnpm dedupe
+        timeout-minutes: 3
+        run: pnpm dedupe
+
+      - name: Detect lockfile changes
+        id: diff
+        timeout-minutes: 2
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No dedupe changes"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- pnpm-lock.yaml
+          fi
+
+      - name: Upload deduped lockfile
+        if: steps.diff.outputs.changed == 'true'
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
+        with:
+          name: pnpm-dedupe-lockfile
+          path: pnpm-lock.yaml
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: dedupe
+    if: needs.dedupe.outputs.changed == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Download deduped lockfile
+        timeout-minutes: 2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.0
+        with:
+          name: pnpm-dedupe-lockfile
+          path: ${{ runner.temp }}/pnpm-dedupe
+
+      - name: Apply lockfile
+        timeout-minutes: 1
+        env:
+          DEDUPED_DIR: ${{ runner.temp }}/pnpm-dedupe
+        run: |
+          set -euo pipefail
+          cp -- "$DEDUPED_DIR/pnpm-lock.yaml" pnpm-lock.yaml
+          git diff --stat -- pnpm-lock.yaml
+
+      - name: Commit and push
+        timeout-minutes: 2
+        env:
+          BRANCH: ${{ inputs.branch }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          TITLE: ${{ inputs.title }}
+          TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ || "$BRANCH" == *".."* || "$BRANCH" == /* || "$BRANCH" == -* ]]; then
+            echo "::error::branch must be a relative ref"
+            exit 2
+          fi
+          if [[ -z "$TITLE" || "$TITLE" == *$'\n'* || "$TITLE" == -* ]]; then
+            echo "::error::title must be a single line"
+            exit 2
+          fi
+          if [[ -z "$TOKEN" ]]; then
+            echo "::error::PUSH_TOKEN is required"
+            exit 2
+          fi
+          git checkout -B "$BRANCH"
+          git add -- pnpm-lock.yaml
+          git -c core.hooksPath=/dev/null commit -m "$TITLE"
+          # Inject the token via GIT_CONFIG_* env vars so it stays out of argv.
+          TOKEN_B64="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $TOKEN_B64" git -c core.hooksPath=/dev/null push --force-with-lease origin "$BRANCH"
+
+      - name: Open PR if missing
+        timeout-minutes: 2
+        env:
+          BASE: ${{ inputs.base }}
+          BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          LABEL: ${{ inputs.label }}
+          OWNER: ${{ github.repository_owner }}
+          TITLE: ${{ inputs.title }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ || "$BRANCH" == *".."* || "$BRANCH" == /* || "$BRANCH" == -* ]]; then
+            echo "::error::branch must be a relative ref"
+            exit 2
+          fi
+          if [[ ! "$BASE" =~ ^[A-Za-z0-9._/-]+$ || "$BASE" == *".."* || "$BASE" == /* || "$BASE" == -* ]]; then
+            echo "::error::base must be a relative ref"
+            exit 2
+          fi
+          if [[ -z "$TITLE" || "$TITLE" == *$'\n'* || "$TITLE" == -* ]]; then
+            echo "::error::title must be a single line"
+            exit 2
+          fi
+          if [[ ! "$LABEL" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+            echo "::error::label must be a single token"
+            exit 2
+          fi
+          # Filter by headRepositoryOwner.login so a fork pull request with the same branch
+          # name is never matched. gh pr list --head does not accept owner:branch.
+          if gh pr list --state open --head "$BRANCH" \
+              --json number,headRepositoryOwner,headRefName \
+              --jq "map(select(.headRepositoryOwner.login == \"$OWNER\" and .headRefName == \"$BRANCH\")) | .[0].number" \
+              2>/dev/null | grep -qE '^[0-9]+$'; then
+            echo "PR already open for $BRANCH; force-push updated it in place"
+            exit 0
+          fi
+          body='Automated pnpm dedupe for the shared workspace lockfile. The branch is force-pushed on subsequent runs, so re-review only when the diff changes.'
+          gh pr create \
+            --base "$BASE" \
+            --head "$BRANCH" \
+            --title "$TITLE" \
+            --label "$LABEL" \
+            --body "$body"
