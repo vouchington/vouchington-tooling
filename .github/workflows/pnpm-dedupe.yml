@@ -127,7 +127,6 @@ jobs:
           git diff --stat -- pnpm-lock.yaml
 
       - name: Commit and push
-        if: steps.diff.outputs.changed == 'true'
         timeout-minutes: 2
         env:
           BRANCH: ${{ inputs.branch }}
@@ -159,7 +158,6 @@ jobs:
           GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $TOKEN_B64" git -c core.hooksPath=/dev/null push --force-with-lease origin "$BRANCH"
 
       - name: Open PR if missing
-        if: steps.diff.outputs.changed == 'true'
         timeout-minutes: 2
         env:
           BASE: ${{ inputs.base }}
