@@ -1,17 +1,19 @@
 import { readHeredocDelimiter } from './shell-heredoc-delimiter.mts'
+import {
+  newHeredocLineState,
+  stepHeredocQuoteState,
+  type HeredocLineState,
+} from './shell-heredoc-quote-state.mts'
+
 export type HeredocSpec = {
   delimiter: string
   expandsSubstitutions: boolean
   stripLeadingTabs: boolean
 }
 
-export function heredocSpecsFromLine(
-  line: string,
-  carried?: { quote: "'" | '"' | null },
-): HeredocSpec[] {
+export function heredocSpecsFromLine(line: string, carried?: HeredocLineState): HeredocSpec[] {
   const specs: HeredocSpec[] = []
-
-  let quote: "'" | '"' | null = carried?.quote ?? null
+  const state = carried ?? newHeredocLineState()
   let escaping = false
   for (let index = 0; index < line.length; index += 1) {
     const char = line[index]!
@@ -20,25 +22,14 @@ export function heredocSpecsFromLine(
       continue
     }
 
-    if (char === '\\' && quote !== "'") {
+    if (char === '\\' && state.quote !== "'") {
       escaping = true
       continue
     }
 
-    if (quote !== null) {
-      if (quote === '"' && char === '$' && line[index + 1] === '(') {
-        quote = null
-        index += 1
-        continue
-      }
-      if (char === quote) {
-        quote = null
-      }
-      continue
-    }
-
-    if (char === "'" || char === '"') {
-      quote = char
+    const consumed = stepHeredocQuoteState(state, char, line[index + 1])
+    if (consumed !== undefined) {
+      index += consumed
       continue
     }
 
@@ -72,6 +63,5 @@ export function heredocSpecsFromLine(
     }
   }
 
-  if (carried !== undefined) carried.quote = quote
   return specs
 }

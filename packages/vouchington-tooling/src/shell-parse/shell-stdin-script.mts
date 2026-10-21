@@ -5,6 +5,7 @@ import { commandSegmentStart, nextShellCommandSeparatorIndex } from './shell-tok
 // Words that close a compound command. Its redirections feed every command inside it.
 const COMPOUND_CLOSERS = new Set(['done', 'esac', 'fi'])
 const EXEC_WRAPPERS = new Set([
+  'busybox',
   'chroot',
   'doas',
   'ionice',
@@ -14,6 +15,7 @@ const EXEC_WRAPPERS = new Set([
   'su',
   'sudo',
   'timeout',
+  'toybox',
   'xargs',
 ])
 const EXPANSION = /[$`*?[]/

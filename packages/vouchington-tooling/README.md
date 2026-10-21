@@ -389,7 +389,7 @@ import {
 import { tokenizeShellWords } from 'vouchington-tooling/shell-parse'
 ```
 
-`vouchington-tooling/shell-parse` splits shell text into words, heredocs, redirections, and command prefixes. Callers pass the text. The parser does not decide which commands are allowed.
+`vouchington-tooling/shell-parse` splits shell text into words, heredocs, redirections, and command prefixes. Callers pass the text. The parser does not decide which commands are allowed. `stripQuotedShellText` and `commandsToInspect*` do not scan `$(...)` substitutions in the command text: call `extractShellCommandSubstitutions` and inspect each result too.
 
 `processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
 a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps

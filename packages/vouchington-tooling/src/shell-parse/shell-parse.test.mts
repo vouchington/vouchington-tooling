@@ -136,7 +136,10 @@ describe('heredoc and substitutions', () => {
     const scan = stripNonShellHeredocBodies(command)
     expect(scan.textWithoutBodies).not.toContain('not a command')
     expect(scan.shellBodies.join('\n')).toContain('echo hi')
-    expect(heredocSpecsFromLine("cat <<'EOF' <<-TAB")?.length).toBeGreaterThan(0)
+    expect(heredocSpecsFromLine("cat <<'EOF' <<-TAB")).toEqual([
+      { delimiter: 'EOF', expandsSubstitutions: false, stripLeadingTabs: false },
+      { delimiter: 'TAB', expandsSubstitutions: true, stripLeadingTabs: true },
+    ])
   })
 
   it('reads command substitutions outside single quotes', () => {

@@ -23,12 +23,15 @@ export function stripGitGlobalOptionsForPolicy(command: string): string {
  * body a shell may read as its script, and each substitution an unquoted-delimiter body runs, each
  * with the `bash -c` scripts nested in it. Any other heredoc body is data (a `git commit -F -`
  * message).
+ *
+ * Substitutions in the command text itself (`echo $(...)`) are not scanned: callers must also run
+ * `extractShellCommandSubstitutions` and inspect each result.
  */
 export function commandsToInspectForGitPolicy(command: string): string[] {
   return commandsToInspectPreservingQuotes(command).map(stripQuotedShellText)
 }
 
-/** Same command list as the regex scan, with quoted refs still readable by the tokenizer. */
+/** The same list with quoted refs readable; it too skips `$(...)` in the command text. */
 export function commandsToInspectPreservingQuotes(command: string): string[] {
   const { bodySubstitutions, shellBodies, textWithoutBodies } = stripNonShellHeredocBodies(command)
   return [textWithoutBodies, ...shellBodies, ...bodySubstitutions].flatMap((script) => {
@@ -151,6 +154,7 @@ export function envPrefixSetsEditor(prefix: string): boolean {
   )
 }
 
+/** Blanks quoted text. It does not look inside `$(...)`; see `extractShellCommandSubstitutions`. */
 export function stripQuotedShellText(command: string): string {
   const commandWithSafeEditor = command.replace(
     /\bGIT_EDITOR\s*=\s*(["'])true\1/g,

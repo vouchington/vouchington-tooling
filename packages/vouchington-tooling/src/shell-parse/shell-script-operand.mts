@@ -1,10 +1,12 @@
 import { readAnsiCString } from './ansi-c-string.mts'
 
-const SHELLS = new Set(['bash', 'sh', 'zsh'])
+// Every shell that reads a script from stdin or `-c`. `busybox` and `toybox` run `sh` / `ash` as an
+// applet, so `segmentMayRunStdin` fails closed on them rather than parsing the applet name.
+const SHELLS = new Set(['ash', 'bash', 'csh', 'dash', 'fish', 'ksh', 'mksh', 'sh', 'tcsh', 'zsh'])
 // Long options that take the next word: bash `--rcfile FILE` / `--init-file FILE`, zsh
 // `--emulate NAME`. Listing an extra name only makes a malformed invocation look scriptless.
 const LONG_OPTIONS_WITH_ARGUMENT = new Set(['emulate', 'init-file', 'rcfile'])
-const SHELL_WORD = /(?:^|[\s;&|()])(?:\S*\/)?(?:bash|sh|zsh)(?=\s)/g
+const SHELL_WORD = /(?:^|[\s;&|()])(?:\S*\/)?(?:ash|bash|csh|dash|fish|ksh|mksh|sh|tcsh|zsh)(?=\s)/g
 const NEXT_WORD = /\s*(\S+)/y
 // A backslash is literal inside single quotes. Inside double quotes it escapes one character, and
 // the two branches start with different characters so a run of backslashes has one reading.

@@ -3,6 +3,7 @@ import {
   readParenthesizedSubstitution,
 } from './shell-command-substitutions.mts'
 import { heredocSpecsFromLine, type HeredocSpec } from './shell-heredoc-parser.mts'
+import { newHeredocLineState } from './shell-heredoc-quote-state.mts'
 import { redirectionOperatorOf } from './shell-redirections.mts'
 import { shellReadsStdinAt } from './shell-stdin-script.mts'
 import { tokenizeShellWords } from './shell-tokenizer.mts'
@@ -24,7 +25,7 @@ export function stripNonShellHeredocBodies(command: string): HeredocScan {
   const bodySubstitutions: string[] = []
   const shellBodies: string[] = []
 
-  const carried: { quote: "'" | '"' | null } = { quote: null }
+  const carried = newHeredocLineState()
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!
     const specs = heredocSpecsFromLine(line, carried)

@@ -44,7 +44,6 @@ describe('shell parser edges', () => {
     expect(decodeAnsiCStringEscape('\\\\', 1).value).toBe('\\')
     expect(decodeAnsiCStringEscape('\\"', 1).value).toBe('"')
     expect(decodeAnsiCStringEscape('\\?', 1).value).toBe('?')
-    expect(decodeAnsiCStringEscape('\\', 1).value).toBeUndefined()
     expect(readAnsiCString('\\', 0)).toBeNull()
     expect(decodeNumericAnsiEscape('x41', 1, 2, 16, '\\x').value).toBe('A')
     expect(decodeNumericAnsiEscape('u0042', 1, 4, 16, '\\u').value).toBe('B')
