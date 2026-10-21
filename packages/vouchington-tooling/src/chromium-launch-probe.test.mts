@@ -94,7 +94,8 @@ function runProbe(
     const result = spawnSync(process.execPath, [script], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, GITHUB_WORKSPACE: directory, ...env },
+      // pnpm exposes its hoisted store through NODE_PATH; clear it so only the fixture resolves.
+      env: { ...process.env, NODE_PATH: '', GITHUB_WORKSPACE: directory, ...env },
     })
     let calls: string[] = []
     try {
