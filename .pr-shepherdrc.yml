@@ -1,3 +1,5 @@
+version: 1
+
 # Bundled vendor bot-noise rules (CodeRabbit, Codex, Codecov, ...). Coverage and review checks
 # still gate readiness; only the informational comments leave the agent's queue.
 classify:
@@ -6,5 +8,5 @@ classify:
 
 # The repository allows only squash merges.
 merge:
-  commandArgs:
+  command-args:
     - '--squash'

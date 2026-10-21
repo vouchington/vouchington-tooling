@@ -63,7 +63,7 @@ a stack, and who may authorize a merge.
 - Ready every layer in parallel so the stack reaches ready together. A ready lower layer waits
   while the layers above are close behind (a poll or a ready-delay away).
 - Drain bottom-up only when the layers above will clearly take longer: a requested change or
-  `FIX_CODE` still open, a pending human review, a blocker, or CI far longer than the wait so far.
+  `TRIAGE` still open, a pending human review, a blocker, or CI far longer than the wait so far.
   Then merge the ready lower layers in one command whose target is the highest ready layer, state
   why in the report, and merge the rest together when it is ready.
 - Re-read every layer's readiness immediately before merging. If the whole stack is ready and

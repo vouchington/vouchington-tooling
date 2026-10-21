@@ -47,7 +47,7 @@ Run one stack shepherd poll for the assigned stack, and follow its printed instr
   push to its owner.
 - Start the shepherd with the first pull request. While the poll is in a pure wait and the
   worktree is clean, commit the next layer once the lower layer is in decent shape. On a
-  fix-code result, finish it on the owning layer before more upper edits. A ready-delay schedules
+  triage result, finish it on the owning layer before more upper edits. A ready-delay schedules
   the rerun: continue owned work on a later layer, and do not invent unrelated work.
 - Never run a printed merge command unless the human's approval covers that layer and every open
   layer below it, and the checks below pass. `gh stack merge <pr>` lands that pull request and
@@ -96,7 +96,7 @@ target is the top layer, and one command lands it and every layer below it. A sh
 a merge for a lower layer does not change that; when the whole stack is ready, target the top.
 
 Drain bottom-up only when the layers above will clearly take longer than the ready lower layers:
-an open requested change or `FIX_CODE`, a pending human review, a blocker, or CI far longer than
+an open requested change or `TRIAGE`, a pending human review, a blocker, or CI far longer than
 the wait so far. A layer a poll or a ready-delay away is not a reason. Then the target is the
 highest layer of the ready, approved run from the bottom, still one command, and the report says
 why the upper layers were left.
