@@ -107,6 +107,13 @@ fetch_base_ref() {
   esac
 }
 
+verify_base_ref() {
+  if ! git -C "$ROOT" rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null; then
+    echo "Error: base ref does not resolve to a commit: $BASE_REF" >&2
+    exit 2
+  fi
+}
+
 validate_caches() {
   local cache segment normalized
   local -a segments
@@ -148,9 +155,15 @@ remove_caches() {
       rm -rf "$ROOT/$cache"
     done
   fi
-  find "$ROOT" \
+  local dir
+  while IFS= read -r -d '' dir; do
+    # A tracked .cache directory is source, not disposable cache.
+    if [ -z "$(git -C "$ROOT" ls-files -- "$dir")" ]; then
+      rm -rf "$dir"
+    fi
+  done < <(find "$ROOT" \
     \( -path "$ROOT/.git" -o -name node_modules \) -prune -o \
-    -type d -name .cache -prune -exec rm -rf {} +
+    -type d -name .cache -prune -print0)
   find "$ROOT" -type d -name node_modules -prune \
     -exec rm -rf '{}/.cache' '{}/.vite' '{}/.vitest' \;
 }
@@ -168,6 +181,7 @@ reset_worktree() {
   refuse_dirty
   clear_index_lock
   fetch_base_ref
+  verify_base_ref
   run_hook "$PRE_HOOK"
   local slug new_branch
   slug=$(openssl rand -hex 4)

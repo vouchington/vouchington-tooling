@@ -1,5 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process'
-import { execFile } from 'node:child_process'
+import { execFile, spawn, spawnSync } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -115,6 +114,52 @@ describe('reset-worktree.sh', () => {
     expect(result.status).toBe(0)
     expect(await readFile(join(root, 'README'), 'utf8')).toBe('remote\n')
     expect(await readFile(join(root, 'pre-branch'), 'utf8')).toBe('main\n')
+  })
+
+  it('rejects an unresolvable or option-like base ref before any side effect', async () => {
+    const root = await initRepo()
+    const missing = run(root, ['--base-ref', 'typo', '--pre', 'touch pre-ran'])
+    expect(missing.status).toBe(2)
+    expect(missing.stderr).toContain('does not resolve to a commit')
+    await expect(readFile(join(root, 'pre-ran'), 'utf8')).rejects.toThrow()
+    const branches = spawnSync('git', ['-C', root, 'branch', '--list', 'reset-*'], {
+      encoding: 'utf8',
+    })
+    expect(branches.stdout).toBe('')
+    const current = spawnSync('git', ['-C', root, 'branch', '--show-current'], {
+      encoding: 'utf8',
+    })
+    expect(current.stdout).toBe('main\n')
+
+    const dashed = run(root, ['--base-ref', '--orphan'])
+    expect(dashed.status).toBe(2)
+    expect(dashed.stderr).toContain("must not start with '-'")
+  })
+
+  it('keeps tracked .cache directories and resolves a subdirectory root', async () => {
+    const root = await initRepo()
+    await mkdir(join(root, 'sub', '.cache'), { recursive: true })
+    await writeFile(join(root, 'sub', '.cache', 'tracked'), 't\n')
+    await git(root, ['add', '-f', 'sub/.cache/tracked'])
+    await git(root, ['commit', '-m', 'tracked cache'])
+    await writeFile(join(root, 'outside.txt'), 'x\n')
+
+    const sub = run(join(root, 'sub'), ['--base-ref', 'main'])
+    expect(sub.status).toBe(1)
+    expect(sub.stderr).toContain('untracked files')
+
+    await rm(join(root, 'outside.txt'))
+    const ok = run(join(root, 'sub'), ['--base-ref', 'main'])
+    expect(ok.status).toBe(0)
+    expect(await readFile(join(root, 'sub', '.cache', 'tracked'), 'utf8')).toBe('t\n')
+    const status = spawnSync('git', ['-C', root, 'status', '--porcelain'], { encoding: 'utf8' })
+    expect(status.stdout).toBe('?? .local/\n')
+
+    const outside = spawnSync(script, ['--root', tmpdir(), '--base-ref', 'main'], {
+      encoding: 'utf8',
+    })
+    expect(outside.status).toBe(2)
+    expect(outside.stderr).toContain('not inside a git worktree')
   })
 
   it('refuses a dirty or untracked tree unless --force discards it', async () => {

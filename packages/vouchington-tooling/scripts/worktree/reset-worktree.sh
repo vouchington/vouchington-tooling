@@ -99,7 +99,18 @@ if [ -z "$BASE_REF" ]; then
   exit 2
 fi
 
+case "$BASE_REF" in
+  -*)
+    echo "Error: --base-ref must not start with '-': $BASE_REF" >&2
+    exit 2
+    ;;
+esac
+
 ROOT=$(cd "${ROOT:-.}" && pwd -P)
+ROOT=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null) || {
+  echo "Error: not inside a git worktree: $ROOT" >&2
+  exit 2
+}
 
 # shellcheck source=reset-worktree-run.sh
 source "$(dirname "$0")/reset-worktree-run.sh"
