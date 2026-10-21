@@ -27,16 +27,20 @@ interface Workflow {
   }
   permissions: Record<string, string>
   concurrency: { group: string; 'cancel-in-progress': boolean }
-  jobs: { dedupe: { 'runs-on': string; steps: Step[] } }
+  jobs: {
+    dedupe: { 'runs-on': string; outputs: Record<string, string>; steps: Step[] }
+    publish: { needs: string; if: string; steps: Step[] }
+  }
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const workflowText = readFileSync(join(root, '.github/workflows/pnpm-dedupe.yml'), 'utf8')
 const workflow = load(workflowText) as Workflow
 const steps = workflow.jobs.dedupe.steps
+const publishSteps = workflow.jobs.publish.steps
 const checkout = steps.find((step) => step.uses?.includes('actions/checkout'))
-const push = steps.find((step) => step.name === 'Commit and push')
-const openPr = steps.find((step) => step.name === 'Open PR if missing')
+const push = publishSteps.find((step) => step.name === 'Commit and push')
+const openPr = publishSteps.find((step) => step.name === 'Open PR if missing')
 
 function runStep(step: Step | undefined, env: Record<string, string>) {
   const directory = mkdtempSync(join(tmpdir(), 'pnpm-dedupe-'))
@@ -107,6 +111,33 @@ describe('pnpm-dedupe reusable workflow', () => {
     expect(openPr?.run).toContain('headRefName')
     expect(openPr?.run).toContain('$OWNER')
     expect(workflowText).not.toContain("--jq '.[0].number'")
+  })
+
+  it('runs caller scripts only in a job that never sees PUSH_TOKEN', () => {
+    const dedupeText = JSON.stringify(workflow.jobs.dedupe)
+    expect(dedupeText).not.toContain('PUSH_TOKEN')
+    expect(dedupeText).not.toContain('secrets.')
+    expect(steps.some((step) => step.run?.includes('pnpm install'))).toBe(true)
+    expect(steps.some((step) => step.run?.includes('pnpm dedupe'))).toBe(true)
+    expect(workflow.jobs.dedupe.outputs.changed).toBe('${{ steps.diff.outputs.changed }}')
+    const upload = steps.find((step) => step.uses?.includes('actions/upload-artifact'))
+    expect(upload?.if).toBe("steps.diff.outputs.changed == 'true'")
+    expect(upload?.with).toMatchObject({ name: 'pnpm-dedupe-lockfile', path: 'pnpm-lock.yaml' })
+  })
+
+  it('applies only the lockfile artifact in the token job and runs nothing from the repository', () => {
+    expect(workflow.jobs.publish.needs).toBe('dedupe')
+    expect(workflow.jobs.publish.if).toBe("needs.dedupe.outputs.changed == 'true'")
+    const download = publishSteps.find((step) => step.uses?.includes('actions/download-artifact'))
+    expect(download?.with).toMatchObject({ name: 'pnpm-dedupe-lockfile' })
+    expect(publishSteps.some((step) => step.uses?.includes('setup-node'))).toBe(false)
+    expect(publishSteps.some((step) => step.uses?.includes('pnpm/action-setup'))).toBe(false)
+    const runs = publishSteps.map((step) => step.run ?? '').join('\n')
+    expect(runs).not.toMatch(/^\s*(pnpm|npm|npx|node)\s/mu)
+    expect(publishSteps[0]?.with).toMatchObject({ 'persist-credentials': false })
+    expect(publishSteps.find((step) => step.name === 'Apply lockfile')?.run).toContain(
+      'cp -- "$DEDUPED_DIR/pnpm-lock.yaml" pnpm-lock.yaml',
+    )
   })
 
   it('rejects a branch that is not a relative ref before git or gh runs', () => {

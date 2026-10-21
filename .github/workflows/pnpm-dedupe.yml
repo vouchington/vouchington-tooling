@@ -1,8 +1,10 @@
 name: pnpm Dedupe
 
 # Reusable lockfile dedupe. The caller owns the schedule. One branch is force-pushed so later
-# runs update the same pull request. PUSH_TOKEN is used only for that push and for opening the
-# pull request; checkout stays read-only so install scripts never see it.
+# runs update the same pull request. Two jobs keep PUSH_TOKEN away from caller code: the dedupe
+# job runs the caller's install and lifecycle scripts without any secret and hands over only
+# pnpm-lock.yaml as an artifact; the publish job holds PUSH_TOKEN, runs nothing from the
+# repository, and applies that file before pushing and opening the pull request.
 on:
   workflow_call:
     inputs:
@@ -46,6 +48,8 @@ jobs:
   dedupe:
     runs-on: ${{ inputs.runs-on }}
     timeout-minutes: 14
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 2
@@ -82,6 +86,45 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             git diff --stat -- pnpm-lock.yaml
           fi
+
+      - name: Upload deduped lockfile
+        if: steps.diff.outputs.changed == 'true'
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
+        with:
+          name: pnpm-dedupe-lockfile
+          path: pnpm-lock.yaml
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: dedupe
+    if: needs.dedupe.outputs.changed == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Download deduped lockfile
+        timeout-minutes: 2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.0
+        with:
+          name: pnpm-dedupe-lockfile
+          path: ${{ runner.temp }}/pnpm-dedupe
+
+      - name: Apply lockfile
+        timeout-minutes: 1
+        env:
+          DEDUPED_DIR: ${{ runner.temp }}/pnpm-dedupe
+        run: |
+          set -euo pipefail
+          cp -- "$DEDUPED_DIR/pnpm-lock.yaml" pnpm-lock.yaml
+          git diff --stat -- pnpm-lock.yaml
 
       - name: Commit and push
         if: steps.diff.outputs.changed == 'true'
