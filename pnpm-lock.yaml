@@ -24,8 +24,8 @@ importers:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
       eslint-plugin-no-mistakes:
-        specifier: ^0.89.2
-        version: 0.89.2(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))
+        specifier: ^0.90.0
+        version: 0.90.0(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -1396,8 +1396,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-no-mistakes@0.89.2:
-    resolution: {integrity: sha512-g+saknhD24T9Cgt0c0crmHiktZ4+xPJB9Zvcj5uHDtCNayI+0YvstG5xFaDjMM6gIYvX1rgPP8RCj8bFPpTFnQ==}
+  eslint-plugin-no-mistakes@0.90.0:
+    resolution: {integrity: sha512-hcNH5Yc8f/UienBfGRWTZE0ECN84CiEnXjvWr3QD0sDapWTJ7BMzx6ZOCK62Ml1w/C62dzGGDyLBR/igraBE4g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     peerDependencies:
       eslint: '>=9'
@@ -2142,8 +2142,8 @@ packages:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
 
-  postcss@8.5.31:
-    resolution: {integrity: sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==}
+  postcss@8.5.30:
+    resolution: {integrity: sha512-zkd+e9S1AQHhmaBKye9zlFHWjOwVgqXl1q3ECYy8561K7qxR2cREf/STLskulBFd78k6AOFeA+ff1TtEzk9bAA==}
     engines: {node: ^10 || ^12 || >=14}
 
   pr-shepherd@0.60.0:
@@ -3477,7 +3477,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-no-mistakes@0.89.2(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0)):
+  eslint-plugin-no-mistakes@0.90.0(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0)):
     dependencies:
       eslint: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
 
@@ -4411,7 +4411,7 @@ snapshots:
 
   pkce-challenge@5.0.1: {}
 
-  postcss@8.5.31:
+  postcss@8.5.30:
     dependencies:
       nanoid: 3.3.20
       picocolors: 1.1.1
@@ -4784,7 +4784,7 @@ snapshots:
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
-      postcss: 8.5.31
+      postcss: 8.5.30
       rolldown: 1.2.14
       tinyglobby: 0.2.17
     optionalDependencies:
