@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test'
 import { createTestInfo } from './browser-issue-monitor.test-helpers.mts'
+import { blockedExternalRequestFailureAllowlist } from './blocked-external-network.mts'
 import { createBrowserErrorsFixture, withMonitoredPage } from './browser-test.mts'
 
 function createContext() {
@@ -100,6 +101,42 @@ describe('browser test fixture', () => {
     ).resolves.toBe('ok')
     expect(close).toHaveBeenCalled()
     expect(routes).toHaveLength(0)
+  })
+
+  it('checks the caller timeout and opens no page when the allowlist is invalid', async () => {
+    const assertTimeout = vi.fn<(timeout: number, label: string) => void>()
+    const newPage = vi.fn<() => Promise<Page>>()
+    const { testInfo } = testInfoWith('passed')
+
+    await expect(
+      withMonitoredPage({ newPage } as unknown as Browser, testInfo, async () => 'ok', {
+        allowlist: [{ pattern: /.*/, reason: 'Too broad', type: 'requestfailed' }],
+        assertTimeout,
+      }),
+    ).rejects.toThrow(/too broad/)
+    expect(assertTimeout).toHaveBeenCalledWith(
+      testInfo.timeout,
+      'Playwright effective test timeout',
+    )
+    expect(newPage).not.toHaveBeenCalled()
+  })
+
+  it('derives the default allowlist from the active rules', async () => {
+    const { context } = createContext()
+    const page = { close: async () => undefined, context: () => context } as unknown as Page
+    const { testInfo } = testInfoWith('passed')
+
+    await expect(
+      withMonitoredPage(
+        { newPage: async () => page } as unknown as Browser,
+        testInfo,
+        async () => 1,
+        {
+          rules: [],
+        },
+      ),
+    ).resolves.toBe(1)
+    expect(blockedExternalRequestFailureAllowlist([], [])).toEqual([])
   })
 
   it('still closes the page when close rejects', async () => {

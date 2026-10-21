@@ -577,7 +577,9 @@ profile and can take a caller-supplied runner.
 requests during Playwright tests. `@playwright/test` is an optional peer. `createBrowserTest` and
 `withMonitoredPage` install the generic telemetry blocks (Google Tag Manager, Google Analytics, and
 DoubleClick) and fail the test when an unallowlisted issue remains. Passing `rules` replaces those
-generic defaults rather than adding to them; spread `BLOCKED_EXTERNAL_NETWORK_RULES` to extend them.
+generic defaults rather than adding to them; spread `BLOCKED_EXTERNAL_NETWORK_RULES` to extend them. The default request-failure allowlist follows
+the active rules, and when two rules match one URL the later rule wins. `assertTimeout` runs in both
+`createBrowserTest` and `withMonitoredPage`.
 Pass host-specific block rules and request-failure allowlist entries, a warning pattern, and a timeout checker; the default warning
 pattern records React hydration and render warnings. The fixture does not import a product timeout
 guard: pass `assertTimeout` when the caller owns the timeout cap.

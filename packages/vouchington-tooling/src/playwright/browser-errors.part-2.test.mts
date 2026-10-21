@@ -135,6 +135,13 @@ describe('BrowserIssueMonitor', () => {
     expect(
       () =>
         new BrowserIssueMonitor(testInfo, {
+          allowlist: [{ pattern: /.+/, reason: 'Too broad', type: 'requestfailed' }],
+        }),
+    ).toThrow(/too broad/)
+
+    expect(
+      () =>
+        new BrowserIssueMonitor(testInfo, {
           allowlist: [{ pattern: /^.*$/, reason: 'Too broad', type: 'requestfailed' }],
         }),
     ).toThrow(/too broad/)

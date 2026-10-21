@@ -57,9 +57,10 @@ export const BLOCKED_EXTERNAL_NETWORK_RULES: BlockedExternalNetworkRule[] = [
 
 export function blockedExternalRequestFailureAllowlist(
   extra: readonly BrowserIssueAllowlistEntry[] = [],
+  rules: readonly BlockedExternalNetworkRule[] = BLOCKED_EXTERNAL_NETWORK_RULES,
 ): BrowserIssueAllowlistEntry[] {
   return [
-    ...BLOCKED_EXTERNAL_NETWORK_RULES.map((rule) => ({
+    ...rules.map((rule) => ({
       pattern: rule.pattern,
       reason: rule.reason,
       type: 'requestfailed' as const,
@@ -78,6 +79,10 @@ export function isBlockedExternalNetworkUrl(
   })
 }
 
+/**
+ * Playwright prefers the most recently registered matching route, so when two rules match the same
+ * URL the later rule in `rules` wins.
+ */
 export async function installBlockedExternalNetwork(
   context: BrowserContext,
   rules: readonly BlockedExternalNetworkRule[] = BLOCKED_EXTERNAL_NETWORK_RULES,

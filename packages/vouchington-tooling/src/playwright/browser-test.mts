@@ -28,7 +28,9 @@ interface BrowserErrorFixtures {
 }
 
 function monitorOptions(options: BrowserTestOptions) {
-  const allowlist = [...(options.allowlist ?? blockedExternalRequestFailureAllowlist())]
+  const allowlist = [
+    ...(options.allowlist ?? blockedExternalRequestFailureAllowlist([], options.rules)),
+  ]
   if (options.warningPattern === undefined) return { allowlist }
   return { allowlist, warningPattern: options.warningPattern }
 }
@@ -75,8 +77,9 @@ export async function withMonitoredPage<T>(
   callback: (page: Page) => Promise<T>,
   options: BrowserTestOptions = {},
 ) {
-  const page = await browserOrContext.newPage()
+  options.assertTimeout?.(testInfo.timeout, 'Playwright effective test timeout')
   const monitor = new BrowserIssueMonitor(testInfo, monitorOptions(options))
+  const page = await browserOrContext.newPage()
   try {
     await installBlockedExternalNetwork(
       page.context(),

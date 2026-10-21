@@ -49,7 +49,8 @@ export function validateAllowlist(entries: BrowserIssueAllowlistEntry[]) {
       'unrelated browser issue probe',
       'https://example.invalid/unrelated-probe',
     ]
-    const matchesEveryProbe = probeValues.every((value) => {
+    // The empty probe is skipped so patterns such as /./ and /.+/ are still rejected.
+    const matchesEveryProbe = probeValues.filter(Boolean).every((value) => {
       entry.pattern.lastIndex = 0
       return entry.pattern.test(value)
     })

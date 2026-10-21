@@ -77,8 +77,7 @@ export class BrowserIssueMonitor {
     }
     const dialogListener = (dialog: Dialog) => {
       const issue = createDialogIssue(dialog)
-      if (matchesAllowlist(issue, this.allowlist)) return
-      this.recordIssue(issue)
+      if (!matchesAllowlist(issue, this.allowlist)) this.recordIssue(issue)
       void dialog.dismiss().catch(() => undefined)
     }
     const requestFailedListener = (request: Request) => {

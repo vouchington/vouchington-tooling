@@ -95,7 +95,7 @@ describe('BrowserIssueMonitor browser dialogs', () => {
     context.emit('dialog', createDialog({ dismiss, message: 'legacy fixture alert' }) as never)
 
     await expect(monitor.assertNoIssues()).resolves.toBeUndefined()
-    expect(dismiss).not.toHaveBeenCalled()
+    expect(dismiss).toHaveBeenCalledOnce()
   })
 
   it('records a dialog when the page URL and dismiss both fail', async () => {
