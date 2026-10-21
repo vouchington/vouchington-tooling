@@ -12,7 +12,7 @@ import {
   page,
   run,
   sha,
-} from './test-helpers/cancel-dequeued-runs.test-helpers.mts'
+} from './test-helpers/cancel-runs.test-helpers.mts'
 
 type Job = {
   if?: string

@@ -1,11 +1,11 @@
-import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { parse } from 'yaml'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { branch, createHarness, page, run, sha } from './test-helpers/cancel-runs.test-helpers.mts'
 
 type Step = { name?: string; run?: string; uses?: string; timeout?: number }
 type Workflow = {
@@ -14,8 +14,6 @@ type Workflow = {
   concurrency?: { group?: string; 'cancel-in-progress'?: boolean }
   jobs: Record<string, { 'runs-on'?: string; permissions?: Record<string, string>; steps?: Step[] }>
 }
-type Run = { id: number; name: string; head_branch: string | null }
-type Statuses = 'queued' | 'in_progress' | 'waiting' | 'requested' | 'pending'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const workflowText = readFileSync(
@@ -26,104 +24,10 @@ const workflow = parse(workflowText) as Workflow
 const job = workflow.jobs.cancel!
 const script = job.steps?.[0]?.run ?? 'exit 99'
 
-// Synthetic queue refs: real shas would trip the repository's no-test-git-sha rule.
-const sha = (digit: string) => digit.repeat(40)
-const branch = (pr: number, digit: string) => `gh-readonly-queue/main/pr-${pr}-${sha(digit)}`
 const entry = branch(14, 'c')
-const run = (id: number, name: string, head_branch: string | null): Run => ({
-  id,
-  name,
-  head_branch,
+const { setup, teardown, execute } = createHarness(script, {
+  HEAD_REF: `refs/heads/${entry}`,
 })
-const page = (...runs: Run[]) => JSON.stringify({ total_count: runs.length, workflow_runs: runs })
-
-// A fake `gh` serves the stored list pages for each status and records cancel requests; the real
-// `jq` and the real workflow script run unchanged.
-const fakeGh = `#!/bin/bash
-set -euo pipefail
-printf '%s\\n' "$*" >> "$FAKE_GH_DIR/calls"
-url="\${!#}"
-if [[ "$*" == *"--method POST"* ]]; then
-  id="\${url#*/runs/}"
-  id="\${id%/cancel}"
-  case " $FAKE_CONFLICT_IDS " in *" $id "*) echo 'gh: Cannot cancel a workflow run that is completed. (HTTP 409)' >&2; exit 1 ;; esac
-  case " $FAKE_ERROR_IDS " in *" $id "*) echo 'gh: Internal Server Error (HTTP 500)' >&2; exit 1 ;; esac
-  case " $FAKE_TRANSIENT_IDS " in
-    *" $id "*)
-      count_file="$FAKE_GH_DIR/transient-$id"
-      count=0
-      if [[ -f "$count_file" ]]; then count=$(cat "$count_file"); fi
-      count=$((count + 1))
-      printf '%s\\n' "$count" > "$count_file"
-      if [[ "$count" -le "\${FAKE_TRANSIENT_FAILURES:-1}" ]]; then
-        echo 'gh: Server Error (HTTP 502)' >&2
-        exit 1
-      fi
-      ;;
-  esac
-  printf '%s\\n' "$id" >> "$FAKE_GH_DIR/cancelled"
-  exit 0
-fi
-[[ "$1 $2" == "api --paginate" ]] || { echo "unexpected gh call: $*" >&2; exit 99; }
-status="\${url#*status=}"
-status="\${status%%&*}"
-file="$FAKE_GH_DIR/list-$status.json"
-if [[ -f "$file" ]]; then cat "$file"; else echo '{"total_count":0,"workflow_runs":[]}'; fi
-`
-
-type Scenario = {
-  headRef?: string
-  runId?: number
-  pages?: Partial<Record<Statuses, string[]>>
-  conflicts?: number[]
-  errors?: number[]
-  transient?: number[]
-  transientFailures?: number
-}
-
-let directory = ''
-
-function lines(name: string): string[] {
-  try {
-    return readFileSync(join(directory, name), 'utf8').split('\n').filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
-function execute(scenario: Scenario) {
-  for (const [status, pages] of Object.entries(scenario.pages ?? {})) {
-    writeFileSync(join(directory, `list-${status}.json`), (pages ?? []).join('\n'))
-  }
-  const result = spawnSync('/bin/bash', ['-c', script], {
-    encoding: 'utf8',
-    env: {
-      PATH: `${directory}:${process.env.PATH ?? ''}`,
-      FAKE_GH_DIR: directory,
-      FAKE_CONFLICT_IDS: (scenario.conflicts ?? []).join(' '),
-      FAKE_ERROR_IDS: (scenario.errors ?? []).join(' '),
-      FAKE_TRANSIENT_IDS: (scenario.transient ?? []).join(' '),
-      FAKE_TRANSIENT_FAILURES: String(scenario.transientFailures ?? 1),
-      GH_TOKEN: 'token',
-      HEAD_REF: scenario.headRef ?? `refs/heads/${entry}`,
-      GITHUB_REPOSITORY: 'example/repo',
-      GITHUB_RUN_ID: String(scenario.runId ?? 500),
-      GITHUB_SERVER_URL: 'https://github.test',
-      GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
-      RUNNER_TEMP: directory,
-    },
-  })
-  return {
-    status: result.status,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    cancelled: lines('cancelled')
-      .map(Number)
-      .toSorted((a, b) => a - b),
-    calls: lines('calls'),
-    summary: lines('summary.md').join('\n'),
-  }
-}
 
 describe('cancel replaced merge-group runs workflow', () => {
   it('is workflow_call only and holds one non-required cancel job', () => {
@@ -150,15 +54,8 @@ describe('cancel replaced merge-group runs workflow', () => {
 })
 
 describe('cancel replaced merge-group runs script', () => {
-  beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), 'cancel-replaced-'))
-    writeFileSync(join(directory, 'gh'), fakeGh)
-    chmodSync(join(directory, 'gh'), 0o755)
-  })
-
-  afterEach(() => {
-    rmSync(directory, { recursive: true, force: true })
-  })
+  beforeEach(setup)
+  afterEach(teardown)
 
   it('cancels older runs of the same pull request on other queue refs across workflows', () => {
     const result = execute({
@@ -280,7 +177,7 @@ describe('cancel replaced merge-group runs script', () => {
   })
 
   it('fails without touching the API when the merge-group ref is unexpected', () => {
-    const result = execute({ headRef: 'refs/heads/main' })
+    const result = execute({ env: { HEAD_REF: 'refs/heads/main' } })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('::error::Unexpected merge group ref')
     expect(result.calls).toEqual([])

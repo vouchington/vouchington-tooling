@@ -19,6 +19,7 @@ export type Scenario = {
   jobErrors?: number[]
   transient?: number[]
   transientFailures?: number
+  env?: Record<string, string>
 }
 
 // Synthetic queue refs: real shas would trip the repository's no-test-git-sha rule.
@@ -79,7 +80,7 @@ file="$FAKE_GH_DIR/list-$status.json"
 if [[ -f "$file" ]]; then cat "$file"; else echo '{"total_count":0,"workflow_runs":[]}'; fi
 `
 
-export function createHarness(script: string) {
+export function createHarness(script: string, defaultEnv: Record<string, string> = {}) {
   let directory = ''
   const lines = (name: string): string[] => {
     try {
@@ -91,7 +92,7 @@ export function createHarness(script: string) {
 
   return {
     setup: () => {
-      directory = mkdtempSync(join(tmpdir(), 'cancel-dequeued-'))
+      directory = mkdtempSync(join(tmpdir(), 'cancel-runs-'))
       writeFileSync(join(directory, 'gh'), fakeGh)
       chmodSync(join(directory, 'gh'), 0o755)
     },
@@ -128,11 +129,14 @@ export function createHarness(script: string) {
           GITHUB_SERVER_URL: 'https://github.test',
           GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
           RUNNER_TEMP: directory,
+          ...defaultEnv,
+          ...scenario.env,
         },
       })
       return {
         status: result.status,
         stdout: result.stdout,
+        stderr: result.stderr,
         cancelled: lines('cancelled')
           .map(Number)
           .toSorted((a, b) => a - b),
