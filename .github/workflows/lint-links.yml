@@ -40,28 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 1
-
-      - name: Resolve tooling repository
-        id: tooling
-        shell: bash
-        env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
-        run: |
-          set -euo pipefail
-          file_ref="${WORKFLOW_REF%%@*}"
-          repository="${file_ref%%/.github/*}"
-          case "$repository" in
-            */*) ;;
-            *) echo "::error::cannot resolve the called workflow repository"; exit 1 ;;
-          esac
-          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+        with:
+          persist-credentials: false
 
       - name: Checkout tooling scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ steps.tooling.outputs.repository }}
+          repository: vouchington/vouchington-tooling
           ref: ${{ job.workflow_sha }}
           path: .tooling
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Install lychee
@@ -73,12 +61,27 @@ jobs:
           case "$LYCHEE_VERSION" in
             ''|*[!0-9A-Za-z._-]*) echo "::error::lychee-version must be a single token"; exit 2 ;;
           esac
+          # lychee 0.24.0 changed asset naming and added .sha256 sidecars; older
+          # releases cannot be checksum-verified.
+          if ! awk -v version="$LYCHEE_VERSION" 'BEGIN {
+            n = split(version, parts, ".")
+            if (n != 3) exit 1
+            for (i = 1; i <= 3; i++) if (parts[i] !~ /^[0-9]+$/) exit 1
+            exit (parts[1] + 0 > 0 || parts[2] + 0 >= 24) ? 0 : 1
+          }'; then
+            echo "::error::lychee-version must be 0.24.0 or newer (X.Y.Z); older releases have no checksum file"
+            exit 2
+          fi
+          asset='lychee-{platform}.tar.gz'
+          if [ "$LYCHEE_VERSION" = 0.24.0 ]; then
+            asset='lychee-lychee-v{version}-{platform}.tar.gz'
+          fi
           LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
           echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
           bash "$GITHUB_WORKSPACE/.tooling/packages/vouchington-tooling/scripts/gha/install-github-release.sh" \
             --repo lycheeverse/lychee \
             --version "$LYCHEE_VERSION" \
-            --asset 'lychee-{platform}.tar.gz' \
+            --asset "$asset" \
             --bin lychee \
             --tag-prefix 'lychee-v' \
             --bin-dir "$LYCHEE_BIN_DIR"

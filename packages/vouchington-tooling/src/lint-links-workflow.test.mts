@@ -12,6 +12,7 @@ interface Step {
   run?: string
   if?: string
   env?: Record<string, string>
+  with?: Record<string, unknown>
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -87,5 +88,64 @@ done
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
+  })
+
+  it('checks out the tooling repository at the called workflow sha', () => {
+    expect(source).not.toContain('workflow_ref')
+    expect(step('Checkout tooling scripts').with).toMatchObject({
+      repository: 'vouchington/vouchington-tooling',
+      ref: '${{ job.workflow_sha }}',
+      'persist-credentials': false,
+    })
+    expect(steps[0]?.with?.['persist-credentials']).toBe(false)
+  })
+
+  describe('lychee version guard', () => {
+    function install(version: string) {
+      const directory = mkdtempSync(join(tmpdir(), 'lint-links-install-'))
+      const script = join(directory, '.tooling/packages/vouchington-tooling/scripts/gha')
+      mkdirSync(script, { recursive: true })
+      writeFileSync(join(script, 'install-github-release.sh'), 'echo "installer $*"\n')
+      try {
+        const result = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-eo', 'pipefail', '-c', step('Install lychee').run ?? ''],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              LYCHEE_VERSION: version,
+              GITHUB_WORKSPACE: directory,
+              GITHUB_PATH: join(directory, 'path'),
+              RUNNER_TEMP: directory,
+            },
+          },
+        )
+        return { status: result.status, out: result.stdout }
+      } finally {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+
+    it.each(['0.23.0', '0.9.1', '0.24', 'latest', '0.24.x'])('rejects %s', (version) => {
+      const result = install(version)
+      expect(result.status).toBe(2)
+      expect(result.out).toContain('::error::')
+      expect(result.out).not.toContain('installer')
+    })
+
+    it('accepts 0.24.1 and later with the default asset name', () => {
+      for (const version of ['0.24.1', '0.25.0', '1.0.0']) {
+        const result = install(version)
+        expect(result.status).toBe(0)
+        expect(result.out).toContain('--asset lychee-{platform}.tar.gz')
+      }
+    })
+
+    it('uses the prefixed asset name for 0.24.0', () => {
+      const result = install('0.24.0')
+      expect(result.status).toBe(0)
+      expect(result.out).toContain('--asset lychee-lychee-v{version}-{platform}.tar.gz')
+    })
   })
 })

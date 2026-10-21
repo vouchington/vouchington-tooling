@@ -92,34 +92,15 @@ describe('gitleaks git reusable workflow', () => {
     expect(upload?.uses).toBe('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9')
   })
 
-  it('resolves the called workflow repository without a fixed owner', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'gitleaks-repo-'))
-    const output = join(directory, 'output')
-    try {
-      const result = spawnSync(
-        'bash',
-        [
-          '--noprofile',
-          '--norc',
-          '-eo',
-          'pipefail',
-          '-c',
-          step('Resolve tooling repository').run ?? '',
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            WORKFLOW_REF: 'octo/example/.github/workflows/gitleaks.yml@refs/heads/main',
-            GITHUB_OUTPUT: output,
-          },
-        },
-      )
-      expect(result.status).toBe(0)
-      expect(readFileSync(output, 'utf8')).toBe('repository=octo/example\n')
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
+  it('checks out the tooling repository at the called workflow sha', () => {
+    expect(source).not.toContain('workflow_ref')
+    const tooling = steps.find((candidate) => candidate.name === 'Checkout tooling scripts')
+    expect(tooling?.with).toMatchObject({
+      repository: 'vouchington/vouchington-tooling',
+      ref: '${{ job.workflow_sha }}',
+      'persist-credentials': false,
+    })
+    expect(steps[0]?.with?.['persist-credentials']).toBe(false)
   })
 
   it('scans the pull request merge base, the merge group range, or all history', () => {

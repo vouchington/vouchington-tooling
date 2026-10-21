@@ -34,28 +34,15 @@ jobs:
         timeout-minutes: 2
         with:
           fetch-depth: 0
-
-      - name: Resolve tooling repository
-        id: tooling
-        shell: bash
-        env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
-        run: |
-          set -euo pipefail
-          file_ref="${WORKFLOW_REF%%@*}"
-          repository="${file_ref%%/.github/*}"
-          case "$repository" in
-            */*) ;;
-            *) echo "::error::cannot resolve the called workflow repository"; exit 1 ;;
-          esac
-          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          persist-credentials: false
 
       - name: Checkout tooling scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ steps.tooling.outputs.repository }}
+          repository: vouchington/vouchington-tooling
           ref: ${{ job.workflow_sha }}
           path: .tooling
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Determine Gitleaks scan range
