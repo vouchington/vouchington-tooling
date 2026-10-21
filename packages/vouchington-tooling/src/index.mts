@@ -535,3 +535,5 @@ export {
   exceedsLargeDiffThreshold,
 } from './pull-request-diff/index.mts'
 export type { DiffLineChanges, LargeDiffThresholds } from './pull-request-diff/index.mts'
+export { tokenizeShellWords, tokenizeShellWordsDetailed } from './shell-parse/index.mts'
+export type { ShellWord } from './shell-parse/index.mts'
