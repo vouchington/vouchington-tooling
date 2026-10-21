@@ -230,6 +230,20 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
   `id-token: write`.
+- `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`) with no fallback
+  key, exports that directory as `PLAYWRIGHT_BROWSERS_PATH`, and installs `browser` (default
+  `chromium`) under `timeout-seconds` and `attempts`. A relative `cache-path` is anchored at the
+  workspace root. The cache key includes the browser. Chrome
+  and Edge install globally, so they skip that cache and, because their Linux installer runs apt
+  as root, also skip the bounded download. `chrome-dev`, `chrome-canary`, and `msedge-canary` are
+  rejected because Playwright provides no installer for them. Host packages are installed only when that browser
+  fails to launch, and that apt step stays outside the download deadline. It supports Linux and
+  macOS runners. Give the calling step its own `timeout-minutes`.
+- `setup-lychee` installs lychee `version` (default `0.24.2`) with checksum verification into the
+  job temporary bin directory and appends that directory to `GITHUB_PATH`. It supports Linux and
+  macOS runners and lychee 0.24.0 or newer. The 0.24.0 archives use a `lychee-lychee-v0.24.0-`
+  prefix; later releases use `lychee-<platform>.tar.gz`. Older releases are rejected because they
+  publish no checksum file.
 
 ### Required-result gate
 

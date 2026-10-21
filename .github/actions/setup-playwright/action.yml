@@ -1,0 +1,151 @@
+name: Setup Playwright
+description: >
+  Install a Playwright browser into an actions/cache path and export that
+  directory as PLAYWRIGHT_BROWSERS_PATH. The cache key includes the browser,
+  OS, architecture, and pnpm lockfile hash, with no fallback key. Chrome and
+  Edge install globally, so they skip this cache. Host packages are installed
+  only when that browser fails to launch. Chromium checks both the headless
+  shell and channel chromium.
+
+inputs:
+  browser:
+    description: Playwright browser passed to install and install-deps
+    default: chromium
+  cache-path:
+    description: Directory restored by actions/cache. A relative path is resolved from the workspace root.
+    default: ~/.cache/ms-playwright
+  timeout-seconds:
+    description: Per-attempt deadline for the browser download
+    default: '120'
+  attempts:
+    description: Download attempts before the install step fails
+    default: '2'
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Playwright cache key
+      id: playwright-cache-key
+      shell: bash
+      env:
+        PLAYWRIGHT_CACHE_PATH: ${{ inputs.cache-path }}
+      run: |
+        set -euo pipefail
+        case "$PLAYWRIGHT_CACHE_PATH" in
+          ''|*$'\n'*) echo "::error::cache-path must be a single path"; exit 2 ;;
+        esac
+        case "$PLAYWRIGHT_CACHE_PATH" in
+          '~') resolved="$HOME" ;;
+          '~/'*) resolved="$HOME/${PLAYWRIGHT_CACHE_PATH#"~/"}" ;;
+          /*) resolved="$PLAYWRIGHT_CACHE_PATH" ;;
+          *)
+            if [ -z "${GITHUB_WORKSPACE:-}" ]; then
+              echo "::error::a relative cache-path needs GITHUB_WORKSPACE"
+              exit 2
+            fi
+            # Keep the exported path absolute so a later step with another
+            # working-directory does not resolve it again.
+            resolved="${GITHUB_WORKSPACE%/}/${PLAYWRIGHT_CACHE_PATH#./}"
+            ;;
+        esac
+        echo "cache-path=$resolved" >> "$GITHUB_OUTPUT"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$resolved" >> "$GITHUB_ENV"
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "lockfile-hash=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        else
+          echo "lockfile-hash=$(shasum -a 256 pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Cache Playwright browsers
+      if: ${{ !contains(',chrome,chrome-beta,chrome-dev,chrome-canary,msedge,msedge-beta,msedge-dev,msedge-canary,', format(',{0},', inputs.browser)) }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.playwright-cache-key.outputs.cache-path }}
+        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}
+
+    - name: Install Playwright browsers
+      shell: bash
+      env:
+        RUN_BOUNDED: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/run-bounded.py
+        PLAYWRIGHT_BROWSER: ${{ inputs.browser }}
+        PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        PLAYWRIGHT_INSTALL_ATTEMPTS: ${{ inputs.attempts }}
+      # A stalled browser download must die inside this attempt. Only this
+      # user-space download runs under run-bounded.py, so its process-group
+      # kill reaches everything the attempt started. Inputs arrive as env
+      # values and are quoted, so they are not interpolated into the shell.
+      run: |
+        set -euo pipefail
+        case "$(uname -s)" in
+          Linux|Darwin) ;;
+          *) echo "::error::setup-playwright supports Linux and macOS runners"; exit 1 ;;
+        esac
+        case "$PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS" in
+          ''|*[!0-9]*) echo "::error::timeout-seconds must be a positive integer"; exit 2 ;;
+        esac
+        case "$PLAYWRIGHT_INSTALL_ATTEMPTS" in
+          ''|*[!0-9]*) echo "::error::attempts must be a positive integer"; exit 2 ;;
+        esac
+        case "$PLAYWRIGHT_BROWSER" in
+          ''|*[!A-Za-z0-9_-]*) echo "::error::browser must be a single token"; exit 2 ;;
+        esac
+        if [ "$PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS" -lt 1 ] || [ "$PLAYWRIGHT_INSTALL_ATTEMPTS" -lt 1 ]; then
+          echo "::error::timeout-seconds and attempts must be positive"
+          exit 2
+        fi
+        case "$PLAYWRIGHT_BROWSER" in
+          chrome-dev|chrome-canary|msedge-canary)
+            # Playwright registers these channels without an installer.
+            echo "::error::setup-playwright cannot install ${PLAYWRIGHT_BROWSER}; Playwright provides no installer for that channel"
+            exit 1
+            ;;
+          chrome|chrome-beta|msedge|msedge-beta|msedge-dev)
+            # These channels install a system browser. On Linux that runs apt
+            # as root, which run-bounded cannot stop. The caller's step timeout
+            # bounds this install, and it is not retried over a live apt.
+            pnpm exec playwright install "$PLAYWRIGHT_BROWSER"
+            exit 0
+            ;;
+        esac
+        attempt=1
+        install_status=0
+        while [ "$attempt" -le "$PLAYWRIGHT_INSTALL_ATTEMPTS" ]; do
+          set +e
+          python3 "$RUN_BOUNDED" "$PLAYWRIGHT_INSTALL_TIMEOUT_SECONDS" pnpm exec playwright install "$PLAYWRIGHT_BROWSER"
+          install_status=$?
+          set -e
+          if [ "$install_status" -eq 0 ]; then
+            exit 0
+          fi
+          if [ "$attempt" -ge "$PLAYWRIGHT_INSTALL_ATTEMPTS" ]; then
+            echo "::error::Playwright browser install failed after ${PLAYWRIGHT_INSTALL_ATTEMPTS} attempts (status ${install_status})"
+            exit "$install_status"
+          fi
+          echo "::warning::Playwright browser install attempt ${attempt} failed with status ${install_status}; retrying"
+          attempt=$((attempt + 1))
+        done
+
+    - name: Verify Chromium launches
+      shell: bash
+      env:
+        CHROMIUM_LAUNCH_PROBE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/chromium-launch-probe.mjs
+        WAIT_FOR_APT_LOCKS: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/wait-for-apt-locks.sh
+        PLAYWRIGHT_BROWSER: ${{ inputs.browser }}
+      # Host packages are installed only when Chromium cannot start. This
+      # fallback stays outside run-bounded.py: Playwright runs apt through
+      # sudo, so a process-group kill as the runner user cannot stop the
+      # root-owned apt. The caller's step timeout-minutes bounds the fallback.
+      run: |
+        set -euo pipefail
+        case "$PLAYWRIGHT_BROWSER" in
+          ''|*[!A-Za-z0-9_-]*) echo "::error::browser must be a single token"; exit 2 ;;
+        esac
+        if node "$CHROMIUM_LAUNCH_PROBE"; then
+          exit 0
+        fi
+        echo "::warning::${PLAYWRIGHT_BROWSER} did not launch; installing its host packages"
+        bash "$WAIT_FOR_APT_LOCKS"
+        pnpm exec playwright install-deps "$PLAYWRIGHT_BROWSER"
+        if ! node "$CHROMIUM_LAUNCH_PROBE"; then
+          echo "::error::${PLAYWRIGHT_BROWSER} still cannot launch after installing its host packages"
+          exit 1
+        fi

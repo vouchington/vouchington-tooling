@@ -1,0 +1,58 @@
+name: Setup lychee
+description: >
+  Install a checksum-verified lychee release onto PATH. Supports Linux and
+  macOS runners.
+inputs:
+  version:
+    description: lychee release version, without the lychee-v tag prefix
+    # renovate: datasource=github-releases depName=lycheeverse/lychee extractVersion=^lychee-v(?<version>.*)$
+    default: '0.24.2'
+runs:
+  using: composite
+  steps:
+    - name: Install lychee
+      shell: bash
+      env:
+        LYCHEE_VERSION: ${{ inputs.version }}
+        INSTALL_GITHUB_RELEASE: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/install-github-release.sh
+      run: |
+        set -euo pipefail
+        case "$(uname -s)" in
+          Linux|Darwin) ;;
+          *) echo "::error::setup-lychee supports Linux and macOS runners"; exit 1 ;;
+        esac
+        # Install into the runner's per-job temporary directory rather than relying
+        # on mutable binaries under $HOME/.local/bin.
+        LYCHEE_BIN_DIR="${RUNNER_TEMP:-$HOME/.local}/bin"
+        # Add to PATH before the version-skip check below, not just after a
+        # fresh install — the skip branch exits early and must still expose
+        # the verified temp binary to the lint-links step that follows.
+        echo "$LYCHEE_BIN_DIR" >> "$GITHUB_PATH"
+        # 0.24.0 names archives lychee-lychee-v0.24.0-<platform>.tar.gz.
+        # 0.24.1 and later use lychee-<platform>.tar.gz. Both publish a
+        # .sha256 sidecar and keep the binary in one directory. Earlier
+        # releases have no checksum file, so they are rejected.
+        if ! awk -v version="$LYCHEE_VERSION" 'BEGIN {
+          n = split(version, parts, ".")
+          if (n != 3) exit 1
+          for (i = 1; i <= 3; i++) if (parts[i] !~ /^[0-9]+$/) exit 1
+          major = parts[1] + 0
+          minor = parts[2] + 0
+          if (major > 0 || minor >= 24) exit 0
+          exit 1
+        }'; then
+          echo "::error::setup-lychee accepts lychee 0.24.0 and newer; older releases have no checksum file"
+          exit 1
+        fi
+        asset='lychee-{platform}.tar.gz'
+        if [ "$LYCHEE_VERSION" = 0.24.0 ]; then
+          asset='lychee-lychee-v{version}-{platform}.tar.gz'
+        fi
+        bash "$INSTALL_GITHUB_RELEASE" \
+          --repo lycheeverse/lychee \
+          --version "$LYCHEE_VERSION" \
+          --asset "$asset" \
+          --bin lychee \
+          --tag-prefix 'lychee-v' \
+          --strip-components 1 \
+          --bin-dir "$LYCHEE_BIN_DIR"
