@@ -5,8 +5,3 @@ version: 1
 classify:
   standard:
     all: true
-
-# The repository allows only squash merges.
-merge:
-  command-args:
-    - '--squash'
