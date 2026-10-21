@@ -6,6 +6,7 @@ import { runPostReviewCli } from '../gha-post-review/cli.mts'
 import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
+import { runStoryCoverage } from './commands/story-coverage.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
@@ -130,6 +131,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':
       return runGhaArtifactsCleanup(parsed)
+    case 'story-coverage':
+      return runStoryCoverage(parsed)
     case 'retrospective-transcript':
       return runRetrospectiveTranscriptCommand(parsed.args)
     case 'link-skill':

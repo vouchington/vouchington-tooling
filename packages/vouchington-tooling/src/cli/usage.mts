@@ -49,6 +49,7 @@ Commands:
   agent-blackboard              Probe and journal an Agent Blackboard deployment
   mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
   worktree                      Reclaim finished git worktrees (dry run unless --yes)
+  story-coverage                Check component exports are imported by stories
 
 Options:
   -h, --help       Show this help
@@ -143,6 +144,8 @@ worktree reclaim [--yes] [--json]
   Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the
   branch is merged or closed at exactly HEAD, using git worktree remove (never forced).
   Skips the main checkout, the current worktree, and locked, bare or detached worktrees.
+
+story-coverage --root <dir> --component-root <rel> --story-root <rel> --source-extension <ext> --component-extension <ext> --marker <regex> --story-pattern <regex> [--alias <prefix>=<path>] [--exclusions <json>] [--exclusions-label <text>]
 `
 
 export function printUsage(stream: NodeJS.WritableStream = process.stdout): void {

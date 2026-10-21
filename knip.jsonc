@@ -64,6 +64,7 @@
         "src/basic-auth-doc-sync/runbook.mts!",
         "src/post-publication-inventory/index.mts!",
         "src/retrospective-distill/index.mts!",
+        "src/story-coverage/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },
