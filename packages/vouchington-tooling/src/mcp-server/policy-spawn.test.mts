@@ -177,9 +177,9 @@ describe('spawnPolicy', () => {
     const realExecPath = process.execPath
     Object.defineProperty(process, 'execPath', { value: '/nonexistent/node', configurable: true })
     try {
-      await expect(
-        spawnPolicy(request('', { command: '/nonexistent/node' })),
-      ).rejects.toThrow(/Node binary \(\/nonexistent\/node\) was removed.*restart Codex/)
+      await expect(spawnPolicy(request('', { command: '/nonexistent/node' }))).rejects.toThrow(
+        /Node binary \(\/nonexistent\/node\) was removed.*restart Codex/,
+      )
     } finally {
       Object.defineProperty(process, 'execPath', { value: realExecPath, configurable: true })
     }
