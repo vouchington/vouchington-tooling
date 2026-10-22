@@ -184,6 +184,14 @@ describe('runCli', () => {
     await expect(runCli(['node', 'vouchington', 'post-review'])).resolves.toBe(1)
   })
 
+  it('routes verify-workflow-secrets', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await expect(
+      runCli(['node', 'vouchington', 'verify-workflow-secrets', '--bogus']),
+    ).resolves.toBe(2)
+    error.mockRestore()
+  })
+
   it('writes usage to an explicit stream', () => {
     const chunks: string[] = []
     printUsage({ write: (chunk: string) => chunks.push(chunk) } as unknown as NodeJS.WritableStream)

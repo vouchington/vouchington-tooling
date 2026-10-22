@@ -55,6 +55,7 @@
         "src/workspace-gates/index.mts!",
         "src/dependency-license-policy/index.mts!",
         "src/nuget-central-version/index.mts!",
+        "src/workflow-secrets-drift/index.mts!",
         "src/nuget-central-version/cli.mts!",
         "src/swift-semantic-equal/index.mts!",
         "src/swift-semantic-equal/cli.mts!",
