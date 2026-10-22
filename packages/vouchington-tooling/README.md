@@ -584,6 +584,15 @@ there at construction and leaves the directory and other files alone. Applicatio
 directory are parameters. `checkFiniteTimeoutProfiles` writes one scratch project per admission
 profile and can take a caller-supplied runner.
 
+`next-navigation-mock`, `jsdom-stubs` and `input-otp-mock` are test-only helpers for Vitest component
+tests; `next` and `react` are optional peers, and each subpath imports only what it needs.
+`vi.mock('next/navigation', () => navMockModule)` swaps in a singleton router whose spies and
+state (`setSearchParams`, `setPathname`, `setParams`, `reset`) come from `createNavMock()`.
+`installJsdomStubs()` adds no-op `ResizeObserver`, `IntersectionObserver`, `matchMedia` and
+`scrollIntoView` only where jsdom lacks them. `installMemoryLocalStorage()` swaps in an in-memory
+`localStorage` and returns it so `afterEach` can clear it. `vi.mock(import('input-otp'),
+inputOtpMockFactory)` replaces the library's post-teardown timer with a plain input.
+
 `playwright` monitors browser console errors, web errors, dialogs, page crashes, and failed
 requests during Playwright tests. `@playwright/test` is an optional peer. `createBrowserTest` and
 `withMonitoredPage` install the generic telemetry blocks (Google Tag Manager, Google Analytics, and
