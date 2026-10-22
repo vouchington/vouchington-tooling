@@ -32,12 +32,11 @@ export function findAutomationMergeBlock(
 }
 
 function mentionsGhMerge(command: string): boolean {
-  return (
-    GH_WORD.test(command) &&
-    commandsToInspectForGitHubPolicy(command).some((inspected) =>
-      tokenizeShellWords(inspected, { splitRedirections: true }).some(isMergeShaped),
-    )
-  )
+  // Tokens, not raw text: a shell-composed name like `g"h"` still runs gh.
+  return commandsToInspectForGitHubPolicy(command).some((inspected) => {
+    const tokens = tokenizeShellWords(inspected, { splitRedirections: true })
+    return tokens.some((token) => GH_WORD.test(token)) && tokens.some(isMergeShaped)
+  })
 }
 
 function isMergeShaped(token: string): boolean {

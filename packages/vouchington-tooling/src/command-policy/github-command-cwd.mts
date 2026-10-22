@@ -43,7 +43,10 @@ function sequentialShellCwd(tokens: string[], index: number, baseCwd: string): s
   for (let cursor = 0; cursor < index; cursor += 1) {
     const token = tokens[cursor]
     if (token === '{') {
-      if (tokens[cursor - 1] === ')' || tokens[cursor - 2] === 'function') functionDepth += 1
+      // Inside a function body every nested `{` also opens a group, so its `}` must not end the body.
+      if (functionDepth > 0 || tokens[cursor - 1] === ')' || tokens[cursor - 2] === 'function') {
+        functionDepth += 1
+      }
       continue
     }
     if (token === '}') {

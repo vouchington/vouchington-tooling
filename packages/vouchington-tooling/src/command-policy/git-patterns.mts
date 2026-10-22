@@ -13,7 +13,13 @@ export function findBlockedPatternReason(
   rules: readonly PatternRule[],
 ): string | null {
   const text = blankSubstitutionSeparators(command)
-  return rules.find(({ pattern }) => pattern.test(text))?.reason ?? null
+  return rules.find(({ pattern }) => matches(pattern, text))?.reason ?? null
+}
+
+// A global or sticky pattern keeps `lastIndex` between tests, so reset it to keep decisions pure.
+function matches(pattern: RegExp, text: string): boolean {
+  pattern.lastIndex = 0
+  return pattern.test(text)
 }
 
 function blankSubstitutionSeparators(command: string): string {

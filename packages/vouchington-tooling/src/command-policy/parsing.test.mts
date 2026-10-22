@@ -35,7 +35,7 @@ describe('parseGhOptions', () => {
   })
 
   it('stops at a command separator and ignores a flag with no value', () => {
-    expect(parseGhOptions(['--title', '&&', '--body', 'x']).title).toEqual(['&&'])
+    expect(parseGhOptions(['--title', '&&', '--body', 'x'])).toMatchObject({ title: [], body: [] })
     expect(parseGhOptions(['--body']).body).toEqual([])
     expect(parseGhOptions(['-b=x']).body).toEqual(['x'])
     expect(parseGhOptions(['--draft', ';', '--title', 'x'])).toMatchObject({
@@ -193,6 +193,7 @@ describe('commandCwd', () => {
     expect(cwdOf('f() { cd sub; }; gh pr view')).toBe('/base')
     expect(cwdOf('function f { cd sub; }; gh pr view')).toBe('/base')
     expect(cwdOf('{ cd sub; }; gh pr view')).toBe('/base/sub')
+    expect(cwdOf('f() { { true; }; cd /tmp; }; gh pr view')).toBe('/base')
     expect(cwdOf(') gh pr view')).toBe('/base')
     expect(cwdOf('} gh pr view')).toBe('/base')
   })

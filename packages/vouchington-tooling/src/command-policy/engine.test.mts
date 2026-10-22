@@ -86,6 +86,15 @@ describe('evaluateCommandPolicy typo and protected paths', () => {
     expect(reasonOf({ tool_input: { file_path: '' } }, true)).toBeNull()
   })
 
+  it('reads protected paths inside nested shell commands', () => {
+    for (const command of [
+      "sh -c 'printf x > tools/hooks/a.mts'",
+      'echo "$(touch tools/policy.mts)"',
+    ]) {
+      expect(reasonOf(bash(command), true)).toBe(policy.protectedPaths!.reason)
+    }
+  })
+
   it('needs no rules to allow anything', () => {
     expect(reasonOf(bash('anything'), true, {})).toBeNull()
     expect(reasonOf(bash('gh pr view 1'), false, {})).toBeNull()
@@ -132,6 +141,12 @@ describe('evaluateCommandPolicy command rules', () => {
     expect(reasonOf(bash('git rebase --continue'), false, {})).toBeNull()
   })
 
+  it('keeps global and sticky patterns pure across evaluations', () => {
+    const stateful: CommandPolicy = { gitPatterns: [{ pattern: /danger/g, reason: 'danger' }] }
+    expect(reasonOf(bash('git danger'), false, stateful)).toBe('danger')
+    expect(reasonOf(bash('git danger'), false, stateful)).toBe('danger')
+  })
+
   it('treats an unterminated substitution as plain text and defaults the pull-rebase reason', () => {
     expect(reasonOf(bash('echo $(oops; git push --force'))).toContain('Force pushes')
     expect(reasonOf(bash('echo `oops; git commit --amend'))).toContain('amend')
@@ -154,6 +169,11 @@ describe('evaluateCommandPolicy merge authority', () => {
     const decision = evaluateCommandPolicy(bash(command), policy, { automationContext: true })
     expect(decision?.disposition).toBe('block')
     expect(decision?.reason).toContain('See docs/merge.md.')
+  })
+
+  it('sees gh through shell-composed names', () => {
+    expect(reasonOf(bash('g"h" pr merge 1'), true)).toContain('Merge authority')
+    expect(reasonOf(bash('git merge topic'), true)).toBeNull()
   })
 
   it('omits guidance when none is configured', () => {

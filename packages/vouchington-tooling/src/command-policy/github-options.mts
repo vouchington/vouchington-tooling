@@ -63,7 +63,9 @@ const OPTION_SPECS: readonly (readonly [OptionKey, string, string])[] = [
 
 // Records the value for the first spec `token` names and returns how many tokens it consumed
 // (2 for a separate value, 1 for an attached one, 0 when no spec matches).
-function consumeOption(options: GhOptions, token: string, nextToken: string | undefined): number {
+function consumeOption(options: GhOptions, token: string, next: string | undefined): number {
+  // A separator ends the command, so it is never an option's value.
+  const nextToken = next !== undefined && isGhCommandSeparator(next) ? undefined : next
   for (const [key, long, short] of OPTION_SPECS) {
     if ((token === long || token === short) && addOptionValue(options, key, nextToken)) return 2
     const attached = optionValueFromLongToken(token, long) ?? attachedShortOptionValue(token, short)

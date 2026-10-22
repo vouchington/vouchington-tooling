@@ -1,4 +1,5 @@
 import { tokenizeShellWords } from '../shell-parse/index.mts'
+import { commandsToInspectForGitHubPolicy } from './github-command-context.mts'
 import { isRecord } from './payload.mts'
 import type { HookPayload } from './types.mts'
 
@@ -42,7 +43,10 @@ function commandReferences(
     return patchHeaderPaths(command).some(matches)
   }
   // Without splitRedirections a no-space redirect like `>dir/file` stays fused to its operator.
-  return tokenizeShellWords(command, options).some(matches)
+  // Nested scripts (`sh -c`, substitutions, heredoc shell bodies) are read like the outer command.
+  return commandsToInspectForGitHubPolicy(command).some((script) =>
+    tokenizeShellWords(script, options).some(matches),
+  )
 }
 
 function valueReferences(
