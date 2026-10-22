@@ -604,7 +604,7 @@ Playwright's full `TestInfo`. A real `TestInfo` is assignable to it, so no cast 
 reporter never reads `process.env.CI`, so the caller opts in explicitly:
 `reporter: [[TestLifecycleReporter.modulePath, { failOnSkippedTests: Boolean(process.env.CI) }]]`.
 When enabled, a run that would otherwise pass fails through the reporter's `onEnd` result status,
-and stderr lists each skipped test's title path and `file:line`. Every test whose final result
+and stderr lists each skipped test's title path and `file:line`. Every test whose latest attempt
 is `skipped` counts, including `test.fixme`, `test.skip`, and runtime `test.skip()`, because
 Playwright reports all of them as `skipped`. A run that already failed keeps its status.
 

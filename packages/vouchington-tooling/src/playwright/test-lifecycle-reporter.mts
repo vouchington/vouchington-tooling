@@ -21,7 +21,7 @@ export default class TestLifecycleReporter implements Reporter {
   static readonly modulePath = import.meta.filename
 
   private readonly failOnSkippedTests: boolean
-  private readonly skipped: string[] = []
+  private readonly skipped = new Map<string, string>()
   private rootDir = ''
   private shard: FullConfig['shard'] = null
 
@@ -40,17 +40,20 @@ export default class TestLifecycleReporter implements Reporter {
 
   onTestEnd(test: TestCase, result: TestResult): void {
     this.record('end', test, result)
-    if (result.status === 'skipped') {
-      const title = test.titlePath().filter(Boolean).join(' > ')
-      this.skipped.push(`${title} (${this.relativeFile(test)}:${test.location.line})`)
+    // Only a test's latest attempt counts: serial suites skip tests that a retry later runs.
+    if (result.status !== 'skipped') {
+      this.skipped.delete(test.id)
+      return
     }
+    const title = test.titlePath().filter(Boolean).join(' > ')
+    this.skipped.set(test.id, `${title} (${this.relativeFile(test)}:${test.location.line})`)
   }
 
   async onEnd(result: FullResult): Promise<{ status: FullResult['status'] } | undefined> {
-    if (!this.failOnSkippedTests || this.skipped.length === 0) return undefined
-    const lines = this.skipped.map((entry) => `  - ${entry}`).join('\n')
+    if (!this.failOnSkippedTests || this.skipped.size === 0) return undefined
+    const lines = [...this.skipped.values()].map((entry) => `  - ${entry}`).join('\n')
     process.stderr.write(
-      `${this.skipped.length} test(s) were skipped and failOnSkippedTests is enabled:\n${lines}\n`,
+      `${this.skipped.size} test(s) were skipped and failOnSkippedTests is enabled:\n${lines}\n`,
     )
     return result.status === 'passed' ? { status: 'failed' } : undefined
   }

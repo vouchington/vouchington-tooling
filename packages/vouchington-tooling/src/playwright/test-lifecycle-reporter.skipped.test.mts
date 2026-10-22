@@ -55,6 +55,16 @@ describe('TestLifecycleReporter failOnSkippedTests', () => {
     expect(stderr).toContain('were skipped')
   })
 
+  it('ignores a skip that a later retry attempt ran', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const reporter = new TestLifecycleReporter({ failOnSkippedTests: true })
+    reporter.onBegin({ rootDir: '/repo', shard: null } as FullConfig)
+    const test = createTest(['serial'], 3)
+    reporter.onTestEnd(test, createResult('skipped'))
+    reporter.onTestEnd(test, createResult('passed'))
+    expect(await reporter.onEnd({ status: 'passed' } as FullResult)).toBeUndefined()
+  })
+
   it('passes when nothing was skipped', async () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     const reporter = new TestLifecycleReporter({ failOnSkippedTests: true })
