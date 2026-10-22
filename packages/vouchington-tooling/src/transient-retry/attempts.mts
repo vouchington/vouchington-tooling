@@ -1,6 +1,6 @@
 /**
  * Normalizes a provider's attempt count when earlier attempts produced no targets.
- * Provider API fetching and parsing intentionally remain outside this package.
+ * Fetching a provider's run state lives in `run-context*.mts`.
  */
 export function deriveRetryAttempt(
   runAttempt: number,

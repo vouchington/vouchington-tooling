@@ -53,6 +53,7 @@ Commands:
   mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
   worktree                      Reclaim finished git worktrees (dry run unless --yes)
   story-coverage                Check component exports are imported by stories
+  transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
 
 Options:
   -h, --help       Show this help
@@ -146,6 +147,10 @@ worktree reclaim [--yes] [--json]
   Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the
   branch is merged or closed at exactly HEAD, using git worktree remove (never forced).
   Skips the main checkout, the current worktree, and locked, bare or detached worktrees.
+
+transient-retry --rules <module> [--repo owner/name] [--token-env NAME] [--dry-run] <run-id>
+  Loads a module exporting "rules" (and optionally "limits"), evaluates them against the failed run,
+  and reruns only on a match. Exits 0 on rerun, 2 when none is warranted, 1 on error.
 
 story-coverage --root <dir> --component-root <rel> --story-root <rel> --source-extension <ext> --component-extension <ext> --marker <regex> --story-pattern <regex> [--alias <prefix>=<path>] [--exclusions <json>] [--exclusions-label <text>]
 `

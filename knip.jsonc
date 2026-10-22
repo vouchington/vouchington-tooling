@@ -74,6 +74,7 @@
         "src/post-publication-inventory/index.mts!",
         "src/retrospective-distill/index.mts!",
         "src/story-coverage/index.mts!",
+        "src/transient-retry/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

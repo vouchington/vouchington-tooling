@@ -12,31 +12,32 @@ export interface RetryContext {
 
 export type RetryDecision = 'rerun' | 'ignore' | 'fresh-plan' | 'reap-lock' | 'dispatch'
 
-export type RetryTarget =
+export type RetryTarget<C extends RetryContext = RetryContext> =
   | { targetName: string; targetFamily?: never; resolveTargetName?: never }
   | {
       targetName?: never
       /** Static prefix shared by every dynamically named target in the family. */
       targetFamily: string
       /** Resolves the exact target for this run, or null when it cannot be determined. */
-      resolveTargetName: (context: RetryContext) => string | null
+      resolveTargetName: (context: C) => string | null
     }
 
-interface RetryRuleBase {
+interface RetryRuleBase<C extends RetryContext> {
   /** Stable identifier for logs and telemetry. */
   id: string
   /** Maximum normalized attempts at which this rule may match. */
   maxAttempts: number
-  match: (context: RetryContext) => boolean | Promise<boolean>
+  match: (context: C) => boolean | Promise<boolean>
 }
 
-export type RetryRule =
-  | (RetryRuleBase & {
+/** `C` lets a provider narrow the context its rules read, e.g. to add logs. */
+export type RetryRule<C extends RetryContext = RetryContext> =
+  | (RetryRuleBase<C> & {
       decision?: 'rerun'
       /** When omitted, the match is an untargeted provider-level rerun. */
-      retryTarget?: RetryTarget
+      retryTarget?: RetryTarget<C>
     })
-  | (RetryRuleBase & {
+  | (RetryRuleBase<C> & {
       decision: Exclude<RetryDecision, 'rerun'>
       retryTarget?: never
     })
