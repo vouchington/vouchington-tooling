@@ -17,6 +17,7 @@ type ForwardedCommand =
   | { kind: 'mcp'; args: string[] }
   | { kind: 'worktree'; args: string[] }
   | { kind: 'transient-retry'; args: string[] }
+  | { kind: 'tmux'; args: string[] }
 
 export function parseForwardedCommand(
   command: string | undefined,
@@ -40,5 +41,6 @@ export function parseForwardedCommand(
   if (command === 'mcp') return { kind: 'mcp', args }
   if (command === 'worktree') return { kind: 'worktree', args }
   if (command === 'transient-retry') return { kind: 'transient-retry', args }
+  if (command === 'tmux') return { kind: 'tmux', args }
   return undefined
 }

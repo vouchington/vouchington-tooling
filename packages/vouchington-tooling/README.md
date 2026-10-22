@@ -86,6 +86,11 @@ vouchington harness-assert-gates HARNESS_DISPATCH_ENABLED HARNESS_SHEPHERD_ENABL
 echo '[{"login":"octocat","type":"User"}]' | vouchington gha-collaborator-trust owner/repo --allow-bot github-actions[bot]
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington verify-workflow-secrets --repo owner/name --inventory .github/workflows/workflow-secrets-inventory.mts
+vouchington tmux up --config tmux.json --no-attach
+vouchington tmux name my-topic
+vouchington tmux read-title
+vouchington tmux agent-reminder session-start
+vouchington tmux post-tool < hook-payload.json
 vouchington dead-code --baseline dead-code-baseline.json --config .jscpd.json --update
 vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
@@ -390,6 +395,7 @@ import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
 import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { runVerifyWorkflowSecretsCli } from 'vouchington-tooling/workflow-secrets-drift'
+import { launchSession, loadTmuxConfig } from 'vouchington-tooling/tmux'
 import { runDeadCodeGate } from 'vouchington-tooling/dead-code'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'
@@ -946,3 +952,38 @@ The check preserves the existing nested SELECT/CTE, equality, inner-join, and co
 heuristics. It rejects weakened OR/NOT/boolean/CASE predicates and non-filtering left joins. Every
 recognized live source reader must be protected. Unparseable SQL fragments are skipped; malformed
 source returns false. These are bounded syntactic heuristics, not a general SQL safety proof.
+
+## tmux dev sessions
+
+`vouchington tmux up --config <file>` starts the windows named in a JSON config inside one tmux
+session per worktree (`<sessionPrefix>d<hash of the worktree path>`), reuses a running session,
+and respawns dead windows. The config holds everything product-specific:
+
+```json
+{
+  "sessionPrefix": "dev-",
+  "readyMarker": "ready",
+  "launcherPidVar": "TMUX_LAUNCHER_PID",
+  "env": { "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318" },
+  "summary": ["Web: http://localhost:3000"],
+  "windows": [
+    {
+      "name": "web",
+      "cwd": "web",
+      "command": "pnpm run dev",
+      "env": { "OTEL_SERVICE_NAME": "web" }
+    },
+    { "name": "api", "command": "node --watch api.mts" }
+  ]
+}
+```
+
+Windows run through `bash -lc '<command>; read'` (`"keepOpen": false` drops the `; read`).
+`--verbose` sets `TMUX_LOG_LEVEL=info` (default `error`) in every window. The tmux binary comes
+from `TMUX_TARGET_BIN`, the worktree from `TMUX_TARGET_ROOT` (default: current directory).
+
+`tmux name`, `tmux read-title` and `tmux agent-reminder` verify that the pane (from
+`--socket/--pane/--worktree` or `AGENT_TMUX_SOCKET/PANE/WORKTREE`) belongs to the worktree before
+touching it. `tmux post-tool` reads an agent post-tool hook payload on stdin and prints a rename
+reminder at plan, PR, push and reset checkpoints; reminders name `TMUX_NAME_COMMAND` (default
+`vouchington tmux name`).
