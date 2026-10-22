@@ -4,11 +4,19 @@ import { stripUnquotedShellComments } from './shell-tokenizer-comments.mts'
 
 const DOUBLE_QUOTE_ESCAPE_CHARS = new Set(['$', '`', '"', '\\', '\n'])
 
-export type ShellWord = { expandable: boolean; value: string }
+export type ShellWord = { expandable: boolean; operator?: true; value: string }
+
+export type ShellTokenizeOptions = {
+  /** Keep `(` and `)` inside words instead of emitting them as operator tokens. */
+  keepParentheses?: boolean
+  /** Tag command-separator tokens (`;`, `&`, `&&`, `|`, `||`, `(`, `)`, newline) with `operator`. */
+  markOperators?: boolean
+  splitRedirections?: boolean
+}
 
 export function tokenizeShellWordsDetailed(
   command: string,
-  options: { splitRedirections?: boolean } = {},
+  options: ShellTokenizeOptions = {},
 ): ShellWord[] {
   const commandWithoutComments = stripUnquotedShellComments(command)
   const tokens: ShellWord[] = []
@@ -75,7 +83,11 @@ export function tokenizeShellWordsDetailed(
 
     if (char === '\n') {
       pushToken()
-      tokens.push({ expandable: false, value: '\n' })
+      tokens.push({
+        expandable: false,
+        value: '\n',
+        ...(options.markOperators ? { operator: true } : {}),
+      })
       continue
     }
 
@@ -89,7 +101,7 @@ export function tokenizeShellWordsDetailed(
       command: string
       expandable: boolean
       index: number
-      options: { splitRedirections?: boolean }
+      options: ShellTokenizeOptions
       token: string
       tokens: ShellWord[]
     } = {
@@ -124,10 +136,7 @@ export function tokenizeShellWordsDetailed(
   return tokens
 }
 
-export function tokenizeShellWords(
-  command: string,
-  options: { splitRedirections?: boolean } = {},
-): string[] {
+export function tokenizeShellWords(command: string, options: ShellTokenizeOptions = {}): string[] {
   return tokenizeShellWordsDetailed(command, options).map((token) => token.value)
 }
 
