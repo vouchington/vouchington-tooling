@@ -23,17 +23,29 @@ export function getRegisteredPoolSocketHandles(): PoolSocketHandles | null {
   return provider?.() ?? null
 }
 
-/** One-line summary, or a multi-line report when resource counts are supplied. */
+const DEFAULT_POOL_METRICS_LABEL = 'pool metrics:'
+
+export type ForkLeakDiagnosticsOptions = {
+  /** Text printed before the pool metrics line. Defaults to `pool metrics:`. */
+  poolMetricsLabel?: string
+}
+
+/**
+ * One-line summary, or a multi-line report when resource counts are supplied. The multi-line
+ * report ends with a pool metrics line whose label comes from `options.poolMetricsLabel`.
+ */
 export function formatForkLeakDiagnostics(verdict: ForkLeakVerdict): string
 export function formatForkLeakDiagnostics(
   verdict: ForkLeakVerdict,
   counts: ReadonlyMap<string, number>,
   poolMetrics?: PoolMetrics | null,
+  options?: ForkLeakDiagnosticsOptions,
 ): string
 export function formatForkLeakDiagnostics(
   verdict: ForkLeakVerdict,
   counts?: ReadonlyMap<string, number>,
   poolMetrics?: PoolMetrics | null,
+  options: ForkLeakDiagnosticsOptions = {},
 ): string {
   if (counts === undefined) return formatForkLeakSummary(verdict)
   return [
@@ -47,7 +59,7 @@ export function formatForkLeakDiagnostics(
     `suspected growth file: ${verdict.suspectedGrowth?.testFile ?? 'unknown'}`,
     `largest growth step: ${formatGrowthStep(verdict.suspectedGrowth)}`,
     `tracked resource counts: ${formatResourceCounts(counts)}`,
-    `pool metrics: ${formatPoolMetrics(poolMetrics ?? null)}`,
+    `${options.poolMetricsLabel ?? DEFAULT_POOL_METRICS_LABEL} ${formatPoolMetrics(poolMetrics ?? null)}`,
   ].join('\n')
 }
 

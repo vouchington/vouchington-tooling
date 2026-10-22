@@ -563,6 +563,17 @@ case it prints the multi-line report and optional pool metrics. `waitForForkLeak
 waits for a caller-supplied pool snapshot to settle. `installTestNetworkAllowlist` takes the
 allowed hosts, an exempt predicate, and the state key. `checkAndRestoreFakeTimers` restores real
 timers and returns a diagnostic when a test left fake timers installed.
+`countResourcesByType` turns resource names into per-type counts and `recordForkLeakCheckpoint`
+feeds a handshake settlement's counts to a detector. `formatForkLeakDiagnostics` takes an optional
+fourth argument, `{ poolMetricsLabel }`, to replace the default `pool metrics:` label (for example
+`'PostgreSQL pool metrics:'`).
+
+`vouchington-tooling/vitest-diagnostics/browser` is the browser-safe entry for Storybook and Vitest
+browser projects, for example a root fake-timer setup file shared with a Node project. It exports
+only `checkAndRestoreFakeTimers`, `formatFakeTimerLeakDiagnostics`, and the `FakeTimerController`
+type, and its import graph contains no `node:*` imports (a test enforces this), so it needs no Vite
+`optimizeDeps` entry. The resource, fork-leak, reporter, and network-allowlist helpers stay in the
+Node entry, and the effective-timeout cap is a config-time plugin that belongs in Node config.
 
 Use a caller-owned run directory: the reporter clears only regular numeric PID `.jsonl` files
 there at construction and leaves the directory and other files alone. Application metrics and CI artifact handling stay with the caller.

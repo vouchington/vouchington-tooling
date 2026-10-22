@@ -326,6 +326,11 @@
       "import": "./dist/vitest-diagnostics/index.mjs",
       "default": "./dist/vitest-diagnostics/index.mjs"
     },
+    "./vitest-diagnostics/browser": {
+      "types": "./dist/vitest-diagnostics/browser.d.mts",
+      "import": "./dist/vitest-diagnostics/browser.mjs",
+      "default": "./dist/vitest-diagnostics/browser.mjs"
+    },
     "./vitest-effective-timeout": {
       "types": "./dist/vitest-effective-timeout/index.d.mts",
       "import": "./dist/vitest-effective-timeout/index.mjs",
