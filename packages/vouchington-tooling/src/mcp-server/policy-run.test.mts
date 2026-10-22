@@ -30,6 +30,31 @@ const run = (
   name: keyof typeof POLICY_TIMEOUTS_MS = 'validateRetrospective',
 ) => runPolicyExport({ worktree: root, export: name, input: { a: 1 }, env: {}, spawn })
 
+describe('missing Node binary', () => {
+  const gone = () => join(root, 'gone', 'node')
+  const request = (extra: object) => ({
+    worktree: root,
+    export: 'validateRetrospective' as const,
+    input: {},
+    env: {},
+    nodePath: gone(),
+    ...extra,
+  })
+
+  it('returns an actionable error without spawning', async () => {
+    declare('policy.mts', 'policy.mts')
+    const spawn = vi.fn()
+    await expect(runPolicyExport(request({ spawn }))).rejects.toThrow(
+      /Node binary \(.*gone.node\) was removed.*`\/mcp`.*restart Codex/,
+    )
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('still reports no-policy when the binary is missing', async () => {
+    await expect(runPolicyExport(request({}))).resolves.toEqual({ status: 'no-policy' })
+  })
+})
+
 describe('resolvePolicyModule', () => {
   it('is undefined without a package.json, a declaration, or a policy key', async () => {
     await expect(resolvePolicyModule(root)).resolves.toBeUndefined()

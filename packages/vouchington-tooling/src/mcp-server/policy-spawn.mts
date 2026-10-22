@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { accessSync, constants } from 'node:fs'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { delimiter, dirname, join } from 'node:path'
 
 export type PolicyRequest = {
@@ -22,6 +22,12 @@ export type PolicyOutcome = {
 }
 
 export type PolicySpawner = (request: PolicyRequest) => Promise<PolicyOutcome>
+
+export function missingNodeError(node: string): Error {
+  return new Error(
+    `The MCP server's Node binary (${node}) was removed, likely by a Node version upgrade. Reconnect the server: \`/mcp\` in Claude Code, or restart Codex.`,
+  )
+}
 
 function isExecutable(path: string): boolean {
   try {
@@ -99,9 +105,16 @@ export const spawnPolicy: PolicySpawner = (request) =>
           killGroup()
         } else chunks[name].push(chunk)
       })
-    child.on('error', (error) => {
+    child.on('error', (error: NodeJS.ErrnoException) => {
       clearTimeout(timer)
-      reject(error)
+      // ENOENT also means a missing cwd, so only a binary that is gone gets the reconnect message.
+      reject(
+        error.code === 'ENOENT' &&
+          request.command === process.execPath &&
+          !existsSync(request.command)
+          ? missingNodeError(request.command)
+          : error,
+      )
     })
     // Reap anything the policy left running in its group as soon as the runner exits: a descendant
     // would otherwise keep the GitHub token it inherited, and one holding an inherited pipe would

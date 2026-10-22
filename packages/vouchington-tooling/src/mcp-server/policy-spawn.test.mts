@@ -171,7 +171,21 @@ describe('spawnPolicy', () => {
   })
 
   it('rejects when the command cannot start, and ignores a closed stdin', async () => {
-    await expect(spawnPolicy(request('', { command: '/nonexistent/node' }))).rejects.toThrow()
+    await expect(spawnPolicy(request('', { command: '/nonexistent/git' }))).rejects.toThrow(
+      /ENOENT/,
+    )
+    const realExecPath = process.execPath
+    Object.defineProperty(process, 'execPath', { value: '/nonexistent/node', configurable: true })
+    try {
+      await expect(spawnPolicy(request('', { command: '/nonexistent/node' }))).rejects.toThrow(
+        /Node binary \(\/nonexistent\/node\) was removed.*restart Codex/,
+      )
+    } finally {
+      Object.defineProperty(process, 'execPath', { value: realExecPath, configurable: true })
+    }
+    await expect(
+      spawnPolicy(request('', { cwd: join(fixture.root, 'no-such-dir') })),
+    ).rejects.toThrow(/ENOENT/)
     const result = await spawnPolicy(request('process.stdin.destroy()', { input: 'x'.repeat(1e6) }))
     expect(result.exitCode).toBe(0)
   })

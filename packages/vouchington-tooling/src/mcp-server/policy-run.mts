@@ -1,6 +1,8 @@
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolvePolicyModule } from './policy-config.mts'
 import {
+  missingNodeError,
   policyEnvironment,
   spawnPolicy,
   type PolicyOutcome,
@@ -34,6 +36,8 @@ export type PolicyRun = {
   env: NodeJS.ProcessEnv
   /** Test seam: replaces the real child process. */
   spawn?: PolicySpawner
+  /** Test seam: replaces `process.execPath` as the Node binary to launch. */
+  nodePath?: string
 }
 
 function failure(name: PolicyExport, reason: string, outcome?: PolicyOutcome): Error {
@@ -113,9 +117,11 @@ async function runUnscrubbed(run: PolicyRun, spawn: PolicySpawner): Promise<Poli
   const { export: name } = run
   const module = await resolvePolicyModule(run.worktree)
   if (module === undefined) return { status: 'no-policy' }
+  const node = run.nodePath ?? process.execPath
+  if (!existsSync(node)) throw missingNodeError(node)
   const timeoutMs = POLICY_TIMEOUTS_MS[name]
   const outcome = await spawn({
-    command: process.execPath,
+    command: node,
     args: [RUNNER, module],
     cwd: run.worktree,
     env: policyEnvironment(run.env),
