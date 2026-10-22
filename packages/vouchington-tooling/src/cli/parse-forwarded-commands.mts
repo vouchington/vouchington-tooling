@@ -7,6 +7,7 @@ type ForwardedCommand =
   | { kind: 'prepare-vitest-reports'; args: string[] }
   | { kind: 'nuget-central-version'; args: string[] }
   | { kind: 'verify-workflow-secrets'; args: string[] }
+  | { kind: 'dead-code'; args: string[] }
   | { kind: 'swift-semantic-equal'; args: string[] }
   | { kind: 'post-review'; args: string[] }
   | { kind: 'stage-review-payload'; args: string[] }
@@ -28,6 +29,7 @@ export function parseForwardedCommand(
   if (command === 'prepare-vitest-reports') return { kind: 'prepare-vitest-reports', args }
   if (command === 'nuget-central-version') return { kind: 'nuget-central-version', args }
   if (command === 'verify-workflow-secrets') return { kind: 'verify-workflow-secrets', args }
+  if (command === 'dead-code') return { kind: 'dead-code', args }
   if (command === 'swift-semantic-equal') return { kind: 'swift-semantic-equal', args }
   if (command === 'post-review') return { kind: 'post-review', args }
   if (command === 'stage-review-payload') return { kind: 'stage-review-payload', args }

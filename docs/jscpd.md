@@ -33,6 +33,32 @@ can fail a local run and cannot hide one.
 configured.
 
 | Glob | Reason | Owner |
-| ---- | ------ | ----- |
 
 `jscpd-wiring.test.mts` fails when a configured ignore glob is missing from this document.
+
+## Dead-code baseline gate
+
+`vouchington dead-code` (library: `vouchington-tooling/dead-code`) runs `jscpd --dead-code` over a
+snapshot of the tracked working tree and compares the findings with a committed baseline of accepted
+identities. Untracked importers and `.gitignore` cannot mask an orphan, because only `git ls-files`
+paths are copied. New findings fail the run; a shrunk baseline fails `check` until it is updated.
+
+```bash
+vouchington dead-code --baseline dead-code-baseline.json --seed     # first adoption only
+vouchington dead-code --baseline dead-code-baseline.json            # check
+vouchington dead-code --baseline dead-code-baseline.json --update   # drop fixed findings
+```
+
+- `--baseline <path>`: Required baseline file, relative to the repository root
+- `--config <path>`: Tracked jscpd config. Default `.jscpd.json`
+- `--binary <path>`: jscpd executable. Default `<repo>/node_modules/.bin/jscpd`
+- `--repo-root <path>`: Repository to scan. Default the working directory
+- `--entry <glob>`: Live entry root, repeatable. Default the config's `deadCode.entry`
+- `--snapshot-ignore <glob>`: Tracked files left out of the snapshot, repeatable
+- `--exclude <glob>`: Finding paths that are not counted, repeatable
+
+Test and spec files and files used only by tests are never counted. Every entry root must be a
+relative glob that matches a tracked file. A stale root fails the run.
+
+This repository does not run the gate on itself yet. Adopting it needs a seeded baseline and a
+`deadCode` section in `.jscpd.json`, which is left to a follow-up.

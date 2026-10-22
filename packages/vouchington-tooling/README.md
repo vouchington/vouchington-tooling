@@ -86,6 +86,7 @@ vouchington harness-assert-gates HARNESS_DISPATCH_ENABLED HARNESS_SHEPHERD_ENABL
 echo '[{"login":"octocat","type":"User"}]' | vouchington gha-collaborator-trust owner/repo --allow-bot github-actions[bot]
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington verify-workflow-secrets --repo owner/name --inventory .github/workflows/workflow-secrets-inventory.mts
+vouchington dead-code --baseline dead-code-baseline.json --config .jscpd.json --update
 vouchington swift-semantic-equal BASE HEAD App.swift
 vouchington post-review
 vouchington stage-review-payload optional|required <source> <destination>
@@ -370,6 +371,7 @@ import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
 import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { runVerifyWorkflowSecretsCli } from 'vouchington-tooling/workflow-secrets-drift'
+import { runDeadCodeGate } from 'vouchington-tooling/dead-code'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
 import { parseUniqueSwiftBinaryTargetChecksum } from 'vouchington-tooling/swift-source-offset'
 import { validateResolvedPinDelta } from 'vouchington-tooling/swift-resolved-pin-delta'
