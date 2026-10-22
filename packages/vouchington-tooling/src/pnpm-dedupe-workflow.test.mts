@@ -91,12 +91,33 @@ describe('pnpm-dedupe reusable workflow', () => {
     expect(workflowText).not.toMatch(/voucha|filament|storybook|vouchington-machines|openai/iu)
   })
 
-  it('installs pnpm 12 only after Node is on PATH', () => {
-    const setupNode = steps.findIndex((step) => step.uses?.startsWith('actions/setup-node'))
-    const setupPnpm = steps.findIndex((step) => step.uses?.startsWith('pnpm/action-setup'))
-    expect(setupNode).toBeGreaterThanOrEqual(0)
-    expect(setupPnpm).toBeGreaterThan(setupNode)
-    expect(steps[setupPnpm]?.with).toEqual({ version: 'latest-12' })
+  it('installs through the shared composite action from a pinned tooling checkout', () => {
+    const toolingIndex = steps.findIndex((step) => step.name === 'Checkout tooling')
+    const setupIndex = steps.findIndex((step) => step.uses?.includes('setup-node-pnpm'))
+    expect(steps.indexOf(checkout!)).toBeLessThan(toolingIndex)
+    expect(setupIndex).toBeGreaterThan(toolingIndex)
+    expect(steps[toolingIndex]?.with).toEqual({
+      repository: 'vouchington/vouchington-tooling',
+      ref: '${{ job.workflow_sha }}',
+      path: '.vouchington-tooling',
+      'fetch-depth': 1,
+      'persist-credentials': false,
+    })
+    expect(steps[setupIndex]?.uses).toBe('./.vouchington-tooling/.github/actions/setup-node-pnpm')
+    expect(steps[setupIndex]?.with).toEqual({
+      'node-version-file': '${{ inputs.node-version-file }}',
+    })
+    expect(steps.some((step) => step.uses?.startsWith('actions/setup-node'))).toBe(false)
+    expect(steps.some((step) => step.uses?.startsWith('pnpm/action-setup'))).toBe(false)
+    expect(steps.some((step) => step.run?.includes('pnpm install'))).toBe(false)
+  })
+
+  it('diffs and uploads only the lockfile, never the tooling checkout', () => {
+    const diff = steps.find((step) => step.id === 'diff')
+    expect(diff?.run).toContain('git diff --quiet -- pnpm-lock.yaml')
+    expect(diff?.run).not.toContain('.vouchington-tooling')
+    const upload = steps.find((step) => step.uses?.includes('actions/upload-artifact'))
+    expect(upload?.with?.path).toBe('pnpm-lock.yaml')
   })
 
   it('keeps the push token out of argv and out of the install environment', () => {
@@ -117,7 +138,7 @@ describe('pnpm-dedupe reusable workflow', () => {
     const dedupeText = JSON.stringify(workflow.jobs.dedupe)
     expect(dedupeText).not.toContain('PUSH_TOKEN')
     expect(dedupeText).not.toContain('secrets.')
-    expect(steps.some((step) => step.run?.includes('pnpm install'))).toBe(true)
+    expect(steps.some((step) => step.uses?.includes('setup-node-pnpm'))).toBe(true)
     expect(steps.some((step) => step.run?.includes('pnpm dedupe'))).toBe(true)
     expect(workflow.jobs.dedupe.outputs.changed).toBe('${{ steps.diff.outputs.changed }}')
     const upload = steps.find((step) => step.uses?.includes('actions/upload-artifact'))
