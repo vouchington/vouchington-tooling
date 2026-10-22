@@ -1,4 +1,4 @@
-import { runGh, type RunTextCommand } from '../gh-cli/index.mts'
+import { runGh, type RunTextCommand } from '../gh-cli/exec.mts'
 import { DEFAULT_LABEL_POLICY, labelMetadata, type LabelPolicy } from './label-policy.mts'
 
 export type EnsureLabelsOptions = {
