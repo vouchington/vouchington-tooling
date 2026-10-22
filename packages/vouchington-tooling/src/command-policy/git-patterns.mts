@@ -60,7 +60,7 @@ export function standardGitPatterns(
   return [
     {
       pattern:
-        /\bgit\s+push\b[^|;&\n]*\s(?:--force(?!-with-lease(?:\b|=))\b|-[A-Za-z]*f[A-Za-z]*\b|\+[^;&|()\s]+)/,
+        /\bgit\s+push\b[^|;&\n]*\s(?:--force(?!-with-lease(?:\b|=))\b|--mirror\b|-[A-Za-z]*f[A-Za-z]*\b|\+[^;&|()\s]+)/,
       reason: reasons.forcePush ?? PLAIN_FORCE_PUSH_REASON,
     },
     {
@@ -73,7 +73,7 @@ export function standardGitPatterns(
     },
     {
       pattern:
-        /\bgit\b[^|;&\n]*(?:\s-X(?:=|\s)?(?:ours|theirs)\b|\s-X(?:ours|theirs)\b|--strategy-option(?:=|\s+)(?:ours|theirs)\b)/,
+        /\bgit\b[^|;&\n]*(?:\s-X(?:=|\s)?(?:ours|theirs)\b|\s-X(?:ours|theirs)\b|\s(?:-s\s*|--strategy(?:=|\s+))ours\b|--strategy-option(?:=|\s+)(?:ours|theirs)\b)/,
       reason:
         'Git strategy options for ours/theirs are banned; during rebase they can silently keep the wrong side.',
     },
