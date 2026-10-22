@@ -420,6 +420,16 @@ import { tokenizeShellWords } from 'vouchington-tooling/shell-parse'
 
 `vouchington-tooling/shell-parse` splits shell text into words, heredocs, redirections, and command prefixes. Callers pass the text. The parser does not decide which commands are allowed. `stripQuotedShellText` and `commandsToInspect*` do not scan `$(...)` substitutions in the command text: call `extractShellCommandSubstitutions` and inspect each result too.
 
+`vouchington-tooling/command-policy` judges a tool call's shell command against a rule table the
+caller supplies. `evaluateCommandPolicy(payload, policy, { automationContext })` returns a
+`BlockDecision` or `null`. The `CommandPolicy` table holds typo paths, protected paths (blocked only
+in automation), command and git regex rules (`standardGitPatterns()` is an opt-in preset), and an
+optional `stack` section for `gh stack` workflow rules. Merge authority is generic: automation never
+merges, and one plain interactive `gh pr merge` yields a `confirm` disposition. Every path, reason,
+base branch, and guidance pointer is a parameter; the module has no repository-specific rules. The
+GitHub command parsing it uses (invocations, options, command position and working directory,
+checkout owners) is exported too.
+
 `processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
 a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps
 at most one file block (which can itself be large), preserves preambles and line content, and drains

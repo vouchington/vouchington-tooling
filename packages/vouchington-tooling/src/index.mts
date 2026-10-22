@@ -551,3 +551,5 @@ export {
 export type { DiffLineChanges, LargeDiffThresholds } from './pull-request-diff/index.mts'
 export { tokenizeShellWords, tokenizeShellWordsDetailed } from './shell-parse/index.mts'
 export type { ShellWord } from './shell-parse/index.mts'
+export { evaluateCommandPolicy } from './command-policy/index.mts'
+export type { BlockDecision, CommandPolicy } from './command-policy/index.mts'

@@ -60,6 +60,11 @@
       "import": "./dist/host-storage/index.mjs",
       "default": "./dist/host-storage/index.mjs"
     },
+    "./command-policy": {
+      "types": "./dist/command-policy/index.d.mts",
+      "import": "./dist/command-policy/index.mjs",
+      "default": "./dist/command-policy/index.mjs"
+    },
     "./shell-parse": {
       "types": "./dist/shell-parse/index.d.mts",
       "import": "./dist/shell-parse/index.mjs",
