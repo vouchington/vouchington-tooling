@@ -51,7 +51,7 @@ export function requiredSecretScopeViolations(
   }
   for (const [name, entry] of Object.entries(inventory)) {
     if (entry.requiredEnvironment) {
-      if (!environmentNames.get(entry.requiredEnvironment)?.has(name)) {
+      if (entry.provisioned && !environmentNames.get(entry.requiredEnvironment)?.has(name)) {
         violations.push(`${name} is missing from environment ${entry.requiredEnvironment}`)
       }
       if (repositoryNames.has(name))

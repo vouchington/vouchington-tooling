@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { runVerifyWorkflowSecretsCli } from './cli.mts'
 import { collectLiveSecretNames } from './collect.mts'
-import { DEFAULT_INVENTORY_PATH, loadInventory } from './inventory.mts'
+import { DEFAULT_INVENTORY_PATH, loadInventory, normalizeInventory } from './inventory.mts'
 import type {
   EnvironmentDeploymentBranchPolicy,
   WorkflowSecretInventory,
@@ -147,6 +147,23 @@ describe('runVerifyWorkflowSecretsCli', () => {
     expect(text).toContain('gh does not see them: NOPE')
   })
 
+  it('compares names case-insensitively and tolerates unprovisioned scoped secrets', async () => {
+    const { output } = capture()
+    const code = await runVerifyWorkflowSecretsCli(['--confirm', 'token'], {
+      dependencies: deps({
+        listRepoSecretNames: async () => ['token'],
+        listEnvironmentNames: async () => ['Prod'],
+        listEnvironmentSecretNames: async () => [],
+      }),
+      inventory: {
+        Token: { provisioned: true },
+        Deploy: { provisioned: false, requiredEnvironment: 'PROD' },
+      },
+      output,
+    })
+    expect(code).toBe(0)
+  })
+
   it('reports usage errors with exit code 2', async () => {
     const { errors, output } = capture()
     expect(await runVerifyWorkflowSecretsCli(['--bogus'], { output })).toBe(2)
@@ -180,7 +197,11 @@ describe('loadInventory', () => {
         'export const CUSTOM = { C: { provisioned: true } }\n' +
         'export const LISTY = []\n' +
         'export const BAD_ENTRY = { D: { provisioned: 1 }, }\n' +
-        'export const NULL_ENTRY = { E: null }\n',
+        'export const NULL_ENTRY = { E: null }\n' +
+        'export const BAD_FLAG = { F: { provisioned: true, neverProvision: "false" } }\n' +
+        'export const BAD_SCOPE = { G: { provisioned: true, requiredEnvironment: 1 } }\n' +
+        'export const NEVER_SCOPED = { H: { provisioned: false, neverProvision: true, requiredBranchPolicy: "x" } }\n' +
+        'export const BOTH_SCOPES = { I: { provisioned: true, requiredEnvironment: "x", requiredBranchPolicy: "y" } }\n',
     )
   })
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -199,7 +220,27 @@ describe('loadInventory', () => {
     await expect(load('MISSING')).rejects.toThrow('must export an object named MISSING')
     await expect(load('LISTY')).rejects.toThrow('must export an object named LISTY')
     await expect(load('BAD_ENTRY')).rejects.toThrow('BAD_ENTRY.D must have a boolean provisioned')
-    await expect(load('NULL_ENTRY')).rejects.toThrow('NULL_ENTRY.E must have a boolean provisioned')
+    await expect(load('NULL_ENTRY')).rejects.toThrow('NULL_ENTRY.E must be an object')
+    await expect(load('BAD_FLAG')).rejects.toThrow('BAD_FLAG.F neverProvision must be a boolean')
+    await expect(load('BAD_SCOPE')).rejects.toThrow(
+      'BAD_SCOPE.G requiredEnvironment must be a string',
+    )
+    await expect(load('NEVER_SCOPED')).rejects.toThrow('cannot be combined with a required scope')
+    await expect(load('BOTH_SCOPES')).rejects.toThrow('mutually exclusive')
+  })
+
+  it('normalizes secret names to upper-case and environments to lower-case', () => {
+    expect(
+      normalizeInventory({
+        token: { provisioned: true },
+        Deploy: { provisioned: true, requiredEnvironment: 'Prod' },
+        Hook: { provisioned: true, requiredBranchPolicy: 'Gate' },
+      }),
+    ).toEqual({
+      TOKEN: { provisioned: true },
+      DEPLOY: { provisioned: true, requiredEnvironment: 'prod' },
+      HOOK: { provisioned: true, requiredBranchPolicy: 'gate' },
+    })
   })
 
   it('loads the inventory from disk through the CLI', async () => {

@@ -12,6 +12,10 @@ export interface LiveSecretNames {
   warnings: string[]
 }
 
+/** GitHub stores secret names upper-case and compares them case-insensitively. */
+const upperCased = (names: readonly string[]): Set<string> =>
+  new Set(names.map((name) => name.toUpperCase()))
+
 async function collectOrganizationNames(
   repo: string,
   dependencies: WorkflowSecretsDependencies,
@@ -23,7 +27,7 @@ async function collectOrganizationNames(
       throw new Error(`unexpected repository owner type: ${ownerType}`)
     }
     if (ownerType === 'User') return new Set()
-    return new Set(await dependencies.listRepositoryOrganizationSecretNames(repo))
+    return upperCased(await dependencies.listRepositoryOrganizationSecretNames(repo))
   } catch (err) {
     warnings.push(`Could not list organization secrets for ${repo}: ${errorMessage(err)}`)
     return new Set()
@@ -47,7 +51,7 @@ async function collectEnvironmentNames(
   const byEnvironment = new Map<string, Set<string>>()
   results.forEach((result, index) => {
     if (result.status === 'fulfilled') {
-      byEnvironment.set(environments[index]!, new Set(result.value))
+      byEnvironment.set(environments[index]!.toLowerCase(), upperCased(result.value))
       return
     }
     warnings.push(
@@ -86,7 +90,7 @@ export async function collectLiveSecretNames(
   requiredPolicyEnvironments: ReadonlySet<string>,
 ): Promise<LiveSecretNames> {
   const warnings: string[] = []
-  const repositoryNames = new Set(await dependencies.listRepoSecretNames(repo))
+  const repositoryNames = upperCased(await dependencies.listRepoSecretNames(repo))
   const organizationNames = await collectOrganizationNames(repo, dependencies, warnings)
   const environmentNames = await collectEnvironmentNames(repo, dependencies, warnings)
   const environmentDeploymentBranchPolicies = await collectBranchPolicies(

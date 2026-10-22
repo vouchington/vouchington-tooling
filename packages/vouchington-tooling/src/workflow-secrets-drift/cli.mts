@@ -8,7 +8,12 @@ import {
   unconfirmedNewlyProvisioned,
 } from './drift.mts'
 import { createGhDependencies } from './gh.mts'
-import { DEFAULT_INVENTORY_EXPORT, DEFAULT_INVENTORY_PATH, loadInventory } from './inventory.mts'
+import {
+  DEFAULT_INVENTORY_EXPORT,
+  DEFAULT_INVENTORY_PATH,
+  loadInventory,
+  normalizeInventory,
+} from './inventory.mts'
 import { requiredEnvironmentNames, requiredSecretScopeViolations } from './scopes.mts'
 import { errorMessage } from './settle.mts'
 import type { WorkflowSecretInventory, WorkflowSecretsDependencies } from './types.mts'
@@ -28,7 +33,7 @@ export interface VerifyWorkflowSecretsOptions {
 const splitNames = (raw: string | undefined): string[] =>
   (raw ?? '')
     .split(',')
-    .map((name) => name.trim())
+    .map((name) => name.trim().toUpperCase())
     .filter((name) => name.length > 0)
 
 export async function runVerifyWorkflowSecretsCli(
@@ -56,9 +61,10 @@ export async function runVerifyWorkflowSecretsCli(
   const confirmNames = splitNames(values.confirm)
 
   try {
-    const inventory =
+    const inventory = normalizeInventory(
       options.inventory ??
-      (await loadInventory(values.inventory, values.export, options.cwd ?? process.cwd()))
+        (await loadInventory(values.inventory, values.export, options.cwd ?? process.cwd())),
+    )
     const repo = values.repo ?? (await dependencies.resolveRepo())
     const live = await collectLiveSecretNames(
       repo,
