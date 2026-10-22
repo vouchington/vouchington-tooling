@@ -59,6 +59,34 @@ describe('formatForkLeakDiagnostics', () => {
     )
   })
 
+  it('uses a caller-supplied pool metrics label and keeps the default otherwise', () => {
+    const verdict = {
+      type: 'TCPSocketWrap',
+      baseline: 1,
+      current: 2,
+      streak: 1,
+      growthCheckpoints: 0,
+      requiredGrowthCheckpoints: 4,
+      detectedInFile: null,
+      suspectedGrowth: null,
+    }
+    const metrics = { main: { total: 1, idle: 1, nonIdleOrConnecting: 0, waiting: 0 } }
+    const last = (report: string) => report.split('\n').at(-1)
+    const custom = formatForkLeakDiagnostics(verdict, new Map(), metrics, {
+      poolMetricsLabel: 'PostgreSQL pool metrics:',
+    })
+    expect(last(custom)).toBe(
+      'PostgreSQL pool metrics: main(total=1,idle=1,non-idle-or-connecting=0,waiting=0)',
+    )
+    expect(custom).not.toContain('\npool metrics:')
+    expect(last(formatForkLeakDiagnostics(verdict, new Map(), metrics, {}))).toBe(
+      'pool metrics: main(total=1,idle=1,non-idle-or-connecting=0,waiting=0)',
+    )
+    expect(
+      last(formatForkLeakDiagnostics(verdict, new Map(), null, { poolMetricsLabel: 'Db:' })),
+    ).toBe('Db: unavailable (pools not initialized)')
+  })
+
   it('formats a missing growth step and registered pool metrics in label order', () => {
     const metricsKey = Symbol.for('vitest-fork-leak-pool-metrics')
     const socketsKey = Symbol.for('vitest-fork-leak-pool-socket-handles')

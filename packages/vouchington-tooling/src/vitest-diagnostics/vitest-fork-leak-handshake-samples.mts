@@ -78,6 +78,11 @@ export type ForkLeakHandshakeSnapshot = {
   poolMetrics: PoolMetrics | null
 }
 
+/**
+ * Records one fork-leak checkpoint from a handshake settlement. It counts the resources of the
+ * coalesced snapshot, or of the detector snapshot otherwise, and passes them to `record` (for
+ * example a fork leak detector's `record`) with the test file name. Returns what `record` returns.
+ */
 export function recordForkLeakCheckpoint<T>(
   record: (counts: ReadonlyMap<string, number>, testFile: string) => T[],
   settlement: {

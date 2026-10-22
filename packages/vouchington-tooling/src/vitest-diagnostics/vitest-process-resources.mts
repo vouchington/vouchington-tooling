@@ -26,7 +26,10 @@ export function formatActiveResources(): string {
   return resources.slice(0, 20).join(', ')
 }
 
-// Used by the fork-leak failure text to name per-type counts instead of the flat list above.
+/**
+ * Counts how many times each resource type appears, such as the names returned by
+ * `process.getActiveResourcesInfo()`. Pass the result to a fork leak detector's `record`.
+ */
 export function countResourcesByType(resources: readonly string[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const resource of resources) {

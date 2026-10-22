@@ -33,6 +33,7 @@
         "src/contract-schema/index.mts!",
         "src/api-fixtures/index.mts!",
         "src/vitest-diagnostics/index.mts!",
+        "src/vitest-diagnostics/browser.mts!",
         "src/vitest-effective-timeout/index.mts!",
         "src/playwright/index.mts!",
         "src/config-inventory/index.mts!",

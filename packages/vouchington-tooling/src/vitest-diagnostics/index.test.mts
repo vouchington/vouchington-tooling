@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  countResourcesByType,
   formatDiagnosticReportSummaries,
   MAX_DIAGNOSTIC_REPORT_BYTES,
   readDiagnosticReportSummaries,
+  recordForkLeakCheckpoint,
   summarizeDiagnosticReport,
 } from './index.mts'
 
@@ -324,5 +326,37 @@ describe('formatDiagnosticReportSummaries', () => {
     expect(formatDiagnosticReportSummaries(summaries, { maxReports: Number.NaN })).toContain(
       'report.json',
     )
+  })
+})
+
+describe('public exports', () => {
+  it('exports the resource counting and checkpoint helpers', () => {
+    expect(countResourcesByType(['Timeout', 'TCPSocketWrap', 'Timeout'])).toEqual(
+      new Map([
+        ['Timeout', 2],
+        ['TCPSocketWrap', 1],
+      ]),
+    )
+    const snapshot = {
+      connectWraps: 0,
+      tcpSockets: 0,
+      resources: ['Timeout'],
+      tcpSocketHandles: new Set<object>(),
+      poolMetrics: null,
+    }
+    const record = (counts: ReadonlyMap<string, number>, testFile: string) => [
+      `${testFile}:${counts.get('Timeout')}`,
+    ]
+    expect(
+      recordForkLeakCheckpoint(
+        record,
+        {
+          snapshot,
+          detectorSnapshot: { ...snapshot, resources: ['Timeout', 'Timeout'] },
+          coalesced: false,
+        },
+        'a.test.ts',
+      ),
+    ).toEqual(['a.test.ts:2'])
   })
 })
