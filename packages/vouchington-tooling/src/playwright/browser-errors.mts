@@ -4,7 +4,6 @@ import type {
   Dialog,
   Page,
   Request,
-  TestInfo,
   WebError,
 } from '@playwright/test'
 import {
@@ -22,6 +21,7 @@ import {
   type BrowserIssueAllowlistEntry,
   validateAllowlist,
 } from './browser-issue-records.mts'
+import type { MonitoredTestInfo } from './monitored-test-info.mts'
 
 interface BrowserIssueMonitorOptions {
   allowlist?: BrowserIssueAllowlistEntry[]
@@ -48,9 +48,9 @@ export class BrowserIssueMonitor {
   private readonly allowlist: BrowserIssueAllowlistEntry[]
   private readonly issues: BrowserIssue[] = []
   private readonly monitoredContexts: MonitoredContext[] = []
-  private readonly testInfo: TestInfo
+  private readonly testInfo: MonitoredTestInfo
   private readonly warningPattern: RegExp
-  constructor(testInfo: TestInfo, options: BrowserIssueMonitorOptions = {}) {
+  constructor(testInfo: MonitoredTestInfo, options: BrowserIssueMonitorOptions = {}) {
     this.allowlist = options.allowlist ?? []
     this.warningPattern = options.warningPattern ?? REACT_RENDER_WARNING_PATTERN
     validateAllowlist(this.allowlist)

@@ -4,9 +4,9 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-  type TestInfo,
 } from '@playwright/test'
 import { BrowserIssueMonitor } from './browser-errors.mts'
+import type { MonitoredTestInfo } from './monitored-test-info.mts'
 import type { BrowserIssueAllowlistEntry } from './browser-issue-records.mts'
 import {
   BLOCKED_EXTERNAL_NETWORK_RULES,
@@ -40,7 +40,7 @@ export function createBrowserErrorsFixture(options: BrowserTestOptions = {}) {
   return async function browserErrorsFixture(
     { context }: { context: BrowserContext },
     run: (monitor: BrowserIssueMonitor) => Promise<void>,
-    testInfo: TestInfo,
+    testInfo: MonitoredTestInfo,
   ) {
     options.assertTimeout?.(testInfo.timeout, 'Playwright effective test timeout')
     const monitor = new BrowserIssueMonitor(testInfo, monitorOptions(options))
@@ -73,7 +73,7 @@ export { expect }
 
 export async function withMonitoredPage<T>(
   browserOrContext: Browser | BrowserContext,
-  testInfo: TestInfo,
+  testInfo: MonitoredTestInfo,
   callback: (page: Page) => Promise<T>,
   options: BrowserTestOptions = {},
 ) {

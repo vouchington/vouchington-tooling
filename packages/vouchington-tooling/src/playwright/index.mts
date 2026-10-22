@@ -37,6 +37,7 @@ export {
   withMonitoredPage,
 } from './browser-test.mts'
 export type { BrowserTestOptions } from './browser-test.mts'
+export type { MonitoredTestInfo } from './monitored-test-info.mts'
 export type { Browser, BrowserContext, Locator, Page, Request, TestInfo } from '@playwright/test'
 export { navigateTo } from './navigate-to.mts'
 export { retryOnConnectionLost } from './retry-on-connection-lost.mts'
@@ -57,6 +58,7 @@ export { randomSuffix } from './random-id.mts'
 export { storybookBundleHasStory } from './storybook.mts'
 export { TEST_PNG } from './test-fixtures.mts'
 export { TestLifecycleReporter }
+export type { TestLifecycleReporterOptions } from './test-lifecycle-reporter.mts'
 export { generateTotpCode } from './totp.mts'
 export { DESKTOP_VIEWPORT, MOBILE_VIEWPORTS } from './viewport-constants.mts'
 export { setupVirtualAuthenticator } from './virtual-authenticator.mts'
