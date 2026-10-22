@@ -8,11 +8,13 @@ import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runAgentIssueLabels } from './commands/agent-issue-labels.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
+import { runGitleaksDirectoryScanCommand } from './commands/gitleaks-directory-scan.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runScript } from './commands/spawn-script.mts'
 import { runNugetCentralVersionCommand } from './commands/nuget-central-version.mts'
+import { runDeadCodeCli } from '../dead-code/cli.mts'
 import { runVerifyWorkflowSecretsCli } from '../workflow-secrets-drift/cli.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
@@ -125,6 +127,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runNugetCentralVersionCommand(parsed.args)
     case 'verify-workflow-secrets':
       return runVerifyWorkflowSecretsCli(parsed.args)
+    case 'dead-code':
+      return runDeadCodeCli(parsed.args)
     case 'swift-semantic-equal':
       return runSwiftSemanticEqualCli(parsed.args)
     case 'post-review':
@@ -156,11 +160,7 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
     case 'fresh-base':
       return runFreshBase(parsed)
     case 'gitleaks-directory-scan':
-      return runScript('bash', packageScriptPath('scripts/gitleaks-directory-scan.sh'), [
-        '--config',
-        parsed.config,
-        ...(parsed.directory === undefined ? [] : ['--root', parsed.directory]),
-      ])
+      return runGitleaksDirectoryScanCommand(parsed)
     case 'ast-grep-examples':
       return runAstGrepExamplesCommand(parsed)
     case 'ast-grep-pack':

@@ -306,6 +306,11 @@
       "import": "./dist/dependency-license-policy/index.mjs",
       "default": "./dist/dependency-license-policy/index.mjs"
     },
+    "./dead-code": {
+      "types": "./dist/dead-code/index.d.mts",
+      "import": "./dist/dead-code/index.mjs",
+      "default": "./dist/dead-code/index.mjs"
+    },
     "./workflow-secrets-drift": {
       "types": "./dist/workflow-secrets-drift/index.d.mts",
       "import": "./dist/workflow-secrets-drift/index.mjs",

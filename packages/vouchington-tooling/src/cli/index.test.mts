@@ -192,6 +192,12 @@ describe('runCli', () => {
     error.mockRestore()
   })
 
+  it('routes dead-code', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await expect(runCli(['node', 'vouchington', 'dead-code', '--bogus'])).resolves.toBe(2)
+    error.mockRestore()
+  })
+
   it('writes usage to an explicit stream', () => {
     const chunks: string[] = []
     printUsage({ write: (chunk: string) => chunks.push(chunk) } as unknown as NodeJS.WritableStream)
