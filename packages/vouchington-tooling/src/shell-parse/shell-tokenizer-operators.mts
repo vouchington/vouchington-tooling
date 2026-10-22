@@ -1,4 +1,4 @@
-import type { ShellWord } from './shell-tokenizer.mts'
+import type { ShellTokenizeOptions, ShellWord } from './shell-tokenizer.mts'
 import { isRedirectionFd, shellRedirectionOperatorAt } from './shell-redirections.mts'
 
 type SeparatorState = {
@@ -6,7 +6,7 @@ type SeparatorState = {
   command: string
   expandable: boolean
   index: number
-  options: { splitRedirections?: boolean }
+  options: ShellTokenizeOptions
   token: string
   tokens: ShellWord[]
 }
@@ -41,16 +41,30 @@ export function consumeShellSeparator(state: SeparatorState): number | undefined
   }
 
   const { char } = state
-  if (char === '&' || char === '|' || char === ';' || char === '(' || char === ')') {
+  const isParenthesis = char === '(' || char === ')'
+  if (
+    char === '&' ||
+    char === '|' ||
+    char === ';' ||
+    (isParenthesis && !state.options.keepParentheses)
+  ) {
     pushStateToken(state)
-    const previousToken = state.tokens.at(-1)?.value
-    if ((char === '&' && previousToken === '&') || (char === '|' && previousToken === '|')) {
+    const operator = state.options.markOperators ? ({ operator: true } as const) : {}
+    const previous = state.tokens.at(-1)
+    const previousToken = previous?.value
+    // With `markOperators` a quoted `"|"` argument is not an operator, so only operators merge.
+    const mergeable = state.options.markOperators !== true || previous?.operator === true
+    if (
+      mergeable &&
+      ((char === '&' && previousToken === '&') || (char === '|' && previousToken === '|'))
+    ) {
       state.tokens[state.tokens.length - 1] = {
         expandable: false,
+        ...operator,
         value: `${previousToken}${char}`,
       }
     } else {
-      state.tokens.push({ expandable: false, value: char })
+      state.tokens.push({ expandable: false, ...operator, value: char })
     }
     return state.index
   }
