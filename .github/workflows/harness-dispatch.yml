@@ -100,7 +100,7 @@ jobs:
     # start this credential-bearing job. Configure the Environment's branch policy accordingly.
     environment: ${{ inputs.environment }}
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: 7
+    timeout-minutes: 4
     outputs:
       session-id: ${{ steps.dispatch.outputs.session-id || steps.resume.outputs.session-id }}
       session-url: ${{ steps.dispatch.outputs.session-url || steps.resume.outputs.session-url }}

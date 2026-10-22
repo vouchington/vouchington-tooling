@@ -8,7 +8,7 @@ inputs:
     description: 'IAM role ARN to assume via OIDC'
     required: true
   aws-region:
-    description: 'AWS region'
+    description: 'AWS region. Defaults to us-east-1; callers should pass their own region.'
     default: us-east-1
   action-timeout-s:
     description: 'Seconds before the credential exchange is abandoned'
