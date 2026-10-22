@@ -23,6 +23,7 @@ import { runRetrospectiveTranscriptCommand } from './commands/retrospective-tran
 import { runLinkSkill } from './commands/link-skill.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
+import { runHookCommand } from './commands/hook.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runWorktreeCommand } from './commands/worktree.mts'
 import { runTmuxCommand } from '../tmux/cli.mts'
@@ -110,6 +111,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return import('./commands/transient-retry.mts').then((command) =>
         command.runTransientRetryCommand(parsed.args),
       )
+    case 'hook':
+      return runHookCommand(parsed.args)
     case 'worktree':
       return runWorktreeCommand(parsed.args)
     case 'tmux':

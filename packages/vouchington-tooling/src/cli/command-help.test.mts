@@ -37,6 +37,7 @@ describe('subcommand help', () => {
     expect(commandUsage('with-host-lock')).not.toContain('agent-harness-config')
     expect(commandUsage('retrospective-facts')).toContain('--pr')
     expect(commandUsage('mcp')).toContain('journal_append')
+    expect(commandUsage('hook')).toContain('--policy <module>')
     expect(commandUsage('agent-blackboard')).toContain('distill classify')
     expect(commandUsage('agent-blackboard')).not.toContain('journal append')
     expect(commandUsage('retrospective-transcript')).toContain('--session-id')

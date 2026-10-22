@@ -51,6 +51,7 @@ Commands:
   retrospective-facts           Gather immutable facts for a retrospective
   agent-blackboard              Probe an Agent Blackboard deployment, classify distill sessions, manage snapshots
   mcp                           Serve the agent-blackboard journal tools over stdio (MCP)
+  hook                          Run a repository policy module as a pre/post tool-use hook
   worktree                      Reclaim finished git worktrees (dry run unless --yes)
   tmux                          Run configured dev windows in tmux; name panes; agent reminders
   story-coverage                Check component exports are imported by stories
@@ -143,6 +144,12 @@ mcp
                          snapshot_export, snapshot_cleanup, and session_archive over stdio.
                          Needs the optional @modelcontextprotocol/sdk peer (and zod).
                          Launch it from inside the repository's git worktree.
+
+hook pre-tool-use|post-tool-use --harness claude|codex|cursor|grok --policy <module> [--root <dir>]
+  Reads the harness hook payload on stdin. <module> default-exports a policy object (or a function
+  of the hook context returning one) with a command rule table, post-tool-use checkers, and an
+  optional reminder. pre-tool-use exits 2 to block, and also when the policy cannot load.
+  post-tool-use is advisory and always exits 0. --root defaults to the working directory.
 
 worktree reclaim [--yes] [--json]
   Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the

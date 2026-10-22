@@ -430,6 +430,14 @@ base branch, and guidance pointer is a parameter; the module has no repository-s
 GitHub command parsing it uses (invocations, options, command position and working directory,
 checkout owners) is exported too.
 
+`vouchington hook pre-tool-use|post-tool-use --harness claude|codex|cursor|grok --policy <module>`
+runs that engine as a harness hook. Register it in each harness's hook configuration with the
+repository's own policy module, which default-exports a `HookPolicy` (`defineHookPolicy`): a
+`command` rule table, post-tool-use `checkers`, an optional `reminder`, and an optional `onPayload`
+callback (for example to persist the harness session id). `pre-tool-use` exits 2 to block, including
+when the module cannot load; `post-tool-use` is advisory and always exits 0, folding checker warnings
+and the reminder into one `additionalContext`. `--root` defaults to the working directory.
+
 `processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
 a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps
 at most one file block (which can itself be large), preserves preambles and line content, and drains

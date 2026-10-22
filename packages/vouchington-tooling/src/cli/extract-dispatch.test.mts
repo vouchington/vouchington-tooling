@@ -21,6 +21,9 @@ vi.mock('./commands/agent-blackboard.mts', () => ({
 vi.mock('./commands/mcp.mts', () => ({
   runMcpCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/hook.mts', () => ({
+  runHookCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/worktree.mts', () => ({
   runWorktreeCommand: vi.fn(() => 0),
 }))
@@ -34,6 +37,7 @@ import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-report
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
+import { runHookCommand } from './commands/hook.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
@@ -72,6 +76,11 @@ describe('runCli extract command dispatch', () => {
     expect(runRetrospectiveFactsCommand).toHaveBeenCalledWith(['--no-pr'])
     await expect(runCli(['node', 'vouchington', 'agent-blackboard', 'probe'])).resolves.toBe(0)
     expect(runAgentBlackboardCommand).toHaveBeenCalledWith(['probe'])
+  })
+
+  it('forwards the hook subcommand and its arguments', async () => {
+    await expect(runCli(['node', 'vouchington', 'hook', 'post-tool-use'])).resolves.toBe(0)
+    expect(runHookCommand).toHaveBeenCalledWith(['post-tool-use'])
   })
 
   it('forwards the mcp subcommand and its arguments', async () => {
