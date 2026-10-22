@@ -55,70 +55,10 @@ human which case applies before continuing:
   was unavailable, the `pendingCount` and `worktreePendingCount` (or that none was written), and
   each unjournaled finding.
 
-Prefer restoring MCP over the CLI fallback below, and use the fallback only when the human asks or
-MCP cannot be restored for this session. Harness sandboxes commonly withhold
-`AGENT_BLACKBOARD_TOKEN` from shell commands, so the fallback usually cannot deliver there. Never
-request an unsandboxed run only to obtain the token. When the fallback is used, record its reason,
-entrypoint, affected operations, and observed delivery status in the caller's journal. Do not treat
-a permission denial as tool unavailability or bypass a host approval requirement through the CLI.
-If neither path persists the note, stop and report the blocker.
-
-## CLI fallback
-
-Deprecated and being phased out: the MCP tools replace it, and retrospective and PR writers are
-moving to MCP tools as well.
-
-Use a trusted machine-installed `vouchington` executable at a verified absolute path outside the
-consumer worktree. Resolve its symlinks and verify the installation's source and version before
-using credentials; its runtime dependencies must also belong to
-that trusted installation. The CLI resolves its client relative to its own installation; installing
-`agent-blackboard` only in the consumer worktree is insufficient for CLI fallback. Do not resolve the executable through the consumer's `node_modules/.bin`,
-`pnpm exec`, or repository-controlled `PATH`. Set `BLACKBOARD_CLI` below to that verified absolute
-script path, and bind any approval request to the same interpreter, script, and arguments.
-Never execute the script directly: its `#!/usr/bin/env node` line would pick whichever `node` comes
-first on `PATH`, which a consumer worktree can control. Set `BLACKBOARD_NODE` to a verified
-absolute Node 24+ binary outside the consumer worktree, and run it with `env -i` so only `HOME`, a
-fixed system `PATH`, and the two blackboard variables reach it. That also drops `NODE_OPTIONS` and
-other loader variables. If no trusted CLI is
-available, report the blocker; do not escalate a consumer-supplied executable. For local development,
-the reviewed source CLI may run inside the sandbox, subject to the harness's credential policy.
-`journal append` invokes the same validated writer as MCP, ensures the exact session identity,
-patches its repository union, and verifies delivery. Use a temporary `0600` markdown input file,
-remove it after the call, and inspect the JSON result: exit zero can mean retained pending feedback.
-The input file is transport to the supported writer, never a replacement journal. Append returns
-`pendingCount` for the caller and `worktreePendingCount` for the whole outbox. Use `journal status`
-or pass `--session-id` to `journal flush` for the same two counts; an unfiltered legacy flush reports
-only the whole-outbox count.
-
-```bash
-blackboard() {
-  env -i HOME="$HOME" PATH=/usr/bin:/bin \
-    AGENT_BLACKBOARD_URL="$AGENT_BLACKBOARD_URL" \
-    AGENT_BLACKBOARD_TOKEN="$AGENT_BLACKBOARD_TOKEN" \
-    "$BLACKBOARD_NODE" "$BLACKBOARD_CLI" agent-blackboard "$@"
-}
-blackboard journal append \
-  --session-id SESSION --agent AGENT --version VERSION \
-  --mode interactive --source-event-id EVENT --work-outcome unknown \
-  --repository owner/name --coverage-status not-assessed --dropped-count 0 \
-  --outbox-directory "$PWD/.local/blackboard-outbox" --file NOTE
-blackboard journal entries --session-id SESSION
-blackboard journal status \
-  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
-blackboard journal flush \
-  --session-id SESSION --outbox-directory "$PWD/.local/blackboard-outbox"
-```
-
-Pass `--parent-session-id` for a child, repeat `--repository` for additional repositories, and use
-explicit coverage sources when assessed. Omit `--timestamp` so the writer owns time. Autonomous
-mode omits `--outbox-directory` and still requires fresh online admission plus readback.
-For session-only or snapshot operations not exposed by this CLI, use the upstream
-`agent-blackboard` CLI under its skill's operation contract; preserve exact identities and tags.
-A sandboxed fallback may only write the outbox: without `AGENT_BLACKBOARD_TOKEN` it cannot deliver
-or read back. Leave the record pending, report `pendingCount`, and deliver it with `outbox_flush`
-once MCP is restored. Never read, print, copy, or export the token to work around the sandbox.
-Return to MCP when available and journal recovery. Never silently downgrade envelope validation,
-retention, or delivery checks because the transport changed.
+Harness sandboxes commonly withhold `AGENT_BLACKBOARD_TOKEN` from shell commands. Never request an
+unsandboxed run only to obtain the token, and do not treat a permission denial as tool
+unavailability or bypass a host approval requirement. If MCP cannot persist the note, stop and
+report the blocker.
 
 ## Journaling policy
 

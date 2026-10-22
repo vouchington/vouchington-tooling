@@ -54,8 +54,8 @@ Never substitute an ad hoc local journal file or use an outbox to authorize auto
 MCP is the supported path: when it is unavailable, stop journaling and tell the human how to
 restore it: run vouchington-machines' `./configure-agents.sh`, then `./diagnose-agents.sh`, when it
 is not registered, and reconnect it (`/mcp` in Claude Code, or restart Codex) when it is
-disconnected. Its CLI fallback is a last resort, never a reason to
-request an unsandboxed run for the token. Host permission denials still require approval.
+disconnected. Never request an unsandboxed run to obtain the token.
+Host permission denials still require approval.
 The machine-registered server runs its own installation and imports no checkout code itself, but the
 retrospective and pull request tools run the checkout's declared policy module in a child process
 without blackboard credentials. That child runs as the same user, so it is not a sandbox (on Linux

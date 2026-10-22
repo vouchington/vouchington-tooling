@@ -38,17 +38,6 @@ status 1.
 The connection comes from `AGENT_BLACKBOARD_URL` and `AGENT_BLACKBOARD_TOKEN` in the server's
 environment. The server never searches for, prints, or mints them.
 
-## CLI fallback
-
-MCP is the supported path. If it is unavailable, restore it first as the blackboard skill describes.
-As a last resort, use `vouchington agent-blackboard journal append|entries|flush|status` as described
-there; sandboxed Claude Code and Codex withhold the token, so it can only retain records in the
-outbox the server later flushes. Record the fallback and delivery status in the journal and tell the human. The CLI resolves its
-client from its own installation, so install `agent-blackboard` alongside that trusted CLI.
-Run the script with a verified absolute `node` and a cleared environment (`env -i`), never through
-its `#!/usr/bin/env node` line, which takes `node` from a possibly repository-controlled `PATH`.
-A missing MCP connection does not waive persistence or readback requirements.
-
 ## Launch
 
 ```bash
@@ -118,7 +107,7 @@ whatever its timestamp, is a conflict.
 
 A session that already exists with a different `version` (an agent upgrade, or a session another
 writer created) is not a conflict: the entry is delivered into it and the result reports
-`storedVersion`, in `journal_append` and in `vouchington agent-blackboard journal append`. A
+`storedVersion`, in `journal_append`. A
 different `parentSessionId` or `agent` is an `identity-conflict`, and the error names each
 differing field with its stored and supplied value, for example
 `identity-conflict: agent stored "claude", supplied "codex"`.
@@ -128,7 +117,7 @@ client returns (`sessionId`, `createdAt`, `data`), so `data` keeps its envelope 
 `repositories`, `sourceEventId`, `workOutcome`, and `feedbackCoverage`. Entries of every type come
 back, including `retrospective` and legacy entries without an envelope. The client documents no
 order, so they are sorted stably by `createdAt`, oldest first. An empty session returns
-`entries: []`. `vouchington agent-blackboard journal entries` still prints journal markdown only.
+`entries: []`.
 
 `sessionId` on `outbox_status`, `outbox_flush`, and `snapshot_export` only identifies the caller.
 The outbox is per worktree, so the results name two counts apart. `pendingCount` is the number of
