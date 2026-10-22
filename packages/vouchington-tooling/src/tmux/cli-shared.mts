@@ -23,4 +23,5 @@ export type TmuxCliDeps = {
   out?: (text: string) => void
   err?: (text: string) => void
   pid?: number
+  isPidAlive?: (pid: number) => boolean
 }

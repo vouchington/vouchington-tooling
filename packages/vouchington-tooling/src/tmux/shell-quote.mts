@@ -5,17 +5,19 @@ export function quoteShellArg(value: string): string {
 }
 
 /**
- * The shell command tmux runs in a window: shared then per-window environment
- * assignments, then `bash -lc` with the body quoted as one argument.
+ * The shell command tmux runs in a window: `bash -lc` with one quoted body that first exports
+ * the extra, shared, then per-window environment and then runs the command. Exporting inside
+ * the body (rather than prefixing `bash`) keeps a configured PATH from hiding `bash` itself and
+ * lets the configured values win over login-profile defaults.
  */
 export function windowCommand(
   config: TmuxSessionConfig,
   window: TmuxWindowConfig,
   extraEnv: Readonly<Record<string, string>> = {},
 ): string {
-  const assignments = Object.entries({ ...extraEnv, ...config.env, ...window.env })
-    .map(([key, value]) => `${key}=${quoteShellArg(value)}`)
-    .join(' ')
-  const body = window.keepOpen ? `${window.command}; read` : window.command
-  return `${assignments === '' ? '' : `${assignments} `}bash -lc ${quoteShellArg(body)}`
+  const exports = Object.entries({ ...extraEnv, ...config.env, ...window.env })
+    .map(([key, value]) => `export ${key}=${quoteShellArg(value)}; `)
+    .join('')
+  const body = `${exports}${window.command}${window.keepOpen ? '; read' : ''}`
+  return `bash -lc ${quoteShellArg(body)}`
 }

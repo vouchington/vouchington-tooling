@@ -26,6 +26,8 @@ export type TmuxSessionConfig = {
 
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/
 const TMUX_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/
+// A purely numeric window name would be read by tmux as an index.
+const WINDOW_NAME = /^(?![0-9]+$)[A-Za-z0-9][A-Za-z0-9_.-]*$/
 const OPTION_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,7 +67,7 @@ function windowConfig(value: unknown, index: number): TmuxWindowConfig {
     throw new Error(`tmux config: ${label}.keepOpen must be a boolean`)
   }
   return {
-    name: text(value.name, `${label}.name`, TMUX_NAME),
+    name: text(value.name, `${label}.name`, WINDOW_NAME),
     command: text(value.command, `${label}.command`),
     ...(cwd === undefined ? {} : { cwd }),
     env: envMap(value.env, `${label}.env`),

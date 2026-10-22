@@ -31,10 +31,10 @@ describe('launchSession: fresh session', () => {
     const first = fake.calls.find((call) => call[0] === 'new-session')!
     expect(first.at(-2)).toBe('/work/web')
     expect(first.at(-1)).toBe(
-      "TMUX_LOG_LEVEL='error' SHARED='1' SERVICE='web' bash -lc 'serve web; read'",
+      "bash -lc 'export TMUX_LOG_LEVEL='\\''error'\\''; export SHARED='\\''1'\\''; export SERVICE='\\''web'\\''; serve web; read'",
     )
     const second = fake.calls.find((call) => call[0] === 'new-window')!
-    expect(second.at(-1)).toContain("bash -lc 'serve api'")
+    expect(second.at(-1)).toMatch(/serve api'$/)
     expect(second.at(-2)).toBe('/work')
   })
 
@@ -131,17 +131,24 @@ describe('launchSession: existing session', () => {
   })
 
   it('respawns only the dead window', () => {
-    const fake = createFakeTmux({ exists: true, windows: ['web', 'api', 'jobs'], dead: ['api'] })
+    const fake = createFakeTmux({ exists: true, windows: ['web', 'api', 'jobs'], dead: ['jobs'] })
     expect(launchSession(fake.context(), fake.launch())).toBe(0)
     const respawns = lines(fake.calls).filter((line) => line.startsWith('respawn-pane'))
     expect(respawns).toHaveLength(1)
-    expect(respawns[0]).toContain('-k -t =dev-dabc:api.0')
+    expect(respawns[0]).toContain('-k -t =dev-dabc:jobs -c /work')
   })
 
-  it('recreates a missing window', () => {
+  it('treats an existing window without keepOpen as live even when its pane has no child', () => {
+    const fake = createFakeTmux({ exists: true, windows: ['web', 'api', 'jobs'], dead: ['api'] })
+    expect(launchSession(fake.context(), fake.launch())).toBe(0)
+    expect(fake.calls.some((call) => call[0] === 'respawn-pane')).toBe(false)
+  })
+
+  it('recreates a missing window without switching clients to it', () => {
     const fake = createFakeTmux({ exists: true, windows: ['web', 'api'] })
     expect(launchSession(fake.context(), fake.launch())).toBe(0)
     expect(created(fake.calls)).toEqual(['jobs'])
+    expect(fake.calls.find((call) => call[0] === 'new-window')![1]).toBe('-d')
   })
 
   it('reports status 1 when reattaching has no exit status', () => {
@@ -171,6 +178,25 @@ describe('launchSession: existing session', () => {
     const fake = createFakeTmux({ exists: true, neverReady: true })
     expect(launchSession(fake.context(), fake.launch())).toBe(1)
     expect(fake.sleeps).toHaveLength(99)
+    expect(fake.err.join('')).toContain('did not finish startup')
+  })
+
+  it('recreates a never-ready session whose launcher is gone', () => {
+    const fake = createFakeTmux({
+      exists: true,
+      neverReady: true,
+      launcherPid: '99',
+      ownerAlive: false,
+    })
+    expect(launchSession(fake.context(), fake.launch())).toBe(0)
+    expect(fake.err.join('')).toContain('was left unfinished')
+    expect(lines(fake.calls)).toContain('kill-session -t =dev-dabc')
+    expect(created(fake.calls)).toEqual(['web', 'api', 'jobs'])
+  })
+
+  it('keeps waiting-failure semantics when the recorded launcher is still running', () => {
+    const fake = createFakeTmux({ exists: true, neverReady: true, launcherPid: '99' })
+    expect(launchSession(fake.context(), fake.launch())).toBe(1)
     expect(fake.err.join('')).toContain('did not finish startup')
   })
 

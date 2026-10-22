@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { TMUX_USAGE, type TmuxCliDeps } from './cli-shared.mts'
 import { loadTmuxConfig } from './config.mts'
 import { launchSession } from './launcher.mts'
-import { createTmuxRun, pgrepHasChildren, sleepMs } from './runner.mts'
+import { createTmuxRun, isPidAlive, pgrepHasChildren, sleepMs } from './runner.mts'
 import { tmuxSessionName } from './session-name.mts'
 
 type UpFlags = { config?: string; root?: string; noAttach: boolean; verbose: boolean }
@@ -60,7 +60,12 @@ export function runUp(args: readonly string[], deps: TmuxCliDeps): number {
       err,
     }
     const sleep = deps.sleep ?? sleepMs
-    return launchSession(context, { noAttach: flags.noAttach, pid: deps.pid ?? process.pid, sleep })
+    return launchSession(context, {
+      noAttach: flags.noAttach,
+      pid: deps.pid ?? process.pid,
+      sleep,
+      isPidAlive: deps.isPidAlive ?? isPidAlive,
+    })
   } catch (error) {
     err(`vouchington: ${(error as Error).message}\n`)
     return 2

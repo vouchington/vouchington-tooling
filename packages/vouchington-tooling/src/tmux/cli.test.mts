@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { runTmuxCommand, TMUX_USAGE } from './cli.mts'
 import { createFakeTmux } from './fake-tmux.test-helpers.mts'
-import { createTmuxRun, pgrepHasChildren, sleepMs } from './runner.mts'
+import { createTmuxRun, isPidAlive, pgrepHasChildren, sleepMs } from './runner.mts'
 
 let dir: string
 let out: string[]
@@ -56,7 +56,7 @@ describe('runTmuxCommand: up', () => {
     expect(status).toBe(0)
     const create = fake.calls.find((call) => call[0] === 'new-session')!
     expect(create[create.indexOf('-s') + 1]).toMatch(/^p-d[0-9a-f]{12}$/)
-    expect(create.at(-1)).toBe("TMUX_LOG_LEVEL='info' bash -lc 'serve; read'")
+    expect(create.at(-1)).toBe("bash -lc 'export TMUX_LOG_LEVEL='\\''info'\\''; serve; read'")
     expect(out.join('')).toContain('Services started')
   })
 
@@ -66,8 +66,8 @@ describe('runTmuxCommand: up', () => {
     const { status, fake } = up(['--config', 'tmux.json', '--root', root, '--no-attach'])
     expect(status).toBe(0)
     expect(fake.calls.find((call) => call[0] === 'new-session')!.at(-2)).toBe(root)
-    expect(fake.calls.find((call) => call[0] === 'new-session')!.at(-1)).toContain(
-      "TMUX_LOG_LEVEL='error'",
+    expect(fake.calls.find((call) => call[0] === 'new-session')!.at(-1)).toMatch(
+      /export TMUX_LOG_LEVEL=.*error/,
     )
   })
 
@@ -187,6 +187,16 @@ esac
     } finally {
       vi.unstubAllEnvs()
     }
+  })
+
+  it('reports whether a pid is running', () => {
+    expect(isPidAlive(process.pid)).toBe(true)
+    expect(isPidAlive(99999999)).toBe(false)
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('denied'), { code: 'EPERM' })
+    })
+    expect(isPidAlive(1)).toBe(true)
+    kill.mockRestore()
   })
 
   it('sleeps for the requested time', () => {

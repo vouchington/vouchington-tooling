@@ -56,6 +56,7 @@ describe('parseTmuxConfig', () => {
     [{ windows: [] }, 'windows must be a non-empty array'],
     [{ windows: ['x'] }, 'windows[0] must be an object'],
     [{ windows: [{ name: 'a b', command: 'c' }] }, 'windows[0].name must be a valid string'],
+    [{ windows: [{ name: '12', command: 'c' }] }, 'windows[0].name must be a valid string'],
     [{ windows: [{ name: 'a', command: '' }] }, 'windows[0].command must be a non-empty string'],
     [{ windows: [{ name: 'a', command: 'c', cwd: 1 }] }, 'windows[0].cwd'],
     [{ windows: [{ name: 'a', command: 'c', keepOpen: 'no' }] }, 'keepOpen must be a boolean'],
@@ -119,7 +120,7 @@ describe('shell quoting', () => {
     const config = parseTmuxConfig({ ...minimal, env: { A: 'shared', B: 'shared' } })
     const window = { name: 'w', command: 'run', env: { B: 'window' }, keepOpen: true }
     expect(windowCommand(config, window, { A: 'extra', C: 'extra' })).toBe(
-      "A='shared' C='extra' B='window' bash -lc 'run; read'",
+      "bash -lc 'export A='\\''shared'\\''; export C='\\''extra'\\''; export B='\\''window'\\''; run; read'",
     )
   })
 

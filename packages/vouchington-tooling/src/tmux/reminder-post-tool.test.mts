@@ -86,6 +86,13 @@ describe('renderPostToolReminder', () => {
     ).toContain('reset-worktree ran')
   })
 
+  it('accepts the Shell tool name', () => {
+    const payload = { tool_name: 'Shell', tool_input: { command: 'gh pr create' } }
+    expect(renderPostToolReminder(payload, { spawnPaneTitle: titled('x'), env: {} })).toContain(
+      'PR created',
+    )
+  })
+
   it('is silent for unrelated tools, empty commands, and failed commands', () => {
     const options = { spawnPaneTitle: titled('x'), env: {} }
     expect(renderPostToolReminder({ tool_name: 'Read' }, options)).toBeNull()

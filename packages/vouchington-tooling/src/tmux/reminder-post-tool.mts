@@ -12,6 +12,7 @@ const PR_CREATE_COMMAND_PATTERN = /(^|[;&|])\s*gh\s+pr\s+create(\s|$)/
 const GIT_PUSH_COMMAND_PATTERN = /(^|[;&|])\s*git\s+push(\s|$)/
 const RESET_WORKTREE_PATTERN =
   /(^|[;&|])\s*(?:\S*\/)?reset-worktree(?:\.sh)?(?:\s+(--help|-h))?(?=[;&|]|\s|$)/g
+const SHELL_TOOLS = new Set(['Bash', 'Shell', 'run_terminal_command'])
 const PR_SUFFIX_PATTERN = /-pr\d+$/
 const transientSpawnCodes = new Set(['EAGAIN', 'EBUSY', 'EINTR', 'EMFILE', 'ENFILE', 'ETXTBSY'])
 const transientStderrPattern =
@@ -97,7 +98,7 @@ export function renderPostToolReminder(
     if (paneTitle(env, spawn) === null) return null
     return `[tmux-window-name] Plan accepted — refine window name if scope shifted. ${name} <name>  ${hint}`
   }
-  if (toolName !== 'Bash' && toolName !== 'run_terminal_command') return null
+  if (!SHELL_TOOLS.has(toolName)) return null
 
   const command = extractToolCommand(payload)
   const exitCode = toolExitCode(payload)

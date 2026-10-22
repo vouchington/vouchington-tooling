@@ -20,6 +20,15 @@ export function pgrepHasChildren(pid: string): boolean {
   return spawnSync('pgrep', ['-P', pid, '.'], { stdio: 'ignore' }).status === 0
 }
 
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
 export function sleepMs(milliseconds: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
 }

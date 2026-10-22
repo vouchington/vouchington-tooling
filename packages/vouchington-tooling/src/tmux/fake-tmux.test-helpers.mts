@@ -19,6 +19,8 @@ export type FakeTmuxOptions = {
   /** Environment value returned for the launcher pid variable. */
   launcherPid?: string
   attachStatus?: number | null
+  /** Whether `isPidAlive` reports the recorded launcher as running. Default true. */
+  ownerAlive?: boolean
 }
 
 const sampleConfig: TmuxSessionConfig = {
@@ -119,6 +121,7 @@ export function createFakeTmux(options: FakeTmuxOptions = {}) {
     noAttach,
     pid: 4242,
     sleep: (ms: number) => void sleeps.push(ms),
+    isPidAlive: () => options.ownerAlive ?? true,
   })
   return { run, calls, out, err, sleeps, state, context, launch }
 }

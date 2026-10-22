@@ -29,8 +29,13 @@ function windowExists(context: SessionContext, name: string): boolean {
   return result.stdout.split('\n').includes(name)
 }
 
-function windowIsLive(context: SessionContext, name: string): boolean {
+// A keep-open pane leaves its shell running after the command ends, so only a child process
+// proves the command is alive. Without keepOpen the pane closes with the command, and bash may
+// exec it directly (no child), so the window existing is the liveness signal.
+function windowIsLive(context: SessionContext, window: TmuxWindowConfig): boolean {
+  const name = window.name
   if (!windowExists(context, name)) return false
+  if (!window.keepOpen) return true
   const result = context.tmux([
     'list-panes',
     '-t',
@@ -52,12 +57,12 @@ export function decorateWindow(context: SessionContext, name: string): boolean {
 /** Respawn dead windows (or recreate missing ones). False when any step fails. */
 export function restoreDeadWindows(context: SessionContext): boolean {
   for (const window of context.config.windows) {
-    if (windowIsLive(context, window.name)) continue
+    if (windowIsLive(context, window)) continue
     const base = ['-c', windowCwd(context, window), commandFor(context, window)]
     const target = `=${context.session}`
     const args = windowExists(context, window.name)
-      ? ['respawn-pane', '-k', '-t', `${target}:${window.name}.0`, ...base]
-      : ['new-window', '-t', target, '-n', window.name, ...base]
+      ? ['respawn-pane', '-k', '-t', `${target}:${window.name}`, ...base]
+      : ['new-window', '-d', '-t', target, '-n', window.name, ...base]
     if (context.tmux(args).status !== 0 || !decorateWindow(context, window.name)) return false
   }
   return true

@@ -11,6 +11,8 @@ export type LaunchOptions = {
   /** Pid recorded in the session environment to prove this launcher owns it. */
   pid: number
   sleep: (milliseconds: number) => void
+  /** Whether the launcher process recorded in the session environment still runs. */
+  isPidAlive: (pid: number) => boolean
 }
 
 const READY_ATTEMPTS = 99
@@ -44,8 +46,21 @@ function waitUntilReady(context: SessionContext, options: LaunchOptions): number
     options.sleep(READY_POLL_MS)
     if (isReady(context)) return 0
   }
+  if (ownerIsDead(context, options)) {
+    context.err(`Error: tmux session '${context.session}' was left unfinished; recreating it.\n`)
+    context.tmux(['kill-session', '-t', `=${context.session}`])
+    return 2
+  }
   context.err(`Error: tmux session '${context.session}' did not finish startup.\n`)
   return 1
+}
+
+/** True when the session records a launcher pid and that process no longer exists. */
+function ownerIsDead(context: SessionContext, options: LaunchOptions): boolean {
+  const variable = context.config.launcherPidVar
+  const result = context.tmux(['show-environment', '-t', `=${context.session}`, variable])
+  const pid = /=([0-9]+)\s*$/.exec(result.stdout)?.[1]
+  return pid !== undefined && !options.isPidAlive(Number(pid))
 }
 
 /** 0 = done, 2 = session was killed and must be recreated, other = failure. */
