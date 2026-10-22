@@ -12,7 +12,7 @@ import type { HookContext, HookPolicy } from './types.mts'
 export async function loadHookPolicy(specifier: string, context: HookContext): Promise<HookPolicy> {
   const url = pathToFileURL(resolve(context.root, specifier)).href
   const loaded = (await import(url)) as { default?: unknown; policy?: unknown }
-  const exported = loaded.default ?? loaded.policy
+  const exported = selectExport(loaded)
   const policy = typeof exported === 'function' ? await exported(context) : exported
   if (!isRecord(policy) || Array.isArray(policy)) {
     throw new Error(
@@ -20,4 +20,13 @@ export async function loadHookPolicy(specifier: string, context: HookContext): P
     )
   }
   return policy as HookPolicy
+}
+
+// A CommonJS module's `default` is its whole `module.exports`, so `exports.policy = {...}` shows up as
+// `default: { policy }` beside the named `policy`; the named export is the policy then.
+function selectExport(loaded: { default?: unknown; policy?: unknown }): unknown {
+  const wrapper = loaded.default
+  const wrapsNamed =
+    isRecord(wrapper) && loaded.policy !== undefined && wrapper.policy === loaded.policy
+  return wrapsNamed ? loaded.policy : (wrapper ?? loaded.policy)
 }

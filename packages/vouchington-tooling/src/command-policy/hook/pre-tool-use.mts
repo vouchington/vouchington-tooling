@@ -20,9 +20,13 @@ export type PreToolUseOptions = {
 
 export function preToolUseOutput(
   payload: HookPayload,
-  policy: CommandPolicy,
+  policy: CommandPolicy | undefined,
   options: PreToolUseOptions = {},
 ): PreToolUseResult {
+  // A policy module without a command table has no opinion, merge authority included.
+  if (policy === undefined) {
+    return { exitCode: 0, stderr: '', stdout: noOpinion(options) }
+  }
   const decision = evaluateCommandPolicy(payload, policy, {
     ...(options.automationContext === undefined
       ? {}

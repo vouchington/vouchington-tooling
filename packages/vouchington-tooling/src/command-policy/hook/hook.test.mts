@@ -276,6 +276,40 @@ describe('loadHookPolicy and runHook', () => {
     }
   })
 
+  it('selects the named policy of a CommonJS module', async () => {
+    const root = module('')
+    writeFileSync(join(root, 'policy.cjs'), "exports.policy = { reminder: () => 'from cjs' }")
+    const policy = await loadHookPolicy('policy.cjs', context({ root }))
+    expect(await policy.reminder?.(context())).toBe('from cjs')
+    const plain = module('')
+    writeFileSync(join(plain, 'policy.cjs'), "module.exports = { reminder: () => 'whole' }")
+    expect(
+      await (await loadHookPolicy('policy.cjs', context({ root: plain }))).reminder?.(context()),
+    ).toBe('whole')
+  })
+
+  it('has no opinion, merge authority included, without a command table', async () => {
+    const root = module('export default { reminder: () => "x" }')
+    const run = io(root, JSON.stringify(bash('gh pr merge 1')), { CI: 'true' })
+    const args = ['pre-tool-use', '--harness', 'claude', '--policy', 'policy.mjs']
+    expect(await runHook(args, run.harness)).toBe(0)
+    expect([run.out, run.err]).toEqual([[], []])
+  })
+
+  it('uses the configured root as the command cwd when the payload names none', async () => {
+    const root = module(`export default {
+      command: { stack: { git: { isAncestor: (cwd) => cwd === process.env.EXPECT_ROOT ? false : true } } },
+    }`)
+    process.env.EXPECT_ROOT = root
+    try {
+      const run = io(root, JSON.stringify(bash('gh stack init t')))
+      const args = ['pre-tool-use', '--harness', 'codex', '--policy', 'policy.mjs']
+      expect(await runHook(args, run.harness)).toBe(2)
+    } finally {
+      delete process.env.EXPECT_ROOT
+    }
+  })
+
   it('blocks through pre-tool-use with exit 2', async () => {
     const root = module(forcePolicy)
     const run = io(root, JSON.stringify(bash('git push --force')))
@@ -301,7 +335,7 @@ describe('loadHookPolicy and runHook', () => {
 
   it('writes the confirm allow only for an attended Claude session and runs onPayload first', async () => {
     const root = module(`export default {
-      onPayload: ctx => { globalThis.__hookSeen = ctx.harness },
+      command: {}, onPayload: ctx => { globalThis.__hookSeen = ctx.harness },
     }`)
     const attended = { CLAUDE_CODE_SESSION_ATTENDED: '1' }
     const run = io(root, JSON.stringify(bash('gh pr merge 4')), attended)
