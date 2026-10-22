@@ -49,7 +49,7 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
       const result = preToolUseOutput(payload, policy.command ?? {}, {
         harness: context.harness,
         attended: isAttendedClaudeSession(io.env),
-        automationContext: isAutomationContext(io.env),
+        automationContext: isAutomationContext(io.env, parsed.automationEnv),
       })
       if (result.stdout !== '') io.stdout.write(result.stdout)
       if (result.stderr !== '') io.stderr.write(result.stderr)

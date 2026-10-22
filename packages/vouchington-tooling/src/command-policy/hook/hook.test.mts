@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
-  checkFile,
   defineHookPolicy,
   isAttendedClaudeSession,
   isAutomationContext,
@@ -13,12 +12,11 @@ import {
   normalizeCursorShellPayload,
   parseHookArgs,
   parseHookPayload,
-  postToolUseOutput,
   preToolUseOutput,
   resolveHarness,
   runHook,
 } from '../index.mts'
-import type { HookContext, HookIo, HookPolicy, PostToolUseChecker } from '../index.mts'
+import type { HookContext, HookIo } from '../index.mts'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -40,10 +38,29 @@ describe('parseHookArgs', () => {
       event: 'pre-tool-use',
       harness: 'codex',
       policy: 'p.mjs',
+      automationEnv: [],
     })
     expect(
       parseHookArgs(['post-tool-use', '--harness=grok', '--policy=p.mjs', '--root', '/r']),
-    ).toEqual({ event: 'post-tool-use', harness: 'grok', policy: 'p.mjs', root: '/r' })
+    ).toEqual({
+      event: 'post-tool-use',
+      harness: 'grok',
+      policy: 'p.mjs',
+      root: '/r',
+      automationEnv: [],
+    })
+    expect(
+      parseHookArgs([
+        'pre-tool-use',
+        '--harness',
+        'claude',
+        '--policy',
+        'p',
+        '--automation-env',
+        'A',
+        '--automation-env=B',
+      ]).automationEnv,
+    ).toEqual(['A', 'B'])
   })
 
   it.each([
@@ -54,6 +71,7 @@ describe('parseHookArgs', () => {
     [['pre-tool-use', '--harness', 'claude'], '--policy <module> is required'],
     [['pre-tool-use', '--harness', 'claude', '--policy='], '--policy <module> is required'],
     [['pre-tool-use', '--harness', 'claude', '--policy'], '--policy needs a value'],
+    [['pre-tool-use', '--automation-env'], '--automation-env needs a value'],
     [['pre-tool-use', '--bogus', 'x'], 'unknown argument: --bogus'],
     [['pre-tool-use', 'stray'], 'unknown argument: stray'],
   ])('rejects %j', (args, message) => {
@@ -216,79 +234,6 @@ describe('preToolUseOutput', () => {
   })
 })
 
-describe('post-tool-use', () => {
-  const warns: PostToolUseChecker = {
-    matches: (file, root) => file.endsWith('.md') && root === '/repo',
-    check: (file) => [{ level: 'warn', message: `bad ${file}` }],
-  }
-  const throws: PostToolUseChecker = {
-    matches: () => true,
-    check: () => {
-      throw new Error('boom')
-    },
-  }
-
-  it('runs only matching checkers', () => {
-    expect(checkFile('a.md', '/repo', [warns])).toEqual([{ level: 'warn', message: 'bad a.md' }])
-    expect(checkFile('a.ts', '/repo', [warns])).toEqual([])
-    expect(checkFile('a.ts', '/repo')).toEqual([])
-  })
-
-  it('turns a throwing checker into one error warning', () => {
-    expect(checkFile('a', '/r', [throws])).toEqual([
-      { level: 'error', message: 'Unexpected error in post-tool-use checks: boom' },
-    ])
-    const thrown = checkFile('a', '/r', [
-      {
-        matches: () => true,
-        check: () => {
-          throw 'plain'
-        },
-      },
-    ])
-    expect(thrown[0]?.message).toContain('plain')
-  })
-
-  it('keeps going after a checker throws and checks every apply_patch path', async () => {
-    const seen: string[] = []
-    const recorder: PostToolUseChecker = {
-      matches: () => true,
-      check: (file) => (seen.push(file), []),
-    }
-    const patch = '*** Begin Patch\n*** Update File: a.md\n*** Add File: b.md\n*** End Patch'
-    const ctx = context({ payload: { tool_input: { command: patch } } })
-    const out = await postToolUseOutput(ctx, { checkers: [throws, recorder] })
-    expect(seen).toEqual(['a.md', 'b.md'])
-    expect(out.match(/Unexpected error in post-tool-use checks: boom/g)).toHaveLength(2)
-  })
-
-  it('emits one additionalContext JSON with warnings and the reminder', async () => {
-    const ctx = context({ payload: { tool_input: { file_path: 'a.md' } } })
-    const out = await postToolUseOutput(ctx, { checkers: [warns], reminder: () => 'remember' })
-    expect(JSON.parse(out)).toEqual({
-      hookSpecificOutput: {
-        additionalContext: '[warn] bad a.md\nremember',
-        hookEventName: 'PostToolUse',
-      },
-    })
-    expect(out.endsWith('\n')).toBe(true)
-  })
-
-  it('is silent with nothing to say and swallows reminder failures', async () => {
-    expect(await postToolUseOutput(context(), {})).toBe('')
-    const ctx = context({ payload: { tool_input: { file_path: 'a.ts' } } })
-    expect(await postToolUseOutput(ctx, { checkers: [warns], reminder: () => null })).toBe('')
-    expect(await postToolUseOutput(ctx, { reminder: () => '' })).toBe('')
-    const failing: HookPolicy = {
-      reminder: () => {
-        throw new Error('x')
-      },
-    }
-    expect(await postToolUseOutput(ctx, failing)).toBe('')
-    expect(await postToolUseOutput(ctx, { reminder: async () => 'async' })).toContain('async')
-  })
-})
-
 describe('loadHookPolicy and runHook', () => {
   function module(source: string): string {
     const dir = mkdtempSync(join(tmpdir(), 'hook-policy-'))
@@ -448,6 +393,20 @@ describe('loadHookPolicy and runHook', () => {
     expect(await runHook(['pre-tool-use', ...args], run.harness)).toBe(2)
     expect(await runHook(['post-tool-use', ...args], run.harness)).toBe(0)
     expect(run.err.join('')).toContain('stdin closed')
+  })
+
+  it('treats --automation-env names as unattended markers', async () => {
+    const root = module(`export default {
+      command: { protectedPaths: { dirPrefixes: ['locked/'], exactFiles: [], reason: 'locked' } },
+    }`)
+    const edit = JSON.stringify({ tool_input: { file_path: 'locked/a' } })
+    const base = ['pre-tool-use', '--harness', 'codex', '--policy', 'policy.mjs']
+    const plain = io(root, edit, { MY_RUN: '1' })
+    expect(await runHook(base, plain.harness)).toBe(0)
+    const marked = io(root, edit, { MY_RUN: '1' })
+    expect(await runHook([...base, '--automation-env', 'MY_RUN'], marked.harness)).toBe(2)
+    const off = io(root, edit, { MY_RUN: '0' })
+    expect(await runHook([...base, '--automation-env', 'MY_RUN'], off.harness)).toBe(0)
   })
 
   it('stays silent in post-tool-use when there is nothing to say', async () => {

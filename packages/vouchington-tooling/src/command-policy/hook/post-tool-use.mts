@@ -1,5 +1,5 @@
 import { hookFilePath, hookToolInput } from '../payload.mts'
-import { patchHeaderPaths } from '../path-references.mts'
+import { patchResultPaths } from '../path-references.mts'
 import type { HookContext, HookPolicy, PostToolUseWarning } from './types.mts'
 
 function failure(error: unknown): PostToolUseWarning {
@@ -22,11 +22,12 @@ export function checkFile(
   })
 }
 
-// Edit/Write report `file_path`; Codex's apply_patch carries every touched file in its patch headers.
+// Edit/Write report `file_path`; Codex's apply_patch carries every touched file in its patch headers,
+// and only files that exist afterwards are checked.
 function editedPaths(context: HookContext): string[] {
   const command = hookToolInput(context.payload)?.command
   if (typeof command === 'string' && command.startsWith('*** Begin Patch')) {
-    return patchHeaderPaths(command)
+    return patchResultPaths(command)
   }
   const filePath = hookFilePath(context.payload)
   return filePath === '' ? [] : [filePath]

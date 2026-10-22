@@ -145,11 +145,13 @@ mcp
                          Needs the optional @modelcontextprotocol/sdk peer (and zod).
                          Launch it from inside the repository's git worktree.
 
-hook pre-tool-use|post-tool-use --harness claude|codex|cursor|grok --policy <module> [--root <dir>]
+hook pre-tool-use|post-tool-use --harness claude|codex|cursor|grok --policy <module> [--root <dir>] [--automation-env NAME]...
   Reads the harness hook payload on stdin. <module> default-exports a policy object (or a function
   of the hook context returning one) with a command rule table, post-tool-use checkers, and an
   optional reminder. pre-tool-use exits 2 to block, and also when the policy cannot load.
   post-tool-use is advisory and always exits 0. --root defaults to the working directory.
+  Each --automation-env NAME (repeatable) marks the run unattended when that environment variable
+  is set, non-empty, and not 0 or false; CI markers and claude -p are always unattended.
 
 worktree reclaim [--yes] [--json]
   Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the

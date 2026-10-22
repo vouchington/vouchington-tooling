@@ -13,11 +13,25 @@ function keyLooksPathLike(key: string): boolean {
 }
 
 /** Header lines name the files an apply_patch touches; body text that mentions a path does not. */
-export function patchHeaderPaths(patch: string): string[] {
+function patchHeaderPaths(patch: string): string[] {
   return patch
     .split('\n')
     .filter((line) => PATCH_HEADER_PREFIX.test(line))
     .map((line) => line.replace(PATCH_HEADER_PREFIX, ''))
+}
+
+/**
+ * The files an apply_patch leaves behind: added files and move destinations, plus updated files
+ * that are not moved. Deleted files and the pre-move side of a move are gone afterwards.
+ */
+export function patchResultPaths(patch: string): string[] {
+  const lines = patch.split('\n').filter((line) => PATCH_HEADER_PREFIX.test(line))
+  return lines.flatMap((line, index) => {
+    const path = line.replace(PATCH_HEADER_PREFIX, '')
+    if (line.startsWith('*** Delete File:')) return []
+    const moved = lines[index + 1]?.startsWith('*** Move to:') === true
+    return line.startsWith('*** Update File:') && moved ? [] : [path]
+  })
 }
 
 /**
