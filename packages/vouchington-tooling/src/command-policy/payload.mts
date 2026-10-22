@@ -28,6 +28,14 @@ export function hookToolName(payload: HookPayload): string {
   return firstString([payload.tool_name, payload.toolName])
 }
 
+/** A numeric `exit_code` from the response shapes that carry one; undefined otherwise. */
+export function hookToolExitCode(payload: HookPayload): number | undefined {
+  for (const response of [payload.tool_response, payload.toolResponse, payload.toolResult]) {
+    if (isRecord(response) && typeof response.exit_code === 'number') return response.exit_code
+  }
+  return undefined
+}
+
 export function hookSessionId(payload: HookPayload): string {
   return firstString([payload.session_id, payload.sessionId, payload.conversation_id])
 }

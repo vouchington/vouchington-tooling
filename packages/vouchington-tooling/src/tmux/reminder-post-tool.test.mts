@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  extractToolCommand,
-  hookToolName,
-  parseHookPayload,
-  toolExitCode,
-} from './hook-payload.mts'
+import { parseHookPayload } from '../command-policy/hook/harness.mts'
+
 import {
   renderPostToolReminder,
   type PaneTitleSpawn,
@@ -153,21 +149,19 @@ describe('renderPostToolReminder', () => {
   })
 })
 
-describe('hook payload helpers', () => {
-  it('reads tool names, commands and exit codes across payload shapes', () => {
-    expect(hookToolName({ toolName: 'Bash' })).toBe('Bash')
-    expect(hookToolName({ name: 'Shell' })).toBe('Shell')
-    expect(hookToolName({})).toBe('')
-    expect(extractToolCommand({ toolInput: { command: 'a' } })).toBe('a')
-    expect(extractToolCommand({ tool_input: 'x', command: 'b' })).toBe('b')
-    expect(extractToolCommand({})).toBe('')
-    expect(toolExitCode({ toolResult: { exit_code: 2 } })).toBe(2)
-    expect(toolExitCode({ toolResponse: { exit_code: 'x' } })).toBeUndefined()
-  })
+describe('Cursor payloads read through the shared harness parser', () => {
+  const options = { spawnPaneTitle: titled('x'), env: {} }
+  const cursor = (exitCode: number) =>
+    parseHookPayload(
+      JSON.stringify({
+        tool_name: 'Shell',
+        tool_input: { command: 'gh pr create' },
+        tool_output: JSON.stringify({ exitCode, stdout: '' }),
+      }),
+    )
 
-  it('parses payload JSON and treats anything else as empty', () => {
-    expect(parseHookPayload('{"a":1}')).toEqual({ a: 1 })
-    expect(parseHookPayload('[1]')).toEqual({})
-    expect(parseHookPayload('not json')).toEqual({})
+  it('reminds after a successful Shell command and skips a failed one', () => {
+    expect(renderPostToolReminder(cursor(0), options)).toContain('PR created')
+    expect(renderPostToolReminder(cursor(1), options)).toBeNull()
   })
 })

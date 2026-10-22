@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { runScript } from '../cli/commands/spawn-script.mts'
 import { packageScriptPath } from '../cli/script-path.mts'
 import { TMUX_USAGE, type TmuxCliDeps } from './cli-shared.mts'
-import { parseHookPayload } from './hook-payload.mts'
+import { parseHookPayload } from '../command-policy/hook/harness.mts'
 import { renderPostToolReminder } from './reminder-post-tool.mts'
 import { runUp } from './up.mts'
 
