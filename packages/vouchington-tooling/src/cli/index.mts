@@ -111,6 +111,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return import('./commands/transient-retry.mts').then((command) =>
         command.runTransientRetryCommand(parsed.args),
       )
+    case 'sandbox-command-audit':
+      return import('./commands/sandbox-command-audit.mts').then((command) =>
+        command.runSandboxCommandAuditCommand(parsed.args),
+      )
     case 'hook':
       return runHookCommand(parsed.args)
     case 'worktree':

@@ -18,6 +18,7 @@ type ForwardedCommand =
   | { kind: 'hook'; args: string[] }
   | { kind: 'worktree'; args: string[] }
   | { kind: 'transient-retry'; args: string[] }
+  | { kind: 'sandbox-command-audit'; args: string[] }
   | { kind: 'tmux'; args: string[] }
 
 export function parseForwardedCommand(
@@ -43,6 +44,7 @@ export function parseForwardedCommand(
   if (command === 'hook') return { kind: 'hook', args }
   if (command === 'worktree') return { kind: 'worktree', args }
   if (command === 'transient-retry') return { kind: 'transient-retry', args }
+  if (command === 'sandbox-command-audit') return { kind: 'sandbox-command-audit', args }
   if (command === 'tmux') return { kind: 'tmux', args }
   return undefined
 }

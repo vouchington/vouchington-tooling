@@ -38,6 +38,7 @@ describe('subcommand help', () => {
     expect(commandUsage('retrospective-facts')).toContain('--pr')
     expect(commandUsage('mcp')).toContain('journal_append')
     expect(commandUsage('hook')).toContain('--policy <module>')
+    expect(commandUsage('sandbox-command-audit')).toContain('--worktree-glob')
     expect(commandUsage('agent-blackboard')).toContain('distill classify')
     expect(commandUsage('agent-blackboard')).not.toContain('journal append')
     expect(commandUsage('retrospective-transcript')).toContain('--session-id')

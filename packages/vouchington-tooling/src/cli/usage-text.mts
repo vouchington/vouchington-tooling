@@ -56,6 +56,7 @@ Commands:
   tmux                          Run configured dev windows in tmux; name panes; agent reminders
   story-coverage                Check component exports are imported by stories
   transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
+  sandbox-command-audit         Audit agent transcripts for sandbox escalations and denials
 
 Options:
   -h, --help       Show this help
@@ -161,6 +162,14 @@ worktree reclaim [--yes] [--json]
 transient-retry --rules <module> [--repo owner/name] [--token-env NAME] [--dry-run] <run-id>
   Loads a module exporting "rules" (and optionally "limits"), evaluates them against the failed run,
   and reruns only on a match. Exits 0 on rerun, 2 when none is warranted, 1 on error.
+
+sandbox-command-audit --rules <module> [--settings-path <file>] [--repo-root <dir>]... [--worktree-glob <glob>]... [--projects-dir <dir>] [--codex-sessions-dir <dir>] [--session-id <id>] [--limit N] [--since DAYS] [--json] [--raw]
+  Scans Claude and Codex transcripts scoped to this repository (git roots plus any --worktree-glob
+  layouts) and reports Bash escalations, denials and permission failures by command prefix.
+  <module> exports an object (default or "rules") with loadPolicy({ settingsPath, cwd }), which
+  returns { covers(list, commandOrPrefix) } for the allow/deny/excluded lists or { error }, and
+  optionally classifyFailure(command, text, source), limits and worktreeGlobs. Transcript roots
+  default to CLAUDE_CONFIG_DIR/projects and CODEX_HOME/sessions. --raw prints full command text.
 
 tmux up --config <file> [--root <dir>] [--no-attach] [-v|--verbose]
 tmux name [--socket PATH --pane %ID --worktree PATH] <name> | read-title | post-tool | agent-reminder <event>
