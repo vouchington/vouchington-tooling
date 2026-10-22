@@ -54,7 +54,7 @@ export function standardGitPatterns(
   return [
     {
       pattern:
-        /\bgit\s+push\b[^|;&\n]*(?:^|[\s])(?:--force(?!-with-lease(?:\b|=))\b|-[A-Za-z]*f[A-Za-z]*\b|\+[^;&|()\s]+)/,
+        /\bgit\s+push\b[^|;&\n]*\s(?:--force(?!-with-lease(?:\b|=))\b|-[A-Za-z]*f[A-Za-z]*\b|\+[^;&|()\s]+)/,
       reason: reasons.forcePush ?? PLAIN_FORCE_PUSH_REASON,
     },
     {
@@ -62,12 +62,12 @@ export function standardGitPatterns(
       reason: 'Commit amend is banned by repository policy.',
     },
     {
-      pattern: /\bgit\s+pull\b[^|;&\n]*(?:--rebase\b|(?:^|[\s])-[A-Za-z]*r[A-Za-z]*\b)/,
+      pattern: /\bgit\s+pull\b[^|;&\n]*(?:--rebase\b|\s-[A-Za-z]*r[A-Za-z]*\b)/,
       reason: reasons.pullRebase ?? 'git pull --rebase and git pull -r are banned.',
     },
     {
       pattern:
-        /\bgit\b[^|;&\n]*(?:(?:^|[\s])-X(?:=|\s)?(?:ours|theirs)\b|(?:^|[\s])-X(?:ours|theirs)\b|--strategy-option(?:=|\s+)(?:ours|theirs)\b)/,
+        /\bgit\b[^|;&\n]*(?:\s-X(?:=|\s)?(?:ours|theirs)\b|\s-X(?:ours|theirs)\b|--strategy-option(?:=|\s+)(?:ours|theirs)\b)/,
       reason:
         'Git strategy options for ours/theirs are banned; during rebase they can silently keep the wrong side.',
     },
@@ -81,7 +81,7 @@ export function standardGitPatterns(
         '--no-verify bypasses repository git hooks. Fix the underlying failure instead of skipping hooks.',
     },
     {
-      pattern: /\bgit\s+commit\b[^|;&\n]*(?:^|[\s])-[A-Za-z]*n[A-Za-z]*\b/,
+      pattern: /\bgit\s+commit\b[^|;&\n]*\s-[A-Za-z]*n[A-Za-z]*\b/,
       reason:
         'git commit -n bypasses the commit-msg and pre-commit hooks. Fix the underlying failure instead.',
     },
