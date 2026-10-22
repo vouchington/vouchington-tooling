@@ -436,7 +436,7 @@ repository's own policy module, which default-exports a `HookPolicy` (`defineHoo
 `command` rule table, post-tool-use `checkers`, an optional `reminder`, and an optional `onPayload`
 callback (for example to persist the harness session id). `pre-tool-use` exits 2 to block, including
 when the module cannot load; `post-tool-use` is advisory and always exits 0, folding checker warnings
-and the reminder into one `additionalContext`. `--root` defaults to the working directory.
+and the reminder into one `additionalContext`. `--root` defaults to the working directory. Register `post-tool-use` with an edit-only matcher (for example `Edit|Write|apply_patch`): the command treats every `file_path` it sees as an edit, and it emits the Claude/Codex `hookSpecificOutput` shape for every harness.
 
 `processDiffCommand` runs a caller-supplied `git diff` or `gh pr diff` executable and argv without
 a shell, emitting complete unified-diff file blocks without accumulating the whole patch. It keeps
