@@ -1,16 +1,17 @@
 # Sandbox and permission audit
 
 The `## Sandbox & Permission Audit` section reports commands that were denied, escalated, or failed
-under a sandbox. Its sources, in order of preference:
+under a sandbox. It is built from journal entries alone:
 
-- The `escalations` in `retrospective-transcript` facts: tool calls whose arguments requested
-  elevated permissions, listed with a normalized command prefix, justification, and prefix rule.
-  These cover only harnesses whose rollout records a sandbox-permission request on the tool call;
-  other harnesses' escalations appear nowhere in them. The approval outcome is not recorded in a
-  stable shape, so never report one from these.
 - `sandbox-escalation`, `sandbox-failure`, and `ambiguous-failure` blocks in the journal (see the
-  [blackboard](../../blackboard/SKILL.md#sandbox-and-permission-blocks) skill): the source for
-  every other harness's escalations, and for denials and failures the transcript cannot show.
+  [blackboard](../../blackboard/SKILL.md#sandbox-and-permission-blocks) skill) are the source for
+  every escalation, denial, and failure on every harness.
+- The `escalations` in `retrospective-transcript` facts are supplementary evidence, reported
+  separately under the transcript facts. They list tool calls whose arguments requested elevated
+  permissions, with a normalized command prefix, justification, and prefix rule, but only for
+  harnesses whose rollout records a sandbox-permission request on the tool call. Use them to check
+  that each reported request has a journal block; they do not replace one. The approval outcome is
+  not recorded in a stable shape, so never report one from these.
 
 ## Reading the evidence
 
