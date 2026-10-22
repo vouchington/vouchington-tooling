@@ -201,6 +201,12 @@ describe('evaluateCommandPolicy merge authority', () => {
     ).toBe('Merging is a human decision - confirm you want this exact merge before it proceeds.')
   })
 
+  it('confirms a merge through a path-qualified gh', () => {
+    expect(
+      evaluateCommandPolicy(bash('/usr/local/bin/gh pr merge 3'), {}, { automationContext: false }),
+    ).toMatchObject({ disposition: 'confirm' })
+  })
+
   it.each([
     'gh pr merge 1 && echo done',
     'gh pr merge 1 > out',

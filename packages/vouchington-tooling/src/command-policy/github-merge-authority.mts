@@ -84,7 +84,8 @@ export function isLoneMergeCommand(command: string): boolean {
   if (tokens[index] === 'env') {
     index = skipAssignments(tokens, index + 1)
   }
-  if (tokens[index] !== 'gh' && tokens[index] !== 'gh-stack') {
+  const executable = tokens[index]?.split('/').at(-1)
+  if (executable !== 'gh' && executable !== 'gh-stack') {
     return false
   }
   const invocation = parseGhOrGhStackInvocation(tokens, index)

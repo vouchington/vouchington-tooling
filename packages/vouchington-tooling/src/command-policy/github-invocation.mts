@@ -21,7 +21,14 @@ type GhInvocationScan = Pick<GhInvocation, 'optionTokenIndexes' | 'optionTokens'
 export function parseGhOrGhStackInvocation(tokens: string[], index: number): GhInvocation | null {
   const executable = tokens[index]!.split('/').at(-1)
   if (executable === 'gh-stack') {
-    return parseGhInvocation(ghStackAsGh(tokens, index), 0)
+    const invocation = parseGhInvocation(ghStackAsGh(tokens, index), 0)
+    // The rewritten array starts `gh stack`, two words standing for the one gh-stack word at `index`.
+    return (
+      invocation && {
+        ...invocation,
+        optionTokenIndexes: invocation.optionTokenIndexes.map((i) => i + index - 1),
+      }
+    )
   }
   if (executable === 'gh') {
     return parseGhInvocation(tokens, index)

@@ -57,6 +57,7 @@ describe('option flag helpers', () => {
   it('returns the last value of a named option', () => {
     expect(lastNamedOption(['--base', 'a', '--base=b'], 'base', 'B')).toBe('b')
     expect(lastNamedOption(['-B', 'a', '-Bc'], 'base', 'B')).toBe('c')
+    expect(lastNamedOption(['-B=d'], 'base', 'B')).toBe('d')
     expect(lastNamedOption(['-fB', 'e'], 'base', 'B')).toBe('e')
     expect(lastNamedOption(['-fBx'], 'base', 'B')).toBe('x')
     expect(lastNamedOption(['-B', '--next'], 'base', 'B')).toBeUndefined()
@@ -110,6 +111,8 @@ describe('gh invocation parsing', () => {
     const stack = parseGhOrGhStackInvocation(words('/bin/gh-stack submit --auto'), 0)
     expect(stack?.area).toBe('stack')
     expect(stack?.optionTokens).toEqual(['--auto'])
+    const mapped = parseGhOrGhStackInvocation(words('echo hi && gh-stack submit --auto'), 3)
+    expect(mapped?.optionTokenIndexes).toEqual([5])
     expect(parseGhOrGhStackInvocation(words('ls -l'), 0)).toBeNull()
     expect(parseGhOrGhStackInvocation(words('gh pr'), 0)).toBeNull()
   })

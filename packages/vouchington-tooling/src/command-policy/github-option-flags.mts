@@ -11,7 +11,8 @@ function clusteredShortOptionValue(token: string, shortName: string): string | n
   if (flagIndex === -1) {
     return null
   }
-  return body.slice(flagIndex + 1)
+  // pflag reads `-B=main` as the value `main`.
+  return body.slice(flagIndex + 1).replace(/^=/, '')
 }
 
 export function lastNamedOption(
