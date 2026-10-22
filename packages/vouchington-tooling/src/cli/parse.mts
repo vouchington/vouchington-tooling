@@ -44,6 +44,7 @@ export type ParsedCli =
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
+  | { kind: 'hook'; args: string[] }
   | { kind: 'worktree'; args: string[] }
   | { kind: 'transient-retry'; args: string[] }
   | { kind: 'tmux'; args: string[] }

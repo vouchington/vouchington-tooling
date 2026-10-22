@@ -21,6 +21,20 @@ function patchHeaderPaths(patch: string): string[] {
 }
 
 /**
+ * The files an apply_patch leaves behind: added files and move destinations, plus updated files
+ * that are not moved. Deleted files and the pre-move side of a move are gone afterwards.
+ */
+export function patchResultPaths(patch: string): string[] {
+  const lines = patch.split('\n').filter((line) => PATCH_HEADER_PREFIX.test(line))
+  return lines.flatMap((line, index) => {
+    const path = line.replace(PATCH_HEADER_PREFIX, '')
+    if (line.startsWith('*** Delete File:')) return []
+    const moved = lines[index + 1]?.startsWith('*** Move to:') === true
+    return line.startsWith('*** Update File:') && moved ? [] : [path]
+  })
+}
+
+/**
  * Whether a path-shaped reference in the payload or the command satisfies `matches`: the payload's
  * path-like string fields, an apply_patch's header lines, and the command's shell words. The
  * command's own `command` field is read as shell text, never as a field value.

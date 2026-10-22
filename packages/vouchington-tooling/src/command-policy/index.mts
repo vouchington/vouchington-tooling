@@ -1,4 +1,27 @@
 export { evaluateCommandPolicy } from './engine.mts'
+export { parseHookArgs } from './hook/args.mts'
+export {
+  isAttendedClaudeSession,
+  isAutomationContext,
+  normalizeCursorShellPayload,
+  parseHookPayload,
+  resolveHarness,
+} from './hook/harness.mts'
+export { loadHookPolicy } from './hook/policy-module.mts'
+export { checkFile, postToolUseOutput } from './hook/post-tool-use.mts'
+export { preToolUseOutput } from './hook/pre-tool-use.mts'
+export type { PreToolUseOptions, PreToolUseResult } from './hook/pre-tool-use.mts'
+export { runHook } from './hook/run.mts'
+export type { HookIo } from './hook/run.mts'
+export { HOOK_HARNESSES, defineHookPolicy } from './hook/types.mts'
+export type {
+  HookContext,
+  HookHarness,
+  HookPolicy,
+  HookPolicyExport,
+  PostToolUseChecker,
+  PostToolUseWarning,
+} from './hook/types.mts'
 export {
   PLAIN_FORCE_PUSH_REASON,
   findBlockedPatternReason,

@@ -15,6 +15,7 @@ type ForwardedCommand =
   | { kind: 'retrospective-facts'; args: string[] }
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
+  | { kind: 'hook'; args: string[] }
   | { kind: 'worktree'; args: string[] }
   | { kind: 'transient-retry'; args: string[] }
   | { kind: 'tmux'; args: string[] }
@@ -39,6 +40,7 @@ export function parseForwardedCommand(
   if (command === 'retrospective-facts') return { kind: 'retrospective-facts', args }
   if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args }
   if (command === 'mcp') return { kind: 'mcp', args }
+  if (command === 'hook') return { kind: 'hook', args }
   if (command === 'worktree') return { kind: 'worktree', args }
   if (command === 'transient-retry') return { kind: 'transient-retry', args }
   if (command === 'tmux') return { kind: 'tmux', args }
