@@ -438,6 +438,18 @@ describe('loadHookPolicy and runHook', () => {
     expect(post.err.join('')).toContain('onPayload failed: bare')
   })
 
+  it('treats an unreadable stdin as a policy failure', async () => {
+    const root = module('export default {}')
+    const run = io(root, '')
+    run.harness.readStdin = async () => {
+      throw new Error('stdin closed')
+    }
+    const args = ['--harness', 'claude', '--policy', 'policy.mjs']
+    expect(await runHook(['pre-tool-use', ...args], run.harness)).toBe(2)
+    expect(await runHook(['post-tool-use', ...args], run.harness)).toBe(0)
+    expect(run.err.join('')).toContain('stdin closed')
+  })
+
   it('stays silent in post-tool-use when there is nothing to say', async () => {
     const root = module('export default {}')
     const run = io(root, '{}')

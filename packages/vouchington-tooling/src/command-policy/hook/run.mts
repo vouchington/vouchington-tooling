@@ -34,15 +34,15 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
     // Post-tool-use is advisory: an argument typo must not reject an already-completed tool call.
     return args[0] === 'post-tool-use' ? 0 : 2
   }
-  const payload = parseHookPayload(await io.readStdin())
-  const context: HookContext = {
-    harness: resolveHarness(parsed.harness, io.env, payload),
-    payload,
-    env: io.env,
-    root: resolve(io.cwd, parsed.root ?? '.'),
-  }
   const blocking = parsed.event === 'pre-tool-use'
   try {
+    const payload = parseHookPayload(await io.readStdin())
+    const context: HookContext = {
+      harness: resolveHarness(parsed.harness, io.env, payload),
+      payload,
+      env: io.env,
+      root: resolve(io.cwd, parsed.root ?? '.'),
+    }
     const policy = await loadHookPolicy(parsed.policy, context)
     await runOnPayload(policy, context, io)
     if (blocking) {
