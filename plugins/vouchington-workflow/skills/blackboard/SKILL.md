@@ -134,8 +134,10 @@ retrospective's sandbox and permission audit is built only from entries that mat
 Use `sandbox-failure` (a sandbox refusal) or `ambiguous-failure` (a failure whose cause is unclear)
 in place of `sandbox-escalation` for a command that failed without an escalation; those blocks omit
 the `Outcome` line. Set `Outcome` only from observed evidence: a request is `requested`, never
-`approved`. Do not hand-journal an escalation the harness transcript already records; the
-retrospective's transcript facts report it. A denial or failure still needs its block.
+`approved`. Skip the block only for an escalation that the retrospective's transcript facts
+(`escalations`) actually report, which today means harnesses whose rollout records a
+sandbox-permission request on the tool call. Every other harness journals a `sandbox-escalation`
+block, and a denial or failure always needs its block.
 
 ## Credential failures
 

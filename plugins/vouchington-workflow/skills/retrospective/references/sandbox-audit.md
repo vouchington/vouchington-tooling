@@ -5,10 +5,12 @@ under a sandbox. Its sources, in order of preference:
 
 - The `escalations` in `retrospective-transcript` facts: tool calls whose arguments requested
   elevated permissions, listed with a normalized command prefix, justification, and prefix rule.
-  The approval outcome is not recorded in a stable shape, so never report one from these.
+  These cover only harnesses whose rollout records a sandbox-permission request on the tool call;
+  other harnesses' escalations appear nowhere in them. The approval outcome is not recorded in a
+  stable shape, so never report one from these.
 - `sandbox-escalation`, `sandbox-failure`, and `ambiguous-failure` blocks in the journal (see the
-  [blackboard](../../blackboard/SKILL.md#sandbox-and-permission-blocks) skill) for denials and
-  failures the transcript cannot show.
+  [blackboard](../../blackboard/SKILL.md#sandbox-and-permission-blocks) skill): the source for
+  every other harness's escalations, and for denials and failures the transcript cannot show.
 
 ## Reading the evidence
 
