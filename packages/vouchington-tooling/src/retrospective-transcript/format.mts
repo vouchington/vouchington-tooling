@@ -20,8 +20,21 @@ export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts)
     `Tokens: input=${facts.tokens.input} output=${facts.tokens.output} cache_read=${facts.tokens.cacheRead} cache_creation=${facts.tokens.cacheCreation}`,
     `Subagent tool calls: ${facts.subagentToolCalls}`,
     `Subagent tokens: input=${facts.subagentTokens.input} output=${facts.subagentTokens.output} cache_read=${facts.subagentTokens.cacheRead} cache_creation=${facts.subagentTokens.cacheCreation}`,
+    ...escalationLines(facts),
     '',
   ].join('\n')
+}
+
+function escalationLines(facts: TranscriptFacts): string[] {
+  if (!facts.escalations.length) return []
+  return [
+    `Sandbox escalations: ${facts.escalations.length}`,
+    ...facts.escalations.map((item) => {
+      const rule = item.prefixRule ? ` prefix_rule=${JSON.stringify(item.prefixRule)}` : ''
+      const why = item.justification ? ` justification=${JSON.stringify(item.justification)}` : ''
+      return `- ${item.commandPrefix || '(unknown)'}${rule}${why}`
+    }),
+  ]
 }
 
 export const formatUnavailable = (reason: string): string =>

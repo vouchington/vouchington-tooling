@@ -13,7 +13,7 @@ import { isPackageRunner, splitCommandSegments } from './command-segments.mts'
 const MAX_COMMAND_TOKEN_LENGTH = 40
 const REDACTED_TOKEN = '…'
 
-function redactOverlongToken(token: string): string {
+export function redactOverlongToken(token: string): string {
   return token.length > MAX_COMMAND_TOKEN_LENGTH ? REDACTED_TOKEN : token
 }
 

@@ -1,4 +1,5 @@
 import { CodexMessageCounter } from './codex-messages.mts'
+import { escalationOf } from './escalations.mts'
 import { commands, hasFailedOutcome } from './codex-payload.mts'
 import {
   applyCommand,
@@ -89,6 +90,8 @@ export function applyRecords(
         if (subagent) facts.subagentToolCalls++
         if (id) calls.add(id)
         if (payload.name === 'advisor') facts.advisorCalls++
+        const escalation = escalationOf(payload)
+        if (escalation) facts.escalations.push(escalation)
         for (const rawCommand of commands(payload)) applyCommand(rawCommand, facts)
       }
     }
