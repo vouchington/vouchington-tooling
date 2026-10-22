@@ -590,6 +590,12 @@ through an injectable Turnstile stub, and scrolls a caller-supplied sentinel int
 and `PLAYWRIGHT_TURNSTILE_TOKEN`. The scroll helper's sentinel test id defaults to
 `infinite-scroll-sentinel`.
 
+`playwright` provides small Playwright helpers: a virtual authenticator, a Radix dropdown opener,
+a Storybook index probe, required-value and mobile overflow assertions, an image-response guard,
+random suffixes, viewport sizes, a 1x1 PNG fixture, RFC 6238 TOTP codes, and a test-lifecycle
+reporter. The reporter prints one JSON line per test with the marker `playwright-test-lifecycle`.
+`@playwright/test` is an optional peer. TOTP setup and cleanup stay with the caller.
+
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.

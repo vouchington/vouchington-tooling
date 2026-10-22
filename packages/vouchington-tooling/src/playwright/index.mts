@@ -1,3 +1,5 @@
+import TestLifecycleReporter from './test-lifecycle-reporter.mts'
+
 export { BrowserIssueMonitor } from './browser-errors.mts'
 export type { BrowserIssueAllowlistEntry } from './browser-issue-records.mts'
 export {
@@ -46,3 +48,15 @@ export {
 } from './turnstile-stub.mts'
 export type { TurnstileStubOptions } from './turnstile-stub.mts'
 export { waitForBelowFoldHydration } from './wait-for-hydration.mts'
+export { requireTestValue } from './assertions.mts'
+export { installImageResponseGuard } from './expect-no-broken-images.mts'
+export { assertNoHorizontalScroll, getHorizontalOverflowState } from './mobile-assertions.mts'
+export type { HorizontalOverflowState } from './mobile-assertions.mts'
+export { openRadixDropdown } from './radix-select.mts'
+export { randomSuffix } from './random-id.mts'
+export { storybookBundleHasStory } from './storybook.mts'
+export { TEST_PNG } from './test-fixtures.mts'
+export { TestLifecycleReporter }
+export { generateTotpCode } from './totp.mts'
+export { DESKTOP_VIEWPORT, MOBILE_VIEWPORTS } from './viewport-constants.mts'
+export { setupVirtualAuthenticator } from './virtual-authenticator.mts'
