@@ -37,8 +37,14 @@ export function createGhDependencies(run: RunTextCommand = runGh): WorkflowSecre
         ]),
       ),
     listEnvironmentSecretNames: async (repo, environment) =>
-      parseSecretNames(
-        await run(['secret', 'list', '-R', repo, '--env', environment, '--json', 'name']),
+      outputNames(
+        await run([
+          'api',
+          `repos/${repo}/environments/${encodeURIComponent(environment)}/secrets`,
+          '--paginate',
+          '--jq',
+          '.secrets[].name',
+        ]),
       ),
     getEnvironmentDeploymentBranchPolicy: async (repo, environment) => {
       const endpoint = `repos/${repo}/environments/${encodeURIComponent(environment)}`

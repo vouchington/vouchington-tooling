@@ -237,6 +237,12 @@ describe('loadInventory', () => {
     await expect(load('BOTH_SCOPES')).rejects.toThrow('mutually exclusive')
   })
 
+  it('rejects names that collide after normalization', () => {
+    expect(() =>
+      normalizeInventory({ token: { provisioned: true }, TOKEN: { provisioned: false } }),
+    ).toThrow('collide after normalization: TOKEN')
+  })
+
   it('normalizes secret names to upper-case and environments to lower-case', () => {
     expect(
       normalizeInventory({

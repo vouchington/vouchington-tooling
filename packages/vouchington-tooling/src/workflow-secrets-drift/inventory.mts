@@ -41,6 +41,9 @@ export function normalizeInventory(inventory: WorkflowSecretInventory): Workflow
   const normalized: Record<string, WorkflowSecretInventoryEntry> = {}
   for (const [name, entry] of Object.entries(inventory)) {
     const { requiredEnvironment, requiredBranchPolicy } = entry
+    if (Object.hasOwn(normalized, name.toUpperCase())) {
+      throw new Error(`inventory names collide after normalization: ${name}`)
+    }
     normalized[name.toUpperCase()] = {
       ...entry,
       ...(requiredEnvironment === undefined

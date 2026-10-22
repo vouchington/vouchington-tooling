@@ -17,7 +17,7 @@ describe('createGhDependencies', () => {
   it('reads names through gh', async () => {
     const { calls, run } = runner({
       'repo view': 'o/r\n',
-      'secret list -R o/r --env e': '[{"name":"E1"}]',
+      'environments/e%2Fx/secrets': 'E1\n',
       'secret list -R o/r --json': '[{"name":"A"},{"name":"B"}]',
       'repos/o/r --jq': 'Organization\n',
       'organization-secrets': 'O1\n\nO2\n',
@@ -29,7 +29,7 @@ describe('createGhDependencies', () => {
     expect(await deps.listRepositoryOwnerType('o/r')).toBe('Organization')
     expect(await deps.listRepositoryOrganizationSecretNames('o/r')).toEqual(['O1', 'O2'])
     expect(await deps.listEnvironmentNames('o/r')).toEqual(['e', 'f'])
-    expect(await deps.listEnvironmentSecretNames('o/r', 'e')).toEqual(['E1'])
+    expect(await deps.listEnvironmentSecretNames('o/r', 'e/x')).toEqual(['E1'])
     expect(calls).toHaveLength(6)
   })
 
