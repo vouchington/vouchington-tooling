@@ -48,7 +48,8 @@ function parseFlags(args: readonly string[]): Flags {
       throw new Error(`${HOOK_USAGE}\nunknown argument: ${arg}`)
     }
     const value = inline ?? args[(index += 1)]
-    if (value === undefined) {
+    // A flag-looking token is the next flag, not this flag's value (`--policy --root x`).
+    if (value === undefined || (inline === undefined && value.startsWith('--'))) {
       throw new Error(`${HOOK_USAGE}\n${name} needs a value`)
     }
     if (name === '--automation-env') flags.automationEnv.push(value)

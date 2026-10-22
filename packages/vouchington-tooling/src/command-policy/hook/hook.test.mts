@@ -72,6 +72,7 @@ describe('parseHookArgs', () => {
     [['pre-tool-use', '--harness', 'claude', '--policy='], '--policy <module> is required'],
     [['pre-tool-use', '--harness', 'claude', '--policy'], '--policy needs a value'],
     [['pre-tool-use', '--automation-env'], '--automation-env needs a value'],
+    [['pre-tool-use', '--policy', '--root', 'x'], '--policy needs a value'],
     [['pre-tool-use', '--bogus', 'x'], 'unknown argument: --bogus'],
     [['pre-tool-use', 'stray'], 'unknown argument: stray'],
   ])('rejects %j', (args, message) => {
@@ -88,7 +89,7 @@ describe('payload and harness detection', () => {
     expect(parseHookPayload('null')).toEqual({})
     expect(parseHookPayload('{"a":1}')).toEqual({ a: 1 })
     expect(parseHookPayload('{"a":1}', true)).toEqual({ a: 1 })
-    expect(parseHookPayload('', true)).toEqual({})
+    expect(() => parseHookPayload('', true)).toThrow('empty')
     expect(() => parseHookPayload('{nope', true)).toThrow('not valid JSON')
     expect(() => parseHookPayload('[1]', true)).toThrow('not a JSON object')
   })
@@ -272,6 +273,17 @@ describe('loadHookPolicy and runHook', () => {
     expect(await fn.reminder?.(context())).toBe('claude')
     const named = module('export const policy = { checkers: [] }')
     expect(await loadHookPolicy(join(named, 'policy.mjs'), context())).toEqual({ checkers: [] })
+    for (const [field, value] of [
+      ['command', '[]'],
+      ['checkers', '{}'],
+      ['reminder', '"x"'],
+      ['onPayload', '1'],
+    ]) {
+      const invalid = module(`export default { ${field}: ${value} }`)
+      await expect(loadHookPolicy('policy.mjs', context({ root: invalid }))).rejects.toThrow(
+        `invalid \`${field}\``,
+      )
+    }
     for (const body of ['export default 5', 'export default [1]', 'export const x = 1']) {
       const bad = module(body)
       await expect(loadHookPolicy('policy.mjs', context({ root: bad }))).rejects.toThrow(

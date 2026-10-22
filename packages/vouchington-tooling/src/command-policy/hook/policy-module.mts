@@ -19,6 +19,23 @@ export async function loadHookPolicy(specifier: string, context: HookContext): P
       `policy module ${specifier} must default-export a policy object or a function returning one`,
     )
   }
+  return validated(policy, specifier)
+}
+
+const FIELD_SHAPES: Record<string, (value: unknown) => boolean> = {
+  command: (value) => isRecord(value) && !Array.isArray(value),
+  checkers: Array.isArray,
+  reminder: (value) => typeof value === 'function',
+  onPayload: (value) => typeof value === 'function',
+}
+
+// A misspelled shape would silently disable the policy, so a present field must have its type.
+function validated(policy: Record<string, unknown>, specifier: string): HookPolicy {
+  for (const [field, isValid] of Object.entries(FIELD_SHAPES)) {
+    if (policy[field] !== undefined && !isValid(policy[field])) {
+      throw new Error(`policy module ${specifier} has an invalid \`${field}\``)
+    }
+  }
   return policy as HookPolicy
 }
 

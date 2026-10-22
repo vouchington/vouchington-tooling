@@ -31,12 +31,15 @@ export function isAutomationContext(
 }
 
 /**
- * Parses hook stdin into a payload. Blank input is an empty payload. Invalid or non-object input is
- * also empty unless `strict`, which throws so a blocking hook fails closed instead of reading a
- * truncated payload as "nothing to judge".
+ * Parses hook stdin into a payload. Blank, invalid, or non-object input is an empty payload unless
+ * `strict`, which throws so a blocking hook fails closed instead of reading a missing or truncated
+ * payload as "nothing to judge".
  */
 export function parseHookPayload(stdin: string, strict = false): HookPayload {
-  if (stdin.trim() === '') return {}
+  if (stdin.trim() === '') {
+    if (strict) throw new Error('hook payload is empty')
+    return {}
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(stdin)
