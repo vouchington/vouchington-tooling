@@ -1,9 +1,34 @@
-import { isAutomationContext } from '../../mcp-server/pr-mode.mts'
 import { isRecord } from '../payload.mts'
 import type { HookPayload } from '../types.mts'
 import type { HookHarness } from './types.mts'
 
-export { isAutomationContext }
+/** Environment variables that mark an automated launch. Set to anything but empty, `0`, or `false`. */
+const AUTOMATION_MARKERS = [
+  'CI',
+  'GITHUB_ACTIONS',
+  'GITLAB_CI',
+  'BUILDKITE',
+  'CIRCLECI',
+  'JENKINS_URL',
+  'TF_BUILD',
+  'CODEBUILD_BUILD_ID',
+] as const
+
+/**
+ * True when the process runs unattended, where merge authority is never delegated: Claude's
+ * `claude -p` (`CLAUDE_CODE_SESSION_ATTENDED=0`) or a CI marker. `extraMarkers` adds
+ * caller-specific variable names.
+ */
+export function isAutomationContext(
+  env: NodeJS.ProcessEnv,
+  extraMarkers: readonly string[] = [],
+): boolean {
+  if (env.CLAUDE_CODE_SESSION_ATTENDED === '0') return true
+  return [...AUTOMATION_MARKERS, ...extraMarkers].some((name) => {
+    const value = env[name]?.trim().toLowerCase()
+    return value !== undefined && value !== '' && value !== '0' && value !== 'false'
+  })
+}
 
 /**
  * Parses hook stdin into a payload. Blank, invalid, or non-object input is an empty payload, so a

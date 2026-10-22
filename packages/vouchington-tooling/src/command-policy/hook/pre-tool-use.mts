@@ -30,7 +30,7 @@ export function preToolUseOutput(
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
   })
   if (decision === null) {
-    return { exitCode: 0, stderr: '', stdout: '' }
+    return { exitCode: 0, stderr: '', stdout: noOpinion(options) }
   }
   if (decision.disposition === 'confirm') {
     return { exitCode: 0, stderr: '', stdout: renderConfirm(policy, options) }
@@ -42,12 +42,18 @@ export function preToolUseOutput(
   }
 }
 
+// Cursor treats a hook that prints nothing as failed (and blocks the call under `failClosed`), so
+// "no opinion" there is an empty JSON object. Every other harness reads empty stdio as no opinion.
+function noOpinion(options: PreToolUseOptions): string {
+  return options.harness === 'cursor' ? '{}' : ''
+}
+
 // Only an attended Claude session gets a silent allow: the human already made the merge decision by
 // asking for it, so a second tool-level click is redundant. Codex, Cursor, Grok, and an unattended
 // Claude session (`claude -p`) get no opinion, so the harness's own prompt or classifier decides.
 function renderConfirm(policy: CommandPolicy, options: PreToolUseOptions): string {
   if (options.harness !== 'claude' || options.attended !== true) {
-    return ''
+    return noOpinion(options)
   }
   const guidance = policy.mergeGuidance === undefined ? '' : ` ${policy.mergeGuidance}`
   return JSON.stringify({

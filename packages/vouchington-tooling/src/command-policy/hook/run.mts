@@ -10,7 +10,7 @@ import {
 import { loadHookPolicy } from './policy-module.mts'
 import { postToolUseOutput } from './post-tool-use.mts'
 import { preToolUseOutput } from './pre-tool-use.mts'
-import type { HookContext } from './types.mts'
+import type { HookContext, HookPolicy } from './types.mts'
 
 export type HookIo = {
   readStdin: () => Promise<string>
@@ -31,7 +31,8 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
     parsed = parseHookArgs(args)
   } catch (error) {
     io.stderr.write(`${(error as Error).message}\n`)
-    return 2
+    // Post-tool-use is advisory: an argument typo must not reject an already-completed tool call.
+    return args[0] === 'post-tool-use' ? 0 : 2
   }
   const payload = parseHookPayload(await io.readStdin())
   const context: HookContext = {
@@ -43,7 +44,7 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
   const blocking = parsed.event === 'pre-tool-use'
   try {
     const policy = await loadHookPolicy(parsed.policy, context)
-    await policy.onPayload?.(context)
+    await runOnPayload(policy, context, io)
     if (blocking) {
       const result = preToolUseOutput(payload, policy.command ?? {}, {
         harness: context.harness,
@@ -61,5 +62,16 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
     const message = error instanceof Error ? error.message : String(error)
     io.stderr.write(`vouchington hook ${parsed.event}: ${message}\n`)
     return blocking ? 2 : 0
+  }
+}
+
+// A failing side effect (for example persisting a session id) is reported, never allowed to
+// suppress the command policy or the post-tool-use checks.
+async function runOnPayload(policy: HookPolicy, context: HookContext, io: HookIo): Promise<void> {
+  try {
+    await policy.onPayload?.(context)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    io.stderr.write(`vouchington hook: onPayload failed: ${message}\n`)
   }
 }

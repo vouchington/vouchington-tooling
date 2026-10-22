@@ -126,6 +126,9 @@ describe('payload and harness detection', () => {
     expect(isAutomationContext({ CI: '1' })).toBe(true)
     expect(isAutomationContext({ CI: 'false' })).toBe(false)
     expect(isAutomationContext({ CLAUDE_CODE_SESSION_ATTENDED: '0' })).toBe(true)
+    expect(isAutomationContext({ MY_AGENT_RUN: '1' })).toBe(false)
+    expect(isAutomationContext({ MY_AGENT_RUN: '1' }, ['MY_AGENT_RUN'])).toBe(true)
+    expect(isAutomationContext({ BUILDKITE: ' TRUE ' })).toBe(true)
     expect(isAutomationContext({ CLAUDE_CODE_SESSION_ATTENDED: '1' })).toBe(false)
     expect(isAutomationContext({})).toBe(false)
     expect(isAttendedClaudeSession({ CLAUDE_CODE_SESSION_ATTENDED: '1' })).toBe(true)
@@ -182,7 +185,6 @@ describe('preToolUseOutput', () => {
     for (const options of [
       { harness: 'claude' as const, attended: false },
       { harness: 'codex' as const, attended: true },
-      { harness: 'cursor' as const, attended: true },
       { attended: true },
       {},
     ]) {
@@ -192,6 +194,17 @@ describe('preToolUseOutput', () => {
         stdout: '',
       })
     }
+  })
+
+  it('answers Cursor with an empty JSON object when it has no opinion', () => {
+    expect(preToolUseOutput(bash('ls'), policy, { harness: 'cursor' }).stdout).toBe('{}')
+    expect(
+      preToolUseOutput(bash('gh pr merge 1'), policy, {
+        harness: 'cursor',
+        attended: true,
+        automationContext: false,
+      }),
+    ).toEqual({ exitCode: 0, stderr: '', stdout: '{}' })
   })
 
   it('passes an explicit cwd through', () => {
@@ -387,6 +400,9 @@ describe('loadHookPolicy and runHook', () => {
     const bad = io(root, '{}')
     expect(await runHook(['pre-tool-use'], bad.harness)).toBe(2)
     expect(bad.err.join('')).toContain('usage: vouchington hook')
+    const postTypo = io(root, '{}')
+    expect(await runHook(['post-tool-use', '--harnes', 'claude'], postTypo.harness)).toBe(0)
+    expect(postTypo.err.join('')).toContain('unknown argument')
   })
 
   it('emits post-tool-use context from the policy', async () => {
@@ -399,6 +415,27 @@ describe('loadHookPolicy and runHook', () => {
       ),
     ).toBe(0)
     expect(JSON.parse(run.out[0]!).hookSpecificOutput.additionalContext).toBe('hello')
+  })
+
+  it('reports a failing onPayload without suppressing the policy', async () => {
+    const root = module(`export default {
+      command: { commandPatterns: [{ pattern: /deploy/, reason: 'no deploy' }] },
+      onPayload: () => { throw new Error('persist failed') },
+    }`)
+    const pre = io(root, JSON.stringify(bash('deploy now')))
+    const args = ['pre-tool-use', '--harness', 'claude', '--policy', 'policy.mjs']
+    expect(await runHook(args, pre.harness)).toBe(2)
+    expect(pre.err.join('')).toContain('onPayload failed: persist failed')
+    expect(pre.err.join('')).toContain('no deploy')
+    const plain = module('export default { onPayload: async () => { throw "bare" } }')
+    const post = io(plain, '{}')
+    expect(
+      await runHook(
+        ['post-tool-use', '--harness', 'claude', '--policy', 'policy.mjs'],
+        post.harness,
+      ),
+    ).toBe(0)
+    expect(post.err.join('')).toContain('onPayload failed: bare')
   })
 
   it('stays silent in post-tool-use when there is nothing to say', async () => {
