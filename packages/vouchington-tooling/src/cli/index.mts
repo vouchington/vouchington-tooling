@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { runPostReviewCli } from '../gha-post-review/cli.mts'
 import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
+import { runAgentIssueLabels } from './commands/agent-issue-labels.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
@@ -131,6 +132,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':
       return runGhaArtifactsCleanup(parsed)
+    case 'agent-issue-labels':
+      return runAgentIssueLabels(parsed)
     case 'story-coverage':
       return runStoryCoverageLazy(parsed)
     case 'retrospective-transcript':
