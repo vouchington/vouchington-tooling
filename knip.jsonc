@@ -29,6 +29,7 @@
         "src/host-storage/index.mts!",
         "src/process-line-buffer/index.mts!",
         "src/shell-parse/index.mts!",
+        "src/command-policy/index.mts!",
         "src/pg-schema-snapshot/index.mts!",
         "src/openapi-document/index.mts!",
         "src/contract-schema/index.mts!",
