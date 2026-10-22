@@ -311,6 +311,11 @@
       "import": "./dist/dead-code/index.mjs",
       "default": "./dist/dead-code/index.mjs"
     },
+    "./tmux": {
+      "types": "./dist/tmux/index.d.mts",
+      "import": "./dist/tmux/index.mjs",
+      "default": "./dist/tmux/index.mjs"
+    },
     "./workflow-secrets-drift": {
       "types": "./dist/workflow-secrets-drift/index.d.mts",
       "import": "./dist/workflow-secrets-drift/index.mjs",

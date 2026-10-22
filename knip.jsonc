@@ -5,7 +5,7 @@
   "ignoreDependencies": ["agent-blackboard", "pr-shepherd"],
   // mise installs the pinned scc binary. It is not an npm package.
   // playwright is installed into the caller workspace by setup-playwright, not a repo dependency.
-  "ignoreBinaries": ["mise", "playwright"],
+  "ignoreBinaries": ["mise", "pgrep", "playwright"],
   "workspaces": {
     "packages/vouchington-tooling": {
       // Loaded from the consumer package boundary only when the opt-in integration runs.
@@ -56,6 +56,7 @@
         "src/dependency-license-policy/index.mts!",
         "src/nuget-central-version/index.mts!",
         "src/workflow-secrets-drift/index.mts!",
+        "src/tmux/index.mts!",
         "src/dead-code/index.mts!",
         "src/nuget-central-version/cli.mts!",
         "src/swift-semantic-equal/index.mts!",

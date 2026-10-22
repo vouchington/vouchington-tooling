@@ -184,6 +184,12 @@ describe('runCli', () => {
     await expect(runCli(['node', 'vouchington', 'post-review'])).resolves.toBe(1)
   })
 
+  it('routes tmux', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    expect(runCli(['node', 'vouchington', 'tmux', 'bogus'])).toBe(2)
+    write.mockRestore()
+  })
+
   it('routes verify-workflow-secrets', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     await expect(
