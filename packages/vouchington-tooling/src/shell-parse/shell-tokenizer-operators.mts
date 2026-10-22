@@ -50,8 +50,14 @@ export function consumeShellSeparator(state: SeparatorState): number | undefined
   ) {
     pushStateToken(state)
     const operator = state.options.markOperators ? ({ operator: true } as const) : {}
-    const previousToken = state.tokens.at(-1)?.value
-    if ((char === '&' && previousToken === '&') || (char === '|' && previousToken === '|')) {
+    const previous = state.tokens.at(-1)
+    const previousToken = previous?.value
+    // With `markOperators` a quoted `"|"` argument is not an operator, so only operators merge.
+    const mergeable = state.options.markOperators !== true || previous?.operator === true
+    if (
+      mergeable &&
+      ((char === '&' && previousToken === '&') || (char === '|' && previousToken === '|'))
+    ) {
       state.tokens[state.tokens.length - 1] = {
         expandable: false,
         ...operator,

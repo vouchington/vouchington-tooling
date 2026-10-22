@@ -23,6 +23,11 @@ describe('splitCommandSegments', () => {
     ])
   })
 
+  it('keeps a quoted operator argument next to a real operator', () => {
+    expect(splitCommandSegments('echo "|" | cat')).toEqual([['echo', '|'], ['cat']])
+    expect(splitCommandSegments('echo "&" & cat')).toEqual([['echo', '&'], ['cat']])
+  })
+
   it('splits on && and || and drops empty segments', () => {
     expect(splitCommandSegments('a && b || c ;; d')).toEqual([['a'], ['b'], ['c'], ['d']])
   })
