@@ -301,6 +301,11 @@
       "import": "./dist/dependency-license-policy/index.mjs",
       "default": "./dist/dependency-license-policy/index.mjs"
     },
+    "./workflow-secrets-drift": {
+      "types": "./dist/workflow-secrets-drift/index.d.mts",
+      "import": "./dist/workflow-secrets-drift/index.mjs",
+      "default": "./dist/workflow-secrets-drift/index.mjs"
+    },
     "./nuget-central-version": {
       "types": "./dist/nuget-central-version/index.d.mts",
       "import": "./dist/nuget-central-version/index.mjs",

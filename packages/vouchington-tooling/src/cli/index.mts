@@ -12,6 +12,7 @@ import { runPnpmInstallCli } from './commands/pnpm-install.mts'
 import { runRunnerPortPolicy } from './commands/runner-port-policy.mts'
 import { runScript } from './commands/spawn-script.mts'
 import { runNugetCentralVersionCommand } from './commands/nuget-central-version.mts'
+import { runVerifyWorkflowSecretsCli } from '../workflow-secrets-drift/cli.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
 import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
@@ -121,6 +122,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runPrepareVitestReportsCommand(parsed.args)
     case 'nuget-central-version':
       return runNugetCentralVersionCommand(parsed.args)
+    case 'verify-workflow-secrets':
+      return runVerifyWorkflowSecretsCli(parsed.args)
     case 'swift-semantic-equal':
       return runSwiftSemanticEqualCli(parsed.args)
     case 'post-review':

@@ -40,6 +40,7 @@ Commands:
   harness-assert-gates          Fail if any named HARNESS_*_ENABLED gate is enabled
   gha-collaborator-trust        Classify authors as write-access collaborators or not
   nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
+  verify-workflow-secrets       Check a secret inventory against live repository and environment secrets
   swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
   post-review                   Post one COMMENT review from a staged payload file
   stage-review-payload          Validate a review payload file into a staging directory
@@ -116,6 +117,7 @@ harness-admission-lane <lanes>
 harness-assert-gates <gate>...
 gha-collaborator-trust <owner/repo> [--allow-bot <login>]... < authors.json
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
+verify-workflow-secrets [--repo OWNER/NAME] [--confirm NAME,...] [--inventory MODULE] [--export NAME] [--branch NAME]
 swift-semantic-equal <base> <head> <file.swift>
 post-review
 stage-review-payload optional|required <source> <destination>
