@@ -171,6 +171,11 @@
       "import": "./dist/gha-artifacts-cleanup/index.mjs",
       "default": "./dist/gha-artifacts-cleanup/index.mjs"
     },
+    "./agent-issue-labels": {
+      "types": "./dist/agent-issue-labels/index.d.mts",
+      "import": "./dist/agent-issue-labels/index.mjs",
+      "default": "./dist/agent-issue-labels/index.mjs"
+    },
     "./http-origin": {
       "types": "./dist/http-origin/index.d.mts",
       "import": "./dist/http-origin/index.mjs",

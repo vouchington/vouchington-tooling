@@ -20,6 +20,7 @@ Commands:
   diagnose-port-collision       Capture bounded localhost port diagnostics
   prepare-trivy-db              Download the Trivy vulnerability database
   gha-artifacts-cleanup         Delete classified GitHub Actions artifacts
+  agent-issue-labels            Map changed paths to labels; create missing repository labels
   http-origin                   Validate an optional HTTP(S) origin
   vitest-blob-manifest          Stamp a vitest-blob-manifest:v1 identity file
   vitest-report-attempt         Write or read a Vitest report-attempt marker
@@ -96,6 +97,8 @@ diagnose-port-collision [--ports "2200 2216"] [--output-dir PATH]
 prepare-trivy-db
 gha-artifacts-cleanup run --run-id <id> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
 gha-artifacts-cleanup sweep --older-than-hours <n> [--keep-pattern glob] [--delete-pattern glob] [--patterns-file json]
+agent-issue-labels labels-from-paths [--labeler <path>] <path>...
+agent-issue-labels ensure-labels [--repo owner/name] [--policy-file json] [--update] <label>...
 http-origin [--field NAME] [value]
 vitest-blob-manifest <suite> [reports-directory]
 vitest-report-attempt <write DIRECTORY SUITE|read ROOT>

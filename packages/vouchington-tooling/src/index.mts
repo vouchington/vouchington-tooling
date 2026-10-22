@@ -226,6 +226,20 @@ export type {
   CleanupRequest,
   DeletionSummary,
 } from './gha-artifacts-cleanup/index.mts'
+export {
+  DEFAULT_LABEL_POLICY,
+  DEFAULT_LABELER_PATH,
+  ensureLabels,
+  labelMetadata,
+  labelsFromPaths,
+  parseLabelPolicy,
+  readLabelPolicyFile,
+} from './agent-issue-labels/index.mts'
+export type {
+  EnsureLabelsOptions,
+  LabelMetadata,
+  LabelPolicy,
+} from './agent-issue-labels/index.mts'
 export { validateOptionalHttpOrigin } from './http-origin/index.mts'
 export {
   boundPendingLine,

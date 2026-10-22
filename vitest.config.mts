@@ -30,6 +30,7 @@ export default defineConfig({
         'packages/*/src/workspace-gates/index.mts',
         'packages/*/src/workspace-gates/index.mts',
         'packages/*/src/gh-cli/index.mts',
+        'packages/*/src/agent-issue-labels/index.mts',
         'packages/*/src/fresh-base/index.mts',
         'packages/*/src/pull-request-diff/index.mts',
         'packages/*/src/**/*-types.mts',

@@ -336,6 +336,8 @@ vouchington allocate-browser-safe-ports 2 --policy ./policy.json --forbidden-por
 vouchington diagnose-port-collision --ports "2200 2216"
 vouchington prepare-trivy-db
 vouchington gha-artifacts-cleanup run --run-id 123 --keep-pattern 'plan-*'
+vouchington agent-issue-labels labels-from-paths --labeler .github/labeler.yml src/a.ts
+vouchington agent-issue-labels ensure-labels --policy-file labels.json --repo owner/name bug
 vouchington http-origin --field cdn_origin https://images.example.com
 vouchington vitest-blob-manifest <suite> [reports-directory]
 vouchington vitest-report-attempt write <directory> <suite>
@@ -431,6 +433,7 @@ import {
 } from 'vouchington-tooling/shared-context'
 import { writeSelectedFilesOutput } from 'vouchington-tooling/gha-selected-files'
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
+import { ensureLabels, labelsFromPaths } from 'vouchington-tooling/agent-issue-labels'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
 import { decide } from 'vouchington-tooling/transient-retry'
