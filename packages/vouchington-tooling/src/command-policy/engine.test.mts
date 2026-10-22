@@ -78,6 +78,17 @@ describe('evaluateCommandPolicy typo and protected paths', () => {
     expect(reasonOf({ command: '' }, true)).toBeNull()
   })
 
+  it('reads patch headers inside an apply_patch heredoc', () => {
+    const patch =
+      "apply_patch <<'EOF'\n*** Begin Patch\n*** Update File: tools/policy.mts\n*** End Patch\nEOF"
+    expect(reasonOf(bash(patch), true)).toBe(policy.protectedPaths!.reason)
+    const safe = "apply_patch <<'EOF'\n*** Begin Patch\n*** Update File: ok.txt\n*** End Patch\nEOF"
+    expect(reasonOf(bash(safe), true)).toBeNull()
+    expect(reasonOf(bash('  *** Begin Patch\n*** Add File: tools/policy.mts'), true)).toBe(
+      policy.protectedPaths!.reason,
+    )
+  })
+
   it('reads camelCase path keys and empty shell words', () => {
     expect(reasonOf({ tool_input: { filePath: 'tools/policy.mts' } }, true)).toBe(
       policy.protectedPaths!.reason,
@@ -120,6 +131,7 @@ describe('evaluateCommandPolicy command rules', () => {
     ['git commit --no-verify', '--no-verify'],
     ['git commit -an', 'git commit -n'],
     ['git -c core.hooksPath=/dev/null commit', 'core.hooksPath'],
+    ['git -c Core.HooksPath=/dev/null commit', 'core.hooksPath'],
     ['git push origin $(git branch --show-current | head -1) --force', 'Force pushes'],
     ['echo `git branch | head` && git push --force', 'Force pushes'],
     ['bash -c "git commit --amend"', 'amend'],

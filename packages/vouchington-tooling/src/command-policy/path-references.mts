@@ -39,8 +39,16 @@ function commandReferences(
   matches: (token: string) => boolean,
   options: { splitRedirections?: boolean },
 ): boolean {
-  if (command.startsWith(PATCH_BEGIN)) {
+  if (command.trimStart().startsWith(PATCH_BEGIN)) {
     return patchHeaderPaths(command).some(matches)
+  }
+  // `apply_patch <<'EOF'` carries its patch in a data heredoc that shell scanning blanks out.
+  if (
+    command.includes(PATCH_BEGIN) &&
+    tokenizeShellWords(command, { splitRedirections: true }).includes('apply_patch') &&
+    patchHeaderPaths(command).some(matches)
+  ) {
+    return true
   }
   // Without splitRedirections a no-space redirect like `>dir/file` stays fused to its operator.
   // Nested scripts (`sh -c`, substitutions, heredoc shell bodies) are read like the outer command.

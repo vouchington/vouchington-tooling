@@ -32,6 +32,10 @@ function repo(remotes: Record<string, string> = {}, config: Record<string, strin
 beforeEach(() => {
   vi.stubEnv('GIT_CONFIG_GLOBAL', '/dev/null')
   vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1')
+  // Inside a git hook these point at the outer repository, which the helpers must not touch.
+  for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX']) {
+    vi.stubEnv(name, undefined)
+  }
 })
 
 afterEach(() => {
