@@ -50,13 +50,44 @@ describe('labelsFromPaths', () => {
     expect(await labelsFromPaths([], labelerPath)).toEqual([])
   })
 
-  it('returns no labels for a missing, empty, or non-mapping config', async () => {
+  it('matches dot-directories and dotfiles like actions/labeler', async () => {
+    const dotted = join(dir, 'dotted.yml')
+    await writeFile(
+      dotted,
+      ['ci:', '  - changed-files:', "      - any-glob-to-any-file: '.github/**'", ''].join('\n'),
+    )
+    expect(await labelsFromPaths(['.github/workflows/ci.yml'], dotted)).toEqual(['ci'])
+    const star = join(dir, 'star.yml')
+    await writeFile(
+      star,
+      ['yaml:', '  - changed-files:', "      - any-glob-to-any-file: '**/*.yml'", ''].join('\n'),
+    )
+    expect(await labelsFromPaths(['.github/workflows/ci.yml'], star)).toEqual(['yaml'])
+  })
+
+  it('returns no labels for a missing config', async () => {
     expect(await labelsFromPaths(['a'], join(dir, 'missing.yml'))).toEqual([])
-    const empty = join(dir, 'empty.yml')
-    await writeFile(empty, '')
-    expect(await labelsFromPaths(['a'], empty)).toEqual([])
+  })
+
+  it('rethrows other read errors', async () => {
+    await expect(labelsFromPaths(['a'], dir)).rejects.toThrow('EISDIR')
+  })
+
+  it('throws with the path for a YAML syntax error', async () => {
     const bad = join(dir, 'bad.yml')
     await writeFile(bad, 'a: [unclosed')
-    expect(await labelsFromPaths(['a'], bad)).toEqual([])
+    await expect(labelsFromPaths(['a'], bad)).rejects.toThrow(`invalid labeler config ${bad}:`)
+  })
+
+  it.each([
+    ['empty', ''],
+    ['scalar', 'just text'],
+    ['list', '- a\n- b'],
+  ])('throws with the path for a non-mapping %s config', async (name, content) => {
+    const file = join(dir, `${name}.yml`)
+    await writeFile(file, content)
+    await expect(labelsFromPaths(['a'], file)).rejects.toThrow(
+      `invalid labeler config ${file}: top level must be a mapping`,
+    )
   })
 })
