@@ -584,6 +584,12 @@ Pass host-specific block rules and request-failure allowlist entries, a warning 
 pattern records React hydration and render warnings. The fixture does not import a product timeout
 guard: pass `assertTimeout` when the caller owns the timeout cap.
 
+`playwright` waits for below-fold hydration, retries transient local connection loss, navigates
+through an injectable Turnstile stub, and scrolls a caller-supplied sentinel into view.
+`@playwright/test` is an optional peer. The stub's attribute name and token default to `data-pw`
+and `PLAYWRIGHT_TURNSTILE_TOKEN`. The scroll helper's sentinel test id defaults to
+`infinite-scroll-sentinel`.
+
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.

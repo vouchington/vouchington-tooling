@@ -36,3 +36,13 @@ export {
 } from './browser-test.mts'
 export type { BrowserTestOptions } from './browser-test.mts'
 export type { Browser, BrowserContext, Locator, Page, Request, TestInfo } from '@playwright/test'
+export { navigateTo } from './navigate-to.mts'
+export { retryOnConnectionLost } from './retry-on-connection-lost.mts'
+export { forceMainScrollableBeforeHydration, scrollToLoadMore } from './scroll-to-load-more.mts'
+export {
+  DEFAULT_TURNSTILE_STUB_ATTRIBUTE,
+  DEFAULT_TURNSTILE_STUB_TOKEN,
+  installTurnstileStub,
+} from './turnstile-stub.mts'
+export type { TurnstileStubOptions } from './turnstile-stub.mts'
+export { waitForBelowFoldHydration } from './wait-for-hydration.mts'
