@@ -106,8 +106,14 @@ describe('blocked external network', () => {
 
   it('ignores unroute failures when the context is already closed', async () => {
     const { context } = createContext()
-    const remove = await installBlockedExternalNetwork(context)
-    vi.mocked(context.unroute).mockRejectedValue(new Error('context closed'))
+    const unroute = vi
+      .fn<(...args: Array<never>) => unknown>()
+      .mockRejectedValue(new Error('context closed'))
+    const closedContext = {
+      route: context.route.bind(context),
+      unroute,
+    } as unknown as BrowserContext
+    const remove = await installBlockedExternalNetwork(closedContext)
 
     await expect(remove()).resolves.toBeUndefined()
   })
