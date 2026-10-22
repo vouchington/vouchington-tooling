@@ -31,8 +31,10 @@ Use when completed retrospectives or journals should become durable follow-up wo
    treating missing records as absent. Require `manifest.schemaVersion` to be 1, `manifest.status`
    to be `"complete"`, a nonempty `cleanupToken`, and manifest counts that exactly match the export
    counts, including the terminal manifest record. Hand subagents only read-only partitions of the
-   verified file, never the original snapshot, and give each partition its own bounded session and
-   byte limits. Read full records, with their storage type, repository
+   verified file, never the original snapshot. Bound each partition to at most 25 contiguous
+   session groups or 1 MiB. A session's record and entries form an indivisible group, so fail the run
+   rather than split a group or weaken the bound. Only the root keeps the `cleanupToken`; never
+   delegate it. Read full records, with their storage type, repository
    tags, source identity, coverage, and outcomes, from that file. Do not distill from
    `journal_entries`: it reads one session at a time and has no checksum or manifest to show that
    the read is complete. For repository-scoped work, filter sessions by
@@ -53,8 +55,14 @@ Use when completed retrospectives or journals should become durable follow-up wo
    drafting. Skip work that is complete, explicitly rejected, or already covered. A first-party version
    bump is not proof of resolution: verify the adopted change against the original finding before
    deferring. Capture a new observation in the journal before filing it.
+   Inspect against the refreshed remote default branch, never the local one, which may sit on an
+   unmerged branch. Before filing a claim such as "direct-to-main" or "merged without CI", verify it
+   with `git branch -r --contains <sha>` and `git merge-base --is-ancestor <sha> origin/<default>`.
+   Prefer a retrospective's generated verifiable facts over its narration, and verify journal-only
+   claims the same way before they reach an issue body; an agent's in-session narration is not
+   evidence.
 6. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
-   validation. Route every authorized creation through
+   validation, using the [issue body template](references/issue-body.md). Route every authorized creation through
    [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
    denied-external tracking behavior.
 7. Archive only verified records fully processed across every represented repository, and never

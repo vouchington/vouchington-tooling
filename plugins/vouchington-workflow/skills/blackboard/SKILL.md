@@ -119,6 +119,24 @@ bounded structured facts or sanitized summaries, never raw command output, trans
 environment dumps, provider payloads, or secrets. Known-secret redaction supplements the author's
 minimization responsibility; it cannot prove arbitrary prose contains no undisclosed secret.
 
+## Sandbox and permission blocks
+
+A denied or escalated command uses this block grammar, one block per entry, because a
+retrospective's sandbox and permission audit is built only from entries that match it:
+
+```
+- `sandbox-escalation` — <command and subcommand only: no paths, hosts, branches, or secrets> — <what needed elevated access>
+  - Outcome: requested|approved|denied|unknown
+  - Evidence: <sanitized denial or approval text>
+  - Disposition: <allowlist change, issue #N, or none>
+```
+
+Use `sandbox-failure` (a sandbox refusal) or `ambiguous-failure` (a failure whose cause is unclear)
+in place of `sandbox-escalation` for a command that failed without an escalation; those blocks omit
+the `Outcome` line. Set `Outcome` only from observed evidence: a request is `requested`, never
+`approved`. Do not hand-journal an escalation the harness transcript already records; the
+retrospective's transcript facts report it. A denial or failure still needs its block.
+
 ## Credential failures
 
 - Never search shell profiles, `env`, or `.env*` files for a credential. Check presence only with

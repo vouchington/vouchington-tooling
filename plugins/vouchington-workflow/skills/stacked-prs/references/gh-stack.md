@@ -27,7 +27,11 @@ Use only non-interactive forms, and run every `gh stack` command without a TTY. 
 create ordinary pull requests when stacks are disabled; without a TTY these fail instead, so treat
 a failure as the exit-9 recovery above rather than answering a prompt.
 
-- `gh stack init <branch>`, rooted on the default branch only.
+- `gh stack init <branch>`, rooted on the default branch only. It roots the first layer at the
+  local default branch, not `origin/<default>`, and in a linked worktree `git fetch origin` does not
+  advance that ref. Fast-forward it with `git fetch origin <default>:<default>` only when no worktree
+  has the default branch checked out. Otherwise the checkout that has it fast-forwards itself with
+  `git merge --ff-only origin/<default>`; never move it from another worktree.
 - `gh stack add <branch>`, after the layer cap check in [SKILL.md](../SKILL.md#work-bottom-up).
 - `gh stack checkout <stack-or-pr-number>` imports an existing remote stack. See
   [Import a stack](#import-a-stack-before-acting-on-it).
