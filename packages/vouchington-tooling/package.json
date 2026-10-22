@@ -391,6 +391,21 @@
       "types": "./dist/post-publication-inventory/index.d.mts",
       "import": "./dist/post-publication-inventory/index.mjs",
       "default": "./dist/post-publication-inventory/index.mjs"
+    },
+    "./next-navigation-mock": {
+      "types": "./dist/next-navigation-mock/index.d.mts",
+      "import": "./dist/next-navigation-mock/index.mjs",
+      "default": "./dist/next-navigation-mock/index.mjs"
+    },
+    "./jsdom-stubs": {
+      "types": "./dist/jsdom-stubs/index.d.mts",
+      "import": "./dist/jsdom-stubs/index.mjs",
+      "default": "./dist/jsdom-stubs/index.mjs"
+    },
+    "./input-otp-mock": {
+      "types": "./dist/input-otp-mock/index.d.mts",
+      "import": "./dist/input-otp-mock/index.mjs",
+      "default": "./dist/input-otp-mock/index.mjs"
     }
   },
   "publishConfig": {
@@ -421,15 +436,22 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "@playwright/test": "1.64.1",
     "@types/picomatch": "^4.0.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@types/spdx-expression-parse": "4.0.0",
+    "next": "16.4.2",
     "no-mistakes": "0.83.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "smol-toml": "1.9.1",
     "typescript5": "npm:typescript@5.9.3"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@playwright/test": ">=1.64.1",
+    "next": ">=15",
     "no-mistakes": "*",
+    "react": ">=18",
     "typescript": ">=5",
     "vitest": ">=5"
   },
@@ -440,7 +462,13 @@
     "@playwright/test": {
       "optional": true
     },
+    "next": {
+      "optional": true
+    },
     "no-mistakes": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     },
     "typescript": {
