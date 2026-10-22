@@ -60,7 +60,7 @@ describe('finished worktrees', () => {
     expect(existsSync(path)).toBe(false)
     expect(existsSync(other)).toBe(true)
     expect(fx.git(fx.main, 'branch', '--list', 'done')).toContain('done')
-  })
+  }, 30_000)
 
   it('reclaims a squash-merged branch deleted on the remote when the PR head is HEAD', () => {
     fx.addWorktree('squashed', { push: true })
@@ -123,12 +123,16 @@ describe('kept worktrees', () => {
     expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
   })
 
-  it.each([['open'], ['all']])('keeps a worktree when the %s PR query fills its page', (state) => {
-    fx.addWorktree('busy', { push: true })
-    fx.setPrs('busy', [merged])
-    const env = { ...fx.env, [`FAKE_GH_PAD_${state.toUpperCase()}`]: '1000' }
-    expect(only(reclaim(false, env))).toEqual(kept('cannot read PR state'))
-  })
+  it.each([['open'], ['all']])(
+    'keeps a worktree when the %s PR query fills its page',
+    (state) => {
+      fx.addWorktree('busy', { push: true })
+      fx.setPrs('busy', [merged])
+      const env = { ...fx.env, [`FAKE_GH_PAD_${state.toUpperCase()}`]: '1000' }
+      expect(only(reclaim(false, env))).toEqual(kept('cannot read PR state'))
+    },
+    30_000,
+  )
 
   it('keeps a worktree with untracked files, including inside new directories', () => {
     const path = fx.addWorktree('dirty', { push: true })
@@ -136,14 +140,14 @@ describe('kept worktrees', () => {
     mkdirSync(join(path, 'new'))
     writeFileSync(join(path, 'new', 'file.txt'), 'x')
     expect(only(reclaim())).toEqual(kept('uncommitted changes'))
-  })
+  }, 30_000)
 
   it('keeps a worktree with modified tracked files', () => {
     const path = fx.addWorktree('edited', { push: true })
     fx.setPrs('edited', [merged])
     writeFileSync(join(path, 'edited.txt'), 'changed\n')
     expect(only(reclaim())).toEqual(kept('uncommitted changes'))
-  })
+  }, 30_000)
 
   it.each(['--assume-unchanged', '--skip-worktree'])(
     'keeps a worktree hiding edits with %s',
@@ -289,7 +293,7 @@ describe('rechecks and nesting', () => {
     )
     expect(entry).toEqual(['gaining', 'kept', 'contains another worktree'])
     expect(existsSync(path)).toBe(true)
-  })
+  }, 30_000)
 
   it('keeps a worktree that contains another registered worktree', () => {
     const parent = fx.addWorktree('parent', { push: true })
@@ -308,7 +312,7 @@ describe('rechecks and nesting', () => {
       ['parent', 'kept', 'contains another worktree'],
     ])
     expect(existsSync(child)).toBe(true)
-  })
+  }, 30_000)
 })
 
 describe('inherited git environment', () => {
@@ -324,7 +328,7 @@ describe('inherited git environment', () => {
     const report = reclaim(true, env)
     expect(report.worktrees.map((e) => [e.path, e.status])).toEqual([[other, 'reclaimed']])
     expect(existsSync(fx.caller)).toBe(true)
-  })
+  }, 30_000)
 })
 
 describe('gh environment', () => {

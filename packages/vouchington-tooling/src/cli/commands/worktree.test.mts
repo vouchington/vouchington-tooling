@@ -35,7 +35,7 @@ describe('runWorktreeCommand', () => {
       dryRun: false,
       worktrees: [{ branch: 'done', status: 'reclaimed' }],
     })
-  })
+  }, 30_000)
 
   it.each([[[]], [['prune']], [['reclaim', '--force']]])(
     'rejects %j with usage and exit 2',

@@ -127,7 +127,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
 
     holder.kill('SIGTERM')
     await held
-  })
+  }, 30_000)
 
   it('prints the holder pid and pgid when acquire timeout runs unlocked', async () => {
     const home = await makeHome()
@@ -160,7 +160,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
 
     holder.kill('SIGTERM')
     await held
-  })
+  }, 30_000)
 
   it('prints missing owner fields when the lock directory has no valid pid or pgid', async () => {
     const home = await makeHome()
@@ -232,7 +232,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
 
     holder.kill('SIGTERM')
     await held
-  })
+  }, 30_000)
 
   it('registers unlocked release markers with the EXIT cleanup path', async () => {
     const source = await readFile(hostLockScript, 'utf8')

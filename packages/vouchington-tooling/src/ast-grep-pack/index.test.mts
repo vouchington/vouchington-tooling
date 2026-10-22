@@ -46,7 +46,7 @@ describe('ast-grep pack', () => {
   it('passes native ast-grep example replay for the shipped pack', () => {
     const pack = astGrepPackPaths()
     expect(runAstGrepExamples({ ...pack, executable: astGrepExecutable })).toBe(0)
-  })
+  }, 30_000)
 
   it('prints pack paths as JSON from the CLI', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)

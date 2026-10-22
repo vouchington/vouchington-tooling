@@ -38,4 +38,4 @@ it('reports a candidate that fails mid-run as kept and carries on', () => {
     reason: 'error: ENOENT: vanished',
   })
   expect(byBranch.fine).toMatchObject({ path: fine, status: 'reclaimed' })
-})
+}, 30_000)

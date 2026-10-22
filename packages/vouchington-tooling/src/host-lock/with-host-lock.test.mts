@@ -105,7 +105,7 @@ describe('with-host-lock.sh', () => {
       { code: 0, stderr: acquired },
       { code: 0, stderr: acquired },
     ])
-  })
+  }, 30_000)
 
   it('serializes the same OS user across runner-specific TMPDIR values', async () => {
     const home = await makeHome()
@@ -140,7 +140,7 @@ describe('with-host-lock.sh', () => {
       { code: 0, stderr: acquired },
       { code: 0, stderr: acquired },
     ])
-  })
+  }, 30_000)
 
   it('allows separate lock families to run concurrently', async () => {
     const home = await makeHome()

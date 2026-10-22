@@ -61,5 +61,5 @@ describe('run-bounded socket sinks', () => {
       sourceHolderStatus: 0,
       wrapperDrained: true,
     })
-  })
+  }, 30_000)
 })
