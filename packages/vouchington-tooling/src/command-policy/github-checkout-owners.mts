@@ -80,7 +80,7 @@ export function ownerOfRepoSelector(value: string): string | undefined {
   if (!REPO_SELECTOR_CHARACTERS.test(path) || segments.length < 2 || segments.length > 3) {
     return undefined
   }
-  return segments.includes('') ? undefined : githubOwner(segments.at(-2) ?? '')
+  return segments.includes('') ? undefined : githubOwner(segments[segments.length - 2]!)
 }
 
 export function githubOwner(value: string): string | undefined {

@@ -92,7 +92,12 @@ describe('checkoutOwners', () => {
 
   it('is undefined when a set-default is not an owner/repo selector', () => {
     expect(
-      checkoutOwners(repo({}, { 'remote.origin.gh-resolved': 'not-a-selector' })),
+      checkoutOwners(
+        repo(
+          { origin: 'https://github.com/acme/t.git' },
+          { 'remote.origin.gh-resolved': 'not-a-selector' },
+        ),
+      ),
     ).toBeUndefined()
   })
 

@@ -107,6 +107,17 @@ describe('stack workflow actions', () => {
   })
 })
 
+describe('default git probe', () => {
+  it('fails open outside a repository', () => {
+    const policy: CommandPolicy = { stack: {} }
+    const decision = evaluateCommandPolicy(bash('gh stack init t'), policy, {
+      automationContext: false,
+      cwd: '/definitely/not/a/repository',
+    })
+    expect(decision).toBeNull()
+  })
+})
+
 describe('stack init root guards', () => {
   it('requires the configured base branch', () => {
     expect(reason('gh stack init t --base feature')).toContain('must root on main')

@@ -78,6 +78,14 @@ describe('evaluateCommandPolicy typo and protected paths', () => {
     expect(reasonOf({ command: '' }, true)).toBeNull()
   })
 
+  it('reads camelCase path keys and empty shell words', () => {
+    expect(reasonOf({ tool_input: { filePath: 'tools/policy.mts' } }, true)).toBe(
+      policy.protectedPaths!.reason,
+    )
+    expect(reasonOf(bash('cat "" ok'), true)).toBeNull()
+    expect(reasonOf({ tool_input: { file_path: '' } }, true)).toBeNull()
+  })
+
   it('needs no rules to allow anything', () => {
     expect(reasonOf(bash('anything'), true, {})).toBeNull()
     expect(reasonOf(bash('gh pr view 1'), false, {})).toBeNull()
@@ -122,6 +130,13 @@ describe('evaluateCommandPolicy command rules', () => {
     expect(reasonOf(bash('git rebase --continue'))).toContain('GIT_EDITOR=true')
     expect(reasonOf(bash('GIT_EDITOR=true git rebase --continue'))).toBeNull()
     expect(reasonOf(bash('git rebase --continue'), false, {})).toBeNull()
+  })
+
+  it('treats an unterminated substitution as plain text and defaults the pull-rebase reason', () => {
+    expect(reasonOf(bash('echo $(oops; git push --force'))).toContain('Force pushes')
+    expect(reasonOf(bash('echo `oops; git commit --amend'))).toContain('amend')
+    const defaults = standardGitPatterns().find((rule) => rule.pattern.test('git pull -r'))
+    expect(defaults?.reason).toBe('git pull --rebase and git pull -r are banned.')
   })
 
   it('skips git rules for commands that never mention git', () => {
