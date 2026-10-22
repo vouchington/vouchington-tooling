@@ -24,6 +24,9 @@ vi.mock('./commands/mcp.mts', () => ({
 vi.mock('./commands/hook.mts', () => ({
   runHookCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/sandbox-command-audit.mts', () => ({
+  runSandboxCommandAuditCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/worktree.mts', () => ({
   runWorktreeCommand: vi.fn(() => 0),
 }))
@@ -38,6 +41,7 @@ import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runHookCommand } from './commands/hook.mts'
+import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
@@ -81,6 +85,13 @@ describe('runCli extract command dispatch', () => {
   it('forwards the hook subcommand and its arguments', async () => {
     await expect(runCli(['node', 'vouchington', 'hook', 'post-tool-use'])).resolves.toBe(0)
     expect(runHookCommand).toHaveBeenCalledWith(['post-tool-use'])
+  })
+
+  it('forwards the sandbox-command-audit subcommand and its arguments', async () => {
+    await expect(
+      runCli(['node', 'vouchington', 'sandbox-command-audit', '--rules', 'r.mjs']),
+    ).resolves.toBe(0)
+    expect(runSandboxCommandAuditCommand).toHaveBeenCalledWith(['--rules', 'r.mjs'])
   })
 
   it('forwards the mcp subcommand and its arguments', async () => {

@@ -316,6 +316,11 @@
       "import": "./dist/dead-code/index.mjs",
       "default": "./dist/dead-code/index.mjs"
     },
+    "./sandbox-command-audit": {
+      "types": "./dist/sandbox-command-audit/index.d.mts",
+      "import": "./dist/sandbox-command-audit/index.mjs",
+      "default": "./dist/sandbox-command-audit/index.mjs"
+    },
     "./tmux": {
       "types": "./dist/tmux/index.d.mts",
       "import": "./dist/tmux/index.mjs",

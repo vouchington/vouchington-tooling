@@ -275,6 +275,53 @@ at most `limits.totalBytes` in all. A log that cannot be read is reported throug
 pieces are exported from `vouchington-tooling/transient-retry` (`rerunKnownTransient`,
 `buildWorkflowRunContext`, `createGhApi`).
 
+## Auditing sandbox escalations
+
+`vouchington sandbox-command-audit --rules <module> [--settings-path <file>] [--repo-root <dir>]...
+[--worktree-glob <glob>]... [--projects-dir <dir>] [--codex-sessions-dir <dir>] [--session-id <id>]
+[--limit N] [--since DAYS] [--json] [--raw]` scans agent transcripts for Bash calls that left the
+sandbox (`dangerouslyDisableSandbox`), were denied, or failed on a permission signature, and groups
+them by command prefix. Transcript roots default to `CLAUDE_CONFIG_DIR/projects` and
+`CODEX_HOME/sessions` (else `~/.claude` and `~/.codex`). Discovery is scoped to the repository so
+other projects' commands are not reported as this repository's gaps: the roots are the main
+checkout plus every worktree `git worktree list` knows, or the `--repo-root` values, plus the
+matches of each `--worktree-glob` (a glob relative to each root, for worktree layouts git no longer
+lists). A transcript is attributed by its first recorded `cwd`; files whose cwd is unknown or
+outside the roots are counted on the `Scope:` line, never dropped silently. `--limit` caps files per
+source after scoping and `--since` is a day window. The default report holds only prefixes and
+counts; `--raw` adds full command and failure text for local inspection and `--json` serializes
+either view.
+
+The package ships no classification. The module named by `--rules` default-exports (or exports as
+`rules`) an object, or a function returning one:
+
+```js
+export default {
+  // Required. Turns the settings location into the repository's coverage answer, or { error }.
+  loadPolicy: ({ settingsPath, cwd }) => ({
+    // list is 'allow' | 'deny' | 'excluded'. 'allow' and 'excluded' receive a normalized
+    // command prefix; 'deny' receives each raw command.
+    covers: (list, commandOrPrefix) =>
+      myPolicy[list].some((rule) => matches(rule, commandOrPrefix)),
+  }),
+  // Optional. Claims a failed Bash result for a bucket of your own (any string); it runs after the
+  // E2BIG check and before the generic permission signatures, and its kinds are reported
+  // separately from bypass candidates. It also runs on Codex CommandExecution output.
+  classifyFailure: (command, text, source) =>
+    /read-only file system/.test(text) ? 'write-path' : undefined,
+  // Optional. Overrides any scan cap (see AuditLimits).
+  limits: { maxRetainedRecords: 1000 },
+  worktreeGlobs: ['../checkouts/*'],
+}
+```
+
+Built-in failure kinds are `genuine` (permission denied, `EACCES`, `EPERM`, sandbox start failures,
+and a timeout against a loopback address) and `e2big`. A missing or unreadable policy, or an
+unresolvable repository, prints a `Status: unavailable` report so a retrospective can still embed
+the output. The pieces are exported from `vouchington-tooling/sandbox-command-audit`
+(`scanTranscripts`, `discoverTranscriptFiles`, `resolveRepoRoots`, `classifyAudit`, `formatReport`,
+`runAudit`). Codex escalations are not scanned: Codex agents journal those separately.
+
 ## Reclaiming finished worktrees
 
 `vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
@@ -357,6 +404,7 @@ import {
   writeGeneratedFiles,
 } from 'vouchington-tooling/api-fixtures'
 import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
+import { scanTranscripts, classifyAudit } from 'vouchington-tooling/sandbox-command-audit'
 import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import {
   extractLooseMarkdownTableRows,
