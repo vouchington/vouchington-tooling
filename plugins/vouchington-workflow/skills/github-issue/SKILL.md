@@ -63,6 +63,18 @@ templates, and repository-routing policy before any remote mutation.
    unchanged and report the gap.
 3. Write a self-contained issue: problem, desired outcome, ownership boundaries, concrete areas,
    validation, and external context. A discovered blocker does not widen implementation scope.
+   - Before absorbing a newly discovered blocker, require the calling workflow to reproduce it
+     against the refreshed default branch and provide the evidence, then search for an existing fix
+     or issue. If a fix resolves it, report it so the caller can use and retest it. Otherwise ask
+     whether to widen the accepted scope or only link or record a follow-up. Filing records work;
+     it does not amend the accepted plan or authorize implementation.
+   - A stop condition in an issue names a real decision for a human. Adding or changing an index,
+     or a rewrite that returns the same rows, is never one: the worker makes the change and records
+     the plan before and after.
+   - Verify every existing path in `## Files / areas` against `HEAD`. Mark a proposed path `New`
+     and verify its owning parent or module. Reject absolute and parent-traversal (`..`) paths. For
+     a target outside the current checkout, verify only redacted remote metadata through the
+     Contents API.
 4. Fetch the complete live taxonomy, including open projects. Apply matching existing labels and a
    selected existing milestone with no separate approval.
    - Use an existing open project for strategic, initiative-level tracking, and a milestone for
