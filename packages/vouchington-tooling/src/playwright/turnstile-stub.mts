@@ -27,6 +27,8 @@ function renderTurnstileStubScript(token: string, attributeName: string) {
   window.turnstile = {
     render: function (container, params) {
       var id = 'pw-' + Math.random().toString(36).slice(2)
+      if (typeof container === 'string') container = document.querySelector(container)
+      if (!container) throw new Error('Turnstile container not found')
       container.replaceChildren()
       var widget = document.createElement('div')
       widget.setAttribute('role', 'group')

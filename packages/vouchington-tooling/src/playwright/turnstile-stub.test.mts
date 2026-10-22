@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 import type { Page, Route } from '@playwright/test'
 import {
@@ -61,5 +62,81 @@ describe('installTurnstileStub', () => {
     await installTurnstileStub(page)
 
     expect(calls).toBe(2)
+  })
+
+  describe('synthetic widget', () => {
+    function loadStub() {
+      const container = {
+        appended: [] as unknown[],
+        replaceChildren: vi.fn<() => void>(),
+        appendChild(child: unknown) {
+          this.appended.push(child)
+        },
+      }
+      const created: Array<{ attributes: Record<string, string>; textContent?: string }> = []
+      const querySelector = vi.fn<(selector: string) => unknown>((selector) =>
+        selector === '#captcha' ? container : null,
+      )
+      const document = {
+        createElement: () => {
+          const element = {
+            attributes: {} as Record<string, string>,
+            setAttribute(name: string, value: string) {
+              this.attributes[name] = value
+            },
+          }
+          created.push(element)
+          return element
+        },
+        querySelector,
+      }
+      const window: { turnstile?: { render: (target: unknown, params?: unknown) => string } } = {}
+      return { container, created, document, querySelector, window }
+    }
+
+    async function render(target: unknown) {
+      const { page, routes } = createPage()
+      await installTurnstileStub(page)
+      const env = loadStub()
+      runInNewContext(routes[0]?.body ?? '', {
+        document: env.document,
+        queueMicrotask,
+        window: env.window,
+      })
+      const callback = vi.fn<(token: string) => void>()
+      const id = env.window.turnstile?.render(target, { callback })
+      await Promise.resolve()
+      return { ...env, callback, id }
+    }
+
+    it('resolves a selector-string container before clearing it', async () => {
+      const { callback, container, created, id, querySelector } = await render('#captcha')
+
+      expect(querySelector).toHaveBeenCalledWith('#captcha')
+      expect(container.replaceChildren).toHaveBeenCalledOnce()
+      expect(container.appended).toEqual(created)
+      expect(id).toMatch(/^pw-/)
+      expect(callback).toHaveBeenCalledWith(DEFAULT_TURNSTILE_STUB_TOKEN)
+    })
+
+    it('accepts an element container directly', async () => {
+      const { page, routes } = createPage()
+      await installTurnstileStub(page)
+      const env = loadStub()
+      runInNewContext(routes[0]?.body ?? '', {
+        document: env.document,
+        queueMicrotask,
+        window: env.window,
+      })
+
+      env.window.turnstile?.render(env.container)
+
+      expect(env.container.replaceChildren).toHaveBeenCalledOnce()
+      expect(env.querySelector).not.toHaveBeenCalled()
+    })
+
+    it('throws when a selector matches no element', async () => {
+      await expect(render('#missing')).rejects.toThrow('Turnstile container not found')
+    })
   })
 })
