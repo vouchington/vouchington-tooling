@@ -12,13 +12,8 @@ import {
   SESSION_ID,
   type ResolveOptions,
 } from './resolve-transcript-file.mts'
-import {
-  emptyFacts,
-  hasMalformedInteriorRecord,
-  parseLines,
-  type CodexSegment,
-  type TranscriptFacts,
-} from './shared.mts'
+import { hasMalformedInteriorRecord } from './malformed-record.mts'
+import { emptyFacts, parseLines, type CodexSegment, type TranscriptFacts } from './shared.mts'
 export type { TokenTotals, TranscriptFacts } from './shared.mts'
 export { codexChildren, codexIdentity } from './codex.mts'
 export { formatTranscriptFacts, formatUnavailable } from './format.mts'

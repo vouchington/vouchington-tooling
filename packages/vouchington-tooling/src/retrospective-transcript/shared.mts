@@ -1,3 +1,4 @@
+import type { SandboxEscalation } from './escalations.mts'
 export type TokenTotals = {
   input: number
   output: number
@@ -16,6 +17,7 @@ export type TranscriptFacts = {
   tokens: TokenTotals
   subagentToolCalls: number
   subagentTokens: TokenTotals
+  escalations: SandboxEscalation[]
 }
 export type ParsedLine = Record<string, unknown>
 export type CodexSegment = { lines: string[]; baseline: TokenTotals }
@@ -37,6 +39,7 @@ export const emptyFacts = (): TranscriptFacts => ({
   tokens: emptyTokens(),
   subagentToolCalls: 0,
   subagentTokens: emptyTokens(),
+  escalations: [],
 })
 export function asRecord(value: unknown): ParsedLine | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -57,17 +60,6 @@ export function parseLines(lines: string[]): ParsedLine[] {
     }
   }
   return records
-}
-export function hasMalformedInteriorRecord(lines: string[]): boolean {
-  const nonblank = lines.filter((line) => line.trim())
-  const complete = lines.at(-1)?.trim() ? nonblank.slice(0, -1) : nonblank
-  return complete.some((line) => {
-    try {
-      return !asRecord(JSON.parse(line))
-    } catch {
-      return true
-    }
-  })
 }
 type HereDoc = { delimiter: string; stripTabs: boolean }
 function hereDocs(tokens: string[]): HereDoc[] {
