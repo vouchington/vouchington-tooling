@@ -114,6 +114,12 @@ describe('deriveRuleAttempts', () => {
     ).rejects.toThrow('HTTP 500')
   })
 
+  it('does not replay attempts that created no jobs', async () => {
+    const routes: Route[] = [['attempts/2/jobs', jobsPage(failed('failure'))]]
+    const attempts = await derive(routes, [rule('catch-all', () => true)], 3, {}, [0, 1])
+    expect(attempts).toEqual(new Map([['catch-all', 2]]))
+  })
+
   it('returns one-based counts for a first attempt', async () => {
     await expect(derive([], [rule('a', () => true)], 1)).resolves.toEqual(new Map([['a', 1]]))
   })

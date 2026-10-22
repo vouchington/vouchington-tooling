@@ -55,12 +55,17 @@ export function createGhRunner(tokenEnv?: string): RunTextCommand {
         encoding: 'utf8',
         maxBuffer: API_MAX_BUFFER_BYTES,
       }),
-    (env) => {
-      const base = ghSpawnEnv(env)
-      const token = tokenEnv === undefined ? undefined : env[tokenEnv]
-      return token ? { ...base, GH_TOKEN: token } : base
-    },
+    ghEnvWithToken(tokenEnv),
   )
+}
+
+/** The `gh` child environment: forced color removed, and `tokenEnv`'s value exposed as `GH_TOKEN`. */
+export function ghEnvWithToken(tokenEnv?: string): (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv {
+  return (env) => {
+    const base = ghSpawnEnv(env)
+    const token = tokenEnv === undefined ? undefined : env[tokenEnv]
+    return token ? { ...base, GH_TOKEN: token } : base
+  }
 }
 
 function errorText(error: unknown): string {

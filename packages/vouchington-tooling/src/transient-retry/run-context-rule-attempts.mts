@@ -57,6 +57,8 @@ export async function deriveRuleAttempts(
   const priorReruns = new Map<string, number>()
   let replayCount = rules.length
   for (let attempt = 1; attempt < runAttempt; attempt += 1) {
+    // An attempt that created no jobs has no failure signal; the shared attempt already discounts it.
+    if (priorCounts[attempt - 1] === 0) continue
     const jobs = await fetchJobs(env, attempt)
     const replayRules = rules.slice(0, replayCount)
     const context: WorkflowRunContext = {

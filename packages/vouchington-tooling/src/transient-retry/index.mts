@@ -7,6 +7,7 @@ export {
   API_MAX_BUFFER_BYTES,
   createGhApi,
   createGhRunner,
+  ghEnvWithToken,
   DEFAULT_RETRYABLE_MARKERS,
 } from './gh-api.mts'
 export type { GhApi, GhApiOptions } from './gh-api.mts'
@@ -16,7 +17,7 @@ export {
   terminalFailedGithubActionsStepLog,
 } from './github-actions-log.mts'
 export type { GithubActionsStepGroupSlice } from './github-actions-log.mts'
-export { streamGhApiLog } from './log-stream.mts'
+export { createGhLogStreamer, streamGhApiLog } from './log-stream.mts'
 export { DEFAULT_LOG_LIMITS, LOG_OMISSION_MARKER } from './log-window.mts'
 export type { LogLimits } from './log-window.mts'
 export { NO_RERUN, RERUN_REQUESTED, rerunKnownTransient } from './rerun.mts'

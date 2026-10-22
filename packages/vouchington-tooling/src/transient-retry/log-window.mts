@@ -39,7 +39,7 @@ export async function collectDiagnosticWindow(
     }
     total += chunk.byteLength
     const headPart = chunk.subarray(0, headBytes - headLength)
-    head.push(headPart)
+    if (headPart.byteLength > 0) head.push(headPart)
     headLength += headPart.byteLength
     tail.push(chunk)
     tailLength += chunk.byteLength

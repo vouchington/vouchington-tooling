@@ -142,6 +142,26 @@ describe('buildWorkflowRunContext', () => {
     expect(streamed).toHaveLength(1)
   })
 
+  it('keeps jobs that share a display name apart', async () => {
+    const { env, streamed } = createFakeEnv(
+      [
+        ['attempts/1/jobs', jobsPage()],
+        [
+          'runs/123/jobs',
+          jobsPage(
+            { name: 'shard', id: 1, conclusion: 'failure' },
+            { name: 'shard', id: 2, conclusion: 'failure' },
+          ),
+        ],
+      ],
+      { '/jobs/1/logs': 'first', '/jobs/2/logs': 'second' },
+    )
+    const context = await buildWorkflowRunContext(env, options)
+    await expect(context.failedJobLogs()).resolves.toEqual(new Map([['shard', 'first\nsecond']]))
+    await expect(context.jobLogs(['shard'])).resolves.toEqual(new Map([['shard', 'first']]))
+    expect(streamed).toHaveLength(2)
+  })
+
   it('records an unreadable log as a failure with empty text and retries transport errors', async () => {
     const fatal = createFakeEnv(baseRoutes, { '/jobs/11/logs': new Error('HTTP 404') })
     const context = await buildWorkflowRunContext(fatal.env, options)
@@ -213,12 +233,15 @@ describe('buildWorkflowRunContext', () => {
   })
 
   it('keeps the shared attempt when replaying the first rule throws', async () => {
-    const { env } = createFakeEnv(baseRoutes)
+    const { env } = createFakeEnv([
+      ['attempts/1/jobs', jobsPage({ name: 'test', id: 5, conclusion: 'failure' })],
+      ['runs/123/jobs', currentJobs],
+    ])
     const context = await buildWorkflowRunContext(env, {
       ...options,
       rules: [{ id: 'bad', maxAttempts: 3, match: () => Promise.reject(new Error('boom')) }],
     })
     expect(context.retryAttempts).toBeUndefined()
-    expect(context.retryAttempt).toBe(1)
+    expect(context.retryAttempt).toBe(2)
   })
 })

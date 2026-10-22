@@ -14,9 +14,11 @@ export function createLogFetchers(
   allJobs: readonly JobEntry[],
   failedJobs: readonly JobEntry[],
 ) {
-  const cached = new Map<string, string>()
-  const inFlight = new Map<string, Promise<string>>()
-  const jobsByName = new Map(allJobs.map((job) => [job.name, job]))
+  // Fetch state is keyed by job id: distinct jobs may share a display name.
+  const cached = new Map<number, string>()
+  const inFlight = new Map<number, Promise<string>>()
+  const jobsByName = new Map<string, JobEntry>()
+  for (const job of allJobs) if (!jobsByName.has(job.name)) jobsByName.set(job.name, job)
   const failures = new Set<string>()
   let retainedBytes = 0
   let queueTail: Promise<void> = Promise.resolve()
@@ -44,20 +46,20 @@ export function createLogFetchers(
     } catch {
       failures.add(job.name)
     }
-    cached.set(job.name, log)
+    cached.set(job.id, log)
     return log
   }
 
   const fetchLog = (job: JobEntry): Promise<string> => {
-    const hit = cached.get(job.name)
+    const hit = cached.get(job.id)
     if (hit !== undefined) return Promise.resolve(hit)
-    const pending = inFlight.get(job.name)
+    const pending = inFlight.get(job.id)
     if (pending) return pending
     // Sequential on purpose: many failed jobs must not hold many windows at once.
     const settled = queueTail
       .then(() => fetchWithinBudget(job))
-      .finally(() => inFlight.delete(job.name))
-    inFlight.set(job.name, settled)
+      .finally(() => inFlight.delete(job.id))
+    inFlight.set(job.id, settled)
     // `fetchWithinBudget` records failures instead of throwing, so the queue never rejects.
     queueTail = settled.then(() => undefined)
     return settled
@@ -68,7 +70,11 @@ export function createLogFetchers(
     failedJobLogs: () =>
       (failedLogs ??= (async () => {
         const logs = new Map<string, string>()
-        for (const job of failedJobs) logs.set(job.name, await fetchLog(job))
+        for (const job of failedJobs) {
+          const log = await fetchLog(job)
+          // Failed jobs that share a name are joined so no job's evidence is dropped.
+          logs.set(job.name, logs.has(job.name) ? `${logs.get(job.name)}\n${log}` : log)
+        }
         return logs
       })()),
     jobLogs: async (jobNames: readonly string[]) => {

@@ -1,15 +1,21 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
-import { ghSpawnEnv } from '../gh-cli/env.mts'
+import { ghEnvWithToken } from './gh-api.mts'
 
 type GhChild = ChildProcessByStdio<null, Readable, Readable>
 export type SpawnGh = (args: string[]) => GhChild
 
 const STDERR_MAX_BYTES = 4 * 1024
 
-const spawnGh: SpawnGh = (args) =>
-  spawn('gh', args, { env: ghSpawnEnv(process.env), stdio: ['ignore', 'pipe', 'pipe'] })
+const spawnGhWith =
+  (buildEnv: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv): SpawnGh =>
+  (args) =>
+    spawn('gh', args, { env: buildEnv(process.env), stdio: ['ignore', 'pipe', 'pipe'] })
+
+/** A log streamer whose `gh` child sees `tokenEnv`'s value as `GH_TOKEN`, like `createGhRunner`. */
+export const createGhLogStreamer = (tokenEnv?: string) => (path: string) =>
+  streamGhApiLog(path, spawnGhWith(ghEnvWithToken(tokenEnv)))
 
 /**
  * Streams one `gh api` response body in chunks so the caller never buffers a whole job log. If the
@@ -17,7 +23,7 @@ const spawnGh: SpawnGh = (args) =>
  */
 export async function* streamGhApiLog(
   path: string,
-  spawnChild: SpawnGh = spawnGh,
+  spawnChild: SpawnGh = spawnGhWith(ghEnvWithToken()),
 ): AsyncGenerator<Buffer> {
   const child = spawnChild(['api', '--allow-escape-sequences', path])
   const stderr: Buffer[] = []

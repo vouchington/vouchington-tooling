@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { streamGhApiLog, type SpawnGh } from './log-stream.mts'
+import { createGhLogStreamer, streamGhApiLog, type SpawnGh } from './log-stream.mts'
 import { installFakeGh } from './run-context.test-helpers.mts'
 
 async function collect(stream: AsyncIterable<Buffer>): Promise<string> {
@@ -62,6 +62,19 @@ describe('streamGhApiLog with the real gh on PATH', () => {
       )
     } finally {
       delete process.env.CLICOLOR_FORCE
+    }
+  })
+
+  it('exposes the named token variable to the streaming child as GH_TOKEN', async () => {
+    restore = installFakeGh('echo "${GH_TOKEN:-none}"')
+    process.env.STREAM_TOKEN_SOURCE = 'streamed-token'
+    try {
+      await expect(collect(createGhLogStreamer('STREAM_TOKEN_SOURCE')('p'))).resolves.toBe(
+        'streamed-token\n',
+      )
+      await expect(collect(createGhLogStreamer()('p'))).resolves.toBe('none\n')
+    } finally {
+      delete process.env.STREAM_TOKEN_SOURCE
     }
   })
 

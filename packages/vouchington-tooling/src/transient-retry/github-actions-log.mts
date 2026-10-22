@@ -32,7 +32,7 @@ export function sliceGithubActionsStepGroup(log: string, runGroup: string): stri
 }
 
 const stepFailurePattern =
-  /(?:Process completed with exit code 1\.|The action(?: '[^']+')? has timed out)/
+  /(?:Process completed with exit code [1-9]\d*\.|The action(?: '[^']+')? has timed out)/
 
 export function terminalFailedGithubActionsStepLog(log: string): string {
   const slices = getGithubActionsStepGroupSlices(log)

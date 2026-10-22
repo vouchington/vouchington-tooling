@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { createGhApi, createGhRunner } from '../../transient-retry/gh-api.mts'
+import { createGhLogStreamer } from '../../transient-retry/log-stream.mts'
 import { rerunKnownTransient } from '../../transient-retry/rerun.mts'
 import { commandUsage } from '../usage.mts'
 import type { LogLimits } from '../../transient-retry/log-window.mts'
@@ -50,6 +51,7 @@ export async function runTransientRetryCommand(
     if (!Array.isArray(module.rules)) throw new Error('rules module must export a `rules` array')
     return await rerunKnownTransient({
       api: createGhApi({ run: createGhRunner(values['token-env']) }),
+      streamLog: createGhLogStreamer(values['token-env']),
       dryRun: values['dry-run'],
       rules: module.rules as WorkflowRetryRule[],
       runId,

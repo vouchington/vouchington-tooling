@@ -62,5 +62,10 @@ describe('github-actions-log', () => {
     )
     expect(terminalFailedGithubActionsStepLog(timedOut)).toBe(timedOut)
     expect(terminalFailedGithubActionsStepLog('##[group]Run fine\nok')).toBe('')
+    for (const code of [2, 127, 137]) {
+      const log = `##[group]Run x\n##[error]Process completed with exit code ${code}.`
+      expect(terminalFailedGithubActionsStepLog(log)).toBe(log)
+    }
+    expect(terminalFailedGithubActionsStepLog('##[group]Run x\nexit code 0.')).toBe('')
   })
 })
