@@ -35,7 +35,10 @@ class VitestWorkerExitDiagnosticsReporter implements Reporter {
   private recentModuleEvents: ModuleEvent[] = []
   private recentStderrLines: string[] = []
 
-  constructor(private readonly recordDirectory: string) {
+  private readonly recordDirectory: string
+
+  constructor(recordDirectory: string) {
+    this.recordDirectory = recordDirectory
     // Clear once before forks start. Clearing on watch reruns would unlink the files still held
     // open by reused workers and make their later records invisible.
     clearForkExitRecords(recordDirectory)
