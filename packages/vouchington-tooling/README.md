@@ -596,6 +596,18 @@ random suffixes, viewport sizes, a 1x1 PNG fixture, RFC 6238 TOTP codes, and a t
 reporter. The reporter prints one JSON line per test with the marker `playwright-test-lifecycle`.
 `@playwright/test` is an optional peer. TOTP setup and cleanup stay with the caller.
 
+`createBrowserErrorsFixture`, `withMonitoredPage`, and `BrowserIssueMonitor` take the narrow
+exported `MonitoredTestInfo` type (`attach`, `status`, `expectedStatus`, `timeout`) instead of
+Playwright's full `TestInfo`. A real `TestInfo` is assignable to it, so no cast is needed.
+
+`TestLifecycleReporter` accepts `failOnSkippedTests`, a plain boolean that defaults to `false`; the
+reporter never reads `process.env.CI`, so the caller opts in explicitly:
+`reporter: [[TestLifecycleReporter.modulePath, { failOnSkippedTests: Boolean(process.env.CI) }]]`.
+When enabled, a run that would otherwise pass fails through the reporter's `onEnd` result status,
+and stderr lists each skipped test's title path and `file:line`. Every test whose final result
+is `skipped` counts, including `test.fixme`, `test.skip`, and runtime `test.skip()`, because
+Playwright reports all of them as `skipped`. A run that already failed keeps its status.
+
 `browser-session-runner` supervises caller-created browser-test processes. Callers supply command
 construction, line classification, retry/outcome policy, and budgets; the library owns process-group
 termination, output line buffering, shared deadlines, progress watchdogs, diagnostics, and parent signals.
