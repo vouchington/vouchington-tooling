@@ -154,12 +154,8 @@ transient-retry --rules <module> [--repo owner/name] [--token-env NAME] [--dry-r
   and reruns only on a match. Exits 0 on rerun, 2 when none is warranted, 1 on error.
 
 tmux up --config <file> [--root <dir>] [--no-attach] [-v|--verbose]
-tmux name [--socket PATH --pane %ID --worktree PATH] <name>
-tmux read-title
-tmux agent-reminder session-start|user-prompt
-tmux post-tool  (hook payload on stdin)
-  Environment: TMUX_TARGET_BIN (tmux binary), TMUX_TARGET_ROOT (worktree, default cwd),
-  TMUX_NAME_COMMAND (rename command named in reminders), AGENT_TMUX_SOCKET/PANE/WORKTREE.
+tmux name [--socket PATH --pane %ID --worktree PATH] <name> | read-title | post-tool | agent-reminder <event>
+  Environment: TMUX_TARGET_BIN, TMUX_TARGET_ROOT, TMUX_NAME_COMMAND, AGENT_TMUX_SOCKET/PANE/WORKTREE.
 
 story-coverage --root <dir> --component-root <rel> --story-root <rel> --source-extension <ext> --component-extension <ext> --marker <regex> --story-pattern <regex> [--alias <prefix>=<path>] [--exclusions <json>] [--exclusions-label <text>]
 `
