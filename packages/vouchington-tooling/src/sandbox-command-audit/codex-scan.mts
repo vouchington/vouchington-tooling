@@ -20,15 +20,18 @@ function inheritedSession(record: Record<string, unknown>): boolean {
   )
 }
 
-function ownedTaskStarted(line: string, sessionSeconds: number): boolean {
+// started_at is epoch seconds or milliseconds. A millisecond value is compared against the exact
+// session creation time, so an inherited task from earlier in the same second is not mistaken for
+// an owned one; a seconds value can only be compared at second precision.
+function ownedTaskStarted(line: string, sessionMs: number): boolean {
   try {
     const record = asRecord(JSON.parse(line))
     const payload = asRecord(record?.payload)
     if (record?.type !== 'event_msg' || payload?.type !== 'task_started') return false
     if (typeof payload.started_at !== 'number') return false
-    const seconds =
-      payload.started_at >= 1_000_000_000_000 ? payload.started_at / 1000 : payload.started_at
-    return seconds >= sessionSeconds
+    const inMillis = payload.started_at >= 1_000_000_000_000
+    if (inMillis) return payload.started_at >= sessionMs
+    return payload.started_at >= Math.floor(sessionMs / 1000)
   } catch {
     return false
   }
@@ -36,13 +39,13 @@ function ownedTaskStarted(line: string, sessionSeconds: number): boolean {
 
 // The creation time of a forked child's session when its first record marks it inherited, else
 // undefined (including for malformed metadata, which falls back to scanning the whole file).
-function inheritedSessionSeconds(line: string): number | undefined {
+function inheritedSessionMs(line: string): number | undefined {
   try {
     const record = asRecord(JSON.parse(line))
     if (record?.type !== 'session_meta' || !inheritedSession(record)) return undefined
     const timestamp = asRecord(record.payload)?.timestamp
     const timestampMs = typeof timestamp === 'string' ? Date.parse(timestamp) : Number.NaN
-    return Number.isFinite(timestampMs) ? Math.floor(timestampMs / 1000) : undefined
+    return Number.isFinite(timestampMs) ? timestampMs : undefined
   } catch {
     return undefined
   }
@@ -63,23 +66,23 @@ export async function scanCodexFile(
   if ('error' in opened) return { error: opened.error }
   const extractor = createCodexRecordExtractor(options)
   let spool: Spool | undefined
-  let sessionSeconds: number | undefined
+  let sessionMs: number | undefined
   let first = true
   try {
     for await (const line of opened.lines) {
       if (first && line.trim()) {
         first = false
-        sessionSeconds = inheritedSessionSeconds(line)
-        if (sessionSeconds !== undefined) {
+        sessionMs = inheritedSessionMs(line)
+        if (sessionMs !== undefined) {
           spool = await createSpool(tempRoot, options.limits.maxInheritedCodexSpoolBytes)
         }
       }
-      if (spool === undefined || sessionSeconds === undefined) {
+      if (spool === undefined || sessionMs === undefined) {
         extractor.pushLine(line)
         continue
       }
       await spool.write(line)
-      if (!ownedTaskStarted(line, sessionSeconds)) continue
+      if (!ownedTaskStarted(line, sessionMs)) continue
       await spool.discard()
       spool = undefined
       extractor.pushLine(line)

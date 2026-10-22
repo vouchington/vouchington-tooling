@@ -283,7 +283,7 @@ pieces are exported from `vouchington-tooling/transient-retry` (`rerunKnownTrans
 sandbox (`dangerouslyDisableSandbox`), were denied, or failed on a permission signature, and groups
 them by command prefix. Transcript roots default to `CLAUDE_CONFIG_DIR/projects` and
 `CODEX_HOME/sessions` (else `~/.claude` and `~/.codex`). Discovery is scoped to the repository so
-other projects' commands are not reported as this repository's gaps: the roots are the main
+other projects' commands are not reported as this repository's gaps: the roots are the current
 checkout plus every worktree `git worktree list` knows, or the `--repo-root` values, plus the
 matches of each `--worktree-glob` (a glob relative to each root, for worktree layouts git no longer
 lists). A transcript is attributed by its first recorded `cwd`; files whose cwd is unknown or

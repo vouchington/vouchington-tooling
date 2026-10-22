@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs'
 import { globFrom } from '../retrospective-transcript/resolve-transcript-file.mts'
 import { isWithinRepoRoots } from './repo-scope.mts'
-import { claudeProjectCwdResolver, readTranscriptCwd } from './transcript-cwd.mts'
+import { claudeSessionCwdResolver, readTranscriptCwd } from './transcript-cwd.mts'
 import type { SkipCounts } from './types.mts'
 
 export type DiscoverOptions = {
@@ -120,7 +120,7 @@ function codexPaths(options: DiscoverOptions): string[] {
 
 export async function discoverTranscriptFiles(options: DiscoverOptions): Promise<DiscoveredFiles> {
   const [claude, codex] = await Promise.all([
-    discoverForRoot(claudePaths(options), options, claudeProjectCwdResolver(options.projectsDir)),
+    discoverForRoot(claudePaths(options), options, claudeSessionCwdResolver(options.projectsDir)),
     discoverForRoot(codexPaths(options), options, readTranscriptCwd),
   ])
   return {

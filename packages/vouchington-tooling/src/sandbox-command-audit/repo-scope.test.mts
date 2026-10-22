@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, realpathSync, symlinkSync } from 'node:fs'
+import { mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './fixtures.test-helpers.mts'
@@ -24,6 +24,38 @@ describe('resolveRepoRoots with git', () => {
     expect((await resolveRepoRoots(sibling)).toSorted()).toEqual([main, sibling].toSorted())
   })
 
+  it('keeps a worktree whose directory was deleted, since it can own past transcripts', async () => {
+    const { main, sibling } = realRepo()
+    rmSync(sibling, { recursive: true })
+    expect((await resolveRepoRoots(main)).toSorted()).toEqual([main, sibling].toSorted())
+  })
+
+  it('roots a submodule at its checkout, not at the parent of its metadata directory', async () => {
+    const { main } = realRepo()
+    const module = join(realpathSync(tempDir()), 'module')
+    const run = (cwd: string, ...args: string[]) =>
+      execFileSync('git', ['-c', 'protocol.file.allow=always', ...args], { cwd, stdio: 'ignore' })
+    mkdirSync(module)
+    run(module, 'init', '-q')
+    run(
+      module,
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'i',
+    )
+    run(main, 'submodule', 'add', '-q', module, 'sub')
+    const checkout = join(main, 'sub')
+    const roots = await resolveRepoRoots(checkout)
+    expect(roots).toEqual([checkout])
+    expect(await isWithinRepoRoots(join(main, '.git', 'modules'), roots)).toBe(false)
+  })
+
   it('rejects outside a repository', async () => {
     await expect(resolveRepoRoots(realpathSync(tempDir()))).rejects.toThrow()
   })
@@ -31,7 +63,7 @@ describe('resolveRepoRoots with git', () => {
 
 describe('resolveRepoRoots with injected git', () => {
   const deps = {
-    gitCommonDir: async () => '/repo/.git',
+    gitToplevel: async () => '/repo',
     gitWorktreePaths: async () => ['/repo', '/repo/.claude/worktrees/a', '/elsewhere/wt'],
   }
 
@@ -42,7 +74,7 @@ describe('resolveRepoRoots with injected git', () => {
   it('uses explicit roots without calling git, resolving relative ones against cwd', async () => {
     const calls: string[] = []
     const guarded = {
-      gitCommonDir: async () => (calls.push('common'), ''),
+      gitToplevel: async () => (calls.push('top'), ''),
       gitWorktreePaths: async () => (calls.push('list'), []),
     }
     const roots = await resolveRepoRoots('/base', {

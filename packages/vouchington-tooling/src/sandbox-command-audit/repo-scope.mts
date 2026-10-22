@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
-import { globSync } from 'node:fs'
+import { existsSync, globSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
-import { dirname, resolve, sep } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { parseWorktreeList } from '../git-worktrees/list.mts'
 
@@ -18,7 +18,7 @@ async function safeRealpath(path: string): Promise<string> {
 }
 
 export type RepoScopeDeps = {
-  gitCommonDir?: (cwd: string) => Promise<string>
+  gitToplevel?: (cwd: string) => Promise<string>
   gitWorktreePaths?: (cwd: string) => Promise<string[]>
 }
 
@@ -34,9 +34,8 @@ export type RepoScopeOptions = {
   deps?: RepoScopeDeps
 }
 
-async function defaultGitCommonDir(cwd: string): Promise<string> {
-  const args = ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir']
-  const { stdout } = await execFileAsync('git', args)
+async function defaultGitToplevel(cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'])
   return stdout.trim()
 }
 
@@ -49,7 +48,16 @@ async function defaultGitWorktreePaths(cwd: string): Promise<string[]> {
     '--porcelain',
     '-z',
   ])
-  return parseWorktreeList(stdout).map((record) => record.path)
+  return parseWorktreeList(stdout)
+    .map((record) => record.path)
+    .filter((path) => !isMetadataDirectory(path))
+}
+
+// The list reports a submodule's `.git/modules/<name>` (and a bare repository) as a worktree. A
+// real checkout has a `.git` entry; a path that no longer exists is kept, because a deleted
+// worktree can still own past transcripts.
+function isMetadataDirectory(path: string): boolean {
+  return existsSync(path) && !existsSync(join(path, '.git'))
 }
 
 function isWithinRoot(candidate: string, root: string): boolean {
@@ -76,15 +84,15 @@ async function baseRoots(cwd: string, options: RepoScopeOptions): Promise<string
   if (options.explicit !== undefined && options.explicit.length > 0) {
     return Promise.all(options.explicit.map((root) => safeRealpath(resolve(cwd, root))))
   }
-  const gitCommonDir = options.deps?.gitCommonDir ?? defaultGitCommonDir
+  const gitToplevel = options.deps?.gitToplevel ?? defaultGitToplevel
   const gitWorktreePaths = options.deps?.gitWorktreePaths ?? defaultGitWorktreePaths
-  const [commonDir, worktrees] = await Promise.all([gitCommonDir(cwd), gitWorktreePaths(cwd)])
-  return Promise.all([dirname(commonDir), ...worktrees].map(safeRealpath))
+  const [toplevel, worktrees] = await Promise.all([gitToplevel(cwd), gitWorktreePaths(cwd)])
+  return Promise.all([toplevel, ...worktrees].map(safeRealpath))
 }
 
 /**
- * The roots a run treats as "this repository": the explicit roots when given, otherwise the main
- * checkout unioned with every `git worktree list` entry, plus any `worktreeGlobs` matches, then
+ * The roots a run treats as "this repository": the explicit roots when given, otherwise the
+ * current checkout's top level unioned with every `git worktree list` entry, plus any `worktreeGlobs` matches, then
  * minimized. A git failure (not a repository, no `git`) rejects; callers report it and point at
  * the explicit roots. Every root is canonicalized once so a symlinked path compares correctly with
  * a transcript's recorded cwd.

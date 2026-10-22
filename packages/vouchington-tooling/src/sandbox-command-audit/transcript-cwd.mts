@@ -1,7 +1,6 @@
 import { open } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { openTranscriptLines } from '../retrospective-transcript/index.mts'
-import { globFrom } from '../retrospective-transcript/resolve-transcript-file.mts'
 
 const PREFIX_BYTES = 64 * 1024
 
@@ -65,40 +64,31 @@ export async function readTranscriptCwd(path: string): Promise<string | undefine
   return undefined
 }
 
-// A top-level session file is the canonical source of a project's cwd: a subagent transcript
-// under <session>/subagents/ may carry none. Glob order is filesystem-dependent, so the first
-// file that yields a cwd wins; every session in one project directory shares its cwd.
-async function resolveProjectCwd(
-  projectsDir: string,
-  projectDir: string,
-): Promise<string | undefined> {
-  for (const entry of globFrom(join(projectsDir, projectDir), '*.jsonl')) {
-    // oxlint-disable-next-line no-await-in-loop
-    const cwd = await readTranscriptCwd(entry)
-    if (cwd !== undefined) return cwd
-  }
-  return undefined
+// A Claude project directory name is a lossy encoding of the cwd, so distinct checkouts can share
+// one. The cwd is therefore read per session: a top-level session file carries its own, and a
+// subagent transcript under <session>/subagents/ resolves through its owning session file.
+function owningSessionFile(projectsDir: string, path: string): string {
+  const [projectDir, session, folder] = relative(projectsDir, path).split(sep)
+  return folder === 'subagents' ? join(projectsDir, projectDir!, `${session}.jsonl`) : path
 }
 
 /**
- * Resolves a Claude transcript's cwd once per project directory (the path segment directly under
- * `projectsDir`) and memoizes it, so thousands of files cost a handful of reads and a subagent
- * transcript resolves through its project's session files. The directory name is never decoded:
- * the encoding is lossy and would over-match sibling repos. A rejected lookup is evicted so the
- * next call retries.
+ * Resolves a Claude transcript's cwd from its own session file (or its subagent's owning session)
+ * and memoizes it per session file. A session whose owner is missing or unreadable rejects, which
+ * discovery counts as an unknown cwd rather than guessing from a sibling session. A rejected
+ * lookup is evicted so the next call retries.
  */
-export function claudeProjectCwdResolver(
+export function claudeSessionCwdResolver(
   projectsDir: string,
 ): (path: string) => Promise<string | undefined> {
   const cache = new Map<string, Promise<string | undefined>>()
   return async (path) => {
-    const rel = relative(projectsDir, path)
-    const projectDir = rel.split(sep)[0]!
-    let resolved = cache.get(projectDir)
+    const owner = owningSessionFile(projectsDir, path)
+    let resolved = cache.get(owner)
     if (resolved === undefined) {
-      resolved = resolveProjectCwd(projectsDir, projectDir)
-      resolved.catch(() => cache.delete(projectDir))
-      cache.set(projectDir, resolved)
+      resolved = readTranscriptCwd(owner)
+      resolved.catch(() => cache.delete(owner))
+      cache.set(owner, resolved)
     }
     return resolved
   }

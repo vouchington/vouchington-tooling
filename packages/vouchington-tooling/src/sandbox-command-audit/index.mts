@@ -30,7 +30,7 @@ export { loadAuditRules, runAudit } from './run.mts'
 export type { AuditRules, PolicyContext } from './run.mts'
 export { scanTranscripts } from './scan.mts'
 export type { ScanOptions } from './scan.mts'
-export { claudeProjectCwdResolver, readTranscriptCwd } from './transcript-cwd.mts'
+export { claudeSessionCwdResolver, readTranscriptCwd } from './transcript-cwd.mts'
 export { emptyScanResult } from './types.mts'
 export type {
   ClassifyFailure,

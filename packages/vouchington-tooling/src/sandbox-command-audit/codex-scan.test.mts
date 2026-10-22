@@ -76,6 +76,23 @@ describe('scanCodexFile', () => {
     expect(spoolLeft).toEqual([])
   })
 
+  it('compares millisecond task starts with the exact session time, not its second', async () => {
+    const meta = forkMeta({ timestamp: '2026-01-01T00:00:10.900Z' })
+    const sameSecond = Date.parse('2026-01-01T00:00:10.100Z')
+    const after = Date.parse('2026-01-01T00:00:10.900Z')
+    const { result } = await scan(
+      jsonl(
+        meta,
+        completed('inherited'),
+        taskStarted(sameSecond),
+        completed('still inherited'),
+        taskStarted(after),
+        completed('owned'),
+      ),
+    )
+    expect(commands(result)).toEqual(['owned'])
+  })
+
   it('recognizes each inherited-session marker', async () => {
     const markers = [
       { source: { subagent: {} } },
