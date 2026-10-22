@@ -378,6 +378,18 @@ describe('loadHookPolicy and runHook', () => {
     expect(JSON.parse(run.out[0]!).hookSpecificOutput.additionalContext).toBe('hello')
   })
 
+  it('stays silent in post-tool-use when there is nothing to say', async () => {
+    const root = module('export default {}')
+    const run = io(root, '{}')
+    expect(
+      await runHook(
+        ['post-tool-use', '--harness', 'claude', '--policy', 'policy.mjs'],
+        run.harness,
+      ),
+    ).toBe(0)
+    expect([run.out, run.err]).toEqual([[], []])
+  })
+
   it('types policy modules through defineHookPolicy', () => {
     const policy = defineHookPolicy({ checkers: [] })
     expect(policy).toEqual({ checkers: [] })
