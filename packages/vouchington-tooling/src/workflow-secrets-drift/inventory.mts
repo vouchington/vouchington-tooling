@@ -24,6 +24,9 @@ function recordProblem(record: Record<string, unknown>): string | undefined {
       return `${field} must be a ${type}`
     }
   }
+  if (record.neverProvision && record.provisioned) {
+    return 'neverProvision cannot be combined with provisioned: true'
+  }
   if (record.neverProvision && (record.requiredEnvironment ?? record.requiredBranchPolicy)) {
     return 'neverProvision cannot be combined with a required scope'
   }

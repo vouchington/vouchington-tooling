@@ -208,6 +208,7 @@ describe('loadInventory', () => {
         'export const NULL_ENTRY = { E: null }\n' +
         'export const BAD_FLAG = { F: { provisioned: true, neverProvision: "false" } }\n' +
         'export const BAD_SCOPE = { G: { provisioned: true, requiredEnvironment: 1 } }\n' +
+        'export const NEVER_PROVISIONED = { J: { provisioned: true, neverProvision: true } }\n' +
         'export const NEVER_SCOPED = { H: { provisioned: false, neverProvision: true, requiredBranchPolicy: "x" } }\n' +
         'export const BOTH_SCOPES = { I: { provisioned: true, requiredEnvironment: "x", requiredBranchPolicy: "y" } }\n',
     )
@@ -233,6 +234,7 @@ describe('loadInventory', () => {
     await expect(load('BAD_SCOPE')).rejects.toThrow(
       'BAD_SCOPE.G requiredEnvironment must be a string',
     )
+    await expect(load('NEVER_PROVISIONED')).rejects.toThrow('cannot be combined with provisioned')
     await expect(load('NEVER_SCOPED')).rejects.toThrow('cannot be combined with a required scope')
     await expect(load('BOTH_SCOPES')).rejects.toThrow('mutually exclusive')
   })
