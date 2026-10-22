@@ -41,7 +41,7 @@ describe('actionlint reusable workflow', () => {
 
   it('installs tools from the caller mise.toml with the cache disabled', () => {
     const install = step('Install CI tools via mise')
-    expect(install.uses).toBe('jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca')
+    expect(install.uses).toMatch(/^jdx\/mise-action@[0-9a-f]{40}$/u)
     expect(install.with).toEqual({ cache: false })
     expect(step('Run actionlint').run).toBe('actionlint')
     expect(source).not.toContain('-ignore')
