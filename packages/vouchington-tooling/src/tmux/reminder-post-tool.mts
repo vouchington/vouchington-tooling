@@ -1,12 +1,8 @@
 import { spawnSync } from 'node:child_process'
 
 import { packageScriptPath } from '../cli/script-path.mts'
-import {
-  extractToolCommand,
-  hookToolName,
-  toolExitCode,
-  type HookPayload,
-} from './hook-payload.mts'
+import { extractToolCommand, hookToolExitCode, hookToolName } from '../command-policy/payload.mts'
+import type { HookPayload } from '../command-policy/types.mts'
 
 const PR_CREATE_COMMAND_PATTERN = /(^|[;&|])\s*gh\s+pr\s+create(\s|$)/
 const GIT_PUSH_COMMAND_PATTERN = /(^|[;&|])\s*git\s+push(\s|$)/
@@ -101,7 +97,7 @@ export function renderPostToolReminder(
   if (!SHELL_TOOLS.has(toolName)) return null
 
   const command = extractToolCommand(payload)
-  const exitCode = toolExitCode(payload)
+  const exitCode = hookToolExitCode(payload)
   if (command === '' || (exitCode !== undefined && exitCode !== 0)) return null
 
   if (PR_CREATE_COMMAND_PATTERN.test(command)) {

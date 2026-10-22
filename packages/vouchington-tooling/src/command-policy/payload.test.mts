@@ -8,6 +8,7 @@ import {
   hookToolInput,
   hookToolName,
 } from './index.mts'
+import { hookToolExitCode } from './payload.mts'
 
 describe('hook payload accessors', () => {
   it('reads tool input in either casing', () => {
@@ -22,6 +23,15 @@ describe('hook payload accessors', () => {
     expect(extractToolCommand({ command: 'pwd' })).toBe('pwd')
     expect(extractToolCommand({ tool_input: { command: 1 } })).toBe('')
     expect(extractToolCommand({})).toBe('')
+  })
+
+  it('reads a numeric exit code from the response shapes that carry one', () => {
+    expect(hookToolExitCode({ tool_response: { exit_code: 0 } })).toBe(0)
+    expect(hookToolExitCode({ toolResponse: { exit_code: 1 } })).toBe(1)
+    expect(hookToolExitCode({ toolResult: { exit_code: 2 } })).toBe(2)
+    expect(hookToolExitCode({ toolResponse: { exit_code: 'x' } })).toBeUndefined()
+    expect(hookToolExitCode({ tool_response: 'x' })).toBeUndefined()
+    expect(hookToolExitCode({})).toBeUndefined()
   })
 
   it('reads and trims tool names and session ids', () => {
