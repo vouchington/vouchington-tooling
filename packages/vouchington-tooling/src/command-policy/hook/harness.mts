@@ -1,6 +1,9 @@
+import { isAutomationContext } from '../../mcp-server/pr-mode.mts'
 import { isRecord } from '../payload.mts'
 import type { HookPayload } from '../types.mts'
 import type { HookHarness } from './types.mts'
+
+export { isAutomationContext }
 
 /**
  * Parses hook stdin into a payload. Blank, invalid, or non-object input is an empty payload, so a
@@ -45,7 +48,7 @@ function cursorShellResult(raw: unknown): { exit_code: number; stdout: string } 
   if (!isRecord(parsed) || typeof parsed.exitCode !== 'number') return undefined
   return {
     exit_code: parsed.exitCode,
-    stdout: typeof parsed.output === 'string' ? parsed.output : '',
+    stdout: firstString(parsed.stdout, parsed.output),
   }
 }
 
@@ -84,15 +87,15 @@ export function resolveHarness(
   return declared
 }
 
-/** True when the process is running inside CI automation, where merge authority is never delegated. */
-export function isAutomationContext(env: NodeJS.ProcessEnv): boolean {
-  return env.GITHUB_ACTIONS === 'true' || env.CI === 'true'
-}
-
 /**
  * True only when Claude Code marks the session attended (CLAUDE_CODE_SESSION_ATTENDED=1; 0 for
  * `claude -p`). A missing or changed variable fails safe: no silent merge allow.
  */
 export function isAttendedClaudeSession(env: NodeJS.ProcessEnv): boolean {
   return env.CLAUDE_CODE_SESSION_ATTENDED === '1'
+}
+
+// Cursor documents `stdout`; `output` is kept as a fallback for older payloads.
+function firstString(...values: unknown[]): string {
+  return values.find((value): value is string => typeof value === 'string') ?? ''
 }

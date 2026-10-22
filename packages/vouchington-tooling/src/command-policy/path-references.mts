@@ -13,7 +13,7 @@ function keyLooksPathLike(key: string): boolean {
 }
 
 /** Header lines name the files an apply_patch touches; body text that mentions a path does not. */
-function patchHeaderPaths(patch: string): string[] {
+export function patchHeaderPaths(patch: string): string[] {
   return patch
     .split('\n')
     .filter((line) => PATCH_HEADER_PREFIX.test(line))

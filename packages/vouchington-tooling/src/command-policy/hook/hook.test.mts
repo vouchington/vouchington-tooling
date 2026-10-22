@@ -84,6 +84,13 @@ describe('payload and harness detection', () => {
     ).toEqual({ exit_code: 0, stdout: '' })
   })
 
+  it('prefers Cursors documented stdout field over the output fallback', () => {
+    const both = JSON.stringify({ exitCode: 0, stdout: 'documented', output: 'legacy' })
+    expect(
+      normalizeCursorShellPayload({ tool_name: 'Shell', tool_output: both }).tool_response,
+    ).toEqual({ exit_code: 0, stdout: 'documented' })
+  })
+
   it('keeps an existing tool_response and ignores unreadable output', () => {
     const kept = normalizeCursorShellPayload({
       tool_name: 'Shell',
@@ -116,7 +123,10 @@ describe('payload and harness detection', () => {
   it('reads automation and attended markers strictly', () => {
     expect(isAutomationContext({ GITHUB_ACTIONS: 'true' })).toBe(true)
     expect(isAutomationContext({ CI: 'true' })).toBe(true)
-    expect(isAutomationContext({ CI: '1' })).toBe(false)
+    expect(isAutomationContext({ CI: '1' })).toBe(true)
+    expect(isAutomationContext({ CI: 'false' })).toBe(false)
+    expect(isAutomationContext({ CLAUDE_CODE_SESSION_ATTENDED: '0' })).toBe(true)
+    expect(isAutomationContext({ CLAUDE_CODE_SESSION_ATTENDED: '1' })).toBe(false)
     expect(isAutomationContext({})).toBe(false)
     expect(isAttendedClaudeSession({ CLAUDE_CODE_SESSION_ATTENDED: '1' })).toBe(true)
     expect(isAttendedClaudeSession({ CLAUDE_CODE_SESSION_ATTENDED: '0' })).toBe(false)
@@ -224,6 +234,19 @@ describe('post-tool-use', () => {
       },
     ])
     expect(thrown[0]?.message).toContain('plain')
+  })
+
+  it('keeps going after a checker throws and checks every apply_patch path', async () => {
+    const seen: string[] = []
+    const recorder: PostToolUseChecker = {
+      matches: () => true,
+      check: (file) => (seen.push(file), []),
+    }
+    const patch = '*** Begin Patch\n*** Update File: a.md\n*** Add File: b.md\n*** End Patch'
+    const ctx = context({ payload: { tool_input: { command: patch } } })
+    const out = await postToolUseOutput(ctx, { checkers: [throws, recorder] })
+    expect(seen).toEqual(['a.md', 'b.md'])
+    expect(out.match(/Unexpected error in post-tool-use checks: boom/g)).toHaveLength(2)
   })
 
   it('emits one additionalContext JSON with warnings and the reminder', async () => {
