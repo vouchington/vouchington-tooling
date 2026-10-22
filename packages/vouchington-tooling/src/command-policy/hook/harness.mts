@@ -31,18 +31,22 @@ export function isAutomationContext(
 }
 
 /**
- * Parses hook stdin into a payload. Blank, invalid, or non-object input is an empty payload, so a
- * malformed call yields no opinion rather than a crash.
+ * Parses hook stdin into a payload. Blank input is an empty payload. Invalid or non-object input is
+ * also empty unless `strict`, which throws so a blocking hook fails closed instead of reading a
+ * truncated payload as "nothing to judge".
  */
-export function parseHookPayload(stdin: string): HookPayload {
+export function parseHookPayload(stdin: string, strict = false): HookPayload {
   if (stdin.trim() === '') return {}
   let parsed: unknown
   try {
     parsed = JSON.parse(stdin)
-  } catch {
+  } catch (error) {
+    if (strict) throw new Error(`hook payload is not valid JSON: ${(error as Error).message}`)
     return {}
   }
-  return isRecord(parsed) && !Array.isArray(parsed) ? normalizeCursorShellPayload(parsed) : {}
+  if (isRecord(parsed) && !Array.isArray(parsed)) return normalizeCursorShellPayload(parsed)
+  if (strict) throw new Error('hook payload is not a JSON object')
+  return {}
 }
 
 // Cursor runs the Claude-compat hooks but names its shell tool `Shell` and reports the result as

@@ -87,6 +87,10 @@ describe('payload and harness detection', () => {
     expect(parseHookPayload('[1]')).toEqual({})
     expect(parseHookPayload('null')).toEqual({})
     expect(parseHookPayload('{"a":1}')).toEqual({ a: 1 })
+    expect(parseHookPayload('{"a":1}', true)).toEqual({ a: 1 })
+    expect(parseHookPayload('', true)).toEqual({})
+    expect(() => parseHookPayload('{nope', true)).toThrow('not valid JSON')
+    expect(() => parseHookPayload('[1]', true)).toThrow('not a JSON object')
   })
 
   it('normalizes a Cursor Shell call to the Claude dialect', () => {
@@ -441,6 +445,17 @@ describe('loadHookPolicy and runHook', () => {
     expect(await runHook([...base, '--automation-env', 'MY_RUN'], marked.harness)).toBe(2)
     const off = io(root, edit, { MY_RUN: '0' })
     expect(await runHook([...base, '--automation-env', 'MY_RUN'], off.harness)).toBe(0)
+  })
+
+  it('fails pre-tool-use closed on a malformed payload but not post-tool-use', async () => {
+    const root = module('export default { command: {} }')
+    const args = ['--harness', 'claude', '--policy', 'policy.mjs']
+    const pre = io(root, '{"tool_input":')
+    expect(await runHook(['pre-tool-use', ...args], pre.harness)).toBe(2)
+    expect(pre.err.join('')).toContain('not valid JSON')
+    const post = io(root, '{"tool_input":')
+    expect(await runHook(['post-tool-use', ...args], post.harness)).toBe(0)
+    expect(post.err).toEqual([])
   })
 
   it('stays silent in post-tool-use when there is nothing to say', async () => {

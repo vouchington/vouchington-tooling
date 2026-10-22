@@ -37,7 +37,7 @@ export async function runHook(args: readonly string[], io: HookIo): Promise<numb
   }
   const blocking = parsed.event === 'pre-tool-use'
   try {
-    const payload = parseHookPayload(await io.readStdin())
+    const payload = parseHookPayload(await io.readStdin(), blocking)
     const context: HookContext = {
       harness: resolveHarness(parsed.harness, io.env, payload),
       payload,
