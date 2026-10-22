@@ -164,6 +164,14 @@ describe('runVerifyWorkflowSecretsCli', () => {
     expect(code).toBe(0)
   })
 
+  it('rejects empty option values with exit code 2', async () => {
+    for (const flag of ['repo', 'inventory', 'export', 'branch', 'confirm']) {
+      const { errors, output } = capture()
+      expect(await runVerifyWorkflowSecretsCli([`--${flag}`, ' '], { inventory, output })).toBe(2)
+      expect(errors[0]).toContain(`--${flag} requires a non-empty value`)
+    }
+  })
+
   it('reports usage errors with exit code 2', async () => {
     const { errors, output } = capture()
     expect(await runVerifyWorkflowSecretsCli(['--bogus'], { output })).toBe(2)

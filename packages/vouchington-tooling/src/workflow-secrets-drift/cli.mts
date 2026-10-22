@@ -59,6 +59,13 @@ export async function runVerifyWorkflowSecretsCli(
     return 2
   }
   const confirmNames = splitNames(values.confirm)
+  const emptyOption = (['repo', 'inventory', 'export', 'branch'] as const).find(
+    (key) => values[key] !== undefined && values[key].trim() === '',
+  )
+  if (emptyOption !== undefined || (values.confirm !== undefined && confirmNames.length === 0)) {
+    output.error(`${USAGE}\n--${emptyOption ?? 'confirm'} requires a non-empty value`)
+    return 2
+  }
 
   try {
     const inventory = normalizeInventory(
