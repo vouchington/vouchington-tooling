@@ -36,7 +36,16 @@ export type RawRetention = {
 }
 
 export function resolveLimits(overrides: Partial<AuditLimits> = {}): AuditLimits {
-  return { ...DEFAULT_LIMITS, ...overrides }
+  const resolved: AuditLimits = { ...DEFAULT_LIMITS }
+  for (const key of Object.keys(DEFAULT_LIMITS) as Array<keyof AuditLimits>) {
+    const value = overrides[key]
+    if (value === undefined) continue
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError(`limits.${key} must be a non-negative integer`)
+    }
+    resolved[key] = value
+  }
+  return resolved
 }
 
 export function emptyRawRetention(): RawRetention {

@@ -130,6 +130,14 @@ describe('classifyAudit', () => {
     expect(JSON.stringify(audit)).not.toContain('"a"')
   })
 
+  it('counts a Codex failure under its kind even when the kind is a built-in one', () => {
+    const codex = {
+      ...emptyScanResult(),
+      codexSandboxFailures: [{ source: 'codex' as const, kind: 'genuine', errorText: '' }],
+    }
+    expect(classifyAudit(codex, policy({})).otherFailures).toEqual([{ kind: 'genuine', count: 1 }])
+  })
+
   it('orders equally common kinds by name', () => {
     const tied = {
       ...emptyScanResult(),

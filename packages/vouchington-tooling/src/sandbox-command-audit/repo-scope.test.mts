@@ -127,6 +127,12 @@ describe('isWithinRepoRoots', () => {
     expect(await isWithinRepoRoots('/repo/x', ['/'])).toBe(true)
   })
 
+  it('normalizes a missing or relative cwd lexically, so dot-dot cannot escape its root', async () => {
+    expect(await isWithinRepoRoots('/repo/../other', ['/repo'])).toBe(false)
+    expect(await isWithinRepoRoots('/repo/a/../b', ['/repo'])).toBe(true)
+    expect(await isWithinRepoRoots('relative/dir', ['/repo'])).toBe(false)
+  })
+
   it('canonicalizes a symlinked cwd before comparing', async () => {
     const base = realpathSync(tempDir())
     mkdirSync(join(base, 'real'))

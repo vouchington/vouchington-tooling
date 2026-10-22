@@ -64,7 +64,9 @@ export async function scanTranscripts(options: ScanOptions): Promise<ScanResult>
     for (const record of scanned.sandboxFailures) keep(result.claudeSandboxFailures, record)
   }
   const tempRoot = options.tempRoot ?? tmpdir()
-  for (const file of discovered.codexFiles) {
+  // Codex output is only classified by the caller's rule, so without one the files are not read.
+  const codexFiles = classifyFailure === undefined ? [] : discovered.codexFiles
+  for (const file of codexFiles) {
     // oxlint-disable-next-line no-await-in-loop
     const scanned: CodexFileResult = await scanCodexFile(file, tempRoot, {
       classifyFailure,

@@ -8,12 +8,12 @@ import { parseWorktreeList } from '../git-worktrees/list.mts'
 const execFileAsync = promisify(execFile)
 
 // A path that no longer exists (a deleted worktree, a recorded cwd since removed) falls back to
-// the literal string: canonicalization resolves symlinks, it does not validate.
+// its lexically normalized form: canonicalization resolves symlinks, it does not validate.
 async function safeRealpath(path: string): Promise<string> {
   try {
     return await realpath(path)
   } catch {
-    return path
+    return resolve(path)
   }
 }
 

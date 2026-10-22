@@ -306,10 +306,11 @@ export default {
   }),
   // Optional. Claims a failed Bash result for a bucket of your own (any string); it runs after the
   // E2BIG check and before the generic permission signatures, and its kinds are reported
-  // separately from bypass candidates. It also runs on Codex CommandExecution output.
+  // separately from bypass candidates. It also runs on Codex CommandExecution output, and Codex
+  // transcripts are only read when this rule is set.
   classifyFailure: (command, text, source) =>
     /read-only file system/.test(text) ? 'write-path' : undefined,
-  // Optional. Overrides any scan cap (see AuditLimits).
+  // Optional. Overrides any scan cap (see AuditLimits); each must be a non-negative integer.
   limits: { maxRetainedRecords: 1000 },
   worktreeGlobs: ['../checkouts/*'],
 }

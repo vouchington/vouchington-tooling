@@ -103,11 +103,14 @@ describe('claude sandbox failures', () => {
     expect(failed('Operation not permitted')).toMatchObject([{ kind: 'genuine' }])
     expect(failed([{ type: 'text', text: 'EACCES: denied' }])).toMatchObject([{ kind: 'genuine' }])
     expect(failed('connect ETIMEDOUT 127.0.0.1:5432')).toMatchObject([{ kind: 'genuine' }])
+    expect(failed('connect ETIMEDOUT ::1:5432')).toMatchObject([{ kind: 'genuine' }])
+    expect(failed('timed out reaching [::1]:8080')).toMatchObject([{ kind: 'genuine' }])
   })
 
   it('ignores ordinary failures and bare timeouts', () => {
     expect(failed('exit code 1')).toEqual([])
     expect(failed('request timed out')).toEqual([])
+    expect(failed('timed out reaching 2001:db8::1')).toEqual([])
     expect(failed('connect ECONNREFUSED 127.0.0.1:5432')).toEqual([])
     expect(failed(undefined)).toEqual([])
   })

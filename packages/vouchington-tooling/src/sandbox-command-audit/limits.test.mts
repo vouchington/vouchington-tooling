@@ -18,6 +18,21 @@ describe('resolveLimits', () => {
   })
 })
 
+describe('resolveLimits validation', () => {
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])('rejects %s', (value) => {
+    expect(() => resolveLimits({ maxRetainedRecords: value })).toThrow(
+      'limits.maxRetainedRecords must be a non-negative integer',
+    )
+  })
+
+  it('accepts zero', () => {
+    expect(resolveLimits({ maxRetainedRecords: 0 })).toEqual({
+      ...DEFAULT_LIMITS,
+      maxRetainedRecords: 0,
+    })
+  })
+})
+
 describe('truncateRawText', () => {
   const limits = resolveLimits({ maxRetainedRawTextChars: 4 })
 

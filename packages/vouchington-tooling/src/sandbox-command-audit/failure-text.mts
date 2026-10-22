@@ -18,7 +18,7 @@ const GENUINE_FAILURE_PATTERNS = [
 // connection. Requiring both tokens keeps it narrow: a bare "timed out" (a slow test run) or a
 // bare loopback mention carries no sandbox signal on its own.
 const TIMEOUT_PATTERN = /\bETIMEDOUT\b|\btimed out\b/i
-const LOOPBACK_PATTERN = /\blocalhost\b|\b127\.0\.0\.1\b|\b::1\b/i
+const LOOPBACK_PATTERN = /\blocalhost\b|\b127\.0\.0\.1\b|(?<![\w:])::1(?!\w)/i
 
 /**
  * Sorts a failed Bash result into `e2big`, a caller-defined kind, `genuine`, or nothing. The

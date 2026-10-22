@@ -75,6 +75,7 @@ describe('scanTranscripts', () => {
     })
     expect(result.claudeSandboxFailures.map((record) => record.kind)).toEqual(['genuine'])
     expect(result.codexSandboxFailures).toEqual([])
+    expect(result.codexFilesScanned).toBe(0)
   })
 
   it('records unreadable files as read errors and keeps going', async () => {
@@ -90,6 +91,7 @@ describe('scanTranscripts', () => {
       codexSessionsDir,
       maxFilesPerRoot: 10,
       repoRoots: [],
+      classifyFailure: claim,
     })
     expect(result.claudeFilesScanned).toBe(1)
     expect(result.readErrors).toHaveLength(2)
@@ -111,6 +113,7 @@ describe('scanTranscripts', () => {
       codexSessionsDir,
       maxFilesPerRoot: 10,
       repoRoots: [],
+      classifyFailure: claim,
     })
     chmodSync(claude, 0o600)
     chmodSync(codex, 0o600)

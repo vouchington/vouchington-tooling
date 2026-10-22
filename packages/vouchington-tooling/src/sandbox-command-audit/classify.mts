@@ -83,9 +83,13 @@ function classifyEscalations(scan: ScanResult, policy: CoveragePolicy): Escalati
 
 function otherFailureCounts(scan: ScanResult): KindCount[] {
   const counts = new Map<string, number>()
-  for (const { kind } of [...scan.claudeSandboxFailures, ...scan.codexSandboxFailures]) {
-    if (!BUILT_IN_KINDS.has(kind)) counts.set(kind, (counts.get(kind) ?? 0) + 1)
-  }
+  // Built-in kinds feed the bypass and E2BIG sections, which read Claude failures only; a Codex
+  // failure of any kind has no other section, so it is always counted here.
+  const failures = [
+    ...scan.claudeSandboxFailures.filter(({ kind }) => !BUILT_IN_KINDS.has(kind)),
+    ...scan.codexSandboxFailures,
+  ]
+  for (const { kind } of failures) counts.set(kind, (counts.get(kind) ?? 0) + 1)
   return [...counts]
     .map(([kind, count]) => ({ kind, count }))
     .toSorted((a, b) => b.count - a.count || a.kind.localeCompare(b.kind))
