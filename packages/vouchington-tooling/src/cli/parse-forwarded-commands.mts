@@ -15,6 +15,7 @@ type ForwardedCommand =
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
   | { kind: 'worktree'; args: string[] }
+  | { kind: 'transient-retry'; args: string[] }
 
 export function parseForwardedCommand(
   command: string | undefined,
@@ -36,5 +37,6 @@ export function parseForwardedCommand(
   if (command === 'agent-blackboard') return { kind: 'agent-blackboard', args }
   if (command === 'mcp') return { kind: 'mcp', args }
   if (command === 'worktree') return { kind: 'worktree', args }
+  if (command === 'transient-retry') return { kind: 'transient-retry', args }
   return undefined
 }

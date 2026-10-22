@@ -250,6 +250,25 @@ The script also deletes `.cache` directories and the direct `.cache`, `.vite`, a
 directories inside `node_modules`. It needs `flock` or `lockf` and holds
 `.local/reset-worktree.lock` for the run.
 
+## Rerunning known-transient workflow failures
+
+`vouchington transient-retry --rules <module> [--repo owner/name] [--token-env NAME] [--dry-run]
+<run-id>` fetches a failed GitHub Actions run, evaluates the rules your module exports, and runs
+`gh run rerun` only when a rule asks for a rerun. The engine ships no rules: the module exports
+`rules` (an array of `WorkflowRetryRule`) and optionally `limits`. It exits 0 when a rerun was
+requested (or would be, with `--dry-run`), 2 when none is warranted, and 1 on error. The repository
+comes from `--repo`, `GITHUB_REPOSITORY`, or the checkout; `--token-env` names the variable that
+holds the token, which is passed to `gh` as `GH_TOKEN`.
+
+Rules receive a `WorkflowRunContext`: job names, conclusions and steps, plus failed-job logs and
+annotations that are fetched only when a rule reads them. Logs may contain secrets, so they are
+streamed and never buffered whole: each job keeps a head window and a tail window
+(`limits.headBytes`, `limits.tailBytes`), reading stops at `limits.maxReadBytes`, and the run keeps
+at most `limits.totalBytes` in all. A log that cannot be read is reported through
+`failedJobLogFetchFailures` with empty text. Only job names and the decision are printed. The same
+pieces are exported from `vouchington-tooling/transient-retry` (`rerunKnownTransient`,
+`buildWorkflowRunContext`, `createGhApi`).
+
 ## Reclaiming finished worktrees
 
 `vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a

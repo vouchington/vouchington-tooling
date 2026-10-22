@@ -14,22 +14,22 @@ export type DecisionResult =
       reason: NoMatchReason
     }
 
-export interface EvaluateRulesOptions {
-  afterRuleEvaluated?: (context: RetryContext, rule: RetryRule) => Promise<void> | void
+export interface EvaluateRulesOptions<C extends RetryContext = RetryContext> {
+  afterRuleEvaluated?: (context: C, rule: RetryRule<C>) => Promise<void> | void
   /** Defaults to `no-match`. Use `dispatch` when unmatched work should leave the retry engine. */
   unmatchedDecision?: 'no-match' | 'dispatch'
 }
 
-function normalizedAttempt(context: RetryContext, rule: RetryRule): number {
+function normalizedAttempt(context: RetryContext, rule: RetryRule<never>): number {
   const sharedAttempt = context.retryAttempt ?? context.runAttempt
   return rule.decision === undefined || rule.decision === 'rerun'
     ? (context.retryAttempts?.get(rule.id) ?? sharedAttempt)
     : sharedAttempt
 }
 
-function resolveTargetName(
-  target: RetryTarget | undefined,
-  context: RetryContext,
+function resolveTargetName<C extends RetryContext>(
+  target: RetryTarget<C> | undefined,
+  context: C,
 ): { targetName: string; reason?: never } | { targetName?: never; reason: NoMatchReason } {
   if (target == null || typeof target !== 'object') return { reason: 'invalid-target' }
   let targetName: unknown
@@ -54,10 +54,10 @@ function resolveTargetName(
   return { targetName }
 }
 
-export async function decide(
-  context: RetryContext,
-  rules: readonly RetryRule[],
-  options: EvaluateRulesOptions = {},
+export async function decide<C extends RetryContext = RetryContext>(
+  context: C,
+  rules: readonly RetryRule<C>[],
+  options: EvaluateRulesOptions<C> = {},
 ): Promise<DecisionResult> {
   for (const rule of rules) {
     const attempt = normalizedAttempt(context, rule)

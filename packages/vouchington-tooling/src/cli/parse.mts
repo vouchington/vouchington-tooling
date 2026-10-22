@@ -44,6 +44,7 @@ export type ParsedCli =
   | { kind: 'agent-blackboard'; args: string[] }
   | { kind: 'mcp'; args: string[] }
   | { kind: 'worktree'; args: string[] }
+  | { kind: 'transient-retry'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
   | { kind: 'fresh-base'; remote?: string; branch?: string; skipFetch: boolean }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }
