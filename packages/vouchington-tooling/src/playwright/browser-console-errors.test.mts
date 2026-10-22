@@ -293,4 +293,20 @@ describe('BrowserIssueMonitor console errors', () => {
 
     await expect(monitor.assertNoIssues()).rejects.toThrow(/1/)
   })
+
+  it('records consecutive matches of a global warning pattern', async () => {
+    const { testInfo } = createTestInfo()
+    const context = new MockBrowserContext()
+    const monitor = new BrowserIssueMonitor(testInfo, { warningPattern: /caller-warning/g })
+    monitor.monitorContext(context as unknown as BrowserContext)
+
+    for (let count = 0; count < 2; count += 1) {
+      context.emit(
+        'console',
+        createConsoleMessage({ text: 'caller-warning', type: 'warning' }) as never,
+      )
+    }
+
+    await expect(monitor.assertNoIssues()).rejects.toThrow(/2/)
+  })
 })

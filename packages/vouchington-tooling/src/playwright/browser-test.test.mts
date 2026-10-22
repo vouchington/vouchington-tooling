@@ -20,6 +20,7 @@ function createContext() {
     route: async (pattern: RegExp) => {
       routes.push(pattern)
     },
+    unroute: async () => undefined,
   }
   return { context: context as unknown as BrowserContext, routes }
 }

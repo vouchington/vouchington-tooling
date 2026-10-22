@@ -80,8 +80,9 @@ export async function withMonitoredPage<T>(
   options.assertTimeout?.(testInfo.timeout, 'Playwright effective test timeout')
   const monitor = new BrowserIssueMonitor(testInfo, monitorOptions(options))
   const page = await browserOrContext.newPage()
+  let removeRoutes: (() => Promise<void>) | undefined
   try {
-    await installBlockedExternalNetwork(
+    removeRoutes = await installBlockedExternalNetwork(
       page.context(),
       options.rules ?? BLOCKED_EXTERNAL_NETWORK_RULES,
     )
@@ -97,6 +98,7 @@ export async function withMonitoredPage<T>(
     return result
   } finally {
     monitor.dispose()
+    await removeRoutes?.()
     await page.close().catch(() => undefined)
   }
 }

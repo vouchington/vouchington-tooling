@@ -24,7 +24,7 @@ export const BLOCKED_EXTERNAL_NETWORK_RULES: BlockedExternalNetworkRule[] = [
   },
   {
     pattern:
-      /^https:\/\/(?:www\.)?google-analytics\.com\/(?:collect|g\/collect|j\/collect|mp\/collect)(?:[?#].*)?$/,
+      /^https:\/\/(?:www\.|region1\.)?google-analytics\.com\/(?:collect|g\/collect|j\/collect|mp\/collect)(?:[?#].*)?$/,
     reason:
       'Google Analytics collection is external telemetry and should not affect Playwright determinism',
     response: {
@@ -87,7 +87,17 @@ export async function installBlockedExternalNetwork(
   context: BrowserContext,
   rules: readonly BlockedExternalNetworkRule[] = BLOCKED_EXTERNAL_NETWORK_RULES,
 ) {
-  await Promise.all(
-    rules.map((rule) => context.route(rule.pattern, (route) => route.fulfill(rule.response))),
-  )
+  const installed = rules.map((rule) => {
+    const handler = (route: Route) => route.fulfill(rule.response)
+    return { handler, pattern: rule.pattern }
+  })
+  await Promise.all(installed.map(({ handler, pattern }) => context.route(pattern, handler)))
+  // Removes only the routes installed here, leaving caller-owned routes in place.
+  return async () => {
+    await Promise.all(
+      installed.map(({ handler, pattern }) =>
+        context.unroute(pattern, handler).catch(() => undefined),
+      ),
+    )
+  }
 }

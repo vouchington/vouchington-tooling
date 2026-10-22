@@ -68,8 +68,12 @@ export class BrowserIssueMonitor {
         !isBrowserSynthesizedResourceLoadError(message)
       ) {
         this.recordIssue(createConsoleErrorIssue(message))
-      } else if (message.type() === 'warning' && this.warningPattern.test(message.text())) {
-        this.recordIssue(createConsoleErrorIssue(message))
+      } else if (message.type() === 'warning') {
+        // Global and sticky patterns keep lastIndex between test() calls.
+        this.warningPattern.lastIndex = 0
+        if (this.warningPattern.test(message.text())) {
+          this.recordIssue(createConsoleErrorIssue(message))
+        }
       }
     }
     const webErrorListener = (webError: WebError) => {

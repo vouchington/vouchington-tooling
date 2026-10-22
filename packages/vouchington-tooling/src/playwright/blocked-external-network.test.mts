@@ -27,6 +27,13 @@ function createContext() {
       routes.push({ handler, pattern })
       return Promise.resolve()
     }),
+    unroute: vi.fn<(...args: Array<never>) => unknown>((pattern: RegExp, handler: RouteHandler) => {
+      const index = routes.findIndex(
+        (entry) => entry.pattern === pattern && entry.handler === handler,
+      )
+      if (index !== -1) routes.splice(index, 1)
+      return Promise.resolve()
+    }),
   } as unknown as BrowserContext
   return { context, routes }
 }
@@ -91,7 +98,31 @@ describe('blocked external network', () => {
       true,
     )
     expect(isBlockedExternalNetworkUrl('https://www.google-analytics.com/collect?v=1')).toBe(true)
+    expect(
+      isBlockedExternalNetworkUrl('https://region1.google-analytics.com/mp/collect?api_secret=x'),
+    ).toBe(true)
     expect(isBlockedExternalNetworkUrl('https://example.com/app.js')).toBe(false)
+  })
+
+  it('ignores unroute failures when the context is already closed', async () => {
+    const { context } = createContext()
+    const remove = await installBlockedExternalNetwork(context)
+    vi.mocked(context.unroute).mockRejectedValue(new Error('context closed'))
+
+    await expect(remove()).resolves.toBeUndefined()
+  })
+
+  it('removes only the routes it installed', async () => {
+    const { context, routes } = createContext()
+    const callerHandler = vi.fn<RouteHandler>()
+    await context.route(/caller/, callerHandler as never)
+    const remove = await installBlockedExternalNetwork(context)
+    expect(routes).toHaveLength(BLOCKED_EXTERNAL_NETWORK_RULES.length + 1)
+
+    await remove()
+
+    expect(routes).toHaveLength(1)
+    expect(routes[0]?.handler).toBe(callerHandler)
   })
 
   it('exports request-failure allowlist entries with reasons', () => {
