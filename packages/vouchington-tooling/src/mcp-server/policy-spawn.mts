@@ -109,7 +109,9 @@ export const spawnPolicy: PolicySpawner = (request) =>
       clearTimeout(timer)
       // ENOENT also means a missing cwd, so only a binary that is gone gets the reconnect message.
       reject(
-        error.code === 'ENOENT' && !existsSync(request.command)
+        error.code === 'ENOENT' &&
+          request.command === process.execPath &&
+          !existsSync(request.command)
           ? missingNodeError(request.command)
           : error,
       )
