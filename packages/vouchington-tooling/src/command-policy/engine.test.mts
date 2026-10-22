@@ -116,6 +116,7 @@ describe('evaluateCommandPolicy command rules', () => {
     ['git pull --rebase', 'Use ./rebase-script.'],
     ['git rebase -X ours main', 'strategy options'],
     ['git checkout --theirs file', '--ours/--theirs'],
+    ['git restore --ours file', '--ours/--theirs'],
     ['git commit --no-verify', '--no-verify'],
     ['git commit -an', 'git commit -n'],
     ['git -c core.hooksPath=/dev/null commit', 'core.hooksPath'],

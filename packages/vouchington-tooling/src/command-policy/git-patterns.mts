@@ -78,8 +78,8 @@ export function standardGitPatterns(
         'Git strategy options for ours/theirs are banned; during rebase they can silently keep the wrong side.',
     },
     {
-      pattern: /\bgit\s+checkout\b[^|;&\n]*(?:--ours|--theirs)\b/,
-      reason: 'git checkout --ours/--theirs is banned; resolve rebase conflicts manually.',
+      pattern: /\bgit\s+(?:checkout|restore)\b[^|;&\n]*(?:--ours|--theirs)\b/,
+      reason: 'git checkout/restore --ours/--theirs is banned; resolve rebase conflicts manually.',
     },
     {
       pattern: /\bgit\b[^|;&\n]*--no-verify\b/,
