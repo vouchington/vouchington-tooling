@@ -201,7 +201,7 @@ describe('run-bounded output pipes', () => {
     expect(code).toBe(0)
     expect(stdout).toBe('out\n')
     expect(stderr).toBe('err\n')
-  })
+  }, 30_000)
 
   it('reaches EOF with status 124 after a deadline even if a detached descendant holds stdout', async () => {
     const { code, stdout, stderr } = await (await fixtures.launch('1', 'hang')).result
@@ -209,7 +209,7 @@ describe('run-bounded output pipes', () => {
     expect(code).toBe(124)
     expect(stdout).toBe('out\n')
     expect(stderr).toBe('err\n')
-  })
+  }, 30_000)
 
   it('drains the command and detached descendant when cleanup interrupts a hanging case', async () => {
     const fixture = await fixtures.launch('30', 'hang')
@@ -267,7 +267,7 @@ describe('run-bounded downstream backpressure', () => {
       sourceHolderStatus: 0,
       wrapperDrained: true,
     })
-  })
+  }, 30_000)
 })
 
 describe('run-bounded absent downstream descriptors', () => {

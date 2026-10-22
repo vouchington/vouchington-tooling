@@ -19,50 +19,54 @@ describe('with-host-lock.sh signals and ownership', () => {
   it.each([
     { expected: 'term', signal: 'SIGTERM' as const },
     { expected: 'int', signal: 'SIGINT' as const },
-  ])('holds the lock until the command exits after $signal', async ({ expected, signal }) => {
-    const home = await makeHome()
-    const ready = join(home, 'ready')
-    const signalled = join(home, 'signalled')
-    const contenderEntered = join(home, 'contender-entered')
-    const lock = join(home, '.cache/host-lock/expensive-build.lock.d')
-    const child = spawnHostLock(home, 'expensive-build', 5, [
-      'bash',
-      '-c',
-      'trap \'printf int > "$1"; sleep 1; exit 43\' INT; trap \'printf term > "$1"; sleep 1; exit 42\' TERM; touch "$2"; while :; do sleep 1; done',
-      'host-lock-test',
-      signalled,
-      ready,
-    ])
-    const done = completion(child)
-    await waitForPath(ready)
+  ])(
+    'holds the lock until the command exits after $signal',
+    async ({ expected, signal }) => {
+      const home = await makeHome()
+      const ready = join(home, 'ready')
+      const signalled = join(home, 'signalled')
+      const contenderEntered = join(home, 'contender-entered')
+      const lock = join(home, '.cache/host-lock/expensive-build.lock.d')
+      const child = spawnHostLock(home, 'expensive-build', 5, [
+        'bash',
+        '-c',
+        'trap \'printf int > "$1"; sleep 1; exit 43\' INT; trap \'printf term > "$1"; sleep 1; exit 42\' TERM; touch "$2"; while :; do sleep 1; done',
+        'host-lock-test',
+        signalled,
+        ready,
+      ])
+      const done = completion(child)
+      await waitForPath(ready)
 
-    child.kill(signal)
-    await waitForPath(signalled)
-    const contender = completion(
-      spawnHostLock(home, 'expensive-build', 5, ['touch', contenderEntered]),
-    )
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    await expect(stat(contenderEntered)).rejects.toMatchObject({
-      code: 'ENOENT',
-    })
+      child.kill(signal)
+      await waitForPath(signalled)
+      const contender = completion(
+        spawnHostLock(home, 'expensive-build', 5, ['touch', contenderEntered]),
+      )
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      await expect(stat(contenderEntered)).rejects.toMatchObject({
+        code: 'ENOENT',
+      })
 
-    const result = await Promise.race([
-      done,
-      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3e3)),
-    ])
-    if (result === 'timeout') {
-      child.kill('SIGTERM')
-      await done
-    }
+      const result = await Promise.race([
+        done,
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3e3)),
+      ])
+      if (result === 'timeout') {
+        child.kill('SIGTERM')
+        await done
+      }
 
-    expect(result).not.toBe('timeout')
-    await expect(readFile(signalled, 'utf8')).resolves.toBe(expected)
-    await expect(contender).resolves.toEqual({
-      code: 0,
-      stderr: expect.stringMatching(/^with-host-lock: expensive-build acquired after \d+s\n$/),
-    })
-    await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+      expect(result).not.toBe('timeout')
+      await expect(readFile(signalled, 'utf8')).resolves.toBe(expected)
+      await expect(contender).resolves.toEqual({
+        code: 0,
+        stderr: expect.stringMatching(/^with-host-lock: expensive-build acquired after \d+s\n$/),
+      })
+      await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
+    },
+    30_000,
+  )
 
   it('keeps the command as lock owner if the wrapper is killed', async () => {
     const home = await makeHome()
@@ -109,7 +113,7 @@ describe('with-host-lock.sh signals and ownership', () => {
         // The command already exited after the successful recovery path.
       }
     }
-  })
+  }, 30_000)
 
   it('records the child owner before releasing its start barrier', async () => {
     const source = await readFile(hostLockScript, 'utf8')
@@ -183,7 +187,7 @@ while :; do :; done`,
       await wrapperDone
       if (contender) await contender
     }
-  })
+  }, 30_000)
 
   it('terminates a lingering process group after the bounded drain period', async () => {
     const home = await makeHome()

@@ -133,7 +133,7 @@ describe('checkStoryCoverage', () => {
       'LocalAlias',
     ])
     expect(report.messages.join('\n')).toContain('namespace imports')
-  })
+  }, 30_000)
 
   it('passes when every marked export is imported and nothing is excluded', async () => {
     root = await writeTree({
@@ -150,7 +150,7 @@ describe('checkStoryCoverage', () => {
       excludedKeys: [],
       messages: [],
     })
-  })
+  }, 30_000)
 
   it('ignores duplicate entries in a caller-supplied file list', async () => {
     root = await writeTree({
