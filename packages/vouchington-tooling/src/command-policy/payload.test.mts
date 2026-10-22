@@ -50,6 +50,7 @@ describe('hook payload accessors', () => {
     expect(hookCwd({ cwd: '/p' })).toBe('/p')
     expect(hookCwd({ workspaceRoot: '/r' })).toBe('/r')
     expect(hookCwd({}, '/fallback')).toBe('/fallback')
+    expect(hookCwd({ cwd: '', tool_input: { cwd: '' } }, '/fallback')).toBe('/fallback')
     expect(hookCwd({})).toBe(process.cwd())
   })
 })

@@ -47,7 +47,7 @@ export function hookFilePath(payload: HookPayload): string {
 export function hookCwd(payload: HookPayload, fallback: string = process.cwd()): string {
   const toolInput = hookToolInput(payload)
   for (const value of [toolInput?.cwd, toolInput?.workdir, payload.cwd, payload.workspaceRoot]) {
-    if (typeof value === 'string') return value
+    if (typeof value === 'string' && value !== '') return value
   }
   return fallback
 }
