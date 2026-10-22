@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolvePolicyModule } from './policy-config.mts'
 import {
+  missingNodeError,
   policyEnvironment,
   spawnPolicy,
   type PolicyOutcome,
@@ -117,10 +118,7 @@ async function runUnscrubbed(run: PolicyRun, spawn: PolicySpawner): Promise<Poli
   const module = await resolvePolicyModule(run.worktree)
   if (module === undefined) return { status: 'no-policy' }
   const node = run.nodePath ?? process.execPath
-  if (!existsSync(node))
-    throw new Error(
-      `The MCP server's Node binary (${node}) was removed, likely by a Node version upgrade. Reconnect the server: \`/mcp\` in Claude Code, or restart Codex.`,
-    )
+  if (!existsSync(node)) throw missingNodeError(node)
   const timeoutMs = POLICY_TIMEOUTS_MS[name]
   const outcome = await spawn({
     command: node,
