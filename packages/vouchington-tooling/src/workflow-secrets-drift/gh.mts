@@ -1,4 +1,4 @@
-import { runGh, type RunTextCommand } from '../gh-cli/exec.mts'
+import { runGh, type RunTextCommand } from '../gh-cli/index.mts'
 import {
   outputNames,
   parseDeploymentBranchPolicy,

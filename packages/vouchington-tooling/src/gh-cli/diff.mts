@@ -13,9 +13,12 @@ export interface DiffCommand {
 export type DiffBlockCallback = (block: string) => void | Promise<void>
 
 export class DiffCommandError extends Error {
+  readonly command: DiffCommand
+  readonly details: { code?: number | null; signal?: NodeJS.Signals | null; stderr: string }
+
   constructor(
-    readonly command: DiffCommand,
-    readonly details: { code?: number | null; signal?: NodeJS.Signals | null; stderr: string },
+    command: DiffCommand,
+    details: { code?: number | null; signal?: NodeJS.Signals | null; stderr: string },
     options?: ErrorOptions,
   ) {
     const status = details.code === null ? details.signal : details.code
@@ -23,6 +26,8 @@ export class DiffCommandError extends Error {
       `${command.executable} ${status === undefined ? 'failed to start' : `exited with ${status}`}${details.stderr ? `: ${details.stderr}` : ''}`,
       options,
     )
+    this.command = command
+    this.details = details
     this.name = 'DiffCommandError'
   }
 }

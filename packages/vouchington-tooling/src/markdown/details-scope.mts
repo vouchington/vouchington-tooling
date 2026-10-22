@@ -7,7 +7,11 @@ export class DetailsScope {
   readonly diagnostics: MarkdownSectionsDiagnostic[] = []
   private readonly frames: DetailsFrame[] = []
 
-  constructor(private readonly markdown: string) {}
+  private readonly markdown: string
+
+  constructor(markdown: string) {
+    this.markdown = markdown
+  }
 
   get visible(): boolean {
     return this.frames.length === 0

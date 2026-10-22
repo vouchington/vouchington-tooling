@@ -2,7 +2,11 @@ export class TailQueue {
   readonly chunks: Buffer[] = []
   bytes = 0
 
-  constructor(readonly maxBytes: number) {}
+  readonly maxBytes: number
+
+  constructor(maxBytes: number) {
+    this.maxBytes = maxBytes
+  }
 
   append(text: string): void {
     const chunk = Buffer.from(text)
