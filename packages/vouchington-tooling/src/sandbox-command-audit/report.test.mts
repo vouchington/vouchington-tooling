@@ -99,6 +99,13 @@ describe('formatRaw', () => {
     expect(text).toContain('  - [write-path] (unresolved): ro')
     expect(text).toContain('  - [write-path] git fetch: ro')
     expect(text).toContain('  - /secret/path.jsonl: boom')
+    expect(text).not.toContain('Raw retention bounded')
+  })
+
+  it('warns when retention caps dropped records, as the default report does', () => {
+    const scan = emptyScanResult()
+    scan.rawRetention.recordsDropped = 1
+    expect(formatRaw(scan)).toContain('Raw retention bounded: 0 command text(s)')
   })
 })
 

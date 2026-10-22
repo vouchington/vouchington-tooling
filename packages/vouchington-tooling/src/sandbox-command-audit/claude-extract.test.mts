@@ -140,6 +140,16 @@ describe('claude sandbox failures', () => {
   })
 })
 
+describe('a throwing classifyFailure rule', () => {
+  it('is not mistaken for a malformed line', () => {
+    const lines = jsonl(bashUse('1', 'ls'), toolResult('1', 'permission denied'))
+    const boom: ClassifyFailure = () => {
+      throw new Error('rule bug')
+    }
+    expect(() => extract(lines, { classifyFailure: boom })).toThrow('rule bug')
+  })
+})
+
 describe('pending tool use bounds', () => {
   it('evicts the oldest pending call when the count cap is reached', () => {
     const result = extract(

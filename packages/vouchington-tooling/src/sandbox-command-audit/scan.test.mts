@@ -122,6 +122,23 @@ describe('scanTranscripts', () => {
     expect(result.claudeFilesScanned + result.codexFilesScanned).toBe(0)
   })
 
+  it('records a throwing rule as a read error rather than an apparently clean audit', async () => {
+    const { projectsDir, codexSessionsDir, base } = fixture()
+    const boom: ClassifyFailure = () => {
+      throw new Error('rule bug')
+    }
+    const result = await scanTranscripts({
+      projectsDir,
+      codexSessionsDir,
+      maxFilesPerRoot: 10,
+      repoRoots: ['/repo'],
+      classifyFailure: boom,
+      tempRoot: base,
+    })
+    expect(result.readErrors).toHaveLength(2)
+    expect(result.readErrors.join('\n')).toContain('rule bug')
+  })
+
   it('carries per-file retention into the totals and bounds the whole result', async () => {
     const base = tempDir()
     const projectsDir = join(base, 'projects')

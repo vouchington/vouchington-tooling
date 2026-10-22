@@ -30,6 +30,19 @@ export function scopeLine(info: ScopeInfo): string {
   return `Scope: ${root}${worktreeSuffix} — ${info.claudeFilesScanned} Claude / ${info.codexFilesScanned} Codex files scanned${skipSuffix}`
 }
 
+/** Warns that caps dropped or truncated records, so a bounded run never looks complete. */
+export function rawRetentionLines(retention: ScanResult['rawRetention']): string[] {
+  const count =
+    retention.commandTextsTruncated +
+    retention.errorTextsTruncated +
+    retention.pendingToolUsesDropped +
+    retention.recordsDropped
+  if (count === 0) return []
+  return [
+    `Raw retention bounded: ${retention.commandTextsTruncated} command text(s), ${retention.errorTextsTruncated} error text(s), ${retention.pendingToolUsesDropped} pending tool use(s), ${retention.recordsDropped} record(s) truncated or dropped; ${retention.pendingToolUseBytesDropped} pending and ${retention.rawBytesDropped} raw byte(s) evicted. Aggregate output may be incomplete.`,
+  ]
+}
+
 /** The one rendering that crosses the privacy boundary; it is only reachable behind `--raw`. */
 export function formatRaw(scan: ScanResult): string {
   const failure = (record: {
@@ -58,6 +71,7 @@ export function formatRaw(scan: ScanResult): string {
     '',
     `## Read errors — ${scan.readErrors.length}`,
     ...scan.readErrors.map((error) => `  - ${error}`),
+    ...rawRetentionLines(scan.rawRetention),
   ]
   return `${lines.join('\n')}\n`
 }

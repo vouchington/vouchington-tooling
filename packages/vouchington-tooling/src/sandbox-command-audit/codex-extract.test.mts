@@ -79,6 +79,13 @@ describe('codex extraction', () => {
     expect(result.sandboxFailures).toEqual([])
   })
 
+  it('lets an error from the injected rule through instead of treating it as a bad line', () => {
+    const boom: ClassifyFailure = () => {
+      throw new Error('rule bug')
+    }
+    expect(() => extract(jsonl(completed({ command: 'ls' })), boom)).toThrow('rule bug')
+  })
+
   it('truncates long command and error text', () => {
     const result = extract(
       jsonl(completed({ command: 'abcdef', aggregated_output: 'ghijkl' })),

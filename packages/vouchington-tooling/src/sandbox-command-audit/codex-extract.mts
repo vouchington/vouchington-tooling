@@ -1,4 +1,5 @@
 import { asRecord } from '../retrospective-transcript/index.mts'
+import { parseJsonRecord } from './json-record.mts'
 import {
   appendBounded,
   emptyRawRetention,
@@ -61,27 +62,23 @@ export function createCodexRecordExtractor(options: CodexExtractOptions): CodexR
   const { classifyFailure, limits } = options
   return {
     pushLine(line) {
-      if (!line.trim() || !classifyFailure) return
-      try {
-        const record = asRecord(JSON.parse(line))
-        const payload = asRecord(record?.payload)
-        const item = asRecord(payload?.item)
-        if (record?.type !== 'event_msg' || payload?.type !== 'item_completed') return
-        if (item?.type !== 'CommandExecution') return
-        const command = commandFromExecution(item)
-        const errorText = outputFromExecution(item)
-        const kind = classifyFailure(command, errorText, 'codex')
-        if (kind === undefined) return
-        const failure = {
-          source: 'codex',
-          kind,
-          command: command ? truncateRawText(command, rawRetention, 'command', limits) : undefined,
-          errorText: truncateRawText(errorText, rawRetention, 'error', limits),
-        } as const
-        appendBounded(sandboxFailures, failure, rawRetention, limits)
-      } catch {
-        // A partially written final line must not hide earlier records.
-      }
+      if (!classifyFailure) return
+      const record = parseJsonRecord(line)
+      const payload = asRecord(record?.payload)
+      const item = asRecord(payload?.item)
+      if (record?.type !== 'event_msg' || payload?.type !== 'item_completed') return
+      if (item?.type !== 'CommandExecution') return
+      const command = commandFromExecution(item)
+      const errorText = outputFromExecution(item)
+      const kind = classifyFailure(command, errorText, 'codex')
+      if (kind === undefined) return
+      const failure = {
+        source: 'codex',
+        kind,
+        command: command ? truncateRawText(command, rawRetention, 'command', limits) : undefined,
+        errorText: truncateRawText(errorText, rawRetention, 'error', limits),
+      } as const
+      appendBounded(sandboxFailures, failure, rawRetention, limits)
     },
     result: () => {
       const result = { sandboxFailures, rawRetention }

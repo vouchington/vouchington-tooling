@@ -103,6 +103,19 @@ describe('runAudit', () => {
     expect(text).toBe('=== Sandbox Command Audit ===\nStatus: unavailable (bad settings)\n')
   })
 
+  it('honors --json for an unavailable report', async () => {
+    const rules = { loadPolicy: async () => ({ error: 'bad settings' }) }
+    const text = await runAudit(args({ json: true }), deps(rules))
+    expect(JSON.parse(text)).toEqual({ status: 'unavailable', reason: 'bad settings' })
+    const input = args({ json: true })
+    delete input.repoRoots
+    const unresolved = await runAudit(input, {
+      cwd: tempDir(),
+      load: async () => ({ default: { loadPolicy: () => covers } }),
+    })
+    expect(JSON.parse(unresolved).status).toBe('unavailable')
+  })
+
   it('reports an unresolvable repository as a status that points at --repo-root', async () => {
     const dir = tempDir()
     const input = args()

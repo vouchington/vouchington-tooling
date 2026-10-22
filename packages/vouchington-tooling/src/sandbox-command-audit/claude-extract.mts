@@ -1,6 +1,7 @@
 import { asArray, asRecord } from '../retrospective-transcript/index.mts'
 import { recordClaudeToolUse, type ToolUseInfo } from './claude-tool-uses.mts'
 import { classifyFailureText } from './failure-text.mts'
+import { parseJsonRecord } from './json-record.mts'
 import {
   appendBounded,
   emptyRawRetention,
@@ -85,26 +86,15 @@ export function createClaudeRecordExtractor(options: ClaudeExtractOptions): Clau
   const pending: Pending = { toolUses: new Map(), bytes: { value: 0 } }
   return {
     pushLine(line) {
-      if (!line.trim()) return
-      try {
-        const record = asRecord(JSON.parse(line))
-        if (record?.type === 'assistant') {
-          for (const block of asArray(asRecord(record.message)?.content)) {
-            const { toolUses, bytes } = pending
-            recordClaudeToolUse(
-              block,
-              toolUses,
-              out.escalations,
-              rawRetention,
-              bytes,
-              options.limits,
-            )
-          }
-        } else if (record?.type === 'user') {
-          recordToolResult(record, pending, out, options)
+      const record = parseJsonRecord(line)
+      if (record?.type === 'assistant') {
+        for (const block of asArray(asRecord(record.message)?.content)) {
+          const { toolUses, bytes } = pending
+          const { escalations } = out
+          recordClaudeToolUse(block, toolUses, escalations, rawRetention, bytes, options.limits)
         }
-      } catch {
-        // A partially written final line must not hide earlier records.
+      } else if (record?.type === 'user') {
+        recordToolResult(record, pending, out, options)
       }
     },
     result: () => {

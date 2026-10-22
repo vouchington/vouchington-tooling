@@ -52,7 +52,11 @@ export type RunDeps = {
   load?: LoadRulesModule
 }
 
-const unavailable = (reason: string): string => `${HEADER}\nStatus: unavailable (${reason})\n`
+// Honors --json so a consumer parsing the output always gets a machine-readable status.
+function unavailable(reason: string, json: boolean): string {
+  if (json) return `${JSON.stringify({ status: 'unavailable', reason }, null, 2)}\n`
+  return `${HEADER}\nStatus: unavailable (${reason})\n`
+}
 
 /**
  * Scan, classify, report. A repository that cannot be resolved or a policy that cannot load yields
@@ -70,13 +74,14 @@ export async function runAudit(args: AuditArgs, deps: RunDeps): Promise<string> 
     const reason = err instanceof Error ? err.message : String(err)
     return unavailable(
       `repo root resolution failed: ${reason} — pass --repo-root to skip git and scope discovery explicitly`,
+      args.json,
     )
   }
   const policy = await rules.loadPolicy({
     cwd: deps.cwd,
     ...(args.settingsPath === undefined ? {} : { settingsPath: args.settingsPath }),
   })
-  if ('error' in policy) return unavailable(policy.error)
+  if ('error' in policy) return unavailable(policy.error, args.json)
   const scan = await scanTranscripts({
     projectsDir: args.projectsDir,
     codexSessionsDir: args.codexSessionsDir,

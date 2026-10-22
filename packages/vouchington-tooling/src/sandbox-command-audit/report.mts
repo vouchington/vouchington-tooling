@@ -1,5 +1,5 @@
 import type { CategorizedAudit, PrefixCount } from './classify.mts'
-import { HEADER, formatRaw, scopeLine } from './report-raw.mts'
+import { HEADER, formatRaw, rawRetentionLines, scopeLine } from './report-raw.mts'
 import type { ScanResult } from './types.mts'
 
 export { HEADER } from './report-raw.mts'
@@ -16,18 +16,6 @@ function rows<T extends PrefixCount>(entries: T[], note: (entry: T) => string): 
 
 function unresolvedNote(count: number): string[] {
   return count > 0 ? [`  (+${count} with an unresolved command — rerun with --raw to inspect)`] : []
-}
-
-function rawRetentionLines(retention: ScanResult['rawRetention']): string[] {
-  const count =
-    retention.commandTextsTruncated +
-    retention.errorTextsTruncated +
-    retention.pendingToolUsesDropped +
-    retention.recordsDropped
-  if (count === 0) return []
-  return [
-    `Raw retention bounded: ${retention.commandTextsTruncated} command text(s), ${retention.errorTextsTruncated} error text(s), ${retention.pendingToolUsesDropped} pending tool use(s), ${retention.recordsDropped} record(s) truncated or dropped; ${retention.pendingToolUseBytesDropped} pending and ${retention.rawBytesDropped} raw byte(s) evicted. Aggregate output may be incomplete.`,
-  ]
 }
 
 function otherFailureLines(audit: CategorizedAudit): string[] {
