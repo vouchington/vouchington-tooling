@@ -6,7 +6,6 @@ import { runPostReviewCli } from '../gha-post-review/cli.mts'
 import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
-import { runStoryCoverage } from './commands/story-coverage.mts'
 import { runGhaRuntimeAudit } from './commands/gha-runtime-audit.mts'
 import { runHttpOrigin } from './commands/http-origin.mts'
 import { runPnpmInstallCli } from './commands/pnpm-install.mts'
@@ -31,6 +30,7 @@ import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { readInstalledVersion } from './installed-version.mts'
 import { parseCli, type ScriptCommand } from './parse.mts'
+import { runStoryCoverageLazy } from './story-coverage-lazy.mts'
 import { packageScriptPath } from './script-path.mts'
 import { commandUsage, printUsage } from './usage.mts'
 
@@ -132,7 +132,7 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
     case 'gha-artifacts-cleanup':
       return runGhaArtifactsCleanup(parsed)
     case 'story-coverage':
-      return runStoryCoverage(parsed)
+      return runStoryCoverageLazy(parsed)
     case 'retrospective-transcript':
       return runRetrospectiveTranscriptCommand(parsed.args)
     case 'link-skill':
