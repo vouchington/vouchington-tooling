@@ -157,6 +157,8 @@ export function formatAttemptResult(attempt: number, result: AttemptResult): str
     `bootstrapStage=${result.bootstrap.terminalStage}`,
     `bootstrapTimeline=${JSON.stringify(result.bootstrap.timeline)}`,
     `orchestratorDisconnectCount=${result.bootstrap.orchestratorDisconnectCount}`,
+    `targetCrashCount=${result.bootstrap.targetCrashCount}`,
+    `targetDetachCount=${result.bootstrap.targetDetachCount}`,
     `requestFailureCount=${result.bootstrap.requestFailureCount}`,
     `requestFailureSamples=${JSON.stringify(result.bootstrap.requestFailureSamples)}`,
     `viteFetchFailure=${String(result.viteFetchFailure)}`,

@@ -393,6 +393,12 @@ retried and the guidance names `--optimize-deps-config`. Progress markers and `v
 output are kept out of the log and replayed from a bounded tail when an attempt fails, and a
 diagnostics file (`_DIAGNOSTICS_FILE`, default `storybook-browser-diagnostics.log`) holds the
 per-attempt summaries and the output tail.
+Before it terminates a stall or hang, the runner writes
+`[storybook-browser] process group <pgid> at stall:` and one line per process of the test command's
+group (pid, RSS in MB, %CPU, state, role such as `renderer`, `gpu-process` or `browser`; never argv,
+capped near 4KB), sampled with `ps -ax` and best effort. The semantic-stall message names the last
+progress marker and its age, and the attempt summary counts Playwright `Target.targetCrashed` /
+`Target.detachedFromTarget` protocol lines (`targetCrashCount`, `targetDetachCount`).
 
 Everything repository-specific is a parameter: the Vitest project name (also the browser-project
 output marker), the command and argv, the `--result-file` paths removed before each attempt, the

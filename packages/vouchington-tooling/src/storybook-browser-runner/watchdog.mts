@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 
 import type { BrowserSessionWatchdog } from '../browser-session-runner/index.mts'
 import type { OutputObserver } from './output-observer.mts'
+import { writeProcessGroupSample } from './process-sample.mts'
 import type { StorybookBrowserRunnerDeps } from './types.mts'
 
 /** What the watchdog decided, read by the attempt result once the session ends. */
@@ -16,11 +17,13 @@ export type StorybookWatchdogOptions = {
   completionFile: string | undefined
   deps: Pick<
     StorybookBrowserRunnerDeps,
-    'clearInterval' | 'cwd' | 'existsSync' | 'now' | 'setInterval' | 'stderr'
+    'clearInterval' | 'cwd' | 'existsSync' | 'now' | 'sampleProcessGroup' | 'setInterval' | 'stderr'
   >
   hangMs: number
   observer: OutputObserver
   outcome: WatchdogOutcome
+  /** The spawned test command's process group (its pid), once started. */
+  processGroupId: () => number | undefined
   stallMs: number
 }
 
@@ -47,13 +50,15 @@ export function createStorybookWatchdog(options: StorybookWatchdogOptions): Brow
           `[storybook-browser] Vite optimizer made no startup progress for ${stallMs}ms; terminating attempt\n`,
         )
         decided = true
+        writeProcessGroupSample(deps, options.processGroupId())
         controller.terminate()
       } else if (seen.semanticProgressSeen && now - seen.lastSemanticProgressAt >= hangMs) {
         outcome.semanticStall = true
         deps.stderr.write(
-          `[storybook-browser] no semantic test progress for ${hangMs}ms; terminating terminal mid-suite stall\n`,
+          `[storybook-browser] no semantic test progress for ${hangMs}ms; terminating terminal mid-suite stall (last progress ${now - seen.lastSemanticProgressAt}ms ago: ${seen.lastSemanticProgressLine ?? 'no marker line'})\n`,
         )
         decided = true
+        writeProcessGroupSample(deps, options.processGroupId())
         controller.terminate()
       } else if (
         seen.anyOutputSeen &&
@@ -65,6 +70,7 @@ export function createStorybookWatchdog(options: StorybookWatchdogOptions): Brow
           `[storybook-browser] no test output for ${hangMs}ms after Vite startup — suspected Vitest/Chromium tester-connection hang; last output:\n${seen.outputBuffer}\n`,
         )
         decided = true
+        writeProcessGroupSample(deps, options.processGroupId())
         controller.terminate()
       }
     }

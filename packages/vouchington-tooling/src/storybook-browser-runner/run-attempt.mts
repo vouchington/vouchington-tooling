@@ -53,6 +53,7 @@ export async function runUpstreamAttempt(input: RunAttemptInput): Promise<Attemp
     stalled: false,
   }
   let spawnFailed = false
+  let processGroupId: number | undefined
   let completed: AttemptResult | undefined
   const replayQuietOutput = () => {
     const quiet = quietOutput.drain()
@@ -95,6 +96,7 @@ export async function runUpstreamAttempt(input: RunAttemptInput): Promise<Attemp
           const started = spawnTestCommand(project, env, deps, () => {
             spawnFailed = true
           })
+          processGroupId = started.processGroupId
           return started
         },
         startupStallMs: DISABLED_STALL_TIMER_MS,
@@ -104,6 +106,7 @@ export async function runUpstreamAttempt(input: RunAttemptInput): Promise<Attemp
           hangMs: options.hangMs,
           observer,
           outcome,
+          processGroupId: () => processGroupId,
           stallMs: options.stallMs,
         }),
       },

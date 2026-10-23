@@ -6,6 +6,7 @@ import type { StorybookBrowserDiagnostics } from './diagnostics.mts'
 import {
   hasAddonVitestSetupFile,
   optimizerProgressPattern,
+  progressMarkerLine,
   viteServerFetchFailurePattern,
   viteServerScriptNetworkChangePattern,
   vitestRunnerMissingMarker,
@@ -135,6 +136,7 @@ export class OutputObserver {
     const sequence = latestStorybookProgressSequence(progressText, progressPrefix)
     if (sequence != null && sequence > this.lastSemanticSequence) {
       this.lastSemanticSequence = sequence
+      state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
       this.recordSemanticProgress(now)
     }
     if (storybookOutput && !state.storybookBrowserOutputSeen) {

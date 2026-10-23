@@ -49,6 +49,8 @@ export type StorybookBrowserRunnerDeps = {
   offParentSignal: BrowserSessionDeps['offParentSignal']
   onParentSignal: BrowserSessionDeps['onParentSignal']
   rmSync: typeof rmSync
+  /** Renders the processes of one process group; best effort, may throw. */
+  sampleProcessGroup: (processGroupId: number) => string
   setInterval: typeof setInterval
   setTimeout: typeof setTimeout
   spawn: typeof defaultSpawn

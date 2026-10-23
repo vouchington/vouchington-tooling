@@ -32,6 +32,7 @@ export type FakeOptions = {
   exists?: (path: string) => boolean
   isProcessGroupAlive?: StorybookBrowserRunnerDeps['isProcessGroupAlive']
   now?: () => number
+  sampleProcessGroup?: StorybookBrowserRunnerDeps['sampleProcessGroup']
 }
 
 /** Injected spawn, clock, timers, filesystem and streams: no process or browser is started. */
@@ -45,6 +46,7 @@ export function makeDeps(children: Child[], options: FakeOptions = {}) {
   const stderr: string[] = []
   const stdout: string[] = []
   const written: Array<{ content: string; path: string }> = []
+  const events: string[] = []
   const live = new Set<number>()
   let index = 0
   const deps: StorybookBrowserRunnerDeps = {
@@ -60,12 +62,19 @@ export function makeDeps(children: Child[], options: FakeOptions = {}) {
     killProcessGroup: (pid, signal) => {
       if (signal === 'SIGTERM') live.add(pid)
       killed.push({ pid, signal })
+      events.push(`kill:${signal}`)
     },
     mkdirSync: (path) => (dirs.push(String(path)), undefined),
     now: options.now ?? (() => 0),
     offParentSignal: () => undefined,
     onParentSignal: () => undefined,
     rmSync: (path) => void removed.push(String(path)),
+    sampleProcessGroup:
+      options.sampleProcessGroup ??
+      ((pgid) => {
+        events.push(`sample:${pgid}`)
+        return `  processes=1 (fake ${pgid})\n`
+      }),
     setInterval: ((callback: () => void) => {
       const interval = { callback }
       intervals.push(interval)
@@ -91,7 +100,19 @@ export function makeDeps(children: Child[], options: FakeOptions = {}) {
         path: String(path),
       }),
   }
-  return { copied, deps, dirs, intervals, killed, removed, spawnCalls, stderr, stdout, written }
+  return {
+    copied,
+    deps,
+    dirs,
+    events,
+    intervals,
+    killed,
+    removed,
+    spawnCalls,
+    stderr,
+    stdout,
+    written,
+  }
 }
 
 export function exitChild(child: Child, code: number | null, signal: NodeJS.Signals | null = null) {

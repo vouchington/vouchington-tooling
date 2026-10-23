@@ -1,3 +1,4 @@
+import { targetCrashedPattern, targetDetachedPattern } from './output-patterns.mts'
 import { stripAnsi } from './vite-detectors.mts'
 import { boundPendingLine, splitCompleteLines } from '../process-line-buffer/index.mts'
 
@@ -24,6 +25,8 @@ export interface StorybookBrowserBootstrapSnapshot {
   orchestratorDisconnectCount: number
   requestFailureCount: number
   requestFailureSamples: string[]
+  targetCrashCount: number
+  targetDetachCount: number
   terminalStage: StorybookBrowserBootstrapTerminalStage
   timeline: Array<{ atMs: number; milestone: StorybookBrowserBootstrapMilestone }>
 }
@@ -78,6 +81,8 @@ export class StorybookBrowserBootstrapTelemetry {
   private playwrightBrowserLineCount = 0
   private orchestratorDisconnectCount = 0
   private requestFailureCount = 0
+  private targetCrashCount = 0
+  private targetDetachCount = 0
 
   consume(stream: OutputStream, chunk: string | Buffer, atMs: number): ConsumedOutput {
     const combined = this.lineBuffers[stream] + String(chunk)
@@ -108,6 +113,8 @@ export class StorybookBrowserBootstrapTelemetry {
       orchestratorDisconnectCount: this.orchestratorDisconnectCount,
       requestFailureCount: this.requestFailureCount,
       requestFailureSamples: [...this.requestFailureSamples],
+      targetCrashCount: this.targetCrashCount,
+      targetDetachCount: this.targetDetachCount,
       terminalStage: terminalMilestone
         ? terminalStageByMilestone[terminalMilestone]
         : 'no-provider-evidence',
@@ -146,6 +153,8 @@ export class StorybookBrowserBootstrapTelemetry {
     if (orchestratorDisconnectedPattern.test(plainLine)) {
       this.orchestratorDisconnectCount += 1
     }
+    if (targetCrashedPattern.test(plainLine)) this.targetCrashCount += 1
+    if (targetDetachedPattern.test(plainLine)) this.targetDetachCount += 1
     if (plainLine.includes('[PW Error]')) {
       this.requestFailureCount += 1
       if (this.requestFailureSamples.length < maxRequestFailureSamples) {
@@ -168,7 +177,11 @@ export class StorybookBrowserBootstrapTelemetry {
         ? '[storybook-browser] suppressed additional request-failure diagnostic lines; see attempt summary count\n'
         : ''
     }
-    if (/\bpw:protocol\b/.test(plainLine)) return ''
+    if (/\bpw:protocol\b/.test(plainLine)) {
+      return targetCrashedPattern.test(plainLine) || targetDetachedPattern.test(plainLine)
+        ? originalLine
+        : ''
+    }
     if (/\bpw:browser\b/.test(plainLine)) {
       this.playwrightBrowserLineCount += 1
       if (this.playwrightBrowserLineCount <= maxPlaywrightBrowserLines) return originalLine
