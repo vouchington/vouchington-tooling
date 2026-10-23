@@ -19,7 +19,7 @@ export function compilePatterns(patterns: readonly string[]): (filePath: string)
     if (picomatch.scan(pattern).isGlob) {
       return picomatch(pattern.endsWith('/') ? `${pattern}**` : pattern, { dot: true })
     }
-    const prefix = pattern.replace(/\/+$/u, '')
+    const prefix = normalizePath(pattern).replace(/\/+$/u, '')
     return (filePath) => filePath === prefix || filePath.startsWith(`${prefix}/`)
   })
   return (filePath) => matchers.some((matches) => matches(filePath))

@@ -20,6 +20,12 @@ describe('compilePatterns', () => {
     expect(compilePatterns([])('anything')).toBe(false)
   })
 
+  it('ignores a leading ./ on prefix patterns', () => {
+    const matches = compilePatterns(['./docs/'])
+    expect(matches('docs/a.md')).toBe(true)
+    expect(matches('other/a.md')).toBe(false)
+  })
+
   it('gives glob patterns with a trailing slash subtree semantics', () => {
     const matches = compilePatterns(['packages/*/'])
     expect(matches('packages/api/src/a.ts')).toBe(true)
