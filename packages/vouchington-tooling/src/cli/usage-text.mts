@@ -57,6 +57,7 @@ Commands:
   story-coverage                Check component exports are imported by stories
   transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
   sandbox-command-audit         Audit agent transcripts for sandbox escalations and denials
+  cloc                          Count tracked lines of code by category and service with scc
 
 Options:
   -h, --help       Show this help
@@ -170,6 +171,13 @@ sandbox-command-audit --rules <module> [--settings-path <file>] [--repo-root <di
   returns { covers(list, commandOrPrefix) } for the allow/deny/excluded lists or { error }, and
   optionally classifyFailure(command, text, source), limits and worktreeGlobs. Transcript roots
   default to CLAUDE_CONFIG_DIR/projects and CODEX_HOME/sessions. --raw prints full command text.
+
+cloc --config <file> [--scc-bin <path>] [--json]
+  Counts git-tracked lines with scc (SCC_BIN or --scc-bin, else "scc"), classified into
+  source/tests/tooling and by service, and prints an aligned table (--json: rows). <file> is a .json
+  file or a module whose default (or "config") export is the layout: services [{ name, match }],
+  defaultService, categories, testPatterns, toolingPatterns, countedRoots, countedRootFiles,
+  excludedDirs, ignoredDirs, sccBin, missingSccHint.
 
 tmux up --config <file> [--root <dir>] [--no-attach] [-v|--verbose]
 tmux name [--socket PATH --pane %ID --worktree PATH] <name> | read-title | post-tool | agent-reminder <event>

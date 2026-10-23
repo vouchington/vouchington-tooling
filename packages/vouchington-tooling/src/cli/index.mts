@@ -115,6 +115,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return import('./commands/sandbox-command-audit.mts').then((command) =>
         command.runSandboxCommandAuditCommand(parsed.args),
       )
+    case 'cloc':
+      return import('./commands/cloc.mts').then((command) => command.runClocCommand(parsed.args))
     case 'hook':
       return runHookCommand(parsed.args)
     case 'worktree':

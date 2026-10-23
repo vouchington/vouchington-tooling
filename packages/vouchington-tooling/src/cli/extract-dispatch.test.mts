@@ -27,6 +27,9 @@ vi.mock('./commands/hook.mts', () => ({
 vi.mock('./commands/sandbox-command-audit.mts', () => ({
   runSandboxCommandAuditCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/cloc.mts', () => ({
+  runClocCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/worktree.mts', () => ({
   runWorktreeCommand: vi.fn(() => 0),
 }))
@@ -42,6 +45,7 @@ import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runHookCommand } from './commands/hook.mts'
 import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
+import { runClocCommand } from './commands/cloc.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
@@ -92,6 +96,11 @@ describe('runCli extract command dispatch', () => {
       runCli(['node', 'vouchington', 'sandbox-command-audit', '--rules', 'r.mjs']),
     ).resolves.toBe(0)
     expect(runSandboxCommandAuditCommand).toHaveBeenCalledWith(['--rules', 'r.mjs'])
+  })
+
+  it('forwards the cloc subcommand and its arguments', async () => {
+    await expect(runCli(['node', 'vouchington', 'cloc', '--config', 'c.json'])).resolves.toBe(0)
+    expect(runClocCommand).toHaveBeenCalledWith(['--config', 'c.json'])
   })
 
   it('forwards the mcp subcommand and its arguments', async () => {
