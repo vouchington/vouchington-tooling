@@ -62,9 +62,12 @@ report the blocker.
 
 ## Journaling policy
 
-1. Capture consequential observations before filing an issue: failed or recovered checks, denied or
-   approved permissions, repeated fixes, scope changes, first-party tool behavior, and architectural
-   findings. Record useful resolved outcomes as well as unresolved gaps. Include bounded evidence,
+1. Friction is the primary thing to journal: failed or recovered checks, denied or approved
+   permissions, scope changes, repeated fixes, and reusable tool gaps. Capture it before filing an
+   issue. Broader consequential observations, such as first-party tool behavior and architectural
+   findings, are allowed but secondary: add them after the friction is recorded, never in place of
+   it. A consumer wrapper may add repository-specific triggers but does not narrow this list.
+   Record useful resolved outcomes as well as unresolved gaps. Include bounded evidence,
    affected areas, an explicit disposition, and an existing tracking reference when present.
    Journal meaningful skips or bypasses of applicable configured workflows before completion, with
    the owning workflow or command-catalog entrypoint, reason, and observed result/action.
