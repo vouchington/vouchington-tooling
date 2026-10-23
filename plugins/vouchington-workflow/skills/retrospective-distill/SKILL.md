@@ -108,10 +108,9 @@ difference is a conflicting payload and stays quarantined.
   alone makes a stale checkpoint-only, journal-only, or zero-entry session eligible, so a
   retrospective-only gate cannot strand it. Everything else is not yet eligible; skip it with a
   reason.
-- Export unfiltered rather than with `inactiveForHours`: a zero-entry session has no last entry and
-  never matches that filter, which would hide the feedback gaps this pass exists to sweep up.
-  Derive age from the cutoffs above; they supply the delay for outboxes in removed worktrees or on
-  other machines.
+- Export unfiltered; the retrospective and session cutoffs above decide eligibility, and too-new
+  sessions must still appear as skipped with a reason. Derive age from the cutoffs above; they supply the delay for outboxes in
+  removed worktrees or on other machines.
 - Journal-only and zero-entry evidence get full issue-filing rights, subject to the same duplicate,
   current-state, and dependency checks as retrospective evidence, plus redaction: never quote a
   journal entry's raw command string or stderr in an issue body, since a journal entry can carry
