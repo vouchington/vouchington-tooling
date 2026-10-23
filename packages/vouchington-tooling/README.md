@@ -1084,3 +1084,53 @@ from `TMUX_TARGET_BIN`, the worktree from `TMUX_TARGET_ROOT` (default: current d
 touching it. `tmux post-tool` reads an agent post-tool hook payload on stdin and prints a rename
 reminder at plan, PR, push and reset checkpoints; reminders name `TMUX_NAME_COMMAND` (default
 `vouchington tmux name`).
+
+## PostgreSQL test faults and lock waits
+
+`vouchington-tooling/postgres-test-faults` injects real PostgreSQL failures and observes real lock
+waits for any `pg.Pool` application. It needs the optional peer `pg` (>=8) and `@types/pg`; no
+product code is imported, so pools and request ownership are passed in.
+
+```ts
+import {
+  createPostgresLockObservers,
+  withPostgresPoolQueryFailureForTest,
+  withPostgresQueryFailureForTest,
+} from 'vouchington-tooling/postgres-test-faults'
+
+const { result, error } = await withPostgresQueryFailureForTest(
+  '/* orders:insert */', // exact leading block comment that marks the statement to fail
+  () => placeOrder().catch((err: unknown) => err), // absorb the injected error
+  { pools: [readPool, writePool], command: 'INSERT' },
+)
+// error.code === '25P02': PostgreSQL rejected the marked statement on an aborted transaction.
+```
+
+- `withPostgresQueryFailureForTest(marker, operation, options)` fails one marked statement on a
+  client leased from `options.pools` with the promise form of `pool.connect()` (the callback
+  overload is not instrumented), inside a transaction the operation began with `BEGIN`. A
+  division by zero aborts that transaction, so PostgreSQL itself answers `25P02`.
+- `withPostgresPoolQueryFailureForTest(marker, operation, options)` does the same for a marked
+  `pool.query({ text })` call: it leases a real client, aborts its transaction, and hands the client
+  to the unchanged `pg.Pool#query` core.
+- Both resolve to `{ result, error }` only when the operation absorbs the injected `25P02` (catch
+  or translate it, and return the outcome as `result`). If the operation lets the error
+  propagate, the helper rejects with that error; it also rejects when the marked SQL never ran.
+  Observers give up after `timeoutMs` even when a query never settles; `signal` is checked between
+  steps, not inside a pending query. `options` is
+  `{ pools, command?, requestId?, isOwnedRequest?, endTimeoutMs? }`. A statement is owned by the
+  operation's async context, or by `requestId` when `isOwnedRequest(requestId)` returns true
+  (use it for work that runs outside that context, such as a request handler). Scopes are
+  serialized and cannot be nested.
+- `createPostgresLockObservers({ write, advisoryLockPool?, timeoutMs?, intervalMs? })` binds the
+  observers to your executors (any `({ text, values }) => Promise<{ rows }>`, for example
+  `query => pool.query(query)`), with defaults of 5000 ms and 10 ms. It returns
+  `getTestPostgresBackendProcessId(executor)`, `getTestPostgresAdvisoryLockHolderProcessId({ key,
+  mode?, namespace? })`, `waitForTestPostgresLockWaiter(holderPid, marker, observer?, onDiagnostic?,
+  signal?, waiterPid?)` and `waitForTestPostgresBlockedLockChain(holderPid, directMarker,
+  blockedMarkers, observer?)`. The waiters poll `pg_stat_activity` and `pg_blocking_pids`; the
+  observer is `'write'`, `'advisoryLock'` or a reserved executor.
+
+The package's own tests start a throwaway cluster with `initdb`/`pg_ctl` found through
+`POSTGRES_BIN_DIR`, `PATH` or a standard install location. They skip where no server can run and
+fail under `CI`.
