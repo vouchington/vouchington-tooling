@@ -20,6 +20,15 @@ describe('normalizeClocConfig', () => {
     })
   })
 
+  it('gives each config its own copy of the default directory lists', () => {
+    const first = normalizeClocConfig({})
+    first.excludedDirs.push('mutated')
+    first.ignoredDirs.push('mutated')
+    const second = normalizeClocConfig({})
+    expect(second.excludedDirs).toEqual(DEFAULT_EXCLUDED_DIRS)
+    expect(second.ignoredDirs).toEqual(DEFAULT_IGNORED_DIRS)
+  })
+
   it('keeps a default service that is already listed and carries every override', () => {
     const config = normalizeClocConfig({
       services: [{ name: 'a', match: ['a/'] }, { name: 'rest' }],

@@ -28,7 +28,7 @@ export type SccRun = {
 export async function readSccFiles(run: SccRun): Promise<CountedFile[]> {
   const args = ['--format', 'csv-stream', '--by-file', '--no-cocomo', '--no-complexity']
   if (run.excludedDirs.length > 0) args.push('--exclude-dir', run.excludedDirs.join(','))
-  const child = spawn(run.sccBin, [...args, ...run.targets], {
+  const child = spawn(run.sccBin, [...args, '--', ...run.targets], {
     cwd: run.cwd,
     stdio: ['ignore', 'pipe', 'inherit'],
   })

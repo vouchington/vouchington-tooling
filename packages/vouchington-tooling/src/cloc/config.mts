@@ -123,11 +123,11 @@ export function normalizeClocConfig(raw: unknown): ClocConfig {
     countedRootFiles: list(input.countedRootFiles, 'countedRootFiles'),
     excludedDirs:
       input.excludedDirs === undefined
-        ? DEFAULT_EXCLUDED_DIRS
+        ? [...DEFAULT_EXCLUDED_DIRS]
         : list(input.excludedDirs, 'excludedDirs'),
     ignoredDirs:
       input.ignoredDirs === undefined
-        ? DEFAULT_IGNORED_DIRS
+        ? [...DEFAULT_IGNORED_DIRS]
         : list(input.ignoredDirs, 'ignoredDirs'),
     ...(sccBin === undefined ? {} : { sccBin }),
     ...(missingSccHint === undefined ? {} : { missingSccHint }),

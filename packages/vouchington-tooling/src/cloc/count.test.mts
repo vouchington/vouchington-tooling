@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { countFiles } from './count.mts'
 import { fakeScc, layoutConfig, SCC_HEADER, sccCsv, tempRepo } from './layout.test-helpers.mts'
@@ -33,6 +34,17 @@ describe('countFiles', () => {
     expect(await countFiles(layoutConfig(), { cwd: repo, env })).toHaveLength(1)
     const config = layoutConfig({ sccBin: fakeScc(out) })
     expect(await countFiles(config, { cwd: repo, env: {} })).toHaveLength(1)
+  })
+
+  it('ends option parsing before the target paths', async () => {
+    const scc = fakeScc('')
+    const script = `const i = process.argv.indexOf('--')
+const first = process.argv[i + 1]
+process.stdout.write(${JSON.stringify(SCC_HEADER)} + 'T,' + first + '/a.ts,x,1,4,0,0,0,0\\n')
+`
+    writeFileSync(scc, `#!/usr/bin/env node\n${script}`)
+    const files = await countFiles(layoutConfig(), { cwd: repo, sccBin: scc })
+    expect(files).toEqual([{ path: 'api/a.ts', code: 4 }])
   })
 
   it('passes no exclude flag when no directories are excluded', async () => {
