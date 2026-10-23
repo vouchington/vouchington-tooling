@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { readUntilAborted } from './abort-listeners.mts'
 import { loadRecordedResponse, parseRecordedResponse } from './recorded-response.mts'
 import { toReplayResponse } from './replay-response.mts'
 
@@ -53,6 +54,13 @@ describe('recorded provider responses', () => {
     const recorded = wire('HTTP/1.1 200 OK\n\nline\r\n\r\nmore')
 
     expect(recorded.body.toString('utf8')).toBe('line\r\n\r\nmore')
+  })
+
+  it('rejects reading a request body with an already aborted signal', async () => {
+    const reason = new Error('before the read')
+    const request = new Request('https://provider.example.com/a', { method: 'POST', body: 'x' })
+
+    await expect(readUntilAborted(request, AbortSignal.abort(reason))).rejects.toBe(reason)
   })
 
   it('errors the body stream when the signal was already aborted', async () => {
