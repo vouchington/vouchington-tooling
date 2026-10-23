@@ -36,7 +36,7 @@ export function stripNonShellHeredocBodies(command: string): HeredocScan {
 
     // The hook does not pair each operator with its body, so a line with a shell-read heredoc
     // inspects every body on it.
-    const isShellScriptHeredoc = lineFeedsShellHeredoc(logicalLine(lines, index))
+    const isShellScriptHeredoc = lineFeedsShellHeredoc(line) || lineFeedsShellHeredoc(logicalLine(lines, index))
     for (const spec of specs) {
       const bodyLines: string[] = []
       index += 1

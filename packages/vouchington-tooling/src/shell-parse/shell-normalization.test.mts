@@ -19,10 +19,9 @@ describe('line continuation before a heredoc shell', () => {
     expect(commands.some((command) => command.includes(PUSH))).toBe(true)
   })
 
-  it('keeps a continued non-shell heredoc body as data', () => {
-    const result = stripNonShellHeredocBodies(`cat \\\n<<'EOF'\n${PUSH}\nEOF`)
-    expect(result.shellBodies).toEqual([])
-    expect(result.textWithoutBodies).not.toContain(PUSH)
+  it('still sees a shell after a quote opened on an earlier line', () => {
+    const command = `printf '%s\n' 'a\nb' \\\n; bash <<'EOF'\n${PUSH}\nEOF`
+    expect(stripNonShellHeredocBodies(command).shellBodies).toEqual([PUSH])
   })
 })
 
