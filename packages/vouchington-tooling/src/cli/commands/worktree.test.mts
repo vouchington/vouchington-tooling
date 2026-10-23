@@ -41,6 +41,7 @@ describe('runWorktreeCommand', () => {
     [[]],
     [['prune']],
     [['reclaim', '--force']],
+    [['reclaim', '--unknown', 'value']],
     [['reclaim', '--after', '--yes']],
     [['reclaim', '--max-worktrees', '0']],
     [['reclaim', '--timeout-ms', 'no']],

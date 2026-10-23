@@ -19,12 +19,13 @@ interface ReclaimEntry {
   readonly reason?: string
 }
 
-export interface ReclaimReport {
+export type ReclaimReport = {
   readonly dryRun: boolean
   readonly worktrees: ReclaimEntry[]
-  readonly hasMore: boolean
-  readonly nextAfter?: string
-}
+} & (
+  | { readonly hasMore: true; readonly nextAfter: string }
+  | { readonly hasMore: false; readonly nextAfter?: never }
+)
 
 export interface ReclaimOptions {
   readonly prLimit?: number
@@ -36,6 +37,8 @@ export interface ReclaimOptions {
 
 interface Context {
   readonly yes: boolean
+  readonly now: () => number
+  readonly deadline: number
   readonly runtime: RunOptions
   readonly mainRun: RunOptions
   readonly selfReal: string
@@ -70,8 +73,7 @@ function reclaimOne(record: WorktreeRecord, context: Context): ReclaimEntry | un
   if (nests(listed.map((entry) => entry.path))) return keep('contains another worktree')
   if ('reason' in again || again.head !== local.head || pullAgain !== undefined || !same)
     return keep('changed since check')
-  if ((context.runtime.now ?? Date.now)() >= context.runtime.deadline!)
-    return keep('scan budget exhausted')
+  if (context.now() >= context.deadline) return keep('scan budget exhausted')
   if (git(['worktree', 'remove', path], { ...context.mainRun, timeout: 0 }) === undefined) {
     return keep('git worktree remove refused')
   }
@@ -108,6 +110,8 @@ export function reclaimWorktrees(
   const repository = readRepository(mainRun)
   const context: Context = {
     yes,
+    now,
+    deadline,
     runtime,
     mainRun,
     selfReal: realpathSync(self),
@@ -118,7 +122,7 @@ export function reclaimWorktrees(
   const worktrees: ReclaimEntry[] = []
   const pending = others
     .filter((record) => options.after === undefined || record.path > options.after)
-    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .sort((a, b) => Number(a.path > b.path) - Number(a.path < b.path))
   let processed = 0
   let nextAfter = options.after ?? ''
   for (const record of pending) {
@@ -135,7 +139,9 @@ export function reclaimWorktrees(
     nextAfter = record.path
   }
   const hasMore = processed < pending.length
-  return { dryRun: !yes, worktrees, hasMore, ...(hasMore ? { nextAfter } : {}) }
+  return hasMore
+    ? { dryRun: !yes, worktrees, hasMore: true, nextAfter }
+    : { dryRun: !yes, worktrees, hasMore: false }
 }
 
 function escape(text: string): string {
@@ -153,9 +159,7 @@ export function formatReport(report: ReclaimReport): string {
         return `${escape(entry.path)}: ${escape(status)}\n`
       })
       .join('') +
-    (report.hasMore
-      ? `Scan incomplete; resume with --after ${quote(report.nextAfter ?? '')}\n`
-      : '')
+    (report.hasMore ? `Scan incomplete; resume with --after ${quote(report.nextAfter)}\n` : '')
   )
 }
 

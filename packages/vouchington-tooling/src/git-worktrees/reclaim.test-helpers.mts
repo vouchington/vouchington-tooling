@@ -79,7 +79,7 @@ export function createFixture(): Fixture {
   // A git wrapper that fails any invocation containing the words in FAKE_GIT_FAIL, to reach error paths.
   writeFileSync(
     join(bin, 'git'),
-    `#!/bin/sh\ncase " $* " in *" $FAKE_GIT_FAIL "*) [ -n "$FAKE_GIT_FAIL" ] && exit 1;; esac\nexec '${realGit}' "$@"\n`,
+    `#!/bin/sh\n[ -z "$FAKE_GIT_LOG" ] || printf '%s\\n' "$*" >> "$FAKE_GIT_LOG"\ncase " $* " in *" $FAKE_GIT_FAIL "*) [ -n "$FAKE_GIT_FAIL" ] && exit 1;; esac\nexec '${realGit}' "$@"\n`,
   )
   chmodSync(join(bin, 'git'), 0o755)
   const env: NodeJS.ProcessEnv = {

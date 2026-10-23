@@ -96,3 +96,25 @@ it.each([{ maxWorktrees: 0 }, { timeoutMs: -1 }, { maxWorktrees: Infinity }, { p
     expect(() => reclaimWorktrees(true, runtime(), options)).toThrow('positive integers')
   },
 )
+
+it('keeps a candidate when the final safety reads exhaust the budget and retries that path', () => {
+  const path = fx.addWorktree('done')
+  fx.setPrs('done', [{ state: 'MERGED' }])
+  const log = join(fx.root, 'git-requests')
+  const env = { ...fx.env, FAKE_GIT_LOG: log }
+  const now = () => {
+    const requests = existsSync(log) ? readFileSync(log, 'utf8').split('\n') : []
+    return requests.filter((args) => args.includes('worktree list --porcelain')).length >= 2
+      ? 30_000
+      : 0
+  }
+  const report = reclaimWorktrees(true, { ...runtime(), env }, { now })
+  expect(report).toMatchObject({ hasMore: true, nextAfter: fx.caller })
+  expect(report.worktrees).toEqual([
+    { path, branch: 'done', status: 'kept', reason: 'scan budget exhausted' },
+  ])
+  expect(existsSync(path)).toBe(true)
+  const rest = reclaimWorktrees(true, runtime(), { after: report.nextAfter! })
+  expect(rest.worktrees).toEqual([{ path, branch: 'done', status: 'reclaimed' }])
+  expect(rest.hasMore).toBe(false)
+})
