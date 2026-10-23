@@ -395,7 +395,7 @@ diagnostics file (`_DIAGNOSTICS_FILE`, default `storybook-browser-diagnostics.lo
 per-attempt summaries and the output tail.
 Before it terminates a stall or hang, the runner writes
 `[storybook-browser] process group <pgid> at stall:` and one line per process of the test command's
-group (pid, RSS in MB, %CPU, state, role such as `renderer`, `gpu-process` or `browser`; never argv,
+group and its descendants, including the detached browser (pid, RSS in MB, %CPU, state, role such as `renderer`, `gpu-process` or `browser`; never argv,
 capped near 4KB), sampled with `ps -ax` and best effort. The semantic-stall message names the last
 progress marker and its age, and the attempt summary counts Playwright `Target.targetCrashed` /
 `Target.detachedFromTarget` protocol lines (`targetCrashCount`, `targetDetachCount`).

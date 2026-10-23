@@ -138,6 +138,9 @@ export class OutputObserver {
       this.lastSemanticSequence = sequence
       state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
       this.recordSemanticProgress(now)
+    } else if (sequence != null && sequence === this.lastSemanticSequence) {
+      // A marker split across chunks completes later: refresh its text, not the timestamp.
+      state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
     }
     if (storybookOutput && !state.storybookBrowserOutputSeen) {
       state.storybookBrowserOutputSeen = true

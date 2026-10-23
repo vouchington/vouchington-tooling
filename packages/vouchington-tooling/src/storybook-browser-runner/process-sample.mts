@@ -9,12 +9,20 @@ export const MAX_SAMPLE_BYTES = 4096
 const PS_TIMEOUT_MS = 2000
 const PS_MAX_BUFFER_BYTES = 8 * 1024 * 1024
 const RESERVED_TRAILER_BYTES = 80
-const psRowPattern = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\S+)\s*(.*)$/
+const psRowPattern = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\S+)\s*(.*)$/
 const chromiumTypePattern = /(?:^|\s)--type=([\w.-]+)/
 const chromiumBinaryPattern =
   /^(?:chrome|chromium|chromium-browser|headless_shell|chrome-headless-shell|google chrome.*|chromium.*)$/i
 
-type ProcessRow = { args: string; cpu: string; pid: number; rssKb: number; stat: string }
+type ProcessRow = {
+  args: string
+  cpu: string
+  pgid: number
+  pid: number
+  ppid: number
+  rssKb: number
+  stat: string
+}
 
 type Exec = (
   file: string,
@@ -22,21 +30,36 @@ type Exec = (
   options: { encoding: 'utf8'; maxBuffer: number; timeout: number },
 ) => string
 
-/** Parses `ps -ax -o pid=,pgid=,rss=,pcpu=,stat=,args=` output, keeping only one process group. */
+/**
+ * Parses `ps -ax -o pid=,ppid=,pgid=,rss=,pcpu=,stat=,args=` output and keeps the processes of one
+ * process group plus their descendants: Playwright launches the browser detached, in its own group.
+ */
 export function parseProcessGroupRows(psOutput: string, processGroupId: number): ProcessRow[] {
-  const rows: ProcessRow[] = []
+  const all: ProcessRow[] = []
   for (const line of psOutput.split('\n')) {
     const match = psRowPattern.exec(line)
-    if (!match || Number(match[2]) !== processGroupId) continue
-    rows.push({
-      args: match[6]!,
-      cpu: match[4]!,
+    if (!match) continue
+    all.push({
+      args: match[7]!,
+      cpu: match[5]!,
+      pgid: Number(match[3]),
       pid: Number(match[1]),
-      rssKb: Number(match[3]),
-      stat: match[5]!,
+      ppid: Number(match[2]),
+      rssKb: Number(match[4]),
+      stat: match[6]!,
     })
   }
-  return rows
+  const included = new Set(all.filter((row) => row.pgid === processGroupId).map((row) => row.pid))
+  for (let grew = true; grew;) {
+    grew = false
+    for (const row of all) {
+      if (!included.has(row.pid) && included.has(row.ppid)) {
+        included.add(row.pid)
+        grew = true
+      }
+    }
+  }
+  return all.filter((row) => included.has(row.pid))
 }
 
 /** Chromium's `--type=<x>`, `browser` for a main Chromium binary, else the executable name. */
@@ -66,12 +89,12 @@ export function renderProcessGroupSample(psOutput: string, processGroupId: numbe
   return out
 }
 
-/** Default sampler: portable `ps -ax` filtered by pgid (never `ps -g`). */
+/** Default sampler: portable `ps -ax`, filtered by pgid and descendants (never `ps -g`). */
 export function samplePsProcessGroup(
   processGroupId: number,
   exec: Exec = execFileSync as unknown as Exec,
 ): string {
-  const output = exec('ps', ['-ax', '-o', 'pid=,pgid=,rss=,pcpu=,stat=,args='], {
+  const output = exec('ps', ['-ax', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='], {
     encoding: 'utf8',
     maxBuffer: PS_MAX_BUFFER_BYTES,
     timeout: PS_TIMEOUT_MS,

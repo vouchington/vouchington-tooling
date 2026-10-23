@@ -14,19 +14,19 @@ import {
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }))
 
 const mac = [
-  '  501 100 20480  0.0 S+   node /Users/me/repo/node_modules/.bin/vitest run --project ui',
-  '  502 100 912384 85.3 R    /Users/me/Library/Caches/ms-playwright/chromium_headless_shell-1181/chrome-headless-shell-mac-arm64/chrome-headless-shell --headless --user-data-dir=/var/secret --remote-debugging-pipe',
-  '  503 100 409600  1.2 S    /Applications/Google Chrome for Testing.app/Contents/Frameworks/Helper (Renderer).app/Contents/MacOS/Helper (Renderer) --type=renderer --secret=1',
-  '  504 999 1024  0.0 S    node unrelated',
-  '  505 100 2048  0.0 S    /Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing --headless',
+  '  501 90 100 20480  0.0 S+   node /Users/me/repo/node_modules/.bin/vitest run --project ui',
+  '  502 501 5000 912384 85.3 R    /Users/me/Library/Caches/ms-playwright/chromium_headless_shell-1181/chrome-headless-shell-mac-arm64/chrome-headless-shell --headless --user-data-dir=/var/secret --remote-debugging-pipe',
+  '  503 502 5000 409600  1.2 S    /Applications/Google Chrome for Testing.app/Contents/Frameworks/Helper (Renderer).app/Contents/MacOS/Helper (Renderer) --type=renderer --secret=1',
+  '  504 1 999 1024  0.0 S    node unrelated',
+  '  505 501 100 2048  0.0 S    /Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing --headless',
 ].join('\n')
 
 const linux = [
-  '    1     1  1100  0.0 Ss   /sbin/init',
-  ' 2001  2000 51200  3.5 Sl   /usr/bin/node /repo/node_modules/vitest/vitest.mjs run',
-  ' 2002  2000 700000 99.9 Dl   /root/.cache/ms-playwright/chromium-1181/chrome-linux/chrome --type=gpu-process --enable-features=X',
-  ' 2003  2000 300000  0.0 Z    [chrome] <defunct>',
-  ' 2004  2000 100000  0.3 S    /usr/bin/chromium-browser --headless=new',
+  '    1     0     1  1100  0.0 Ss   /sbin/init',
+  ' 2001  1 2000 51200  3.5 Sl   /usr/bin/node /repo/node_modules/vitest/vitest.mjs run',
+  ' 2002  2001 2002 700000 99.9 Dl   /root/.cache/ms-playwright/chromium-1181/chrome-linux/chrome --type=gpu-process --enable-features=X',
+  ' 2003  2001 2000 300000  0.0 Z    [chrome] <defunct>',
+  ' 2004  2001 2000 100000  0.3 S    /usr/bin/chromium-browser --headless=new',
 ].join('\n')
 
 describe('process group sample', () => {
@@ -42,6 +42,17 @@ describe('process group sample', () => {
     expect(sample).not.toContain('/Users')
     expect(sample).not.toContain('unrelated')
     expect(sample.indexOf('pid=502')).toBeLessThan(sample.indexOf('pid=503'))
+  })
+
+  it('includes detached descendants such as a Playwright browser in its own group', () => {
+    const rows = parseProcessGroupRows(mac, 100)
+    expect(rows.map((row) => [row.pid, row.pgid])).toEqual([
+      [501, 100],
+      [502, 5000],
+      [503, 5000],
+      [505, 100],
+    ])
+    expect(renderProcessGroupSample(mac, 999)).toContain('processes=1')
   })
 
   it('parses linux rows including zombies and chromium-browser', () => {
@@ -69,7 +80,7 @@ describe('process group sample', () => {
   it('caps the rendering and counts omitted processes', () => {
     const many = Array.from(
       { length: 300 },
-      (_, i) => `${1000 + i} 42 ${1000 + i} 0.0 S node /x/${'y'.repeat(50)}`,
+      (_, i) => `${1000 + i} 1 42 ${1000 + i} 0.0 S node /x/${'y'.repeat(50)}`,
     ).join('\n')
     const sample = renderProcessGroupSample(many, 42)
     expect(Buffer.byteLength(sample)).toBeLessThanOrEqual(MAX_SAMPLE_BYTES)
@@ -82,7 +93,7 @@ describe('process group sample', () => {
     const sample = samplePsProcessGroup(100, (...args) => (calls.push(args), mac))
     expect(calls[0]).toEqual([
       'ps',
-      ['-ax', '-o', 'pid=,pgid=,rss=,pcpu=,stat=,args='],
+      ['-ax', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='],
       { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 2000 },
     ])
     expect(sample).toContain('processes=4')

@@ -43,6 +43,17 @@ describe('stall process-group diagnostics', () => {
     await run
   })
 
+  it('completes a progress marker split across chunks', async () => {
+    const { child, harness, run, tick } = setup()
+    child.stdout.emit('data', '[vitest-browser-progress] seq=7 event=module-start')
+    child.stdout.emit('data', ' module="a.stories.tsx"\n')
+    child.stdout.emit('data', `${'x'.repeat(700)}\n`)
+    tick(120_000)
+    expect(harness.stderr.join('')).toContain('seq=7 event=module-start module="a.stories.tsx")')
+    exitChild(child, null, 'SIGTERM')
+    await run
+  })
+
   it('names a missing marker line when progress came from project output only', async () => {
     const { child, harness, run, tick } = setup()
     child.stdout.emit('data', 'x |browser-suite y\n')
