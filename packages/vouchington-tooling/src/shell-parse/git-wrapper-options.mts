@@ -64,7 +64,7 @@ export const EXTRA_WRAPPERS: ReadonlyMap<string, ExtraWrapper> = new Map([
     },
   ],
 ])
-const DURATION = /^\d+(?:\.\d+)?[smhd]?$/
+const DURATION = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?[smhd]?$|^inf(?:inity)?[smhd]?$/i
 
 /** The words after a wrapper's own options (and `timeout`'s duration). */
 export function skipWrapper(words: string[], wrapper: ExtraWrapper): string[] {

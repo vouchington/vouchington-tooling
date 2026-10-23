@@ -80,7 +80,7 @@ export function overridesConfig(invocation: GitInvocation, key: string): boolean
   return invocation.configOverrides.some((override) => override.key.toLowerCase() === wanted)
 }
 
-// Heredoc bodies that are data are dropped. A `$(` opens a substitution, and `name=(` an array literal;: its body is skipped (it
+// Heredoc bodies that are data are dropped. A `$(` opens a substitution, `name=(` an array literal, and `<(` / `>(` a process substitution;: its body is skipped (it
 // belongs to `extractShellCommandSubstitutions`) so the outer command keeps its later arguments.
 function segmentsOf(command: string): string[][] {
   const segments: string[][] = [[]]
@@ -93,8 +93,10 @@ function segmentsOf(command: string): string[][] {
     const current = segments.at(-1)!
     if (
       depth > 0 ||
-      (word.operator === true && word.value === '(' && /[$=]$/.test(current.at(-1) ?? ''))
+      (word.operator === true && word.value === '(' && /[$=<>]$/.test(current.at(-1) ?? ''))
     ) {
+      // A bare `<` / `>` before `(` is a process substitution, not a redirection of the next word.
+      if (/^[<>]$/.test(current.at(-1)!)) current.pop()
       if (word.operator === true) depth += word.value === '(' ? 1 : word.value === ')' ? -1 : 0
     } else if (word.operator === true) {
       segments.push([])

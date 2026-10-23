@@ -112,6 +112,13 @@ describe('gitInvocations', () => {
     ])
   })
 
+  it('reads float timeout durations and keeps args around process substitutions', () => {
+    for (const duration of ['.5', '1e2', '1.5m', '5.', 'inf']) {
+      expect(gitInvocations(`timeout ${duration} git push`)).toHaveLength(1)
+    }
+    expect(only('git push origin <(printf main) --force').args).toEqual(['origin', '--force'])
+  })
+
   it('keeps a quoted redirection-looking argument', () => {
     expect(only("git log --grep '>'").subcommand).toBe('log')
   })
