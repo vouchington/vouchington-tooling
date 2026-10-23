@@ -58,6 +58,7 @@ Commands:
   transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
   sandbox-command-audit         Audit agent transcripts for sandbox escalations and denials
   cloc                          Count tracked lines of code by category and service with scc
+  storybook-browser-runner      Run the Storybook Vitest browser project with cache, retry and watchdog
 
 Options:
   -h, --help       Show this help
@@ -178,6 +179,15 @@ cloc --config <file> [--scc-bin <path>] [--json]
   file or a module whose default (or "config") export is the layout: services [{ name, match }],
   defaultService, categories, testPatterns, toolingPatterns, countedRoots, countedRootFiles,
   excludedDirs, ignoredDirs, sccBin, missingSccHint.
+
+storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]... [--completion-file <path>] [--coverage-arg=<arg>]... [--optimize-deps-config <path>] [--env-prefix <PREFIX>] [--progress-prefix <text>] [-- <argv>...]
+  Spawns <cmd> (default pnpm) in its own process group with <argv> (default "exec vitest run
+  --project <name>") plus the coverage args (default --coverage) and supervises it: a Vite optimizer
+  cache, retries on known Vite and browser start-up flakes, and stall, hang and session-budget
+  watchdogs. --result-file paths are removed before each attempt and --completion-file is the one
+  whose appearance is recorded. Tuned by <PREFIX>_STARTUP_ATTEMPTS, _OPTIMIZER_STALL_MS, _HANG_MS,
+  _SESSION_BUDGET_MS, _DIAGNOSTICS_FILE, _PERSISTENT_CACHE, _PERSISTENT_CACHE_DIR and _COVERAGE
+  (PREFIX defaults to STORYBOOK_BROWSER). Exits with the resolved test exit code.
 
 tmux up --config <file> [--root <dir>] [--no-attach] [-v|--verbose]
 tmux name [--socket PATH --pane %ID --worktree PATH] <name> | read-title | post-tool | agent-reminder <event>

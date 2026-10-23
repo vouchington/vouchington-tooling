@@ -117,6 +117,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       )
     case 'cloc':
       return import('./commands/cloc.mts').then((command) => command.runClocCommand(parsed.args))
+    case 'storybook-browser-runner':
+      return import('./commands/storybook-browser-runner.mts').then((command) =>
+        command.runStorybookBrowserRunnerCommand(parsed.args),
+      )
     case 'hook':
       return runHookCommand(parsed.args)
     case 'worktree':

@@ -369,6 +369,47 @@ The pieces are exported from `vouchington-tooling/cloc` (`loadClocConfig`, `norm
 `countFiles`, `buildRows`, `formatRows`, `createClassifier`, `createPathPolicy`,
 `compilePatterns`).
 
+## Running the Storybook browser tests
+
+`vouchington storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]...
+[--completion-file <path>] [--coverage-arg=<arg>]... [--optimize-deps-config <path>]
+[--env-prefix <PREFIX>] [--progress-prefix <text>] [-- <argv>...]` runs the Storybook Vitest browser
+project under a watchdog. It spawns `<cmd>` (default `pnpm`) in its own process group with `<argv>`
+(default `exec vitest run --project <name>`) plus the coverage args (default `--coverage`, dropped
+when `<PREFIX>_COVERAGE=0`), supervised by `browser-session-runner`. Arguments after `--` replace the
+default argv and may begin with a dash; flag values that begin with a dash use `--flag=value`.
+
+The runner keeps a Vite optimizer cache: a persistent one in CI (`.cache/vite/storybook-browser`, or
+`<PREFIX>_PERSISTENT_CACHE_DIR`; `<PREFIX>_PERSISTENT_CACHE=0` turns it off) and a per-attempt one
+otherwise. A successful attempt that used a fresh cache is promoted to the persistent one. It
+retries (at most 3 attempts, `<PREFIX>_STARTUP_ATTEMPTS`) on known Vite and browser start-up flakes:
+a failed dynamic import from the Vite server, `ERR_NETWORK_CHANGED` before any test progress, the
+Storybook add-on's "Vitest failed to find the runner", an optimizer that stops progressing
+(`_OPTIMIZER_STALL_MS`, default 30000), and a tester-connection hang (`_HANG_MS`, default 120000).
+A start-up failure clears the persistent cache and the retry uses a fresh attempt cache. A stall
+after test progress began, an expired session budget (`_SESSION_BUDGET_MS`, default 300000) and a
+spawn failure are never retried. When Vite discovers new `optimizeDeps` and reloads, the run is not
+retried and the guidance names `--optimize-deps-config`. Progress markers and `vite:deps` debug
+output are kept out of the log and replayed from a bounded tail when an attempt fails, and a
+diagnostics file (`_DIAGNOSTICS_FILE`, default `storybook-browser-diagnostics.log`) holds the
+per-attempt summaries and the output tail.
+
+Everything repository-specific is a parameter: the Vitest project name (also the browser-project
+output marker), the command and argv, the `--result-file` paths removed before each attempt, the
+`--completion-file` whose appearance is recorded, the optimizeDeps config path named in the
+guidance, the env var prefix (default `STORYBOOK_BROWSER`) and the progress marker prefix (default
+`[vitest-browser-progress]`, the one `createVitestStorybookProgressReporter` writes). The Vitest
+config must read `VITEST_STORYBOOK_BROWSER`, `VITEST_STORYBOOK_BROWSER_API_PORT` and
+`VITEST_STORYBOOK_BROWSER_CACHE_DIR`, which the runner sets for each attempt, and
+`VITEST_COVERAGE_SCOPE`, set to the project name. The module is exported from
+`vouchington-tooling/storybook-browser-runner` as `runStorybookBrowserTests(project, { env }, deps)`,
+which resolves with the exit code; every effect (`spawn`, clock, timers, filesystem, streams) is
+injectable through `deps`. Exits 2 on a usage error. The runner is POSIX-only (it signals process
+groups) and the command exits 1 on Windows. Semantic progress comes from the progress-marker reporter
+(`createVitestStorybookProgressReporter`); without it only the first project result counts as progress.
+A session budget of 5000 ms or less caps the termination
+grace at half the budget.
+
 ## Reclaiming finished worktrees
 
 `vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
@@ -462,6 +503,7 @@ import {
 } from 'vouchington-tooling/api-fixtures'
 import { decide, deriveRetryAttempt } from 'vouchington-tooling/transient-retry'
 import { scanTranscripts, classifyAudit } from 'vouchington-tooling/sandbox-command-audit'
+import { runStorybookBrowserTests } from 'vouchington-tooling/storybook-browser-runner'
 import { parseCsvRows, streamCsvRows } from 'vouchington-tooling/csv'
 import {
   extractLooseMarkdownTableRows,

@@ -326,6 +326,11 @@
       "import": "./dist/cloc/index.mjs",
       "default": "./dist/cloc/index.mjs"
     },
+    "./storybook-browser-runner": {
+      "types": "./dist/storybook-browser-runner/index.d.mts",
+      "import": "./dist/storybook-browser-runner/index.mjs",
+      "default": "./dist/storybook-browser-runner/index.mjs"
+    },
     "./sandbox-command-audit": {
       "types": "./dist/sandbox-command-audit/index.d.mts",
       "import": "./dist/sandbox-command-audit/index.mjs",
