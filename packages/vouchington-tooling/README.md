@@ -1070,7 +1070,7 @@ import {
 
 const { result, error } = await withPostgresQueryFailureForTest(
   '/* orders:insert */', // exact leading block comment that marks the statement to fail
-  () => placeOrder(),
+  () => placeOrder().catch((err: unknown) => err), // absorb the injected error
   { pools: [readPool, writePool], command: 'INSERT' },
 )
 // error.code === '25P02': PostgreSQL rejected the marked statement on an aborted transaction.
@@ -1082,7 +1082,10 @@ const { result, error } = await withPostgresQueryFailureForTest(
 - `withPostgresPoolQueryFailureForTest(marker, operation, options)` does the same for a marked
   `pool.query({ text })` call: it leases a real client, aborts its transaction, and hands the client
   to the unchanged `pg.Pool#query` core.
-- Both resolve to `{ result, error }` and reject when the marked SQL never ran. `options` is
+- Both resolve to `{ result, error }` only when the operation absorbs the injected `25P02` (catch
+  or translate it, and return the outcome as `result`). If the operation lets the error
+  propagate, the helper rejects with that error; it also rejects when the marked SQL never ran.
+  `options` is
   `{ pools, command?, requestId?, isOwnedRequest?, endTimeoutMs? }`. A statement is owned by the
   operation's async context, or by `requestId` when `isOwnedRequest(requestId)` returns true
   (use it for work that runs outside that context, such as a request handler). Scopes are

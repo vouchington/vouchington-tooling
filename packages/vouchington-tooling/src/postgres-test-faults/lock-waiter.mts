@@ -2,6 +2,11 @@ import type { LockObserverConfig, LockWaiterDiagnostic, ObserverPool } from './f
 import { runObservation } from './lock-wait.mts'
 import { pollUntilNotNull } from './polling.mts'
 
+/** A LIKE pattern matching `text` literally anywhere, so `%`, `_` and `\` in markers are not wildcards. */
+function likeContains(text: string): string {
+  return `%${text.replace(/[\\%_]/g, '\\$&')}%`
+}
+
 const CLEAR_SNAPSHOT = 'SELECT pg_stat_clear_snapshot()'
 
 const WAITER_SQL = `
@@ -72,7 +77,7 @@ export async function waitForLockWaiter(
         config,
         observerPool,
         WAITER_SQL,
-        [waiterProcessId ?? null, `%${queryMarker}%`, holderProcessId],
+        [waiterProcessId ?? null, likeContains(queryMarker), holderProcessId],
       )
       signal?.throwIfAborted()
       onDiagnostic?.({ phase: 'waiter-query', waiting: rows[0]?.waiting ?? false })
@@ -111,9 +116,9 @@ export async function waitForBlockedLockChain(
           text: `/* waitForTestPostgresBlockedLockChain.refresh */ ${CLEAR_SNAPSHOT}`,
         })
       const { rows } = await runObservation<{ waiting: boolean }>(config, observerPool, CHAIN_SQL, [
-        `%${directQueryMarker}%`,
+        likeContains(directQueryMarker),
         holderProcessId,
-        blockedByDirectQueryMarkers.map((marker) => `%${marker}%`),
+        blockedByDirectQueryMarkers.map(likeContains),
       ])
       return rows[0]?.waiting ? true : null
     },

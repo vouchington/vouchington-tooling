@@ -76,8 +76,8 @@ export async function withPostgresQueryFailureForTest<Result>(
         const text = queryText(args[0])
         const command = text.trimStart().replace(/^\/\*[\s\S]*?\*\/\s*/, '')
         const owned = ownsContext()
-        if (owned && /^BEGIN\b/.test(command)) began = true
-        if (owned && /^(?:COMMIT|ROLLBACK)\b/.test(command)) began = false
+        if (owned && /^(?:BEGIN|START\s+TRANSACTION)\b/i.test(command)) began = true
+        if (owned && /^(?:COMMIT|ROLLBACK|END|ABORT)\b/i.test(command)) began = false
         if (!owned || fired || !targetsStatement(text, queryMarker, options.command))
           return Reflect.apply(originalQuery, client, args)
         if (!began || !isPlainTextConfig(args))

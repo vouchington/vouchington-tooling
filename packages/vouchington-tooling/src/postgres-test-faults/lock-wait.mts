@@ -41,6 +41,7 @@ export async function getAdvisoryLockHolderProcessId(
           SELECT pid::integer AS process_id
           FROM pg_locks
           WHERE locktype = 'advisory'
+            AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
             AND mode = $1
             AND granted
             AND objsubid = 1
@@ -55,6 +56,7 @@ export async function getAdvisoryLockHolderProcessId(
           SELECT pid::integer AS process_id
           FROM pg_locks
           WHERE locktype = 'advisory'
+            AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
             AND mode = $1
             AND granted
             AND objsubid = 2

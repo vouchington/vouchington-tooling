@@ -60,7 +60,7 @@ describe.skipIf(!started)('withPostgresQueryFailureForTest (real PostgreSQL)', (
           { one: 1 },
         ])
         await client.query('COMMIT')
-        await client.query('BEGIN')
+        await client.query('begin')
         await client.query({ text: `${MARKER} SELECT 1` }).catch(() => undefined)
         await client.query('ROLLBACK')
         client.release()

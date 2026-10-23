@@ -105,6 +105,25 @@ describe.skipIf(!started)('lock observers (real PostgreSQL)', () => {
     await holder.query('SELECT pg_advisory_unlock_all()')
   })
 
+  it('matches markers literally instead of as LIKE wildcards', async () => {
+    const { observers, lease } = await setup({ timeoutMs: 100 })
+    const holder = await lease()
+    const waiter = await lease()
+    const holderPid = await observers.getTestPostgresBackendProcessId(toExecutor(holder))
+    await holder.query("SELECT pg_advisory_lock(hashtextextended('literal', 0))")
+    pending.push(
+      waiter.query("/* blocked_op */ SELECT pg_advisory_lock(hashtextextended('literal', 0))"),
+    )
+    await observers.waitForTestPostgresLockWaiter(holderPid, 'blocked_op')
+    await expect(observers.waitForTestPostgresLockWaiter(holderPid, 'blocked%op')).rejects.toThrow(
+      'did not wait for the test lock',
+    )
+    await expect(observers.waitForTestPostgresLockWaiter(holderPid, 'blockedXop')).rejects.toThrow(
+      'did not wait for the test lock',
+    )
+    await holder.query('SELECT pg_advisory_unlock_all()')
+  })
+
   it('times out with the marker when nothing is blocked', async () => {
     const { observers, lease } = await setup({ timeoutMs: 50 })
     const holder = await lease()
