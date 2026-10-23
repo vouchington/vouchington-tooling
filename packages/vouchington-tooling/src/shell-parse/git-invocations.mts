@@ -1,3 +1,5 @@
+import { EXTRA_WRAPPERS, skipWrapper } from './git-wrapper-options.mts'
+import { stripNonShellHeredocBodies } from './shell-heredoc.mts'
 import { readCommandPrefix, withoutRedirections } from './shell-command-wrappers.mts'
 import { tokenizeShellWordsDetailed } from './shell-tokenizer.mts'
 
@@ -14,8 +16,6 @@ export type GitInvocation = {
   /** The subcommand word, or undefined for a bare `git` or `git --version`. */
   subcommand: string | undefined
 }
-
-type ExtraWrapper = { duration?: true; values: readonly string[] }
 
 const VALUE_OPTIONS = new Set([
   '-C',
@@ -43,6 +43,7 @@ const FLAG_OPTIONS = new Set([
   '--man-path',
   '--no-advice',
   '--no-lazy-fetch',
+  '--no-literal-pathspecs',
   '--no-optional-locks',
   '--no-pager',
   '--no-replace-objects',
@@ -53,19 +54,6 @@ const FLAG_OPTIONS = new Set([
 const ATTACHED_OPTION =
   /^--(?:git-dir|work-tree|namespace|exec-path|config-env|super-prefix|attr-source|list-cmds)=/
 const CONFIG_ENV_PREFIX = '--config-env='
-
-// Wrappers `readCommandPrefix` does not read through, with the options that take a separate value.
-const EXTRA_WRAPPERS: ReadonlyMap<string, ExtraWrapper> = new Map([
-  ['doas', { values: ['-u', '-C'] }],
-  ['ionice', { values: ['-c', '-n', '-p', '-P', '-u'] }],
-  ['nice', { values: ['-n'] }],
-  ['setsid', { values: [] }],
-  ['stdbuf', { values: ['-i', '-o', '-e'] }],
-  ['sudo', { values: ['-u', '-g', '-h', '-p', '-C', '-D', '-R', '-T', '-U', '-r', '-t'] }],
-  ['timeout', { duration: true, values: ['-s', '-k'] }],
-  ['xargs', { values: ['-I', '-n', '-P', '-L', '-s', '-E', '-d', '-a'] }],
-])
-const DURATION = /^\d+(?:\.\d+)?[smhd]?$/
 
 /**
  * Each `git` the shell would run in command position: after a separator, env assignments, or a
@@ -89,14 +77,27 @@ export function overridesConfig(invocation: GitInvocation, key: string): boolean
   return invocation.configOverrides.some((override) => override.key.toLowerCase() === wanted)
 }
 
+// Heredoc bodies that are data are dropped. A `$(` opens a substitution: its body is skipped (it
+// belongs to `extractShellCommandSubstitutions`) so the outer command keeps its later arguments.
 function segmentsOf(command: string): string[][] {
   const segments: string[][] = [[]]
-  for (const word of tokenizeShellWordsDetailed(command, {
+  let depth = 0
+  const words = tokenizeShellWordsDetailed(stripNonShellHeredocBodies(command).textWithoutBodies, {
     markOperators: true,
     splitRedirections: true,
-  })) {
-    if (word.operator === true) segments.push([])
-    else segments.at(-1)!.push(word.value)
+  })
+  for (const word of words) {
+    const current = segments.at(-1)!
+    if (
+      depth > 0 ||
+      (word.operator === true && word.value === '(' && current.at(-1)?.endsWith('$'))
+    ) {
+      if (word.operator === true) depth += word.value === '(' ? 1 : word.value === ')' ? -1 : 0
+    } else if (word.operator === true) {
+      segments.push([])
+    } else {
+      current.push(word.value)
+    }
   }
   return segments
 }
@@ -107,8 +108,9 @@ function basename(word: string): string {
 
 /** The words from the command word on, or null when the segment runs nothing readable. */
 function commandWords(segment: string[]): string[] | null {
-  let words = withoutRedirections(segment)
-  while (words !== null) {
+  // A quoted `'>'` argument is indistinguishable from a redirection here; keep the words then.
+  let words = withoutRedirections(segment) ?? segment
+  for (;;) {
     const read = readCommandPrefix(words)
     if (read === null || read.commandIndex >= words.length) return null
     words = words.slice(read.commandIndex)
@@ -116,19 +118,6 @@ function commandWords(segment: string[]): string[] | null {
     if (wrapper === undefined) return words
     words = skipWrapper(words, wrapper)
   }
-  return null
-}
-
-function skipWrapper(words: string[], wrapper: ExtraWrapper): string[] {
-  let cursor = 1
-  while (words[cursor]?.startsWith('-') === true) {
-    const word = words[cursor]!
-    cursor += 1
-    if (word === '--') break
-    if (wrapper.values.includes(word)) cursor += 1
-  }
-  if (wrapper.duration === true && DURATION.test(words[cursor] ?? '')) cursor += 1
-  return words.slice(cursor)
 }
 
 function readInvocation(words: string[]): GitInvocation {

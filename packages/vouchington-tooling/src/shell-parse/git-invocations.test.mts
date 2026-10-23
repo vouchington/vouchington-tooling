@@ -79,6 +79,38 @@ describe('gitInvocations', () => {
     }
   })
 
+  it('consumes separate values of long wrapper options', () => {
+    for (const command of [
+      'sudo --user root git push',
+      'xargs --max-args 1 git push',
+      'timeout --signal TERM 5 git push',
+    ]) {
+      expect(gitInvocations(command).map((item) => item.subcommand)).toEqual(['push'])
+    }
+  })
+
+  it('ignores a git line inside a heredoc body', () => {
+    expect(gitInvocations("cat <<'EOF'\ngit push --force\nEOF")).toEqual([])
+  })
+
+  it('keeps later arguments after a command substitution', () => {
+    const invocation = only('git push origin $(printf "(a)" $(echo b)) --force')
+    expect(invocation.args).toEqual(['origin', '$', '--force'])
+  })
+
+  it('skips separators inside a substitution and reads a subshell', () => {
+    expect(only('git log $(a; b) --oneline').args).toEqual(['$', '--oneline'])
+    expect(only('(git push)').subcommand).toBe('push')
+  })
+
+  it('keeps a quoted redirection-looking argument', () => {
+    expect(only("git log --grep '>'").subcommand).toBe('log')
+  })
+
+  it('skips --no-literal-pathspecs', () => {
+    expect(only('git --no-literal-pathspecs status').subcommand).toBe('status')
+  })
+
   it('returns every invocation in order', () => {
     const commands = gitInvocations('git add . && git commit -m x; git push')
     expect(commands.map((item) => item.subcommand)).toEqual(['add', 'commit', 'push'])
