@@ -13,6 +13,9 @@ export function toReplayResponse(
   signal?: AbortSignal | null,
 ): Response {
   const size = chunkBytes ?? Math.max(recorded.body.length, 1)
+  if (!Number.isSafeInteger(size) || size < 1) {
+    throw new RangeError(`chunkBytes must be a positive integer, received ${chunkBytes}`)
+  }
   let offset = 0
   let detach!: () => void
   const body =

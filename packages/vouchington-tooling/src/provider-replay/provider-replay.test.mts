@@ -27,6 +27,26 @@ describe('provider replay transport', () => {
     replay.assertDrained()
   })
 
+  it.each([0, -1, 1.5, Number.NaN])('rejects the chunk size %s', async (chunkBytes) => {
+    const replay = createProviderReplay({ chunkBytes })
+    replay.respondWith(ok)
+
+    await expect(replay.fetch('https://provider.example.com/a')).rejects.toThrow(RangeError)
+  })
+
+  it('forwards extra constructor arguments to the client', () => {
+    class Client {
+      args: unknown[]
+      constructor(...args: unknown[]) {
+        this.args = args
+      }
+    }
+
+    const client = new (replayClient(Client, createProviderReplay()))({ a: 1 }, 'second')
+
+    expect(client.args[1]).toBe('second')
+  })
+
   it('parses an empty body as null JSON', async () => {
     const replay = createProviderReplay()
     replay.respondWith(ok)
