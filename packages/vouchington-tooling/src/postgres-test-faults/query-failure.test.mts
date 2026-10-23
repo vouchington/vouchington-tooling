@@ -80,6 +80,7 @@ describe.skipIf(!started)('withPostgresQueryFailureForTest (real PostgreSQL)', (
         await client.query('BEGIN')
         await client.query('SAVEPOINT s')
         await client.query('ROLLBACK TO SAVEPOINT s')
+        await client.query('COMMIT AND CHAIN')
         const outcome = await client
           .query({ text: `${MARKER} SELECT 1` })
           .catch((err: unknown) => err)

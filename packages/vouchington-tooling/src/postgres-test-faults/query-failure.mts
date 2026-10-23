@@ -14,11 +14,12 @@ import {
 import type { PostgresFaultOptions, PostgresFaultResult } from './fault-types.mts'
 import { runPoolObservationExclusively } from './observation-queue.mts'
 
-/** COMMIT, END, ABORT and ROLLBACK end the transaction; ROLLBACK TO SAVEPOINT keeps it open. */
+/** COMMIT, END, ABORT and ROLLBACK end the transaction; ROLLBACK TO SAVEPOINT and AND CHAIN keep one open. */
 function endsTransaction(command: string): boolean {
   return (
     /^(?:COMMIT|ROLLBACK|END|ABORT)\b/i.test(command) &&
-    !/^ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO\b/i.test(command)
+    !/^ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO\b/i.test(command) &&
+    !/\bAND\s+CHAIN\b/i.test(command)
   )
 }
 

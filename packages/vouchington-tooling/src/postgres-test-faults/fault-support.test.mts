@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { isPlainTextConfig, queryText, targetsStatement } from './fault-support.mts'
+import pg from 'pg'
+import {
+  assertFaultOptions,
+  isPlainTextConfig,
+  queryText,
+  targetsStatement,
+} from './fault-support.mts'
 
 describe('queryText', () => {
   it('reads strings and text configs and ignores anything else', () => {
@@ -8,6 +14,15 @@ describe('queryText', () => {
     expect(queryText({ name: 'no-text' })).toBe('')
     expect(queryText(null)).toBe('')
     expect(queryText(42)).toBe('')
+  })
+})
+
+describe('assertFaultOptions', () => {
+  const pools = [new pg.Pool()]
+  it('rejects an invalid close timeout before any client is leased', () => {
+    for (const endTimeoutMs of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(() => assertFaultOptions('/* m */', { pools, endTimeoutMs })).toThrow('endTimeoutMs')
+    expect(() => assertFaultOptions('/* m */', { pools, endTimeoutMs: 0 })).not.toThrow()
   })
 })
 

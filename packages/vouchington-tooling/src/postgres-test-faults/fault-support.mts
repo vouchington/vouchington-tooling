@@ -8,6 +8,11 @@ export function assertFaultOptions(queryMarker: string, options: PostgresFaultOp
     throw new Error('PostgreSQL fault injection requires an exact leading query annotation')
   if (options.pools.length === 0)
     throw new Error('PostgreSQL fault injection requires at least one pool')
+  if (
+    options.endTimeoutMs !== undefined &&
+    !(Number.isInteger(options.endTimeoutMs) && options.endTimeoutMs >= 0)
+  )
+    throw new Error('endTimeoutMs must be a non-negative integer')
   if (options.requestId === undefined) return
   if (options.requestId === '' || options.isOwnedRequest === undefined)
     throw new Error('Request-scoped PostgreSQL faults require a request id and isOwnedRequest')

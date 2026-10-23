@@ -1086,7 +1086,8 @@ const { result, error } = await withPostgresQueryFailureForTest(
 - Both resolve to `{ result, error }` only when the operation absorbs the injected `25P02` (catch
   or translate it, and return the outcome as `result`). If the operation lets the error
   propagate, the helper rejects with that error; it also rejects when the marked SQL never ran.
-  `options` is
+  Observers give up after `timeoutMs` even when a query never settles; `signal` is checked between
+  steps, not inside a pending query. `options` is
   `{ pools, command?, requestId?, isOwnedRequest?, endTimeoutMs? }`. A statement is owned by the
   operation's async context, or by `requestId` when `isOwnedRequest(requestId)` returns true
   (use it for work that runs outside that context, such as a request handler). Scopes are
