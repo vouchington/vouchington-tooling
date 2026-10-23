@@ -5,6 +5,8 @@ export interface RunOptions {
   readonly env: NodeJS.ProcessEnv
   /** Milliseconds before a read-only call is killed; 0 for none (worktree removal). */
   readonly timeout?: number
+  readonly deadline?: number
+  readonly now?: () => number
 }
 
 /** Runs a command without a shell; returns stdout, or undefined when it fails to start or exits non-zero. */
@@ -13,6 +15,9 @@ export function run(
   args: readonly string[],
   options: RunOptions,
 ): string | undefined {
+  const remaining =
+    options.deadline === undefined ? Infinity : options.deadline - (options.now ?? Date.now)()
+  if (remaining <= 0 && options.timeout !== 0) return undefined
   try {
     return execFileSync(file, args, {
       cwd: options.cwd,
@@ -20,7 +25,8 @@ export function run(
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: options.timeout ?? 120_000,
+      timeout:
+        options.timeout === 0 ? 0 : Math.max(1, Math.min(options.timeout ?? 120_000, remaining)),
     })
   } catch {
     return undefined

@@ -412,21 +412,35 @@ grace at half the budget.
 
 ## Reclaiming finished worktrees
 
-`vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
+`vouchington worktree reclaim [--yes] [--json] [--max-worktrees N] [--timeout-ms N] [--pr-limit N] [--after PATH]` removes git worktrees whose work is done. It is a
 dry run unless `--yes` is passed. It prints one line per worktree (`reclaimed`, `would reclaim`, or
-`kept: <reason>`, control characters escaped), or `{ dryRun, worktrees }` with `--json`.
+`kept: <reason>`, control characters escaped), or `{ dryRun, worktrees, hasMore, nextAfter? }` with `--json`. Progress and elapsed time go to stderr.
+
+Scans default to at most 100 registered worktrees and 30 seconds of read-only work. Read calls share
+that deadline; a deletion already started is allowed to finish. An incomplete scan returns `hasMore`
+and a path cursor (`nextAfter`) and prints `--after` instructions. Pass that cursor with the same
+limits and `--yes` selection to resume; path ordering lets the cursor survive deletion of its worktree.
+Increase `--timeout-ms` if a single slow worktree repeatedly exhausts the budget.
+The cursor is an exclusive path boundary: newly added paths before it are covered by the next scan
+from the beginning. When using a consumer cleanup wrapper that owns a resource lock, resume through
+that wrapper rather than invoking the CLI directly.
 
 It skips the main checkout, the caller's own worktree, and locked, bare, detached and missing
 worktrees. Any other worktree is kept, with a reason, unless all of these hold:
 
 - `git status` (untracked files and submodules included) is empty, and no index entry is
   assume-unchanged or skip-worktree.
-- `gh pr list --head <branch>` has a merged or closed pull request from this repository (not a
+- Shared repository-wide PR discovery has a merged or closed pull request from this repository (not a
   fork) whose `headRefOid` equals HEAD, and no open pull request from this repository. That PR also
   proves HEAD is published, so squash merges whose branch was deleted are reclaimed. A `gh` failure,
-  or a query returning 1000 results, keeps the worktree.
+  or an incomplete open-PR list, keeps the worktree. Discovery reads open and recent PR lists once
+  across all branches (paginated internally by `gh`). Each list is capped by `--pr-limit` (default
+  1000, maximum 10000); worktrees without matching history are kept. Increase the limit to include
+  older finished PRs. A full recent-history page can prove a candidate; a full open page cannot
+  prove the absence of an open PR.
 
-With `--yes`, HEAD and cleanliness are checked again right before `git worktree remove <path>` runs.
+With `--yes`, candidates receive fresh branch-specific open/history PR checks, then HEAD,
+cleanliness and registration are checked again right before `git worktree remove <path>` runs.
 It is never forced, and a refusal from git is reported as kept. Ignored files (for example `.env`, `node_modules`, build output) are deleted with the worktree, exactly as `git worktree remove` does; keep anything you need outside ignored paths or commit it. An unexpected error on one worktree is reported as `kept: error: <message>` and the run carries on. There is no `prune`, no branch
 deletion, and git runs with `core.fsmonitor=false`.
 

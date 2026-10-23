@@ -19,8 +19,9 @@ if (env.FAKE_GH_GARBAGE) {
   process.exit(0)
 }
 const state = args[args.indexOf('--state') + 1]
+if (env.FAKE_GH_LOG) fs.appendFileSync(env.FAKE_GH_LOG, JSON.stringify(args) + '\\n')
 // Simulates a change that lands between the first assessment and the re-check.
-if (state === 'all') {
+if (state === 'all' && args.includes('--head')) {
   const { execFileSync } = require('node:child_process')
   const run = (cwd, ...a) => execFileSync('git', a, { cwd, stdio: 'ignore' })
   if (env.FAKE_GH_NEST && !fs.existsSync(env.FAKE_GH_DIR + '/nested')) {
@@ -34,15 +35,19 @@ if (state === 'all') {
     run(env.FAKE_GH_ADVANCE, 'push', 'origin', 'HEAD')
   }
 }
-const branch = args[args.indexOf('--head') + 1]
-const file = env.FAKE_GH_DIR + '/' + branch.replaceAll('/', '_') + '.json'
-let pulls = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : []
+const branch = args.includes('--head') ? args[args.indexOf('--head') + 1] : undefined
+const file = env.FAKE_GH_DIR + '/' + (branch || '').replaceAll('/', '_') + '.json'
+let pulls = branch === undefined
+ ? fs.readdirSync(env.FAKE_GH_DIR).filter(name => name.endsWith('.json')).flatMap(name => JSON.parse(fs.readFileSync(env.FAKE_GH_DIR + '/' + name, 'utf8')))
+ : fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : []
 if (state === 'open') pulls = pulls.filter((pr) => pr.state === 'OPEN')
 const pad = Number(env['FAKE_GH_PAD_' + state.toUpperCase()] || 0)
 for (let i = 0; i < pad; i += 1) pulls.push({ state: 'CLOSED' })
 console.log(JSON.stringify(pulls))
 // Reopen every PR after the first full answer, as if it changed before the re-check.
 if (state === 'all' && env.FAKE_GH_REOPEN && !fs.existsSync(file + '.reopened')) {
+  const target = branch === undefined ? fs.readdirSync(env.FAKE_GH_DIR).find(name => name.endsWith('.json')) : undefined
+  if (target) fs.writeFileSync(env.FAKE_GH_DIR + '/' + target, JSON.stringify(pulls.map(pr => ({ ...pr, state: 'OPEN' }))))
   fs.writeFileSync(file, JSON.stringify(pulls.map((pr) => ({ ...pr, state: 'OPEN' }))))
   fs.writeFileSync(file + '.reopened', '')
 }
@@ -74,7 +79,7 @@ export function createFixture(): Fixture {
   // A git wrapper that fails any invocation containing the words in FAKE_GIT_FAIL, to reach error paths.
   writeFileSync(
     join(bin, 'git'),
-    `#!/bin/sh\ncase " $* " in *" $FAKE_GIT_FAIL "*) [ -n "$FAKE_GIT_FAIL" ] && exit 1;; esac\nexec '${realGit}' "$@"\n`,
+    `#!/bin/sh\n[ -z "$FAKE_GIT_LOG" ] || printf '%s\\n' "$*" >> "$FAKE_GIT_LOG"\ncase " $* " in *" $FAKE_GIT_FAIL "*) [ -n "$FAKE_GIT_FAIL" ] && exit 1;; esac\nexec '${realGit}' "$@"\n`,
   )
   chmodSync(join(bin, 'git'), 0o755)
   const env: NodeJS.ProcessEnv = {
@@ -119,6 +124,7 @@ export function createFixture(): Fixture {
     setPrs: (branch, prs) => {
       const tip = git(main, 'rev-parse', `refs/heads/${branch}`).trim()
       const filled = prs.map((pr) => ({
+        headRefName: branch,
         headRefOid: tip,
         isCrossRepository: false,
         headRepository: { name: 'Widgets' },

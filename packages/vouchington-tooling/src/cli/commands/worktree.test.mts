@@ -37,13 +37,39 @@ describe('runWorktreeCommand', () => {
     })
   }, 30_000)
 
-  it.each([[[]], [['prune']], [['reclaim', '--force']]])(
-    'rejects %j with usage and exit 2',
-    (args) => {
-      expect(runWorktreeCommand(args, fx.env, fx.caller)).toBe(2)
-      expect(stderr).toContain('worktree reclaim [--yes] [--json]')
-    },
-  )
+  it.each([
+    [[]],
+    [['prune']],
+    [['reclaim', '--force']],
+    [['reclaim', '--unknown', 'value']],
+    [['reclaim', '--after', '--yes']],
+    [['reclaim', '--max-worktrees', '0']],
+    [['reclaim', '--timeout-ms', 'no']],
+    [['reclaim', '--pr-limit', '10001']],
+    [['reclaim', '--yes', '--yes']],
+  ])('rejects %j with usage and exit 2', (args) => {
+    expect(runWorktreeCommand(args, fx.env, fx.caller)).toBe(2)
+    expect(stderr).toContain('worktree reclaim [--yes] [--json]')
+  })
+
+  it('prints JSON continuation and accepts it on the next scan', () => {
+    fx.addWorktree('aaa')
+    fx.addWorktree('bbb')
+    expect(
+      runWorktreeCommand(
+        ['reclaim', '--json', '--max-worktrees', '1', '--pr-limit', '10', '--timeout-ms', '30000'],
+        fx.env,
+        fx.caller,
+      ),
+    ).toBe(0)
+    const first = JSON.parse(stdout)
+    expect(first.hasMore).toBe(true)
+    stdout = ''
+    expect(
+      runWorktreeCommand(['reclaim', '--json', '--after', first.nextAfter], fx.env, fx.caller),
+    ).toBe(0)
+    expect(JSON.parse(stdout).hasMore).toBe(false)
+  })
 
   it('exits 1 outside a repository', () => {
     expect(runWorktreeCommand(['reclaim'], fx.env, fx.root)).toBe(1)

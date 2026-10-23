@@ -156,7 +156,7 @@ hook pre-tool-use|post-tool-use --harness claude|codex|cursor|grok --policy <mod
   Each --automation-env NAME (repeatable) marks the run unattended when that environment variable
   is set, non-empty, and not 0 or false; CI markers and claude -p are always unattended.
 
-worktree reclaim [--yes] [--json]
+worktree reclaim [--yes] [--json] [--max-worktrees N] [--timeout-ms N] [--pr-limit N] [--after PATH]
   Dry run by default. Removes clean, fully pushed worktrees whose same-repository PR for the
   branch is merged or closed at exactly HEAD, using git worktree remove (never forced).
   Skips the main checkout, the current worktree, and locked, bare or detached worktrees.
