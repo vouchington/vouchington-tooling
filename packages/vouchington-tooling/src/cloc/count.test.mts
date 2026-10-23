@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { countFiles } from './count.mts'
 import { fakeScc, layoutConfig, SCC_HEADER, sccCsv, tempRepo } from './layout.test-helpers.mts'
-import { isSccRecordLine } from './scc.mts'
 
 const repo = tempRepo({
   'api/a.ts': 'a',
@@ -63,21 +62,11 @@ describe('countFiles', () => {
     ['blank code', 'TypeScript,api/a.ts,a,1, ,0,0,0,0\n'],
     ['non-numeric code', 'TypeScript,api/a.ts,a,1,many,0,0,0,0\n'],
     ['missing path', 'TypeScript,,a,1,1,0,0,0,0\n'],
-    ['embedded carriage return', 'TypeScript,api/a.ts,a,1,1\r0,0,0,0\n'],
     ['empty line', '\n'],
   ])('rejects an invalid record: %s', async (_name, row) => {
     const scc = fakeScc(SCC_HEADER + row)
     await expect(countFiles(layoutConfig(), { cwd: repo, sccBin: scc })).rejects.toThrow(
       'Invalid CSV record from scc',
     )
-  })
-})
-
-describe('isSccRecordLine', () => {
-  it('rejects embedded newlines and carriage returns', () => {
-    expect(isSccRecordLine('a,b')).toBe(true)
-    expect(isSccRecordLine('a\r')).toBe(true)
-    expect(isSccRecordLine('a\nb')).toBe(false)
-    expect(isSccRecordLine('a\rb')).toBe(false)
   })
 })

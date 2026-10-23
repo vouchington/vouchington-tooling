@@ -52,6 +52,8 @@ describe('normalizeClocConfig', () => {
     [{ services: [{ name: 'a' }, { name: 'a' }] }, 'duplicate service "a"'],
     [{ defaultService: 'total' }, '"total" is reserved'],
     [{ categories: { tests: 'source' } }, 'category names must be distinct'],
+    [{ categories: { source: 'total' } }, 'not "service" or "total"'],
+    [{ categories: { tooling: 'service' } }, 'not "service" or "total"'],
     [{ sccBin: 3 }, '"sccBin" must be a non-empty string'],
   ])('rejects %j', (raw, message) => {
     expect(() => normalizeClocConfig(raw)).toThrow(message)

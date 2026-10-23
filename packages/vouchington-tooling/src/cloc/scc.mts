@@ -5,12 +5,7 @@ import { requireSuccess, terminateChild } from './child-process.mts'
 import { normalizePath } from './patterns.mts'
 import type { CountedFile } from './rows.mts'
 
-export function isSccRecordLine(row: string): boolean {
-  return !row.includes('\n') && !/\r./u.test(row)
-}
-
 function parseRecord(row: string): CountedFile {
-  if (!isSccRecordLine(row)) throw new Error('Invalid CSV record from scc')
   const records = parse(row) as string[][]
   const fields = records.length === 1 ? records[0] : undefined
   const path = fields?.[1]

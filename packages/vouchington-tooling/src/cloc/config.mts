@@ -107,8 +107,9 @@ export function normalizeClocConfig(raw: unknown): ClocConfig {
     tests: text(categories.tests, 'categories.tests') ?? 'tests',
     tooling: text(categories.tooling, 'categories.tooling') ?? 'tooling',
   }
-  if (new Set(Object.values(labels)).size !== 3) {
-    throw new Error('cloc config category names must be distinct')
+  const used = new Set(['service', 'total', ...Object.values(labels)])
+  if (used.size !== 5) {
+    throw new Error('cloc config category names must be distinct and not "service" or "total"')
   }
   const sccBin = text(input.sccBin, 'sccBin')
   const missingSccHint = text(input.missingSccHint, 'missingSccHint')

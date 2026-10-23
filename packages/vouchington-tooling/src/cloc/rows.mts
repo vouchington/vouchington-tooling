@@ -20,7 +20,7 @@ export function buildRows(files: readonly CountedFile[], config: ClocConfig): Cl
     const { category, service } = classify(file.path)
     const label = names[category]
     for (const target of [rows.get(service) as ClocRow, total]) {
-      target.counts[label] = (target.counts[label] ?? 0) + file.code
+      target.counts[label] = Number(target.counts[label]) + file.code
       target.total += file.code
     }
   }
@@ -34,18 +34,19 @@ export function formatRows(rows: readonly ClocRow[], config: ClocConfig): string
     if (column === 'service') return row.service
     return String(column === 'total' ? row.total : (row.counts[column] ?? 0))
   }
-  const widths = columns.map((column) =>
-    Math.max(column.length, ...rows.map((row) => cell(row, column).length)),
-  )
-  const line = (values: string[]): string =>
-    values
-      .map((value, index) =>
-        index === 0 ? value.padEnd(widths[index] ?? 0) : value.padStart(widths[index] ?? 0),
+  const table = columns.map((name) => {
+    const width = Math.max(name.length, ...rows.map((row) => cell(row, name).length))
+    return { name, width }
+  })
+  const line = (cells: (column: string) => string): string =>
+    table
+      .map(({ name, width }, index) =>
+        index === 0 ? cells(name).padEnd(width) : cells(name).padStart(width),
       )
       .join('  ')
   return [
-    line(columns),
-    widths.map((width) => '-'.repeat(width)).join('  '),
-    ...rows.map((row) => line(columns.map((column) => cell(row, column)))),
+    line((name) => name),
+    table.map(({ width }) => '-'.repeat(width)).join('  '),
+    ...rows.map((row) => line((name) => cell(row, name))),
   ].join('\n')
 }
