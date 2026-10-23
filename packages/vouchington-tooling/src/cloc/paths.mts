@@ -26,7 +26,7 @@ export function createPathPolicy(config: ClocConfig) {
   }
 
   function countTargetsFor(trackedFiles: ReadonlySet<string>): string[] {
-    if (countAll) return ['.']
+    if (countAll) return trackedFiles.size === 0 ? [] : ['.']
     const files = [...trackedFiles]
     const present = [...new Set([...countedRoots, ...countedRootFiles])].filter(
       (target) => trackedFiles.has(target) || files.some((file) => file.startsWith(`${target}/`)),

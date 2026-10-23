@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import type { ClocConfig } from './config.mts'
 import { createPathPolicy } from './paths.mts'
 import type { CountedFile } from './rows.mts'
@@ -17,7 +18,9 @@ export async function countFiles(
   const targets = policy.countTargetsFor(tracked)
   // scc with no target would scan the whole working directory.
   if (targets.length === 0) return []
-  const sccBin = options.sccBin ?? (options.env ?? process.env).SCC_BIN ?? config.sccBin ?? 'scc'
+  const requested = options.sccBin ?? (options.env ?? process.env).SCC_BIN ?? config.sccBin ?? 'scc'
+  // The child runs from the repository top level; a path-like binary is relative to the caller.
+  const sccBin = requested.includes('/') ? resolve(options.cwd, requested) : requested
   try {
     return await readSccFiles({
       sccBin,

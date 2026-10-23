@@ -3,10 +3,12 @@ import { normalizePath } from './patterns.mts'
 export type ClocCategories = { source: string; tests: string; tooling: string }
 export type ClocServiceRule = { name: string; match: string[] }
 
+export type ClocServiceRuleInput = { name: string; match?: string[] }
+
 /** The repository layout, as a consumer writes it. Every field is optional. */
 export type ClocConfigInput = {
   /** Ordered rules; the first whose `match` patterns match a file wins. Also the table row order. */
-  services?: ClocServiceRule[]
+  services?: ClocServiceRuleInput[]
   /** Service for files no rule matches. Appended after the listed services when not among them. */
   defaultService?: string
   /** Column names for the three categories. */

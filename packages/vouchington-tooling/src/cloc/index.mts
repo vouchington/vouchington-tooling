@@ -3,7 +3,13 @@ export type { CategoryKey, Classification } from './classify.mts'
 export { loadClocConfig } from './config-load.mts'
 export type { LoadModule } from './config-load.mts'
 export { normalizeClocConfig } from './config.mts'
-export type { ClocCategories, ClocConfig, ClocConfigInput, ClocServiceRule } from './config.mts'
+export type {
+  ClocCategories,
+  ClocConfig,
+  ClocConfigInput,
+  ClocServiceRule,
+  ClocServiceRuleInput,
+} from './config.mts'
 export { countFiles } from './count.mts'
 export type { CountOptions } from './count.mts'
 export { createPathPolicy } from './paths.mts'

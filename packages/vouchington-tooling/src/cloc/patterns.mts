@@ -16,7 +16,9 @@ export function normalizePath(filePath: string): string {
 export function compilePatterns(patterns: readonly string[]): (filePath: string) => boolean {
   const matchers = patterns.map((pattern): ((filePath: string) => boolean) => {
     if (!pattern.includes('/')) return picomatch(pattern, { basename: true, dot: true })
-    if (picomatch.scan(pattern).isGlob) return picomatch(pattern, { dot: true })
+    if (picomatch.scan(pattern).isGlob) {
+      return picomatch(pattern.endsWith('/') ? `${pattern}**` : pattern, { dot: true })
+    }
     const prefix = pattern.replace(/\/+$/u, '')
     return (filePath) => filePath === prefix || filePath.startsWith(`${prefix}/`)
   })

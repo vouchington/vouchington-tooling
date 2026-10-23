@@ -1,6 +1,6 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative as relativePath } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fakeScc, layoutConfig, sccCsv, tempRepo } from './layout.test-helpers.mts'
 import { countFiles } from './count.mts'
@@ -33,6 +33,16 @@ describe('countFiles from a subdirectory', () => {
       sccBin: scc,
     })
     expect(files.map((file) => file.path)).toEqual(['api/a.ts', 'api/nested/b.ts'])
+  })
+})
+
+describe('countFiles with a relative scc path', () => {
+  it('resolves it against the caller directory, not the repository root', async () => {
+    const repo = tempRepo({ 'api/a.ts': 'a', 'tools/.keep': '' })
+    const scc = fakeScc(sccCsv({ 'api/a.ts': 2 }))
+    const relative = relativePath(join(repo, 'api'), scc)
+    const files = await countFiles(layoutConfig(), { cwd: join(repo, 'api'), sccBin: relative })
+    expect(files).toEqual([{ path: 'api/a.ts', code: 2 }])
   })
 })
 

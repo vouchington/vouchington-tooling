@@ -20,6 +20,12 @@ describe('compilePatterns', () => {
     expect(compilePatterns([])('anything')).toBe(false)
   })
 
+  it('gives glob patterns with a trailing slash subtree semantics', () => {
+    const matches = compilePatterns(['packages/*/'])
+    expect(matches('packages/api/src/a.ts')).toBe(true)
+    expect(matches('other/api/a.ts')).toBe(false)
+  })
+
   it('normalizes separators and a leading ./', () => {
     expect(normalizePath('./a/b.ts')).toBe('a/b.ts')
   })
@@ -85,6 +91,11 @@ describe('createPathPolicy', () => {
       'docs',
       'README.md',
     ])
+  })
+
+  it('counts nothing when the index is empty in count-all mode', () => {
+    const all = createPathPolicy(layoutConfig({ countedRoots: [], countedRootFiles: [] }))
+    expect(all.countTargetsFor(new Set())).toEqual([])
   })
 
   it('counts everything from the root when no roots are configured', () => {
