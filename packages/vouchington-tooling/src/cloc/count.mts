@@ -16,7 +16,7 @@ export async function countFiles(
   const targets = policy.countTargetsFor(tracked)
   // scc with no target would scan the whole working directory.
   if (targets.length === 0) return []
-  const sccBin = options.sccBin ?? options.env?.SCC_BIN ?? config.sccBin ?? 'scc'
+  const sccBin = options.sccBin ?? (options.env ?? process.env).SCC_BIN ?? config.sccBin ?? 'scc'
   try {
     return await readSccFiles({
       sccBin,

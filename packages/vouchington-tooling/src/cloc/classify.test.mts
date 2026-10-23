@@ -73,6 +73,20 @@ describe('createPathPolicy', () => {
     expect(policy.countTargetsFor(tracked)).toEqual(['api', 'README.md', 'package.json'])
   })
 
+  it('drops targets nested under another and duplicates', () => {
+    const nested = createPathPolicy(
+      layoutConfig({
+        countedRoots: ['api', 'api/sub', 'docs'],
+        countedRootFiles: ['api/a.ts', 'README.md', 'docs'],
+      }),
+    )
+    expect(nested.countTargetsFor(new Set([...tracked, 'api/sub/x.ts', 'docs/g.md']))).toEqual([
+      'api',
+      'docs',
+      'README.md',
+    ])
+  })
+
   it('counts everything from the root when no roots are configured', () => {
     const all = createPathPolicy(layoutConfig({ countedRoots: [], countedRootFiles: [] }))
     expect(all.countTargetsFor(tracked)).toEqual(['.'])

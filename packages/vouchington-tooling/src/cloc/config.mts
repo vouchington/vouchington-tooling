@@ -1,3 +1,5 @@
+import { normalizePath } from './patterns.mts'
+
 export type ClocCategories = { source: string; tests: string; tooling: string }
 export type ClocServiceRule = { name: string; match: string[] }
 
@@ -62,6 +64,11 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
+// `./api/` and `api` name the same target; tracked and scc paths never carry either spelling.
+function cleanTarget(target: string): string {
+  return normalizePath(target).replace(/\/+$/u, '')
+}
+
 function list(value: unknown, field: string): string[] {
   if (value === undefined) return []
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item === '')) {
@@ -119,8 +126,8 @@ export function normalizeClocConfig(raw: unknown): ClocConfig {
     categories: labels,
     testPatterns: list(input.testPatterns, 'testPatterns'),
     toolingPatterns: list(input.toolingPatterns, 'toolingPatterns'),
-    countedRoots: list(input.countedRoots, 'countedRoots'),
-    countedRootFiles: list(input.countedRootFiles, 'countedRootFiles'),
+    countedRoots: list(input.countedRoots, 'countedRoots').map(cleanTarget),
+    countedRootFiles: list(input.countedRootFiles, 'countedRootFiles').map(cleanTarget),
     excludedDirs:
       input.excludedDirs === undefined
         ? [...DEFAULT_EXCLUDED_DIRS]

@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { countFiles } from './count.mts'
 import { fakeScc, layoutConfig, SCC_HEADER, sccCsv, tempRepo } from './layout.test-helpers.mts'
 
@@ -9,6 +9,8 @@ const repo = tempRepo({
   'docs/guide.md': 'g',
   'untracked-elsewhere/x.ts': 'x',
 })
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('countFiles', () => {
   it('keeps tracked, counted, non-ignored rows from scc output', async () => {
@@ -45,6 +47,19 @@ process.stdout.write(${JSON.stringify(SCC_HEADER)} + 'T,' + first + '/a.ts,x,1,4
     writeFileSync(scc, `#!/usr/bin/env node\n${script}`)
     const files = await countFiles(layoutConfig(), { cwd: repo, sccBin: scc })
     expect(files).toEqual([{ path: 'api/a.ts', code: 4 }])
+  })
+
+  it('falls back to the process environment for SCC_BIN', async () => {
+    vi.stubEnv('SCC_BIN', fakeScc(sccCsv({ 'api/a.ts': 3 })))
+    expect(await countFiles(layoutConfig(), { cwd: repo })).toEqual([{ path: 'api/a.ts', code: 3 }])
+  })
+
+  it.each([
+    ['a wrong header', 'file,lines\napi/a.ts,1\n', 'Unexpected CSV header from scc'],
+    ['no output', '', 'scc produced no CSV header'],
+  ])('rejects %s', async (_name, output, message) => {
+    const scc = fakeScc(output)
+    await expect(countFiles(layoutConfig(), { cwd: repo, sccBin: scc })).rejects.toThrow(message)
   })
 
   it('passes no exclude flag when no directories are excluded', async () => {

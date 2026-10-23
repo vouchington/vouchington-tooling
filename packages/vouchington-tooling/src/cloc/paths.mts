@@ -28,8 +28,12 @@ export function createPathPolicy(config: ClocConfig) {
   function countTargetsFor(trackedFiles: ReadonlySet<string>): string[] {
     if (countAll) return ['.']
     const files = [...trackedFiles]
-    return [...countedRoots, ...countedRootFiles].filter(
+    const present = [...new Set([...countedRoots, ...countedRootFiles])].filter(
       (target) => trackedFiles.has(target) || files.some((file) => file.startsWith(`${target}/`)),
+    )
+    // scc counts a file once per target that reaches it, so drop targets nested under another.
+    return present.filter(
+      (target) => !present.some((other) => other !== target && target.startsWith(`${other}/`)),
     )
   }
 

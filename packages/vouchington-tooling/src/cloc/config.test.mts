@@ -29,6 +29,15 @@ describe('normalizeClocConfig', () => {
     expect(second.ignoredDirs).toEqual(DEFAULT_IGNORED_DIRS)
   })
 
+  it('normalizes ./ prefixes and trailing slashes on counted targets', () => {
+    const config = normalizeClocConfig({
+      countedRoots: ['./api/', 'docs//'],
+      countedRootFiles: ['./README.md'],
+    })
+    expect(config.countedRoots).toEqual(['api', 'docs'])
+    expect(config.countedRootFiles).toEqual(['README.md'])
+  })
+
   it('keeps a default service that is already listed and carries every override', () => {
     const config = normalizeClocConfig({
       services: [{ name: 'a', match: ['a/'] }, { name: 'rest' }],

@@ -37,18 +37,20 @@ export async function readSccFiles(run: SccRun): Promise<CountedFile[]> {
   completion.catch(() => {})
   const files: CountedFile[] = []
   const rows = createInterface({ input: child.stdout, crlfDelay: Infinity })
-  let header = true
+  let sawHeader = false
   let completed = false
   try {
     for await (const row of rows) {
-      if (header) {
-        header = false
+      if (!sawHeader) {
+        if (!row.startsWith('Language,')) throw new Error('Unexpected CSV header from scc')
+        sawHeader = true
         continue
       }
       const file = parseRecord(row)
       if (run.keep(file.path)) files.push(file)
     }
     await completion
+    if (!sawHeader) throw new Error('scc produced no CSV header')
     completed = true
   } finally {
     rows.close()
