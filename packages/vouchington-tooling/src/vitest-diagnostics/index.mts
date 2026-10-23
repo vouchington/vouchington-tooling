@@ -66,3 +66,40 @@ export {
   summarizeDiagnosticReport,
 } from './report-summary.mts'
 export type { DiagnosticReportLimitOptions, DiagnosticReportSummary } from './report-summary.mts'
+export { DEFAULT_CI_REPORTER_ENV_NAMES, ciOutputFile, ciReporters } from './vitest-ci-reporters.mts'
+export type {
+  CiReporterEnvNames,
+  CiReportersOptions,
+  VitestReporter,
+  VitestReporters,
+} from './vitest-ci-reporters.mts'
+export {
+  githubActionsReporter,
+  normalizeGithubActionsPath,
+} from './vitest-github-actions-reporter.mts'
+export type {
+  GithubActionsEnv,
+  NormalizeGithubActionsPathOptions,
+} from './vitest-github-actions-reporter.mts'
+export {
+  DEFAULT_FILE_PROGRESS_PREFIX,
+  createFileProgressWriter,
+  createVitestFileProgressReporter,
+  formatFileProgress,
+  isFileProgressReporter,
+} from './vitest-file-progress-reporter.mts'
+export type {
+  FileProgressEvent,
+  FileProgressReporterOptions,
+  WriteProgress,
+} from './vitest-file-progress-reporter.mts'
+export {
+  DEFAULT_STORYBOOK_PROGRESS_PREFIX,
+  createVitestStorybookProgressReporter,
+  formatStorybookProgressMarker,
+  latestStorybookProgressSequence,
+} from './vitest-storybook-progress-reporter.mts'
+export type {
+  StorybookProgressEvent,
+  StorybookProgressReporterOptions,
+} from './vitest-storybook-progress-reporter.mts'

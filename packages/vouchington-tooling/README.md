@@ -667,6 +667,20 @@ feeds a handshake settlement's counts to a detector. `formatForkLeakDiagnostics`
 fourth argument, `{ poolMetricsLabel }`, to replace the default `pool metrics:` label (for example
 `'PostgreSQL pool metrics:'`).
 
+`ciReporters(options?)` builds the Vitest `reporters` list from env vars, and `ciOutputFile(options?)`
+builds `outputFile`. Unset or empty `VITEST_CI_REPORTERS` returns `undefined` (or `default` plus file
+progress when `VITEST_DIAGNOSTICS=1`); `run` returns `minimal`, the optional Storybook progress
+reporter (`VITEST_STORYBOOK_BROWSER=1`), `github-actions`, `junit`, `extraReporters`,
+`hanging-process`, and file progress (stdout with `VITEST_DIAGNOSTICS=1`, appended to
+`VITEST_FILE_PROGRESS_FILE` when set). Options: `env`, `envNames` (rename any variable; see
+`DEFAULT_CI_REPORTER_ENV_NAMES`), `fileProgressPrefix`, `storybookProgressPrefix`, `extraReporters`
+(for example a no-skips or teardown-overrun reporter), and `cwd`. The progress reporters print
+`<prefix> event=start|finish module="..."` and `<prefix> seq=N event=module-*` lines; the defaults
+are `[vitest-file]` and `[vitest-browser-progress]`, exported as `DEFAULT_FILE_PROGRESS_PREFIX` and
+`DEFAULT_STORYBOOK_PROGRESS_PREFIX`. Pass the same prefix to `formatFileProgress`,
+`formatStorybookProgressMarker`, and `latestStorybookProgressSequence(text, prefix)` when parsing.
+These stay in the Node entry, never the browser entry.
+
 `vouchington-tooling/vitest-diagnostics/browser` is the browser-safe entry for Storybook and Vitest
 browser projects, for example a root fake-timer setup file shared with a Node project. It exports
 only `checkAndRestoreFakeTimers`, `formatFakeTimerLeakDiagnostics`, and the `FakeTimerController`
