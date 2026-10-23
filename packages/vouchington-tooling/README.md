@@ -385,6 +385,15 @@ import {
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
 import { ensureLabels, labelsFromPaths } from 'vouchington-tooling/agent-issue-labels'
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
+// Replay recorded raw `.http` responses through an SDK `fetch` or AWS SDK v3 `requestHandler`:
+// const replay = createProviderReplay({ chunkBytes: 3 })
+// replay.respondWith(loadRecordedResponse('ok.http', { fixtureRoot: new URL('./fixtures/', import.meta.url) }))
+// new Sdk({ fetch: replay.fetch }) or new AwsClient({ requestHandler: createAwsReplayRequestHandler(replay) })
+import {
+  createAwsReplayRequestHandler,
+  createProviderReplay,
+  loadRecordedResponse,
+} from 'vouchington-tooling/provider-replay'
 import { boundPendingLine, splitCompleteLines } from 'vouchington-tooling/process-line-buffer'
 import {
   isProcessGroupAlive,

@@ -26,6 +26,7 @@
         "src/gha-artifacts-cleanup/index.mts!",
         "src/agent-issue-labels/index.mts!",
         "src/http-origin/index.mts!",
+        "src/provider-replay/index.mts!",
         "src/host-storage/index.mts!",
         "src/process-line-buffer/index.mts!",
         "src/shell-parse/index.mts!",
