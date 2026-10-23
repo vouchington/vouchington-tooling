@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 
 import type { BrowserSessionWatchdog } from '../browser-session-runner/index.mts'
 import type { OutputObserver } from './output-observer.mts'
+import type { OutputObserverSnapshot } from './observer-state.mts'
 import { writeProcessGroupSample } from './process-sample.mts'
 import type { StorybookBrowserRunnerDeps } from './types.mts'
 
@@ -55,7 +56,7 @@ export function createStorybookWatchdog(options: StorybookWatchdogOptions): Brow
       } else if (seen.semanticProgressSeen && now - seen.lastSemanticProgressAt >= hangMs) {
         outcome.semanticStall = true
         deps.stderr.write(
-          `[storybook-browser] no semantic test progress for ${hangMs}ms; terminating terminal mid-suite stall (last progress ${now - seen.lastSemanticProgressAt}ms ago: ${seen.lastSemanticProgressLine ?? 'no marker line'})\n`,
+          `[storybook-browser] no semantic test progress for ${hangMs}ms; terminating terminal mid-suite stall (${lastMarkerNote(seen, now)})\n`,
         )
         decided = true
         writeProcessGroupSample(deps, options.processGroupId())
@@ -97,4 +98,9 @@ export function isSpawnedProcessGroupId(
     processGroupId > 1 &&
     processGroupId <= 2_147_483_647
   )
+}
+
+function lastMarkerNote(seen: OutputObserverSnapshot, now: number): string {
+  if (seen.lastSemanticProgressMarkerAt == null) return 'no progress marker line seen'
+  return `last progress marker ${now - seen.lastSemanticProgressMarkerAt}ms ago: ${seen.lastSemanticProgressLine}`
 }

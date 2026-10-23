@@ -69,6 +69,7 @@ describe('process group sample', () => {
   it('names the role from the type token, the browser binary, or the executable', () => {
     expect(processRole('/x/chrome --type=utility --foo')).toBe('utility')
     expect(processRole('/x/headless_shell --headless')).toBe('browser')
+    expect(processRole('/x/node --type=privateToken')).toBe('other')
     expect(processRole('/usr/bin/node /x.js')).toBe('node')
     expect(processRole('')).toBe('unknown')
   })
@@ -93,7 +94,7 @@ describe('process group sample', () => {
     const sample = samplePsProcessGroup(100, (...args) => (calls.push(args), mac))
     expect(calls[0]).toEqual([
       'ps',
-      ['-ax', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='],
+      ['-axww', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='],
       { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 2000 },
     ])
     expect(sample).toContain('processes=4')

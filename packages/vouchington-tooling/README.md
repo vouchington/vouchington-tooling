@@ -397,8 +397,9 @@ Before it terminates a stall or hang, the runner writes
 `[storybook-browser] process group <pgid> at stall:` and one line per process of the test command's
 group and its descendants, including the detached browser (pid, RSS in MB, %CPU, state, role such as `renderer`, `gpu-process` or `browser`; never argv,
 capped near 4KB), sampled with `ps -ax` and best effort. The semantic-stall message names the last
-progress marker and its age, and the attempt summary counts Playwright `Target.targetCrashed` /
-`Target.detachedFromTarget` protocol lines (`targetCrashCount`, `targetDetachCount`).
+progress marker and its age, and the attempt summary counts Playwright `Target.targetCrashed` and
+`Inspector.targetCrashed` (`targetCrashCount`) and `Target.detachedFromTarget`
+(`targetDetachCount`) protocol lines.
 
 Everything repository-specific is a parameter: the Vitest project name (also the browser-project
 output marker), the command and argv, the `--result-file` paths removed before each attempt, the

@@ -11,6 +11,20 @@ const PS_MAX_BUFFER_BYTES = 8 * 1024 * 1024
 const RESERVED_TRAILER_BYTES = 80
 const psRowPattern = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\S+)\s*(.*)$/
 const chromiumTypePattern = /(?:^|\s)--type=([\w.-]+)/
+// Only known Chromium process types are echoed; any other --type value is not copied to the log.
+const chromiumTypes = new Set([
+  'broker',
+  'crashpad-handler',
+  'extension',
+  'gpu-process',
+  'ppapi',
+  'ppapi-broker',
+  'renderer',
+  'sandbox-ipc',
+  'service-worker',
+  'utility',
+  'zygote',
+])
 const chromiumBinaryPattern =
   /^(?:chrome|chromium|chromium-browser|headless_shell|chrome-headless-shell|google chrome.*|chromium.*)$/i
 
@@ -31,7 +45,7 @@ type Exec = (
 ) => string
 
 /**
- * Parses `ps -ax -o pid=,ppid=,pgid=,rss=,pcpu=,stat=,args=` output and keeps the processes of one
+ * Parses `ps -axww -o pid=,ppid=,pgid=,rss=,pcpu=,stat=,args=` output and keeps the processes of one
  * process group plus their descendants: Playwright launches the browser detached, in its own group.
  */
 export function parseProcessGroupRows(psOutput: string, processGroupId: number): ProcessRow[] {
@@ -65,7 +79,7 @@ export function parseProcessGroupRows(psOutput: string, processGroupId: number):
 /** Chromium's `--type=<x>`, `browser` for a main Chromium binary, else the executable name. */
 export function processRole(args: string): string {
   const type = chromiumTypePattern.exec(args)?.[1]
-  if (type) return type
+  if (type) return chromiumTypes.has(type) ? type : 'other'
   const executable = basename(args.split(' --')[0]!.trim())
   if (chromiumBinaryPattern.test(executable)) return 'browser'
   return basename(args.trim().split(/\s+/)[0]!).replace(/[^\w.()-]/g, '') || 'unknown'
@@ -89,12 +103,12 @@ export function renderProcessGroupSample(psOutput: string, processGroupId: numbe
   return out
 }
 
-/** Default sampler: portable `ps -ax`, filtered by pgid and descendants (never `ps -g`). */
+/** Default sampler: portable `ps -axww` (full-width args), filtered by pgid and descendants (never `ps -g`). */
 export function samplePsProcessGroup(
   processGroupId: number,
   exec: Exec = execFileSync as unknown as Exec,
 ): string {
-  const output = exec('ps', ['-ax', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='], {
+  const output = exec('ps', ['-axww', '-o', 'pid=,ppid=,pgid=,rss=,pcpu=,stat=,args='], {
     encoding: 'utf8',
     maxBuffer: PS_MAX_BUFFER_BYTES,
     timeout: PS_TIMEOUT_MS,

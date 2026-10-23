@@ -37,7 +37,7 @@ describe('stall process-group diagnostics', () => {
       '[storybook-browser] process group 321 at stall:\n  processes=1 (fake 321)\n',
     )
     expect(log).toContain(
-      'no semantic test progress for 120000ms; terminating terminal mid-suite stall (last progress 120000ms ago: [vitest-browser-progress] seq=7 event=module-start module="a.stories.tsx")',
+      'no semantic test progress for 120000ms; terminating terminal mid-suite stall (last progress marker 120000ms ago: [vitest-browser-progress] seq=7 event=module-start module="a.stories.tsx")',
     )
     exitChild(child, null, 'SIGTERM')
     await run
@@ -58,7 +58,7 @@ describe('stall process-group diagnostics', () => {
     const { child, harness, run, tick } = setup()
     child.stdout.emit('data', 'x |browser-suite y\n')
     tick(120_000)
-    expect(harness.stderr.join('')).toContain('ago: no marker line)')
+    expect(harness.stderr.join('')).toContain('(no progress marker line seen)')
     exitChild(child, null, 'SIGTERM')
     await run
   })

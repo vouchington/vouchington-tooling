@@ -137,6 +137,7 @@ export class OutputObserver {
     if (sequence != null && sequence > this.lastSemanticSequence) {
       this.lastSemanticSequence = sequence
       state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
+      state.lastSemanticProgressMarkerAt = now
       this.recordSemanticProgress(now)
     } else if (sequence != null && sequence === this.lastSemanticSequence) {
       // A marker split across chunks completes later: refresh its text, not the timestamp.
