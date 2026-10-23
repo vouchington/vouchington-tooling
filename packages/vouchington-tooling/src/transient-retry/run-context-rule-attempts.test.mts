@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { decide } from './decision-evaluator.mts'
 import { deriveRuleAttempts } from './run-context-rule-attempts.mts'
 import type { WorkflowRetryRule, WorkflowRunContext } from './run-context-types.mts'
 import { createFakeEnv, jobsPage, type LogReply, type Route } from './run-context.test-helpers.mts'
@@ -114,10 +115,34 @@ describe('deriveRuleAttempts', () => {
     ).rejects.toThrow('HTTP 500')
   })
 
-  it('does not replay attempts that created no jobs', async () => {
+  it('counts a zero-job attempt a rule matches, so maxAttempts is exhausted', async () => {
+    const cancelledBeforeJobs = rule(
+      'cancelled-before-jobs',
+      (context) => context.conclusion === 'cancelled' && context.jobNames.length === 0,
+      { maxAttempts: 1 },
+    )
+    const attempts = await derive([], [cancelledBeforeJobs], 2, {}, [0])
+    expect(attempts).toEqual(new Map([['cancelled-before-jobs', 2]]))
+    const context = {
+      conclusion: 'cancelled',
+      jobNames: [],
+      runAttempt: 2,
+      retryAttempts: attempts,
+    }
+    const result = await decide(context as unknown as WorkflowRunContext, [cancelledBeforeJobs])
+    expect(result.decision).toBe('no-match')
+  })
+
+  it('does not count a zero-job attempt the rule does not match', async () => {
+    const needsJobs = rule('needs-jobs', (context) => context.jobNames.length > 0)
+    const attempts = await derive([], [needsJobs], 2, {}, [0])
+    expect(attempts).toEqual(new Map([['needs-jobs', 1]]))
+  })
+
+  it('replays zero-job and job attempts together without fetching empty attempts', async () => {
     const routes: Route[] = [['attempts/2/jobs', jobsPage(failed('failure'))]]
     const attempts = await derive(routes, [rule('catch-all', () => true)], 3, {}, [0, 1])
-    expect(attempts).toEqual(new Map([['catch-all', 2]]))
+    expect(attempts).toEqual(new Map([['catch-all', 3]]))
   })
 
   it('returns one-based counts for a first attempt', async () => {
