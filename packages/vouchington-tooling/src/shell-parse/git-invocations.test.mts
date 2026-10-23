@@ -103,6 +103,15 @@ describe('gitInvocations', () => {
     expect(only('(git push)').subcommand).toBe('push')
   })
 
+  it('stops at terminal options and array literals', () => {
+    expect(only('git --exec-path push --force')).toMatchObject({ args: [], subcommand: undefined })
+    expect(only('git --exec-path=/x push').subcommand).toBe('push')
+    expect(gitInvocations('commands=(git push --force)')).toEqual([])
+    expect(gitInvocations('xargs --replace git push').map((item) => item.subcommand)).toEqual([
+      'push',
+    ])
+  })
+
   it('keeps a quoted redirection-looking argument', () => {
     expect(only("git log --grep '>'").subcommand).toBe('log')
   })
@@ -118,7 +127,7 @@ describe('gitInvocations', () => {
 
   it('skips attached, flag, and valued global options', () => {
     const invocation = only(
-      'git --git-dir=/g --work-tree /w --namespace=n --exec-path --no-pager -p --bare ' +
+      'git --git-dir=/g --work-tree /w --namespace=n --exec-path=/e --no-pager -p --bare ' +
         '--no-replace-objects --config-env=core.hooksPath=HOOKS status -s',
     )
     expect(invocation.subcommand).toBe('status')

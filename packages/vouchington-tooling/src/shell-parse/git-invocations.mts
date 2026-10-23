@@ -27,20 +27,24 @@ const VALUE_OPTIONS = new Set([
   '--super-prefix',
   '--attr-source',
 ])
-const FLAG_OPTIONS = new Set([
+// These print and exit: any later word is not a subcommand.
+const TERMINAL_OPTIONS = new Set([
   '-h',
-  '-p',
-  '-P',
   '-v',
-  '--bare',
   '--exec-path',
-  '--glob-pathspecs',
   '--help',
   '--html-path',
-  '--icase-pathspecs',
   '--info-path',
-  '--literal-pathspecs',
   '--man-path',
+  '--version',
+])
+const FLAG_OPTIONS = new Set([
+  '-p',
+  '-P',
+  '--bare',
+  '--glob-pathspecs',
+  '--icase-pathspecs',
+  '--literal-pathspecs',
   '--no-advice',
   '--no-lazy-fetch',
   '--no-literal-pathspecs',
@@ -49,7 +53,6 @@ const FLAG_OPTIONS = new Set([
   '--no-replace-objects',
   '--noglob-pathspecs',
   '--paginate',
-  '--version',
 ])
 const ATTACHED_OPTION =
   /^--(?:git-dir|work-tree|namespace|exec-path|config-env|super-prefix|attr-source|list-cmds)=/
@@ -77,7 +80,7 @@ export function overridesConfig(invocation: GitInvocation, key: string): boolean
   return invocation.configOverrides.some((override) => override.key.toLowerCase() === wanted)
 }
 
-// Heredoc bodies that are data are dropped. A `$(` opens a substitution: its body is skipped (it
+// Heredoc bodies that are data are dropped. A `$(` opens a substitution, and `name=(` an array literal;: its body is skipped (it
 // belongs to `extractShellCommandSubstitutions`) so the outer command keeps its later arguments.
 function segmentsOf(command: string): string[][] {
   const segments: string[][] = [[]]
@@ -90,7 +93,7 @@ function segmentsOf(command: string): string[][] {
     const current = segments.at(-1)!
     if (
       depth > 0 ||
-      (word.operator === true && word.value === '(' && current.at(-1)?.endsWith('$'))
+      (word.operator === true && word.value === '(' && /[$=]$/.test(current.at(-1) ?? ''))
     ) {
       if (word.operator === true) depth += word.value === '(' ? 1 : word.value === ')' ? -1 : 0
     } else if (word.operator === true) {
@@ -132,6 +135,9 @@ function readInvocation(words: string[]): GitInvocation {
       globalOptions.push(word, value)
       if (word === '-c' || word === '--config-env') configOverrides.push(splitOverride(value))
       cursor += 2
+    } else if (TERMINAL_OPTIONS.has(word)) {
+      globalOptions.push(word)
+      return { args: [], configOverrides, globalOptions, subcommand: undefined }
     } else if (FLAG_OPTIONS.has(word) || ATTACHED_OPTION.test(word)) {
       globalOptions.push(word)
       if (word.startsWith(CONFIG_ENV_PREFIX)) {
