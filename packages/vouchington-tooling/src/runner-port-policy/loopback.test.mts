@@ -74,4 +74,38 @@ describe('listenOnLoopbackEphemeralPort', () => {
       port: 4046,
     })
   })
+
+  it('does not fall back when isAllowedPort throws EAFNOSUPPORT after a successful bind', async () => {
+    const hosts: string[] = []
+    const listen = async (_server: Server, host: string) => {
+      hosts.push(host)
+    }
+    await expect(
+      listenOnLoopbackEphemeralPort(fakeServer(4046), {
+        listen,
+        isAllowedPort: () => {
+          throw codedError('EAFNOSUPPORT')
+        },
+      }),
+    ).rejects.toThrow('EAFNOSUPPORT')
+    expect(hosts).toEqual(['::1'])
+  })
+
+  it('uses the default listener against the server when none is injected', async () => {
+    const listened: unknown[][] = []
+    const server = {
+      once: () => undefined,
+      off: () => undefined,
+      listen: (...args: unknown[]) => {
+        listened.push(args.slice(0, 2))
+        ;(args[2] as () => void)()
+      },
+      address: () => ({ address: '::1', family: 'IPv6', port: 4046 }),
+    } as unknown as Server
+    await expect(listenOnLoopbackEphemeralPort(server)).resolves.toEqual({
+      host: '::1',
+      port: 4046,
+    })
+    expect(listened).toEqual([[0, '::1']])
+  })
 })

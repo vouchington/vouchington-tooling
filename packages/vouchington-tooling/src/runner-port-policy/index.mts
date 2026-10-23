@@ -71,13 +71,24 @@ export async function listenOnLoopbackEphemeralPort(
   server: Server,
   options: EphemeralListenerOptions = {},
 ): Promise<{ host: LoopbackHost; port: number }> {
+  const listen = options.listen ?? listenOnHost
+  let ipv6Unsupported = false
   try {
-    return {
-      host: '::1',
-      port: await listenOnRunnerUnreservedEphemeralPort(server, '::1', options),
-    }
+    const port = await listenOnRunnerUnreservedEphemeralPort(server, '::1', {
+      ...options,
+      listen: async (target, host) => {
+        try {
+          await listen(target, host)
+        } catch (error) {
+          ipv6Unsupported =
+            error instanceof Error && 'code' in error && error.code === 'EAFNOSUPPORT'
+          throw error
+        }
+      },
+    })
+    return { host: '::1', port }
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'EAFNOSUPPORT')) throw error
+    if (!ipv6Unsupported) throw error
     return {
       host: '127.0.0.1',
       port: await listenOnRunnerUnreservedEphemeralPort(server, '127.0.0.1', options),
