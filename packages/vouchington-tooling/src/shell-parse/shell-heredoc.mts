@@ -36,7 +36,8 @@ export function stripNonShellHeredocBodies(command: string): HeredocScan {
 
     // The hook does not pair each operator with its body, so a line with a shell-read heredoc
     // inspects every body on it.
-    const isShellScriptHeredoc = lineFeedsShellHeredoc(line)
+    const isShellScriptHeredoc =
+      lineFeedsShellHeredoc(line) || lineFeedsShellHeredoc(logicalLine(lines, index))
     for (const spec of specs) {
       const bodyLines: string[] = []
       index += 1
@@ -102,6 +103,14 @@ function heredocBodySubstitutions(body: string): string[] {
   }
 
   return substitutions
+}
+
+// A line ending in an odd run of backslashes continues onto the next, so the command that owns a
+// heredoc operator may start on earlier lines (`bash \\\n-s <<'EOF'`).
+function logicalLine(lines: string[], index: number): string {
+  let start = index
+  while (start > 0 && /(?:^|[^\\])(?:\\\\)*\\$/.test(lines[start - 1]!)) start -= 1
+  return lines.slice(start, index + 1).join('\n')
 }
 
 function heredocLineDelimiter(line: string, spec: HeredocSpec): string {
