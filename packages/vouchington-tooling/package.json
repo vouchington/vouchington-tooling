@@ -401,6 +401,11 @@
       "import": "./dist/gh-api-shell-quoting/index.mjs",
       "default": "./dist/gh-api-shell-quoting/index.mjs"
     },
+    "./postgres-test-faults": {
+      "types": "./dist/postgres-test-faults/index.d.mts",
+      "import": "./dist/postgres-test-faults/index.mjs",
+      "default": "./dist/postgres-test-faults/index.mjs"
+    },
     "./package.json": "./package.json",
     "./basic-auth-doc-sync": {
       "types": "./dist/basic-auth-doc-sync/index.d.mts",
@@ -465,12 +470,14 @@
     "@ast-grep/cli": "0.50.0",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@playwright/test": "1.64.1",
+    "@types/pg": "8.23.1",
     "@types/picomatch": "^4.0.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/spdx-expression-parse": "4.0.0",
     "next": "16.4.2",
     "no-mistakes": "0.83.0",
+    "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "smol-toml": "1.9.1",
@@ -481,6 +488,7 @@
     "@playwright/test": ">=1.64.1",
     "next": ">=15",
     "no-mistakes": "*",
+    "pg": ">=8",
     "react": ">=18",
     "typescript": ">=5",
     "vitest": ">=5"
@@ -496,6 +504,9 @@
       "optional": true
     },
     "no-mistakes": {
+      "optional": true
+    },
+    "pg": {
       "optional": true
     },
     "react": {
