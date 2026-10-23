@@ -66,7 +66,15 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 // `./api/` and `api` name the same target; tracked and scc paths never carry either spelling.
 function cleanTarget(target: string): string {
-  return normalizePath(target).replace(/\/+$/u, '')
+  return normalizePath(target).replace(/\/+$/u, '') || '.'
+}
+
+function categoryLabels(value: unknown): Partial<ClocCategories> {
+  if (value === undefined) return {}
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('cloc config "categories" must be an object')
+  }
+  return value as Partial<ClocCategories>
 }
 
 function list(value: unknown, field: string): string[] {
@@ -108,7 +116,11 @@ export function normalizeClocConfig(raw: unknown): ClocConfig {
   const duplicate = names.find((name, index) => names.indexOf(name) !== index)
   if (duplicate !== undefined) throw new Error(`cloc config has duplicate service "${duplicate}"`)
   if (names.includes('total')) throw new Error('cloc config service name "total" is reserved')
-  const categories = (input.categories ?? {}) as Partial<ClocCategories>
+  const roots = list(input.countedRoots, 'countedRoots').map(cleanTarget)
+  const rootFiles = list(input.countedRootFiles, 'countedRootFiles').map(cleanTarget)
+  // A root of "." (or "./") is the whole repository: no narrowing.
+  const countAll = roots.includes('.')
+  const categories = categoryLabels(input.categories)
   const labels: ClocCategories = {
     source: text(categories.source, 'categories.source') ?? 'source',
     tests: text(categories.tests, 'categories.tests') ?? 'tests',
@@ -126,8 +138,8 @@ export function normalizeClocConfig(raw: unknown): ClocConfig {
     categories: labels,
     testPatterns: list(input.testPatterns, 'testPatterns'),
     toolingPatterns: list(input.toolingPatterns, 'toolingPatterns'),
-    countedRoots: list(input.countedRoots, 'countedRoots').map(cleanTarget),
-    countedRootFiles: list(input.countedRootFiles, 'countedRootFiles').map(cleanTarget),
+    countedRoots: countAll ? [] : roots,
+    countedRootFiles: countAll ? [] : rootFiles,
     excludedDirs:
       input.excludedDirs === undefined
         ? [...DEFAULT_EXCLUDED_DIRS]

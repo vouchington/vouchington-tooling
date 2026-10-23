@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { fakeScc, layoutConfig, tempRepo } from './layout.test-helpers.mts'
+import { fakeScc, layoutConfig, sccCsv, tempRepo } from './layout.test-helpers.mts'
 import { countFiles } from './count.mts'
 import { listTrackedFiles } from './tracked.mts'
 
@@ -21,6 +21,18 @@ describe('listTrackedFiles', () => {
   it('fails outside a git repository', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cloc-nogit-'))
     await expect(listTrackedFiles(dir)).rejects.toThrow('git ls-files exited with status')
+  })
+})
+
+describe('countFiles from a subdirectory', () => {
+  it('resolves paths against the repository top level', async () => {
+    const repo = tempRepo({ 'api/a.ts': 'a', 'api/nested/b.ts': 'b' })
+    const scc = fakeScc(sccCsv({ 'api/a.ts': 5, 'api/nested/b.ts': 6 }))
+    const files = await countFiles(layoutConfig(), {
+      cwd: join(repo, 'api', 'nested'),
+      sccBin: scc,
+    })
+    expect(files.map((file) => file.path)).toEqual(['api/a.ts', 'api/nested/b.ts'])
   })
 })
 

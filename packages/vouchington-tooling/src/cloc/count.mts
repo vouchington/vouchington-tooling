@@ -2,7 +2,7 @@ import type { ClocConfig } from './config.mts'
 import { createPathPolicy } from './paths.mts'
 import type { CountedFile } from './rows.mts'
 import { readSccFiles } from './scc.mts'
-import { listTrackedFiles } from './tracked.mts'
+import { gitTopLevel, listTrackedFiles } from './tracked.mts'
 
 export type CountOptions = { cwd: string; sccBin?: string; env?: NodeJS.ProcessEnv }
 
@@ -11,7 +11,8 @@ export async function countFiles(
   config: ClocConfig,
   options: CountOptions,
 ): Promise<CountedFile[]> {
-  const tracked = await listTrackedFiles(options.cwd)
+  const root = await gitTopLevel(options.cwd)
+  const tracked = await listTrackedFiles(root)
   const policy = createPathPolicy(config)
   const targets = policy.countTargetsFor(tracked)
   // scc with no target would scan the whole working directory.
@@ -22,7 +23,7 @@ export async function countFiles(
       sccBin,
       targets,
       excludedDirs: config.excludedDirs,
-      cwd: options.cwd,
+      cwd: root,
       keep: (filePath) => policy.shouldCountFile(filePath, tracked),
     })
   } catch (err: unknown) {

@@ -38,6 +38,12 @@ describe('normalizeClocConfig', () => {
     expect(config.countedRootFiles).toEqual(['README.md'])
   })
 
+  it('treats a root of "./" as the whole repository', () => {
+    const config = normalizeClocConfig({ countedRoots: ['./', 'api'], countedRootFiles: ['x'] })
+    expect(config.countedRoots).toEqual([])
+    expect(config.countedRootFiles).toEqual([])
+  })
+
   it('keeps a default service that is already listed and carries every override', () => {
     const config = normalizeClocConfig({
       services: [{ name: 'a', match: ['a/'] }, { name: 'rest' }],
@@ -69,6 +75,9 @@ describe('normalizeClocConfig', () => {
     [{ defaultService: '' }, '"defaultService" must be a non-empty string'],
     [{ services: [{ name: 'a' }, { name: 'a' }] }, 'duplicate service "a"'],
     [{ defaultService: 'total' }, '"total" is reserved'],
+    [{ categories: 'specs' }, '"categories" must be an object'],
+    [{ categories: [] }, '"categories" must be an object'],
+    [{ categories: null }, '"categories" must be an object'],
     [{ categories: { tests: 'source' } }, 'category names must be distinct'],
     [{ categories: { source: 'total' } }, 'not "service" or "total"'],
     [{ categories: { tooling: 'service' } }, 'not "service" or "total"'],

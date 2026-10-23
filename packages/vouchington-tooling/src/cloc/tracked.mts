@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { promisify } from 'node:util'
 import { requireSuccess, terminateChild } from './child-process.mts'
 import { normalizePath } from './patterns.mts'
 
@@ -28,4 +29,12 @@ export async function listTrackedFiles(cwd: string): Promise<Set<string>> {
     if (!completed) await terminateChild(child, completion)
   }
   return files
+}
+
+const execFileAsync = promisify(execFile)
+
+/** The repository top level, so a run from a subdirectory still sees repository-relative paths. */
+export async function gitTopLevel(cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd })
+  return stdout.trim()
 }
