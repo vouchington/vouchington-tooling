@@ -261,6 +261,11 @@
       "import": "./dist/gha-check-run/index.mjs",
       "default": "./dist/gha-check-run/index.mjs"
     },
+    "./provider-replay": {
+      "types": "./dist/provider-replay/index.d.mts",
+      "import": "./dist/provider-replay/index.mjs",
+      "default": "./dist/provider-replay/index.mjs"
+    },
     "./http-link-pagination": {
       "types": "./dist/http-link-pagination/index.d.mts",
       "import": "./dist/http-link-pagination/index.mjs",
