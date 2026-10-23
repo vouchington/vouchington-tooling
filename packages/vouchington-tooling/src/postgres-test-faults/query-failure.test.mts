@@ -176,6 +176,32 @@ describe('withPostgresQueryFailureForTest (validation and fake clients)', () => 
     await expect(run(MARKER, { pools: [pool], requestId: 'a' })).rejects.toThrow('isOwnedRequest')
   })
 
+  it('does not observe a client that connects after the scope ended', async () => {
+    const pool = new pg.Pool()
+    const original = { rows: [] }
+    const client = new EventEmitter() as unknown as pg.PoolClient
+    Object.assign(client, { query: async () => original, release: () => undefined })
+    const queryBefore = Object.getOwnPropertyDescriptor(client, 'query')?.value
+    Object.assign(pool, {
+      connect: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return client
+      },
+    })
+    let late: Promise<pg.PoolClient> | undefined
+    await expect(
+      withPostgresQueryFailureForTest(
+        MARKER,
+        async () => {
+          late = pool.connect()
+        },
+        { pools: [pool] },
+      ),
+    ).rejects.toThrow('did not execute the targeted failed SQL')
+    expect(await late).toBe(client)
+    expect(Object.getOwnPropertyDescriptor(client, 'query')?.value).toBe(queryBefore)
+  })
+
   it('rejects a server that accepts the division by zero', async () => {
     const pool = fakePool(async () => ({ rows: [] }))
     await expect(

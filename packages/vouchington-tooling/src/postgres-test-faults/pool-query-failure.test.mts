@@ -1,7 +1,7 @@
 import { AsyncResource } from 'node:async_hooks'
 import { EventEmitter } from 'node:events'
 import pg from 'pg'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { withPostgresPoolQueryFailureForTest } from './pool-query-failure.mts'
 import { tryStartTestCluster, type TestCluster } from './test-cluster.test-helpers.mts'
 
@@ -204,6 +204,57 @@ describe('withPostgresPoolQueryFailureForTest (validation and fake clients)', ()
         { pools: [target], endTimeoutMs: 10 },
       ),
     ).rejects.toThrow('did not finish closing')
+  })
+
+  it('surfaces a close failure even when the operation swallows the error', async () => {
+    const target = new pg.Pool()
+    const client = new EventEmitter() as unknown as pg.PoolClient
+    Object.assign(client, {
+      release: () => undefined,
+      query: async (text: string) => {
+        if (text.includes('SELECT 1 / 0')) throw Object.assign(new Error('div'), { code: '22012' })
+        return { rows: [] }
+      },
+    })
+    Object.assign(target, {
+      connect: async () => client,
+      query: async () => {
+        throw Object.assign(new Error('aborted'), { code: '25P02' })
+      },
+    })
+    await expect(
+      withPostgresPoolQueryFailureForTest(
+        MARKER,
+        async () => target.query({ text: `${MARKER} SELECT 1` }).catch(() => undefined),
+        { pools: [target], endTimeoutMs: 10 },
+      ),
+    ).rejects.toThrow('did not finish closing')
+  })
+
+  it('ignores a connect callback that arrives after the lease ended', async () => {
+    const target = new pg.Pool()
+    const client = fakeClient(async (text) => {
+      if (text.includes('SELECT 1 / 0')) throw Object.assign(new Error('div'), { code: '22012' })
+      return { rows: [] }
+    })
+    const callback = vi.fn()
+    Object.assign(target, {
+      connect: async () => client,
+      query: async () => {
+        // Runs before the lease continuation, so the handoff microtask finds the lease ended.
+        void Promise.resolve().then(() => (target.connect as (cb: () => void) => void)(callback))
+        throw Object.assign(new Error('aborted'), { code: '25P02' })
+      },
+    })
+    await expect(
+      withPostgresPoolQueryFailureForTest(
+        MARKER,
+        async () => target.query({ text: `${MARKER} SELECT 1` }),
+        { pools: [target] },
+      ),
+    ).rejects.toThrow('did not acquire the lease')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(callback).not.toHaveBeenCalled()
   })
 
   it('rejects a pool core that answers the aborted client successfully', async () => {
