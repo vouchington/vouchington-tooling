@@ -61,6 +61,30 @@ export async function listenOnRunnerUnreservedEphemeralPort(
   throw new EphemeralListenerAttemptsExhaustedError(maxBindAttempts)
 }
 
+export type LoopbackHost = '::1' | '127.0.0.1'
+
+/**
+ * Binds `server` to an unreserved ephemeral port on IPv6 loopback, falling back to IPv4
+ * loopback only when the host has no IPv6 support (EAFNOSUPPORT). Other errors are rethrown.
+ */
+export async function listenOnLoopbackEphemeralPort(
+  server: Server,
+  options: EphemeralListenerOptions = {},
+): Promise<{ host: LoopbackHost; port: number }> {
+  try {
+    return {
+      host: '::1',
+      port: await listenOnRunnerUnreservedEphemeralPort(server, '::1', options),
+    }
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'EAFNOSUPPORT')) throw error
+    return {
+      host: '127.0.0.1',
+      port: await listenOnRunnerUnreservedEphemeralPort(server, '127.0.0.1', options),
+    }
+  }
+}
+
 export function loadRunnerPortPolicy(policyUrl: URL = shippedPolicyUrl): RunnerPortPolicy {
   return validateRunnerPortPolicy(JSON.parse(readFileSync(policyUrl, 'utf8')), policyUrl)
 }

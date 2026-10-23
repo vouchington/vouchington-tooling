@@ -355,6 +355,7 @@ gone.
 ```ts
 import {
   isRunnerReservedPort,
+  listenOnLoopbackEphemeralPort,
   listenOnRunnerUnreservedEphemeralPort,
   runnerPortPolicy,
 } from 'vouchington-tooling/runner-port-policy'
@@ -739,6 +740,12 @@ The runner uses monotonic elapsed time, rejects timer budgets above Node's maxim
 the dedicated process group to exit after the direct child closes so descendants cannot overlap a retry.
 `isProcessGroupAlive` and `waitForProcessGroupExit` are also available when callers need the same
 process-group probe and bounded-drain semantics outside a browser session.
+
+`listenOnLoopbackEphemeralPort(server, options?)` from `runner-port-policy` binds an ephemeral port
+outside the reserved runner range on IPv6 loopback (`::1`) and falls back to `127.0.0.1` only when the
+host reports `EAFNOSUPPORT` (for example a kernel booted with `ipv6.disable=1`). Any other bind error is
+rethrown. It resolves `{ host, port }` and accepts the same `EphemeralListenerOptions` (`isAllowedPort`,
+`listen`, `maxBindAttempts`, `policy`) as `listenOnRunnerUnreservedEphemeralPort`, whose bind-retry loop it reuses.
 
 ### Generated arbiter input
 
