@@ -581,6 +581,8 @@ import { tokenizeShellWords } from 'vouchington-tooling/shell-parse'
 
 `vouchington-tooling/shell-parse` splits shell text into words, heredocs, redirections, and command prefixes. Callers pass the text. The parser does not decide which commands are allowed. `stripQuotedShellText` and `commandsToInspect*` do not scan `$(...)` substitutions in the command text: call `extractShellCommandSubstitutions` and inspect each result too.
 
+`gitInvocations(command)` returns each `git` run in command position (after `;`, `&&`, `||`, `|`, a newline, env assignments, or wrappers such as `env`, `sudo`, `xargs`, `timeout`, `nice`) as `{ globalOptions, configOverrides: [{ key, value }], subcommand, args }`. Global options (`-c`, `-C`, `--git-dir`, `--no-pager`, ...) are skipped to reach the subcommand, and `git` as an argument (`printf '%s' git`) is not an invocation. `overridesConfig(invocation, 'core.hooksPath')` checks the `-c` keys case-insensitively. Substitutions and `bash -c` scripts are not read; run it on each result of `extractShellCommandSubstitutions` and `extractShellCommandArguments`. Known best-effort limits: value options inside clustered short wrapper flags are not read, backtick bodies are not read, and a quoted redirection-looking word mid-argv can truncate `args`.
+
 `vouchington-tooling/command-policy` judges a tool call's shell command against a rule table the
 caller supplies. `evaluateCommandPolicy(payload, policy, { automationContext })` returns a
 `BlockDecision` or `null`. The `CommandPolicy` table holds typo paths, protected paths (blocked only

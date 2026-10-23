@@ -8,6 +8,8 @@ export {
   readParenthesizedSubstitution,
 } from './shell-command-substitution-reads.mts'
 export { extractShellCommandSubstitutions } from './shell-command-substitutions.mts'
+export { gitInvocations, overridesConfig } from './git-invocations.mts'
+export type { GitConfigOverride, GitInvocation } from './git-invocations.mts'
 export {
   parseCommandPrefix,
   readCommandPrefix,
