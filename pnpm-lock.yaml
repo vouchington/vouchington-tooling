@@ -140,8 +140,8 @@ importers:
         specifier: 16.4.2
         version: 16.4.2(@playwright/test@1.64.1)(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       no-mistakes:
-        specifier: 0.83.0
-        version: 0.83.0
+        specifier: 0.91.2
+        version: 0.91.2(vitest@5.0.5)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -2311,31 +2311,36 @@ packages:
       sass:
         optional: true
 
-  no-mistakes-darwin-arm64@0.83.0:
-    resolution: {integrity: sha512-tCXJ7imwPItJPlnkK3MSpFP7AG2GRIAN7FLnLQzV+G92U8DVAqaNj8Q+XZVF63QahCp3iCNKbcnB5DUSJvUZnQ==}
+  no-mistakes-darwin-arm64@0.91.2:
+    resolution: {integrity: sha512-BrJJ04vpuux/bXlOJDxCFPqK6Se46NtkrdK1uDvBdxkyQ+J8I7Rw7otJEsiH20HTgu9Cu5Cs6QyplXzTFMLT2w==}
     cpu: [arm64]
     os: [darwin]
 
-  no-mistakes-linux-arm64-gnu@0.83.0:
-    resolution: {integrity: sha512-QEZo02s4+bYLD55qvqTPJqJFd7aktV8G+1FmHa9mJNMGhAJAEyp/pTSFOaaE6xk/yTItxYmus/wm4GbmlMeDiw==}
+  no-mistakes-linux-arm64-gnu@0.91.2:
+    resolution: {integrity: sha512-jHm/luXKSORB1vqfl4BR5gGrDnPUo64LDQE3i+/eAaKOxWD1karph8r1CYPFkoAGOYtmkIVtQ7OWaSpITOYHFA==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-linux-x64-gnu@0.83.0:
-    resolution: {integrity: sha512-ektG0h+bsqOSrJIK+Yknc8p+36mf0zN/vinDPHMXHDUYeeCjJ3M4eg5sMnPAsIimHEl9cNgi/lsLG6KrQuG2lw==}
+  no-mistakes-linux-x64-gnu@0.91.2:
+    resolution: {integrity: sha512-Qv4ExiTDX5hJVyUxVdFEmCIBb2qEYRyDlFwtEWVTemkggpin0AGCGUAVH9KhgHSsiY8zu014T48qt30Y4dKT+Q==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-win32-x64-msvc@0.83.0:
-    resolution: {integrity: sha512-V0kRAzHGsreslgNejmTJUz59e3D/nNJ4Uh6XXNj2auvePnknwD1n9L5BbB+AkfIbnMZ2aFVw0SlNvd9X6iKgKQ==}
+  no-mistakes-win32-x64-msvc@0.91.2:
+    resolution: {integrity: sha512-xaRiRt0s8X3SlJcu/3TMxrVbueDT6GQiopgSOiPFof0eU+8cFVEcKj/r3R//Cc2N98xBI7hL80oP6F+g4mQk8w==}
     cpu: [x64]
     os: [win32]
 
-  no-mistakes@0.83.0:
-    resolution: {integrity: sha512-byaK+spPGI/deudq0LOaIFtlGUMC5IP4t0y4q4nU+lN6hNjCS3KGwyaGSlqEyRTmQnqVUfRIVZp8UGZ3rtMxXA==}
+  no-mistakes@0.91.2:
+    resolution: {integrity: sha512-peYCKck60Aza+PFjE5zwC9NOkxVoedLwphtN/zQyUBIjBIwxpHcQDpZzKyFVQ18tIiOA+dw13RYfv+yxgNxJ7g==}
     hasBin: true
+    peerDependencies:
+      vitest: ^5.0.3
+    peerDependenciesMeta:
+      vitest:
+        optional: true
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -4835,24 +4840,25 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  no-mistakes-darwin-arm64@0.83.0:
+  no-mistakes-darwin-arm64@0.91.2:
     optional: true
 
-  no-mistakes-linux-arm64-gnu@0.83.0:
+  no-mistakes-linux-arm64-gnu@0.91.2:
     optional: true
 
-  no-mistakes-linux-x64-gnu@0.83.0:
+  no-mistakes-linux-x64-gnu@0.91.2:
     optional: true
 
-  no-mistakes-win32-x64-msvc@0.83.0:
+  no-mistakes-win32-x64-msvc@0.91.2:
     optional: true
 
-  no-mistakes@0.83.0:
+  no-mistakes@0.91.2(vitest@5.0.5):
     optionalDependencies:
-      no-mistakes-darwin-arm64: 0.83.0
-      no-mistakes-linux-arm64-gnu: 0.83.0
-      no-mistakes-linux-x64-gnu: 0.83.0
-      no-mistakes-win32-x64-msvc: 0.83.0
+      no-mistakes-darwin-arm64: 0.91.2
+      no-mistakes-linux-arm64-gnu: 0.91.2
+      no-mistakes-linux-x64-gnu: 0.91.2
+      no-mistakes-win32-x64-msvc: 0.91.2
+      vitest: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
 
   object-assign@4.1.1: {}
 
