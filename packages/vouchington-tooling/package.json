@@ -316,6 +316,11 @@
       "import": "./dist/dead-code/index.mjs",
       "default": "./dist/dead-code/index.mjs"
     },
+    "./cloc": {
+      "types": "./dist/cloc/index.d.mts",
+      "import": "./dist/cloc/index.mjs",
+      "default": "./dist/cloc/index.mjs"
+    },
     "./sandbox-command-audit": {
       "types": "./dist/sandbox-command-audit/index.d.mts",
       "import": "./dist/sandbox-command-audit/index.mjs",

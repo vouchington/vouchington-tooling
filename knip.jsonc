@@ -59,6 +59,7 @@
         "src/workflow-secrets-drift/index.mts!",
         "src/tmux/index.mts!",
         "src/sandbox-command-audit/index.mts!",
+        "src/cloc/index.mts!",
         "src/dead-code/index.mts!",
         "src/nuget-central-version/cli.mts!",
         "src/swift-semantic-equal/index.mts!",

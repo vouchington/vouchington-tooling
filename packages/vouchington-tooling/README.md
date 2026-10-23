@@ -323,6 +323,52 @@ the output. The pieces are exported from `vouchington-tooling/sandbox-command-au
 (`scanTranscripts`, `discoverTranscriptFiles`, `resolveRepoRoots`, `classifyAudit`, `formatReport`,
 `runAudit`). Codex escalations are not scanned: Codex agents journal those separately.
 
+## Counting lines of code
+
+`vouchington cloc --config <file> [--scc-bin <path>] [--json]` counts git-tracked lines with
+[`scc`](https://github.com/boyter/scc) (`--by-file` CSV, streamed), classifies each file into
+`source`, `tests` or `tooling` and into a service, and prints an aligned table with a `total` row
+(`--json` prints the rows). The binary is `--scc-bin`, else `SCC_BIN`, else the config's `sccBin`,
+else `scc`. Exits 0, 2 on a usage error, and 1 when the config or the count fails.
+
+`<file>` is a `.json` file, or a module whose default (or `config`) export is the layout (or a
+function returning it). Every field is optional:
+
+```json
+{
+  "services": [
+    { "name": "api", "match": ["api/"] },
+    { "name": "web", "match": ["web/", "e2e/"] }
+  ],
+  "defaultService": "tooling",
+  "categories": { "tests": "specs" },
+  "testPatterns": ["*.test.*", "**/__tests__/**"],
+  "toolingPatterns": [".github/", "**/scripts/**", "package.json", "*.config.*"],
+  "countedRoots": ["api", "web", "e2e", ".github"],
+  "countedRootFiles": ["package.json"],
+  "excludedDirs": ["node_modules", "dist"],
+  "ignoredDirs": ["fixtures", "__snapshots__"],
+  "missingSccHint": "Install scc with your package manager."
+}
+```
+
+- `services`: ordered; the first rule with a matching pattern wins, and the order is the row order.
+  `defaultService` (default `other`) takes the rest and is appended when not listed.
+- Patterns: no `/` matches the basename anywhere (`*.test.*`, `package.json`); a trailing `/` or a
+  `/` without glob characters matches the path or anything under it; a `/` with glob characters is
+  a full-path glob (`**/tests/**`). Dotfiles match. Tests are checked first, then tooling; the rest
+  is source.
+- `countedRoots` and `countedRootFiles` limit what is counted and what scc is given; omit both to
+  count every tracked file. `excludedDirs` is passed to scc (defaults cover VCS, build and
+  `node_modules` directories); `ignoredDirs` drops files under those directory names at any depth
+  (defaults: `fixtures`, `__fixtures__`, `__snapshots__`).
+- `categories` renames the three column labels; `missingSccHint` is appended to the error shown when
+  the binary is not found.
+
+The pieces are exported from `vouchington-tooling/cloc` (`loadClocConfig`, `normalizeClocConfig`,
+`countFiles`, `buildRows`, `formatRows`, `createClassifier`, `createPathPolicy`,
+`compilePatterns`).
+
 ## Reclaiming finished worktrees
 
 `vouchington worktree reclaim [--yes] [--json]` removes git worktrees whose work is done. It is a
