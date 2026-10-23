@@ -1077,7 +1077,8 @@ const { result, error } = await withPostgresQueryFailureForTest(
 ```
 
 - `withPostgresQueryFailureForTest(marker, operation, options)` fails one marked statement on a
-  client leased from `options.pools`, inside a transaction the operation began with `BEGIN`. A
+  client leased from `options.pools` with the promise form of `pool.connect()` (the callback
+  overload is not instrumented), inside a transaction the operation began with `BEGIN`. A
   division by zero aborts that transaction, so PostgreSQL itself answers `25P02`.
 - `withPostgresPoolQueryFailureForTest(marker, operation, options)` does the same for a marked
   `pool.query({ text })` call: it leases a real client, aborts its transaction, and hands the client

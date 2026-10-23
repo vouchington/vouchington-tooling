@@ -71,6 +71,27 @@ describe.skipIf(!started)('withPostgresQueryFailureForTest (real PostgreSQL)', (
     expect(Object.getOwnPropertyDescriptor(pool, 'connect')).toBeUndefined()
   })
 
+  it('keeps the transaction open across ROLLBACK TO SAVEPOINT', async () => {
+    const pool = cluster().createPool()
+    const { result } = await withPostgresQueryFailureForTest(
+      MARKER,
+      async () => {
+        const client = await pool.connect()
+        await client.query('BEGIN')
+        await client.query('SAVEPOINT s')
+        await client.query('ROLLBACK TO SAVEPOINT s')
+        const outcome = await client
+          .query({ text: `${MARKER} SELECT 1` })
+          .catch((err: unknown) => err)
+        await client.query('ROLLBACK')
+        client.release()
+        return outcome
+      },
+      { pools: [pool] },
+    )
+    expect(result).toMatchObject({ code: '25P02' })
+  })
+
   it('only targets the configured command', async () => {
     const pool = cluster().createPool()
     const { error } = await withPostgresQueryFailureForTest(

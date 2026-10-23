@@ -16,6 +16,7 @@ describe('targetsStatement', () => {
     expect(targetsStatement('  /* m */ INSERT INTO t', '/* m */', 'INSERT')).toBe(true)
     expect(targetsStatement('/* m */ SELECT 1', '/* m */', 'INSERT')).toBe(false)
     expect(targetsStatement('SELECT 1', '/* m */')).toBe(false)
+    expect(targetsStatement('/* m */ insert into t', '/* m */', 'INSERT')).toBe(true)
   })
 })
 

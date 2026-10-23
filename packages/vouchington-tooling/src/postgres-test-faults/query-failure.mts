@@ -14,6 +14,14 @@ import {
 import type { PostgresFaultOptions, PostgresFaultResult } from './fault-types.mts'
 import { runPoolObservationExclusively } from './observation-queue.mts'
 
+/** COMMIT, END, ABORT and ROLLBACK end the transaction; ROLLBACK TO SAVEPOINT keeps it open. */
+function endsTransaction(command: string): boolean {
+  return (
+    /^(?:COMMIT|ROLLBACK|END|ABORT)\b/i.test(command) &&
+    !/^ROLLBACK\s+(?:(?:WORK|TRANSACTION)\s+)?TO\b/i.test(command)
+  )
+}
+
 const queryFailureContext = new AsyncLocalStorage<{ active: boolean }>()
 
 /**
@@ -77,7 +85,7 @@ export async function withPostgresQueryFailureForTest<Result>(
         const command = text.trimStart().replace(/^\/\*[\s\S]*?\*\/\s*/, '')
         const owned = ownsContext()
         if (owned && /^(?:BEGIN|START\s+TRANSACTION)\b/i.test(command)) began = true
-        if (owned && /^(?:COMMIT|ROLLBACK|END|ABORT)\b/i.test(command)) began = false
+        if (owned && endsTransaction(command)) began = false
         if (!owned || fired || !targetsStatement(text, queryMarker, options.command))
           return Reflect.apply(originalQuery, client, args)
         if (!began || !isPlainTextConfig(args))

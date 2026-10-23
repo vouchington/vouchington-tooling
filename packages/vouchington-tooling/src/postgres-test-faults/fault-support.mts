@@ -25,7 +25,7 @@ export function queryText(input: unknown): string {
 export function targetsStatement(text: string, queryMarker: string, command?: string): boolean {
   const target = text.trimStart()
   if (!target.startsWith(queryMarker)) return false
-  return !command || target.slice(queryMarker.length).trimStart().startsWith(command)
+  return !command || target.slice(queryMarker.length).trimStart().toUpperCase().startsWith(command)
 }
 
 /** The faulted call must be the adapter's plain `{ text }` config, never a callback or submittable. */
