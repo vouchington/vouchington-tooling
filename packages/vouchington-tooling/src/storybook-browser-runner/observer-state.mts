@@ -5,6 +5,8 @@ export type OutputObserverSnapshot = {
   lastHangProgressAt: number
   lastOutputAt: number
   lastSemanticProgressAt: number
+  lastSemanticProgressLine: string | null
+  lastSemanticProgressMarkerAt: number | null
   newOptimizeDeps: string[]
   optimizerLastProgressAt: number | null
   optimizerReadyAt: number | null
@@ -29,6 +31,8 @@ export function initialObserverState(startedAt: number): OutputObserverState {
     lastHangProgressAt: startedAt,
     lastOutputAt: startedAt,
     lastSemanticProgressAt: startedAt,
+    lastSemanticProgressLine: null,
+    lastSemanticProgressMarkerAt: null,
     optimizerLastProgressAt: null,
     optimizerReadyAt: null,
     outputBuffer: '',

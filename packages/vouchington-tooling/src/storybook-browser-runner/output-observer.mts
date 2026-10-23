@@ -6,6 +6,7 @@ import type { StorybookBrowserDiagnostics } from './diagnostics.mts'
 import {
   hasAddonVitestSetupFile,
   optimizerProgressPattern,
+  progressMarkerLine,
   viteServerFetchFailurePattern,
   viteServerScriptNetworkChangePattern,
   vitestRunnerMissingMarker,
@@ -135,7 +136,12 @@ export class OutputObserver {
     const sequence = latestStorybookProgressSequence(progressText, progressPrefix)
     if (sequence != null && sequence > this.lastSemanticSequence) {
       this.lastSemanticSequence = sequence
+      state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
+      state.lastSemanticProgressMarkerAt = now
       this.recordSemanticProgress(now)
+    } else if (sequence != null && sequence === this.lastSemanticSequence) {
+      // A marker split across chunks completes later: refresh its text, not the timestamp.
+      state.lastSemanticProgressLine = progressMarkerLine(progressText, progressPrefix, sequence)
     }
     if (storybookOutput && !state.storybookBrowserOutputSeen) {
       state.storybookBrowserOutputSeen = true

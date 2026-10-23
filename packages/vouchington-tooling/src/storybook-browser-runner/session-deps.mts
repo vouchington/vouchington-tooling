@@ -6,6 +6,7 @@ import {
   waitForProcessGroupExit,
   type BrowserSessionDeps,
 } from '../browser-session-runner/index.mts'
+import { samplePsProcessGroup } from './process-sample.mts'
 import type { StorybookBrowserRunnerDeps } from './types.mts'
 
 /** browser-session-runner uses this delay for its disabled startup and semantic stall timers. */
@@ -30,6 +31,7 @@ export const defaultRunnerDeps = (): StorybookBrowserRunnerDeps => ({
   offParentSignal: (signal, listener) => process.off(signal, listener),
   onParentSignal: (signal, listener) => process.on(signal, listener),
   rmSync,
+  sampleProcessGroup: samplePsProcessGroup,
   setInterval,
   setTimeout,
   spawn,
