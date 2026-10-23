@@ -102,4 +102,11 @@ describe('post-tool-use', () => {
     expect(await postToolUseOutput(ctx, failing)).toBe('')
     expect(await postToolUseOutput(ctx, { reminder: async () => 'async' })).toContain('async')
   })
+
+  it('stays silent for Grok, which ignores passive-event stdout', async () => {
+    const policy: HookPolicy = { checkers: [warns], reminder: () => 'remember' }
+    const payload = { tool_input: { file_path: 'a.md' } }
+    expect(await postToolUseOutput(context({ harness: 'grok', payload }), policy)).toBe('')
+    expect(await postToolUseOutput(context({ payload }), policy)).toContain('additionalContext')
+  })
 })

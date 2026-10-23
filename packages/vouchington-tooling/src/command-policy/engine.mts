@@ -1,5 +1,7 @@
 import {
   commandsToInspectForGitPolicy,
+  commandsToInspectPreservingQuotes,
+  extractShellCommandSubstitutions,
   isInteractiveRebaseContinue,
 } from '../shell-parse/index.mts'
 import { findBlockedPatternReason } from './git-patterns.mts'
@@ -53,7 +55,7 @@ export function evaluateCommandPolicy(
 }
 
 function findScriptBlock(command: string, policy: CommandPolicy): BlockDecision | null {
-  const scripts = commandsToInspectForGitPolicy(command)
+  const scripts = [...commandsToInspectForGitPolicy(command), ...quotedSubstitutionScripts(command)]
   for (const script of scripts) {
     const reason = findBlockedPatternReason(script, policy.commandPatterns ?? [])
     if (reason !== null) return { reason }
@@ -69,4 +71,12 @@ function findScriptBlock(command: string, policy: CommandPolicy): BlockDecision 
     if (reason !== null) return { reason }
   }
   return null
+}
+
+// Quoted text is blanked so a message mentioning `--force` passes, but a `$(...)` or backtick
+// substitution inside double quotes still runs. Best effort: one level, no deeper quoting analysis.
+function quotedSubstitutionScripts(command: string): string[] {
+  return commandsToInspectPreservingQuotes(command)
+    .flatMap(extractShellCommandSubstitutions)
+    .flatMap(commandsToInspectForGitPolicy)
 }

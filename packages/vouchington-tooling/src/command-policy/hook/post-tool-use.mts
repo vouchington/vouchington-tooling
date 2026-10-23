@@ -47,6 +47,8 @@ async function reminderOf(policy: HookPolicy, context: HookContext): Promise<str
  * hook is advisory and never blocks, so failures here are swallowed.
  */
 export async function postToolUseOutput(context: HookContext, policy: HookPolicy): Promise<string> {
+  // Grok ignores stdout for passive events and documents no other channel, so stay silent.
+  if (context.harness === 'grok') return ''
   const warnings = editedPaths(context).flatMap((path) =>
     checkFile(path, context.root, policy.checkers),
   )

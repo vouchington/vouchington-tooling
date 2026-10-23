@@ -259,3 +259,15 @@ describe('evaluateCommandPolicy cwd', () => {
     expect(seen).toEqual(['/explicit', '/from-payload'])
   })
 })
+
+describe('evaluateCommandPolicy quoted command substitutions', () => {
+  it('blocks a git command run by a substitution inside double quotes', () => {
+    expect(reasonOf(bash('echo "$(git push --force)"'))).toContain('Force pushes')
+    expect(reasonOf(bash('echo "`git push --force`"'))).toContain('Force pushes')
+  })
+
+  it('keeps quoted mentions and single-quoted substitutions allowed', () => {
+    expect(reasonOf(bash('git commit -m "mention --force"'))).toBeNull()
+    expect(reasonOf(bash("git commit -m '$(git push --force)'"))).toBeNull()
+  })
+})
