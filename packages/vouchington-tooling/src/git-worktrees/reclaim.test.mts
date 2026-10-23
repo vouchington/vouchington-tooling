@@ -123,7 +123,7 @@ describe('kept worktrees', () => {
     expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
   })
 
-  it.each([['open'], ['all']])(
+  it.each([['open']])(
     'keeps a worktree when the %s PR query fills its page',
     (state) => {
       fx.addWorktree('busy', { push: true })
@@ -381,6 +381,7 @@ describe('parseWorktreeList and formatReport', () => {
   it('prints one line per worktree with control characters escaped', () => {
     const text = formatReport({
       dryRun: true,
+      hasMore: false,
       worktrees: [
         { path: '/a\nb\u001b[31m', branch: 'x', status: 'would reclaim' },
         { path: '/c', branch: 'y', status: 'kept', reason: 'open PR' },

@@ -2,7 +2,8 @@ import { git, LOCAL_ENV, run, withoutVariables, type RunOptions } from './run.mt
 
 const FINISHED = new Set(['MERGED', 'CLOSED'])
 
-interface PullRequest {
+export interface PullRequest {
+  readonly headRefName?: string
   readonly state?: string
   readonly headRefOid?: string
   readonly isCrossRepository?: boolean
@@ -23,7 +24,7 @@ function parseJson(text: string | undefined): unknown {
 /** Repo-local git variables, GH_REPO and GH_HOST must not redirect the lookup away from the main checkout. */
 function runGh(args: readonly string[], main: RunOptions): string | undefined {
   const env = withoutVariables(main.env, [...LOCAL_ENV, 'GH_REPO', 'GH_HOST'])
-  return run('gh', args, { cwd: main.cwd, env })
+  return run('gh', args, { ...main, env })
 }
 
 export function readRepository(main: RunOptions): string | undefined {
@@ -54,11 +55,20 @@ export function assessLocal(worktree: RunOptions): Assessment {
 
 const PAGE = 1000
 
-function listPulls(branch: string, state: string, main: RunOptions): PullRequest[] | undefined {
-  const fields = 'state,headRefOid,isCrossRepository,headRepository,headRepositoryOwner'
-  const args = ['pr', 'list', '--head', branch, '--state', state, '--limit', String(PAGE)]
+function listPulls(
+  branch: string | undefined,
+  state: string,
+  main: RunOptions,
+  limit = PAGE,
+): PullRequest[] | undefined {
+  const fields = 'state,headRefName,headRefOid,isCrossRepository,headRepository,headRepositoryOwner'
+  const args = ['pr', 'list', '--state', state, '--limit', String(limit)]
+  if (branch !== undefined) args.push('--head', branch)
   const listed = parseJson(runGh([...args, '--json', fields], main))
-  return Array.isArray(listed) && listed.length < PAGE ? (listed as PullRequest[]) : undefined
+  return Array.isArray(listed) &&
+    (listed.length < limit || (branch === undefined && state === 'all'))
+    ? (listed as PullRequest[])
+    : undefined
 }
 
 /**
@@ -76,8 +86,30 @@ export function assessPullRequest(
   const open = listPulls(branch, 'open', main)
   const all = listPulls(branch, 'all', main)
   if (open === undefined || all === undefined) return 'cannot read PR state'
-  const own = [...open, ...all].filter(
+  return assessListedPulls([...open, ...all], branch, head, repository)
+}
+
+/** A complete open list protects active branches; bounded recent history only proves candidates. */
+export function readPullSnapshot(
+  main: RunOptions,
+  limit: number,
+): readonly PullRequest[] | undefined {
+  const open = listPulls(undefined, 'open', main, limit)
+  const all = listPulls(undefined, 'all', main, limit)
+  return open === undefined || all === undefined ? undefined : [...open, ...all]
+}
+
+export function assessListedPulls(
+  pulls: readonly PullRequest[] | undefined,
+  branch: string,
+  head: string,
+  repository: string | undefined,
+): string | undefined {
+  if (repository === undefined) return 'cannot read repository'
+  if (pulls === undefined) return 'cannot read PR state'
+  const own = pulls.filter(
     (pr) =>
+      pr.headRefName === branch &&
       pr.isCrossRepository === false &&
       `${pr.headRepositoryOwner?.login}/${pr.headRepository?.name}`.toLowerCase() === repository,
   )
