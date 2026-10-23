@@ -30,6 +30,9 @@ vi.mock('./commands/sandbox-command-audit.mts', () => ({
 vi.mock('./commands/cloc.mts', () => ({
   runClocCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/storybook-browser-runner.mts', () => ({
+  runStorybookBrowserRunnerCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/worktree.mts', () => ({
   runWorktreeCommand: vi.fn(() => 0),
 }))
@@ -46,6 +49,7 @@ import { runMcpCommand } from './commands/mcp.mts'
 import { runHookCommand } from './commands/hook.mts'
 import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
 import { runClocCommand } from './commands/cloc.mts'
+import { runStorybookBrowserRunnerCommand } from './commands/storybook-browser-runner.mts'
 
 describe('runCli extract command dispatch', () => {
   afterEach(() => {
@@ -101,6 +105,13 @@ describe('runCli extract command dispatch', () => {
   it('forwards the cloc subcommand and its arguments', async () => {
     await expect(runCli(['node', 'vouchington', 'cloc', '--config', 'c.json'])).resolves.toBe(0)
     expect(runClocCommand).toHaveBeenCalledWith(['--config', 'c.json'])
+  })
+
+  it('forwards the storybook-browser-runner subcommand and its arguments', async () => {
+    await expect(
+      runCli(['node', 'vouchington', 'storybook-browser-runner', '--project', 'p']),
+    ).resolves.toBe(0)
+    expect(runStorybookBrowserRunnerCommand).toHaveBeenCalledWith(['--project', 'p'])
   })
 
   it('forwards the mcp subcommand and its arguments', async () => {

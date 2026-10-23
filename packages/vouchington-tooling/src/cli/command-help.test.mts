@@ -40,6 +40,7 @@ describe('subcommand help', () => {
     expect(commandUsage('hook')).toContain('--policy <module>')
     expect(commandUsage('sandbox-command-audit')).toContain('--worktree-glob')
     expect(commandUsage('cloc')).toContain('--scc-bin')
+    expect(commandUsage('storybook-browser-runner')).toContain('--result-file')
     expect(commandUsage('agent-blackboard')).toContain('distill classify')
     expect(commandUsage('agent-blackboard')).not.toContain('journal append')
     expect(commandUsage('retrospective-transcript')).toContain('--session-id')
