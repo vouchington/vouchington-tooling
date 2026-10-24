@@ -33,6 +33,7 @@
         "src/command-policy/index.mts!",
         "src/pg-schema-snapshot/index.mts!",
         "src/postgres-test-faults/index.mts!",
+        "src/request-query-profile/index.mts!",
         "src/openapi-document/index.mts!",
         "src/contract-schema/index.mts!",
         "src/api-fixtures/index.mts!",

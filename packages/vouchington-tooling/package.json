@@ -421,6 +421,11 @@
       "import": "./dist/postgres-test-faults/index.mjs",
       "default": "./dist/postgres-test-faults/index.mjs"
     },
+    "./request-query-profile": {
+      "types": "./dist/request-query-profile/index.d.mts",
+      "import": "./dist/request-query-profile/index.mjs",
+      "default": "./dist/request-query-profile/index.mjs"
+    },
     "./package.json": "./package.json",
     "./basic-auth-doc-sync": {
       "types": "./dist/basic-auth-doc-sync/index.d.mts",
