@@ -9,7 +9,10 @@ export interface ProfileObservations {
   workerScopes: Set<string>
 }
 
-/** Collect exact repeated-query scopes and valid request/worker diagnostics from run logs. */
+/**
+ * Collect exact repeated-query scopes and valid request/worker diagnostics from run logs. Worker
+ * lines are recognized by the compact `"kind":"pg-worker-profile"` form `JSON.stringify` writes.
+ */
 export function collectProfileObservations(
   logTexts: readonly string[],
   resolveRoute: (route: string) => string,

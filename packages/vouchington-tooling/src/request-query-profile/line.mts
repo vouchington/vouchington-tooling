@@ -10,7 +10,10 @@ export interface ParsedRequestProfileLine {
   repeats: RepeatedAnnotation[]
 }
 
-/** One stderr line for a request, or null when it has nothing to report and `all` is off. */
+/**
+ * One stderr line for a request, or null when it has nothing to report and `all` is off.
+ * Annotations are written verbatim, so one containing a comma does not survive parsing.
+ */
 export function formatRequestProfileLine(
   route: string,
   summary: RequestQuerySummary,
