@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 2
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && '0' || '1' }}
           persist-credentials: false
 
       - name: Checkout tooling scripts
@@ -50,8 +50,33 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            BASE_SHA="$PR_BASE_SHA"
+            HEAD_SHA="$PR_HEAD_SHA"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            BASE_SHA="$MERGE_GROUP_BASE_SHA"
+            HEAD_SHA="$MERGE_GROUP_HEAD_SHA"
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "merge_group" ]]; then
+            for SHA in "$BASE_SHA" "$HEAD_SHA"; do
+              if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+                echo "::error::Event base/head must be full commit OIDs"
+                exit 2
+              fi
+            done
+            if [[ -z "$TOKEN" ]]; then
+              echo "::error::GITHUB_TOKEN is required for exact history fetch"
+              exit 2
+            fi
+            TOKEN_B64="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+            GIT_CONFIG_COUNT=1 \
+              GIT_CONFIG_KEY_0=http.extraheader \
+              GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $TOKEN_B64" \
+              git fetch --no-tags --unshallow origin "$BASE_SHA" "$HEAD_SHA"
+          fi
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             MERGE_BASE=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")
             LOG_OPTS="${MERGE_BASE}..${PR_HEAD_SHA}"
