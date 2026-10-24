@@ -1196,6 +1196,48 @@ touching it. `tmux post-tool` reads an agent post-tool hook payload on stdin and
 reminder at plan, PR, push and reset checkpoints; reminders name `TMUX_NAME_COMMAND` (default
 `vouchington tmux name`).
 
+## Request query profiles
+
+`vouchington-tooling/request-query-profile` is the test-only rule layer on top of a per-request
+query telemetry summary. It has no runtime dependencies: the summary is a structural type
+(`{ totalQueries, serialDepth, repeats: { annotation, count }[] }`) and the route resolver is a
+function you pass in.
+
+```ts
+import {
+  buildStaleReport,
+  findUnbaselinedRepeats,
+  formatRequestProfileLine,
+  formatUnbaselinedRepeats,
+  parseRepeatBaseline,
+  parseRequestProfileLine,
+} from 'vouchington-tooling/request-query-profile'
+
+const baseline = parseRepeatBaseline(JSON.parse(baselineJson))
+const line = formatRequestProfileLine('GET /orders/:id', summary, { all: false }) // null if no repeats
+const parsed = parseRequestProfileLine(line ?? '') // { route, queries, serialDepth, repeats }
+const bad = findUnbaselinedRepeats('GET /orders/:id', summary.repeats, baseline)
+if (bad.length > 0)
+  throw new Error(
+    formatUnbaselinedRepeats('GET /orders/:id', bad, { baselineFile: 'test/query-baseline.json' }),
+  )
+const report = buildStaleReport(baseline, [logText], (route) => route) // report-only
+```
+
+- A baseline entry names an `annotation`, a `reason`, exact `routes` (`METHOD /path`, optionally
+  followed by ` tools/call <name>`) and optional `workers: [{ queue, job }]`, a `maxCount` (an
+  integer of at least 2, or `null` for unbounded), and either `issue` (a positive issue number, a
+  temporary entry) or `permanent: true` with `code` (`<repo path>:<line, range or symbol>`).
+  `parseRepeatBaseline` throws naming every malformed or duplicate-scope entry.
+- `formatClosedBaselineIssues(baseline, states, { issueGroup })` reports temporary entries whose
+  issue is not open; `states` maps issue numbers to their GitHub state.
+- `formatRequestProfileLine` and `parseRequestProfileLine` are inverses and live in one module, so
+  the line format cannot drift. `collectProfileObservations` also reads
+  `{"kind":"pg-worker-profile", ...}` JSON lines, including nested `children`.
+- `buildStaleReport(baseline, logTexts, resolveRoute)` and `findStaleBaselineEntries` never treat a
+  missing or malformed diagnostic kind as evidence of absence: `sufficient` is false then, and the
+  scopes of that kind stay unreported.
+
 ## PostgreSQL test faults and lock waits
 
 `vouchington-tooling/postgres-test-faults` injects real PostgreSQL failures and observes real lock

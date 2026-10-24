@@ -20,6 +20,8 @@ export default defineConfig({
         'packages/*/src/vitest-blob-manifest/index.mts',
         'packages/*/src/pg-schema-snapshot/index.mts',
         'packages/*/src/postgres-test-faults/index.mts',
+        'packages/*/src/request-query-profile/index.mts',
+        'packages/*/src/request-query-profile/types.mts',
         'packages/*/src/openapi-document/index.mts',
         'packages/*/src/contract-schema/index.mts',
         'packages/*/src/contract-schema/types.mts',
