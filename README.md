@@ -221,11 +221,13 @@ if duplicate deliveries are possible. It validates the target number, session id
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
 
 - `setup-node-pnpm` runs `actions/setup-node` from `node-version-file` (default `.nvmrc`), then
-  `pnpm/action-setup` with `version: latest-12`, restores the pnpm store cache keyed on
+  `pnpm/action-setup` with `version: latest-12` (retried once if the first attempt fails), restores the pnpm store cache keyed on
   `pnpm-lock.yaml`, and runs a frozen install. `install-scripts: 'false'` adds `--ignore-scripts`.
   The caller runs `actions/checkout` first.
-- `fetch-base-ref` fetches the pull request base branch as `refs/remotes/origin/<base>` and unshallows
-  the clone so merge-base and diff tools can resolve it. Run it after `actions/checkout`.
+- `fetch-base-ref` fetches only the pull request base branch (`refs/remotes/origin/<base>`) and the
+  checked-out commit's ancestry (`refs/remotes/origin/ci-head`), deepening a shallow clone, so
+  merge-base and diff tools resolve them without pulling every branch. The optional `filter` input
+  (for example `blob:none`) adds a partial-clone filter. Run it after `actions/checkout`.
 - `upload-full-lcov` validates a lowercase hyphen-delimited `suite` and uploads `path` (default
   `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs

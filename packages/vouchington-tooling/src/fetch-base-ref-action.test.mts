@@ -17,6 +17,7 @@ const action = load(source) as {
     using: string
     steps: Array<{ shell?: string; env?: Record<string, string>; run?: string }>
   }
+  inputs: Record<string, { default?: string; required?: boolean }>
 }
 const [fetchStep] = action.runs.steps
 const script = fetchStep?.run ?? ''
@@ -38,6 +39,8 @@ function clone(name: string, shallow: boolean) {
   git(origin, 'config', 'user.email', 'test@example.com')
   git(origin, 'config', 'user.name', 'Test')
   git(origin, 'config', 'commit.gpgsign', 'false')
+  git(origin, 'config', 'uploadpack.allowFilter', 'true')
+  git(origin, 'config', 'uploadpack.allowAnySHA1InWant', 'true')
   for (const n of [1, 2, 3]) {
     writeFileSync(join(origin, 'file'), String(n))
     git(origin, 'add', 'file')
@@ -48,11 +51,11 @@ function clone(name: string, shallow: boolean) {
   return work
 }
 
-function run(cwd: string, baseRef: string) {
+function run(cwd: string, baseRef: string, filter = '') {
   return spawnSync('bash', ['-c', script], {
     cwd,
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, BASE_REF: baseRef },
+    env: { PATH: process.env.PATH, BASE_REF: baseRef, FILTER: filter },
   })
 }
 
@@ -63,16 +66,44 @@ describe('fetch-base-ref composite action', () => {
     expect(fetchStep?.env?.BASE_REF).toBe(
       "${{ github.base_ref || github.event.repository.default_branch || 'main' }}",
     )
+    expect(fetchStep?.env?.FILTER).toBe('${{ inputs.filter }}')
+    expect(action.inputs.filter).toEqual({
+      description: expect.any(String),
+      required: false,
+      default: '',
+    })
     expect(script).not.toContain('${{')
     expect(source).not.toMatch(/vouchington|voucha/iu)
   })
 
-  it('unshallows a shallow clone and creates the origin/<base> ref', () => {
+  it('deepens a shallow clone and creates the origin/<base> and ci-head refs', () => {
     const work = clone('shallow', true)
     expect(git(work, 'rev-parse', '--is-shallow-repository')).toBe('true')
     expect(run(work, 'main').status).toBe(0)
     expect(git(work, 'rev-parse', '--is-shallow-repository')).toBe('false')
     expect(git(work, 'rev-list', '--count', 'refs/remotes/origin/main')).toBe('3')
+    expect(git(work, 'rev-parse', 'refs/remotes/origin/ci-head')).toBe(
+      git(work, 'rev-parse', 'HEAD'),
+    )
+  })
+
+  it('fetches only the base branch and HEAD, not other branches', () => {
+    const work = clone('scoped', false)
+    git(join(scratch, 'scoped-origin'), 'branch', 'other')
+    expect(run(work, 'main').status).toBe(0)
+    expect(git(work, 'for-each-ref', '--format=%(refname)', 'refs/remotes/origin')).toBe(
+      'refs/remotes/origin/HEAD\nrefs/remotes/origin/ci-head\nrefs/remotes/origin/main',
+    )
+  })
+
+  it('passes the filter input as a partial-clone filter only when set', () => {
+    const plain = clone('plain', false)
+    expect(run(plain, 'main').status).toBe(0)
+    const unset = spawnSync('git', ['config', 'remote.origin.partialclonefilter'], { cwd: plain })
+    expect(unset.status).toBe(1)
+    const filtered = clone('filtered', false)
+    expect(run(filtered, 'main', 'blob:none').status).toBe(0)
+    expect(git(filtered, 'config', 'remote.origin.partialclonefilter')).toBe('blob:none')
   })
 
   it('skips the unshallow for a complete clone', () => {
