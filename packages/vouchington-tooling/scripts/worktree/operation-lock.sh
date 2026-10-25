@@ -117,19 +117,33 @@ worktree_operation_lock_acquire() {
 }
 
 worktree_operation_lock_clear_stale() {
-  local lock_root lock_path held_owner_path held_pid held_token
+  local lock_root lock_path clearing_path clearer_pid status
   WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=missing
   lock_root=$(_worktree_operation_lock_resolve_root "${1:-}") || return 2
   lock_path="$lock_root/lock"
   [ -L "$lock_path" ] || return 0
-  # Serialize clearers so one cannot delete a lock another clearer replaced.
-  if ! mkdir "$lock_root/clearing.d" 2>/dev/null; then
-    WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=busy
-    return 1
+  # Serialize clearers so one cannot delete a lock another clearer replaced. The mutex is a
+  # symlink to the clearer's PID, created atomically, so a clearer that died holding it is
+  # recognizable and its mutex is recovered.
+  clearing_path="$lock_root/clearing"
+  _worktree_operation_lock_set_self_pid
+  clearer_pid=$WORKTREE_OPERATION_LOCK_SELF_PID
+  if ! ln -s "$clearer_pid" "$clearing_path" 2>/dev/null; then
+    status=$(readlink "$clearing_path" 2>/dev/null || true)
+    if _worktree_operation_lock_pid_is_live "$status" \
+      || [ "$(readlink "$clearing_path" 2>/dev/null || true)" != "$status" ]; then
+      WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=busy
+      return 1
+    fi
+    rm -f "$clearing_path"
+    if ! ln -s "$clearer_pid" "$clearing_path" 2>/dev/null; then
+      WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=busy
+      return 1
+    fi
   fi
   status=0
   _worktree_operation_lock_clear_locked "$lock_root" || status=$?
-  rmdir "$lock_root/clearing.d"
+  rm -f "$clearing_path"
   return "$status"
 }
 

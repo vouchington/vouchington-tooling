@@ -211,12 +211,30 @@ describe('operation-lock.sh', () => {
 
   it('reports busy while another clearer holds the clearing mutex', async () => {
     await plantLock(`${await deadPid()}\n`)
-    await mkdir(join(root, 'clearing.d'))
+    await symlink(String(process.pid), join(root, 'clearing'))
     const { stdout } = await run(
       `worktree_operation_lock_clear_stale "${root}"; echo "$? $WORKTREE_OPERATION_LOCK_CLEANUP_STATUS"`,
     )
     expect(stdout.trim()).toBe('1 busy')
     expect(await exists(join(root, 'lock'))).toBe(true)
+  })
+
+  it('recovers a clearing mutex whose owner died', async () => {
+    await plantLock(`${await deadPid()}\n`)
+    await symlink(String(await deadPid()), join(root, 'clearing'))
+    const { stdout } = await run(
+      `worktree_operation_lock_clear_stale "${root}"; echo "$? $WORKTREE_OPERATION_LOCK_CLEANUP_STATUS"`,
+    )
+    expect(stdout.trim()).toBe('0 removed')
+    expect(await readdir(root)).toEqual([])
+  })
+
+  it('keeps the caller status variable intact', async () => {
+    await plantLock(`${await deadPid()}\n`)
+    const { stdout } = await run(
+      `status=42; worktree_operation_lock_clear_stale "${root}"; echo "$status"`,
+    )
+    expect(stdout.trim()).toBe('42')
   })
 
   it('fails when the owner PID cannot be recorded', async () => {
@@ -250,7 +268,7 @@ describe('operation-lock.sh', () => {
     await expect(
       run(`set -e; worktree_operation_lock_clear_stale "${root}"; echo unreachable`),
     ).rejects.toMatchObject({ code: 1 })
-    expect(await exists(join(root, 'clearing.d'))).toBe(false)
+    expect(await exists(join(root, 'clearing'))).toBe(false)
   })
 
   it('treats a permission-denied probe as a live owner', async () => {
