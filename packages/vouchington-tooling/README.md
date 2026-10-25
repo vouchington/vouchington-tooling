@@ -247,6 +247,18 @@ and `git_worktree_main_path` fails when git reports no worktree. Its
 `scripts/worktree/git-index-lock.sh` removes only a 0-byte `index.lock`. A non-empty lock is left
 in place.
 
+`scripts/worktree/operation-lock.sh` holds a host-wide lock across a region of the sourcing script,
+for code that shares shell state with its surroundings and so cannot run under
+`vouchington with-host-lock`, which wraps one command and forbids nesting. The lock is a symlink
+named `lock` whose target is an owner token; a file with that name holds the owner PID. Pass the
+absolute lock root to each call or set `WORKTREE_OPERATION_LOCK_ROOT`; there is no default.
+`worktree_operation_lock_acquire [root]` takes the lock or prints the holder's PID (or says the
+lock is stale) and returns 1 without waiting. `worktree_operation_lock_release` is a no-op unless
+this shell holds the lock, so `trap worktree_operation_lock_release EXIT` is safe.
+`worktree_operation_lock_clear_stale [root]` removes a lock whose owner PID is dead and sets
+`WORKTREE_OPERATION_LOCK_CLEANUP_STATUS` to `missing`, `removed`, `active` or `invalid`; it returns
+0 for the first two and 1 otherwise.
+
 `scripts/worktree/reset-worktree.sh --base-ref <ref>` checks out a new `reset-<hex>` branch and
 hard-resets it to `<ref>`. A `remote/branch` ref is fetched first; `refs/...` and a local ref are
 not. It refuses uncommitted or untracked changes unless `--force` is set, refuses a non-empty
