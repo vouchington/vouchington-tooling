@@ -1,0 +1,97 @@
+name: Authorize comment command
+description: >
+  Decide whether the author of a comment-command trigger may run it. Mode `check` reads the
+  association from the event payload and reports the result as an output. Mode `revalidate`
+  refetches the comment by id, confirms it still belongs to the issue or pull request, and fails
+  the step when the author is no longer authorized.
+inputs:
+  mode:
+    description: '`check` (output only) or `revalidate` (refetch the comment, fail when unauthorized)'
+    required: false
+    default: check
+  allowed-associations:
+    description: Comma-separated author_association values that are authorized
+    required: false
+    default: OWNER,COLLABORATOR,MEMBER
+  association:
+    description: Commenter author_association for `check` mode, defaulting to the event's comment
+    required: false
+    default: ${{ github.event.comment.author_association }}
+  comment-id:
+    description: Comment id refetched in `revalidate` mode, defaulting to the event's comment
+    required: false
+    default: ${{ github.event.comment.id }}
+  issue-number:
+    description: Issue or pull request number the comment must belong to in `revalidate` mode
+    required: false
+    default: ${{ github.event.issue.number }}
+  token:
+    description: Token used to refetch the comment in `revalidate` mode
+    required: false
+    default: ${{ github.token }}
+outputs:
+  authorized:
+    description: '`true` when the association is allowed, otherwise `false`'
+    value: ${{ steps.authorize.outputs.authorized }}
+  association:
+    description: The author_association that was checked
+    value: ${{ steps.authorize.outputs.association }}
+runs:
+  using: composite
+  steps:
+    - name: Authorize commenter
+      id: authorize
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        MODE: ${{ inputs.mode }}
+        ALLOWED_ASSOCIATIONS: ${{ inputs.allowed-associations }}
+        EVENT_ASSOCIATION: ${{ inputs.association }}
+        COMMENT_ID: ${{ inputs.comment-id }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+      run: |
+        set -euo pipefail
+        export COMMENT_ID ISSUE_NUMBER
+        ASSOCIATION="$EVENT_ASSOCIATION"
+        MATCHES=true
+        case "$MODE" in
+          check) ;;
+          revalidate)
+            if [[ ! "$COMMENT_ID" =~ ^[1-9][0-9]*$ || ! "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::Refusing to revalidate a non-numeric comment id or issue number."
+              exit 1
+            fi
+            COMMENT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}")"
+            ASSOCIATION="$(jq -r '.author_association // ""' <<< "$COMMENT_JSON")"
+            if ! jq -e \
+              'select((.id | tostring) == env.COMMENT_ID and
+                (.issue_url | endswith("/issues/" + env.ISSUE_NUMBER)))' \
+              <<< "$COMMENT_JSON" > /dev/null; then
+              MATCHES=false
+            fi
+            ;;
+          *)
+            echo "::error::mode must be check or revalidate."
+            exit 1
+            ;;
+        esac
+
+        AUTHORIZED=false
+        if [[ "$MATCHES" == "true" ]]; then
+          IFS=',' read -r -a ALLOWED <<< "$ALLOWED_ASSOCIATIONS"
+          for CANDIDATE in "${ALLOWED[@]}"; do
+            CANDIDATE="${CANDIDATE//[[:space:]]/}"
+            if [[ -n "$CANDIDATE" && "$CANDIDATE" == "$ASSOCIATION" ]]; then
+              AUTHORIZED=true
+            fi
+          done
+        fi
+
+        {
+          echo "authorized=$AUTHORIZED"
+          echo "association=$ASSOCIATION"
+        } >> "$GITHUB_OUTPUT"
+        if [[ "$AUTHORIZED" != "true" && "$MODE" == "revalidate" ]]; then
+          echo "::error::Comment ${COMMENT_ID} is no longer an authorized command (association: ${ASSOCIATION:-none})."
+          exit 1
+        fi

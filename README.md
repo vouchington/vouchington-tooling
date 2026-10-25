@@ -216,6 +216,33 @@ check and post are not atomic, so give the comment job a caller-level `concurren
 if duplicate deliveries are possible. It validates the target number, session id
 (`sess-` plus eight hex digits), and an `https://.../sessions/<id>` URL before commenting.
 
+### Comment-command actions
+
+Two composite actions for workflows triggered by an `issue_comment` command. Pin them like the
+others and pass nothing through expressions in `run`; every input reaches the script through `env`.
+
+- `comment-command-authorize` takes `mode` (`check` by default, or `revalidate`),
+  `allowed-associations` (default `OWNER,COLLABORATOR,MEMBER`), `association` (default the event
+  comment's `author_association`), `comment-id` and `issue-number` (default the event's), and `token`
+  (default `github.token`). It outputs `authorized` and `association`. `check` never calls the API
+  and always succeeds, so gate later steps or jobs on `authorized == 'true'`. `revalidate`
+  refetches the comment by id, requires that it still belongs to `issue-number`, and fails the step
+  when the author no longer qualifies; run it in an escalate job before posting a failure comment.
+- `comment-command-acknowledge` adds an `eyes` reaction to `comment-id` and, when
+  `github.run_attempt` is `1` and `post-run-link` is `true` (default), comments on `issue-number`
+  with a link to the run. A failed reaction or comment only emits a `::warning::` (`command` names
+  the command in it), so the workflow continues. It needs `issues: write`.
+
+```yaml
+steps:
+  - id: auth
+    uses: vouchington/vouchington-tooling/.github/actions/comment-command-authorize@<40-character-commit-sha> # vX.Y.Z
+  - if: steps.auth.outputs.authorized == 'true'
+    uses: vouchington/vouchington-tooling/.github/actions/comment-command-acknowledge@<40-character-commit-sha> # vX.Y.Z
+    with:
+      command: /fix
+```
+
 ### Setup and coverage actions
 
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
