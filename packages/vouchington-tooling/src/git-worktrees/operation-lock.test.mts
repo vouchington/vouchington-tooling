@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { access, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -185,6 +185,51 @@ describe('operation-lock.sh', () => {
   it('release is a no-op without a held lock', async () => {
     await run('worktree_operation_lock_release')
     expect(await exists(root)).toBe(false)
+  })
+
+  it('rejects a second acquisition by a shell that already holds a lock', async () => {
+    const other = `${root}-other`
+    testDirs.push(other)
+    const { stdout, stderr } = await run(
+      `worktree_operation_lock_acquire "${root}" || exit 1
+       worktree_operation_lock_acquire "${other}" || echo rejected
+       worktree_operation_lock_release
+       [ -L "${root}/lock" ] || echo released`,
+    )
+    expect(stdout.trim().split('\n')).toEqual(['rejected', 'released'])
+    expect(stderr).toMatch(/already holds/)
+    expect(await exists(other)).toBe(false)
+  })
+
+  it('records the subshell PID so a dead subshell leaves a stale lock', async () => {
+    const { stdout } = await run(
+      `( worktree_operation_lock_acquire "${root}" )
+       worktree_operation_lock_clear_stale "${root}"; echo "$WORKTREE_OPERATION_LOCK_CLEANUP_STATUS"`,
+    )
+    expect(stdout.trim()).toBe('removed')
+  })
+
+  it('reports busy while another clearer holds the clearing mutex', async () => {
+    await plantLock(`${await deadPid()}\n`)
+    await mkdir(join(root, 'clearing.d'))
+    const { stdout } = await run(
+      `worktree_operation_lock_clear_stale "${root}"; echo "$? $WORKTREE_OPERATION_LOCK_CLEANUP_STATUS"`,
+    )
+    expect(stdout.trim()).toBe('1 busy')
+    expect(await exists(join(root, 'lock'))).toBe(true)
+  })
+
+  it('fails when the owner PID cannot be recorded', async () => {
+    await mkdir(root, { recursive: true })
+    await chmod(root, 0o500)
+    try {
+      await expect(run(`worktree_operation_lock_acquire "${root}"`)).rejects.toMatchObject({
+        code: 1,
+      })
+    } finally {
+      await chmod(root, 0o700)
+    }
+    expect(await readdir(root)).toEqual([])
   })
 
   it('releases on EXIT when installed as a trap', async () => {

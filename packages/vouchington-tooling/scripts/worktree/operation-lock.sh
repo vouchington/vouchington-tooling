@@ -18,7 +18,7 @@
 # Variables set:
 #   WORKTREE_OPERATION_LOCK_TOKEN        owner token while the lock is held
 #   WORKTREE_OPERATION_LOCK_HELD_ROOT    root of the lock this shell holds
-#   WORKTREE_OPERATION_LOCK_CLEANUP_STATUS  after clear_stale: missing, removed, active or invalid
+#   WORKTREE_OPERATION_LOCK_CLEANUP_STATUS  after clear_stale: missing, removed, active, invalid or busy
 #
 # Release with a trap, for example: `trap worktree_operation_lock_release EXIT`.
 
@@ -44,13 +44,24 @@ _worktree_operation_lock_pid_is_live() {
 
 worktree_operation_lock_acquire() {
   local lock_root lock_path token owner_path held_owner_path held_pid held_token
+  local self_pid=${BASHPID:-}
+  # Bash 3.2 has no BASHPID; a child shell reports this (sub)shell as its parent.
+  [ -n "$self_pid" ] || self_pid=$(exec sh -c 'echo $PPID')
+  if [ -n "${WORKTREE_OPERATION_LOCK_TOKEN:-}" ]; then
+    echo "Error: this shell already holds a worktree operation lock: ${WORKTREE_OPERATION_LOCK_HELD_ROOT:-}" >&2
+    return 1
+  fi
   lock_root=$(_worktree_operation_lock_resolve_root "${1:-}") || return 1
   lock_path="$lock_root/lock"
-  token="owner.$$.$RANDOM$RANDOM"
+  token="owner.$self_pid.$RANDOM$RANDOM"
   owner_path="$lock_root/$token"
 
   mkdir -p "$lock_root" || return 1
-  printf '%s\n' "$$" >"$owner_path"
+  if ! printf '%s\n' "$self_pid" >"$owner_path"; then
+    rm -f "$owner_path"
+    echo "Error: cannot record the worktree operation lock owner: $owner_path" >&2
+    return 1
+  fi
 
   if ln -s "$token" "$lock_path" 2>/dev/null; then
     if [ "$(readlink "$lock_path" 2>/dev/null || true)" = "$token" ]; then
@@ -93,6 +104,20 @@ worktree_operation_lock_clear_stale() {
   WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=missing
   lock_root=$(_worktree_operation_lock_resolve_root "${1:-}") || return 2
   lock_path="$lock_root/lock"
+  [ -L "$lock_path" ] || return 0
+  # Serialize clearers so one cannot delete a lock another clearer replaced.
+  if ! mkdir "$lock_root/clearing.d" 2>/dev/null; then
+    WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=busy
+    return 1
+  fi
+  _worktree_operation_lock_clear_locked "$lock_root"
+  local status=$?
+  rmdir "$lock_root/clearing.d"
+  return "$status"
+}
+
+_worktree_operation_lock_clear_locked() {
+  local lock_root=$1 lock_path="$1/lock" held_owner_path held_pid held_token
   [ -L "$lock_path" ] || return 0
   held_token=$(readlink "$lock_path")
   if [[ ! "$held_token" =~ ^owner\.[0-9]+\.[0-9]+$ ]]; then
