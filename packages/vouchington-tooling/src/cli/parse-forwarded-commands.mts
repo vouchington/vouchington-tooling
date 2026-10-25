@@ -20,6 +20,7 @@ type ForwardedCommand =
   | { kind: 'transient-retry'; args: string[] }
   | { kind: 'sandbox-command-audit'; args: string[] }
   | { kind: 'cloc'; args: string[] }
+  | { kind: 'coverage-scope-check'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
 
@@ -48,6 +49,7 @@ export function parseForwardedCommand(
   if (command === 'transient-retry') return { kind: 'transient-retry', args }
   if (command === 'sandbox-command-audit') return { kind: 'sandbox-command-audit', args }
   if (command === 'cloc') return { kind: 'cloc', args }
+  if (command === 'coverage-scope-check') return { kind: 'coverage-scope-check', args }
   if (command === 'storybook-browser-runner') return { kind: 'storybook-browser-runner', args }
   if (command === 'tmux') return { kind: 'tmux', args }
   return undefined

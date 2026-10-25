@@ -369,6 +369,29 @@ The pieces are exported from `vouchington-tooling/cloc` (`loadClocConfig`, `norm
 `countFiles`, `buildRows`, `formatRows`, `createClassifier`, `createPathPolicy`,
 `compilePatterns`).
 
+## Checking the coverage collector scope
+
+`vouchington coverage-scope-check [--rules <path>] [--scope-file <json>] [--include <glob>]...
+[--exclude <glob>]...` fails when a `git ls-files -z` entry that a
+[`coverage-check`](https://www.npmjs.com/package/coverage-check) rules file (default
+`.coverage-rules.yml`) gives a `patch_coverage_min` above 0, and whose `scope` does not ignore, is
+outside the collector's scope. Such a file would be required to have coverage that the collector can
+never produce. Every mismatch is printed to stderr and the exit code is 1; 2 is a usage error.
+
+The collector's scope is consumer input, mirroring the Vitest `coverage.include` and
+`coverage.exclude` arrays: repeat `--include`/`--exclude`, or point `--scope-file` at a JSON file
+`{ "include": [...], "exclude": [...] }` written from the Vitest config so the two cannot drift. Both
+sources are combined, and at least one include glob is required.
+
+```bash
+vouchington coverage-scope-check --scope-file coverage-scope.json
+vouchington coverage-scope-check --include '**/*.{mts,ts,tsx}' --exclude '**/fixtures/**'
+```
+
+The pure `findCoverageScopeMismatches(files, config, instrumentedScope)` and
+`checkCoverageScope({ cwd, rulesFile, instrumentedScope, listFiles })` (which returns the
+mismatches) are exported from `vouchington-tooling/coverage-scope`.
+
 ## Running the Storybook browser tests
 
 `vouchington storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]...

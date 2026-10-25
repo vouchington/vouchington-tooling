@@ -63,6 +63,7 @@
         "src/tmux/index.mts!",
         "src/sandbox-command-audit/index.mts!",
         "src/cloc/index.mts!",
+        "src/coverage-scope/index.mts!",
         "src/storybook-browser-runner/index.mts!",
         "src/dead-code/index.mts!",
         "src/nuget-central-version/cli.mts!",
