@@ -20,6 +20,59 @@ clears the old selection after the exit animation.
 
 No diagram, cost calculation, database inventory, or local successful-test list is needed.
 
+## Request-flow change with activation conditions
+
+````markdown
+## Summary
+
+Writes from sessions the edge flags as likely automated must now pass a challenge first. The web
+app shows the challenge and retries the request on its own.
+
+**Why:** the plan limit applies only to the agent API. A script holding a copied session cookie
+could use the REST API to do what the agent API refuses.
+
+| Request                               | Before  | After                                                        |
+| ------------------------------------- | ------- | ------------------------------------------------------------ |
+| Cookie-session write, bot score 30–99 | Allowed | Allowed, unchanged                                           |
+| Cookie-session write, bot score 1–29  | Allowed | `403 CHALLENGE_REQUIRED`, then one retry after the challenge |
+| Any read                              | Allowed | Allowed, never challenged                                    |
+| OAuth or API-key request              | Allowed | Allowed; keeps its own admission path                        |
+| No score supplied                     | Allowed | Allowed; check skipped                                       |
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant E as Edge proxy
+  participant A as API
+  B->>E: POST (session cookie)
+  E->>A: forward + score header (only if the edge supplied one)
+  alt score missing or 30–99
+    A-->>B: normal response
+  else score 1–29
+    A-->>B: 403 CHALLENGE_REQUIRED
+    B->>E: same request + challenge token
+    E->>A: forward
+    A-->>B: normal response, or 400 if the token fails
+  end
+```
+
+## Impact
+
+**Not active yet.** The score comes from a paid edge plan, and every check is skipped without it.
+It switches on with no code change once the score is available.
+
+- **Normal users:** nothing changes.
+- **Flagged users:** a short, usually invisible challenge before each write.
+- **Scripts with a copied cookie:** writes fail.
+- **OAuth and API-key clients:** unaffected.
+- **Limitation:** automation driving a real browser can often pass the challenge. Session binding
+  remains the main defense.
+````
+
+The table covers the unchanged paths a reviewer would worry about. The Impact opens by saying
+when the change takes effect. A real description adds Details grouped by subsystem, naming the
+files and functions involved.
+
 ## Database relationship change
 
 ```markdown
