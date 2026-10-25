@@ -276,8 +276,8 @@ steps:
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
 
 - `setup-node-pnpm` runs `actions/setup-node` from `node-version-file` (default `.nvmrc`), then
-  `pnpm/action-setup` with `version: latest-12` (retried once if the first attempt fails), restores the pnpm store cache keyed on
-  `pnpm-lock.yaml`, and runs a frozen install. `install-scripts: 'false'` adds `--ignore-scripts`.
+  `pnpm/action-setup` with `version: latest-12` (retried once if the first attempt fails), and runs a frozen install with no pnpm store
+  cache. `install-scripts: 'false'` adds `--ignore-scripts`.
   The caller runs `actions/checkout` first.
 - `fetch-base-ref` fetches only the pull request base branch (`refs/remotes/origin/<base>`) and the
   checked-out commit's ancestry (`refs/remotes/origin/ci-head`), deepening a shallow clone, so

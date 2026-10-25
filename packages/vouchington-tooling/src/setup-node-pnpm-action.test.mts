@@ -66,19 +66,11 @@ describe('setup-node-pnpm composite action', () => {
     ).toHaveLength(2)
   })
 
-  it('restores the pnpm store cache before installing', () => {
-    const names = steps.map((candidate) => candidate.name)
-    const cache = names.indexOf('Cache pnpm store')
-    expect(cache).toBeGreaterThan(-1)
-    expect(cache).toBeLessThan(names.indexOf('pnpm install'))
-    expect(cache).toBeLessThan(names.indexOf('pnpm install without lifecycle scripts'))
-    expect(step('Cache pnpm store').uses).toMatch(/^actions\/cache@[0-9a-f]{40}$/)
-  })
-
-  it('hashes the lockfile with sha256sum or shasum', () => {
-    const run = step('Resolve pnpm store path').run ?? ''
-    expect(run).toContain('sha256sum pnpm-lock.yaml')
-    expect(run).toContain('shasum -a 256 pnpm-lock.yaml')
+  it('never caches the pnpm store', () => {
+    expect(steps.some((candidate) => (candidate.uses ?? '').startsWith('actions/cache'))).toBe(
+      false,
+    )
+    expect(steps.some((candidate) => (candidate.run ?? '').includes('pnpm store path'))).toBe(false)
   })
 
   it('runs exactly one frozen full install per input value', () => {
