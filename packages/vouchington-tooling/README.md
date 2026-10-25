@@ -256,8 +256,11 @@ absolute lock root to each call or set `WORKTREE_OPERATION_LOCK_ROOT`; there is 
 lock is stale) and returns 1 without waiting. `worktree_operation_lock_release` is a no-op unless
 this shell holds the lock, so `trap worktree_operation_lock_release EXIT` is safe.
 `worktree_operation_lock_clear_stale [root]` removes a lock whose owner PID is dead and sets
-`WORKTREE_OPERATION_LOCK_CLEANUP_STATUS` to `missing`, `removed`, `active`, `invalid` or `busy` (another clearer is running); it returns
-0 for the first two and 1 otherwise.
+`WORKTREE_OPERATION_LOCK_CLEANUP_STATUS` to `missing`, `removed`, `active`, `invalid` or `busy` (another clearer is running, or the lock
+changed during cleanup); it returns 2 for a missing or relative root, 0 for `missing` and
+`removed`, and 1 otherwise. The root must be owned by the calling user and is meant for one user's
+processes; run `clear_stale` only as operator recovery while no operation is starting, because
+releasing and clearing are not serialized against each other.
 
 `scripts/worktree/reset-worktree.sh --base-ref <ref>` checks out a new `reset-<hex>` branch and
 hard-resets it to `<ref>`. A `remote/branch` ref is fetched first; `refs/...` and a local ref are

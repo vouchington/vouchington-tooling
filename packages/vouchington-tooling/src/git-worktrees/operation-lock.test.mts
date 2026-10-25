@@ -280,6 +280,12 @@ describe('operation-lock.sh', () => {
     expect(stdout.trim()).toBe('active')
   })
 
+  it('refuses a lock root the user does not own', async () => {
+    await expect(run('worktree_operation_lock_acquire /')).rejects.toMatchObject({
+      stderr: expect.stringMatching(/not owned by this user/),
+    })
+  })
+
   it('releases on EXIT when installed as a trap', async () => {
     await run(
       `trap worktree_operation_lock_release EXIT; worktree_operation_lock_acquire "${root}"`,

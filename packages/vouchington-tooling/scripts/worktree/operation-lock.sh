@@ -41,7 +41,7 @@ _worktree_operation_lock_resolve_root() {
 _worktree_operation_lock_pid_is_live() {
   local error
   [[ "$1" =~ ^[0-9]+$ ]] || return 1
-  error=$(kill -0 "$1" 2>&1) && return 0
+  error=$(export LC_ALL=C; kill -0 "$1" 2>&1) && return 0
   # A live process owned by another user answers "not permitted".
   case "$error" in
     *[Oo]peration*not*permitted* | *[Pp]ermission*denied*) return 0 ;;
@@ -74,12 +74,23 @@ worktree_operation_lock_acquire() {
   owner_path="$lock_root/$token"
 
   mkdir -p "$lock_root" || return 1
+  # Owner files are PID records, so the root must be private to one user: another user's
+  # process could not be probed or trusted, and a shared root would let it delete live locks.
+  if [ ! -O "$lock_root" ]; then
+    echo "Error: worktree operation lock root is not owned by this user: $lock_root" >&2
+    return 1
+  fi
   if ! printf '%s\n' "$self_pid" >"$owner_path"; then
     rm -f "$owner_path"
     echo "Error: cannot record the worktree operation lock owner: $owner_path" >&2
     return 1
   fi
 
+  if [ -e "$lock_path" ] && [ ! -L "$lock_path" ]; then
+    rm -f "$owner_path"
+    echo "Error: worktree operation lock is not a symbolic link: $lock_path" >&2
+    return 1
+  fi
   if ln -s "$token" "$lock_path" 2>/dev/null; then
     if [ "$(readlink "$lock_path" 2>/dev/null || true)" = "$token" ]; then
       WORKTREE_OPERATION_LOCK_TOKEN=$token
