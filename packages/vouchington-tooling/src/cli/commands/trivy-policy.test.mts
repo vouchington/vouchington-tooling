@@ -84,7 +84,13 @@ describe('vouchington trivy-policy', () => {
   })
 
   it('exits 2 on bad arguments and 1 outside a git repository', async () => {
-    for (const args of [['--nope'], ['--min-gates', 'x'], ['extra']]) {
+    for (const args of [
+      ['--nope'],
+      ['--min-gates', 'x'],
+      ['--max-expiry-days', '99999999999999999999'],
+      ['--findings-exit-code-env', '1'],
+      ['extra'],
+    ]) {
       const result = await run(runTrivyPolicyCommand, args)
       expect(result.code).toBe(2)
       expect(result.err).toContain('trivy-policy [--root <dir>]')

@@ -13,7 +13,7 @@ interface Dependencies {
 
 function integer(name: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined
-  if (!/^\d+$/.test(value)) throw new Error(`--${name} must be a non-negative integer`)
+  if (!/^\d{1,5}$/.test(value)) throw new Error(`--${name} must be an integer from 0 to 99999`)
   return Number(value)
 }
 
@@ -31,6 +31,9 @@ function parseOptions(args: readonly string[]): { root: string; options: TrivyPo
       'max-expiry-days': { type: 'string' },
     },
   })
+  const envName = values['findings-exit-code-env']
+  if (envName !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(envName))
+    throw new Error('--findings-exit-code-env must be an environment variable name')
   const minGates = integer('min-gates', values['min-gates'])
   const minSboms = integer('min-sboms', values['min-sboms'])
   const maxExpiryDays = integer('max-expiry-days', values['max-expiry-days'])

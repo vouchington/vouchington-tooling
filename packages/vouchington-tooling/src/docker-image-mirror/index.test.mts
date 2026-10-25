@@ -59,6 +59,17 @@ describe('checkDockerImageMirrors', () => {
     ).toEqual(['.github/workflows/a.yml#b container: node must come from registry.test/'])
   })
 
+  it('skips empty workflows and names the file of a YAML syntax error', () => {
+    const root = repo({
+      '.github/workflows/empty.yml': '# only a comment\n',
+      '.github/workflows/bad.yml': 'jobs: [invalid',
+    })
+    expect(checkDockerImageMirrors(root, ['.github/workflows/empty.yml'])).toEqual([])
+    expect(() => checkDockerImageMirrors(root, ['.github/workflows/bad.yml'])).toThrow(
+      '.github/workflows/bad.yml: ',
+    )
+  })
+
   it('does not silently ignore an unreadable tracked input', () => {
     expect(() => checkDockerImageMirrors('/nonexistent-mirror-fixture', ['Dockerfile'])).toThrow(
       'ENOENT',
@@ -113,6 +124,7 @@ describe('workflowImageViolations', () => {
             steps: [
               { run: 'docker run --gpus all mirror.gcr.io/library/ubuntu' },
               { run: 'docker run --cidfile ./id alpine' },
+              { run: 'docker run --log-opt max-size=1m mirror.gcr.io/x' },
             ],
           },
         },

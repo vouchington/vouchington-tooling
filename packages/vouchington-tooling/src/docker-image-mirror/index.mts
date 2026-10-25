@@ -14,8 +14,19 @@ export { DEFAULT_MIRROR, dockerfileViolations, workflowImageViolations } from '.
 export type { Document } from './images.mts'
 
 export interface DockerImageMirrorOptions {
-  /** Registry host that images must come from instead of Docker Hub. Default `mirror.gcr.io`. */
+  /**
+   * Registry host named in violation messages as the place to pull from. Any registry other than
+   * Docker Hub passes; this value does not restrict them. Default `mirror.gcr.io`.
+   */
   readonly mirror?: string
+}
+
+function parseDocument(path: string, source: string): Document {
+  try {
+    return (parse(source) as Document | null) ?? {}
+  } catch (error) {
+    throw new Error(`${path}: ${(error as Error).message}`, { cause: error })
+  }
 }
 
 export function isDockerfilePath(path: string): boolean {
@@ -44,7 +55,7 @@ export function checkDockerImageMirrors(
     const source = readFileSync(join(root, path), 'utf8')
     errors.push(
       ...(yaml
-        ? workflowImageViolations(path, parse(source) as Document, mirror)
+        ? workflowImageViolations(path, parseDocument(path, source), mirror)
         : dockerfileViolations(path, source)),
     )
   }
