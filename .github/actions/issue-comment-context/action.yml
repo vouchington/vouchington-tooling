@@ -1,0 +1,92 @@
+name: Issue comment context
+description: >
+  Snapshots an issue or pull request for an agent prompt: its body, label names, and its most
+  recent comments, each truncated to a character cap, plus snapshot metadata (total comments,
+  included comments, whether the list was capped, and the character cap). Writes the JSON to
+  `output-path` and also returns it as the `context` output.
+inputs:
+  number:
+    description: Issue or pull request number
+    required: true
+  repository:
+    description: Repository as owner/name
+    required: false
+    default: ${{ github.repository }}
+  max-comments:
+    description: Number of most recent comments to include
+    required: false
+    default: '100'
+  max-comment-chars:
+    description: Maximum characters kept from each comment body
+    required: false
+    default: '2000'
+  output-path:
+    description: File the JSON context is written to
+    required: false
+    default: issue-context.json
+  token:
+    description: GitHub token with read access to the issue
+    required: false
+    default: ${{ github.token }}
+outputs:
+  context-file:
+    description: Path of the JSON context file
+    value: ${{ steps.capture.outputs.context-file }}
+  context:
+    description: The JSON context
+    value: ${{ steps.capture.outputs.context }}
+runs:
+  using: composite
+  steps:
+    - name: Capture issue context
+      id: capture
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE_NUMBER: ${{ inputs.number }}
+        REPOSITORY: ${{ inputs.repository }}
+        MAX_COMMENTS: ${{ inputs.max-comments }}
+        MAX_COMMENT_CHARS: ${{ inputs.max-comment-chars }}
+        OUTPUT_PATH: ${{ inputs.output-path }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        for name in ISSUE_NUMBER MAX_COMMENTS MAX_COMMENT_CHARS; do
+          if [[ ! "${!name}" =~ ^[1-9][0-9]{0,8}$ ]]; then
+            echo "::error::$name must be a positive integer."
+            exit 1
+          fi
+        done
+        if [[ ! "$REPOSITORY" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+          echo "::error::repository must be owner/name."
+          exit 1
+        fi
+        work="$(mktemp -d)"
+        trap 'rm -rf "$work"' EXIT
+        gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > "$work/issue.json"
+        comment_count="$(jq -er '.comments' "$work/issue.json")"
+        : > "$work/issue-comments.ndjson"
+        if (( comment_count > 0 )); then
+          last_page="$(((comment_count + 99) / 100))"
+          pages_needed="$(((MAX_COMMENTS + 99) / 100))"
+          first_page="$((last_page > pages_needed ? last_page - pages_needed : 1))"
+          for ((page = first_page; page <= last_page; page++)); do
+            gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER/comments?per_page=100&page=$page" |
+              jq -c --argjson maxChars "$MAX_COMMENT_CHARS" \
+                '.[] | {id, author: .user.login,
+                  body: (.body // "" | .[0:$maxChars]), bodyTruncated: ((.body // "" | length) > $maxChars),
+                  created_at, updated_at}' >> "$work/issue-comments.ndjson"
+          done
+        fi
+        jq -s --argjson maxComments "$MAX_COMMENTS" \
+          'sort_by(.created_at) | .[-$maxComments:]' \
+          "$work/issue-comments.ndjson" > "$work/issue-comments.json"
+        jq --slurpfile comments "$work/issue-comments.json" --argjson commentCount "$comment_count" \
+          --argjson maxComments "$MAX_COMMENTS" --argjson maxCommentChars "$MAX_COMMENT_CHARS" '{
+          body, labels: [.labels[].name], comments: $comments[0],
+          commentSnapshot: {total: $commentCount, included: ($comments[0] | length),
+            capped: ($commentCount > $maxComments), maxCommentChars: $maxCommentChars}
+        }' "$work/issue.json" > "$OUTPUT_PATH"
+        echo "context-file=$OUTPUT_PATH" >> "$GITHUB_OUTPUT"
+        "$ACTION_PATH/../../../packages/vouchington-tooling/scripts/gha/write-github-multiline-output.sh" \
+          context < "$OUTPUT_PATH"

@@ -255,6 +255,13 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   checked-out commit's ancestry (`refs/remotes/origin/ci-head`), deepening a shallow clone, so
   merge-base and diff tools resolve them without pulling every branch. The optional `filter` input
   (for example `blob:none`) adds a partial-clone filter. Run it after `actions/checkout`.
+- `issue-comment-context` snapshots an issue or pull request `number` for an agent prompt as JSON:
+  `body`, `labels`, the newest `max-comments` comments (default 100; `id`, `author`, `body`,
+  `bodyTruncated`, `created_at`, `updated_at`) with each body cut to `max-comment-chars` (default
+  2000), and `commentSnapshot` (`total`, `included`, `capped`, `maxCommentChars`). It writes
+  `output-path` (default `issue-context.json`) and returns the `context-file` and `context`
+  outputs. `repository` and `token` default to the current repository and `github.token`; the job
+  needs `issues: read`.
 - `upload-full-lcov` validates a lowercase hyphen-delimited `suite` and uploads `path` (default
   `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
