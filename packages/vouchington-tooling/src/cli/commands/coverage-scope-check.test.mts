@@ -36,7 +36,7 @@ describe('runCoverageScopeCheckCommand', () => {
       join(cwd, 'scope.json'),
       JSON.stringify({ include: ['**/*.mts'], exclude: ['app/**'] }),
     )
-    expect(runCoverageScopeCheckCommand(['--scope-file', join(cwd, 'scope.json')], cwd)).toBe(1)
+    expect(runCoverageScopeCheckCommand(['--scope-file', 'scope.json'], cwd)).toBe(1)
     const args = ['--rules', 'missing.yml', '--include', '**']
     expect(runCoverageScopeCheckCommand(args, cwd)).toBe(1)
     expect(stderr).toContain('vouchington:')

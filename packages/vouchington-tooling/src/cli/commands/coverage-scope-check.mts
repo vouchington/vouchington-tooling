@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { checkCoverageScope } from '../../coverage-scope/check.mts'
 import { commandUsage } from '../usage.mts'
@@ -15,7 +16,7 @@ function readGlobs(path: string, value: unknown, name: string): string[] {
   throw new Error(`${path}: "${name}" must be an array of strings`)
 }
 
-function parse(args: readonly string[]): Options {
+function parse(args: readonly string[], cwd: string): Options {
   const { values } = parseArgs({
     args: [...args],
     allowPositionals: false,
@@ -28,7 +29,9 @@ function parse(args: readonly string[]): Options {
   })
   const path = values['scope-file']
   const file =
-    path === undefined ? {} : (JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>)
+    path === undefined
+      ? {}
+      : (JSON.parse(readFileSync(resolve(cwd, path), 'utf8')) as Record<string, unknown>)
   const include = [...readGlobs(String(path), file.include, 'include'), ...values.include]
   if (include.length === 0) throw new Error('at least one include glob is required')
   return {
@@ -50,7 +53,7 @@ export function runCoverageScopeCheckCommand(
 ): number {
   let options: Options
   try {
-    options = parse(args)
+    options = parse(args, cwd)
   } catch (error) {
     const message = (error as Error).message
     process.stderr.write(`vouchington: ${message}\n${commandUsage('coverage-scope-check')}`)
