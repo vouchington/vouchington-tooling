@@ -105,6 +105,21 @@ describe('workflowImageViolations', () => {
     ])
   })
 
+  it('skips the values of less common docker run options', () => {
+    expect(
+      violations({
+        jobs: {
+          j: {
+            steps: [
+              { run: 'docker run --gpus all mirror.gcr.io/library/ubuntu' },
+              { run: 'docker run --cidfile ./id alpine' },
+            ],
+          },
+        },
+      }).map((v) => v.replace('w.yml#', '')),
+    ).toEqual(['j: alpine must come from mirror.gcr.io/'])
+  })
+
   it('handles bare docker words and flag-only global options', () => {
     expect(
       violations({
