@@ -105,6 +105,25 @@ describe('workflowImageViolations', () => {
     ])
   })
 
+  it('handles bare docker words and flag-only global options', () => {
+    expect(
+      violations({
+        jobs: {
+          j: {
+            steps: [
+              { run: 'docker ; echo' },
+              { run: 'docker --debug pull alpine' },
+              { run: 'docker container run busybox' },
+            ],
+          },
+        },
+      }).map((v) => v.replace('w.yml#', '')),
+    ).toEqual([
+      'j: alpine must come from mirror.gcr.io/',
+      'j: busybox must come from mirror.gcr.io/',
+    ])
+  })
+
   it('ignores docker commands that only appear in comments', () => {
     expect(
       violations({
@@ -184,6 +203,7 @@ describe('dockerfileViolations', () => {
       'COPY --from=build /a /b',
       'COPY --chown=1 --from=0 /a /b',
       'COPY --from=nginx /a /b',
+      'COPY --from=mirror.gcr.io/library/nginx /a /b',
       'COPY . .',
       'RUN echo \\',
       '  FROM ignored',

@@ -29,15 +29,11 @@ export {
   trivyPackageScanCommands,
 } from './scan.mts'
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 function attempt(violations: string[], check: () => void): void {
   try {
     check()
   } catch (error) {
-    violations.push(messageOf(error))
+    violations.push((error as Error).message)
   }
 }
 

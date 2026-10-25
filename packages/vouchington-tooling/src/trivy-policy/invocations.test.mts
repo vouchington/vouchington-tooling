@@ -75,7 +75,7 @@ describe('Trivy invocation discovery', () => {
   })
 
   it('rejects background scans, substitutions and indirect execution', () => {
-    for (const command of ['trivy image target & echo', `${completeGate} &`])
+    for (const command of ['trivy image target & echo', `${completeGate} &`, '& trivy image t'])
       expect(() => trivyPackageScanCommandSegments(command)).toThrow(
         'unsupported background Trivy package scan',
       )

@@ -124,6 +124,7 @@ describe('trivyPackageScanCommands', () => {
       '.github/actions/x/y/action.yml':
         'runs:\n  using: composite\n  steps:\n    - run: trivy fs b\n',
       '.github/workflows/empty.yml': '',
+      '.github/workflows/no-steps.yml': 'jobs:\n  j: {}\n',
       'notes.yml': workflow('trivy image ignored'),
     })
     expect(
@@ -132,6 +133,7 @@ describe('trivyPackageScanCommands', () => {
           '.github/workflows/a.yaml',
           '.github/actions/x/y/action.yml',
           '.github/workflows/empty.yml',
+          '.github/workflows/no-steps.yml',
           '.github/workflows/deleted.yml',
           'notes.yml',
           'deleted-but-indexed.sh',

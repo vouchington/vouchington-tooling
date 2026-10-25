@@ -12,7 +12,7 @@ export function isShellPolicySource(path: string): boolean {
   if (/\.(bash|sh|zsh)$/.test(path)) return true
   try {
     if ((statSync(path).mode & 0o111) === 0) return false
-    const firstLine = readFileSync(path, 'utf8').split('\n', 1)[0] ?? ''
+    const firstLine = readFileSync(path, 'utf8').split('\n', 1)[0]!
     return /^#!\s*(?:\/usr\/bin\/env(?:\s+-S)?\s+|\/(?:usr\/)?bin\/)(?:ba|z)?sh(?:\s|$)/.test(
       firstLine,
     )
