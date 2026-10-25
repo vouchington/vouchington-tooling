@@ -1353,6 +1353,10 @@ const { result, error } = await withPostgresQueryFailureForTest(
   blockedMarkers, observer?)`. The waiters poll `pg_stat_activity` and `pg_blocking_pids`; the
   observer is `'write'`, `'advisoryLock'` or a reserved executor.
 
+- `runPoolObservationExclusively(operation)` is the queue the two helpers above share. Wrap your own
+  fault injection or pool observation in it so it never overlaps theirs on the same pool; it
+  rejects when nested.
+
 The package's own tests start a throwaway cluster with `initdb`/`pg_ctl` found through
 `POSTGRES_BIN_DIR`, `PATH` or a standard install location. They skip where no server can run and
 fail under `CI`.
