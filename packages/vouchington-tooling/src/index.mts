@@ -101,6 +101,10 @@ export type {
   RuntimeJobResult,
   RuntimeSample,
 } from './gha-runtime-audit/index.mts'
+export { checkTrivyPolicy } from './trivy-policy/index.mts'
+export type { TrivyPolicyOptions } from './trivy-policy/index.mts'
+export { checkDockerImageMirrors } from './docker-image-mirror/index.mts'
+export type { DockerImageMirrorOptions } from './docker-image-mirror/index.mts'
 export { checkGhaWorkspacePolicy } from './gha-workspace-policy/index.mts'
 export type { GhaWorkspacePolicyOptions } from './gha-workspace-policy/index.mts'
 export { checkFreshBase, classifyFreshBase, relationOf } from './fresh-base/index.mts'

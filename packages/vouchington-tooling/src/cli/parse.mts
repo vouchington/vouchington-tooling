@@ -50,6 +50,8 @@ export type ParsedCli =
   | { kind: 'sandbox-command-audit'; args: string[] }
   | { kind: 'cloc'; args: string[] }
   | { kind: 'coverage-scope-check'; args: string[] }
+  | { kind: 'trivy-policy'; args: string[] }
+  | { kind: 'docker-image-mirror'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }

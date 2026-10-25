@@ -391,6 +391,37 @@ vouchington coverage-scope-check --include '**/*.{mts,ts,tsx}' --exclude '**/fix
 The pure `findCoverageScopeMismatches(files, config, instrumentedScope)` and
 `checkCoverageScope({ cwd, rulesFile, instrumentedScope, listFiles })` (which returns the
 mismatches) are exported from `vouchington-tooling/coverage-scope`.
+## Trivy policy and Docker Hub mirror checks
+
+Two repository-file checks read the git-tracked files (`git ls-files -z`) under `--root` (default
+the current directory), print one violation per line to stderr, and exit 1 when any exist (0 when
+compliant, 2 on a usage error).
+
+`vouchington trivy-policy [--ignore-file <path>] [--findings-exit-code-env <NAME>]
+[--cleanup-url-prefix <url>] [--min-gates N] [--min-sboms N] [--max-expiry-days N]` requires every
+Trivy package scan in tracked workflows, composite actions and shell scripts to be an auditable CLI
+run block: no `trivy` action, wrapper, command or process substitution, `bash -c`, `eval`,
+background job or grouped scan (shell scripts may only run `--download-db-only`). Vulnerability
+gates must pass `--scanners vuln`, `--pkg-types os`, `--severity CRITICAL,HIGH`, `--ignore-unfixed`,
+`--skip-db-update`, `--quiet`, `--format table --table-mode detailed`, one `--output`,
+`--ignorefile <ignore-file>` (default `.trivyignore.yaml`) and `--exit-code "$<NAME>"` (default
+`TRIVY_FINDINGS_EXIT_CODE`), with no other options. CycloneDX component SBOM scans must be unfiltered
+(`--quiet --skip-db-update --exit-code 0 --format cyclonedx --output <file>`). At least `--min-gates`
+gates and `--min-sboms` SBOM scans (default 2 each) must exist. The tracked ignore registry must list
+exact versioned `deb`/`apk`/`rpm` purls, a `Not exploitable: <reason>. Cleanup: <issue URL>`
+statement (the URL must start with `--cleanup-url-prefix` when given, else any GitHub issue) and an
+`expired_at` UTC date after today and at most `--max-expiry-days` (default 30) away.
+
+`vouchington docker-image-mirror [--mirror <host>]` reports every Docker Hub image reference in
+tracked workflows, composite actions and Dockerfiles: `docker run|pull|create`, `container:`,
+`services:`, `docker://` uses, `docker/setup-buildx-action` drivers, `FROM`, `COPY --from` and
+`# syntax=`. An image is accepted when it names a registry host; `--mirror` (default
+`mirror.gcr.io`) is the host the message tells you to use.
+
+The checks are exported as `checkTrivyPolicy(root, trackedFiles, options)` from
+`vouchington-tooling/trivy-policy` (plus the command parsers and `validateIgnoreRegistry`) and
+`checkDockerImageMirrors(root, trackedFiles, { mirror })` from `vouchington-tooling/docker-image-mirror`;
+both return violation strings.
 
 ## Running the Storybook browser tests
 

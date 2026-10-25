@@ -1,0 +1,27 @@
+import { COVERAGE_SCOPE_CHECK_USAGE } from './usage-text-coverage-scope.mts'
+
+export const POLICY_COMMANDS = `  coverage-scope-check          Check positive-threshold coverage rules against the Vitest scope
+  trivy-policy                 Check tracked Trivy workflow scans and the exception registry
+  docker-image-mirror           Require tracked Docker images to come from a Docker Hub mirror
+`
+
+export const POLICY_USAGE = `
+${COVERAGE_SCOPE_CHECK_USAGE}
+trivy-policy [--root <dir>] [--ignore-file <path>] [--findings-exit-code-env <NAME>] [--cleanup-url-prefix <url>] [--min-gates N] [--min-sboms N] [--max-expiry-days N]
+  Reads git-tracked workflows, composite actions and shell scripts and prints each violation (exit 1).
+  Every Trivy package scan must be an auditable CLI run block (no action, wrapper, substitution or
+  background). Vulnerability gates need --scanners vuln, --pkg-types os, --severity CRITICAL,HIGH,
+  --ignore-unfixed, --skip-db-update, --quiet, table output to a file, --ignorefile <ignore-file>
+  (default .trivyignore.yaml) and --exit-code "$<NAME>" (default TRIVY_FINDINGS_EXIT_CODE).
+  CycloneDX SBOM scans must be unfiltered with --exit-code 0. At least --min-gates gates and
+  --min-sboms SBOM scans (default 2 each) must exist. The tracked ignore registry needs purl-exact OS
+  packages, a "Not exploitable: ... Cleanup: <issue URL>" statement (URL must start with
+  --cleanup-url-prefix when given) and an expired_at between tomorrow and --max-expiry-days (30).
+
+docker-image-mirror [--root <dir>] [--mirror <host>]
+  Prints each Docker Hub image in git-tracked workflows, composite actions and Dockerfiles (exit 1):
+  run, pull and create commands, containers, services, docker:// references, buildx drivers, FROM,
+  COPY --from and # syntax. Images must name a registry host; --mirror (default mirror.gcr.io) is
+  the host the message tells you to use.
+
+`

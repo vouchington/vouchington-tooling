@@ -21,6 +21,8 @@ type ForwardedCommand =
   | { kind: 'sandbox-command-audit'; args: string[] }
   | { kind: 'cloc'; args: string[] }
   | { kind: 'coverage-scope-check'; args: string[] }
+  | { kind: 'trivy-policy'; args: string[] }
+  | { kind: 'docker-image-mirror'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
 
@@ -50,6 +52,8 @@ export function parseForwardedCommand(
   if (command === 'sandbox-command-audit') return { kind: 'sandbox-command-audit', args }
   if (command === 'cloc') return { kind: 'cloc', args }
   if (command === 'coverage-scope-check') return { kind: 'coverage-scope-check', args }
+  if (command === 'trivy-policy') return { kind: 'trivy-policy', args }
+  if (command === 'docker-image-mirror') return { kind: 'docker-image-mirror', args }
   if (command === 'storybook-browser-runner') return { kind: 'storybook-browser-runner', args }
   if (command === 'tmux') return { kind: 'tmux', args }
   return undefined

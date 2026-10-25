@@ -1,4 +1,5 @@
-import { COVERAGE_SCOPE_CHECK_USAGE } from './usage-text-coverage-scope.mts'
+import { POLICY_COMMANDS, POLICY_USAGE } from './usage-text-policy.mts'
+
 export const USAGE = `Usage: vouchington <command> [options]
 
 Commands:
@@ -59,8 +60,7 @@ Commands:
   transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
   sandbox-command-audit         Audit agent transcripts for sandbox escalations and denials
   cloc                          Count tracked lines of code by category and service with scc
-  coverage-scope-check          Check positive-threshold coverage rules against the Vitest scope
-  storybook-browser-runner      Run the Storybook Vitest browser project with cache, retry and watchdog
+${POLICY_COMMANDS}  storybook-browser-runner      Run the Storybook Vitest browser project with cache, retry and watchdog
 
 Options:
   -h, --help       Show this help
@@ -181,9 +181,7 @@ cloc --config <file> [--scc-bin <path>] [--json]
   file or a module whose default (or "config") export is the layout: services [{ name, match }],
   defaultService, categories, testPatterns, toolingPatterns, countedRoots, countedRootFiles,
   excludedDirs, ignoredDirs, sccBin, missingSccHint.
-
-${COVERAGE_SCOPE_CHECK_USAGE}
-storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]... [--completion-file <path>] [--coverage-arg=<arg>]... [--optimize-deps-config <path>] [--env-prefix <PREFIX>] [--progress-prefix <text>] [-- <argv>...]
+${POLICY_USAGE}storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]... [--completion-file <path>] [--coverage-arg=<arg>]... [--optimize-deps-config <path>] [--env-prefix <PREFIX>] [--progress-prefix <text>] [-- <argv>...]
   Spawns <cmd> (default pnpm) in its own process group with <argv> (default "exec vitest run
   --project <name>") plus the coverage args (default --coverage) and supervises it: a Vite optimizer
   cache, retries on known Vite and browser start-up flakes, and stall, hang and session-budget
