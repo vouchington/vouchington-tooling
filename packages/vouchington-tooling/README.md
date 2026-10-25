@@ -391,6 +391,7 @@ vouchington coverage-scope-check --include '**/*.{mts,ts,tsx}' --exclude '**/fix
 The pure `findCoverageScopeMismatches(files, config, instrumentedScope)` and
 `checkCoverageScope({ cwd, rulesFile, instrumentedScope, listFiles })` (which returns the
 mismatches) are exported from `vouchington-tooling/coverage-scope`.
+
 ## Trivy policy and Docker Hub mirror checks
 
 Two repository-file checks read the git-tracked files (`git ls-files -z`) under `--root` (default
