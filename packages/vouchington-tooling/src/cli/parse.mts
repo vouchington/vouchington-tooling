@@ -49,6 +49,7 @@ export type ParsedCli =
   | { kind: 'transient-retry'; args: string[] }
   | { kind: 'sandbox-command-audit'; args: string[] }
   | { kind: 'cloc'; args: string[] }
+  | { kind: 'coverage-scope-check'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }

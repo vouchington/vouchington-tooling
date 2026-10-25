@@ -30,6 +30,9 @@ vi.mock('./commands/sandbox-command-audit.mts', () => ({
 vi.mock('./commands/cloc.mts', () => ({
   runClocCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/coverage-scope-check.mts', () => ({
+  runCoverageScopeCheckCommand: vi.fn(() => 0),
+}))
 vi.mock('./commands/storybook-browser-runner.mts', () => ({
   runStorybookBrowserRunnerCommand: vi.fn(async () => 0),
 }))
@@ -49,6 +52,7 @@ import { runMcpCommand } from './commands/mcp.mts'
 import { runHookCommand } from './commands/hook.mts'
 import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
 import { runClocCommand } from './commands/cloc.mts'
+import { runCoverageScopeCheckCommand } from './commands/coverage-scope-check.mts'
 import { runStorybookBrowserRunnerCommand } from './commands/storybook-browser-runner.mts'
 
 describe('runCli extract command dispatch', () => {
@@ -105,6 +109,13 @@ describe('runCli extract command dispatch', () => {
   it('forwards the cloc subcommand and its arguments', async () => {
     await expect(runCli(['node', 'vouchington', 'cloc', '--config', 'c.json'])).resolves.toBe(0)
     expect(runClocCommand).toHaveBeenCalledWith(['--config', 'c.json'])
+  })
+
+  it('forwards the coverage-scope-check subcommand and its arguments', async () => {
+    await expect(
+      runCli(['node', 'vouchington', 'coverage-scope-check', '--include', '**/*.ts']),
+    ).resolves.toBe(0)
+    expect(runCoverageScopeCheckCommand).toHaveBeenCalledWith(['--include', '**/*.ts'])
   })
 
   it('forwards the storybook-browser-runner subcommand and its arguments', async () => {

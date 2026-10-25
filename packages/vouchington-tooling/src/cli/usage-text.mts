@@ -1,3 +1,4 @@
+import { COVERAGE_SCOPE_CHECK_USAGE } from './usage-text-coverage-scope.mts'
 export const USAGE = `Usage: vouchington <command> [options]
 
 Commands:
@@ -58,6 +59,7 @@ Commands:
   transient-retry               Rerun a failed GitHub Actions run when an injected rule matches
   sandbox-command-audit         Audit agent transcripts for sandbox escalations and denials
   cloc                          Count tracked lines of code by category and service with scc
+  coverage-scope-check          Check positive-threshold coverage rules against the Vitest scope
   storybook-browser-runner      Run the Storybook Vitest browser project with cache, retry and watchdog
 
 Options:
@@ -180,6 +182,7 @@ cloc --config <file> [--scc-bin <path>] [--json]
   defaultService, categories, testPatterns, toolingPatterns, countedRoots, countedRootFiles,
   excludedDirs, ignoredDirs, sccBin, missingSccHint.
 
+${COVERAGE_SCOPE_CHECK_USAGE}
 storybook-browser-runner --project <name> [--command <cmd>] [--result-file <path>]... [--completion-file <path>] [--coverage-arg=<arg>]... [--optimize-deps-config <path>] [--env-prefix <PREFIX>] [--progress-prefix <text>] [-- <argv>...]
   Spawns <cmd> (default pnpm) in its own process group with <argv> (default "exec vitest run
   --project <name>") plus the coverage args (default --coverage) and supervises it: a Vite optimizer

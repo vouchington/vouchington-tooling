@@ -426,6 +426,11 @@
       "import": "./dist/request-query-profile/index.mjs",
       "default": "./dist/request-query-profile/index.mjs"
     },
+    "./coverage-scope": {
+      "types": "./dist/coverage-scope/index.d.mts",
+      "import": "./dist/coverage-scope/index.mjs",
+      "default": "./dist/coverage-scope/index.mjs"
+    },
     "./package.json": "./package.json",
     "./basic-auth-doc-sync": {
       "types": "./dist/basic-auth-doc-sync/index.d.mts",
@@ -476,6 +481,7 @@
     "@types/unist": "3.0.3",
     "@typescript-eslint/parser": "^8.71.2",
     "agent-blackboard": "^0.7.0",
+    "coverage-check": "0.18.0",
     "csv-parse": "7.0.3",
     "csv-stringify": "6.9.0",
     "dockerfile-ast": "0.7.1",
