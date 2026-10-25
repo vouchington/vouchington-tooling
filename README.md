@@ -216,6 +216,24 @@ check and post are not atomic, so give the comment job a caller-level `concurren
 if duplicate deliveries are possible. It validates the target number, session id
 (`sess-` plus eight hex digits), and an `https://.../sessions/<id>` URL before commenting.
 
+Set `status: failed` (or `cancelled`) from an escalate job to post the failure comment instead. It
+is not deduplicated and does not revalidate: run the authorize action in revalidate mode first and
+gate this step on its result. The body is `headline`, a blank line, the optional `details` lines,
+`**<run-label>:** <run-url>`, `**<session-label>:** <session-id>` (omitted when `session-id` is
+empty), and the optional `closing` paragraph after a blank line. `run-url` defaults to the current
+run, `session-label` to `Harness session`; `session-url` is not used.
+
+```yaml
+- uses: vouchington/vouchington-tooling/.github/actions/comment-harness-session@<40-character-commit-sha> # vX.Y.Z
+  with:
+    status: failed
+    target: ${{ github.event.issue.number }}
+    session-id: ${{ needs.dispatch.outputs.session-id }}
+    headline: /fix run failed — auto-fix could not complete.
+    run-label: Auto-fix run
+    closing: Please investigate manually or re-comment `/fix` to retry.
+```
+
 ### Comment-command actions
 
 Two composite actions for workflows triggered by an `issue_comment` command. Pin them like the

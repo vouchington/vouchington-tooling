@@ -2,17 +2,54 @@ name: Comment Auto Harness session
 description: >
   Post one idempotent session-link comment on an existing issue or pull request.
   Points the acknowledgement at the Auto Harness session instead of the workflow run
-  that only dispatched it.
+  that only dispatched it. With status failed or cancelled it instead posts the caller's
+  failure comment with the run URL and the session id. Callers revalidate first.
 inputs:
   target:
     description: Issue or pull request number
     required: true
   session-id:
-    description: Auto Harness session id
-    required: true
+    description: >
+      Auto Harness session id. Required when status is started. For failed or cancelled it may
+      be empty, and the session line is then omitted.
+    required: false
+    default: ''
   session-url:
-    description: Auto Harness session URL
-    required: true
+    description: Auto Harness session URL. Required when status is started; unused otherwise.
+    required: false
+    default: ''
+  status:
+    description: >
+      started posts the idempotent session-link comment. failed and cancelled post the failure
+      comment built from headline, details, run-label, run-url, session-label and closing.
+    required: false
+    default: started
+  headline:
+    description: First line of the failure comment. Required when status is failed or cancelled.
+    required: false
+    default: ''
+  details:
+    description: >
+      Optional complete lines placed between the headline and the run line, for example a link
+      to the pull request.
+    required: false
+    default: ''
+  run-label:
+    description: Bold label of the run line. Required when status is failed or cancelled.
+    required: false
+    default: ''
+  run-url:
+    description: URL of the run that failed. Defaults to the current workflow run.
+    required: false
+    default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  session-label:
+    description: Bold label of the session line.
+    required: false
+    default: Harness session
+  closing:
+    description: Optional last paragraph of the failure comment.
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -23,16 +60,62 @@ runs:
         SESSION_ID: ${{ inputs.session-id }}
         SESSION_URL: ${{ inputs.session-url }}
         TARGET: ${{ inputs.target }}
+        STATUS: ${{ inputs.status }}
+        HEADLINE: ${{ inputs.headline }}
+        DETAILS: ${{ inputs.details }}
+        RUN_LABEL: ${{ inputs.run-label }}
+        RUN_URL: ${{ inputs.run-url }}
+        SESSION_LABEL: ${{ inputs.session-label }}
+        CLOSING: ${{ inputs.closing }}
       run: |
         set -euo pipefail
         if [[ ! "$TARGET" =~ ^[1-9][0-9]*$ ]]; then
           echo "::error::Refusing to comment on a non-numeric issue or pull request."
           exit 1
         fi
-        if [[ ! "$SESSION_ID" =~ ^sess-[0-9a-f]{8}$ ]]; then
-          echo "::error::Refusing to comment with an unexpected Auto Harness session id."
-          exit 1
+        case "$STATUS" in
+          started | failed | cancelled) ;;
+          *)
+            echo "::error::Refusing to comment with an unexpected status."
+            exit 1
+            ;;
+        esac
+        if [[ "$STATUS" == "started" || -n "$SESSION_ID" ]]; then
+          if [[ ! "$SESSION_ID" =~ ^sess-[0-9a-f]{8}$ ]]; then
+            echo "::error::Refusing to comment with an unexpected Auto Harness session id."
+            exit 1
+          fi
         fi
+
+        if [[ "$STATUS" != "started" ]]; then
+          if [[ -z "$HEADLINE" || -z "$RUN_LABEL" ]]; then
+            echo "::error::A failure comment needs a headline and a run label."
+            exit 1
+          fi
+          if [[ ! "$RUN_URL" =~ ^https://[^[:space:]]+$ ]]; then
+            echo "::error::Refusing to comment with an unexpected run URL."
+            exit 1
+          fi
+          trim() {
+            local value="$1"
+            while [[ "$value" == *$'\n' ]]; do value="${value%$'\n'}"; done
+            printf '%s' "$value"
+          }
+          BODY="${HEADLINE}"$'\n\n'
+          if [[ -n "$DETAILS" ]]; then
+            BODY+="$(trim "$DETAILS")"$'\n'
+          fi
+          BODY+="**${RUN_LABEL}:** ${RUN_URL}"
+          if [[ -n "$SESSION_ID" ]]; then
+            BODY+=$'\n'"**${SESSION_LABEL}:** ${SESSION_ID}"
+          fi
+          if [[ -n "$CLOSING" ]]; then
+            BODY+=$'\n\n'"$(trim "$CLOSING")"
+          fi
+          gh issue comment "$TARGET" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+          exit 0
+        fi
+
         URL_PATTERN="^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*/sessions/${SESSION_ID}\$"
         if [[ ! "$SESSION_URL" =~ $URL_PATTERN ]]; then
           echo "::error::Refusing to comment with an unexpected Auto Harness session URL."
