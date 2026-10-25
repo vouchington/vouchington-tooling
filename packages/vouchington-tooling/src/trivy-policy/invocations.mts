@@ -1,4 +1,5 @@
-import { hasBackgroundOperator, shellSegments, withoutShellComment } from './shell.mts'
+import { hasBackgroundOperator } from './background.mts'
+import { shellSegments, withoutShellComment } from './shell.mts'
 
 const SUBCOMMANDS = new Set(
   'image|fs|filesystem|rootfs|repo|repository|sbom|vm|k8s|kubernetes'.split('|'),
