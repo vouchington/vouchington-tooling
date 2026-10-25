@@ -39,14 +39,31 @@ _worktree_operation_lock_resolve_root() {
 }
 
 _worktree_operation_lock_pid_is_live() {
-  [[ "$1" =~ ^[0-9]+$ ]] && kill -0 "$1" 2>/dev/null
+  local error
+  [[ "$1" =~ ^[0-9]+$ ]] || return 1
+  error=$(kill -0 "$1" 2>&1) && return 0
+  # A live process owned by another user answers "not permitted".
+  case "$error" in
+    *[Oo]peration*not*permitted* | *[Pp]ermission*denied*) return 0 ;;
+  esac
+  return 1
+}
+
+# Set WORKTREE_OPERATION_LOCK_SELF_PID to the PID of the running (sub)shell. $$ names the
+# top-level shell, and Bash 3.2 has no BASHPID, so a child shell is asked for its parent. This
+# cannot be a command substitution, which would report its own subshell.
+_worktree_operation_lock_set_self_pid() {
+  if [ -n "${BASHPID:-}" ]; then
+    WORKTREE_OPERATION_LOCK_SELF_PID=$BASHPID
+  else
+    WORKTREE_OPERATION_LOCK_SELF_PID=$(exec sh -c 'printf %s "$PPID"')
+  fi
 }
 
 worktree_operation_lock_acquire() {
-  local lock_root lock_path token owner_path held_owner_path held_pid held_token
-  local self_pid=${BASHPID:-}
-  # Bash 3.2 has no BASHPID; a child shell reports this (sub)shell as its parent.
-  [ -n "$self_pid" ] || self_pid=$(exec sh -c 'echo $PPID')
+  local lock_root lock_path token owner_path held_owner_path held_pid held_token self_pid
+  _worktree_operation_lock_set_self_pid
+  self_pid=$WORKTREE_OPERATION_LOCK_SELF_PID
   if [ -n "${WORKTREE_OPERATION_LOCK_TOKEN:-}" ]; then
     echo "Error: this shell already holds a worktree operation lock: ${WORKTREE_OPERATION_LOCK_HELD_ROOT:-}" >&2
     return 1
@@ -110,8 +127,8 @@ worktree_operation_lock_clear_stale() {
     WORKTREE_OPERATION_LOCK_CLEANUP_STATUS=busy
     return 1
   fi
-  _worktree_operation_lock_clear_locked "$lock_root"
-  local status=$?
+  status=0
+  _worktree_operation_lock_clear_locked "$lock_root" || status=$?
   rmdir "$lock_root/clearing.d"
   return "$status"
 }
@@ -141,9 +158,15 @@ worktree_operation_lock_release() {
   local token=${WORKTREE_OPERATION_LOCK_TOKEN:-}
   local lock_root=${WORKTREE_OPERATION_LOCK_HELD_ROOT:-}
   [ -n "$token" ] && [ -n "$lock_root" ] || return 0
+  # A subshell inherits these variables but must not release its parent's lock.
+  _worktree_operation_lock_set_self_pid
+  case "$token" in
+    owner."$WORKTREE_OPERATION_LOCK_SELF_PID".*) ;;
+    *) return 0 ;;
+  esac
   if [ "$(readlink "$lock_root/lock" 2>/dev/null || true)" = "$token" ]; then
     rm -f "$lock_root/lock"
   fi
   rm -f "$lock_root/$token"
-  unset WORKTREE_OPERATION_LOCK_TOKEN WORKTREE_OPERATION_LOCK_HELD_ROOT
+  unset WORKTREE_OPERATION_LOCK_TOKEN WORKTREE_OPERATION_LOCK_HELD_ROOT WORKTREE_OPERATION_LOCK_SELF_PID
 }

@@ -232,6 +232,36 @@ describe('operation-lock.sh', () => {
     expect(await readdir(root)).toEqual([])
   })
 
+  it('does not let a subshell release its parent lock', async () => {
+    const { stdout } = await run(
+      `worktree_operation_lock_acquire "${root}" || exit 1
+       ( worktree_operation_lock_release )
+       [ -L "${root}/lock" ] && echo held
+       worktree_operation_lock_release
+       [ -L "${root}/lock" ] || echo released`,
+    )
+    expect(stdout.trim().split('\n')).toEqual(['held', 'released'])
+  })
+
+  it('removes the clearing mutex when errexit aborts on a live holder', async () => {
+    await mkdir(root, { recursive: true })
+    await writeFile(join(root, 'owner.1.2'), `${process.pid}\n`)
+    await symlink('owner.1.2', join(root, 'lock'))
+    await expect(
+      run(`set -e; worktree_operation_lock_clear_stale "${root}"; echo unreachable`),
+    ).rejects.toMatchObject({ code: 1 })
+    expect(await exists(join(root, 'clearing.d'))).toBe(false)
+  })
+
+  it('treats a permission-denied probe as a live owner', async () => {
+    await plantLock('12345\n')
+    const { stdout } = await run(
+      `kill() { echo 'kill: (12345) - Operation not permitted' >&2; return 1; }
+       worktree_operation_lock_clear_stale "${root}"; echo "$WORKTREE_OPERATION_LOCK_CLEANUP_STATUS"`,
+    )
+    expect(stdout.trim()).toBe('active')
+  })
+
   it('releases on EXIT when installed as a trap', async () => {
     await run(
       `trap worktree_operation_lock_release EXIT; worktree_operation_lock_acquire "${root}"`,
