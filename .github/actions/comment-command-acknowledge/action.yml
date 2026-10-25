@@ -1,0 +1,60 @@
+name: Acknowledge comment command
+description: >
+  React to a comment-command trigger with an eyes reaction and, on the first run attempt, post a
+  comment linking to the workflow run. A failed reaction or comment only warns, so the workflow
+  continues.
+inputs:
+  command:
+    description: Command name used in warning messages, such as `/fix`
+    required: false
+    default: command
+  comment-id:
+    description: Comment to react to, defaulting to the event's comment
+    required: false
+    default: ${{ github.event.comment.id }}
+  issue-number:
+    description: Issue or pull request that receives the run-link comment
+    required: false
+    default: ${{ github.event.issue.number }}
+  post-run-link:
+    description: '`true` posts the run-link comment on the first run attempt; `false` only reacts'
+    required: false
+    default: 'true'
+  token:
+    description: Token used for the reaction and the comment
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Acknowledge command
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        COMMAND: ${{ inputs.command }}
+        COMMENT_ID: ${{ inputs.comment-id }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        POST_RUN_LINK: ${{ inputs.post-run-link }}
+        RUN_ATTEMPT: ${{ github.run_attempt }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+
+        if ! gh api -X POST \
+          "/repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+          -f content=eyes; then
+          echo "::warning::Could not add eyes reaction to ${COMMAND} comment. comment_id=${COMMENT_ID}. Continuing."
+          {
+            echo "## ${COMMAND} acknowledgement warning"
+            echo
+            echo "- Comment id: ${COMMENT_ID}"
+            echo
+            echo "GitHub rejected the optional eyes reaction. The workflow will continue."
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+        fi
+
+        if [[ "$POST_RUN_LINK" == "true" && "$RUN_ATTEMPT" == "1" ]] && ! gh issue comment "$ISSUE_NUMBER" \
+          --repo "$GITHUB_REPOSITORY" \
+          --body "👀 [View the automation workflow run]($RUN_URL)."; then
+          echo "::warning::Could not post workflow run link for ${COMMAND}. issue_number=${ISSUE_NUMBER}. Continuing."
+        fi
