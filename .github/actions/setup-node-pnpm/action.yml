@@ -1,7 +1,7 @@
 name: Setup Node.js and pnpm
 description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
-  against a restored pnpm store cache.
+  without a pnpm store cache.
   The caller must run actions/checkout before invoking this action.
   Set timeout-minutes on the calling step to cap the combined operations.
 inputs:
@@ -31,23 +31,8 @@ runs:
       uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       with:
         version: latest-12
-    - name: Resolve pnpm store path
-      id: pnpm-store
-      shell: bash
-      run: |
-        echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-        if command -v sha256sum >/dev/null 2>&1; then
-          echo "lockfile-hash=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-        else
-          echo "lockfile-hash=$(shasum -a 256 pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-        fi
-    - name: Cache pnpm store
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ steps.pnpm-store.outputs.path }}
-        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ steps.pnpm-store.outputs.lockfile-hash }}
-        restore-keys: |
-          pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+    # No pnpm store cache: on hosted runners a fresh install is fast enough, and restoring and
+    # saving the store costs more than it saves.
     # --loglevel=warn drops the progress bar and package summary but still prints warnings and
     # errors. From pnpm 12.8.0 (pnpm/pnpm#16076) it also keeps a failed lifecycle script's full
     # output and a failed supply-chain verdict, so the quiet log stays diagnosable.
