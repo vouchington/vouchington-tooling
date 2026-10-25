@@ -68,6 +68,13 @@ describe('checkTrivyPolicy', () => {
     expect(check({ '.trivyignore.yaml': registry() }, { minGates: 0, minSboms: 0 })).toEqual([])
   })
 
+  it('enforces the configured cleanup URL prefix', () => {
+    expect(check(compliant, { cleanupUrlPrefix: 'https://github.com/a/b/issues/' })).toEqual([])
+    expect(check(compliant, { cleanupUrlPrefix: 'https://github.com/other/repo/issues/' })).toEqual(
+      [expect.stringContaining('cleanup issue URL')],
+    )
+  })
+
   it('does not count database-only downloads as gates', () => {
     expect(
       check({

@@ -58,7 +58,7 @@ export function checkTrivyPolicy(
   const gates = scans.filter((command) => !isComponentSbomGeneration(command))
   if (gates.length < options.minGates || sboms.length < options.minSboms)
     violations.push('Trivy policy requires OS gates and unfiltered component SBOMs')
-  for (const command of gates) attempt(violations, () => assertVulnerabilityGate(command, options))
+  for (const command of gates) attempt(violations, () => assertVulnerabilityGate(command, input))
   for (const command of sboms) attempt(violations, () => assertUnfilteredComponentSbom(command))
   if (!trackedFiles.includes(options.ignoreFile))
     violations.push('Trivy exception registry must be tracked')
@@ -66,7 +66,7 @@ export function checkTrivyPolicy(
     attempt(violations, () =>
       validateIgnoreRegistry(
         parseIgnoreRegistry(readFileSync(join(root, options.ignoreFile), 'utf8')),
-        options,
+        input,
       ),
     )
   return violations
