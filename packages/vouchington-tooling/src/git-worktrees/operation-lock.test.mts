@@ -237,7 +237,7 @@ describe('operation-lock.sh', () => {
     expect(stdout.trim()).toBe('42')
   })
 
-  it('fails when the owner PID cannot be recorded', async () => {
+  it.skipIf(process.getuid?.() === 0)('fails when the owner PID cannot be recorded', async () => {
     await mkdir(root, { recursive: true })
     await chmod(root, 0o500)
     try {
