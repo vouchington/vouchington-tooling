@@ -321,6 +321,16 @@
       "import": "./dist/dead-code/index.mjs",
       "default": "./dist/dead-code/index.mjs"
     },
+    "./trivy-policy": {
+      "types": "./dist/trivy-policy/index.d.mts",
+      "import": "./dist/trivy-policy/index.mjs",
+      "default": "./dist/trivy-policy/index.mjs"
+    },
+    "./docker-image-mirror": {
+      "types": "./dist/docker-image-mirror/index.d.mts",
+      "import": "./dist/docker-image-mirror/index.mjs",
+      "default": "./dist/docker-image-mirror/index.mjs"
+    },
     "./cloc": {
       "types": "./dist/cloc/index.d.mts",
       "import": "./dist/cloc/index.mjs",

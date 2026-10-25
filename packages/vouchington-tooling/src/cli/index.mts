@@ -121,6 +121,14 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       )
     case 'cloc':
       return import('./commands/cloc.mts').then((command) => command.runClocCommand(parsed.args))
+    case 'trivy-policy':
+      return import('./commands/trivy-policy.mts').then((command) =>
+        command.runTrivyPolicyCommand(parsed.args),
+      )
+    case 'docker-image-mirror':
+      return import('./commands/docker-image-mirror.mts').then((command) =>
+        command.runDockerImageMirrorCommand(parsed.args),
+      )
     case 'storybook-browser-runner':
       return import('./commands/storybook-browser-runner.mts').then((command) =>
         command.runStorybookBrowserRunnerCommand(parsed.args),

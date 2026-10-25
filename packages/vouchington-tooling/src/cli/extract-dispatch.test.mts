@@ -33,6 +33,12 @@ vi.mock('./commands/cloc.mts', () => ({
 vi.mock('./commands/coverage-scope-check.mts', () => ({
   runCoverageScopeCheckCommand: vi.fn(() => 0),
 }))
+vi.mock('./commands/trivy-policy.mts', () => ({
+  runTrivyPolicyCommand: vi.fn(async () => 0),
+}))
+vi.mock('./commands/docker-image-mirror.mts', () => ({
+  runDockerImageMirrorCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/storybook-browser-runner.mts', () => ({
   runStorybookBrowserRunnerCommand: vi.fn(async () => 0),
 }))
@@ -53,6 +59,8 @@ import { runHookCommand } from './commands/hook.mts'
 import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
 import { runClocCommand } from './commands/cloc.mts'
 import { runCoverageScopeCheckCommand } from './commands/coverage-scope-check.mts'
+import { runTrivyPolicyCommand } from './commands/trivy-policy.mts'
+import { runDockerImageMirrorCommand } from './commands/docker-image-mirror.mts'
 import { runStorybookBrowserRunnerCommand } from './commands/storybook-browser-runner.mts'
 
 describe('runCli extract command dispatch', () => {
@@ -116,6 +124,15 @@ describe('runCli extract command dispatch', () => {
       runCli(['node', 'vouchington', 'coverage-scope-check', '--include', '**/*.ts']),
     ).resolves.toBe(0)
     expect(runCoverageScopeCheckCommand).toHaveBeenCalledWith(['--include', '**/*.ts'])
+  })
+
+  it('forwards the trivy-policy and docker-image-mirror subcommands', async () => {
+    await expect(runCli(['node', 'vouchington', 'trivy-policy', '--root', '.'])).resolves.toBe(0)
+    expect(runTrivyPolicyCommand).toHaveBeenCalledWith(['--root', '.'])
+    await expect(
+      runCli(['node', 'vouchington', 'docker-image-mirror', '--mirror', 'm']),
+    ).resolves.toBe(0)
+    expect(runDockerImageMirrorCommand).toHaveBeenCalledWith(['--mirror', 'm'])
   })
 
   it('forwards the storybook-browser-runner subcommand and its arguments', async () => {
