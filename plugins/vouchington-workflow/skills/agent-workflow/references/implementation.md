@@ -1,5 +1,10 @@
 # Implementation
 
+Before fixing an issue, find out why the affected code exists: read its history, callers, tests,
+and linked issues. A fix that ignores the code's original purpose often breaks it or patches a
+symptom. If the code no longer serves a purpose, or its job is done elsewhere, delete it instead of
+fixing it, along with its tests, configuration, and documentation.
+
 For cross-cutting work, track accepted interface, data, validation, and ownership decisions that
 could otherwise be lost during coding. Start from a failing behavioral test when practical and
 complete the real path rather than adding placeholders or compatibility shims without a requirement.

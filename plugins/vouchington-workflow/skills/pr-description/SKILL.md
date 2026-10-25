@@ -12,14 +12,29 @@ Local policy overrides these defaults; do not reload an already-read adapter or 
 Use before opening or updating a pull request, after diagnosing a CI failure, or at handoff. Read local
 `AGENTS.md`, pull-request template, and issue-linking policy first.
 
-Keep the description understandable without the conversation. Its short visible core explains:
+Write for a reviewer who has not seen the conversation or the code. Use plain language and short
+bullets, not dense paragraphs of internal terms. Its visible core explains:
 
-- **Summary:** what changed, why, and the concrete before/after behavior. For a fix, explain its
-  root cause as well as the symptom. A reader should understand the outcome before implementation
-  details.
-- **Impact:** who or what is affected and how their behavior changes. Name the actual audience,
-  such as end users, staff, API clients, operators, or contributors. Keep material risks and
-  limitations visible. For internal work, describe the affected development or operational flow.
+- **Summary:** open with one or two sentences on the outcome in plain terms. Then give a
+  **Why:** that names the concrete problem or risk, such as who could do what before this change.
+  For a fix, give the root cause as well as the symptom.
+- **Before/after table:** for any behavior change, add a visible table whose rows are concrete
+  scenarios, such as requests, configurations, environments, inputs, or user actions. Its columns
+  are the situation, the behavior before, and the behavior after. Include the unchanged cases a
+  reviewer would worry about, and the error or status each failure case returns.
+- **Diagram:** when a request or event crosses components, add a Mermaid `sequenceDiagram` of the
+  new flow. Use a `flowchart` for decision logic or changed architecture. Keep the main diagram
+  visible.
+- **Impact:** one bullet per affected audience, such as end users, staff, native or API clients,
+  operators, or contributors, saying what each one sees. Say when the change is active: what
+  enables it, such as a plan tier, feature flag, environment, configuration value, or rollout
+  step, and whether current deployments already satisfy it. Name the configuration it reads and
+  its defaults. Keep risks, limitations, and dependent follow-ups visible.
+
+Put implementation detail under **Details**, grouped by subsystem with short headings. Name the
+files and functions that carry each part, so a reviewer can find them. Leave CI history, rebase
+narrative, and local test lists out of the body; the Shepherd Journal and evidence record hold
+them.
 
 Add detail only where the change warrants it:
 
@@ -32,11 +47,11 @@ Add detail only where the change warrants it:
   producer/consumer changes and any justified exceptions. Link the policy and concrete evidence.
 - For API, workflow, or independently deployed changes, explain the affected contract, lifecycle,
   or operational safety. Follow the consumer's compatibility and deployment policy.
-- Use a before/after table or meaningful Mermaid diagram when it makes behavior, relationships,
-  workflow topology, or lifecycle easier to understand. Prose is sufficient for a simple change.
+- A one-line fix with no new scenarios needs only prose. Skip the table and diagram there.
 
-Put long comparisons, inventories, diagrams, calculations, and failure evidence in collapsed
-`<details>` sections. Keep the short conclusions and material risks outside them. Keep the
+Put long inventories, secondary diagrams, calculations, and failure evidence in collapsed
+`<details>` sections. Keep the summary, the main before/after table, the main diagram, and
+material risks outside them. Keep the
 consumer's required visible core headings outside disclosure containers. Put opening/closing tags
 on separate lines, with a blank line after `</summary>` and before `</details>` so Markdown renders.
 Read [description examples](references/examples.md) when choosing a comparison, diagram, or failure
