@@ -63,10 +63,7 @@ function findScriptBlock(command: string, policy: CommandPolicy): BlockDecision 
   if (!/\bgit\b/.test(command)) {
     return null
   }
-  for (const script of [
-    ...commandsToInspectPreservingQuotes(command),
-    ...quotedSubstitutions(command),
-  ]) {
+  for (const script of rawScripts(command)) {
     const reason = findBlockedConfigReason(script, policy.gitPatterns ?? [])
     if (reason !== null) return { reason }
   }
@@ -88,4 +85,10 @@ function quotedSubstitutionScripts(command: string): string[] {
 
 function quotedSubstitutions(command: string): string[] {
   return commandsToInspectPreservingQuotes(command).flatMap(extractShellCommandSubstitutions)
+}
+
+// Config-key rules need `git -c` intact, so these scripts skip global-option stripping.
+function rawScripts(command: string): string[] {
+  const scripts = commandsToInspectPreservingQuotes(command, { keepGitGlobalOptions: true })
+  return [...scripts, ...scripts.flatMap(extractShellCommandSubstitutions)]
 }

@@ -165,6 +165,14 @@ describe('evaluateCommandPolicy command rules', () => {
     expect(reasonOf(bash(command))).toBeNull()
   })
 
+  it('enforces caller-supplied and escaped config keys', () => {
+    const custom: CommandPolicy = { gitPatterns: [{ configKey: 'core.editor', reason: 'editor' }] }
+    expect(reasonOf(bash('git -c core.editor=true status'), false, custom)).toBe('editor')
+    expect(reasonOf(bash('git -c "Core.Editor=true" status'), false, custom)).toBe('editor')
+    expect(reasonOf(bash('git -c user.name=x status'), false, custom)).toBeNull()
+    expect(reasonOf(bash('git -c co\\re.hooksPath=/dev/null status'))).toContain('core.hooksPath')
+  })
+
   it('rejects an interactive rebase continue only when configured', () => {
     expect(reasonOf(bash('git rebase --continue'))).toContain('GIT_EDITOR=true')
     expect(reasonOf(bash('GIT_EDITOR=true git rebase --continue'))).toBeNull()

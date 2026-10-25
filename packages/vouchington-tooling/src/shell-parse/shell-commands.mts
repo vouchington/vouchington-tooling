@@ -1,22 +1,9 @@
+import { stripGitGlobalOptionsForPolicy } from './git-global-options.mts'
+
+export { stripGitGlobalOptionsForPolicy }
 import { stripNonShellHeredocBodies } from './shell-heredoc.mts'
 import { findShellScriptArguments, shellScriptOperandIndex } from './shell-script-operand.mts'
 import { stripUnquotedShellComments, tokenizeShellWords } from './shell-tokenizer.mts'
-
-const GIT_GLOBAL_OPTIONS_RE = new RegExp(
-  String.raw`\bgit(?:\s+(?:` +
-    String.raw`-C\s+(?:"[^"]*"|'[^']*'|\S+)|` +
-    String.raw`-c\s+(?!["']?[Cc][Oo][Rr][Ee]\.[Hh][Oo][Oo][Kk][Ss][Pp][Aa][Tt][Hh]\b)(?:"[^"]*"|'[^']*'|[^\s=]+(?:=(?:"[^"]*"|'[^']*'|\S+))?)|` +
-    String.raw`--(?:git-dir|work-tree|namespace|exec-path)=[^\s]+|` +
-    String.raw`--(?:no-pager|paginate|bare|no-replace-objects|version|help|html-path|man-path|info-path)|` +
-    String.raw`-[vhpP]` +
-    String.raw`))+`,
-  'g',
-)
-
-/** Collapse `git -C <path>` / other globals so banned-subcommand regexes still match. */
-export function stripGitGlobalOptionsForPolicy(command: string): string {
-  return command.replace(GIT_GLOBAL_OPTIONS_RE, 'git')
-}
 
 /**
  * The scripts the git, hook-bypass, and dev-server policies read: the command text, each heredoc
@@ -32,15 +19,19 @@ export function commandsToInspectForGitPolicy(command: string): string[] {
 }
 
 /** The same list with quoted refs readable; it too skips `$(...)` in the command text. */
-export function commandsToInspectPreservingQuotes(command: string): string[] {
+export function commandsToInspectPreservingQuotes(
+  command: string,
+  options: { keepGitGlobalOptions?: boolean } = {},
+): string[] {
+  const normalize = options.keepGitGlobalOptions ? (s: string) => s : stripGitGlobalOptionsForPolicy
   const { bodySubstitutions, shellBodies, textWithoutBodies } = stripNonShellHeredocBodies(command)
   return [textWithoutBodies, ...shellBodies, ...bodySubstitutions].flatMap((script) => {
-    const normalizedScript = stripGitGlobalOptionsForPolicy(script.replace(/\\\n/g, ' '))
+    const normalizedScript = normalize(script.replace(/\\\n/g, ' '))
     return [
       normalizedScript,
       ...extractShellCommandArguments(normalizedScript).map(
         ({ command: shellCommand, inheritsEditor }) =>
-          `${inheritsEditor ? 'export GIT_EDITOR=true; ' : ''}${stripGitGlobalOptionsForPolicy(shellCommand)}`,
+          `${inheritsEditor ? 'export GIT_EDITOR=true; ' : ''}${normalize(shellCommand)}`,
       ),
     ]
   })
