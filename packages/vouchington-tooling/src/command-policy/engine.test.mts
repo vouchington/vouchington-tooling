@@ -135,6 +135,15 @@ describe('evaluateCommandPolicy command rules', () => {
     ['git commit -an', 'git commit -n'],
     ['git -c core.hooksPath=/dev/null commit', 'core.hooksPath'],
     ['git -c Core.HooksPath=/dev/null commit', 'core.hooksPath'],
+    ['git -c "core.hooksPath=/dev/null" status', 'core.hooksPath'],
+    ["git -c 'core.hooksPath=/dev/null' status", 'core.hooksPath'],
+    ['git -c "CORE.hookspath=/dev/null" status', 'core.hooksPath'],
+    ["git -c 'Core.HooksPath=/dev/null' status", 'core.hooksPath'],
+    ['git -c user.name=x -c "core.hooksPath=/dev/null" commit', 'core.hooksPath'],
+    ['git --config-env=core.hooksPath=HOOKS commit', 'core.hooksPath'],
+    ['git --config-env "core.hookspath=HOOKS" commit', 'core.hooksPath'],
+    ['bash -c \'git -c "core.hooksPath=/dev/null" status\'', 'core.hooksPath'],
+    ['echo "$(git -c \'core.hooksPath=/dev/null\' status)"', 'core.hooksPath'],
     ['git push origin $(git branch --show-current | head -1) --force', 'Force pushes'],
     ['echo `git branch | head` && git push --force', 'Force pushes'],
     ['bash -c "git commit --amend"', 'amend'],
@@ -147,6 +156,11 @@ describe('evaluateCommandPolicy command rules', () => {
     'git push --force-with-lease=main',
     'git commit -F msg | tail -n 20',
     'git log -n 5',
+    'git commit -m "mentions core.hooksPath=x"',
+    "git commit -m 'git -c core.hooksPath=/dev/null'",
+    'git -c user.name=x -c "color.ui=false" status',
+    'git config core.hooksPath .githooks',
+    'echo "-c core.hooksPath=x"',
   ])('allows %j', (command) => {
     expect(reasonOf(bash(command))).toBeNull()
   })
@@ -166,7 +180,9 @@ describe('evaluateCommandPolicy command rules', () => {
   it('treats an unterminated substitution as plain text and defaults the pull-rebase reason', () => {
     expect(reasonOf(bash('echo $(oops; git push --force'))).toContain('Force pushes')
     expect(reasonOf(bash('echo `oops; git commit --amend'))).toContain('amend')
-    const defaults = standardGitPatterns().find((rule) => rule.pattern.test('git pull -r'))
+    const defaults = standardGitPatterns().find(
+      (rule) => 'pattern' in rule && rule.pattern.test('git pull -r'),
+    )
     expect(defaults?.reason).toBe('git pull --rebase and git pull -r are banned.')
   })
 
