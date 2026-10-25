@@ -18,10 +18,13 @@ trivy-policy [--root <dir>] [--ignore-file <path>] [--findings-exit-code-env <NA
   packages, a "Not exploitable: ... Cleanup: <issue URL>" statement (URL must start with
   --cleanup-url-prefix when given) and an expired_at between tomorrow and --max-expiry-days (30).
 
-docker-image-mirror [--root <dir>] [--mirror <host>]
+docker-image-mirror [--root <dir>] [--mirror <host>] [--allow-registry <prefix>]... [--require-digest]
   Prints each Docker Hub image in git-tracked workflows, composite actions and Dockerfiles (exit 1):
   run, pull and create commands, containers, services, docker:// references, buildx drivers, FROM,
   COPY --from and # syntax. Images must name a registry host; --mirror (default mirror.gcr.io) is
-  the host the message tells you to use.
+  the host the message tells you to use. --allow-registry (repeatable) instead requires every image,
+  including FROM and COPY --from, to start with one of the prefixes; a reference that expands a
+  variable passes only when its literal text before the variable starts with a prefix. --require-digest
+  requires @sha256: plus 64 lowercase hex characters. Stage aliases and scratch stay exempt.
 
 `

@@ -413,15 +413,29 @@ exact versioned `deb`/`apk`/`rpm` purls, a `Not exploitable: <reason>. Cleanup: 
 statement (the URL must start with `--cleanup-url-prefix` when given, else any GitHub issue) and an
 `expired_at` UTC date after today and at most `--max-expiry-days` (default 30) away.
 
-`vouchington docker-image-mirror [--mirror <host>]` reports every Docker Hub image reference in
+`vouchington docker-image-mirror [--mirror <host>] [--allow-registry <prefix>]... [--require-digest]` reports every Docker Hub image reference in
 tracked workflows, composite actions and Dockerfiles: `docker run|pull|create`, `container:`,
 `services:`, `docker://` uses, `docker/setup-buildx-action` drivers, `FROM`, `COPY --from` and
 `# syntax=`. An image is accepted when it names a registry host; `--mirror` (default
 `mirror.gcr.io`) is the host the message tells you to use.
 
+`--allow-registry <prefix>` (repeatable) turns the check into an allowlist: every image reference
+above, including `FROM`, `COPY --from` and `# syntax=`, must start with one of the prefixes, so
+`mirror.gcr.io` and Docker Hub are rejected unless listed. `--require-digest` additionally requires
+`@sha256:` followed by 64 lowercase hex characters. Earlier stage aliases, numeric `COPY --from`
+indexes and `scratch` stay exempt. A reference that expands a variable (`${{ }}`, `$VAR`) is
+checked by its literal text before the first variable: it passes only when that text already starts
+with an allowed prefix, so a wholly dynamic reference is rejected, and a variable-expanded digest
+never satisfies `--require-digest`. Without `--allow-registry`, behavior is unchanged (only Docker
+Hub is rejected). Violations name the file, the image and the allowed prefixes or the digest requirement:
+
+```bash
+vouchington docker-image-mirror --allow-registry ghcr.io/vouchington/dependency- --require-digest
+```
+
 The checks are exported as `checkTrivyPolicy(root, trackedFiles, options)` from
 `vouchington-tooling/trivy-policy` (plus the command parsers and `validateIgnoreRegistry`) and
-`checkDockerImageMirrors(root, trackedFiles, { mirror })` from `vouchington-tooling/docker-image-mirror`;
+`checkDockerImageMirrors(root, trackedFiles, { mirror, allowRegistries, requireDigest })` from `vouchington-tooling/docker-image-mirror`;
 both return violation strings.
 
 ## Running the Storybook browser tests

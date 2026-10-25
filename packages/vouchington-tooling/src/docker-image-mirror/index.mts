@@ -3,22 +3,20 @@ import { join } from 'node:path'
 
 import { parse } from 'yaml'
 
-import {
-  DEFAULT_MIRROR,
-  dockerfileViolations,
-  workflowImageViolations,
-  type Document,
-} from './images.mts'
+import { dockerfileViolations, workflowImageViolations, type Document } from './images.mts'
+import { DEFAULT_MIRROR, type ImagePolicy } from './policy.mts'
 
 export { DEFAULT_MIRROR, dockerfileViolations, workflowImageViolations } from './images.mts'
 export type { Document } from './images.mts'
+export type { ImagePolicy } from './policy.mts'
 
-export interface DockerImageMirrorOptions {
+export interface DockerImageMirrorOptions extends ImagePolicy {
   /**
-   * Registry host named in violation messages as the place to pull from. Any registry other than
-   * Docker Hub passes; this value does not restrict them. Default `mirror.gcr.io`.
+   * Registry host named in violation messages as the place to pull from. Without
+   * `allowRegistries`, any registry other than Docker Hub passes; this value does not restrict
+   * them. Default `mirror.gcr.io`.
    */
-  readonly mirror?: string
+  readonly mirror?: string | undefined
 }
 
 function parseDocument(path: string, source: string): Document {
@@ -44,6 +42,10 @@ export function checkDockerImageMirrors(
   options: DockerImageMirrorOptions = {},
 ): string[] {
   const mirror = options.mirror ?? DEFAULT_MIRROR
+  const policy: ImagePolicy = {
+    allowRegistries: options.allowRegistries,
+    requireDigest: options.requireDigest,
+  }
   const errors: string[] = []
   for (const path of trackedFiles) {
     const yaml =
@@ -55,8 +57,8 @@ export function checkDockerImageMirrors(
     const source = readFileSync(join(root, path), 'utf8')
     errors.push(
       ...(yaml
-        ? workflowImageViolations(path, parseDocument(path, source), mirror)
-        : dockerfileViolations(path, source)),
+        ? workflowImageViolations(path, parseDocument(path, source), mirror, policy)
+        : dockerfileViolations(path, source, policy, mirror)),
     )
   }
   return errors

@@ -9,6 +9,7 @@ import {
   isDockerfilePath,
   workflowImageViolations,
   type Document,
+  type ImagePolicy,
 } from './index.mts'
 
 const roots: string[] = []
@@ -243,5 +244,119 @@ describe('dockerfileViolations', () => {
     expect(
       dockerfileViolations('Dockerfile', '# syntax=mirror.gcr.io/docker/dockerfile\n'),
     ).toEqual([])
+  })
+})
+
+describe('image policy', () => {
+  const digest = `@sha256:${'0'.repeat(64)}`
+  const allow = ['ghcr.io/v/dependency-']
+  const check = (
+    document: Document,
+    policy: ImagePolicy = { allowRegistries: allow, requireDigest: true },
+  ) =>
+    workflowImageViolations('w.yml', document, 'm.test', policy).map((v) => v.replace('w.yml#', ''))
+
+  it('requires every workflow image to start with an allowed prefix and pin a digest', () => {
+    expect(
+      check({
+        jobs: {
+          j: {
+            container: `ghcr.io/v/dependency-node${digest}`,
+            services: {
+              db: { image: 'mirror.gcr.io/postgres' },
+              ok: { image: `ghcr.io/v/dependency-p${digest}` },
+            },
+            steps: [
+              { run: `docker run ghcr.io/v/dependency-x:1` },
+              { uses: 'docker://alpine' },
+              { run: 'docker pull scratch' },
+            ],
+          },
+        },
+        runs: { image: 'docker://ghcr.io/v/other@sha256:abc' },
+      }),
+    ).toEqual([
+      'j service db: mirror.gcr.io/postgres must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+      'j: ghcr.io/v/dependency-x:1 must be pinned with @sha256:<64 lowercase hex characters>',
+      'j: alpine must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+      'action image: ghcr.io/v/other@sha256:abc must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+    ])
+  })
+
+  it('rejects uppercase or short digests and Hub even when digest-only', () => {
+    const images = [`a/b@sha256:${'A'.repeat(64)}`, `a/b@sha256:${'0'.repeat(63)}`, `a/b${digest}`]
+    const flagged = images.filter(
+      (image) =>
+        check({ jobs: { j: { container: image } } }, { allowRegistries: [], requireDigest: true })
+          .length > 0,
+    )
+    expect(flagged).toEqual([
+      `a/b@sha256:${'A'.repeat(64)}`,
+      `a/b@sha256:${'0'.repeat(63)}`,
+      `a/b${digest}`,
+    ])
+    expect(
+      check({ jobs: { j: { container: `ghcr.io/a/b${digest}` } } }, { requireDigest: true }),
+    ).toEqual([])
+  })
+
+  it('judges variable-expanded references by their literal text', () => {
+    const images = [
+      '$IMAGE',
+      '${{ env.IMAGE }}',
+      'ghcr.io/v/${{ x }}',
+      `ghcr.io/v/dependency-${'${{ x }}'}${digest}`,
+      `ghcr.io/v/dependency-node@sha256:${'${{ d }}'}`,
+    ]
+    const flagged = images.filter(
+      (image) => check({ jobs: { j: { container: image } } }).length > 0,
+    )
+    expect(flagged).toEqual([
+      '$IMAGE',
+      '${{ env.IMAGE }}',
+      'ghcr.io/v/${{ x }}',
+      `ghcr.io/v/dependency-node@sha256:${'${{ d }}'}`,
+    ])
+  })
+
+  it('keeps Dockerfile stage aliases, scratch and numeric indexes exempt', () => {
+    const source = [
+      '# syntax=docker/dockerfile:1',
+      `FROM ghcr.io/v/dependency-node${digest} AS build`,
+      'FROM build AS again',
+      'FROM scratch',
+      'FROM alpine',
+      'COPY --from=build /a /b',
+      'COPY --from=0 /a /b',
+      'COPY --from=nginx /a /b',
+    ].join('\n')
+    expect(
+      dockerfileViolations('Dockerfile', source, { allowRegistries: allow, requireDigest: true }),
+    ).toEqual([
+      'Dockerfile: # syntax=docker/dockerfile:1 must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+      'Dockerfile: FROM alpine must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+      'Dockerfile: COPY --from=nginx must start with "ghcr.io/v/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+    ])
+    expect(
+      dockerfileViolations('Dockerfile', 'FROM node\n', { requireDigest: true }, 'm.test'),
+    ).toEqual([
+      'Dockerfile: FROM node must come from m.test/; must be pinned with @sha256:<64 lowercase hex characters>',
+    ])
+  })
+
+  it('passes the policy through checkDockerImageMirrors', () => {
+    const root = repo({
+      '.github/workflows/a.yml': 'jobs:\n  b:\n    container: mirror.gcr.io/node\n',
+      Dockerfile: 'FROM mirror.gcr.io/node\n',
+    })
+    expect(
+      checkDockerImageMirrors(root, ['.github/workflows/a.yml', 'Dockerfile'], {
+        allowRegistries: ['ghcr.io/x/'],
+      }),
+    ).toEqual([
+      '.github/workflows/a.yml#b container: mirror.gcr.io/node must start with "ghcr.io/x/"',
+      'Dockerfile: FROM mirror.gcr.io/node must start with "ghcr.io/x/"',
+    ])
+    expect(checkDockerImageMirrors(root, ['Dockerfile'], { allowRegistries: [] })).toEqual([])
   })
 })
