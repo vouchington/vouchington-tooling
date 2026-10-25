@@ -1,0 +1,113 @@
+name: Parse comment command
+description: >
+  Find a standalone slash command in an issue or pull request comment and extract the request
+  text that follows it. Does not authorize the commenter or acknowledge the comment.
+inputs:
+  command:
+    description: Command token to look for, such as /fix, /plan or /shepherd
+    required: true
+  comment-body:
+    description: Comment body to parse. Passed through the environment, never interpolated into a script.
+    default: ${{ github.event.comment.body }}
+  mode:
+    description: >
+      first-line accepts a comment whose first line is only the command and returns every later
+      line as the request. whole-body accepts a comment that is only the command (surrounding
+      whitespace and trailing blank lines allowed) and returns an empty request.
+    default: first-line
+  pr-number:
+    description: >
+      Optional pull request number. When set and the comment is accepted, the pull request title is
+      returned as pr-title.
+    default: ''
+  github-token:
+    description: Token used to read the pull request title when pr-number is set
+    default: ${{ github.token }}
+outputs:
+  accepted:
+    description: "'true' when the comment is a standalone command, otherwise 'false'"
+    value: ${{ steps.parse.outputs.accepted }}
+  request:
+    description: Text after the command (empty in whole-body mode)
+    value: ${{ steps.parse.outputs.request }}
+  pr-title:
+    description: Pull request title, set only when pr-number is given and the comment is accepted
+    value: ${{ steps.parse.outputs.pr-title }}
+runs:
+  using: composite
+  steps:
+    - name: Parse comment command
+      id: parse
+      shell: bash
+      env:
+        COMMAND_TOKEN: ${{ inputs.command }}
+        COMMENT_BODY: ${{ inputs.comment-body }}
+        PARSE_MODE: ${{ inputs.mode }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        WRITE_OUTPUT: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/gha/write-github-multiline-output.sh
+      run: |
+        set -euo pipefail
+
+        if [[ ! "$COMMAND_TOKEN" =~ ^/[A-Za-z0-9_-]+$ ]]; then
+          echo "::error::command must be a slash followed by letters, digits, hyphens or underscores."
+          exit 1
+        fi
+        if [[ "$PARSE_MODE" != "first-line" && "$PARSE_MODE" != "whole-body" ]]; then
+          echo "::error::mode must be first-line or whole-body."
+          exit 1
+        fi
+        if [[ -n "$PR_NUMBER" && ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+          echo "::error::pr-number must be a positive integer."
+          exit 1
+        fi
+
+        COMMENT_BODY_FILE="$(mktemp)"
+        REQUEST_FILE="$(mktemp)"
+        printf '%s' "$COMMENT_BODY" > "$COMMENT_BODY_FILE"
+        echo "accepted=false" >> "$GITHUB_OUTPUT"
+
+        if [[ "$PARSE_MODE" == "whole-body" ]]; then
+          COMMAND="$(tr -d '\r' < "$COMMENT_BODY_FILE" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+        else
+          COMMAND="$(head -n 1 "$COMMENT_BODY_FILE" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+        fi
+        if [[ "$COMMAND" != "$COMMAND_TOKEN" ]]; then
+          echo "Ignoring comment that is not the standalone $COMMAND_TOKEN command."
+          exit 0
+        fi
+
+        if [[ "$PARSE_MODE" == "first-line" ]]; then
+          awk '
+            BEGIN { found = 0; command = ENVIRON["COMMAND_TOKEN"] }
+            {
+              if (found) {
+                print
+                next
+              }
+
+              search = $0
+              offset = 0
+              while ((pos = index(search, command)) > 0) {
+                absolute = offset + pos
+                before = substr($0, 1, absolute - 1)
+                after = substr($0, absolute + length(command))
+                if (before ~ /(^|[[:space:]])$/ && after ~ /^($|[[:space:]])/) {
+                  sub(/^[[:space:]]+/, "", after)
+                  if (after != "") print after
+                  found = 1
+                  next
+                }
+                offset += pos + length(command) - 1
+                search = substr($0, offset + 1)
+              }
+            }
+          ' "$COMMENT_BODY_FILE" > "$REQUEST_FILE"
+        fi
+
+        "$WRITE_OUTPUT" request < "$REQUEST_FILE"
+        if [[ -n "$PR_NUMBER" ]]; then
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.title' \
+            | "$WRITE_OUTPUT" pr-title
+        fi
+        echo "accepted=true" >> "$GITHUB_OUTPUT"

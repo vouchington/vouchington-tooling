@@ -218,7 +218,7 @@ if duplicate deliveries are possible. It validates the target number, session id
 
 ### Comment-command actions
 
-Two composite actions for workflows triggered by an `issue_comment` command. Pin them like the
+Three composite actions for workflows triggered by an `issue_comment` command. Pin them like the
 others and pass nothing through expressions in `run`; every input reaches the script through `env`.
 
 - `comment-command-authorize` takes `mode` (`check` by default, or `revalidate`),
@@ -232,6 +232,16 @@ others and pass nothing through expressions in `run`; every input reaches the sc
   `github.run_attempt` is `1` and `post-run-link` is `true` (default), comments on `issue-number`
   with a link to the run. A failed reaction or comment only emits a `::warning::` (`command` names
   the command in it), so the workflow continues. It needs `issues: write`.
+- `comment-command-parse` finds a standalone slash command (`command`, such as `/fix`) in a comment
+  body and extracts the request text that follows it. It outputs `accepted` (`'true'` or `'false'`),
+  `request` and, when `pr-number` is given, `pr-title`. `comment-body` defaults to the event's
+  comment body and reaches the script only through the environment. In the default `first-line`
+  mode the comment's first line must be only the command (surrounding whitespace and CRs ignored,
+  case-sensitive) and every later line is the request, verbatim; code fences are not special. In
+  `whole-body` mode the whole comment must be only the command (leading blank lines reject it,
+  trailing blank lines do not) and the request is empty. `pr-number` reads that pull request's title
+  with `github-token` (default `github.token`, needs `pull-requests: read`) once the comment is
+  accepted. It does not authorize the commenter or acknowledge the comment.
 
 ```yaml
 steps:
