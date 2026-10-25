@@ -115,6 +115,11 @@ export function standardGitPatterns(
         'git commit -n bypasses the commit-msg and pre-commit hooks. Fix the underlying failure instead.',
     },
     {
+      // Catches unquoted forms through wrappers `gitInvocations` skips, such as `env -S`.
+      pattern: /\bgit\b[^|;&\n]*-c\s+core\.hooksPath\s*=/i,
+      reason: 'Overriding core.hooksPath disables git hooks. Fix the underlying failure instead.',
+    },
+    {
       configKey: 'core.hooksPath',
       reason: 'Overriding core.hooksPath disables git hooks. Fix the underlying failure instead.',
     },

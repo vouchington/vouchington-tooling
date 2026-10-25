@@ -135,6 +135,7 @@ describe('evaluateCommandPolicy command rules', () => {
     ['git commit -an', 'git commit -n'],
     ['git -c core.hooksPath=/dev/null commit', 'core.hooksPath'],
     ['git -c Core.HooksPath=/dev/null commit', 'core.hooksPath'],
+    ['env -S git -c core.hooksPath=/dev/null commit', 'core.hooksPath'],
     ['git -c "core.hooksPath=/dev/null" status', 'core.hooksPath'],
     ["git -c 'core.hooksPath=/dev/null' status", 'core.hooksPath'],
     ['git -c "CORE.hookspath=/dev/null" status', 'core.hooksPath'],
