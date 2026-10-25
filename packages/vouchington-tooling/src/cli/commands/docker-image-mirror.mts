@@ -22,15 +22,32 @@ export async function runDockerImageMirrorCommand(
 ): Promise<number> {
   const stdout = dependencies.stdout ?? process.stdout
   const stderr = dependencies.stderr ?? process.stderr
-  let values: { root?: string; mirror?: string }
+  let values: {
+    root?: string
+    mirror?: string
+    'allow-registry'?: string[]
+    'require-digest'?: boolean
+  }
   try {
     values = parseArgs({
       args: [...args],
       allowPositionals: false,
-      options: { root: { type: 'string' }, mirror: { type: 'string' } },
+      options: {
+        root: { type: 'string' },
+        mirror: { type: 'string' },
+        'allow-registry': { type: 'string', multiple: true },
+        'require-digest': { type: 'boolean' },
+      },
     }).values
   } catch (error) {
     stderr.write(`vouchington: ${(error as Error).message}\n${commandUsage('docker-image-mirror')}`)
+    return 2
+  }
+  const allowRegistries = values['allow-registry']
+  if (allowRegistries?.includes('')) {
+    stderr.write(
+      `vouchington: --allow-registry needs a non-empty prefix\n${commandUsage('docker-image-mirror')}`,
+    )
     return 2
   }
   const root = resolve(values.root ?? process.cwd())
@@ -39,7 +56,11 @@ export async function runDockerImageMirrorCommand(
     stderr.write(`vouchington: ${root} is not inside a git repository\n`)
     return 1
   }
-  const errors = checkDockerImageMirrors(context.repoRoot, context.trackedFiles, values)
+  const errors = checkDockerImageMirrors(context.repoRoot, context.trackedFiles, {
+    mirror: values.mirror,
+    allowRegistries,
+    requireDigest: values['require-digest'],
+  })
   if (errors.length === 0) {
     stdout.write('Docker image mirror policy: ok\n')
     return 0

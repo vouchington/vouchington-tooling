@@ -1,10 +1,11 @@
 import { withoutShellComment } from '../trivy-policy/shell.mts'
+import { DEFAULT_MIRROR, imageReasons, policyActive, type ImagePolicy } from './policy.mts'
+
+export { DEFAULT_MIRROR } from './policy.mts'
 
 // Unauthenticated Docker Hub pulls from hosted runners hit its rate limit. A pull-through mirror
 // serves the same pinned digest without credentials, so every image must name a non-Hub registry.
 // Shell scripts are not workflow bodies and are outside this scan.
-export const DEFAULT_MIRROR = 'mirror.gcr.io'
-const HUB_HOSTS = ['docker.io', 'index.docker.io', 'registry-1.docker.io']
 const VALUE_FLAGS = new Set(
   '-e --env -p --publish -v --volume --name --network --net --add-host --entrypoint -u --user -w --workdir --tmpfs --platform --mount --label -l --env-file --health-cmd --health-interval --health-retries --health-timeout --health-start-period -m --memory --cpus --restart --cap-add --cap-drop --shm-size --log-driver --ulimit -h --hostname --pull --pids-limit --group-add --device --dns --ipc --pid --cgroupns --stop-signal --stop-timeout --gpus --cidfile --link --volumes-from --cpuset-cpus --cpu-shares --cgroup-parent --dns-search --dns-option --ip --ip6 --mac-address --blkio-weight --memory-swap --memory-reservation --kernel-memory --oom-score-adj --runtime --security-opt --sysctl --userns --uts --annotation --network-alias --expose --label-file --isolation --log-opt --storage-opt --cpu-quota --cpu-period --domainname --detach-keys -a --attach --cpuset-mems --device-cgroup-rule'.split(
     ' ',
@@ -22,20 +23,6 @@ export type Document = {
     }
   >
   runs?: { steps?: Step[]; image?: string }
-}
-
-function isHubImage(reference: string): boolean {
-  const image = reference.replace(/^["']|["'),;]+$/gu, '')
-  if (image === '' || image === 'scratch') return false
-  // Only the part before a variable is knowable; a wholly dynamic reference or registry is not.
-  const dynamicAt = image.search(/\$|\{\{/u)
-  const known = dynamicAt === -1 ? image : image.slice(0, dynamicAt)
-  if (known === '') return false
-  if (dynamicAt !== -1 && !known.includes('/') && image.slice(dynamicAt).includes('/')) return false
-  const [first = ''] = known.split('/')
-  if (!known.includes('/')) return true
-  if (HUB_HOSTS.includes(first)) return true
-  return !(first.includes('.') || first.includes(':') || first === 'localhost')
 }
 
 const GLOBAL_VALUE_OPTIONS = new Set(
@@ -82,6 +69,7 @@ export function workflowImageViolations(
   path: string,
   document: Document,
   mirror = DEFAULT_MIRROR,
+  policy: ImagePolicy = {},
 ): string[] {
   const found: Array<[string, string]> = []
   for (const [jobId, job] of Object.entries(document.jobs ?? {})) {
@@ -101,26 +89,35 @@ export function workflowImageViolations(
   for (const step of document.runs?.steps ?? []) {
     found.push(...stepImages(step).map((image): [string, string] => ['composite', image]))
   }
-  return found.flatMap(([where, image]) =>
-    isHubImage(image) ? [`${path}#${where}: ${image} must come from ${mirror}/`] : [],
-  )
+  return found.flatMap(([where, image]) => {
+    const reasons = imageReasons(image, mirror, policy)
+    return reasons.length > 0 ? [`${path}#${where}: ${image} ${reasons.join('; ')}`] : []
+  })
 }
 
-export function dockerfileViolations(path: string, source: string): string[] {
+export function dockerfileViolations(
+  path: string,
+  source: string,
+  policy: ImagePolicy = {},
+  mirror = DEFAULT_MIRROR,
+): string[] {
   const stages = new Set<string>()
   const violations: string[] = []
+  const check = (label: string, image: string): void => {
+    const reasons = imageReasons(image, mirror, policy)
+    if (reasons.length === 0) return
+    violations.push(`${path}: ${label}${policyActive(policy) ? ` ${reasons.join('; ')}` : ''}`)
+  }
   const syntax = /^#\s*syntax\s*=\s*(\S+)/imu.exec(source)?.[1]
-  if (syntax && isHubImage(syntax)) violations.push(`${path}: # syntax=${syntax}`)
+  if (syntax) check(`# syntax=${syntax}`, syntax)
   for (const line of source.replace(/\\\r?\n/gu, ' ').split('\n')) {
     const copyFrom = /^\s*COPY\s+(?:--\S+\s+)*--from=(\S+)/iu.exec(line)?.[1]
     if (copyFrom && !/^\d+$/u.test(copyFrom) && !stages.has(copyFrom.toLowerCase())) {
-      if (isHubImage(copyFrom)) violations.push(`${path}: COPY --from=${copyFrom}`)
+      check(`COPY --from=${copyFrom}`, copyFrom)
     }
     const from = /^\s*FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/iu.exec(line)
     if (!from) continue
-    if (!stages.has(from[1]!.toLowerCase()) && isHubImage(from[1]!)) {
-      violations.push(`${path}: FROM ${from[1]}`)
-    }
+    if (!stages.has(from[1]!.toLowerCase())) check(`FROM ${from[1]}`, from[1]!)
     if (from[2]) stages.add(from[2].toLowerCase())
   }
   return violations

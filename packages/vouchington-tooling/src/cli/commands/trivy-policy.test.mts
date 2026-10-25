@@ -146,6 +146,35 @@ describe('vouchington docker-image-mirror', () => {
     expect((await run(runDockerImageMirrorCommand, ['--root', outside])).code).toBe(1)
   })
 
+  it('enforces --allow-registry and --require-digest', async () => {
+    const digest = `sha256:${'a'.repeat(64)}`
+    const root = gitRepo({
+      Dockerfile: `FROM ghcr.io/vouchington/dependency-node@${digest}\nFROM mirror.gcr.io/node\n`,
+    })
+    const args = ['--root', root, '--allow-registry', 'ghcr.io/vouchington/dependency-']
+    const result = await run(runDockerImageMirrorCommand, [...args, '--allow-registry', 'x/'])
+    expect(result.code).toBe(1)
+    expect(result.err).toBe(
+      'Dockerfile: FROM mirror.gcr.io/node must start with "ghcr.io/vouchington/dependency-" or "x/"\n',
+    )
+    const digestOnly = await run(runDockerImageMirrorCommand, ['--root', root, '--require-digest'])
+    expect(digestOnly.err).toBe(
+      'Dockerfile: FROM mirror.gcr.io/node must be pinned with @sha256:<64 lowercase hex characters>\n',
+    )
+    const ok = gitRepo({ Dockerfile: `FROM ghcr.io/vouchington/dependency-node@${digest}\n` })
+    const pass = await run(runDockerImageMirrorCommand, [
+      '--root',
+      ok,
+      '--allow-registry',
+      'ghcr.io/vouchington/dependency-',
+      '--require-digest',
+    ])
+    expect(pass.code).toBe(0)
+    const empty = await run(runDockerImageMirrorCommand, ['--allow-registry', ''])
+    expect(empty.code).toBe(2)
+    expect(empty.err).toContain('non-empty prefix')
+  })
+
   it('defaults the root and streams to the process', async () => {
     const root = gitRepo({ Dockerfile: 'FROM mirror.gcr.io/library/ubuntu\n' })
     vi.spyOn(process, 'cwd').mockReturnValue(root)
