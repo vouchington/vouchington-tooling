@@ -68,6 +68,21 @@ describe('checkTrivyPolicy', () => {
     expect(check({ '.trivyignore.yaml': registry() }, { minGates: 0, minSboms: 0 })).toEqual([])
   })
 
+  it('does not count database-only downloads as gates', () => {
+    expect(
+      check({
+        ...compliant,
+        '.github/workflows/build.yml': workflow(
+          'trivy image --download-db-only',
+          gate(),
+          sbom,
+          gate('other-'),
+          sbom,
+        ),
+      }),
+    ).toEqual([])
+  })
+
   it('requires a tracked registry and reports an unreadable or malformed one', () => {
     const { '.trivyignore.yaml': _, ...withoutRegistry } = compliant
     expect(check(withoutRegistry)).toEqual(['Trivy exception registry must be tracked'])

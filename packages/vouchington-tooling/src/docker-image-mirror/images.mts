@@ -1,3 +1,5 @@
+import { withoutShellComment } from '../trivy-policy/shell.mts'
+
 // Unauthenticated Docker Hub pulls from hosted runners hit its rate limit. A pull-through mirror
 // serves the same pinned digest without credentials, so every image must name a non-Hub registry.
 // Shell scripts are not workflow bodies and are outside this scan.
@@ -41,7 +43,7 @@ const GLOBAL_VALUE_OPTIONS = new Set(
 )
 
 function dockerCommandImages(script: string): string[] {
-  const logical = script.replace(/\\\r?\n/gu, ' ')
+  const logical = withoutShellComment(script).replace(/\\\r?\n/gu, ' ')
   return [...logical.matchAll(/\bdocker\s+([^\n;&|]*)/gu)].flatMap(([, command]) => {
     const tokens = command!.match(/(?:[^\s"']|"[^"]*"|'[^']*')+/gu) ?? []
     let i = 0

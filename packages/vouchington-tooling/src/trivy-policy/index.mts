@@ -5,13 +5,14 @@ import {
   assertUnfilteredComponentSbom,
   assertVulnerabilityGate,
   isComponentSbomGeneration,
+  isDownloadDatabaseOnly,
 } from './gate.mts'
 import { resolveOptions, type TrivyPolicyOptions } from './options.mts'
 import { parseIgnoreRegistry, validateIgnoreRegistry } from './registry.mts'
 import { trivyPackageScanCommands } from './scan.mts'
 
 export { assertUnfilteredComponentSbom, assertVulnerabilityGate, isComponentSbomGeneration }
-export { isDownloadDatabaseOnly } from './gate.mts'
+export { isDownloadDatabaseOnly }
 export {
   isTrivyPackageScanCommand,
   trivyPackageScanCommandSegments,
@@ -56,8 +57,9 @@ export function checkTrivyPolicy(
     commands = trivyPackageScanCommands(trackedFiles, root)
   })
   if (violations.length > 0) return violations
-  const sboms = commands.filter(isComponentSbomGeneration)
-  const gates = commands.filter((command) => !isComponentSbomGeneration(command))
+  const scans = commands.filter((command) => !isDownloadDatabaseOnly(command))
+  const sboms = scans.filter(isComponentSbomGeneration)
+  const gates = scans.filter((command) => !isComponentSbomGeneration(command))
   if (gates.length < options.minGates || sboms.length < options.minSboms)
     violations.push('Trivy policy requires OS gates and unfiltered component SBOMs')
   for (const command of gates) attempt(violations, () => assertVulnerabilityGate(command, options))

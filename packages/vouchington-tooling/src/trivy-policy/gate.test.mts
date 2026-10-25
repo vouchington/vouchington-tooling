@@ -32,6 +32,7 @@ describe('assertVulnerabilityGate', () => {
   it('rejects widened or malformed values', () => {
     for (const [needle, replacement, message] of [
       ['--severity CRITICAL,HIGH', '', '--severity CRITICAL,HIGH'],
+      ['--severity CRITICAL,HIGH', '--severity CRITICAL,CRITICAL', '--severity CRITICAL,HIGH'],
       ['--scanners vuln', '--scanners vuln,secret', '--scanners vuln'],
       ['--pkg-types os', '--pkg-types os,library', '--pkg-types os'],
       ['--severity CRITICAL,HIGH', '--severity CRITICAL,HIGH,MEDIUM', '--severity CRITICAL,HIGH'],
@@ -56,6 +57,16 @@ describe('assertVulnerabilityGate', () => {
         missing(message),
       )
     }
+  })
+
+  it('accepts quoted fragments inside a flag word', () => {
+    const quoted = complete
+      .replace('--scanners vuln', '--scanners="vuln"')
+      .replace('--format table', "--format='table'")
+    expect(() => assertVulnerabilityGate(quoted)).not.toThrow()
+    expect(
+      isComponentSbomGeneration(sbom.replace('--format cyclonedx', '--format="cyclonedx"')),
+    ).toBe(true)
   })
 
   it('requires bare boolean flags exactly once', () => {

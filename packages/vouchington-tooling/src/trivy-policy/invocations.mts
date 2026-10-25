@@ -5,12 +5,17 @@ const SUBCOMMANDS = new Set(
   'image|fs|filesystem|rootfs|repo|repository|sbom|vm|k8s|kubernetes'.split('|'),
 )
 
+// Trivy reads every CLI option from a TRIVY_* variable, so an inline assignment could filter a scan
+// that its flags leave compliant. Only variables that cannot change what is scanned are allowed.
+const SAFE_ENVIRONMENT =
+  /^TRIVY_(?:CACHE_DIR|DB_REPOSITORY|JAVA_DB_REPOSITORY|TIMEOUT|DEBUG|NO_PROGRESS)=/
+
 type TrivyInvocation = { args: string[]; source: string }
 
 export function tokens(command: string): string[] {
   const uncommented = withoutShellComment(command)
   return (uncommented.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []).map((token) =>
-    token.replace(/^("|')|("|')$/g, '').replace(/\\(.)/g, '$1'),
+    token.replace(/"([^"]*)"|'([^']*)'/g, '$1$2').replace(/\\(.)/g, '$1'),
   )
 }
 
@@ -61,6 +66,13 @@ function trivyExecutableInvocations(command: string): TrivyInvocation[] {
     const args = segmentTokens.slice(executable + 1)
     const leading = segmentTokens.slice(0, executable)
     if (leading.includes('echo')) return []
+    const unsafe = leading.find(
+      (token) => token.startsWith('TRIVY_') && !SAFE_ENVIRONMENT.test(token),
+    )
+    if (unsafe !== undefined && isPackageScan(args))
+      throw new Error(
+        `${source.trim()}: unsupported Trivy environment option ${unsafe.split('=')[0]}`,
+      )
     if (leading.some((token) => token !== 'env' && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))) {
       if (isPackageScan(args))
         throw new Error(`${source.trim()}: unsupported wrapper before Trivy package scan`)

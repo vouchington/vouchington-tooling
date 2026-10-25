@@ -55,7 +55,11 @@ function requireOnlyOptions(command: string, allowed: Set<string>, label: string
 
 function hasExactSet(command: string, flag: string, required: string[]): boolean {
   const actual = flagValues(command, flag).flatMap((value) => value.split(','))
-  return actual.length === required.length && actual.every((value) => required.includes(value))
+  return (
+    actual.length === required.length &&
+    actual.every((value) => required.includes(value)) &&
+    required.every((value) => actual.includes(value))
+  )
 }
 
 function hasSingleValue(command: string, flag: string, expected?: string): boolean {

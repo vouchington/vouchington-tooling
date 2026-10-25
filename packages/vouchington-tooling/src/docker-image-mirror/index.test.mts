@@ -105,6 +105,18 @@ describe('workflowImageViolations', () => {
     ])
   })
 
+  it('ignores docker commands that only appear in comments', () => {
+    expect(
+      violations({
+        jobs: {
+          j: {
+            steps: [{ run: '# docker pull alpine\ndocker pull mirror.gcr.io/a # docker run b' }],
+          },
+        },
+      }),
+    ).toEqual([])
+  })
+
   it('reads buildx drivers, docker:// steps and composite actions', () => {
     expect(
       violations({

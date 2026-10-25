@@ -40,6 +40,14 @@ describe('Trivy invocation discovery', () => {
     expect(isTrivyPackageScanCommand('env A=1 trivy image target')).toBe(true)
   })
 
+  it('rejects inline TRIVY_* options that could filter a scan but allows cache settings', () => {
+    expect(() =>
+      trivyPackageScanCommandSegments('TRIVY_SKIP_FILES=/lib/apk/db/installed trivy image target'),
+    ).toThrow('unsupported Trivy environment option TRIVY_SKIP_FILES')
+    expect(trivyPackageScanCommandSegments('TRIVY_CACHE_DIR=/c trivy image target')).toHaveLength(1)
+    expect(trivyPackageScanCommandSegments('TRIVY_SKIP_FILES=x trivy --version')).toEqual([])
+  })
+
   it('normalizes path-qualified, escaped and continued executable names', () => {
     expect(trivyPackageScanCommandSegments('./trivy image target')).toEqual([
       './trivy image target',
