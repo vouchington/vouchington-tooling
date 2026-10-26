@@ -40,9 +40,20 @@ function isLoaded(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
+function isNotLoaded(value: unknown): boolean {
+  return value === false || value === 'false'
+}
+
+/** Bake output overrides that keep the image out of the local store (cache-only, registry, ...). */
+const FOREIGN_OUTPUT = /output=(?!(?:type=)?docker\b)/u
+
 /** A `docker/build-push-action` with `load: true`, or a `docker/bake-action` that does not push. */
 function isBuildAction(step: BuildStep): boolean {
-  if (step.uses?.startsWith('docker/bake-action@')) return !isLoaded(step.with?.push)
+  if (step.uses?.startsWith('docker/bake-action@')) {
+    const set = step.with?.set
+    const foreign = typeof set === 'string' && FOREIGN_OUTPUT.test(set)
+    return !isLoaded(step.with?.push) && !isNotLoaded(step.with?.load) && !foreign
+  }
   return step.uses?.startsWith('docker/build-push-action@') === true && isLoaded(step.with?.load)
 }
 
@@ -89,7 +100,7 @@ export function collectLocalBuilds(steps: readonly BuildStep[]): LocalBuilds {
       const value = recorded(tag, step)
       if (value) tags.add(value)
     }
-    const used = JSON.stringify(step.with ?? {})
+    const used = `${step.with?.tags}\n${step.with?.files}`
     for (const [id, images] of metadata) {
       if (used.includes(`steps.${id}.outputs.`)) images.forEach((image) => repositories.add(image))
     }

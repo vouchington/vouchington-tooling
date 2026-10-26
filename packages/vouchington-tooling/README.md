@@ -455,16 +455,18 @@ exempt when it exactly equals a tag that file produces, or is exactly
 `-t`/`--tag`/`--tag=` values of `docker build`, `docker buildx build` and `podman build` in `run:`
 steps, and the newline- or comma-separated `tags:` of a `docker/build-push-action` step with
 `load: true`. A tag is recorded as normalized text: quotes are stripped, `${X}` and `${{ env.X }}`
-become `$X`, and an expression a step `env:` entry assigns to a variable (`REPO: ${{ inputs.repo }}`)
-becomes that variable, so a `docker run` image written with either form matches. A tag that is only
+become `$X`, and a variable the step's own `env:` defines (`REPO: ${{ inputs.repo }}`, `TAG: built`)
+is replaced by its value, so each step's binding is compared by what it holds, never by name. A tag that is only
 a variable is skipped. A `docker/metadata-action` `images:` name also counts as a built repository
-(any tag, never a `@digest` form) when a `docker/build-push-action` (`load: true`) or non-pushing
-`docker/bake-action` step in the same file consumes that step's outputs.
+(any tag, never a `@digest` form) when a `docker/build-push-action` (`load: true`) step's `tags:` or
+a `docker/bake-action` step's `files:` consumes that step's outputs. A bake step must not set
+`push: true`, `load: false` or a non-docker `set: *.output=`.
 
 An image argument that is exactly `$VAR`, `"$VAR"` or `${VAR}` of `docker run|pull|create` is
 resolved through the last `VAR=value` (or `export`/`local`/`readonly`) line before it in the same
-`run:` block, then compared as above. A variable assigned in another block, after the command, or
-by `$(...)` is not resolved. A docker command inside `$(...)` no longer keeps the trailing `)`.
+`run:` block, then compared as above. Only unindented assignments are trusted: a variable that is
+also assigned on an indented line (a possible branch), in another block, after the command, or by
+`$(...)`, or a single-quoted `'$VAR'`, is not resolved. A docker command inside `$(...)` no longer keeps the trailing `)`.
 A matching tag in a different file does not count, and every other reference is checked as before.
 Without either flag nothing is exempt.
 

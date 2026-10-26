@@ -193,10 +193,10 @@ runs:
     const reverse = `
 runs:
   steps:
-    - run: docker build -t "$REPO/app:ci" .
     - env:
         REPO: \${{ inputs.repo }}
-      run: docker run "\${{ inputs.repo }}/app:ci"
+      run: docker build -t "$REPO/app:ci" .
+    - run: docker run "\${{ inputs.repo }}/app:ci"
 `
     expect(violations(reverse)).toEqual([])
   })
@@ -259,17 +259,23 @@ describe('the Dockerfile tag stays rejected', () => {
 
 describe('helpers', () => {
   it('normalizes text and variable names', () => {
-    const env = envMapping({ A: '${{ inputs.a }}', B: 3, C: 'x' })
-    expect([...env]).toEqual([['inputs.a', '$A']])
+    const env = envMapping({ A: '${{ inputs.a }}', B: 3, C: "'x'" })
+    expect([...env]).toEqual([
+      ['A', '${{ inputs.a }}'],
+      ['B', '3'],
+      ['C', 'x'],
+    ])
     expect(envMapping(undefined).size).toBe(0)
-    expect(normalizeText('"${{ inputs.a }}"/${B}/${{env.C}}/${{ x.y }}', env)).toBe(
-      '$A/$B/$C/${{ x.y }}',
+    expect(normalizeText('"${{ inputs.a }}"/${B}/${{env.C}}/${{ x.y }}/$D', env)).toBe(
+      '${{ inputs.a }}/3/x/${{ x.y }}/$D',
     )
-    expect(variableName("'$X'")).toBe('X')
+    expect(variableName("'$X'")).toBeUndefined()
     expect(variableName('${X}')).toBe('X')
     expect(variableName('$X/y')).toBeUndefined()
     expect(lastAssignment('A=1\nlocal A="2 3"\nAB=4', 'A')).toBe('"2 3"')
     expect(lastAssignment('echo A=1', 'A')).toBeUndefined()
+    expect(lastAssignment('A="x"-y', 'A')).toBe('"x"-y')
+    expect(lastAssignment('A=1\nif t; then\n  A=2\nfi', 'A')).toBeUndefined()
   })
 
   it('records metadata repositories only for build steps that consume them', () => {
@@ -284,5 +290,71 @@ describe('helpers', () => {
     ])
     expect([...repositories]).toEqual(['a/b'])
     expect([...stepIds]).toEqual(['bake'])
+  })
+})
+
+describe('review hardening', () => {
+  const metaBuild = (extra: string) => `
+runs:
+  steps:
+    - id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: ghcr.io/o/app
+${extra}
+    - run: docker run ghcr.io/o/app:$TAG
+`
+  it('does not equate a variable bound to different step values', () => {
+    const doc = `
+runs:
+  steps:
+    - env:
+        TAG: built
+      run: docker build -t app:$TAG .
+    - env:
+        TAG: unbuilt
+      run: docker run app:$TAG
+    - env:
+        TAG: built
+      run: docker run app:$TAG
+`
+    expect(short(doc)).toEqual(['app:$TAG'])
+  })
+
+  it('requires the metadata outputs to feed the build tags or bake files', () => {
+    const labels = `    - uses: docker/build-push-action@v7
+      with:
+        load: true
+        tags: app:ci
+        labels: \${{ steps.meta.outputs.labels }}
+`
+    expect(short(metaBuild(labels))).toEqual(['ghcr.io/o/app:$TAG'])
+    const tags = labels.replace('tags: app:ci', 'tags: \${{ steps.meta.outputs.tags }}')
+    expect(short(metaBuild(tags))).toEqual([])
+  })
+
+  it('requires a bake step to export to the local image store', () => {
+    const bake = (with_: string) => `    - uses: docker/bake-action@v7
+      with:
+        files: \${{ steps.meta.outputs.bake-file }}
+${with_}`
+    expect(short(metaBuild(bake('')))).toEqual([])
+    expect(short(metaBuild(bake('        set: "*.output=type=docker"\n')))).toEqual([])
+    for (const extra of [
+      '        set: "*.output=type=cacheonly"\n',
+      '        load: false\n',
+      '        push: true\n',
+    ]) {
+      expect(short(metaBuild(bake(extra)))).toEqual(['ghcr.io/o/app:$TAG'])
+    }
+  })
+
+  it('takes the whole assignment word, skips branch assignments, and ignores single quotes', () => {
+    expect(short(stepsOf('IMAGE="app:ci"-external\ndocker run "$IMAGE"', built))).toEqual([
+      '"$IMAGE"',
+    ])
+    const branch = 'IMAGE=ext:1\nif false; then\n  IMAGE=app:ci\nfi\ndocker run "$IMAGE"'
+    expect(short(stepsOf(branch, built))).toEqual(['"$IMAGE"'])
+    expect(short(stepsOf("IMAGE=app:ci\ndocker run '$IMAGE'", built))).toEqual(["'$IMAGE'"])
   })
 })
