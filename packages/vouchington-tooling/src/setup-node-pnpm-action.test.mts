@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest'
 type Step = {
   id?: string
   name?: string
-  'continue-on-error'?: boolean
   run?: string
   uses?: string
   if?: string
@@ -43,27 +42,28 @@ describe('setup-node-pnpm composite action', () => {
   })
 
   it('activates Node from the input version file and then pnpm 12', () => {
-    const [node, pnpm] = steps
+    const [node, resolve, pnpm] = steps
     expect(node?.uses).toMatch(/^actions\/setup-node@[0-9a-f]{40}$/)
     expect(node?.with).toEqual({
       'node-version-file': '${{ inputs.node-version-file }}',
       'package-manager-cache': false,
     })
-    expect(pnpm?.uses).toMatch(/^pnpm\/action-setup@[0-9a-f]{40}$/)
-    expect(pnpm?.with).toEqual({ version: 'latest-12' })
-    expect(pnpm?.id).toBe('pnpm-setup')
-    expect(pnpm?.['continue-on-error']).toBe(true)
+    expect(pnpm?.uses).toMatch(/^pnpm\/setup@[0-9a-f]{40}$/)
+    expect(resolve?.id).toBe('pnpm-version')
+    expect(resolve?.run).toBe('node "$GITHUB_ACTION_PATH/../resolve-pnpm-version/resolve.mjs"')
+    expect(pnpm?.with).toEqual({
+      version: '${{ steps.pnpm-version.outputs.version }}',
+      install: false,
+      'node-version-file': false,
+    })
   })
 
-  it('retries pnpm setup once, only when the first attempt failed', () => {
-    const [, first, retry] = steps
-    expect(retry?.if).toBe("steps.pnpm-setup.outcome == 'failure'")
-    expect(retry?.uses).toBe(first?.uses)
-    expect(retry?.with).toEqual(first?.with)
-    expect(retry?.['continue-on-error']).toBeUndefined()
+  it('sets pnpm up once, with no retry', () => {
     expect(
-      steps.filter((candidate) => (candidate.uses ?? '').startsWith('pnpm/action-setup@')),
-    ).toHaveLength(2)
+      steps.filter((candidate) => (candidate.uses ?? '').startsWith('pnpm/setup@')),
+    ).toHaveLength(1)
+    expect(steps.some((candidate) => 'continue-on-error' in candidate)).toBe(false)
+    expect(source).not.toMatch(/action-setup|outcome/u)
   })
 
   it('never caches the pnpm store', () => {

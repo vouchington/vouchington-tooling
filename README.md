@@ -276,7 +276,7 @@ steps:
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
 
 - `setup-node-pnpm` runs `actions/setup-node` from `node-version-file` (default `.nvmrc`), then
-  `pnpm/action-setup` with `version: latest-12` (retried once if the first attempt fails), and runs a frozen install with no pnpm store
+  `resolve-pnpm-version`, then `pnpm/setup` with the resolved `version`, `install: false`, and `node-version-file: false` (no retry), and runs a frozen install with no pnpm store
   cache. `install-scripts: 'false'` adds `--ignore-scripts`.
   The caller runs `actions/checkout` first.
 - `fetch-base-ref` fetches only the pull request base branch (`refs/remotes/origin/<base>`) and the
@@ -334,7 +334,7 @@ These are reusable `workflow_call` workflows. The caller owns the schedule or th
 event. Pin them by full commit SHA. Do not pass `secrets: inherit`.
 
 - `pnpm-dedupe` checks out the caller with credentials disabled, installs from `node-version-file`
-  (default `.nvmrc`) and pnpm `latest-12`, then runs `pnpm dedupe`. When `pnpm-lock.yaml` changes
+  (default `.nvmrc`) and pnpm 12 (at least one day old), then runs `pnpm dedupe`. When `pnpm-lock.yaml` changes
   it force-pushes `branch` (default `chore/pnpm-dedupe`) and opens a pull request against `base`
   (default `main`) with `title` and `label`. Forward `PUSH_TOKEN` by name. That token needs
   contents and pull-request write, and it is used only for the push and the pull request.
@@ -594,9 +594,10 @@ The plugin currently ships `postgres-cursor-call-contract`, `banned-member-read`
 ## Development
 
 Requires Node 24+ and pnpm 12. The repository does not pin pnpm: no manifest declares
-`packageManager`, and local work uses whichever pnpm 12 is installed. CI asks `pnpm/action-setup` for
-`latest-12` after `actions/setup-node`, so it runs the newest pnpm 12 release that is at least one day
-old. New 12.x releases reach CI without a PR; moving to pnpm 13 needs one.
+`packageManager`, and local work uses whichever pnpm 12 is installed. CI asks `pnpm/setup` for
+the resolved pnpm 12 version after `actions/setup-node`, so it runs the newest pnpm 12 release that is at least one day
+old: the `resolve-pnpm-version` action reads the npm publish times and passes the chosen exact
+version to `pnpm/setup`, which applies no cutoff of its own. New 12.x releases reach CI without a PR; moving to pnpm 13 needs one.
 `pnpm-setup-policy.test.mts` enforces that shape.
 
 ```bash
