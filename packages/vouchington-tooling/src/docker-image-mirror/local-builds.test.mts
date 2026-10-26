@@ -29,17 +29,35 @@ describe('collectLocalBuilds', () => {
           'docker build -t "$IMG" -t six-${{ github.sha }} -t',
           'docker image ls',
           'docker build',
+          'echo "docker build -t echoed ."',
+          'if true; then docker build -t thenned .; fi',
+          'sudo docker build -t sudoed . && docker build -t chained .',
         ].join('\n'),
       },
       { id: 'b', uses: 'docker/build-push-action@v6', with: { load: true, tags: 'x\ny, z\n' } },
       { id: 'c', uses: 'docker/build-push-action@v6', with: { load: 'true', tags: 7 } },
       { id: 'd', uses: 'docker/build-push-action@v6', with: { push: true, tags: 'nope' } },
       { id: 'e', run: 'echo hi' },
+      { id: 'h', uses: 'docker/build-push-action-helper@v1', with: { load: true, tags: 'helper' } },
       { uses: 'docker/build-push-action@v6', with: { load: true, tags: 'noid' } },
       { run: 'docker build \\\n  -t multi .' },
     ])
     expect([...tags].sort()).toEqual(
-      ['five', 'four', 'multi', 'noid', 'one', 'three', 'two', 'x', 'y', 'z'].sort(),
+      [
+        'chained',
+        'five',
+        'four',
+        'multi',
+        'noid',
+        'one',
+        'sudoed',
+        'thenned',
+        'three',
+        'two',
+        'x',
+        'y',
+        'z',
+      ].sort(),
     )
     expect([...stepIds].sort()).toEqual(['a', 'b', 'c'])
   })

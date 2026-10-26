@@ -16,7 +16,9 @@ export interface LocalBuilds {
 }
 
 const STEP_OUTPUT = /^\$\{\{\s*steps\.([\w-]+)\.outputs\.[\w-]+\s*\}\}$/u
-const BUILD_COMMAND = /\b(?:docker\s+(?:buildx\s+)?|podman\s+)build\b([^\n;&|]*)/gu
+// A build counts only at a command position, not as text inside `echo` or another argument.
+const BUILD_COMMAND =
+  /(?:^|[;&|(]|\b(?:sudo|then|do|else))[ \t]*(?:docker\s+(?:buildx\s+)?|podman\s+)build\b([^\n;&|]*)/gmu
 
 function literal(tag: string): string | undefined {
   const value = tag.trim().replace(/^(["'])(.*)\1$/u, '$2')
@@ -42,7 +44,7 @@ function runBuildTags(script: string): string[] | undefined {
 /** Raw `tags:` values of a `docker/build-push-action` step with `load: true`. */
 function actionBuildTags(step: BuildStep): string[] | undefined {
   const load = step.with?.load
-  if (!step.uses?.startsWith('docker/build-push-action') || (load !== true && load !== 'true')) {
+  if (!step.uses?.startsWith('docker/build-push-action@') || (load !== true && load !== 'true')) {
     return undefined
   }
   const tags = step.with?.tags
