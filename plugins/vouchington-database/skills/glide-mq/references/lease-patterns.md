@@ -9,7 +9,7 @@ moved to delayed keeps its slot until it completes.
 const token = randomUUID()
 // SET leaseKey token NX PX ttlMs  -> null when another job holds the lease
 if (!(await setIfAbsent(leaseKey, token, ttlMs))) {
-  await job.moveToDelayed(Date.now() + jitteredDelayMs) // this job only
+  return job.moveToDelayed(Date.now() + jitteredDelayMs) // this job only; never falls through
 }
 try {
   // renew while running, e.g. every ttlMs / 3, only while the stored value equals token
