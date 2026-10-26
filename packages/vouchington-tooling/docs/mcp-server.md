@@ -81,6 +81,7 @@ as MCP tool errors (`isError: true`) with an actionable message rather than cras
 | `retrospective_check` | optional `sourceEventId`                                                                                                                                                                                                                                                                      | `sessionId`, `saved`, `entries` (`sourceEventId`, `timestamp`, `issues`, `prs` of each retrospective, oldest first)                              |
 | `retrospective_save`  | `parentSessionId`, `agent`, `version`, `mode`, `workOutcome`, `feedbackCoverage`, exactly one of `markdown` or `compose`, optional `repositories`, `sourceEventId`, `category`, `dryRun`, `knownSensitiveValues` (markdown only); or `previewToken` with identity, `mode` and `sourceEventId` | as `journal_append` plus `policy.warnings`; with `dryRun`, `markdown`, `previewToken` and `policy.warnings`                                      |
 | `snapshot_export`     | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                                                                                                                               | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
+| `snapshot_partition`  | `cleanupToken`, optional `checksum`, `counts`, `maxSessions`, `maxBytes`                                                                                                                                                                                                                      | `sessionId`, `directory`, `partitions` (`path`, `counts`, `checksum`, `manifest` of each)                                                        |
 | `snapshot_cleanup`    | `cleanupToken`                                                                                                                                                                                                                                                                                | `sessionId`, `cleaned: true`                                                                                                                     |
 | `session_archive`     | none                                                                                                                                                                                                                                                                                          | `sessionId`, `archived: true`                                                                                                                    |
 
@@ -136,6 +137,27 @@ outbox does not create the directory. `snapshot_export` never accepts a destinat
 `agent-blackboard` client chooses a private file and returns its path. `session_archive` is the one
 destructive tool; archived metadata is immutable, while entries stay appendable.
 
+### Snapshot partition
+
+`snapshot_partition` splits the exported snapshot into bounded, whole-session, read-only JSONL files
+so a distill pass can hand subagents partitions instead of the raw snapshot. It replaces running
+`agent-blackboard snapshot partition` by hand, which cannot work with the server's token: the
+client's ownership marker stores the hash of the client's own `cleanupToken` (which the server never
+returns), and the client requires the snapshot to sit directly in its own `os.tmpdir()`.
+
+- **Same token, resolved server-side.** It takes the `cleanupToken` `snapshot_export` returned,
+  checked against the exporting `sessionId` and `worktree` like `snapshot_cleanup`. The server reads
+  the path and the client's capability from its own record and calls the installed client's
+  `partitionSnapshot` in-process, so the temporary-directory check compares the snapshot with this
+  server's directory, not the caller's `TMPDIR`. An export without a client capability (an older
+  client) is partitioned by the in-tree `partitionSnapshot`, which records a signed receipt.
+- **Verified by default.** The file is verified against the checksum and counts the export reported;
+  `checksum` (sha256 hex) and `counts` (`sessions`, `entries`, `records`, `bytes`) override them.
+  `maxSessions` (default 25) and `maxBytes` (default 1 MiB) bound each partition.
+- **Not spent.** The token stays valid for `snapshot_cleanup`, which removes the snapshot and the
+  recorded partition directory together. A failed partition leaves the token valid for a retry, and a
+  snapshot is partitioned once: a second call fails until a fresh export.
+
 ### Snapshot cleanup
 
 `snapshot_export` writes a private file in the OS temp directory, and `snapshot_cleanup` is the only
@@ -145,8 +167,8 @@ whether or not archiving happened. Call it as a finally step after processing, o
 failure.
 
 - **No caller-chosen path.** The tool takes only `cleanupToken` (`path`, `directory`, and `receipt`
-  are unsupported arguments). The server records the export's file path itself, plus a partition
-  directory and its signed receipt when the client reports both, and cleans exactly that record.
+  are unsupported arguments). The server records the export's file path itself, plus the partition
+  directory `snapshot_partition` created (with its signed receipt when the in-tree partition ran), and cleans exactly that record.
   When the client's export carried its own cleanup capability, the server keeps it (never
   returning it) and cleans through the client's `cleanupSnapshotPartitions`, so the client's
   ownership marker goes with the file; otherwise it uses the in-tree `cleanupSnapshotPartitions`.

@@ -32,6 +32,15 @@ export type BlackboardClientModule = {
     export(options?: unknown): Promise<unknown>
   }
   /** Newer clients own the ownership markers of their exports and clean them with a capability. */
+  /** Newer clients partition with the export's own capability and write a partition marker. */
+  partitionSnapshot?: (options: {
+    path: string
+    cleanupToken: string
+    checksum?: { algorithm: 'sha256'; value: string }
+    counts?: { sessions: number; entries: number; records: number; bytes: number }
+    maxSessions?: number
+    maxBytes?: number
+  }) => Promise<unknown>
   cleanupSnapshotPartitions?: (options: {
     path?: string
     directory?: string

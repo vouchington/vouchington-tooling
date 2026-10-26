@@ -24,7 +24,7 @@ describe('vouchington mcp over real stdio', () => {
     clients.push(client)
     await client.connect(transport)
     const { tools } = await client.listTools()
-    expect(tools).toHaveLength(13)
+    expect(tools).toHaveLength(14)
     const rejected = await client.callTool({
       name: 'journal_entries',
       arguments: { sessionId: 'native:owner', worktree: fixture().outside },

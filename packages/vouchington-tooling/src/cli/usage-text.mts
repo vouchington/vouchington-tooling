@@ -146,7 +146,7 @@ mcp
   (no args)              Serve journal_append, journal_entries, outbox_status, outbox_flush,
                          session_ensure, retrospective_check, retrospective_save,
                          pr_validate, pr_create, pr_update,
-                         snapshot_export, snapshot_cleanup, and session_archive over stdio.
+                         snapshot_export, snapshot_partition, snapshot_cleanup, and session_archive over stdio.
                          Needs the optional @modelcontextprotocol/sdk peer (and zod).
                          Launch it from inside the repository's git worktree.
 

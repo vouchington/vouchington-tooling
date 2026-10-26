@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto'
-import type { SnapshotCleanupReceipt } from '../agent-blackboard/snapshot-types.mts'
+import type {
+  SnapshotChecksum,
+  SnapshotCleanupReceipt,
+  SnapshotCounts,
+} from '../agent-blackboard/snapshot-types.mts'
 
 /** What the server itself recorded when it exported a snapshot. Never read from a caller. */
 export type SnapshotRecord = {
@@ -8,6 +12,9 @@ export type SnapshotRecord = {
   path: string
   /** The exporting client's own capability; kept server-side and never returned to a caller. */
   clientToken?: string
+  /** What the export reported, so a partition verifies the file against the server's own record. */
+  checksum?: SnapshotChecksum
+  counts?: SnapshotCounts
   directory?: string
   receipt?: SnapshotCleanupReceipt
 }

@@ -31,8 +31,12 @@ Use when completed retrospectives or journals should become durable follow-up wo
    treating missing records as absent. Require `manifest.schemaVersion` to be 1, `manifest.status`
    to be `"complete"`, a nonempty `cleanupToken`, and manifest counts that exactly match the export
    counts, including the terminal manifest record. Hand subagents only read-only partitions of the
-   verified file, never the original snapshot. Bound each partition to at most 25 contiguous
-   session groups or 1 MiB. A session's record and entries form an indivisible group, so fail the run
+   verified file, never the original snapshot. Create the partitions with the `snapshot_partition`
+   tool of the same server, passing the `cleanupToken` from `snapshot_export`: the server holds the
+   blackboard client's capability and the export path, so do not run the `agent-blackboard
+   snapshot partition` CLI or hand-roll a partition. Each partition holds at most 25 contiguous
+   session groups or 1 MiB (the tool's defaults; `maxSessions` and `maxBytes` may only lower
+   them). A session's record and entries form an indivisible group, so fail the run
    rather than split a group or weaken the bound. Only the root keeps the `cleanupToken`; never
    delegate it. Read full records, with their storage type, repository
    tags, source identity, coverage, and outcomes, from that file. Do not distill from
@@ -125,9 +129,8 @@ difference is a conflicting payload and stays quarantined.
   disposition. Inspectors hand-read only journal-only and retrospective sessions; every other shape
   is determined structurally.
 - Keep the verified snapshot until the last `session_archive`, because the archival check reads it.
-  Then remove the snapshot with the cleanup capability returned at export, and any partitions with
-  the separate receipt returned when they were created (the export capability cannot remove them),
-  in a cleanup path that runs even when no session is archived.
+  Then call `snapshot_cleanup`, which removes the snapshot and the partitions
+  `snapshot_partition` recorded, in a cleanup path that runs even when no session is archived.
 - Report reviewed, fixed, duplicate, deferred, quarantined, actionable, created, updated,
   not-yet-eligible, entry-type-unresolved, and archived counts with reasons, splitting eligible
   sessions into retrospective and stale (checkpoint-only, journal-only, zero-entry child, and
@@ -135,7 +138,7 @@ difference is a conflicting payload and stays quarantined.
 
 Cleanup, as a finally step: whether processing succeeded or failed, call `snapshot_cleanup` with
 the `cleanupToken` from `snapshot_export`, with the same `sessionId` and `worktree`, once the
-snapshot is no longer needed. The token is single-use and server-restart-scoped; if cleanup fails,
+snapshot and its partitions are no longer needed. The token is single-use and server-restart-scoped; if cleanup fails,
 retry the same call.
 
 Use source records only for local verification and leave them in the repository's approved journal

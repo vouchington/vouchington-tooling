@@ -65,6 +65,7 @@ describe('in-process client and server round trip', () => {
       'pr_create',
       'pr_update',
       'snapshot_export',
+      'snapshot_partition',
       'snapshot_cleanup',
       'session_archive',
     ])
