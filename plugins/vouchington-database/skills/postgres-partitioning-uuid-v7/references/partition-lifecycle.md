@@ -4,8 +4,10 @@ UUIDv7 ordering supports range bounds and index-friendly time windows. Generate 
 instead of extracting timestamps in predicates; use a generated timestamp only when application
 semantics require one. Partition on the range key that queries and retention actually constrain.
 
-Create future ranges before writes need them and maintain a default partition only with an explicit
-attachment plan. Before attaching a populated range, prove the default partition excludes that range
+Choose a lifecycle. Pre-create future ranges before writes need them, or use on-demand ranges:
+`RANGE (id)` with a DEFAULT partition, split into explicit ranges on demand, and a guarded drop
+that refuses drops inside the retention window or under legal hold. Maintain a default partition
+only with an explicit attachment plan. Before attaching a populated range, prove the default partition excludes that range
 or move conflicting rows; otherwise attachment can scan and lock the default partition.
 
 Every primary or unique constraint on a partitioned table must include its partition key. Verify

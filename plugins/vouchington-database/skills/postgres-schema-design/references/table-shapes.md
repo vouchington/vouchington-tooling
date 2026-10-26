@@ -7,14 +7,14 @@ explicit sweeper-written timestamp; `now()` cannot appear in an immutable genera
 When state keeps returning to earlier states, record append-only attempts or changes and derive
 current state from the latest row rather than erasing the previous lifecycle.
 
-| Concept                    | Shape                                                                                                                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Field-diff history         | `<entity>_revisions`: UUIDv7 `id`, entity FK, nullable revision actor FK with `ON DELETE SET NULL`, revision-type enum, `changes jsonb`.                                                   |
-| Typed lifecycle ledger     | `<entity>_changes`: UUIDv7 `id`, entity FK, change-type enum, retained actor identity FK with `ON DELETE RESTRICT`, typed joined payload and JSON for unjoined data. Time comes from `id`. |
-| Current state from a log   | Latest change by `id DESC`, projected through a shared trigger or read through a view.                                                                                                     |
-| Per-entity work            | `<entity>_<job>_work_items`: entity FK, lease and final-outcome columns, claim index, retention.                                                                                           |
-| Job progress               | `<job>_cursors`: finite enum key or checked singleton, keyset positions without FKs, optional sweep upper bound.                                                                           |
-| Inbound or protocol events | Append-only `<source>_events` with `occurred_at` recording the event's business time.                                                                                                      |
+| Concept                    | Shape                                                                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field-diff history         | `<entity>_revisions`: UUIDv7 `id`, entity FK, nullable revision actor FK with `ON DELETE SET NULL`, revision-type enum, `changes jsonb`.                                                                  |
+| Typed lifecycle ledger     | `<entity>_changes`: UUIDv7 `id`, entity FK, change-type enum, retained actor identity FK with `ON DELETE RESTRICT`, typed joined payload and JSON for unjoined data. Time comes from `id`.                |
+| Current state from a log   | Latest change by `id DESC`, projected through a shared trigger or read through a view.                                                                                                                    |
+| Per-entity work            | `<entity>_<job>_work_items`: entity FK, lease and final-outcome columns, claim index, retention.                                                                                                          |
+| Job progress               | Prefer the position in job data. Use `<job>_cursors` only when it must be transactional with domain rows: finite enum key or checked singleton, keyset positions without FKs, optional sweep upper bound. |
+| Inbound or protocol events | Append-only `<source>_events` with `occurred_at` recording the event's business time.                                                                                                                     |
 
 Revisions and changes are append-only through a generic `fn_reject_mutation`, parameterized by
 actor columns that may be erased to NULL. Permit only those erasures; parent-cascade deletion
@@ -36,9 +36,17 @@ and failure must include `WHERE lease_token = $mine`; zero affected rows means o
 Keep retries in an optional `_attempts` ledger with `attempt_number` when their lifecycle must
 survive. One-shot compare-and-set claims and human assignments need their own shapes.
 
+## Retention
+
+Give every durable row a finite retention window, except user content. Keep one compact row per
+entity rather than every raw event, and delete a cache's older rows when a new version is written.
+A bounded post-commit enqueue-loss window is acceptable when the stale result heals itself through
+a TTL; no transactional dirty-work table is needed.
+
 ## Cursors and shared functions
 
-A cursor key names the finite thing being swept. A singleton uses
+Prefer keeping the position in job data; a cursor table is for a sweep whose position must commit with
+its domain rows. A cursor key names the finite thing being swept. A singleton uses
 `is_singleton boolean PRIMARY KEY DEFAULT true CHECK (is_singleton)`; the job seeds its own row
 with `ON CONFLICT DO NOTHING`. `cursor_<thing>_id` and optional `sweep_upper_bound_<thing>_id` are
 FK-free UUIDv7 positions; NULL means the start. Per-unit work progress belongs in work items.

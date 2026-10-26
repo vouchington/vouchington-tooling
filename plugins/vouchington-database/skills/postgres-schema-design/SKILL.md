@@ -13,6 +13,7 @@ Local policy overrides these portable conventions.
 - Joined identities use foreign keys; read [relations](references/relations.md) before modeling references.
 - Split differing shapes, share identical values, and keep history documents as JSON.
 - Use canonical [table shapes](references/table-shapes.md) for revisions, changes, work, and cursors.
+- Default to finite retention for everything except user content; see [table shapes](references/table-shapes.md#retention).
 - Reuse parameterized trigger functions instead of copying bodies.
 - Comment every table, column, and view; document reviewed exceptions explicitly.
 

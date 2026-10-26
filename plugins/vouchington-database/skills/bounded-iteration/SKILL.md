@@ -29,7 +29,8 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    per run.
 5. **Resume without restarting.** Keep a keyset position on the UUIDv7 key or a
    `<verb>_through_at` time position, fix the sweep's end when it starts, and rescan an overlap
-   when insert order differs from commit order. Cursor tables follow
+   when insert order differs from commit order. Prefer the position in job data; a cursor table is
+   for a position that must be transactional with domain rows, and follows
    [table shapes](../postgres-schema-design/references/table-shapes.md).
    (`postgres-generated-column-predicates`)
 6. **No unbounded fan-out.** Use `Promise.all` only over a bounded result, with bounded
