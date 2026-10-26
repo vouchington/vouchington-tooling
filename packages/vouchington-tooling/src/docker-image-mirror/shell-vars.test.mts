@@ -329,7 +329,7 @@ runs:
         labels: \${{ steps.meta.outputs.labels }}
 `
     expect(short(metaBuild(labels))).toEqual(['ghcr.io/o/app:$TAG'])
-    const tags = labels.replace('tags: app:ci', 'tags: \${{ steps.meta.outputs.tags }}')
+    const tags = labels.replace('tags: app:ci', 'tags: ${{ steps.meta.outputs.tags }}')
     expect(short(metaBuild(tags))).toEqual([])
   })
 

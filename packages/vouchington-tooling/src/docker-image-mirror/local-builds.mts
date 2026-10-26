@@ -100,7 +100,7 @@ export function collectLocalBuilds(steps: readonly BuildStep[]): LocalBuilds {
       const value = recorded(tag, step)
       if (value) tags.add(value)
     }
-    const used = `${step.with?.tags}\n${step.with?.files}`
+    const used = [step.with?.tags, step.with?.files].filter((v) => typeof v === 'string').join('\n')
     for (const [id, images] of metadata) {
       if (used.includes(`steps.${id}.outputs.`)) images.forEach((image) => repositories.add(image))
     }
