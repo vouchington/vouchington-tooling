@@ -75,6 +75,8 @@ export const snapshotExport: ToolHandler = async (args, context) => {
       sessionId: context.sessionId,
       worktree: context.worktree,
       path: outcome.path,
+      ...(outcome.checksum === undefined ? {} : { checksum: outcome.checksum }),
+      ...(outcome.counts === undefined ? {} : { counts: outcome.counts }),
       ...(typeof clientToken === 'string' ? { clientToken } : {}),
       ...recordedPartitions(outcome),
     }),

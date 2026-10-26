@@ -17,6 +17,8 @@ export type FakeOptions = {
   exportResult?: unknown
   /** Gives the fake client its own capability-aware snapshot cleanup. */
   clientCleanup?: (options: unknown) => Promise<void>
+  /** Gives the fake client its own capability-aware snapshot partition. */
+  clientPartition?: (options: unknown) => Promise<unknown>
   /** Makes `ensure` fail for any other identity, and `get` report a session with this one. */
   conflictingSession?: { id: string; parentSessionId: null; agent: string; version: string }
   entries?: StoredEntry[]
@@ -119,6 +121,9 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     ...(options.clientCleanup === undefined
       ? {}
       : { cleanupSnapshotPartitions: options.clientCleanup }),
+    ...(options.clientPartition === undefined
+      ? {}
+      : { partitionSnapshot: options.clientPartition }),
   }
   return { dependencies: { loadClient: async () => module }, calls, stored }
 }

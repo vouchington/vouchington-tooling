@@ -104,8 +104,47 @@ export const TOOLS: readonly ToolDefinition[] = [
     },
   ),
   tool(
+    'snapshot_partition',
+    'Splits the snapshot snapshot_export wrote into bounded, whole-session, read-only JSONL ' +
+      'partitions. Takes the cleanupToken snapshot_export returned: the server resolves the file ' +
+      'and the blackboard client capability from its own record, verifies the file against the ' +
+      'checksum and counts the export reported (or the ones supplied), and records the partition ' +
+      'directory so snapshot_cleanup removes it with the snapshot. Returns the directory and each ' +
+      "partition's path, counts, checksum, and manifest. The token stays valid for " +
+      'snapshot_cleanup; a snapshot is partitioned once, and a failed partition leaves the token ' +
+      'valid for a retry. Hand subagents only these partitions, never the snapshot.',
+    ADDITIVE,
+    {
+      cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' },
+      checksum: {
+        type: 'string',
+        pattern: '^[0-9a-f]{64}$',
+        description: 'Expected sha256 hex of the snapshot; defaults to the export checksum.',
+      },
+      counts: {
+        type: 'object',
+        properties: {
+          sessions: { type: 'integer', minimum: 0 },
+          entries: { type: 'integer', minimum: 0 },
+          records: { type: 'integer', minimum: 0 },
+          bytes: { type: 'integer', minimum: 0 },
+        },
+        required: ['sessions', 'entries', 'records', 'bytes'],
+        additionalProperties: false,
+        description: 'Expected counts of the snapshot; defaults to the export counts.',
+      },
+      maxSessions: {
+        type: 'integer',
+        minimum: 1,
+        description: 'Whole sessions per partition (25).',
+      },
+      maxBytes: { type: 'integer', minimum: 1, description: 'Bytes per partition (1048576).' },
+    },
+    ['cleanupToken'],
+  ),
+  tool(
     'snapshot_cleanup',
-    'Deletes the snapshot file (and partition directory, when one was recorded) that ' +
+    'Deletes the snapshot file and the partition directory (from snapshot_partition) that ' +
       'snapshot_export produced. Takes only the cleanupToken it returned: the server resolves the ' +
       'paths from its own record, never from the caller. The token is bound to the sessionId and ' +
       'worktree that exported, is single-use, and is forgotten when the server restarts (the ' +
