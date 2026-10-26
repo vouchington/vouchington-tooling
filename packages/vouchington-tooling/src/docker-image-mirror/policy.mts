@@ -19,7 +19,7 @@ export function policyActive(policy: ImagePolicy): boolean {
   return (policy.allowRegistries?.length ?? 0) > 0 || policy.requireDigest === true
 }
 
-function cleanImage(reference: string): string {
+export function cleanImage(reference: string): string {
   return reference.replace(/^["']|["'),;]+$/gu, '')
 }
 
