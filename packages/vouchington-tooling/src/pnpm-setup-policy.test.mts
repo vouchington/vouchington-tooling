@@ -17,7 +17,7 @@ type Manifest = {
   packageManager?: unknown
 }
 
-const pnpmSetup = /^pnpm\/action-setup@/
+const pnpmSetup = /^pnpm\/setup@[0-9a-f]{40}$/
 const nodeSetup = /^actions\/setup-node@/
 const latestOfMajor = /^latest-\d+$/
 const manualActivation = [
@@ -77,14 +77,27 @@ describe('pnpm setup policy', () => {
   )
   const manifests = workspaceManifests()
 
-  it('installs pnpm through pnpm/action-setup in CI', () => {
+  it('installs pnpm through a SHA-pinned pnpm/setup in CI', () => {
     expect(setups.length).toBeGreaterThan(0)
   })
 
-  it('passes pnpm/action-setup nothing but the latest-<major> dist-tag', () => {
+  it('passes pnpm/setup the latest-<major> dist-tag and installs nothing else', () => {
     for (const { source, step } of setups) {
-      expect(Object.keys(step.with ?? {}), source).toEqual(['version'])
+      expect(Object.keys(step.with ?? {}).toSorted(), source).toEqual([
+        'install',
+        'node-version-file',
+        'version',
+      ])
       expect(String(step.with?.version), source).toMatch(latestOfMajor)
+      expect(step.with?.install, source).toBe(false)
+      expect(step.with?.['node-version-file'], source).toBe(false)
+    }
+  })
+
+  it('never installs a runtime or caches the store through pnpm/setup', () => {
+    for (const { source, step } of setups) {
+      expect(step.with, source).not.toHaveProperty('runtime')
+      expect(step.with, source).not.toHaveProperty('cache')
     }
   })
 

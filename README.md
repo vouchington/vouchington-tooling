@@ -276,7 +276,7 @@ steps:
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
 
 - `setup-node-pnpm` runs `actions/setup-node` from `node-version-file` (default `.nvmrc`), then
-  `pnpm/action-setup` with `version: latest-12` (retried once if the first attempt fails), and runs a frozen install with no pnpm store
+  `pnpm/setup` with `version: latest-12`, `install: false`, and `node-version-file: false` (no retry), and runs a frozen install with no pnpm store
   cache. `install-scripts: 'false'` adds `--ignore-scripts`.
   The caller runs `actions/checkout` first.
 - `fetch-base-ref` fetches only the pull request base branch (`refs/remotes/origin/<base>`) and the
@@ -594,9 +594,9 @@ The plugin currently ships `postgres-cursor-call-contract`, `banned-member-read`
 ## Development
 
 Requires Node 24+ and pnpm 12. The repository does not pin pnpm: no manifest declares
-`packageManager`, and local work uses whichever pnpm 12 is installed. CI asks `pnpm/action-setup` for
-`latest-12` after `actions/setup-node`, so it runs the newest pnpm 12 release that is at least one day
-old. New 12.x releases reach CI without a PR; moving to pnpm 13 needs one.
+`packageManager`, and local work uses whichever pnpm 12 is installed. CI asks `pnpm/setup` for
+`latest-12` after `actions/setup-node`, so it runs the newest pnpm 12 release as soon as it is
+published (`pnpm/setup` applies no release-age cutoff). New 12.x releases reach CI without a PR; moving to pnpm 13 needs one.
 `pnpm-setup-policy.test.mts` enforces that shape.
 
 ```bash

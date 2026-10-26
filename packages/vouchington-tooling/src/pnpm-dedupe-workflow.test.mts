@@ -108,7 +108,7 @@ describe('pnpm-dedupe reusable workflow', () => {
       'node-version-file': '${{ inputs.node-version-file }}',
     })
     expect(steps.some((step) => step.uses?.startsWith('actions/setup-node'))).toBe(false)
-    expect(steps.some((step) => step.uses?.startsWith('pnpm/action-setup'))).toBe(false)
+    expect(steps.some((step) => step.uses?.startsWith('pnpm/setup'))).toBe(false)
     expect(steps.some((step) => step.run?.includes('pnpm install'))).toBe(false)
   })
 
@@ -152,7 +152,7 @@ describe('pnpm-dedupe reusable workflow', () => {
     const download = publishSteps.find((step) => step.uses?.includes('actions/download-artifact'))
     expect(download?.with).toMatchObject({ name: 'pnpm-dedupe-lockfile' })
     expect(publishSteps.some((step) => step.uses?.includes('setup-node'))).toBe(false)
-    expect(publishSteps.some((step) => step.uses?.includes('pnpm/action-setup'))).toBe(false)
+    expect(publishSteps.some((step) => step.uses?.includes('pnpm/setup'))).toBe(false)
     const runs = publishSteps.map((step) => step.run ?? '').join('\n')
     expect(runs).not.toMatch(/^\s*(pnpm|npm|npx|node)\s/mu)
     expect(publishSteps[0]?.with).toMatchObject({ 'persist-credentials': false })

@@ -3,8 +3,10 @@
 pnpm workspace. Node >= 24. Two published packages live under `packages/`.
 
 pnpm 12 is required but never pinned: no `packageManager` or `devEngines.packageManager` field,
-no Corepack, and every `pnpm/action-setup` step takes only `version: latest-12` after
-`actions/setup-node`. CI therefore runs the newest pnpm 12 release that is at least one day old: 12.x
+no Corepack, and every `pnpm/setup` step takes only `version: latest-12` after
+`actions/setup-node`, with `install: false` and `node-version-file: false` so it installs neither
+dependencies nor a second Node. `pnpm/setup` resolves the `latest-12` dist-tag directly and applies
+no release-age cutoff, so CI runs the newest pnpm 12 release as soon as it is published: 12.x
 releases reach CI without a PR, and moving to pnpm 13 needs one.
 `packages/vouchington-tooling/src/pnpm-setup-policy.test.mts` enforces this.
 

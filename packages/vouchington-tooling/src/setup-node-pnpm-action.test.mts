@@ -6,9 +6,7 @@ import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 type Step = {
-  id?: string
   name?: string
-  'continue-on-error'?: boolean
   run?: string
   uses?: string
   if?: string
@@ -49,21 +47,20 @@ describe('setup-node-pnpm composite action', () => {
       'node-version-file': '${{ inputs.node-version-file }}',
       'package-manager-cache': false,
     })
-    expect(pnpm?.uses).toMatch(/^pnpm\/action-setup@[0-9a-f]{40}$/)
-    expect(pnpm?.with).toEqual({ version: 'latest-12' })
-    expect(pnpm?.id).toBe('pnpm-setup')
-    expect(pnpm?.['continue-on-error']).toBe(true)
+    expect(pnpm?.uses).toMatch(/^pnpm\/setup@[0-9a-f]{40}$/)
+    expect(pnpm?.with).toEqual({
+      version: 'latest-12',
+      install: false,
+      'node-version-file': false,
+    })
   })
 
-  it('retries pnpm setup once, only when the first attempt failed', () => {
-    const [, first, retry] = steps
-    expect(retry?.if).toBe("steps.pnpm-setup.outcome == 'failure'")
-    expect(retry?.uses).toBe(first?.uses)
-    expect(retry?.with).toEqual(first?.with)
-    expect(retry?.['continue-on-error']).toBeUndefined()
+  it('sets pnpm up once, with no retry', () => {
     expect(
-      steps.filter((candidate) => (candidate.uses ?? '').startsWith('pnpm/action-setup@')),
-    ).toHaveLength(2)
+      steps.filter((candidate) => (candidate.uses ?? '').startsWith('pnpm/setup@')),
+    ).toHaveLength(1)
+    expect(steps.some((candidate) => 'continue-on-error' in candidate)).toBe(false)
+    expect(source).not.toMatch(/action-setup|outcome/u)
   })
 
   it('never caches the pnpm store', () => {

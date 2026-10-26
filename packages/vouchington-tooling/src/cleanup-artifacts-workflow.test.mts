@@ -84,9 +84,13 @@ describe('cleanup-artifacts reusable workflow', () => {
       'persist-credentials': false,
     })
     const setupNode = steps.findIndex((step) => step.uses?.startsWith('actions/setup-node'))
-    const setupPnpm = steps.findIndex((step) => step.uses?.startsWith('pnpm/action-setup'))
+    const setupPnpm = steps.findIndex((step) => step.uses?.startsWith('pnpm/setup@'))
     expect(setupPnpm).toBeGreaterThan(setupNode)
-    expect(steps[setupPnpm]?.with).toEqual({ version: 'latest-12' })
+    expect(steps[setupPnpm]?.with).toEqual({
+      version: 'latest-12',
+      install: false,
+      'node-version-file': false,
+    })
     expect(
       steps.find((step) => step.name === 'Install and build the CLI')?.['working-directory'],
     ).toBe('.tooling')
