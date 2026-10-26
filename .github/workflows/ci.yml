@@ -25,9 +25,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      - id: pnpm-version
+        uses: ./.github/actions/resolve-pnpm-version
       - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          version: latest-12
+          version: ${{ steps.pnpm-version.outputs.version }}
           install: false
           node-version-file: false
       - run: pnpm install --frozen-lockfile
@@ -58,9 +60,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      - id: pnpm-version
+        uses: ./.github/actions/resolve-pnpm-version
       - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          version: latest-12
+          version: ${{ steps.pnpm-version.outputs.version }}
           install: false
           node-version-file: false
       - run: pnpm install --frozen-lockfile
@@ -111,9 +115,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      - id: pnpm-version
+        uses: ./.github/actions/resolve-pnpm-version
       - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          version: latest-12
+          version: ${{ steps.pnpm-version.outputs.version }}
           install: false
           node-version-file: false
       - run: pnpm install --frozen-lockfile

@@ -87,7 +87,7 @@ describe('cleanup-artifacts reusable workflow', () => {
     const setupPnpm = steps.findIndex((step) => step.uses?.startsWith('pnpm/setup@'))
     expect(setupPnpm).toBeGreaterThan(setupNode)
     expect(steps[setupPnpm]?.with).toEqual({
-      version: 'latest-12',
+      version: '${{ steps.pnpm-version.outputs.version }}',
       install: false,
       'node-version-file': false,
     })

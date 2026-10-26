@@ -6,6 +6,7 @@ import { parse as load } from 'yaml'
 import { describe, expect, it } from 'vitest'
 
 type Step = {
+  id?: string
   name?: string
   run?: string
   uses?: string
@@ -41,15 +42,17 @@ describe('setup-node-pnpm composite action', () => {
   })
 
   it('activates Node from the input version file and then pnpm 12', () => {
-    const [node, pnpm] = steps
+    const [node, resolve, pnpm] = steps
     expect(node?.uses).toMatch(/^actions\/setup-node@[0-9a-f]{40}$/)
     expect(node?.with).toEqual({
       'node-version-file': '${{ inputs.node-version-file }}',
       'package-manager-cache': false,
     })
     expect(pnpm?.uses).toMatch(/^pnpm\/setup@[0-9a-f]{40}$/)
+    expect(resolve?.id).toBe('pnpm-version')
+    expect(resolve?.run).toBe('node "$GITHUB_ACTION_PATH/../resolve-pnpm-version/resolve.mjs"')
     expect(pnpm?.with).toEqual({
-      version: 'latest-12',
+      version: '${{ steps.pnpm-version.outputs.version }}',
       install: false,
       'node-version-file': false,
     })

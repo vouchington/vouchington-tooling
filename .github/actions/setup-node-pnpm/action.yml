@@ -21,9 +21,13 @@ runs:
     # pnpm/setup downloads pnpm's native binary and needs no Node. install: false keeps the
     # explicit frozen install below; node-version-file: false with no runtime input stops it
     # installing a second Node (no devEngines.runtime is declared); cache stays off.
+    # The newest stable pnpm 12 release at least 24 hours old; pnpm stays unpinned in the repo.
+    - id: pnpm-version
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../resolve-pnpm-version/resolve.mjs"
     - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
       with:
-        version: latest-12
+        version: ${{ steps.pnpm-version.outputs.version }}
         install: false
         node-version-file: false
     # No pnpm store cache: on hosted runners a fresh install is fast enough, and restoring and

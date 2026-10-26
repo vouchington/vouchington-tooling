@@ -1,0 +1,25 @@
+name: Resolve pnpm version
+description: >
+  Resolves the highest stable pnpm release of one major that was published at least
+  min-age-hours ago, so pnpm stays unpinned in the repository but a just-published release
+  is quarantined. Makes one registry request with no retry. Requires Node.js on PATH.
+inputs:
+  major:
+    description: 'pnpm major version to resolve'
+    default: '12'
+  min-age-hours:
+    description: 'Minimum age of the release in hours'
+    default: '24'
+outputs:
+  version:
+    description: 'Exact pnpm version to pass to pnpm/setup'
+    value: ${{ steps.resolve.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        PNPM_MAJOR: ${{ inputs.major }}
+        MIN_AGE_HOURS: ${{ inputs.min-age-hours }}
+      run: node "$GITHUB_ACTION_PATH/resolve.mjs"

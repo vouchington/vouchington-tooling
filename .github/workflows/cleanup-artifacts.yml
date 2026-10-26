@@ -56,10 +56,13 @@ jobs:
         with:
           node-version: 24
 
+      - id: pnpm-version
+        uses: ./.tooling/.github/actions/resolve-pnpm-version
+        timeout-minutes: 2
       - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         timeout-minutes: 2
         with:
-          version: latest-12
+          version: ${{ steps.pnpm-version.outputs.version }}
           install: false
           node-version-file: false
 

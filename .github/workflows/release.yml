@@ -61,9 +61,11 @@ jobs:
           # npm trusted-publishing docs: do not cache the package manager on release.
           package-manager-cache: false
 
+      - id: pnpm-version
+        uses: ./.github/actions/resolve-pnpm-version
       - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          version: latest-12
+          version: ${{ steps.pnpm-version.outputs.version }}
           install: false
           node-version-file: false
 

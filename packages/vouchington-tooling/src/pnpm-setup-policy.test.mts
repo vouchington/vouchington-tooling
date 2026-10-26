@@ -9,7 +9,7 @@ import { expandWorkspaceGlob } from './workspace-glob.mts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-type Step = { uses?: string; with?: Record<string, unknown> }
+type Step = { id?: string; run?: string; uses?: string; with?: Record<string, unknown> }
 type StepList = { source: string; steps: Step[] }
 type Manifest = {
   devEngines?: { packageManager?: unknown }
@@ -19,7 +19,8 @@ type Manifest = {
 
 const pnpmSetup = /^pnpm\/setup@[0-9a-f]{40}$/
 const nodeSetup = /^actions\/setup-node@/
-const latestOfMajor = /^latest-\d+$/
+const resolvedVersion = /^\$\{\{ steps\.([\w-]+)\.outputs\.version \}\}$/
+const resolver = /(?:^|\/)resolve-pnpm-version(?:\/resolve\.mjs)?(?:\s|"|$)/
 const manualActivation = [
   /\bcorepack\b/i,
   /\bpnpm@\d/,
@@ -81,14 +82,18 @@ describe('pnpm setup policy', () => {
     expect(setups.length).toBeGreaterThan(0)
   })
 
-  it('passes pnpm/setup the latest-<major> dist-tag and installs nothing else', () => {
-    for (const { source, step } of setups) {
+  it('passes pnpm/setup a version from the resolver step and installs nothing else', () => {
+    for (const { before, source, step } of setups) {
       expect(Object.keys(step.with ?? {}).toSorted(), source).toEqual([
         'install',
         'node-version-file',
         'version',
       ])
-      expect(String(step.with?.version), source).toMatch(latestOfMajor)
+      const id = resolvedVersion.exec(String(step.with?.version))?.[1]
+      expect(id, source).toBeDefined()
+      const producer = before.find((candidate) => candidate.id === id)
+      expect(`${producer?.uses ?? ''} ${producer?.run ?? ''}`, source).toMatch(resolver)
+      expect(producer?.with, source).toBeUndefined()
       expect(step.with?.install, source).toBe(false)
       expect(step.with?.['node-version-file'], source).toBe(false)
     }
@@ -99,10 +104,6 @@ describe('pnpm setup policy', () => {
       expect(step.with, source).not.toHaveProperty('runtime')
       expect(step.with, source).not.toHaveProperty('cache')
     }
-  })
-
-  it('requests the same pnpm major everywhere', () => {
-    expect(new Set(setups.map(({ step }) => String(step.with?.version))).size).toBe(1)
   })
 
   it('sets up Node before pnpm in the same job or composite action', () => {
