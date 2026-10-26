@@ -45,6 +45,7 @@ export function checkDockerImageMirrors(
   const policy: ImagePolicy = {
     allowRegistries: options.allowRegistries,
     requireDigest: options.requireDigest,
+    allowRefExpressions: options.allowRefExpressions,
   }
   const errors: string[] = []
   for (const path of trackedFiles) {

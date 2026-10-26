@@ -428,7 +428,7 @@ exact versioned `deb`/`apk`/`rpm` purls, a `Not exploitable: <reason>. Cleanup: 
 statement (the URL must start with `--cleanup-url-prefix` when given, else any GitHub issue) and an
 `expired_at` UTC date after today and at most `--max-expiry-days` (default 30) away.
 
-`vouchington docker-image-mirror [--mirror <host>] [--allow-registry <prefix>]... [--require-digest]` reports every Docker Hub image reference in
+`vouchington docker-image-mirror [--mirror <host>] [--allow-registry <prefix>]... [--require-digest] [--allow-ref-expression <text>]...` reports every Docker Hub image reference in
 tracked workflows, composite actions and Dockerfiles: `docker run|pull|create`, `container:`,
 `services:`, `docker://` uses, `docker/setup-buildx-action` drivers, `FROM`, `COPY --from` and
 `# syntax=`. An image is accepted when it names a registry host; `--mirror` (default
@@ -454,13 +454,35 @@ exempt when it exactly equals a tag that file produces, or is exactly
 `${{ steps.<id>.outputs.<name> }}` where `<id>` is a step that builds. Produced tags are the
 `-t`/`--tag`/`--tag=` values of `docker build`, `docker buildx build` and `podman build` in `run:`
 steps, and the newline- or comma-separated `tags:` of a `docker/build-push-action` step with
-`load: true`. A tag value that itself contains an expression (`${{ }}`) or shell variable is
-skipped and exempts nothing. A matching tag in a different file does not count, and every other
-reference is checked as before. Without either flag nothing is exempt.
+`load: true`. A tag is recorded as normalized text: quotes are stripped, `${X}` and `${{ env.X }}`
+become `$X`, and a variable the step's own `env:` defines (`REPO: ${{ inputs.repo }}`, `TAG: built`)
+is replaced by its value, so each step's binding is compared by what it holds, never by name. A tag that is only
+a variable is skipped. A `docker/metadata-action` `images:` name also counts as a built repository
+(any tag, never a `@digest` form) when a `docker/build-push-action` (`load: true`) step's `tags:` or
+a `docker/bake-action` step's `files:` consumes that step's outputs. A bake step must not set
+`push: true`, `load: false` or a non-docker `set: *.output=`.
+
+An image argument that is exactly `$VAR`, `"$VAR"` or `${VAR}` of `docker run|pull|create` is
+resolved through the last `VAR=value` (or `export`/`local`/`readonly`) line before it in the same
+`run:` block, then compared as above. Only unindented assignments are trusted: a variable that is
+also assigned on an indented line (a possible branch), in another block, after the command, or by
+`$(...)`, or a single-quoted `'$VAR'`, is not resolved. A docker command inside `$(...)` no longer keeps the trailing `)`.
+A matching tag in a different file does not count, and every other reference is checked as before.
+Without either flag nothing is exempt.
+
+`--allow-ref-expression <text>` (repeatable) is an audited escape hatch for dynamic values a scan
+cannot verify, such as a job output validated by a trusted job: an image reference whose raw text
+exactly equals the value is accepted by both checks. It is an exact string match, never a pattern,
+and an empty value exits 2. Spell out each value in the command so it is reviewed:
+
+```bash
+vouchington docker-image-mirror --allow-registry ghcr.io/vouchington/dependency- --require-digest \
+  --allow-ref-expression '${{ needs.prepare.outputs.postgres_image }}'
+```
 
 The checks are exported as `checkTrivyPolicy(root, trackedFiles, options)` from
 `vouchington-tooling/trivy-policy` (plus the command parsers and `validateIgnoreRegistry`) and
-`checkDockerImageMirrors(root, trackedFiles, { mirror, allowRegistries, requireDigest })` from `vouchington-tooling/docker-image-mirror`;
+`checkDockerImageMirrors(root, trackedFiles, { mirror, allowRegistries, requireDigest, allowRefExpressions })` from `vouchington-tooling/docker-image-mirror`;
 both return violation strings.
 
 ## Running the Storybook browser tests

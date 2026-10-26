@@ -50,6 +50,7 @@ describe('collectLocalBuilds', () => {
         'multi',
         'noid',
         'one',
+        'six-${{ github.sha }}',
         'sudoed',
         'thenned',
         'three',
@@ -142,19 +143,21 @@ describe('local build exemptions', () => {
     ])
   })
 
-  it('skips tags containing an expression or variable', () => {
+  it('records tags containing an expression or variable as normalized text', () => {
     const doc: Document = {
       jobs: {
         j: {
           steps: [
             { run: 'docker build -t app:${{ github.sha }} .' },
             { run: 'docker build -t "app:$TAG" .' },
-            { run: 'docker run app:${{ github.sha }}\ndocker run "app:$TAG"' },
+            {
+              run: 'docker run app:${{ github.sha }}\ndocker run "app:${TAG}"\ndocker run app:$TAGS',
+            },
           ],
         },
       },
     }
-    expect(check(doc)).toHaveLength(2)
+    expect(check(doc).map((v) => v.split(' must')[0])).toEqual(['j: app:$TAGS'])
   })
 
   it('leaves the Docker Hub default check unchanged without a policy', () => {

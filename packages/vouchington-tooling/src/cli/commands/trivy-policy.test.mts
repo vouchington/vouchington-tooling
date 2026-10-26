@@ -146,6 +146,32 @@ describe('vouchington docker-image-mirror', () => {
     expect((await run(runDockerImageMirrorCommand, ['--root', outside])).code).toBe(1)
   })
 
+  it('accepts an exact --allow-ref-expression and rejects an empty value', async () => {
+    const expression = '${{ needs.prepare.outputs.postgres_image }}'
+    const root = gitRepo({
+      '.github/workflows/s.yml': `jobs:\n  g:\n    services:\n      postgres:\n        image: ${expression}\n`,
+    })
+    const base = ['--root', root, '--allow-registry', 'ghcr.io/vouchington/dependency-']
+    const denied = await run(runDockerImageMirrorCommand, [...base, '--require-digest'])
+    expect(denied.code).toBe(1)
+    const near = await run(runDockerImageMirrorCommand, [
+      ...base,
+      '--allow-ref-expression',
+      '${{ needs.prepare.outputs.postgres_image }} ',
+    ])
+    expect(near.code).toBe(1)
+    const allowed = await run(runDockerImageMirrorCommand, [
+      ...base,
+      '--require-digest',
+      '--allow-ref-expression',
+      expression,
+    ])
+    expect(allowed.code).toBe(0)
+    const empty = await run(runDockerImageMirrorCommand, ['--allow-ref-expression', ''])
+    expect(empty.code).toBe(2)
+    expect(empty.err).toContain('non-empty value')
+  })
+
   it('enforces --allow-registry and --require-digest', async () => {
     const digest = `sha256:${'a'.repeat(64)}`
     const root = gitRepo({
