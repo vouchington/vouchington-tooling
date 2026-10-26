@@ -412,8 +412,8 @@ mismatches) are exported from `vouchington-tooling/coverage-scope`.
 `vouchington workspace-registry-check [--root <dir>] [--syncpack-config <path>]
 [--workspace-file <path>] [--path-filters <path>] [--tooling-group <name>]
 [--trigger-only-glob <glob>] [--runtime-prefix <prefix>]` reconciles every `package.json` listed by
-`git ls-files` under `--root` (default the current directory) with four registries and prints one
-line per violation to stderr (exit 1; 0 when clean, 2 on a usage error):
+`git ls-files` under `--root` (default the current directory) with three registry files (five checks) and
+prints one line per violation to stderr (exit 1; 0 when clean, 2 on a usage error):
 
 | Registry              | Default path                                     | Checks                                                                                                                                           |
 | --------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -424,7 +424,8 @@ line per violation to stderr (exit 1; 0 when clean, 2 on a usage error):
 | tooling reachability  | same file                                        | every manifest and wildcard workspace glob is matched by the `--tooling-group` group (default `tooling`)                                         |
 
 The `--trigger-only-glob` (default `**/package.json`) in the tooling group only triggers CI and does
-not count as registering a manifest. The pure `checkRegistries(trackedFiles, files, names)` and
+not count as registering a manifest in the "real CI path-filter group" check; the tooling
+reachability check still matches against the whole group, trigger-only glob included. The pure `checkRegistries(trackedFiles, files, names)` and
 `loadRegistryFiles(root, paths)` are exported from `vouchington-tooling/workspace-registry-check`.
 
 ```bash
