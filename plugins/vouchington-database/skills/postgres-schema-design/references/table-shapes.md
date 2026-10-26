@@ -38,8 +38,9 @@ survive. One-shot compare-and-set claims and human assignments need their own sh
 
 ## Retention
 
-Give every durable row a finite retention window, except user content. Keep one compact row per
-entity rather than every raw event, and delete a cache's older rows when a new version is written.
+Give every durable row a finite retention window, except user content. Prefer a compact per-entity
+summary over raw event rows when no reader needs the individual events; append-only ledgers still
+get a retention window. Delete a cache's older rows when a new version is written.
 A bounded post-commit enqueue-loss window is acceptable when the stale result heals itself through
 a TTL; no transactional dirty-work table is needed.
 
