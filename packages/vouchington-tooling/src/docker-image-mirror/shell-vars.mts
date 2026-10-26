@@ -6,8 +6,18 @@ const SHELL_VARIABLE = /^\$(?:(\w+)|\{(\w+)\})$/u
 
 export type EnvMap = ReadonlyMap<string, string>
 
+/**
+ * `envMapping` of a step, minus every variable its `run:` script assigns: a reassigned variable no
+ * longer holds the step's declared value, so it is left unsubstituted.
+ */
+export function stepEnv(step: { env?: unknown; run?: string }): EnvMap {
+  const map = new Map(envMapping(step.env))
+  for (const [, name] of (step.run ?? '').matchAll(/(?:^|[\s;&|(])(\w+)=/gu)) map.delete(name!)
+  return map
+}
+
 /** Canonical text of each variable a step `env:` mapping defines, keyed by name. */
-export function envMapping(env: unknown): EnvMap {
+function envMapping(env: unknown): EnvMap {
   const map = new Map<string, string>()
   if (typeof env !== 'object' || env === null) return map
   for (const [name, value] of Object.entries(env)) map.set(name, canonical(String(value).trim()))
@@ -47,7 +57,7 @@ export function variableName(token: string): string | undefined {
  */
 export function lastAssignment(before: string, name: string): string | undefined {
   const pattern = new RegExp(
-    `^([ \\t]*)(?:(?:export|local|readonly)[ \\t]+)?${name}=((?:"[^"]*"|'[^']*'|[^\\s;&|)"'])*)`,
+    `^([ \\t]*)(?:(?:export|local|readonly)[ \\t]+)?${name}=((?:"[^"]*"|'[^']*'|[^\\s;&|)"'])*)(?=[ \\t]*(?:$|[;&|)]))`,
     'gmu',
   )
   const found = [...before.matchAll(pattern)]

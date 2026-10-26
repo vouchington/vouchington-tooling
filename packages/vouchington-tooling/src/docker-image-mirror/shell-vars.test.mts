@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { dockerfileViolations, workflowImageViolations, type Document } from './index.mts'
 import { collectLocalBuilds } from './local-builds.mts'
-import { envMapping, lastAssignment, normalizeText, variableName } from './shell-vars.mts'
+import { lastAssignment, normalizeText, stepEnv, variableName } from './shell-vars.mts'
 
 const strict = { allowRegistries: ['ghcr.io/vouchington/dependency-'], requireDigest: true }
 const violations = (yaml: string, policy = strict) =>
@@ -259,13 +259,16 @@ describe('the Dockerfile tag stays rejected', () => {
 
 describe('helpers', () => {
   it('normalizes text and variable names', () => {
-    const env = envMapping({ A: '${{ inputs.a }}', B: 3, C: "'x'" })
+    const env = stepEnv({
+      env: { A: '${{ inputs.a }}', B: 3, C: "'x'", D: 'd' },
+      run: 'echo x; D=2',
+    })
     expect([...env]).toEqual([
       ['A', '${{ inputs.a }}'],
       ['B', '3'],
       ['C', 'x'],
     ])
-    expect(envMapping(undefined).size).toBe(0)
+    expect(stepEnv({}).size).toBe(0)
     expect(normalizeText('"${{ inputs.a }}"/${B}/${{env.C}}/${{ x.y }}/$D', env)).toBe(
       '${{ inputs.a }}/3/x/${{ x.y }}/$D',
     )
@@ -275,6 +278,7 @@ describe('helpers', () => {
     expect(lastAssignment('A=1\nlocal A="2 3"\nAB=4', 'A')).toBe('"2 3"')
     expect(lastAssignment('echo A=1', 'A')).toBeUndefined()
     expect(lastAssignment('A="x"-y', 'A')).toBe('"x"-y')
+    expect(lastAssignment('A=1\nA=2 cmd', 'A')).toBe('1')
     expect(lastAssignment('A=1\nif t; then\n  A=2\nfi', 'A')).toBeUndefined()
     expect(lastAssignment('f() {\nA=1\n}\nA=2', 'A')).toBe('2')
     expect(lastAssignment('f() {\nA=1\n}', 'A')).toBeUndefined()
@@ -369,6 +373,22 @@ runs:
     expect(short(stepsOf(subshell, built))).toEqual(['"$IMAGE"'])
     const fn = 'IMAGE=ext:1\nset_it() {\nIMAGE=app:ci\n}\ndocker run "$IMAGE"'
     expect(short(stepsOf(fn, built))).toEqual(['"$IMAGE"'])
+  })
+
+  it('does not trust command-local assignments or step env the script overwrites', () => {
+    const local = 'IMAGE=ext:1\nIMAGE=app:ci true\ndocker run "$IMAGE"'
+    expect(short(stepsOf(local, built))).toEqual(['"$IMAGE"'])
+    const doc = `
+runs:
+  steps:
+    - run: docker build -t app:ci .
+    - env:
+        TAG: ci
+      run: |
+        TAG=external
+        docker run app:$TAG
+`
+    expect(short(doc)).toEqual(['app:$TAG'])
   })
 
   it('takes the whole assignment word, skips branch assignments, and ignores single quotes', () => {

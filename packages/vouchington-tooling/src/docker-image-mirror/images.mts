@@ -7,13 +7,7 @@ import {
   policyActive,
   type ImagePolicy,
 } from './policy.mts'
-import {
-  envMapping,
-  lastAssignment,
-  normalizeText,
-  variableName,
-  type EnvMap,
-} from './shell-vars.mts'
+import { stepEnv, lastAssignment, normalizeText, variableName, type EnvMap } from './shell-vars.mts'
 
 export { DEFAULT_MIRROR } from './policy.mts'
 
@@ -85,7 +79,7 @@ function stepImages(step: Step): Ref[] {
     ...(step.uses?.startsWith('docker://') ? [step.uses.slice('docker://'.length)] : []),
   ]
   return [
-    ...dockerCommandImages(step.run ?? '', envMapping(step.env)),
+    ...dockerCommandImages(step.run ?? '', stepEnv(step)),
     ...plain.map((raw): Ref => ({ raw, text: raw })),
   ]
 }

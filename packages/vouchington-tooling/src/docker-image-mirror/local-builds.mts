@@ -1,5 +1,5 @@
 import { withoutShellComment } from '../trivy-policy/shell.mts'
-import { envMapping, normalizeText } from './shell-vars.mts'
+import { normalizeText, stepEnv } from './shell-vars.mts'
 
 // Images a workflow file or composite action builds locally are never pulled, so a registry
 // allowlist or digest pin cannot apply to them. A tag is recorded as normalized text, so `$VAR`,
@@ -26,7 +26,7 @@ const BUILD_COMMAND =
   /(?:^|[;&|(]|\b(?:sudo|then|do|else))[ \t]*(?:docker\s+(?:buildx\s+)?|podman\s+)build\b([^\n;&|]*)/gmu
 
 function recorded(tag: string, step: BuildStep): string | undefined {
-  const value = normalizeText(tag.trim(), envMapping(step.env))
+  const value = normalizeText(tag.trim(), stepEnv(step))
   return value === '' || /^\$\w+$|^\$\{\{.*\}\}$/u.test(value) ? undefined : value
 }
 
