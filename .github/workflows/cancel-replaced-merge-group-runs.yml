@@ -51,15 +51,27 @@ jobs:
           # The runs API filters on one status at a time, and gh follows every page of each list.
           candidates="$RUNNER_TEMP/replaced-runs.tsv"
           : > "$candidates"
+          # This job is best-effort housekeeping: a failed or empty listing is a warning, and that
+          # status is skipped.
           for status in queued in_progress waiting requested pending; do
-            gh api --paginate \
-              "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100" |
-              jq -r --arg prefix "$queue_prefix" --arg current "$current_branch" \
-                --argjson run_id "$GITHUB_RUN_ID" '
-                  .workflow_runs[]
-                  | select((.head_branch // "") | startswith($prefix))
-                  | select(.head_branch != $current and .id < $run_id)
-                  | [.id, .name, .head_branch] | @tsv' >> "$candidates"
+            endpoint="repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100"
+            if ! listing=$(gh api --paginate "$endpoint" 2>"$RUNNER_TEMP/list-error.txt") ||
+              [[ -z "$listing" ]]; then
+              echo "::warning::Could not list $status runs from $endpoint, skipping: $(tr '\n' ' ' < "$RUNNER_TEMP/list-error.txt")"
+              continue
+            fi
+            if ! matches=$(jq -r --arg prefix "$queue_prefix" --arg current "$current_branch" \
+              --argjson run_id "$GITHUB_RUN_ID" '
+                (.workflow_runs // [])[]
+                | select((.head_branch // "") | startswith($prefix))
+                | select(.head_branch != $current and .id < $run_id)
+                | [.id, .name, .head_branch] | @tsv' <<< "$listing"); then
+              echo "::warning::Could not parse $status runs from $endpoint, skipping"
+              continue
+            fi
+            if [[ -n "$matches" ]]; then
+              printf '%s\n' "$matches" >> "$candidates"
+            fi
           done
 
           failed=0

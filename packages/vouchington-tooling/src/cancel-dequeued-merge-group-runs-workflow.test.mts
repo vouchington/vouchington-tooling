@@ -307,4 +307,56 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.stdout).toContain('::error::queue-base must be a single branch name')
     expect(result.calls).toEqual([])
   })
+
+  it('warns and exits 0 when listing runs returns an HTTP 502', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'error',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).toContain('::warning::')
+    expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
+  })
+
+  it('warns and exits 0 when listing runs returns empty output', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'empty',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).toContain('::warning::')
+    expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
+  })
+
+  it('treats a null runs body as no runs without a warning', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'null',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).not.toContain('::warning::')
+  })
+
+  it('cancels nothing and exits 0 when the pull request state cannot be read', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      pullError: true,
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).toContain('::warning::Could not read repos/example/repo/pulls/14')
+    expect(result.summary).toContain('could not be read')
+  })
+
+  it('keeps cancelling a run whose jobs body has no jobs array', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      jobs: { 100: 'null' },
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([100])
+  })
 })

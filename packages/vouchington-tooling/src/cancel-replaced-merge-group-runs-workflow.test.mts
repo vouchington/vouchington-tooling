@@ -182,4 +182,36 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.stdout).toContain('::error::Unexpected merge group ref')
     expect(result.calls).toEqual([])
   })
+
+  it('warns and exits 0 when listing runs returns an HTTP 502', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'error',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).toContain('::warning::')
+    expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
+  })
+
+  it('warns and exits 0 when listing runs returns empty output', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'empty',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).toContain('::warning::')
+    expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
+  })
+
+  it('treats a null runs body as no runs without a warning', () => {
+    const result = execute({
+      pages: { in_progress: [page(run(100, 'Backend', branch(14, 'a')))] },
+      listing: 'null',
+    })
+    expect(result.status).toBe(0)
+    expect(result.cancelled).toEqual([])
+    expect(result.stdout).not.toContain('::warning::')
+  })
 })
