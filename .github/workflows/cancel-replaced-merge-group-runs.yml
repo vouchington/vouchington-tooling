@@ -51,6 +51,7 @@ jobs:
           # The runs API filters on one status at a time, and gh follows every page of each list.
           candidates="$RUNNER_TEMP/replaced-runs.tsv"
           : > "$candidates"
+          skipped=
           # This job is best-effort housekeeping: a failed or empty listing is a warning, and that
           # status is skipped.
           for status in queued in_progress waiting requested pending; do
@@ -58,6 +59,7 @@ jobs:
             if ! listing=$(gh api --paginate "$endpoint" 2>"$RUNNER_TEMP/list-error.txt") ||
               [[ -z "$listing" ]]; then
               echo "::warning::Could not list $status runs from $endpoint, skipping: $(tr '\n' ' ' < "$RUNNER_TEMP/list-error.txt")"
+              skipped="$skipped $status"
               continue
             fi
             if ! matches=$(jq -r --arg prefix "$queue_prefix" --arg current "$current_branch" \
@@ -67,6 +69,7 @@ jobs:
                 | select(.head_branch != $current and .id < $run_id)
                 | [.id, .name, .head_branch] | @tsv' <<< "$listing"); then
               echo "::warning::Could not parse $status runs from $endpoint, skipping"
+              skipped="$skipped $status"
               continue
             fi
             if [[ -n "$matches" ]]; then
@@ -109,6 +112,10 @@ jobs:
               echo "| Workflow | Run | Queue branch | Result |"
               echo "| --- | --- | --- | --- |"
               printf '%s' "$rows"
+            fi
+            if [[ -n "$skipped" ]]; then
+              echo
+              echo "Run listings skipped after an API error for status:$skipped."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

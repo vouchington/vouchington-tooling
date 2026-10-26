@@ -95,6 +95,7 @@ jobs:
           queue_prefix="gh-readonly-queue/${QUEUE_BASE}/pr-${PR_NUMBER}-"
           candidates="$RUNNER_TEMP/dequeued-runs.tsv"
           : > "$candidates"
+          skipped=
           # This job is best-effort housekeeping: a failed or empty listing is a warning, and that
           # status is skipped.
           for status in queued in_progress waiting requested pending; do
@@ -102,6 +103,7 @@ jobs:
             if ! listing=$(gh api --paginate "$endpoint" 2>"$RUNNER_TEMP/list-error.txt") ||
               [[ -z "$listing" ]]; then
               echo "::warning::Could not list $status runs from $endpoint, skipping: $(tr '\n' ' ' < "$RUNNER_TEMP/list-error.txt")"
+              skipped="$skipped $status"
               continue
             fi
             if ! matches=$(jq -r --arg prefix "$queue_prefix" --argjson run_id "$GITHUB_RUN_ID" '
@@ -110,6 +112,7 @@ jobs:
               | select(.id < $run_id)
               | [.id, .name, .head_branch] | @tsv' <<< "$listing"); then
               echo "::warning::Could not parse $status runs from $endpoint, skipping"
+              skipped="$skipped $status"
               continue
             fi
             if [[ -n "$matches" ]]; then
@@ -155,9 +158,9 @@ jobs:
           done < <(sort -t$'\t' -k1,1n -u "$candidates")
 
           if [[ -z "$rows" ]]; then
-            summary "Cancelled runs: none active."
+            summary "Cancelled runs: none active.${skipped:+ Run listings skipped after an API error for status:$skipped.}"
           else
-            summary "$(printf '%s\n' '| Workflow | Run | Queue branch | Result |' '| --- | --- | --- | --- |')"$'\n'"${rows%$'\n'}"
+            summary "$(printf '%s\n' '| Workflow | Run | Queue branch | Result |' '| --- | --- | --- | --- |')"$'\n'"${rows%$'\n'}${skipped:+$'\n\n'Run listings skipped after an API error for status:$skipped.}"
           fi
 
           exit "$failed"

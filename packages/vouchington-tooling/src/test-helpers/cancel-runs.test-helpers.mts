@@ -21,6 +21,7 @@ export type Scenario = {
   transientFailures?: number
   listing?: 'error' | 'empty' | 'null'
   pullError?: boolean
+  listingStatus?: Status
   env?: Record<string, string>
 }
 
@@ -79,7 +80,9 @@ esac
 [[ "$1 $2" == "api --paginate" ]] || { echo "unexpected gh call: $*" >&2; exit 99; }
 status="\${url#*status=}"
 status="\${status%%&*}"
-case "\${FAKE_LISTING:-}" in
+mode="\${FAKE_LISTING:-}"
+if [[ -n "\${FAKE_LISTING_STATUS:-}" && "$FAKE_LISTING_STATUS" != "$status" ]]; then mode=; fi
+case "$mode" in
   error) echo 'gh: Server Error (HTTP 502)' >&2; exit 1 ;;
   empty) exit 0 ;;
   null) echo 'null'; exit 0 ;;
@@ -128,6 +131,7 @@ export function createHarness(script: string, defaultEnv: Record<string, string>
           FAKE_TRANSIENT_IDS: (scenario.transient ?? []).join(' '),
           FAKE_TRANSIENT_FAILURES: String(scenario.transientFailures ?? 1),
           FAKE_LISTING: scenario.listing ?? '',
+          FAKE_LISTING_STATUS: scenario.listingStatus ?? '',
           FAKE_PULL_ERROR: String(scenario.pullError ?? false),
           FAKE_MERGED: String(scenario.merged ?? false),
           GH_TOKEN: 'token',
