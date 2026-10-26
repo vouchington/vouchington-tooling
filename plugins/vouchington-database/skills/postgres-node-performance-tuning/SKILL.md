@@ -18,7 +18,8 @@ Measure the query plan and the workload shape before changing code.
 - Keep connection-pool usage bounded.
 - Validate a query change at representative cardinality. Watch latency, memory, lock time, and
   connection pressure together.
-- Cut round trips: fold dependent reads, batch per-item lookups, and overlap independent reads; see
+- Cut round trips without weakening correctness: fold dependent reads, batch per-item lookups, and
+  overlap independent reads; see
   [round trips](references/performance-patterns.md#round-trips).
 - Read the plan for hidden per-row work before trusting a change; see
   [reading plans](references/reading-plans.md).

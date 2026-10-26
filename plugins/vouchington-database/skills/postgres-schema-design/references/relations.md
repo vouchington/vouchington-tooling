@@ -2,7 +2,9 @@
 
 An identity that readers join is an FK column or an FK child row. JSON holds structured,
 schemaless data and history snapshots, including identities recorded as they were at the time.
-Do not use UUID arrays, JSON ids, or type/id pairs for live relations. A column never names a
+Do not use UUID arrays, JSON ids, or type/id pairs for live relations. A relation id that
+appears in JSON or in a hashed key also gets an FK column on the same row; the JSON copy may stay,
+and dedup keys on the FK columns, plus any other identity fields, rather than a hash of the document. A column never names a
 table: use one table per target and generate any per-relation progress enum from the same metadata.
 Cursor positions and random fencing tokens are intentionally not live entity references; record
 their reviewed exception instead of inventing a foreign key.
