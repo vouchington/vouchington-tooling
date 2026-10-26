@@ -6,7 +6,8 @@ semantics require one. Partition on the range key that queries and retention act
 
 Choose a lifecycle. Pre-create future ranges before writes need them, or use on-demand ranges:
 `RANGE (id)` with a DEFAULT partition, split into explicit ranges on demand, and a guarded drop
-that refuses drops inside the retention window or under legal hold. Maintain a default partition
+that refuses drops inside the retention window or under legal hold. Move or check rows in the
+DEFAULT partition that belong to the range before dropping it. Maintain a default partition
 only with an explicit attachment plan. Before attaching a populated range, prove the default partition excludes that range
 or move conflicting rows; otherwise attachment can scan and lock the default partition.
 

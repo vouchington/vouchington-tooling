@@ -81,8 +81,9 @@ parent id, `WHERE account_id = $1`, for the one account it was started for.
 
 ## High-water-mark window with an overlap
 
-Prefer keeping the position and the sweep's fixed end in job data. Use a persisted cursor table only
-when the position must be transactional with domain rows, as here.
+Prefer keeping the position and the sweep's fixed end in job data for a single-writer continuation.
+Use a persisted cursor table when workers share progress through compare-and-set, or when the
+position must be transactional with domain rows, as here.
 
 An export reads `invoices` added since the last sweep. The cursor row holds the position and the
 sweep's fixed end, and the job seeds its own row:

@@ -4,7 +4,8 @@ Use pools and release checked-out clients in `finally`, especially for cursors, 
 Route ordinary reads to a replica when its lag is acceptable; route read-after-write, locking, and
 transaction-consistent reads to the writer. Do not hold a client across unrelated application work.
 Never hold a transaction, connection, or advisory lock across an external call; take a token lease
-in a shared store instead, with a TTL, renewal, and compare-and-delete release.
+in a shared store instead, with a TTL, renewal, and compare-and-delete release. Stop work when
+renewal fails, and guard any write a stale owner could make with the token.
 
 For large reads, use keyset pagination, cursors, or streams with cancellation and bounded batches.
 For writes, prefer set-based batches such as UNNEST or COPY when they preserve validation and error
@@ -133,14 +134,16 @@ runs one statement at a time. Merge them instead: CTEs, `UNNEST`, or one multi-r
 
 Write the batch implementation first: it takes an array of keys and returns a keyed map. The
 single-item function is a thin wrapper over it (`addUrl(url)` calls `addUrls([url])`), with no
-parallel per-item SQL path, for lookups and mutations alike. Call the batch from loops, `.map`
+parallel per-item SQL path, for lookups and mutations alike. Keep atomicity, partial-failure,
+ordering, duplicate-key, and result-shape semantics identical, or keep a per-item path. Call the batch from loops, `.map`
 callbacks, and `Promise.all` fan-outs. `no-await-in-loop` misses a helper that queries internally
 and `Promise.all(items.map(helper))`; review those call sites by hand.
 
 Overlap independent cache and PostgreSQL reads with `Promise.all`, such as a rate-limiter check
 alongside the user fetch. Serialize only true dependencies, where one result feeds the next call. Suppress the
 sequential-await lint only when each step consumes the previous step's result; a shared
-transaction client or lock ordering is not a data dependency. Audit every added suppression.
+transaction client or lock ordering is not a data dependency. A lock that must be taken first
+stays a separate, earlier statement; never reorder or parallelize it. Audit every added suppression.
 
 Correctness comes before round trips. Before folding a statement away, state the guarantee it
 gave (what it locked, which snapshot it read) and reject the fold if that weakens. An `EXISTS`
