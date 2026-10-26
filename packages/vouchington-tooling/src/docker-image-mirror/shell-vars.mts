@@ -21,7 +21,7 @@ function canonical(text: string): string {
       const name = /^env\.(\w+)$/u.exec(expression)?.[1]
       return name ? `$${name}` : `\${{ ${expression} }}`
     })
-    .replace(/\$\{(\w+)\}/gu, '$$$1')
+    .replace(/\$\{(\w+)\}(?!\w)/gu, '$$$1')
 }
 
 /**
@@ -41,8 +41,9 @@ export function variableName(token: string): string | undefined {
 
 /**
  * Value of the last `VAR=value` statement in `before` (the same run block, earlier lines). Only
- * unindented statements are trusted: any indented assignment to the name may sit in a branch that
- * does not run, so the variable is then left unresolved.
+ * unindented statements outside any open `(`/`{` group are trusted: an indented assignment may sit
+ * in a branch that does not run, and a grouped one in a subshell or function, so the variable is
+ * then left unresolved.
  */
 export function lastAssignment(before: string, name: string): string | undefined {
   const pattern = new RegExp(
@@ -50,5 +51,9 @@ export function lastAssignment(before: string, name: string): string | undefined
     'gmu',
   )
   const found = [...before.matchAll(pattern)]
-  return found.some((match) => match[1] !== '') ? undefined : found.at(-1)?.[2]
+  const last = found.at(-1)
+  if (!last || found.some((match) => match[1] !== '')) return undefined
+  const prefix = before.slice(0, last.index).replace(/"[^"]*"|'[^']*'/gu, '')
+  const balance = (prefix.match(/[({]/gu)?.length ?? 0) - (prefix.match(/[)}]/gu)?.length ?? 0)
+  return balance === 0 ? last[2] : undefined
 }

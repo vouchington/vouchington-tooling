@@ -276,6 +276,8 @@ describe('helpers', () => {
     expect(lastAssignment('echo A=1', 'A')).toBeUndefined()
     expect(lastAssignment('A="x"-y', 'A')).toBe('"x"-y')
     expect(lastAssignment('A=1\nif t; then\n  A=2\nfi', 'A')).toBeUndefined()
+    expect(lastAssignment('f() {\nA=1\n}\nA=2', 'A')).toBe('2')
+    expect(lastAssignment('f() {\nA=1\n}', 'A')).toBeUndefined()
   })
 
   it('records metadata repositories only for build steps that consume them', () => {
@@ -347,6 +349,26 @@ ${with_}`
     ]) {
       expect(short(metaBuild(bake(extra)))).toEqual(['ghcr.io/o/app:$TAG'])
     }
+  })
+
+  it('keeps braces before a word character and ignores subshell and function assignments', () => {
+    const doc = `
+runs:
+  steps:
+    - env:
+        TAG: ci
+        TAG1: external
+      run: docker build -t app:\${TAG}1 .
+    - env:
+        TAG: ci
+        TAG1: external
+      run: docker run app:$TAG1
+`
+    expect(short(doc)).toEqual(['app:$TAG1'])
+    const subshell = 'IMAGE=ext:1\n(\nIMAGE=app:ci\n)\ndocker run "$IMAGE"'
+    expect(short(stepsOf(subshell, built))).toEqual(['"$IMAGE"'])
+    const fn = 'IMAGE=ext:1\nset_it() {\nIMAGE=app:ci\n}\ndocker run "$IMAGE"'
+    expect(short(stepsOf(fn, built))).toEqual(['"$IMAGE"'])
   })
 
   it('takes the whole assignment word, skips branch assignments, and ignores single quotes', () => {
