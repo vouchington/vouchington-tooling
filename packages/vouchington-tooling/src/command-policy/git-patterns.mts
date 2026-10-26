@@ -1,4 +1,9 @@
-import { readBacktickSubstitution, readParenthesizedSubstitution } from '../shell-parse/index.mts'
+import {
+  gitInvocations,
+  overridesConfig,
+  readBacktickSubstitution,
+  readParenthesizedSubstitution,
+} from '../shell-parse/index.mts'
 import type { PatternRule } from './types.mts'
 
 /**
@@ -13,7 +18,25 @@ export function findBlockedPatternReason(
   rules: readonly PatternRule[],
 ): string | null {
   const text = blankSubstitutionSeparators(command)
-  return rules.find(({ pattern }) => matches(pattern, text))?.reason ?? null
+  return rules.find((rule) => 'pattern' in rule && matches(rule.pattern, text))?.reason ?? null
+}
+
+/**
+ * Why a script sets a git config key the rules forbid, or null. Reads the unblanked script, since
+ * the key lives inside the quotes; `git commit -m "core.hooksPath=x"` is a message, not an override.
+ */
+export function findBlockedConfigReason(
+  script: string,
+  rules: readonly PatternRule[],
+): string | null {
+  const configRules = rules.filter((rule) => 'configKey' in rule)
+  if (configRules.length === 0) return null
+  const invocations = gitInvocations(script)
+  return (
+    configRules.find((rule) =>
+      invocations.some((invocation) => overridesConfig(invocation, rule.configKey)),
+    )?.reason ?? null
+  )
 }
 
 // A global or sticky pattern keeps `lastIndex` between tests, so reset it to keep decisions pure.
@@ -92,7 +115,12 @@ export function standardGitPatterns(
         'git commit -n bypasses the commit-msg and pre-commit hooks. Fix the underlying failure instead.',
     },
     {
+      // Catches unquoted forms through wrappers `gitInvocations` skips, such as `env -S`.
       pattern: /\bgit\b[^|;&\n]*-c\s+core\.hooksPath\s*=/i,
+      reason: 'Overriding core.hooksPath disables git hooks. Fix the underlying failure instead.',
+    },
+    {
+      configKey: 'core.hooksPath',
       reason: 'Overriding core.hooksPath disables git hooks. Fix the underlying failure instead.',
     },
   ]

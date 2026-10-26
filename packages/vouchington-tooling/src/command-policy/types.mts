@@ -23,7 +23,13 @@ export type BlockDecision = {
   disposition?: 'block' | 'confirm'
 }
 
-export type PatternRule = { pattern: RegExp; reason: string }
+/**
+ * A regex rule, or a git config-override rule: `configKey` matches `git -c <key>=...` and
+ * `git --config-env=<key>=...` on the unblanked command, so quoting and key case cannot bypass it.
+ */
+export type PatternRule =
+  | { pattern: RegExp; reason: string }
+  | { configKey: string; reason: string }
 
 /** Paths that automation must not write. Directory prefixes end in `/`. */
 export type ProtectedPaths = {

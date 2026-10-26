@@ -4,7 +4,7 @@ import {
   extractShellCommandSubstitutions,
   isInteractiveRebaseContinue,
 } from '../shell-parse/index.mts'
-import { findBlockedPatternReason } from './git-patterns.mts'
+import { findBlockedConfigReason, findBlockedPatternReason } from './git-patterns.mts'
 import { findGitHubWorkflowBlock } from './github-workflow.mts'
 import { findInteractiveMergeConfirm } from './github-merge-authority.mts'
 import { extractToolCommand, hookCwd } from './payload.mts'
@@ -63,6 +63,10 @@ function findScriptBlock(command: string, policy: CommandPolicy): BlockDecision 
   if (!/\bgit\b/.test(command)) {
     return null
   }
+  for (const script of rawScripts(command)) {
+    const reason = findBlockedConfigReason(script, policy.gitPatterns ?? [])
+    if (reason !== null) return { reason }
+  }
   for (const script of scripts) {
     if (policy.rebaseContinueReason !== undefined && isInteractiveRebaseContinue(script)) {
       return { reason: policy.rebaseContinueReason }
@@ -76,7 +80,15 @@ function findScriptBlock(command: string, policy: CommandPolicy): BlockDecision 
 // Quoted text is blanked so a message mentioning `--force` passes, but a `$(...)` or backtick
 // substitution inside double quotes still runs. Best effort: one level, no deeper quoting analysis.
 function quotedSubstitutionScripts(command: string): string[] {
-  return commandsToInspectPreservingQuotes(command)
-    .flatMap(extractShellCommandSubstitutions)
-    .flatMap(commandsToInspectForGitPolicy)
+  return quotedSubstitutions(command).flatMap(commandsToInspectForGitPolicy)
+}
+
+function quotedSubstitutions(command: string): string[] {
+  return commandsToInspectPreservingQuotes(command).flatMap(extractShellCommandSubstitutions)
+}
+
+// Config-key rules need `git -c` intact, so these scripts skip global-option stripping.
+function rawScripts(command: string): string[] {
+  const scripts = commandsToInspectPreservingQuotes(command, { keepGitGlobalOptions: true })
+  return [...scripts, ...scripts.flatMap(extractShellCommandSubstitutions)]
 }
