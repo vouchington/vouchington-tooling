@@ -30,7 +30,7 @@
     {
       "name": "bounded-iteration",
       "plugin": "vouchington-database",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "bounded-iteration/SKILL.md"
     },
     {
@@ -75,7 +75,7 @@
     {
       "name": "glide-mq",
       "plugin": "vouchington-database",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "glide-mq/SKILL.md"
     },
     {
@@ -121,19 +121,19 @@
     {
       "name": "postgres-node-performance-tuning",
       "plugin": "vouchington-database",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "postgres-node-performance-tuning/SKILL.md"
     },
     {
       "name": "postgres-partitioning-uuid-v7",
       "plugin": "vouchington-database",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "postgres-partitioning-uuid-v7/SKILL.md"
     },
     {
       "name": "postgres-schema-design",
       "plugin": "vouchington-database",
-      "pluginVersion": "0.8.0",
+      "pluginVersion": "0.9.0",
       "path": "postgres-schema-design/SKILL.md"
     },
     {
