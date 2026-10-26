@@ -1,5 +1,12 @@
 import { withoutShellComment } from '../trivy-policy/shell.mts'
-import { DEFAULT_MIRROR, imageReasons, policyActive, type ImagePolicy } from './policy.mts'
+import { collectLocalBuilds, isLocalBuild, type BuildStep } from './local-builds.mts'
+import {
+  DEFAULT_MIRROR,
+  cleanImage,
+  imageReasons,
+  policyActive,
+  type ImagePolicy,
+} from './policy.mts'
 
 export { DEFAULT_MIRROR } from './policy.mts'
 
@@ -12,7 +19,7 @@ const VALUE_FLAGS = new Set(
   ),
 )
 
-type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> }
+type Step = BuildStep & { name?: string }
 export type Document = {
   jobs?: Record<
     string,
@@ -32,7 +39,7 @@ const GLOBAL_VALUE_OPTIONS = new Set(
 function dockerCommandImages(script: string): string[] {
   const logical = withoutShellComment(script).replace(/\\\r?\n/gu, ' ')
   return [...logical.matchAll(/\bdocker\s+([^\n;&|]*)/gu)].flatMap(([, command]) => {
-    const tokens = command!.match(/(?:[^\s"']|"[^"]*"|'[^']*')+/gu) ?? []
+    const tokens = command!.match(/(?:\$\{\{.*?\}\}|[^\s"']|"[^"]*"|'[^']*')+/gu) ?? []
     let i = 0
     while (tokens[i]?.startsWith('-')) i += GLOBAL_VALUE_OPTIONS.has(tokens[i]!) ? 2 : 1
     if (tokens[i] === 'container' || tokens[i] === 'image') i++
@@ -89,7 +96,15 @@ export function workflowImageViolations(
   for (const step of document.runs?.steps ?? []) {
     found.push(...stepImages(step).map((image): [string, string] => ['composite', image]))
   }
+  // Images this file builds locally are never pulled, so the allowlist and digest pin skip them.
+  const builds = policyActive(policy)
+    ? collectLocalBuilds([
+        ...Object.values(document.jobs ?? {}).flatMap((job) => job.steps ?? []),
+        ...(document.runs?.steps ?? []),
+      ])
+    : undefined
   return found.flatMap(([where, image]) => {
+    if (builds && isLocalBuild(cleanImage(image), builds)) return []
     const reasons = imageReasons(image, mirror, policy)
     return reasons.length > 0 ? [`${path}#${where}: ${image} ${reasons.join('; ')}`] : []
   })

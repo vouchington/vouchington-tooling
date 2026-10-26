@@ -448,6 +448,16 @@ Hub is rejected). Violations name the file, the image and the allowed prefixes o
 vouchington docker-image-mirror --allow-registry ghcr.io/vouchington/dependency- --require-digest
 ```
 
+When `--allow-registry` or `--require-digest` is set, images the same workflow file or composite
+action builds locally are exempt from both, because they are never pulled. An image reference is
+exempt when it exactly equals a tag that file produces, or is exactly
+`${{ steps.<id>.outputs.<name> }}` where `<id>` is a step that builds. Produced tags are the
+`-t`/`--tag`/`--tag=` values of `docker build`, `docker buildx build` and `podman build` in `run:`
+steps, and the newline- or comma-separated `tags:` of a `docker/build-push-action` step with
+`load: true`. A tag value that itself contains an expression (`${{ }}`) or shell variable is
+skipped and exempts nothing. A matching tag in a different file does not count, and every other
+reference is checked as before. Without either flag nothing is exempt.
+
 The checks are exported as `checkTrivyPolicy(root, trackedFiles, options)` from
 `vouchington-tooling/trivy-policy` (plus the command parsers and `validateIgnoreRegistry`) and
 `checkDockerImageMirrors(root, trackedFiles, { mirror, allowRegistries, requireDigest })` from `vouchington-tooling/docker-image-mirror`;
