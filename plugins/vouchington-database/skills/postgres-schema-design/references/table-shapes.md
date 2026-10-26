@@ -12,7 +12,7 @@ current state from the latest row rather than erasing the previous lifecycle.
 | Field-diff history         | `<entity>_revisions`: UUIDv7 `id`, entity FK, nullable revision actor FK with `ON DELETE SET NULL`, revision-type enum, `changes jsonb`.                                                                  |
 | Typed lifecycle ledger     | `<entity>_changes`: UUIDv7 `id`, entity FK, change-type enum, retained actor identity FK with `ON DELETE RESTRICT`, typed joined payload and JSON for unjoined data. Time comes from `id`.                |
 | Current state from a log   | Latest change by `id DESC`, projected through a shared trigger or read through a view.                                                                                                                    |
-| Per-entity work            | `<entity>_<job>_work_items`: entity FK, lease and final-outcome columns, claim index, retention.                                                                                                          |
+| Per-entity work            | Default to a queue job id plus a bounded re-enqueue sweep. When justified, `<entity>_<job>_work_items`: entity FK, lease and final-outcome columns, claim index, retention.                               |
 | Job progress               | Prefer the position in job data. Use `<job>_cursors` only when it must be transactional with domain rows: finite enum key or checked singleton, keyset positions without FKs, optional sweep upper bound. |
 | Inbound or protocol events | Append-only `<source>_events` with `occurred_at` recording the event's business time.                                                                                                                     |
 
@@ -25,11 +25,22 @@ A system change has a NULL actor. Retained actors remain historical identities, 
 
 ## Work leases
 
-The lease lives on a row that exists only for the work. If an invoice outlives a delivery job,
+Default to a queue job whose job id is the durable row id, enqueued after commit, plus a bounded
+sweep that re-enqueues rows with no recorded outcome. The queue already supplies attempts,
+backoff, locking, stall recovery and unique ids. A lease or outbox work-item table needs a stated
+reason: legal or payment records, old values that vanish at commit, or an outcome that must
+commit with domain rows.
+
+When a table is justified, fence with one compare-and-set on the outcome or a generation
+(`WHERE completed_at IS NULL` / `AND generation = $n`) instead of a full set of lease columns.
+Idempotent database-only work needs no fence. A unique job id stops duplicate enqueues, not
+duplicate runs.
+
+When a full lease is needed, the lease lives on a row that exists only for the work. If an invoice outlives a delivery job,
 use `invoice_delivery_work_items`, with an invoice FK and `ON DELETE CASCADE`, rather than putting
 the lease on the invoice. Do not create a shared polymorphic lease table.
 
-Use `lease_token uuid`, `leased_at`, `lease_expires_at`, `attempt_count`, `available_at`, and
+A full lease uses `lease_token uuid`, `leased_at`, `lease_expires_at`, `attempt_count`, `available_at`, and
 `completed_at` plus timestamps for final outcomes. Add `generation` only when re-enqueue can race
 a running worker. Each claim or reclaim gets a fresh opaque token. Every renewal, completion,
 and failure must include `WHERE lease_token = $mine`; zero affected rows means ownership was lost.
