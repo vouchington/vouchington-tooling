@@ -147,8 +147,8 @@ describe('snapshot_partition with a capability-aware client', () => {
     )
   })
 
-  it('rejects an unexpected client result and leaves nothing recorded', async () => {
-    for (const bad of [null, { directory: 1, partitions: [] }, { directory: '/d' }]) {
+  it('rejects an unexpected client result and still records any directory it created', async () => {
+    for (const bad of [null, { directory: 1, partitions: [] }]) {
       const cleanup = vi.fn(async () => undefined)
       const { h, call, cleanupToken } = await setup(clientExport, {
         partition: async () => bad,
@@ -158,6 +158,18 @@ describe('snapshot_partition with a capability-aware client', () => {
       await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
       expect(cleanup).toHaveBeenCalledExactlyOnceWith({ path: PATH, cleanupToken: 'client-secret' })
     }
+    const cleanup = vi.fn(async () => undefined)
+    const { h, call, cleanupToken } = await setup(clientExport, {
+      partition: async () => ({ directory: '/d' }),
+      cleanup,
+    })
+    expect(textOf(await call())).toContain('unexpected snapshot partition result')
+    await h.call('snapshot_cleanup', { sessionId: OWNER, cleanupToken })
+    expect(cleanup).toHaveBeenCalledExactlyOnceWith({
+      path: PATH,
+      directory: '/d',
+      cleanupToken: 'client-secret',
+    })
   })
 
   it('names the upgrade when the client holds a capability but cannot partition', async () => {

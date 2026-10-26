@@ -9,6 +9,7 @@ import type {
 } from '../agent-blackboard/snapshot-types.mts'
 import { optionalRecord, optionalString, requiredString, type Args } from './args.mts'
 import type { ToolHandler } from './context.mts'
+import type { SnapshotRecord } from './snapshot-registry.mts'
 
 const COUNT_KEYS = ['sessions', 'entries', 'records', 'bytes']
 
@@ -51,6 +52,7 @@ export const snapshotPartition: ToolHandler = async (args, context) => {
   const maxSessions = optionalLimit(args, 'maxSessions')
   const maxBytes = optionalLimit(args, 'maxBytes')
   const record = context.snapshots.take(token, context.sessionId, context.worktree)
+  let current: SnapshotRecord | undefined
   try {
     if (record.directory !== undefined)
       throw new Error('this snapshot is already partitioned; clean it up and export again')
@@ -71,27 +73,28 @@ export const snapshotPartition: ToolHandler = async (args, context) => {
     else if (client.partitionSnapshot)
       result = await client.partitionSnapshot({ ...options, cleanupToken: record.clientToken })
     else throw new Error('the installed agent-blackboard client cannot partition snapshots')
-    if (
-      !isObject(result) ||
-      typeof result.directory !== 'string' ||
-      !Array.isArray(result.partitions)
-    )
+    // Record whatever directory the client created before judging the rest of its result, so a
+    // malformed result cannot orphan a directory that cleanup would then never remove.
+    if (isObject(result) && typeof result.directory === 'string') {
+      const receipt = isObject(result.cleanupReceipt)
+        ? (result.cleanupReceipt as SnapshotCleanupReceipt)
+        : undefined
+      current = {
+        ...record,
+        directory: result.directory,
+        ...(receipt === undefined ? {} : { receipt }),
+      }
+      context.snapshots.restore(token, current)
+    }
+    if (!current || !isObject(result) || !Array.isArray(result.partitions))
       throw new Error('agent-blackboard returned an unexpected snapshot partition result')
-    const receipt = isObject(result.cleanupReceipt)
-      ? (result.cleanupReceipt as SnapshotCleanupReceipt)
-      : undefined
-    context.snapshots.restore(token, {
-      ...record,
-      directory: result.directory,
-      ...(receipt === undefined ? {} : { receipt }),
-    })
     return {
       sessionId: context.sessionId,
-      directory: result.directory,
+      directory: current.directory,
       partitions: result.partitions,
     }
   } catch (error) {
-    context.snapshots.restore(token, record)
+    context.snapshots.restore(token, current ?? record)
     const reason = error instanceof Error ? error.message : String(error)
     throw new Error(`snapshot partition failed and the cleanupToken is still valid. ${reason}`, {
       cause: error,
