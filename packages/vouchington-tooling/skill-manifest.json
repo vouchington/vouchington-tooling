@@ -73,6 +73,12 @@
       "path": "github-issue/SKILL.md"
     },
     {
+      "name": "glide-mq",
+      "plugin": "vouchington-database",
+      "pluginVersion": "0.8.0",
+      "path": "glide-mq/SKILL.md"
+    },
+    {
       "name": "nextjs-vitest-test-authoring",
       "plugin": "vouchington-testing",
       "pluginVersion": "0.2.0",
