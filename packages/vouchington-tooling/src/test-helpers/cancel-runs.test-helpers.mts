@@ -19,6 +19,9 @@ export type Scenario = {
   jobErrors?: number[]
   transient?: number[]
   transientFailures?: number
+  listing?: 'error' | 'empty' | 'null'
+  pullError?: boolean
+  listingStatus?: Status
   env?: Record<string, string>
 }
 
@@ -70,12 +73,20 @@ case "$*" in
     if [[ -f "$file" ]]; then cat "$file"; else echo '{"jobs":[{"name":"build","conclusion":"success"}]}'; fi
     exit 0 ;;
   *"/pulls/"*)
+    if [[ "$FAKE_PULL_ERROR" == "true" ]]; then echo 'gh: Server Error (HTTP 502)' >&2; exit 1; fi
     echo "$FAKE_MERGED"
     exit 0 ;;
 esac
 [[ "$1 $2" == "api --paginate" ]] || { echo "unexpected gh call: $*" >&2; exit 99; }
 status="\${url#*status=}"
 status="\${status%%&*}"
+mode="\${FAKE_LISTING:-}"
+if [[ -n "\${FAKE_LISTING_STATUS:-}" && "$FAKE_LISTING_STATUS" != "$status" ]]; then mode=; fi
+case "$mode" in
+  error) echo 'gh: Server Error (HTTP 502)' >&2; exit 1 ;;
+  empty) exit 0 ;;
+  null) echo 'null'; exit 0 ;;
+esac
 file="$FAKE_GH_DIR/list-$status.json"
 if [[ -f "$file" ]]; then cat "$file"; else echo '{"total_count":0,"workflow_runs":[]}'; fi
 `
@@ -119,6 +130,9 @@ export function createHarness(script: string, defaultEnv: Record<string, string>
           FAKE_JOB_ERROR_IDS: (scenario.jobErrors ?? []).join(' '),
           FAKE_TRANSIENT_IDS: (scenario.transient ?? []).join(' '),
           FAKE_TRANSIENT_FAILURES: String(scenario.transientFailures ?? 1),
+          FAKE_LISTING: scenario.listing ?? '',
+          FAKE_LISTING_STATUS: scenario.listingStatus ?? '',
+          FAKE_PULL_ERROR: String(scenario.pullError ?? false),
           FAKE_MERGED: String(scenario.merged ?? false),
           GH_TOKEN: 'token',
           PR_NUMBER: scenario.pr ?? '14',

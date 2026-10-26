@@ -78,7 +78,13 @@ jobs:
           fi
 
           # Merge-group-only jobs such as image publishing must finish for a merged group.
-          merged=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .merged)
+          # Without the merge state, cancel nothing: a merged pull request must never be touched.
+          if ! merged=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .merged 2>&1) ||
+            [[ -z "$merged" ]]; then
+            echo "::warning::Could not read repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER, skipping: ${merged:-empty response}"
+            summary "Cancelled runs: none. The pull request state could not be read."
+            exit 0
+          fi
           if [[ "$merged" == "true" ]]; then
             echo "PR #$PR_NUMBER is merged; cancelling nothing."
             summary "Cancelled runs: none. The pull request is merged."
@@ -89,14 +95,29 @@ jobs:
           queue_prefix="gh-readonly-queue/${QUEUE_BASE}/pr-${PR_NUMBER}-"
           candidates="$RUNNER_TEMP/dequeued-runs.tsv"
           : > "$candidates"
+          skipped=
+          # This job is best-effort housekeeping: a failed or empty listing is a warning, and that
+          # status is skipped.
           for status in queued in_progress waiting requested pending; do
-            gh api --paginate \
-              "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100" |
-              jq -r --arg prefix "$queue_prefix" --argjson run_id "$GITHUB_RUN_ID" '
-                .workflow_runs[]
-                | select((.head_branch // "") | startswith($prefix))
-                | select(.id < $run_id)
-                | [.id, .name, .head_branch] | @tsv' >> "$candidates"
+            endpoint="repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100"
+            if ! listing=$(gh api --paginate "$endpoint" 2>"$RUNNER_TEMP/list-error.txt") ||
+              [[ -z "$listing" ]]; then
+              echo "::warning::Could not list $status runs from $endpoint, skipping: $(tr '\n' ' ' < "$RUNNER_TEMP/list-error.txt")"
+              skipped="$skipped $status"
+              continue
+            fi
+            if ! matches=$(jq -r --arg prefix "$queue_prefix" --argjson run_id "$GITHUB_RUN_ID" '
+              (.workflow_runs // [])[]
+              | select((.head_branch // "") | startswith($prefix))
+              | select(.id < $run_id)
+              | [.id, .name, .head_branch] | @tsv' <<< "$listing"); then
+              echo "::warning::Could not parse $status runs from $endpoint, skipping"
+              skipped="$skipped $status"
+              continue
+            fi
+            if [[ -n "$matches" ]]; then
+              printf '%s\n' "$matches" >> "$candidates"
+            fi
           done
 
           failed=0
@@ -106,7 +127,7 @@ jobs:
             # A cancelled run no longer reads as failed, which hides it from the ejection triage.
             if ! holds_failure=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?filter=latest&per_page=100" |
-              jq -s 'any(.[].jobs[]; .conclusion == "failure" or .conclusion == "timed_out")'); then
+              jq -s 'any(.[] | (.jobs // [])[];.conclusion == "failure" or .conclusion == "timed_out")'); then
               result='failed'
               failed=1
               echo "::warning::Could not read the jobs of run $id"
@@ -137,9 +158,9 @@ jobs:
           done < <(sort -t$'\t' -k1,1n -u "$candidates")
 
           if [[ -z "$rows" ]]; then
-            summary "Cancelled runs: none active."
+            summary "Cancelled runs: none active.${skipped:+ Run listings skipped after an API error for status:$skipped.}"
           else
-            summary "$(printf '%s\n' '| Workflow | Run | Queue branch | Result |' '| --- | --- | --- | --- |')"$'\n'"${rows%$'\n'}"
+            summary "$(printf '%s\n' '| Workflow | Run | Queue branch | Result |' '| --- | --- | --- | --- |')"$'\n'"${rows%$'\n'}${skipped:+$'\n\n'Run listings skipped after an API error for status:$skipped.}"
           fi
 
           exit "$failed"
