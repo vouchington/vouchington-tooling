@@ -23,6 +23,7 @@ const FORWARDED = [
   'coverage-scope-check',
   'trivy-policy',
   'docker-image-mirror',
+  'workspace-registry-check',
   'storybook-browser-runner',
   'tmux',
 ] as const

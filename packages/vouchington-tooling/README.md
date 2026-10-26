@@ -407,6 +407,30 @@ The pure `findCoverageScopeMismatches(files, config, instrumentedScope)` and
 `checkCoverageScope({ cwd, rulesFile, instrumentedScope, listFiles })` (which returns the
 mismatches) are exported from `vouchington-tooling/coverage-scope`.
 
+## Checking package registries against tracked manifests
+
+`vouchington workspace-registry-check [--root <dir>] [--syncpack-config <path>]
+[--workspace-file <path>] [--path-filters <path>] [--tooling-group <name>]
+[--trigger-only-glob <glob>] [--runtime-prefix <prefix>]` reconciles every `package.json` listed by
+`git ls-files` under `--root` (default the current directory) with four registries and prints one
+line per violation to stderr (exit 1; 0 when clean, 2 on a usage error):
+
+| Registry              | Default path                                     | Checks                                                                                                                                           |
+| --------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| syncpack `source`     | `.syncpackrc.json` (`--syncpack-config`)         | non-empty; every manifest matched; stale fixed entries (brace-expanded); unmatched wildcards                                                     |
+| pnpm `packages`       | `pnpm-workspace.yaml` (`--workspace-file`)       | unmatched globs; negated globs rejected; every non-root manifest matched                                                                         |
+| CI path-filter groups | `.github/ci-path-filters.yml` (`--path-filters`) | every manifest matched by a real group; stale fixed and unmatched wildcard manifest entries                                                      |
+| mirror groups         | same file                                        | each group named `<--runtime-prefix><name>` (default `runtime-`) has a primary group `<name>` whose brace-flattened positive globs equal its own |
+| tooling reachability  | same file                                        | every manifest and wildcard workspace glob is matched by the `--tooling-group` group (default `tooling`)                                         |
+
+The `--trigger-only-glob` (default `**/package.json`) in the tooling group only triggers CI and does
+not count as registering a manifest. The pure `checkRegistries(trackedFiles, files, names)` and
+`loadRegistryFiles(root, paths)` are exported from `vouchington-tooling/workspace-registry-check`.
+
+```bash
+vouchington workspace-registry-check --path-filters .github/paths.yml --tooling-group ci
+```
+
 ## Trivy policy and Docker Hub mirror checks
 
 Two repository-file checks read the git-tracked files (`git ls-files -z`) under `--root` (default

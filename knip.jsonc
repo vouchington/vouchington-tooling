@@ -66,6 +66,7 @@
         "src/coverage-scope/index.mts!",
         "src/trivy-policy/index.mts!",
         "src/docker-image-mirror/index.mts!",
+        "src/workspace-registry-check/index.mts!",
         "src/storybook-browser-runner/index.mts!",
         "src/dead-code/index.mts!",
         "src/nuget-central-version/cli.mts!",

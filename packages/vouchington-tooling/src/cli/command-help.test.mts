@@ -43,6 +43,7 @@ describe('subcommand help', () => {
     expect(commandUsage('coverage-scope-check')).toContain('--scope-file')
     expect(commandUsage('trivy-policy')).toContain('--findings-exit-code-env')
     expect(commandUsage('docker-image-mirror')).toContain('--mirror')
+    expect(commandUsage('workspace-registry-check')).toContain('--runtime-prefix')
     expect(commandUsage('storybook-browser-runner')).toContain('--result-file')
     expect(commandUsage('agent-blackboard')).toContain('distill classify')
     expect(commandUsage('agent-blackboard')).not.toContain('journal append')

@@ -52,6 +52,7 @@ export type ParsedCli =
   | { kind: 'coverage-scope-check'; args: string[] }
   | { kind: 'trivy-policy'; args: string[] }
   | { kind: 'docker-image-mirror'; args: string[] }
+  | { kind: 'workspace-registry-check'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
