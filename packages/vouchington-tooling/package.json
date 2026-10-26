@@ -326,6 +326,11 @@
       "import": "./dist/trivy-policy/index.mjs",
       "default": "./dist/trivy-policy/index.mjs"
     },
+    "./workspace-registry-check": {
+      "types": "./dist/workspace-registry-check/index.d.mts",
+      "import": "./dist/workspace-registry-check/index.mjs",
+      "default": "./dist/workspace-registry-check/index.mjs"
+    },
     "./docker-image-mirror": {
       "types": "./dist/docker-image-mirror/index.d.mts",
       "import": "./dist/docker-image-mirror/index.mjs",

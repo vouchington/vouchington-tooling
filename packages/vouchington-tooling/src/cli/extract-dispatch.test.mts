@@ -39,6 +39,9 @@ vi.mock('./commands/trivy-policy.mts', () => ({
 vi.mock('./commands/docker-image-mirror.mts', () => ({
   runDockerImageMirrorCommand: vi.fn(async () => 0),
 }))
+vi.mock('./commands/workspace-registry-check.mts', () => ({
+  runWorkspaceRegistryCheckCommand: vi.fn(async () => 0),
+}))
 vi.mock('./commands/storybook-browser-runner.mts', () => ({
   runStorybookBrowserRunnerCommand: vi.fn(async () => 0),
 }))
@@ -60,6 +63,7 @@ import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.
 import { runClocCommand } from './commands/cloc.mts'
 import { runCoverageScopeCheckCommand } from './commands/coverage-scope-check.mts'
 import { runTrivyPolicyCommand } from './commands/trivy-policy.mts'
+import { runWorkspaceRegistryCheckCommand } from './commands/workspace-registry-check.mts'
 import { runDockerImageMirrorCommand } from './commands/docker-image-mirror.mts'
 import { runStorybookBrowserRunnerCommand } from './commands/storybook-browser-runner.mts'
 
@@ -133,6 +137,13 @@ describe('runCli extract command dispatch', () => {
       runCli(['node', 'vouchington', 'docker-image-mirror', '--mirror', 'm']),
     ).resolves.toBe(0)
     expect(runDockerImageMirrorCommand).toHaveBeenCalledWith(['--mirror', 'm'])
+  })
+
+  it('forwards the workspace-registry-check subcommand and its arguments', async () => {
+    await expect(
+      runCli(['node', 'vouchington', 'workspace-registry-check', '--tooling-group', 't']),
+    ).resolves.toBe(0)
+    expect(runWorkspaceRegistryCheckCommand).toHaveBeenCalledWith(['--tooling-group', 't'])
   })
 
   it('forwards the storybook-browser-runner subcommand and its arguments', async () => {

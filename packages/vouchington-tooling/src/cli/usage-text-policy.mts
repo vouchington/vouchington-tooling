@@ -3,6 +3,7 @@ import { COVERAGE_SCOPE_CHECK_USAGE } from './usage-text-coverage-scope.mts'
 export const POLICY_COMMANDS = `  coverage-scope-check          Check positive-threshold coverage rules against the Vitest scope
   trivy-policy                 Check tracked Trivy workflow scans and the exception registry
   docker-image-mirror           Require tracked Docker images to come from a Docker Hub mirror
+  workspace-registry-check      Check syncpack, pnpm workspace and CI path-filter registries against tracked manifests
 `
 
 export const POLICY_USAGE = `
@@ -29,5 +30,14 @@ docker-image-mirror [--root <dir>] [--mirror <host>] [--allow-registry <prefix>]
   requires @sha256: plus 64 lowercase hex characters. Stage aliases and scratch stay exempt.
   --allow-ref-expression (repeatable) is an audited escape hatch for dynamic job outputs: a reference
   whose raw text exactly equals the value is accepted. Images the same file builds locally are exempt.
+
+workspace-registry-check [--root <dir>] [--syncpack-config <path>] [--workspace-file <path>]
+  [--path-filters <path>] [--tooling-group <name>] [--trigger-only-glob <glob>] [--runtime-prefix <prefix>]
+  Reconciles git-tracked package.json manifests with the syncpack "source" globs (default
+  .syncpackrc.json), the pnpm "packages" globs (pnpm-workspace.yaml) and the dorny/paths-filter groups
+  (.github/ci-path-filters.yml) and prints one line per violation (exit 1). The --tooling-group group
+  (default tooling) must reach every manifest and wildcard workspace glob, and its --trigger-only-glob
+  (default **/package.json) does not count as registering a manifest. Each group named with
+  --runtime-prefix (default runtime-) must mirror the primary group of the same name.
 
 `

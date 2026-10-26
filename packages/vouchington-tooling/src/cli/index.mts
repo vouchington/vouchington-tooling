@@ -36,6 +36,7 @@ import { runAstGrepPackCommand } from './commands/ast-grep-pack.mts'
 import { runGhaWorkspacePolicy } from './commands/gha-workspace-policy.mts'
 import { readInstalledVersion } from './installed-version.mts'
 import { parseCli } from './parse.mts'
+import { isPolicyCli, runPolicyCommand } from './policy-dispatch.mts'
 import { SCRIPT_PATHS } from './script-paths.mts'
 import { runStoryCoverageLazy } from './story-coverage-lazy.mts'
 import { packageScriptPath } from './script-path.mts'
@@ -43,6 +44,7 @@ import { commandUsage, printUsage } from './usage.mts'
 
 export function runCli(argv: readonly string[] = process.argv): number | Promise<number> {
   const parsed = parseCli(argv)
+  if (isPolicyCli(parsed)) return runPolicyCommand(parsed)
   switch (parsed.kind) {
     case 'help':
       printUsage()
@@ -115,20 +117,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return import('./commands/sandbox-command-audit.mts').then((command) =>
         command.runSandboxCommandAuditCommand(parsed.args),
       )
-    case 'coverage-scope-check':
-      return import('./commands/coverage-scope-check.mts').then((command) =>
-        command.runCoverageScopeCheckCommand(parsed.args),
-      )
     case 'cloc':
       return import('./commands/cloc.mts').then((command) => command.runClocCommand(parsed.args))
-    case 'trivy-policy':
-      return import('./commands/trivy-policy.mts').then((command) =>
-        command.runTrivyPolicyCommand(parsed.args),
-      )
-    case 'docker-image-mirror':
-      return import('./commands/docker-image-mirror.mts').then((command) =>
-        command.runDockerImageMirrorCommand(parsed.args),
-      )
     case 'storybook-browser-runner':
       return import('./commands/storybook-browser-runner.mts').then((command) =>
         command.runStorybookBrowserRunnerCommand(parsed.args),
