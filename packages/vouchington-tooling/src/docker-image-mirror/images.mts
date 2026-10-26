@@ -7,6 +7,13 @@ import {
   policyActive,
   type ImagePolicy,
 } from './policy.mts'
+import {
+  envMapping,
+  lastAssignment,
+  normalizeText,
+  variableName,
+  type EnvMap,
+} from './shell-vars.mts'
 
 export { DEFAULT_MIRROR } from './policy.mts'
 
@@ -20,6 +27,8 @@ const VALUE_FLAGS = new Set(
 )
 
 type Step = BuildStep & { name?: string }
+/** An image reference as written (`raw`) and the text it stands for after variable resolution. */
+type Ref = { raw: string; text: string; env?: EnvMap }
 export type Document = {
   jobs?: Record<
     string,
@@ -36,24 +45,30 @@ const GLOBAL_VALUE_OPTIONS = new Set(
   '--config --context -c --host -H --log-level -l --tlscacert --tlscert --tlskey'.split(' '),
 )
 
-function dockerCommandImages(script: string): string[] {
+function dockerCommandImages(script: string, env: EnvMap): Ref[] {
   const logical = withoutShellComment(script).replace(/\\\r?\n/gu, ' ')
-  return [...logical.matchAll(/\bdocker\s+([^\n;&|]*)/gu)].flatMap(([, command]) => {
-    const tokens = command!.match(/(?:\$\{\{.*?\}\}|[^\s"']|"[^"]*"|'[^']*')+/gu) ?? []
+  return [...logical.matchAll(/\bdocker\s+([^\n;&|]*)/gu)].flatMap((match) => {
+    const tokens = match[1]!.match(/(?:\$\{\{.*?\}\}|[^\s"')]|"[^"]*"|'[^']*')+/gu) ?? []
     let i = 0
     while (tokens[i]?.startsWith('-')) i += GLOBAL_VALUE_OPTIONS.has(tokens[i]!) ? 2 : 1
     if (tokens[i] === 'container' || tokens[i] === 'image') i++
     if (!['run', 'pull', 'create'].includes(tokens[i] ?? '')) return []
     for (i++; i < tokens.length; i++) {
       const token = tokens[i]!
-      if (!token.startsWith('-')) return [token]
+      if (!token.startsWith('-')) return [reference(token, logical.slice(0, match.index), env)]
       if (VALUE_FLAGS.has(token)) i++
     }
     return []
   })
 }
 
-function stepImages(step: Step): string[] {
+function reference(raw: string, before: string, env: EnvMap): Ref {
+  const name = variableName(raw)
+  const value = name === undefined ? undefined : lastAssignment(before, name)
+  return { raw, text: value ?? raw, env }
+}
+
+function stepImages(step: Step): Ref[] {
   const driverOptions = step.with?.['driver-opts']
   const driverImage = /(?:^|[\s,])image=(\S+)/u.exec(
     typeof driverOptions === 'string' ? driverOptions : '',
@@ -64,11 +79,14 @@ function stepImages(step: Step): string[] {
     step.uses?.startsWith('docker/setup-buildx-action') === true &&
     !driverImage &&
     (driver === undefined || driver === 'docker-container')
-  return [
-    ...dockerCommandImages(step.run ?? ''),
+  const plain = [
     ...(driverImage ? [driverImage[1]!] : []),
     ...(defaultsToHub ? ['moby/buildkit'] : []),
     ...(step.uses?.startsWith('docker://') ? [step.uses.slice('docker://'.length)] : []),
+  ]
+  return [
+    ...dockerCommandImages(step.run ?? '', envMapping(step.env)),
+    ...plain.map((raw): Ref => ({ raw, text: raw })),
   ]
 }
 
@@ -78,23 +96,26 @@ export function workflowImageViolations(
   mirror = DEFAULT_MIRROR,
   policy: ImagePolicy = {},
 ): string[] {
-  const found: Array<[string, string]> = []
+  const found: Array<[string, Ref]> = []
   for (const [jobId, job] of Object.entries(document.jobs ?? {})) {
     const container = typeof job.container === 'string' ? job.container : job.container?.image
-    if (container) found.push([`${jobId} container`, container])
+    if (container) found.push([`${jobId} container`, { raw: container, text: container }])
     for (const [name, service] of Object.entries(job.services ?? {})) {
-      if (service.image) found.push([`${jobId} service ${name}`, service.image])
+      if (service.image) {
+        found.push([`${jobId} service ${name}`, { raw: service.image, text: service.image }])
+      }
     }
     for (const step of job.steps ?? []) {
-      found.push(...stepImages(step).map((image): [string, string] => [jobId, image]))
+      found.push(...stepImages(step).map((ref): [string, Ref] => [jobId, ref]))
     }
   }
   const actionImage = document.runs?.image
   if (actionImage?.startsWith('docker://')) {
-    found.push(['action image', actionImage.slice('docker://'.length)])
+    const image = actionImage.slice('docker://'.length)
+    found.push(['action image', { raw: image, text: image }])
   }
   for (const step of document.runs?.steps ?? []) {
-    found.push(...stepImages(step).map((image): [string, string] => ['composite', image]))
+    found.push(...stepImages(step).map((ref): [string, Ref] => ['composite', ref]))
   }
   // Images this file builds locally are never pulled, so the allowlist and digest pin skip them.
   const builds = policyActive(policy)
@@ -103,10 +124,10 @@ export function workflowImageViolations(
         ...(document.runs?.steps ?? []),
       ])
     : undefined
-  return found.flatMap(([where, image]) => {
-    if (builds && isLocalBuild(cleanImage(image), builds)) return []
-    const reasons = imageReasons(image, mirror, policy)
-    return reasons.length > 0 ? [`${path}#${where}: ${image} ${reasons.join('; ')}`] : []
+  return found.flatMap(([where, { raw, text, env }]) => {
+    if (builds && isLocalBuild(normalizeText(cleanImage(text), env), builds)) return []
+    const reasons = imageReasons(raw, mirror, policy)
+    return reasons.length > 0 ? [`${path}#${where}: ${raw} ${reasons.join('; ')}`] : []
   })
 }
 

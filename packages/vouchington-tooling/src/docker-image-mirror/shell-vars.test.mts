@@ -1,0 +1,288 @@
+import { parse } from 'yaml'
+import { describe, expect, it } from 'vitest'
+
+import { dockerfileViolations, workflowImageViolations, type Document } from './index.mts'
+import { collectLocalBuilds } from './local-builds.mts'
+import { envMapping, lastAssignment, normalizeText, variableName } from './shell-vars.mts'
+
+const strict = { allowRegistries: ['ghcr.io/vouchington/dependency-'], requireDigest: true }
+const violations = (yaml: string, policy = strict) =>
+  workflowImageViolations('f.yml', parse(yaml) as Document, undefined, policy).map(
+    (v) => v.replace('f.yml#', '').split(' must')[0]!,
+  )
+const short = (yaml: string) => violations(yaml).map((v) => v.replace('composite: ', ''))
+
+// Trimmed from the build-backend-images and build-web-images composite actions: images are built
+// by metadata-action plus bake-action / build-push-action, then smoke-tested through IMAGE.
+const backend = `
+runs:
+  using: composite
+  steps:
+    - id: meta-api
+      uses: docker/metadata-action@v6
+      with:
+        images: \${{ env.IMAGE_REPOSITORY }}/api
+        bake-target: api
+    - id: meta-worker-cpu
+      uses: docker/metadata-action@v6
+      with:
+        images: \${{ env.IMAGE_REPOSITORY }}/worker-cpu
+    - id: meta-worker-io
+      uses: docker/metadata-action@v6
+      with:
+        images: \${{ env.IMAGE_REPOSITORY }}/worker-io
+    - id: bake
+      uses: docker/bake-action@v7
+      with:
+        files: |
+          ./docker-bake.hcl
+          \${{ steps.meta-api.outputs.bake-file }}
+          \${{ steps.meta-worker-cpu.outputs.bake-file }}
+          \${{ steps.meta-worker-io.outputs.bake-file }}
+    - shell: bash
+      env:
+        IMAGE_TAG: \${{ env.SHA_TAG }}
+      run: |
+        set -euo pipefail
+        IMAGE="$IMAGE_REPOSITORY/api:$IMAGE_TAG"
+        docker run -d --name "$C" --network host \\
+          -e NODE_ENV=test \\
+          "$IMAGE"
+        DIAGNOSTIC_OUTPUT=$(docker run --rm --network host \\
+          -e X \\
+          "$IMAGE" valkey-admin.mts diagnose)
+    - shell: bash
+      env:
+        IMAGE_TAG: \${{ env.SHA_TAG }}
+      run: |
+        IMAGE="$IMAGE_REPOSITORY/worker-cpu:$IMAGE_TAG"
+        docker run -d --name "$C" --network host \\
+          "$IMAGE"
+    - shell: bash
+      env:
+        IMAGE_TAG: \${{ env.SHA_TAG }}
+      run: |
+        IMAGE="$IMAGE_REPOSITORY/worker-io:$IMAGE_TAG"
+        Q=$(docker run --rm --entrypoint /nodejs/bin/node "$IMAGE" -e 'x')
+        docker run -d --name "$C" --network host \\
+          "$IMAGE"
+`
+const web = `
+runs:
+  using: composite
+  steps:
+    - id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: \${{ env.IMAGE_REPOSITORY }}/web
+        tags: |
+          type=sha,prefix=sha-,format=long
+    - uses: docker/build-push-action@v7
+      with:
+        load: true
+        push: false
+        tags: \${{ steps.meta.outputs.tags }}
+    - shell: bash
+      env:
+        IMAGE_TAG: \${{ env.SHA_TAG }}
+      run: |
+        IMAGE="$IMAGE_REPOSITORY/web:$IMAGE_TAG"
+        CONTAINER=$(docker run -d -p "$PORT:3000" --add-host=host.docker.internal:host-gateway \\
+          -e AWS_REGION "$IMAGE")
+`
+const snapshot = `
+jobs:
+  generate:
+    services:
+      postgres:
+        image: \${{ needs.prepare.outputs.postgres_image }}
+`
+const built = '    - run: docker build -t app:ci .\n'
+const stepsOf = (run: string, extra = '') => `
+runs:
+  steps:
+${extra}    - run: |
+${run
+  .split('\n')
+  .map((line) => `        ${line}`)
+  .join('\n')}
+`
+
+describe('real action shapes', () => {
+  it('accepts the seven references from the report', () => {
+    expect(violations(backend)).toEqual([])
+    expect(violations(web)).toEqual([])
+    const expression = '${{ needs.prepare.outputs.postgres_image }}'
+    expect(violations(snapshot)).toEqual([`generate service postgres: ${expression}`])
+    expect(
+      workflowImageViolations('f.yml', parse(snapshot) as Document, undefined, {
+        ...strict,
+        allowRefExpressions: [expression],
+      }),
+    ).toEqual([])
+  })
+
+  it('still flags them when the build steps are absent', () => {
+    const without = (yaml: string) => short(yaml.replace(/uses: docker\/\S+/gu, 'uses: x/y'))
+    expect(without(backend)).toEqual(Array(5).fill('"$IMAGE"'))
+    expect(without(web)).toEqual(['"$IMAGE"'])
+  })
+})
+
+describe('shell variable resolution', () => {
+  it('resolves $VAR, "$VAR" and ${VAR} through an earlier assignment, last one winning', () => {
+    const run = [
+      'IMAGE=evil:1',
+      'export IMAGE=app:ci',
+      'docker run $IMAGE',
+      'docker run "$IMAGE"',
+      'docker run ${IMAGE}',
+    ].join('\n')
+    expect(violations(stepsOf(run, built))).toEqual([])
+    const reassigned = ['IMAGE=app:ci', 'IMAGE=evil:1', 'docker run "$IMAGE"'].join('\n')
+    expect(short(stepsOf(reassigned, built))).toEqual(['"$IMAGE"'])
+  })
+
+  it('rejects an unrelated variable, a later assignment, and another run block', () => {
+    expect(short(stepsOf('IMAGE=app:ci\ndocker run "$OTHER"', built))).toEqual(['"$OTHER"'])
+    expect(short(stepsOf('docker run "$IMAGE"\nIMAGE=app:ci', built))).toEqual(['"$IMAGE"'])
+    const split = `
+runs:
+  steps:
+    - run: docker build -t app:ci .
+    - run: IMAGE=app:ci
+    - run: docker run "$IMAGE"
+`
+    expect(short(split)).toEqual(['"$IMAGE"'])
+  })
+
+  it('does not resolve a command-substituted assignment', () => {
+    expect(short(stepsOf('IMAGE=$(pick)\ndocker run "$IMAGE"', built))).toEqual(['"$IMAGE"'])
+  })
+})
+
+describe('variable build tags', () => {
+  it('matches normalized tag text exactly and rejects near misses', () => {
+    const build = '    - run: docker build -t "app:${TAG}" -t "$REPO/x:$TAG" .\n'
+    const run = [
+      'docker run app:$TAG',
+      'docker run "$REPO/x:${TAG}"',
+      'docker run app:$TAGS',
+      'docker run app:${{ env.TAG }}',
+      'docker run $REPO/x:$TAG2',
+    ].join('\n')
+    expect(short(stepsOf(run, build))).toEqual(['app:$TAGS', '$REPO/x:$TAG2'])
+  })
+
+  it('maps step env inputs to the variable the run block uses, in either direction', () => {
+    const doc = `
+runs:
+  steps:
+    - env:
+        REPO: \${{ inputs.repo }}
+      run: docker build -t "\${{ inputs.repo }}/app:ci" .
+    - env:
+        REPO: \${{ inputs.repo }}
+      run: |
+        IMAGE="$REPO/app:ci"
+        docker run "$IMAGE"
+        docker run "\${{ inputs.repo }}/app:ci"
+        docker run "$REPO/app:other"
+`
+    expect(short(doc)).toEqual(['"$REPO/app:other"'])
+    const reverse = `
+runs:
+  steps:
+    - run: docker build -t "$REPO/app:ci" .
+    - env:
+        REPO: \${{ inputs.repo }}
+      run: docker run "\${{ inputs.repo }}/app:ci"
+`
+    expect(violations(reverse)).toEqual([])
+  })
+
+  it('skips tags that are only a variable and metadata names no build consumes', () => {
+    const doc = `
+runs:
+  steps:
+    - run: docker build -t "$IMG" -t '\${{ inputs.tag }}' .
+    - id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: ghcr.io/o/unbuilt
+    - uses: docker/build-push-action@v7
+      with:
+        push: true
+        tags: \${{ steps.meta.outputs.tags }}
+    - run: |
+        docker run "$IMG"
+        docker run ghcr.io/o/unbuilt:1
+        docker run \${{ inputs.tag }}
+`
+    expect(short(doc)).toEqual(['"$IMG"', 'ghcr.io/o/unbuilt:1', '${{ inputs.tag }}'])
+  })
+
+  it('does not exempt a digest-pinned or sibling repository reference', () => {
+    const doc = `
+runs:
+  steps:
+    - id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: ghcr.io/o/app, ghcr.io/o/side
+    - uses: docker/bake-action@v7
+      with:
+        files: \${{ steps.meta.outputs.bake-file }}
+    - run: |
+        docker run ghcr.io/o/app:$TAG
+        docker run ghcr.io/o/app
+        docker run ghcr.io/o/app@sha256:\${DIGEST}
+        docker run ghcr.io/o/apple:$TAG
+        docker run ghcr.io/o/app/sub:$TAG
+`
+    expect(short(doc)).toEqual([
+      'ghcr.io/o/app@sha256:${DIGEST}',
+      'ghcr.io/o/apple:$TAG',
+      'ghcr.io/o/app/sub:$TAG',
+    ])
+  })
+})
+
+describe('the Dockerfile tag stays rejected', () => {
+  it('flags a distroless-style tagged FROM', () => {
+    const from = 'FROM gcr.io/distroless/nodejs26-debian13:nonroot\n'
+    expect(dockerfileViolations('Dockerfile', from, strict)).toEqual([
+      'Dockerfile: FROM gcr.io/distroless/nodejs26-debian13:nonroot must start with "ghcr.io/vouchington/dependency-"; must be pinned with @sha256:<64 lowercase hex characters>',
+    ])
+  })
+})
+
+describe('helpers', () => {
+  it('normalizes text and variable names', () => {
+    const env = envMapping({ A: '${{ inputs.a }}', B: 3, C: 'x' })
+    expect([...env]).toEqual([['inputs.a', '$A']])
+    expect(envMapping(undefined).size).toBe(0)
+    expect(normalizeText('"${{ inputs.a }}"/${B}/${{env.C}}/${{ x.y }}', env)).toBe(
+      '$A/$B/$C/${{ x.y }}',
+    )
+    expect(variableName("'$X'")).toBe('X')
+    expect(variableName('${X}')).toBe('X')
+    expect(variableName('$X/y')).toBeUndefined()
+    expect(lastAssignment('A=1\nlocal A="2 3"\nAB=4', 'A')).toBe('"2 3"')
+    expect(lastAssignment('echo A=1', 'A')).toBeUndefined()
+  })
+
+  it('records metadata repositories only for build steps that consume them', () => {
+    const { repositories, stepIds } = collectLocalBuilds([
+      { id: 'm', uses: 'docker/metadata-action@v6', with: { images: 7 } },
+      { id: 'n', uses: 'docker/metadata-action@v6', with: { images: '$X,a/b' } },
+      {
+        id: 'bake',
+        uses: 'docker/bake-action@v7',
+        with: { files: '${{ steps.n.outputs.bake-file }}' },
+      },
+    ])
+    expect([...repositories]).toEqual(['a/b'])
+    expect([...stepIds]).toEqual(['bake'])
+  })
+})

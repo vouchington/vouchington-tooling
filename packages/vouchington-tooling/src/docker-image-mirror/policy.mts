@@ -13,6 +13,11 @@ export interface ImagePolicy {
   readonly allowRegistries?: readonly string[] | undefined
   /** Require `@sha256:` followed by 64 lowercase hex characters. */
   readonly requireDigest?: boolean | undefined
+  /**
+   * Audited escape hatch for dynamic values (such as job outputs) a scan cannot verify: an image
+   * reference whose raw text exactly equals one of these is accepted. No patterns.
+   */
+  readonly allowRefExpressions?: readonly string[] | undefined
 }
 
 export function policyActive(policy: ImagePolicy): boolean {
@@ -47,6 +52,7 @@ export function imageReasons(
   mirror: string,
   policy: ImagePolicy = {},
 ): string[] {
+  if (policy.allowRefExpressions?.includes(reference)) return []
   const image = cleanImage(reference)
   if (image === '' || image === 'scratch') return []
   const allowed = policy.allowRegistries ?? []

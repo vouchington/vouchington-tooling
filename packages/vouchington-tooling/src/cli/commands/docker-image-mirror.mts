@@ -27,6 +27,7 @@ export async function runDockerImageMirrorCommand(
     mirror?: string
     'allow-registry'?: string[]
     'require-digest'?: boolean
+    'allow-ref-expression'?: string[]
   }
   try {
     values = parseArgs({
@@ -37,6 +38,7 @@ export async function runDockerImageMirrorCommand(
         mirror: { type: 'string' },
         'allow-registry': { type: 'string', multiple: true },
         'require-digest': { type: 'boolean' },
+        'allow-ref-expression': { type: 'string', multiple: true },
       },
     }).values
   } catch (error) {
@@ -50,6 +52,13 @@ export async function runDockerImageMirrorCommand(
     )
     return 2
   }
+  const allowRefExpressions = values['allow-ref-expression']
+  if (allowRefExpressions?.includes('')) {
+    stderr.write(
+      `vouchington: --allow-ref-expression needs a non-empty value\n${commandUsage('docker-image-mirror')}`,
+    )
+    return 2
+  }
   const root = resolve(values.root ?? process.cwd())
   const context = await (dependencies.buildContext ?? buildSharedContext)(root)
   if (!context.isInsideGitRepo) {
@@ -60,6 +69,7 @@ export async function runDockerImageMirrorCommand(
     mirror: values.mirror,
     allowRegistries,
     requireDigest: values['require-digest'],
+    allowRefExpressions,
   })
   if (errors.length === 0) {
     stdout.write('Docker image mirror policy: ok\n')
