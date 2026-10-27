@@ -85,9 +85,10 @@ function collectSupportedArchitectures(
  * supports only the `current` platform. pnpm reports every package missing from the store as
  * Unknown, so the listing workspace supports every `os`, `cpu`, and `libc` in the lockfile and
  * `pnpm licenses list` covers the whole graph, with off-platform licenses resolved from the
- * registry afterwards. The lockfile drops every
- * `engines` constraint because pnpm 12's `fetch` ignores `force` and skips an optional package whose
- * `engines` exclude the running Node.js, which would leave that package's license Unknown.
+ * registry afterwards.
+ *
+ * The lockfile drops every `engines` constraint because pnpm 12's `fetch` ignores `force` and skips
+ * an optional package whose `engines` exclude the running Node.js.
  */
 export function renderPnpmLicenseAuditFiles(
   lockfileSource: string,

@@ -94,7 +94,11 @@ describe('resolveUnknownLicenses', () => {
     const resolved = await resolveUnknownLicenses(report, execute, OPTIONS)
     expect(resolved).toEqual({
       MIT: [{ name: 'a', versions: ['2.0.0'] }],
-      Unknown: [{ name: 'a', versions: ['1.0.0'] }, { name: 'bare' }],
+      Unknown: [
+        { name: 'a', versions: ['1.0.0'] },
+        { name: 'bare' },
+        { name: 'none', versions: [] },
+      ],
     })
   })
 

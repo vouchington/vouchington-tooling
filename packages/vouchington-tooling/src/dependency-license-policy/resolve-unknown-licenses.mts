@@ -92,7 +92,7 @@ export async function resolveUnknownLicenses(
       return false
     })
     if (stillUnknown.length > 0) remaining.push({ name: entry.name, versions: stillUnknown })
-    else if (entry.versions === undefined) remaining.push(entry)
+    else if (!entry.versions?.length) remaining.push(entry)
   }
   if (remaining.length > 0) report[UNKNOWN_LICENSE] = remaining
   else delete report[UNKNOWN_LICENSE]
