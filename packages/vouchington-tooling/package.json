@@ -481,6 +481,11 @@
       "types": "./dist/input-otp-mock/index.d.mts",
       "import": "./dist/input-otp-mock/index.mjs",
       "default": "./dist/input-otp-mock/index.mjs"
+    },
+    "./worker-query-profile": {
+      "types": "./dist/worker-query-profile/index.d.mts",
+      "import": "./dist/worker-query-profile/index.mjs",
+      "default": "./dist/worker-query-profile/index.mjs"
     }
   },
   "publishConfig": {
@@ -516,6 +521,9 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/spdx-expression-parse": "4.0.0",
+    "@vouchington/postgres": "0.1.0",
+    "@vouchington/worker-runtime": "0.2.1",
+    "glide-mq": "^0.19.0",
     "next": "16.4.2",
     "no-mistakes": "0.83.0",
     "pg": "8.23.1",
@@ -527,6 +535,8 @@
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@playwright/test": ">=1.64.1",
+    "@vouchington/postgres": ">=0.1.0",
+    "@vouchington/worker-runtime": ">=0.2.1",
     "next": ">=15",
     "no-mistakes": "*",
     "pg": ">=8",
@@ -557,6 +567,12 @@
       "optional": true
     },
     "vitest": {
+      "optional": true
+    },
+    "@vouchington/postgres": {
+      "optional": true
+    },
+    "@vouchington/worker-runtime": {
       "optional": true
     }
   },
