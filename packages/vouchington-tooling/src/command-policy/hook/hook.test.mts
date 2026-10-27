@@ -21,6 +21,7 @@ import type { HookContext, HookIo } from '../index.mts'
 const dirs: string[] = []
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  Reflect.deleteProperty(globalThis, '__hookSeen')
 })
 
 const context = (overrides: Partial<HookContext> = {}): HookContext => ({
