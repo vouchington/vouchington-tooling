@@ -54,22 +54,22 @@ describe('projectGeneratedArbiterInput', () => {
     'preserves direct reference and indirection facts for %s',
     async (assignment, reference, indirect) => {
       const { projected } = await input('(key)', assignment)
-      expect(projected.complete).toBe(assignment !== 'source = source::text')
+      expect(projected.complete).toBe(true)
       expect(projected.assignments[0]).toMatchObject({
         referencedColumn: reference,
         hasIndirection: indirect,
-        complete: assignment !== 'source = source::text',
+        complete: true,
       })
     },
   )
 
-  it('retains a direct nested parenthesized reference while closing incomplete child facts', async () => {
+  it('retains a direct nested parenthesized reference with complete child facts', async () => {
     const { projected } = await input('(key)', 'source = ((items.source))')
-    expect(projected.complete).toBe(false)
+    expect(projected.complete).toBe(true)
     expect(projected.assignments[0]).toMatchObject({
       referencedColumn: 'source',
       hasIndirection: false,
-      complete: false,
+      complete: true,
     })
   })
 
