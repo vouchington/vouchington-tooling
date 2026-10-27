@@ -26,6 +26,17 @@ type Step = {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const actionPath = join(repoRoot, '.github/actions/setup-playwright/action.yml')
+const resolvePlaywrightVersion = join(
+  repoRoot,
+  'packages/vouchington-tooling/scripts/resolve-playwright-version.mjs',
+)
+const onePlaywrightLockfile = `lockfileVersion: '9.0'
+
+packages:
+
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-abc}
+`
 const actionSource = readFileSync(actionPath, 'utf8')
 const action = parse(actionSource) as {
   inputs: Record<string, { default?: string }>
@@ -109,21 +120,26 @@ describe('setup-playwright composite action', () => {
     expect(actionSource).not.toContain('ubicloud')
   })
 
-  it('caches the input path with no restore-keys fallback', () => {
+  it('caches by resolved Playwright version and restores that version prefix', () => {
     const cache = action.runs.steps.find(
       (candidate) => candidate.name === 'Cache Playwright browsers',
     )
+    const version = '${{ steps.playwright-cache-key.outputs.playwright-version }}'
     expect(cache?.uses).toBe('actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9')
     expect(cache?.with).toEqual({
       path: '${{ steps.playwright-cache-key.outputs.cache-path }}',
-      key: 'playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}',
+      key: `playwright-browsers-\${{ runner.os }}-\${{ runner.arch }}-${version}-\${{ inputs.browser }}`,
+      'restore-keys': `playwright-browsers-\${{ runner.os }}-\${{ runner.arch }}-${version}-`,
     })
     expect(cache?.if).toContain(',chrome,')
     expect(cache?.if).toContain(',msedge,')
     expect(cache?.if).toContain("format(',{0},', inputs.browser)")
     expect(step('Resolve Playwright cache key').run).toContain('PLAYWRIGHT_BROWSERS_PATH=$resolved')
-    expect(step('Resolve Playwright cache key').run).toContain('sha256sum pnpm-lock.yaml')
-    expect(step('Resolve Playwright cache key').run).toContain('shasum -a 256 pnpm-lock.yaml')
+    expect(step('Resolve Playwright cache key').run).toContain(
+      'node "$RESOLVE_PLAYWRIGHT_VERSION" pnpm-lock.yaml',
+    )
+    expect(step('Resolve Playwright cache key').run).not.toContain('sha256sum')
+    expect(actionSource).not.toContain('lockfile-hash')
   })
 
   it('points the download and the launch probe at this repository', () => {
@@ -137,6 +153,10 @@ describe('setup-playwright composite action', () => {
     expect(step('Verify Chromium launches').env?.WAIT_FOR_APT_LOCKS).toContain(
       'scripts/gha/wait-for-apt-locks.sh',
     )
+    expect(step('Resolve Playwright cache key').env?.RESOLVE_PLAYWRIGHT_VERSION).toContain(
+      `${scripts}/resolve-playwright-version.mjs`,
+    )
+    expect(existsSync(resolvePlaywrightVersion)).toBe(true)
     expect(existsSync(join(repoRoot, scripts, 'run-bounded.py'))).toBe(true)
     expect(existsSync(join(repoRoot, scripts, 'run_bounded_process.py'))).toBe(true)
     expect(existsSync(join(repoRoot, scripts, 'chromium-launch-probe.mjs'))).toBe(true)
@@ -250,7 +270,7 @@ describe('setup-playwright browser download', () => {
     const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-cache-'))
     const output = join(directory, 'output')
     const envFile = join(directory, 'env')
-    writeFileSync(join(directory, 'pnpm-lock.yaml'), 'lock\n')
+    writeFileSync(join(directory, 'pnpm-lock.yaml'), onePlaywrightLockfile)
     try {
       const result = spawnSync(
         'bash',
@@ -269,6 +289,7 @@ describe('setup-playwright browser download', () => {
             ...process.env,
             HOME: '/home/runner',
             PLAYWRIGHT_CACHE_PATH: '~/.cache/ms-playwright',
+            RESOLVE_PLAYWRIGHT_VERSION: resolvePlaywrightVersion,
             GITHUB_OUTPUT: output,
             GITHUB_ENV: envFile,
           },
@@ -279,6 +300,7 @@ describe('setup-playwright browser download', () => {
         'PLAYWRIGHT_BROWSERS_PATH=/home/runner/.cache/ms-playwright\n',
       )
       expect(readFileSync(output, 'utf8')).toContain('cache-path=/home/runner/.cache/ms-playwright')
+      expect(readFileSync(output, 'utf8')).toContain('playwright-version=1.64.1')
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
@@ -288,7 +310,7 @@ describe('setup-playwright browser download', () => {
     const directory = mkdtempSync(join(tmpdir(), 'setup-playwright-cache-'))
     const output = join(directory, 'output')
     const envFile = join(directory, 'env')
-    writeFileSync(join(directory, 'pnpm-lock.yaml'), 'lock\n')
+    writeFileSync(join(directory, 'pnpm-lock.yaml'), onePlaywrightLockfile)
     const run = (cachePath: string) => {
       writeFileSync(output, '')
       writeFileSync(envFile, '')
@@ -310,6 +332,7 @@ describe('setup-playwright browser download', () => {
             HOME: '/home/runner',
             GITHUB_WORKSPACE: '/home/runner/work/repo/repo',
             PLAYWRIGHT_CACHE_PATH: cachePath,
+            RESOLVE_PLAYWRIGHT_VERSION: resolvePlaywrightVersion,
             GITHUB_OUTPUT: output,
             GITHUB_ENV: envFile,
           },
