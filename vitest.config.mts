@@ -4,10 +4,11 @@ import { defineConfig } from 'vitest/config'
 
 const TESTS = 'packages/*/src/**/*.test.mts'
 
-// Reusing workers saves a fork per file, but a vi.mock or vi.doMock leaks
-// into every later file in that worker, so those files keep their own.
+// Reusing workers saves a fork per file, but a module mock or a module
+// re-imported after vi.resetModules stays in the shared module registry for
+// every later file in that worker, so those files keep their own.
 const MODULE_MOCKING_TESTS = globSync(TESTS).filter((file) =>
-  /\bvi\.(?:mock|doMock)\b/.test(readFileSync(file, 'utf8')),
+  /\bvi\.(?:mock|doMock|resetModules)\b/.test(readFileSync(file, 'utf8')),
 )
 
 export default defineConfig({
@@ -17,7 +18,13 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'shared', include: [TESTS], exclude: MODULE_MOCKING_TESTS, isolate: false },
+        test: {
+          name: 'shared',
+          include: [TESTS],
+          exclude: MODULE_MOCKING_TESTS,
+          isolate: false,
+          setupFiles: ['./vitest.shared-reset.mts'],
+        },
       },
       { extends: true, test: { name: 'isolated', include: MODULE_MOCKING_TESTS } },
     ],
