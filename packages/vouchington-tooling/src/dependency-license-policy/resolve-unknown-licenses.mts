@@ -6,16 +6,21 @@ const VIEW_CONCURRENCY = 8
 
 type CommandOptions = Parameters<PnpmExecutor>[2]
 
+// A blank or literal `Unknown` manifest license identifies nothing, so the entry stays Unknown.
+function usableLicense(license: unknown): string | undefined {
+  if (typeof license !== 'string') return undefined
+  const trimmed = license.trim()
+  return trimmed === '' || trimmed === UNKNOWN_LICENSE ? undefined : trimmed
+}
+
 /** Reads the license from `pnpm view <spec> license --json` output, or undefined if unusable. */
 function parseViewedLicense(stdout: string): string | undefined {
   if (stdout.trim() === '') return undefined
   const value = JSON.parse(stdout) as unknown
-  if (typeof value === 'string') return value
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-    const { type } = value as Record<string, unknown>
-    if (typeof type === 'string') return type
+    return usableLicense((value as Record<string, unknown>).type)
   }
-  return undefined
+  return usableLicense(value)
 }
 
 async function viewLicense(

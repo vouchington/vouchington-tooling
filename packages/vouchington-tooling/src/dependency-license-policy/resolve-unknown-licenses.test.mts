@@ -79,6 +79,9 @@ describe('resolveUnknownLicenses', () => {
     ['an object with a non-string type', '{"type":1}'],
     ['an array', '["MIT"]'],
     ['a number', '3'],
+    ['a blank string', '"  "'],
+    ['a literal Unknown', '"Unknown"'],
+    ['an object with a literal Unknown type', '{"type":"Unknown"}'],
   ])('keeps an entry Unknown for %s', async (_label, stdout) => {
     const report = reportOf({
       Unknown: [
