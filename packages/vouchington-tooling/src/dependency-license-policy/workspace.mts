@@ -18,12 +18,17 @@ const PLATFORM_KEYS: readonly PlatformKey[] = ['os', 'cpu', 'libc']
 export interface PnpmLicenseAuditWorkspace {
   readonly cleanup: () => void
   readonly cwd: string
+  /** Rewrites `pnpm-workspace.yaml` to support every platform in the lockfile, for listing. */
+  readonly useListingWorkspace: () => void
 }
 
-/** The rendered `pnpm-lock.yaml` and `pnpm-workspace.yaml` of a license audit workspace. */
+/** The rendered audit files: one lockfile and the `pnpm-workspace.yaml` for each audit phase. */
 export interface PnpmLicenseAuditFiles {
+  /** Supports only the current platform, so `pnpm fetch` stays within the disk quota. */
+  readonly fetchWorkspace: string
   readonly lockfile: string
-  readonly workspace: string
+  /** Supports every platform in the lockfile, so `pnpm licenses list` reports every package. */
+  readonly listingWorkspace: string
 }
 
 function parseYamlDocument(source: string, path: string) {
@@ -73,12 +78,17 @@ function collectSupportedArchitectures(
 }
 
 /**
- * Renders the audit copies of `pnpm-lock.yaml` and `pnpm-workspace.yaml` so `pnpm fetch` downloads
- * every package in the lockfile, including optional ones that don't match the host.
+ * Renders the audit copies of `pnpm-lock.yaml` and the two `pnpm-workspace.yaml` variants.
  *
- * The workspace supports every `os`, `cpu`, and `libc` in the lockfile. The lockfile drops every
- * `engines` constraint because pnpm 12's `fetch` ignores `force` and skips an optional package whose
- * `engines` exclude the running Node.js, which would leave that package's license Unknown.
+ * Fetching every platform binary in a lockfile can need several times the disk of the current
+ * platform alone and exceed the quota of the temporary directory. The fetch workspace therefore
+ * supports only the `current` platform. pnpm reports every package missing from the store as
+ * Unknown, so the listing workspace supports every `os`, `cpu`, and `libc` in the lockfile and
+ * `pnpm licenses list` covers the whole graph, with off-platform licenses resolved from the
+ * registry afterwards.
+ *
+ * The lockfile drops every `engines` constraint because pnpm 12's `fetch` ignores `force` and skips
+ * an optional package whose `engines` exclude the running Node.js.
  */
 export function renderPnpmLicenseAuditFiles(
   lockfileSource: string,
@@ -101,9 +111,11 @@ export function renderPnpmLicenseAuditFiles(
     paths.lockfile,
   )
   for (const { value } of packageNodes.items) if (isMap(value)) value.delete('engines')
+  const current = { cpu: ['current'], libc: ['current'], os: ['current'] }
   return {
+    fetchWorkspace: stringifyYaml({ ...workspace, packages: [], supportedArchitectures: current }),
     lockfile: lockfileDocument.toString({ lineWidth: 0 }),
-    workspace: stringifyYaml({ ...workspace, packages: [], supportedArchitectures }),
+    listingWorkspace: stringifyYaml({ ...workspace, packages: [], supportedArchitectures }),
   }
 }
 
@@ -120,6 +132,8 @@ export function preparePnpmLicenseAuditWorkspace(
   const directory = licenseAuditParentDirectory(options.directory)
   reclaimStaleLicenseAuditDirectories(directory, options)
   const auditRoot = mkdtempSync(join(directory, LICENSE_AUDIT_DIRECTORY_PREFIX))
+  const workspaceFile = join(auditRoot, 'pnpm-workspace.yaml')
+  let listingWorkspace = ''
   try {
     writeAuditPid(auditRoot, options.pid)
     copyFileSync(join(repoRoot, 'package.json'), join(auditRoot, 'package.json'))
@@ -130,7 +144,8 @@ export function preparePnpmLicenseAuditWorkspace(
       workspace: join(repoRoot, 'pnpm-workspace.yaml'),
     })
     writeFileSync(join(auditRoot, 'pnpm-lock.yaml'), files.lockfile, 'utf8')
-    writeFileSync(join(auditRoot, 'pnpm-workspace.yaml'), files.workspace, 'utf8')
+    writeFileSync(workspaceFile, files.fetchWorkspace, 'utf8')
+    listingWorkspace = files.listingWorkspace
   } catch (error) {
     removeAuditDirectory(auditRoot)
     throw error
@@ -138,5 +153,6 @@ export function preparePnpmLicenseAuditWorkspace(
   return {
     cwd: auditRoot,
     cleanup: () => removeAuditDirectory(auditRoot),
+    useListingWorkspace: () => writeFileSync(workspaceFile, listingWorkspace, 'utf8'),
   }
 }

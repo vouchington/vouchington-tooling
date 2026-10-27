@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { assertCommandSucceeded } from './assert-command.mts'
 import { withAuditSignalCleanup } from './audit-signals.mts'
 import { ensurePrivateLicenseAuditStore } from './audit-store.mts'
 import { executePnpm } from './execute-pnpm.mts'
 import { parsePnpmLicenseReport } from './report.mts'
-import type { PnpmCommandResult, PnpmExecutor, PnpmLicenseReport } from './types.mts'
+import { resolveUnknownLicenses } from './resolve-unknown-licenses.mts'
+import type { PnpmExecutor, PnpmLicenseReport } from './types.mts'
 import { preparePnpmLicenseAuditWorkspace, type PnpmLicenseAuditWorkspace } from './workspace.mts'
 
 export interface CollectPnpmLicenseReportOptions {
@@ -26,20 +28,14 @@ const DEFAULT_OPTIONS = {
   readFile: readFileSync,
 }
 
-function commandFailureOutput(result: { stderr: string; stdout: string }): string {
-  return result.stderr.trim() || result.stdout.trim()
-}
-
-function assertCommandSucceeded(label: string, result: PnpmCommandResult): void {
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    throw new Error(
-      `${label} exited with status ${String(result.status)}: ${commandFailureOutput(result)}`,
-    )
-  }
-}
-
-/** Collects licenses for every platform represented in a pnpm lockfile. */
+/**
+ * Collects licenses for every platform represented in a pnpm lockfile.
+ *
+ * Only the current platform is fetched, because fetching every platform binary can exceed the disk
+ * quota of a temporary directory. The workspace then switches to the all-platform configuration so
+ * `pnpm licenses list` reports the full package set. pnpm reports packages missing from the store
+ * as `Unknown`, and those are resolved from the registry with `pnpm view`.
+ */
 export async function collectPnpmLicenseReport(
   repoRoot: string,
   options: CollectPnpmLicenseReportOptions = {},
@@ -61,18 +57,21 @@ export async function collectPnpmLicenseReport(
       commandOptions,
     )
     assertCommandSucceeded('pnpm fetch', fetchResult)
+    auditWorkspace.useListingWorkspace()
     const result = await execute(
       'pnpm',
       [storeConfig, 'licenses', 'list', '--json'],
       commandOptions,
     )
     assertCommandSucceeded('pnpm licenses list --json', result)
+    let report: PnpmLicenseReport
     try {
-      return parsePnpmLicenseReport(JSON.parse(result.stdout) as unknown)
+      report = parsePnpmLicenseReport(JSON.parse(result.stdout) as unknown)
     } catch (error) {
       throw new Error(`pnpm licenses list --json produced unparseable output: ${String(error)}`, {
         cause: error,
       })
     }
+    return resolveUnknownLicenses(report, execute, commandOptions)
   })
 }
