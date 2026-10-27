@@ -152,8 +152,8 @@ importers:
         specifier: 16.4.2
         version: 16.4.2(@playwright/test@1.64.1)(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       no-mistakes:
-        specifier: 0.83.0
-        version: 0.83.0
+        specifier: 0.93.0
+        version: 0.93.0(vitest@5.0.5)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -2741,31 +2741,36 @@ packages:
       sass:
         optional: true
 
-  no-mistakes-darwin-arm64@0.83.0:
-    resolution: {integrity: sha512-tCXJ7imwPItJPlnkK3MSpFP7AG2GRIAN7FLnLQzV+G92U8DVAqaNj8Q+XZVF63QahCp3iCNKbcnB5DUSJvUZnQ==}
+  no-mistakes-darwin-arm64@0.93.0:
+    resolution: {integrity: sha512-J3Y/TjWKx66ZoSCz3Ob2VL8WTotjY48tk39+rdG4OQZZVmsN5p4j2aSLkbDB4KhReuG2RE/9AGNHEFfd3vqO4Q==}
     cpu: [arm64]
     os: [darwin]
 
-  no-mistakes-linux-arm64-gnu@0.83.0:
-    resolution: {integrity: sha512-QEZo02s4+bYLD55qvqTPJqJFd7aktV8G+1FmHa9mJNMGhAJAEyp/pTSFOaaE6xk/yTItxYmus/wm4GbmlMeDiw==}
+  no-mistakes-linux-arm64-gnu@0.93.0:
+    resolution: {integrity: sha512-y5bmAOadwc+hbqNS3rr58HNlT1xV4kHmXMVaaCCJCenx48qVidhFUAcFmu7CuGGs9/ZitF8VXLoZ9wlPm0d1KA==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-linux-x64-gnu@0.83.0:
-    resolution: {integrity: sha512-ektG0h+bsqOSrJIK+Yknc8p+36mf0zN/vinDPHMXHDUYeeCjJ3M4eg5sMnPAsIimHEl9cNgi/lsLG6KrQuG2lw==}
+  no-mistakes-linux-x64-gnu@0.93.0:
+    resolution: {integrity: sha512-8tNmuRjn9mVn2X9/4L0Tzaw1Z8kqCAurHa9YnKw+7jCXB7UwK5Jf/qgJw2CzkxpZiFIW9q9jlbu6O/IH1uF0UA==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-win32-x64-msvc@0.83.0:
-    resolution: {integrity: sha512-V0kRAzHGsreslgNejmTJUz59e3D/nNJ4Uh6XXNj2auvePnknwD1n9L5BbB+AkfIbnMZ2aFVw0SlNvd9X6iKgKQ==}
+  no-mistakes-win32-x64-msvc@0.93.0:
+    resolution: {integrity: sha512-7frPJ+ml/UUi9UKQEQie1btbaCuSqWhUjQb2wDHuA1+jwI4DpMEoORsxKqK13nQhCfH/I+O2hGOHz+j7zX/eaA==}
     cpu: [x64]
     os: [win32]
 
-  no-mistakes@0.83.0:
-    resolution: {integrity: sha512-byaK+spPGI/deudq0LOaIFtlGUMC5IP4t0y4q4nU+lN6hNjCS3KGwyaGSlqEyRTmQnqVUfRIVZp8UGZ3rtMxXA==}
+  no-mistakes@0.93.0:
+    resolution: {integrity: sha512-KZ1u07xbMGXveeEhA5nd6tAw03n8p3ueLYoA0I7EFEvRAmtgYpCgwG7gmbRt9B8/mpYoSjQ8zB+6H4m8QAs4yg==}
     hasBin: true
+    peerDependencies:
+      vitest: ^5.0.3
+    peerDependenciesMeta:
+      vitest:
+        optional: true
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -2976,8 +2981,8 @@ packages:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
 
-  qs@6.17.0:
-    resolution: {integrity: sha512-5LK5BZ2XDHMvcUJaf0CQ5HL3aVgKbpklvByC7qLSxYkfE8COEEbJg5xCHWCTqzqi0Gs4Jn5Mv5v3R38W6edscA==}
+  qs@6.16.1:
+    resolution: {integrity: sha512-5Px6J7rfHBAGUhNQ3es4YzcOdBBw0SDcVtThJml4RdnKw4tKs2epA0kPZ+K8X+WiHktT93RHVcQ/3ym5aTCgtg==}
     engines: {node: '>=0.6'}
 
   range-parser@1.3.0:
@@ -4675,7 +4680,7 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.3
       on-finished: 2.4.1
-      qs: 6.17.0
+      qs: 6.16.1
       raw-body: 3.0.2
       type-is: 2.1.0
     transitivePeerDependencies:
@@ -5003,7 +5008,7 @@ snapshots:
       once: 1.4.0
       parseurl: 1.3.3
       proxy-addr: 2.0.8
-      qs: 6.17.0
+      qs: 6.16.1
       range-parser: 1.3.0
       router: 2.2.0(supports-color@7.2.0)
       send: 1.2.1(supports-color@7.2.0)
@@ -5733,24 +5738,25 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  no-mistakes-darwin-arm64@0.83.0:
+  no-mistakes-darwin-arm64@0.93.0:
     optional: true
 
-  no-mistakes-linux-arm64-gnu@0.83.0:
+  no-mistakes-linux-arm64-gnu@0.93.0:
     optional: true
 
-  no-mistakes-linux-x64-gnu@0.83.0:
+  no-mistakes-linux-x64-gnu@0.93.0:
     optional: true
 
-  no-mistakes-win32-x64-msvc@0.83.0:
+  no-mistakes-win32-x64-msvc@0.93.0:
     optional: true
 
-  no-mistakes@0.83.0:
+  no-mistakes@0.93.0(vitest@5.0.5):
     optionalDependencies:
-      no-mistakes-darwin-arm64: 0.83.0
-      no-mistakes-linux-arm64-gnu: 0.83.0
-      no-mistakes-linux-x64-gnu: 0.83.0
-      no-mistakes-win32-x64-msvc: 0.83.0
+      no-mistakes-darwin-arm64: 0.93.0
+      no-mistakes-linux-arm64-gnu: 0.93.0
+      no-mistakes-linux-x64-gnu: 0.93.0
+      no-mistakes-win32-x64-msvc: 0.93.0
+      vitest: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   object-assign@4.1.1: {}
 
@@ -6015,7 +6021,7 @@ snapshots:
     dependencies:
       hookified: 2.2.0
 
-  qs@6.17.0:
+  qs@6.16.1:
     dependencies:
       es-define-property: 1.0.1
       side-channel: 1.1.1

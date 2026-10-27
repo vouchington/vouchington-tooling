@@ -525,7 +525,7 @@
     "@vouchington/worker-runtime": "0.2.1",
     "glide-mq": "^0.19.0",
     "next": "16.4.2",
-    "no-mistakes": "0.83.0",
+    "no-mistakes": "0.93.0",
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
