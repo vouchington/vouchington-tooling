@@ -1,11 +1,12 @@
 name: Setup Playwright
 description: >
   Install a Playwright browser into an actions/cache path and export that
-  directory as PLAYWRIGHT_BROWSERS_PATH. The cache key includes the browser,
-  OS, architecture, and pnpm lockfile hash, with no fallback key. Chrome and
-  Edge install globally, so they skip this cache. Host packages are installed
-  only when that browser fails to launch. Chromium checks both the headless
-  shell and channel chromium.
+  directory as PLAYWRIGHT_BROWSERS_PATH. The cache key is the OS, architecture,
+  resolved Playwright version, and browser. restore-keys is the OS,
+  architecture, and version prefix, so an exact-key miss can reuse a browser
+  cached for that version. Chrome and Edge install globally, so they skip this
+  cache. Host packages are installed only when that browser fails to launch.
+  Chromium checks both the headless shell and channel chromium.
 
 inputs:
   browser:
@@ -29,6 +30,7 @@ runs:
       shell: bash
       env:
         PLAYWRIGHT_CACHE_PATH: ${{ inputs.cache-path }}
+        RESOLVE_PLAYWRIGHT_VERSION: ${{ github.action_path }}/../../../packages/vouchington-tooling/scripts/resolve-playwright-version.mjs
       run: |
         set -euo pipefail
         case "$PLAYWRIGHT_CACHE_PATH" in
@@ -50,17 +52,25 @@ runs:
         esac
         echo "cache-path=$resolved" >> "$GITHUB_OUTPUT"
         echo "PLAYWRIGHT_BROWSERS_PATH=$resolved" >> "$GITHUB_ENV"
-        if command -v sha256sum >/dev/null 2>&1; then
-          echo "lockfile-hash=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-        else
-          echo "lockfile-hash=$(shasum -a 256 pnpm-lock.yaml | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        if [ ! -f pnpm-lock.yaml ]; then
+          echo "::error::pnpm-lock.yaml is required to resolve the Playwright version"
+          exit 2
         fi
+        version="$(node "$RESOLVE_PLAYWRIGHT_VERSION" pnpm-lock.yaml)"
+        case "$version" in
+          ''|*[!0-9.]*)
+            echo "::error::resolved Playwright version must be numeric x.y.z"
+            exit 2
+            ;;
+        esac
+        echo "playwright-version=$version" >> "$GITHUB_OUTPUT"
     - name: Cache Playwright browsers
       if: ${{ !contains(',chrome,chrome-beta,chrome-dev,chrome-canary,msedge,msedge-beta,msedge-dev,msedge-canary,', format(',{0},', inputs.browser)) }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.playwright-cache-key.outputs.cache-path }}
-        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ inputs.browser }}-${{ steps.playwright-cache-key.outputs.lockfile-hash }}
+        key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-cache-key.outputs.playwright-version }}-${{ inputs.browser }}
+        restore-keys: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-cache-key.outputs.playwright-version }}-
 
     - name: Install Playwright browsers
       shell: bash

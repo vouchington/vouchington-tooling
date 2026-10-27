@@ -294,10 +294,12 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
   `id-token: write`.
-- `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`) with no fallback
-  key, exports that directory as `PLAYWRIGHT_BROWSERS_PATH`, and installs `browser` (default
-  `chromium`) under `timeout-seconds` and `attempts`. A relative `cache-path` is anchored at the
-  workspace root. The cache key includes the browser. Chrome
+- `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`), exports that
+  directory as `PLAYWRIGHT_BROWSERS_PATH`, and installs `browser` (default `chromium`) under
+  `timeout-seconds` and `attempts`. A relative `cache-path` is anchored at the workspace root. The
+  cache key is the OS, architecture, Playwright version resolved from `pnpm-lock.yaml`, and browser,
+  so a lockfile-only change still hits. `restore-keys` is the OS, architecture, and version prefix,
+  so an exact-key miss can reuse a browser cached for that version. Chrome
   and Edge install globally, so they skip that cache and, because their Linux installer runs apt
   as root, also skip the bounded download. `chrome-dev`, `chrome-canary`, and `msedge-canary` are
   rejected because Playwright provides no installer for them. Host packages are installed only when that browser
