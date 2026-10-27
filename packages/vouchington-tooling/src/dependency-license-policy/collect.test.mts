@@ -69,7 +69,7 @@ function collectTestReport(execute: PnpmExecutor, cleanup: () => void = () => un
       expect(repoRoot).toBe('/repo')
       expect(lockfileSource).toBe('packages: {}\n')
       expect(workspaceSource).toBe('packages: [app]\nengineStrict: true\n')
-      return { cwd: '/audit', cleanup }
+      return { cwd: '/audit', cleanup, useListingWorkspace: () => undefined }
     },
   })
 }
@@ -99,7 +99,9 @@ const GRAPH_WITHOUT_ENGINES = {
 }
 
 function renderAuditWorkspace(lockfile: string, workspace: string) {
-  return parseYaml(renderPnpmLicenseAuditFiles(lockfile, workspace, AUDIT_PATHS).workspace) as {
+  return parseYaml(
+    renderPnpmLicenseAuditFiles(lockfile, workspace, AUDIT_PATHS).listingWorkspace,
+  ) as {
     supportedArchitectures: Record<string, string[]>
   }
 }
@@ -123,6 +125,18 @@ describe('pnpm license collection', () => {
         libc: ['current', 'musl'],
         os: ['current', 'win32'],
       },
+    })
+  })
+
+  it('fetches only the current platform even when the source workspace sets its own', () => {
+    const { fetchWorkspace } = renderPnpmLicenseAuditFiles(
+      'packages:\n  example@1.0.0:\n    os: [win32]\n',
+      'packages: [app]\nsupportedArchitectures: {os: [linux], cpu: [x64]}\n',
+      AUDIT_PATHS,
+    )
+    expect(parseYaml(fetchWorkspace)).toEqual({
+      packages: [],
+      supportedArchitectures: { cpu: ['current'], libc: ['current'], os: ['current'] },
     })
   })
 
@@ -186,9 +200,16 @@ describe('pnpm license collection', () => {
         expect(parseYaml(readFileSync(join(workspace.cwd, 'pnpm-lock.yaml'), 'utf8'))).toEqual(
           GRAPH_WITHOUT_ENGINES,
         )
-        expect(
-          parseYaml(readFileSync(join(workspace.cwd, 'pnpm-workspace.yaml'), 'utf8')),
-        ).toMatchObject({ packages: [], supportedArchitectures: { os: ['current', 'win32'] } })
+        const workspaceFile = join(workspace.cwd, 'pnpm-workspace.yaml')
+        expect(parseYaml(readFileSync(workspaceFile, 'utf8'))).toEqual({
+          packages: [],
+          supportedArchitectures: { cpu: ['current'], libc: ['current'], os: ['current'] },
+        })
+        workspace.useListingWorkspace()
+        expect(parseYaml(readFileSync(workspaceFile, 'utf8'))).toMatchObject({
+          packages: [],
+          supportedArchitectures: { os: ['current', 'win32'] },
+        })
         workspace.cleanup()
         expect(existsSync(workspace.cwd)).toBe(false)
       } finally {
@@ -288,6 +309,7 @@ describe('pnpm license collection', () => {
         prepareWorkspace: () => ({
           cwd: workspace,
           cleanup: () => rmSync(workspace, { force: true, recursive: true }),
+          useListingWorkspace: () => undefined,
         }),
         readFile: () => 'packages: {}\n',
       })
@@ -325,7 +347,7 @@ describe('pnpm license collection', () => {
           prepareWorkspace: (_root, lockfileSource, workspaceSource) => {
             expect(lockfileSource).toBe('packages: {}\n')
             expect(workspaceSource).toBe('packages: []\n')
-            return { cwd: '/audit', cleanup: () => undefined }
+            return { cwd: '/audit', cleanup: () => undefined, useListingWorkspace: () => undefined }
           },
         }),
       ).resolves.toEqual({})
@@ -345,7 +367,11 @@ describe('pnpm license collection', () => {
         expect(options.signal.aborted).toBe(false)
         return { status: 0, stderr: '', stdout: '{}' }
       },
-      prepareWorkspace: () => ({ cwd: '/audit', cleanup: () => undefined }),
+      prepareWorkspace: () => ({
+        cwd: '/audit',
+        cleanup: () => undefined,
+        useListingWorkspace: () => undefined,
+      }),
       readFile: () => 'packages: {}\n',
     })
     expect(seen).toBe('/audit/store')
@@ -368,6 +394,7 @@ describe('pnpm license collection', () => {
             prepareWorkspace: () => ({
               cwd: workspace,
               cleanup: () => rmSync(workspace, { force: true, recursive: true }),
+              useListingWorkspace: () => undefined,
             }),
             readFile: () => 'packages: {}\n',
           }),
@@ -392,6 +419,7 @@ describe('pnpm license collection', () => {
           cleanup: () => {
             cleaned = true
           },
+          useListingWorkspace: () => undefined,
         }),
         readFile: () => 'packages: {}\n',
       }),
