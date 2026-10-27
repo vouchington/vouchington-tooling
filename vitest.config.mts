@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     fileParallelism: false,
+    server: { deps: { inline: [/@vouchington\/worker-runtime/] } },
     include: ['packages/*/src/**/*.test.mts'],
     coverage: {
       provider: 'v8',
@@ -41,6 +42,12 @@ export default defineConfig({
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],
       thresholds: {
+        'packages/vouchington-tooling/src/worker-query-profile/**': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 100,
+        },
         lines: 99,
         functions: 99,
         statements: 99,

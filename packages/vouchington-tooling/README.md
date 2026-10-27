@@ -1337,6 +1337,13 @@ touching it. `tmux post-tool` reads an agent post-tool hook payload on stdin and
 reminder at plan, PR, push and reset checkpoints; reminders name `TMUX_NAME_COMMAND` (default
 `vouchington tmux name`).
 
+## Worker query profiles
+
+`vouchington-tooling/worker-query-profile` provides test-only worker profiling through the optional
+PostgreSQL and worker-runtime peers. It installs the runtime factory decorator and supplies a thin
+testing Worker adapter with per-instance observers. Profiles, violation collection, and diagnostic
+configuration are injected. See [worker query profile usage](docs/worker-query-profile.md).
+
 ## Request query profiles
 
 `vouchington-tooling/request-query-profile` is the test-only rule layer on top of a per-request

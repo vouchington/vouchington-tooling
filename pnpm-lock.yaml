@@ -139,6 +139,15 @@ importers:
       '@types/spdx-expression-parse':
         specifier: 4.0.0
         version: 4.0.0
+      '@vouchington/postgres':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@vouchington/worker-runtime':
+        specifier: 0.2.1
+        version: 0.2.1(glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)
+      glide-mq:
+        specifier: ^0.19.0
+        version: 0.19.0(express@5.2.1(supports-color@7.2.0))
       next:
         specifier: 16.4.2
         version: 16.4.2(@playwright/test@1.64.1)(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -515,6 +524,49 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@glidemq/speedkey-darwin-arm64@0.4.2':
+    resolution: {integrity: sha512-3woTAlnICLzupaa+zeOFRL1LSgUWFixfyG6f0d8z+GYPesnBUpVZnTiE6I0CB9J4ZA3HQCNzWZNcDuTKY+ep/w==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@glidemq/speedkey-darwin-x64@0.4.2':
+    resolution: {integrity: sha512-BQnt/Av36zY74kfAoIUM4/GcDNoqfnXo+uGQFiH7v6NkrzUAIauK2F7tMXJhgen869Skai11H406om6zRiuduA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@glidemq/speedkey-linux-arm64-gnu@0.4.2':
+    resolution: {integrity: sha512-1Iu4l3Bj3f6pFk7L2Dvuijnho1Q2WX2er3FONwX+WiuA455m49fRcE6zxo3ceSkYG2/+UgfWOX4plS0dl77Qrw==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@glidemq/speedkey-linux-arm64-musl@0.4.2':
+    resolution: {integrity: sha512-70ZEMYuX7vgJKKaS3OmepQZy7yrd0wmj9ebvY55FrYryqlpcbJHsYZvBM9LPXW8s2e6SLop+Jt+E84qtJWRGDg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@glidemq/speedkey-linux-x64-gnu@0.4.2':
+    resolution: {integrity: sha512-kvtvp30PPvs8r/rG1EeGwMvqD4nbQUKvJupJG6hQa3HtsowoJQxw+u7cGl7Iddvz4F+QVz+/EYokdP4O8aOBDA==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@glidemq/speedkey-linux-x64-musl@0.4.2':
+    resolution: {integrity: sha512-yv78BZThknUUD+lKukoMO+E69aEBqHgbjycP41LG4cF9GMgQ3OSExpR99qeBY3CK/ZYQnWgTA4jsnEFRdO1fAA==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@glidemq/speedkey-win32-x64-msvc@0.4.2':
+    resolution: {integrity: sha512-j+ApHETDt1ChL88j7Mzp76dMwDqANULzfpAbz/QjChLW4yOaDfr+o18nzz+3WvHvd2N4euPXkD+vPAeSuWhonQ==}
+    cpu: [x64]
+    os: [win32]
+
+  '@glidemq/speedkey@0.4.2':
+    resolution: {integrity: sha512-O7NB0BpWm8r9jYmGEiFaxLk4OaqYhx4a2dicwUvcfwgLucf5RUWb9xBT/dQeFhuMaccdMtLtytn8I0G9H3u7Ag==}
+    engines: {node: '>=20'}
 
   '@hono/node-server@2.1.1':
     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
@@ -1312,6 +1364,33 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  '@protobufjs/aspromise@1.1.2':
+    resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
+
+  '@protobufjs/base64@1.1.2':
+    resolution: {integrity: sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==}
+
+  '@protobufjs/codegen@2.0.5':
+    resolution: {integrity: sha512-zgXFLzW3Ap33e6d0Wlj4MGIm6Ce8O89n/apUaGNB/jx+hw+ruWEp7EwGUshdLKVRCxZW12fp9r40E1mQrf/34g==}
+
+  '@protobufjs/eventemitter@1.1.1':
+    resolution: {integrity: sha512-vW1GmwMZNnL+gMRaovlh9yZX74kc+TTU3FObkkurpMaRtBfLP3ldjS9KQWlwZgraRE0+dheEEoAxdzcJQ8eXZg==}
+
+  '@protobufjs/fetch@1.1.1':
+    resolution: {integrity: sha512-GpptLrs57adMSuHi3VNj0mAF8dwh36LMaYF6XyJ6JMWlVsc+t42tm1HSEDmOs3A8fC9yyeisgLhsTVQokOZ0zw==}
+
+  '@protobufjs/float@1.0.2':
+    resolution: {integrity: sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==}
+
+  '@protobufjs/path@1.1.2':
+    resolution: {integrity: sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==}
+
+  '@protobufjs/pool@1.1.0':
+    resolution: {integrity: sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==}
+
+  '@protobufjs/utf8@1.1.2':
+    resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
+
   '@rolldown/binding-android-arm-eabi@1.2.14':
     resolution: {integrity: sha512-aWR+XKH9+rW7m5fWq/5360J3mHycrx/o6xZM2DQFdJnTMdyP7/WzxPjhtLbVWdKo2y612/4U1bWqb3HQhiF7vg==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1679,6 +1758,23 @@ packages:
 
   '@vitest/spy@5.0.5':
     resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
+
+  '@vouchington/postgres@0.1.0':
+    resolution: {integrity: sha512-Uv2lSMIvkJrV92oHTO5J1i498PwXClKcSKiKGNsy+J0EU79fdeP5yZ2mE9qDGVCQeogKj7T+FpNI3EuTgb0hiw==}
+    engines: {node: '>=24.0.0'}
+
+  '@vouchington/worker-runtime@0.2.1':
+    resolution: {integrity: sha512-8qdSwDfupziFe8f0JVl5rdrpoNBH5A4r5FWoBIagBkv2jikEey4KnyCL/UJv3lLU0uC1F9Z12zwUAEYwM0wmRw==}
+    engines: {node: '>=24.0.0'}
+    peerDependencies:
+      '@aws-sdk/client-sqs': '>=3.1154.0 <4'
+      glide-mq: ^0.19.0
+      vitest: ^5.0.5
+    peerDependenciesMeta:
+      '@aws-sdk/client-sqs':
+        optional: true
+      vitest:
+        optional: true
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -2117,6 +2213,18 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
+  glide-mq@0.19.0:
+    resolution: {integrity: sha512-Qp2NgHPP5SgsDcYkBl1LZ4Wfh3yRVzW0eEpBdDQViw32L34+u8kQFQQzi/E2hfNRbDduVyzg/Y1gQq9qQUBD4A==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+      express: '>=4.18.0'
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+      express:
+        optional: true
+
   glob-parent@6.0.2:
     resolution: {integrity: sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A==}
     engines: {node: '>=10.13.0'}
@@ -2415,6 +2523,9 @@ packages:
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
+
+  long@5.3.2:
+    resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
@@ -2754,6 +2865,11 @@ packages:
   pg-connection-string@2.14.1:
     resolution: {integrity: sha512-qR3kGNPBLpCNtz0evbKA0Y/MRFXwSSdT+pTJvYp/bXTcReZbvX1kzF0IyTc1QnxqF7AZbOeBhNL8R5mYQZV/MA==}
 
+  pg-cursor@2.22.1:
+    resolution: {integrity: sha512-X10ldv3wwBONQkOSwgWEbaEITMGLd92V2Zd+xsFPhDt3nhhU3hpAT08SERBChnIFmomczLax6lKXLJrHPPXfxA==}
+    peerDependencies:
+      pg: ^8
+
   pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
     engines: {node: '>=4.0.0'}
@@ -2781,6 +2897,10 @@ packages:
 
   pgpass@1.0.5:
     resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
+  pgvector@0.3.0:
+    resolution: {integrity: sha512-+t7qcQD2us8fO8YIq/3lA0gUrD+bVO70MG1MhcDcxJz/OlRGGIIHzFq/4x57Vn/LpzX5wFdfOTLQp9QMPd4ljQ==}
+    engines: {node: '>=22'}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -2839,6 +2959,10 @@ packages:
   prompts@2.4.2:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
+
+  protobufjs@7.6.6:
+    resolution: {integrity: sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg==}
+    engines: {node: '>=12.0.0'}
 
   proxy-addr@2.0.8:
     resolution: {integrity: sha512-5nnx0yGyVUcY6t9RnWcARWtwT9F1D8O9rt08htPvnd49W1IgZtmLkhu9WfMzQj1cFxjHIO6connUNVW5k7AVyQ==}
@@ -2999,6 +3123,10 @@ packages:
   split2@4.2.0:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
+
+  sql-template-strings@2.2.2:
+    resolution: {integrity: sha512-UXhXR2869FQaD+GMly8jAMCRZ94nU5KcrFetZfWEMd+LVVG6y0ExgHAhatEcKZ/wk8YcKPdi+hiD2wm75lq3/Q==}
+    engines: {node: '>=4.0.0'}
 
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
@@ -3654,6 +3782,40 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
+  '@glidemq/speedkey-darwin-arm64@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-darwin-x64@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-linux-arm64-gnu@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-linux-arm64-musl@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-linux-x64-gnu@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-linux-x64-musl@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey-win32-x64-msvc@0.4.2':
+    optional: true
+
+  '@glidemq/speedkey@0.4.2':
+    dependencies:
+      long: 5.3.2
+      protobufjs: 7.6.6
+    optionalDependencies:
+      '@glidemq/speedkey-darwin-arm64': 0.4.2
+      '@glidemq/speedkey-darwin-x64': 0.4.2
+      '@glidemq/speedkey-linux-arm64-gnu': 0.4.2
+      '@glidemq/speedkey-linux-arm64-musl': 0.4.2
+      '@glidemq/speedkey-linux-x64-gnu': 0.4.2
+      '@glidemq/speedkey-linux-x64-musl': 0.4.2
+      '@glidemq/speedkey-win32-x64-msvc': 0.4.2
+
   '@hono/node-server@2.1.1(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
@@ -3805,7 +3967,6 @@ snapshots:
   '@libpg-query/parser@18.0.0':
     dependencies:
       '@pgsql/types': 18.0.0
-    optional: true
 
   '@modelcontextprotocol/sdk@1.32.1(supports-color@7.2.0)(zod@4.6.5)':
     dependencies:
@@ -4114,12 +4275,31 @@ snapshots:
   '@oxlint/binding-win32-x64-msvc@1.88.0':
     optional: true
 
-  '@pgsql/types@18.0.0':
-    optional: true
+  '@pgsql/types@18.0.0': {}
 
   '@playwright/test@1.64.1':
     dependencies:
       playwright: 1.64.1
+
+  '@protobufjs/aspromise@1.1.2': {}
+
+  '@protobufjs/base64@1.1.2': {}
+
+  '@protobufjs/codegen@2.0.5': {}
+
+  '@protobufjs/eventemitter@1.1.1': {}
+
+  '@protobufjs/fetch@1.1.1':
+    dependencies:
+      '@protobufjs/aspromise': 1.1.2
+
+  '@protobufjs/float@1.0.2': {}
+
+  '@protobufjs/path@1.1.2': {}
+
+  '@protobufjs/pool@1.1.0': {}
+
+  '@protobufjs/utf8@1.1.2': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.14':
     optional: true
@@ -4401,6 +4581,22 @@ snapshots:
       vite: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
 
   '@vitest/spy@5.0.5': {}
+
+  '@vouchington/postgres@0.1.0':
+    dependencies:
+      '@libpg-query/parser': 18.0.0
+      pg: 8.23.1
+      pg-cursor: 2.22.1(pg@8.23.1)
+      pgvector: 0.3.0
+      sql-template-strings: 2.2.2
+    transitivePeerDependencies:
+      - pg-native
+
+  '@vouchington/worker-runtime@0.2.1(glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)':
+    dependencies:
+      glide-mq: 0.19.0(express@5.2.1(supports-color@7.2.0))
+    optionalDependencies:
+      vitest: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   accepts@2.0.0:
     dependencies:
@@ -4909,6 +5105,12 @@ snapshots:
       adm-zip: 0.5.18
       tar: 7.5.22
 
+  glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)):
+    dependencies:
+      '@glidemq/speedkey': 0.4.2
+    optionalDependencies:
+      express: 5.2.1(supports-color@7.2.0)
+
   glob-parent@6.0.2:
     dependencies:
       is-glob: 4.0.3
@@ -5138,6 +5340,8 @@ snapshots:
   locate-path@6.0.0:
     dependencies:
       p-locate: 5.0.0
+
+  long@5.3.2: {}
 
   longest-streak@3.1.0: {}
 
@@ -5698,6 +5902,10 @@ snapshots:
 
   pg-connection-string@2.14.1: {}
 
+  pg-cursor@2.22.1(pg@8.23.1):
+    dependencies:
+      pg: 8.23.1
+
   pg-int8@1.0.1: {}
 
   pg-pool@3.14.0(pg@8.23.1):
@@ -5727,6 +5935,8 @@ snapshots:
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+
+  pgvector@0.3.0: {}
 
   picocolors@1.1.1: {}
 
@@ -5779,6 +5989,20 @@ snapshots:
     dependencies:
       kleur: 3.0.3
       sisteransi: 1.0.5
+
+  protobufjs@7.6.6:
+    dependencies:
+      '@protobufjs/aspromise': 1.1.2
+      '@protobufjs/base64': 1.1.2
+      '@protobufjs/codegen': 2.0.5
+      '@protobufjs/eventemitter': 1.1.1
+      '@protobufjs/fetch': 1.1.1
+      '@protobufjs/float': 1.0.2
+      '@protobufjs/path': 1.1.2
+      '@protobufjs/pool': 1.1.0
+      '@protobufjs/utf8': 1.1.2
+      '@types/node': 26.6.5
+      long: 5.3.2
 
   proxy-addr@2.0.8:
     dependencies:
@@ -6018,6 +6242,8 @@ snapshots:
   spdx-license-ids@3.0.24: {}
 
   split2@4.2.0: {}
+
+  sql-template-strings@2.2.2: {}
 
   statuses@2.0.2: {}
 
