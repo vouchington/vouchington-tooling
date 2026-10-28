@@ -10,16 +10,29 @@ const script = join(
   resolve(dirname(fileURLToPath(import.meta.url)), '../../..'),
   '.github/actions/setup-node-pnpm/install.mjs',
 )
-const { buildArgs, parseOptions, FETCH_FLAGS } = (await import(script)) as {
-  buildArgs: (attempt: number, ignoreScripts: boolean) => string[]
-  parseOptions: (env: Record<string, string | undefined>) => {
-    timeoutSeconds: number
-    attempts: number
-    ignoreScripts: boolean
-    graceMs: number
+const { buildArgs, parseOptions, makeKiller, runAttempt, FETCH_FLAGS, MAX_TIMER_MS } =
+  (await import(script)) as {
+    buildArgs: (attempt: number, ignoreScripts: boolean) => string[]
+    parseOptions: (env: Record<string, string | undefined>) => {
+      timeoutSeconds: number
+      attempts: number
+      ignoreScripts: boolean
+      graceMs: number
+    }
+    makeKiller: (
+      platform: string,
+      run: (...args: unknown[]) => unknown,
+    ) => (pid: number, signal: string) => void
+    runAttempt: (
+      args: string[],
+      timeoutMs: number,
+      graceMs: number,
+      platform: string,
+      kill: (pid: number, signal: string) => void,
+    ) => Promise<{ timedOut: boolean; code: number }>
+    FETCH_FLAGS: string[]
+    MAX_TIMER_MS: number
   }
-  FETCH_FLAGS: string[]
-}
 
 // A fake pnpm that records its arguments and then acts out one behavior per call:
 // ok, fail (exit 7), hang (sleep), or stubborn (ignore SIGTERM and sleep).
@@ -31,7 +44,7 @@ case "$mode" in
   ok) exit 0 ;;
   fail) exit 7 ;;
   stubborn) trap '' TERM; while :; do sleep 1; done ;;
-  *) sleep 30 & wait ;;
+  *) sleep 30 & echo $! > "$FAKE_PID"; wait ;;
 esac
 `
 
@@ -48,6 +61,7 @@ async function install(behavior: string, env: Record<string, string> = {}) {
           ...process.env,
           PATH: `${dir}${delimiter}${process.env.PATH}`,
           FAKE_LOG: log,
+          FAKE_PID: join(dir, 'pid'),
           FAKE_BEHAVIOR: behavior,
           INSTALL_ATTEMPT_TIMEOUT_SECONDS: '1',
           ...env,
@@ -61,7 +75,7 @@ async function install(behavior: string, env: Record<string, string> = {}) {
     },
   )
   const calls = readFileSync(log, 'utf8').trim().split('\n').filter(Boolean)
-  return { ...result, calls }
+  return { ...result, calls, pidFile: join(dir, 'pid') }
 }
 
 describe('setup-node-pnpm install options', () => {
@@ -82,6 +96,20 @@ describe('setup-node-pnpm install options', () => {
     expect(() => parseOptions({ INSTALL_ATTEMPTS: value })).toThrow(/install-attempts/u)
     expect(() => parseOptions({ INSTALL_ATTEMPT_TIMEOUT_SECONDS: value })).toThrow(
       /install-attempt-timeout-seconds/u,
+    )
+  })
+
+  it('rejects delays beyond the setTimeout maximum', () => {
+    const seconds = Math.floor(MAX_TIMER_MS / 1000)
+    expect(parseOptions({ INSTALL_ATTEMPT_TIMEOUT_SECONDS: String(seconds) }).timeoutSeconds).toBe(
+      seconds,
+    )
+    expect(() => parseOptions({ INSTALL_ATTEMPT_TIMEOUT_SECONDS: String(seconds + 1) })).toThrow(
+      /at most/u,
+    )
+    expect(parseOptions({ INSTALL_KILL_GRACE_MS: String(MAX_TIMER_MS) }).graceMs).toBe(MAX_TIMER_MS)
+    expect(() => parseOptions({ INSTALL_KILL_GRACE_MS: String(MAX_TIMER_MS + 1) })).toThrow(
+      /at most/u,
     )
   })
 
@@ -131,6 +159,18 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.stdout).toMatch(
       /::warning::pnpm install attempt 1\/2 timed out after \d+s; retrying/u,
     )
+    const pid = Number(readFileSync(result.pidFile, 'utf8').trim())
+    let alive = true
+    for (let i = 0; i < 30 && alive; i++) {
+      try {
+        process.kill(pid, 0)
+        await new Promise((done) => setTimeout(done, 100))
+      } catch (error) {
+        expect((error as NodeJS.ErrnoException).code).toBe('ESRCH')
+        alive = false
+      }
+    }
+    expect(alive).toBe(false)
   })
 
   it('fails with an error after the final attempt times out', async () => {
@@ -162,5 +202,47 @@ describe('setup-node-pnpm install.mjs', () => {
     const result = await install('ok', { PATH: '/nonexistent' })
     expect(result.code).toBe(127)
     expect(result.stderr).toContain('::error::Could not start pnpm')
+  })
+})
+
+describe('setup-node-pnpm install process-tree killer', () => {
+  it('uses taskkill on the whole tree on win32 and ignores its failure', () => {
+    const calls: unknown[][] = []
+    const kill = makeKiller('win32', (...args: unknown[]) => {
+      calls.push(args)
+      throw new Error('taskkill failed')
+    })
+    expect(() => kill(42, 'SIGTERM')).not.toThrow()
+    expect(calls).toEqual([['taskkill', ['/pid', '42', '/T', '/F'], { stdio: 'ignore' }]])
+  })
+
+  it('signals the process group elsewhere and ignores a missing group', () => {
+    const run = (): never => {
+      throw new Error('must not run taskkill')
+    }
+    expect(() => makeKiller('linux', run)(2_147_483_000, 'SIGTERM')).not.toThrow()
+  })
+
+  it('spawns attached on win32 and kills through the injected killer', async () => {
+    const kills: Array<[number, string]> = []
+    const dir = mkdtempSync(join(tmpdir(), 'fake-pnpm-'))
+    const original = process.env.PATH
+    writeFileSync(join(dir, 'pnpm'), '#!/bin/sh\nexec sleep 30\n')
+    chmodSync(join(dir, 'pnpm'), 0o755)
+    process.env.PATH = `${dir}${delimiter}${original}`
+    try {
+      const result = await runAttempt(['install'], 200, 50, 'win32', (pid, signal) => {
+        kills.push([pid, signal])
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          // Already gone.
+        }
+      })
+      expect(result.timedOut).toBe(true)
+      expect(kills[0]?.[1]).toBe('SIGTERM')
+    } finally {
+      process.env.PATH = original
+    }
   })
 })

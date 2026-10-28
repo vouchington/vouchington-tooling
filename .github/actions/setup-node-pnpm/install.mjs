@@ -1,7 +1,7 @@
 // Runs `pnpm install --frozen-lockfile` with tight fetch settings, a wall-clock limit per
 // attempt, and a retry when an attempt times out. A non-timeout failure is never retried.
 // Node >= 24, no dependencies, no GNU `timeout` (macOS runners have none).
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 // pnpm 12 accepts only --fetch-timeout as a flag; the retry settings go through --config.*.
@@ -12,12 +12,17 @@ export const FETCH_FLAGS = [
   '--config.fetch-retry-maxtimeout=5000',
 ]
 
-function positiveInteger(name, raw, fallback) {
+// setTimeout fires immediately for delays above this.
+export const MAX_TIMER_MS = 2_147_483_647
+
+function positiveInteger(name, raw, fallback, max = Number.MAX_SAFE_INTEGER) {
   const text = (raw ?? '').trim() || fallback
   if (!/^[1-9]\d*$/u.test(text)) {
     throw new Error(`${name} must be a positive integer, got "${raw}"`)
   }
-  return Number(text)
+  const value = Number(text)
+  if (value > max) throw new Error(`${name} must be at most ${max}, got "${raw}"`)
+  return value
 }
 
 export function parseOptions(env) {
@@ -26,10 +31,11 @@ export function parseOptions(env) {
       'install-attempt-timeout-seconds',
       env.INSTALL_ATTEMPT_TIMEOUT_SECONDS,
       '150',
+      Math.floor(MAX_TIMER_MS / 1000),
     ),
     attempts: positiveInteger('install-attempts', env.INSTALL_ATTEMPTS, '2'),
     ignoreScripts: env.INSTALL_IGNORE_SCRIPTS === 'true',
-    graceMs: positiveInteger('kill grace ms', env.INSTALL_KILL_GRACE_MS, '10000'),
+    graceMs: positiveInteger('kill grace ms', env.INSTALL_KILL_GRACE_MS, '10000', MAX_TIMER_MS),
   }
 }
 
@@ -44,23 +50,37 @@ export function buildArgs(attempt, ignoreScripts) {
   ]
 }
 
-function signalGroup(pid, signal) {
-  try {
-    process.kill(-pid, signal)
-  } catch {
-    // The group is already gone.
+// Terminates the whole process tree: taskkill on Windows, the process group elsewhere.
+export function makeKiller(platform = process.platform, run = spawnSync) {
+  return (pid, signal) => {
+    try {
+      if (platform === 'win32') {
+        run('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' })
+      } else {
+        process.kill(-pid, signal)
+      }
+    } catch {
+      // The process or group is already gone.
+    }
   }
 }
 
-export function runAttempt(args, timeoutMs, graceMs) {
+export function runAttempt(
+  args,
+  timeoutMs,
+  graceMs,
+  platform = process.platform,
+  kill = makeKiller(platform),
+) {
   return new Promise((resolve) => {
-    const child = spawn('pnpm', args, { stdio: 'inherit', detached: true })
+    // detached opens a new console on Windows; elsewhere it makes a killable process group.
+    const child = spawn('pnpm', args, { stdio: 'inherit', detached: platform !== 'win32' })
     let timedOut = false
     let killTimer
     const timer = setTimeout(() => {
       timedOut = true
-      signalGroup(child.pid, 'SIGTERM')
-      killTimer = setTimeout(() => signalGroup(child.pid, 'SIGKILL'), graceMs)
+      kill(child.pid, 'SIGTERM')
+      killTimer = setTimeout(() => kill(child.pid, 'SIGKILL'), graceMs)
     }, timeoutMs)
     child.on('error', (error) => {
       clearTimeout(timer)
@@ -70,7 +90,7 @@ export function runAttempt(args, timeoutMs, graceMs) {
     child.on('close', (code, signal) => {
       clearTimeout(timer)
       clearTimeout(killTimer)
-      if (timedOut) signalGroup(child.pid, 'SIGKILL')
+      if (timedOut) kill(child.pid, 'SIGKILL')
       resolve({ timedOut, code: code ?? (signal ? 1 : 0) })
     })
   })
