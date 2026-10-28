@@ -56,7 +56,18 @@ function omissionBlock(count: number): string {
   ].join('\n')
 }
 
-/** Journal entries that hold exactly one sandbox or permission block, made paste-safe. */
+/** Journal text that names a sandbox block type but does not match its grammar. */
+const UNPARSED = {
+  marker: /`(?:sandbox-escalation|sandbox-failure|ambiguous-failure)`/,
+  note: (count: number) =>
+    [
+      `- \`ambiguous-failure\` — unparsed — ${count} journal blocks named a sandbox event but did not match the block grammar; see journal`,
+      '  - Evidence: unparsed blocks remain in the session journal',
+      '  - Disposition: see journal for the unparsed sandbox blocks',
+    ].join('\n'),
+}
+
+/** Journal entries that hold sandbox or permission blocks (several per entry), made paste-safe. */
 export function getConformingSandboxBlocks(
   entries: Iterable<JournalEntry>,
   redact?: AuditRedactor,
@@ -68,6 +79,7 @@ export function getConformingSandboxBlocks(
     Math.min(maxBytes, SANDBOX_BLOCKS_MAX_BYTES),
     redact,
     omissionBlock,
+    UNPARSED,
   )
 }
 

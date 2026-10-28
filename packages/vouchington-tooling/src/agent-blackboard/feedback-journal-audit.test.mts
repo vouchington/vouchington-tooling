@@ -153,6 +153,10 @@ describe('journal-only audit report', () => {
   })
 })
 
+/** Nonconforming sandbox text yields no block, only the note that it went unparsed. */
+const onlyUnparsed = (blocks: string[]): boolean =>
+  blocks.every((block) => block.includes('— unparsed —'))
+
 describe('sandbox journal grammar', () => {
   it('accepts each block shape with surrounding blank lines and CRLF', () => {
     const blocks = [escalation, failure, ambiguous].map((block) => `\n\n${block}\n`)
@@ -171,21 +175,29 @@ describe('sandbox journal grammar', () => {
     for (const markdown of [
       lines.slice(0, 3).join('\n'),
       `${escalation}\nextra`,
-      `${escalation}\n${failure}`,
       [lines[0], lines[2], lines[1], lines[3]].join('\n'),
       escalation.replace('approved', 'maybe'),
       failure.replace('sandbox-failure', 'tool-failure'),
       failure.replace('  - Evidence', '- Evidence'),
       '',
     ])
-      expect(getConformingSandboxBlocks([entry(markdown)])).toEqual([])
+      expect(onlyUnparsed(getConformingSandboxBlocks([entry(markdown)]))).toBe(true)
+  })
+
+  it('accepts several blocks in one entry', () => {
+    expect(getConformingSandboxBlocks([entry(`${escalation}\n${failure}`)])).toEqual([
+      escalation,
+      failure,
+    ])
   })
 
   it('rejects ill-formed Unicode and fields that sanitise to nothing', () => {
-    expect(getConformingSandboxBlocks([entry(failure.replace('EPERM', '\uD800'))])).toEqual([])
-    expect(getConformingSandboxBlocks([entry(failure.replace('stderr showed EPERM', '​'))])).toEqual(
-      [],
-    )
+    expect(
+      onlyUnparsed(getConformingSandboxBlocks([entry(failure.replace('EPERM', '\uD800'))])),
+    ).toBe(true)
+    expect(
+      onlyUnparsed(getConformingSandboxBlocks([entry(failure.replace('stderr showed EPERM', '​'))])),
+    ).toBe(true)
   })
 
   it('escapes Markdown and keeps each field whole before rendering', () => {

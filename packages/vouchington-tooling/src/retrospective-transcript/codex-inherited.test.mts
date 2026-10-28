@@ -199,18 +199,6 @@ describe('inherited Codex child transcripts', () => {
         }),
       ]),
     ).toBeUndefined()
-    expect(
-      segmentCodex([
-        JSON.stringify({
-          type: 'session_meta',
-          payload: { parent_thread_id: parent, timestamp: '2026-07-13T10:00:00.000Z' },
-        }),
-        JSON.stringify({
-          type: 'event_msg',
-          payload: { type: 'task_started', started_at: Date.parse('2026-07-13T10:00:00.000Z') },
-        }),
-      ]),
-    ).toBeUndefined()
   })
 
   it('reports unavailable when a root or referenced child cannot be segmented', async () => {

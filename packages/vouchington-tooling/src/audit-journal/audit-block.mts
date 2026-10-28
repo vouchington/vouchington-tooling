@@ -57,10 +57,32 @@ export function matchAuditBlock(
   return safe.map(({ prefix }, index) => `${prefix}${contents[index]}`).join('\n')
 }
 
+/** What counts as an audit block that failed to parse, and how to report that many of them. */
+export type UnparsedReport = { marker: RegExp; note: (count: number) => string }
+
+const BLOCK_START = '- `'
+
+/**
+ * One entry may hold several blocks: each top-level block line starts one. Text that does not
+ * open with a block is returned whole, so it either matches as a single block or is reported.
+ */
+function splitBlocks(markdown: string): string[] {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n')
+  const first = lines.find((line) => !BLANK.test(line))
+  if (first === undefined || !first.startsWith(BLOCK_START)) return [markdown]
+  const chunks: string[][] = []
+  for (const line of lines.slice(lines.indexOf(first))) {
+    if (line.startsWith(BLOCK_START)) chunks.push([line])
+    else chunks.at(-1)!.push(line)
+  }
+  return chunks.map((chunk) => chunk.join('\n'))
+}
+
 /**
  * Matches every journal block whole while together they fit `totalBudgetBytes`. Otherwise it keeps
  * the leading blocks that fit an equal share of the total and appends `omission(count)` — itself a
- * conforming block — so dropped groups are always reported, never silent.
+ * conforming block — so dropped groups are always reported, never silent. Blocks that name an
+ * audit type but do not match the grammar are counted and reported by `unparsed`, never ignored.
  */
 export function conformingBlocks(
   entries: Iterable<JournalEntry>,
@@ -68,13 +90,21 @@ export function conformingBlocks(
   totalBudgetBytes: number,
   redact: AuditRedactor | undefined,
   omission: (count: number) => string,
+  unparsed?: UnparsedReport,
 ): string[] {
+  let unparsedCount = 0
   const markdowns = [...entries]
     .flatMap((entry) => {
       const data = (entry as JournalEntry | null)?.data
-      return data?.type === 'journal' && typeof data.markdown === 'string' ? [data.markdown] : []
+      return data?.type === 'journal' && typeof data.markdown === 'string'
+        ? splitBlocks(data.markdown)
+        : []
     })
-    .filter((markdown) => match(markdown, { redact }) !== null)
+    .filter((markdown) => {
+      if (match(markdown, { redact }) !== null) return true
+      if (unparsed?.marker.test(markdown)) unparsedCount++
+      return false
+    })
   const { rendered, omitted } = selectWithin(
     markdowns,
     totalBudgetBytes,
@@ -83,5 +113,6 @@ export function conformingBlocks(
     MIN_BLOCK_SHARE_BYTES,
     (markdown, budgetBytes) => match(markdown, { redact, budgetBytes })!,
   )
-  return omitted ? [...rendered, omission(omitted)] : rendered
+  const blocks = omitted ? [...rendered, omission(omitted)] : rendered
+  return unparsed && unparsedCount ? [...blocks, unparsed.note(unparsedCount)] : blocks
 }

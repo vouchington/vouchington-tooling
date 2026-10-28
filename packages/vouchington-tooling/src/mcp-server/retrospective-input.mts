@@ -12,7 +12,7 @@ import {
 } from '../agent-harness-identity/index.mts'
 import { SESSION_ID } from '../retrospective-transcript/resolve-transcript-file.mts'
 import { serverJournalLoader } from './journal-read.mts'
-import { checkFactsInput } from './retrospective-facts-input.mts'
+import { checkFactsInput, prNumber } from './retrospective-facts-input.mts'
 import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
 const HARNESSES = ['codex', 'claude', 'cursor', 'grok'] as const
@@ -157,7 +157,11 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
 
 function factsInput(facts: Args, base: ComposeBase): Args {
   return checkFactsInput(facts)
-    ? { ...facts, execute: worktreeExecutor(base.worktree, base.env) }
+    ? {
+        ...facts,
+        ...('pr' in facts ? { pr: prNumber(facts.pr) } : {}),
+        execute: worktreeExecutor(base.worktree, base.env),
+      }
     : facts
 }
 
