@@ -35,7 +35,14 @@ function step(name: string) {
 describe('setup-node-pnpm composite action', () => {
   it('is a composite action with optional install-scripts and node-version-file inputs', () => {
     expect(action.runs.using).toBe('composite')
-    expect(Object.keys(action.inputs)).toEqual(['install-scripts', 'node-version-file'])
+    expect(Object.keys(action.inputs)).toEqual([
+      'install-scripts',
+      'node-version-file',
+      'install-attempt-timeout-seconds',
+      'install-attempts',
+    ])
+    expect(action.inputs['install-attempt-timeout-seconds']?.default).toBe('150')
+    expect(action.inputs['install-attempts']?.default).toBe('2')
     expect(action.inputs['install-scripts']?.default).toBe('true')
     expect(action.inputs['node-version-file']?.default).toBe('.nvmrc')
     expect(source).not.toMatch(/vouchington|voucha/iu)
@@ -74,17 +81,24 @@ describe('setup-node-pnpm composite action', () => {
   })
 
   it('runs exactly one frozen full install per input value', () => {
+    const env = {
+      INSTALL_ATTEMPT_TIMEOUT_SECONDS: '${{ inputs.install-attempt-timeout-seconds }}',
+      INSTALL_ATTEMPTS: '${{ inputs.install-attempts }}',
+    }
+    const run = 'node "$GITHUB_ACTION_PATH/install.mjs"'
     expect(step('pnpm install')).toEqual({
       name: 'pnpm install',
       if: "inputs.install-scripts != 'false'",
       shell: 'bash',
-      run: 'pnpm install --frozen-lockfile --loglevel=warn',
+      env,
+      run,
     })
     expect(step('pnpm install without lifecycle scripts')).toEqual({
       name: 'pnpm install without lifecycle scripts',
       if: "inputs.install-scripts == 'false'",
       shell: 'bash',
-      run: 'pnpm install --frozen-lockfile --ignore-scripts --loglevel=warn',
+      env: { ...env, INSTALL_IGNORE_SCRIPTS: 'true' },
+      run,
     })
   })
 })
