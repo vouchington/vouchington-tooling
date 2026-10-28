@@ -30,7 +30,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const source = readFileSync(join(root, '.github/workflows/gitleaks.yml'), 'utf8')
 const workflow = load(source) as {
   on: { workflow_call: { inputs: Record<string, { default?: string }> } }
-  jobs: { gitleaks: { steps: Step[] } }
+  jobs: { gitleaks: { 'timeout-minutes': number; steps: Step[] } }
 }
 const steps = workflow.jobs.gitleaks.steps
 
@@ -50,12 +50,20 @@ function runRange(env: Record<string, string>) {
     join(bin, 'git'),
     `#!/bin/bash
 if [ "$1" = fetch ]; then printf '%s\\n' "$*" >> "$GIT_FETCH_LOG"; exit 0; fi
-if [ "$1" = merge-base ]; then printf '%s\\n' merge-base-sha; exit 0; fi
+if [ "$1" = rev-list ]; then printf '%s\n' "$GIT_COUNT"; exit 0; fi
 echo "unexpected git $*" >&2
 exit 1
 `,
   )
   chmodSync(join(bin, 'git'), 0o755)
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/bash
+printf 'api %s\n' "$2" >> "$GIT_FETCH_LOG"
+printf '%b\n' "$GH_OUT"
+`,
+  )
+  chmodSync(join(bin, 'gh'), 0o755)
   try {
     const result = spawnSync(
       'bash',
@@ -75,7 +83,10 @@ exit 1
           PATH: `${bin}:${process.env.PATH ?? ''}`,
           GITHUB_OUTPUT: output,
           GIT_FETCH_LOG: fetchLog,
-          TOKEN: 'test-token',
+          GH_TOKEN: 'test-token',
+          GITHUB_REPOSITORY: 'owner/repo',
+          GH_OUT: `${'e'.repeat(40)}\t2`,
+          GIT_COUNT: '2',
           ...env,
         },
       },
@@ -193,6 +204,25 @@ function shallowClient(remote: string, directory: string, refspec: string, ref: 
   git(directory, 'checkout', '--quiet', '--detach', ref)
 }
 
+let ghStubDir = ''
+
+function writeGhStub(directory: string, sourceRepo: string) {
+  ghStubDir = join(directory, 'gh-bin')
+  mkdirSync(ghStubDir)
+  writeFileSync(
+    join(ghStubDir, 'gh'),
+    `#!/bin/bash
+range="\${2##*/compare/}"
+base="\${range%%...*}"
+head="\${range##*...}"
+mb=$(git -C '${sourceRepo}' merge-base "$base" "$head")
+n=$(git -C '${sourceRepo}' rev-list --count "$mb..$head")
+printf '%s\t%s\n' "$mb" "$n"
+`,
+  )
+  chmodSync(join(ghStubDir, 'gh'), 0o755)
+}
+
 function runActualRange(directory: string, env: Record<string, string>) {
   const output = join(directory, 'range-output')
   const result = spawnSync(
@@ -209,7 +239,14 @@ function runActualRange(directory: string, env: Record<string, string>) {
       encoding: 'utf8',
       cwd: directory,
       timeout: 30_000,
-      env: { ...process.env, GITHUB_OUTPUT: output, TOKEN: 'test-token', ...env },
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: output,
+        GH_TOKEN: 'test-token',
+        GITHUB_REPOSITORY: 'owner/repo',
+        PATH: `${ghStubDir}:${process.env.PATH ?? ''}`,
+        ...env,
+      },
     },
   )
   return {
@@ -239,6 +276,63 @@ describe('gitleaks git reusable workflow', () => {
     expect(upload?.uses).toBe('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9')
   })
 
+  it('bounds the history fetch with the compare API and never unshallows', () => {
+    const script = step('Determine Gitleaks scan range').run ?? ''
+    expect(script).not.toContain('--unshallow')
+    expect(script).toContain('gh api "repos/$GITHUB_REPOSITORY/compare/$BASE_SHA...$HEAD_SHA"')
+    expect(script).toContain("--jq '[.merge_base_commit.sha, .ahead_by] | @tsv'")
+    expect(script).toContain('--depth=$((AHEAD_BY + 1)) origin "$HEAD_SHA"')
+    expect(script).toContain('--depth=1 origin "$MERGE_BASE" "$BASE_SHA"')
+    expect(script).toContain('git rev-list --count "$LOG_OPTS"')
+    expect(script).not.toContain('git merge-base')
+    const base = 'a'.repeat(40)
+    const head = 'b'.repeat(40)
+    const pr = runRange({
+      EVENT_NAME: 'pull_request',
+      PR_BASE_SHA: base,
+      PR_HEAD_SHA: head,
+      MERGE_GROUP_BASE_SHA: '',
+      MERGE_GROUP_HEAD_SHA: '',
+      GH_OUT: `${'e'.repeat(40)}\t4`,
+      GIT_COUNT: '4',
+    })
+    expect(pr.status, pr.stderr).toBe(0)
+    expect(pr.fetchCalls).toContain(`api repos/owner/repo/compare/${base}...${head}`)
+    expect(pr.fetchCalls).toContain(`fetch --no-tags --depth=5 origin ${head}`)
+    expect(pr.fetchCalls).toContain(`fetch --no-tags --depth=1 origin ${'e'.repeat(40)} ${base}`)
+  })
+
+  it.each([
+    ['a non-OID merge base', 'nothex\t2'],
+    ['a negative ahead_by', `${'e'.repeat(40)}\t-1`],
+    ['a missing ahead_by', 'e'.repeat(40)],
+  ])('rejects %s from the compare API before fetching history', (_name, out) => {
+    const result = runRange({
+      EVENT_NAME: 'pull_request',
+      PR_BASE_SHA: 'a'.repeat(40),
+      PR_HEAD_SHA: 'b'.repeat(40),
+      MERGE_GROUP_BASE_SHA: '',
+      MERGE_GROUP_HEAD_SHA: '',
+      GH_OUT: out,
+    })
+    expect(result.status).toBe(2)
+    expect(result.stdout).toContain('::error::Compare API returned')
+    expect(result.fetchCalls).not.toContain('fetch')
+  })
+
+  it('fails when the fetched range does not match ahead_by', () => {
+    const result = runRange({
+      EVENT_NAME: 'merge_group',
+      PR_BASE_SHA: '',
+      PR_HEAD_SHA: '',
+      MERGE_GROUP_BASE_SHA: 'c'.repeat(40),
+      MERGE_GROUP_HEAD_SHA: 'd'.repeat(40),
+      GIT_COUNT: '1',
+    })
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('::error::Fetched range has 1 commits but compare reports 2')
+  })
+
   it('checks out the tooling repository at the called workflow sha', () => {
     expect(source).not.toContain('workflow_ref')
     const tooling = steps.find((candidate) => candidate.name === 'Checkout tooling scripts')
@@ -251,8 +345,12 @@ describe('gitleaks git reusable workflow', () => {
       "${{ github.event_name == 'workflow_dispatch' && '0' || '1' }}",
     )
     expect(steps[0]?.with?.['persist-credentials']).toBe(false)
-    expect(step('Determine Gitleaks scan range').env?.TOKEN).toBe('${{ github.token }}')
-    expect(step('Determine Gitleaks scan range')['timeout-minutes']).toBe(2)
+    expect(step('Determine Gitleaks scan range').env?.GH_TOKEN).toBe('${{ github.token }}')
+    expect(step('Determine Gitleaks scan range')['timeout-minutes']).toBe(5)
+    expect(tooling?.['timeout-minutes']).toBe(2)
+    expect(workflow.jobs.gitleaks['timeout-minutes']).toBe(12)
+    const stepTotal = steps.reduce((sum, candidate) => sum + (candidate['timeout-minutes'] ?? 0), 0)
+    expect(workflow.jobs.gitleaks['timeout-minutes']).toBeLessThan(stepTotal)
   })
 
   it('scans the pull request merge base, the merge group range, or all history', () => {
@@ -263,7 +361,7 @@ describe('gitleaks git reusable workflow', () => {
       MERGE_GROUP_BASE_SHA: '',
       MERGE_GROUP_HEAD_SHA: '',
     })
-    expect(pullRequest.written).toBe(`log-opts=merge-base-sha..${'b'.repeat(40)}\n`)
+    expect(pullRequest.written).toBe(`log-opts=${'e'.repeat(40)}..${'b'.repeat(40)}\n`)
     expect(pullRequest.fetchCalls).not.toBe('')
     const mergeGroup = runRange({
       EVENT_NAME: 'merge_group',
@@ -296,6 +394,7 @@ describe('gitleaks git reusable workflow', () => {
 
   it('fetches exact PR and merge-group OIDs with full event-range object parity', () => {
     const fixture = createSyntheticRemote()
+    writeGhStub(fixture.directory, fixture.sourceRepo)
     try {
       const prClient = join(fixture.directory, 'pr-client')
       shallowClient(
