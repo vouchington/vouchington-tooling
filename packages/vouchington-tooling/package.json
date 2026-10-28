@@ -231,6 +231,11 @@
       "import": "./dist/markdown/index.mjs",
       "default": "./dist/markdown/index.mjs"
     },
+    "./markdown-article-links": {
+      "types": "./dist/markdown-article-links/index.d.mts",
+      "import": "./dist/markdown-article-links/index.mjs",
+      "default": "./dist/markdown-article-links/index.mjs"
+    },
     "./http-body": {
       "types": "./dist/http-body/index.d.mts",
       "import": "./dist/http-body/index.mjs",
