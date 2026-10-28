@@ -675,6 +675,10 @@ import {
   parseGfmMarkdown,
   parseMarkdownTables,
 } from 'vouchington-tooling/markdown'
+import {
+  checkMarkdownArticleLinks,
+  discoverMarkdownArticles,
+} from 'vouchington-tooling/markdown-article-links'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
@@ -788,6 +792,41 @@ exceedsLargeDiffThreshold(countDiffLineChanges(diffText), {
   deletedLines: 20_000,
 })
 ```
+
+`vouchington-tooling/markdown-article-links` checks rendered article links statically. It bundles no
+markdown parser or renderer: the caller supplies all three callbacks.
+
+```ts
+const inputs = await discoverMarkdownArticles('content/articles')
+const offenders = await checkMarkdownArticleLinks({
+  inputs,
+  routePrefix: '/article/',
+  parse: (source) => ({ slug: frontmatter(source).slug, body: bodyOf(source) }),
+  rewrite: rewriteArticleLinks,
+  render: renderMarkdown, // may return a Promise
+})
+// [{ name: 'a.md', href: '/article/gone', reason: 'missing-target' }]
+```
+
+`checkMarkdownArticleLinks({ inputs, routePrefix, parse, rewrite, render })` takes
+`inputs: { name, source }[]` and derives each slug as `slug || basename(name, '.md')`. It renders
+`rewrite(body)` for each input and reads every `href="…"` from the HTML. Hrefs with a scheme or a
+leading `//` are skipped. For the rest it strips the query and fragment, then returns offenders
+`{ name, href, reason }`:
+
+- `residual-md`: the path still ends in `.md`.
+- `missing-target`: the path is exactly `<routePrefix><slug>` with no further `/`, and no input
+  provides that slug.
+- `duplicate-slug`: two or more inputs resolve to the same slug. Every such input is reported, with
+  the shared slug as `href`.
+
+`discoverMarkdownArticles(root, { exclude, allowEmpty, listTrackedFiles })` returns the inputs. It
+runs `git ls-files -z -- '*.md'` from `root` with an argv array and no shell, so only git-tracked
+files count: untracked files are ignored. Only files directly under `root` are used; nested
+directories are never searched. `README.md` is excluded by default, and `exclude` replaces that list
+with the basenames you give it. The result is sorted by name (code-unit order). If nothing is found
+it throws, because a wrong `root` must not pass silently; pass `allowEmpty: true` to get `[]`
+instead. `listTrackedFiles(root)` replaces the git runner, for example in tests.
 
 This breaking minor removes `getDiffAgainstBase`; migrate callers to `processDiffCommand` and pass
 the command they need to run.
