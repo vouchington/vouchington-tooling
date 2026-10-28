@@ -29,14 +29,37 @@ export interface CheckMarkdownArticleLinksOptions {
 }
 
 const EXTERNAL_HREF = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i
-const HREF_ATTRIBUTE = /href="([^"]*)"/g
+const HREF_ATTRIBUTE = /(?<=\s)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+const ENTITIES: Readonly<Record<string, string>> = {
+  '&quot;': '"',
+  '&#39;': "'",
+  '&#x27;': "'",
+  '&lt;': '<',
+  '&gt;': '>',
+}
+
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&(?:quot|#39|#x27|lt|gt);/gi, (e) => ENTITIES[e.toLowerCase()] as string)
+    .replace(/&amp;/gi, '&')
+}
+
+function slugExists(catalog: ReadonlySet<string>, target: string): boolean {
+  try {
+    return catalog.has(decodeURIComponent(target))
+  } catch {
+    return false
+  }
+}
 
 export function articleSlug(name: string, slug: string | undefined): string {
   return slug || basename(name, '.md')
 }
 
 function hrefsOf(html: string): string[] {
-  return Array.from(html.matchAll(HREF_ATTRIBUTE), (match) => match[1] as string)
+  return Array.from(html.matchAll(HREF_ATTRIBUTE), (match) =>
+    decodeEntities(match[1] ?? match[2] ?? (match[3] as string)),
+  )
 }
 
 function duplicateSlugOffenders(
@@ -74,7 +97,7 @@ export async function checkMarkdownArticleLinks(
         offenders.push({ name, href, reason: 'residual-md' })
       } else if (path.startsWith(options.routePrefix)) {
         const target = path.slice(options.routePrefix.length)
-        if (!target.includes('/') && !catalog.has(target)) {
+        if (!target.includes('/') && !slugExists(catalog, target)) {
           offenders.push({ name, href, reason: 'missing-target' })
         }
       }

@@ -39,7 +39,7 @@ export async function discoverMarkdownArticles(
   const tracked = await (options.listTrackedFiles ?? gitLsFiles)(root)
   const names = tracked
     .filter((path) => path.endsWith('.md') && !path.includes('/') && !exclude.has(path))
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort((a, b) => (a < b ? -1 : 1))
   if (names.length === 0 && !options.allowEmpty) {
     throw new Error(`No git-tracked markdown articles found directly under ${root}`)
   }

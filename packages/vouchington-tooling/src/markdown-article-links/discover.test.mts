@@ -89,11 +89,13 @@ describe('discoverMarkdownArticles', () => {
   })
 
   it('does not sort by locale or case-fold', async () => {
-    const found = await discoverMarkdownArticles(repo, {
-      listTrackedFiles: async () => ['a.md', 'B.md', 'a.md'],
-      allowEmpty: true,
+    const root = mkdtempSync(join(tmpdir(), 'article-links-sort-'))
+    roots.push(root)
+    for (const name of ['a.md', 'B.md', 'c.md']) writeFileSync(join(root, name), name)
+    const found = await discoverMarkdownArticles(root, {
+      listTrackedFiles: async () => ['c.md', 'a.md', 'B.md'],
     })
-    expect(found.map((input) => input.name)).toEqual(['B.md', 'a.md', 'a.md'])
+    expect(found.map((input) => input.name)).toEqual(['B.md', 'a.md', 'c.md'])
   })
 })
 

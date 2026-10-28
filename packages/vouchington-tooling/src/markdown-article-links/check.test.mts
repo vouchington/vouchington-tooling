@@ -173,6 +173,50 @@ describe('checkMarkdownArticleLinks links', () => {
     expect(seen).toEqual(['rewrite:BODY', 'render:R(BODY)'])
   })
 
+  it('only reads real href attributes, in any quoting style', async () => {
+    const offenders = await check([
+      {
+        name: 'a.md',
+        source:
+          '<div data-href="gone.md"></div> <a href=\'single.md\'>s</a> <a href=bare.md>b</a> ' +
+          '<a HREF = "spaced.md">p</a>',
+      },
+    ])
+    expect(offenders.map((o) => o.href)).toEqual(['single.md', 'bare.md', 'spaced.md'])
+  })
+
+  it('decodes HTML entities in href values before classifying', async () => {
+    const offenders = await check([
+      {
+        name: 'a.md',
+        source:
+          '<a href="/article/a?x=1&amp;y=2">ok</a> <a href="x&#39;y.md">q</a> ' +
+          '<a href="&quot;z.md">r</a> <a href="/article/&lt;t&gt;">t</a> <a href="u&#x27;.md">u</a>',
+      },
+    ])
+    expect(offenders).toEqual([
+      { name: 'a.md', href: "x'y.md", reason: 'residual-md' },
+      { name: 'a.md', href: '"z.md', reason: 'residual-md' },
+      { name: 'a.md', href: '/article/<t>', reason: 'missing-target' },
+      { name: 'a.md', href: "u'.md", reason: 'residual-md' },
+    ])
+  })
+
+  it('decodes percent-encoded targets and reports malformed escapes', async () => {
+    const offenders = await check([
+      { name: 'café.md', source: '<a href="/article/caf%C3%A9">c</a>' },
+      { name: 'hello world.md', source: '<a href="/article/hello%20world">h</a>' },
+      {
+        name: 'x.md',
+        source: '<a href="/article/%E0%A4%A">bad</a> <a href="/article/nope%20x">n</a>',
+      },
+    ])
+    expect(offenders).toEqual([
+      { name: 'x.md', href: '/article/%E0%A4%A', reason: 'missing-target' },
+      { name: 'x.md', href: '/article/nope%20x', reason: 'missing-target' },
+    ])
+  })
+
   it('returns nothing for no inputs', async () => {
     expect(await check([])).toEqual([])
   })
