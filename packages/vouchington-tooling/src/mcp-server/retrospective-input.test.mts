@@ -168,10 +168,11 @@ describe('composeFromArgs transcript', () => {
     ).rejects.toThrow('compose.facts: status is exclusive with pr, noPr')
     for (const [facts, message] of [
       [{ noPr: 'false' }, 'compose.facts.noPr must be a boolean'],
-      [{ pr: 1 }, 'compose.facts.pr must be a pull request number string'],
+      [{ pr: 1.5 }, 'compose.facts.pr must be a pull request number'],
+      [{ pr: 0 }, 'compose.facts.pr must be a pull request number'],
       [
         { pr: 'https://github.com/other/private/pull/1' },
-        'compose.facts.pr must be a pull request number string',
+        'compose.facts.pr must be a pull request number',
       ],
       [{ branch: null }, 'compose.facts.branch must be a branch name'],
       [
@@ -186,5 +187,16 @@ describe('composeFromArgs transcript', () => {
     await expect(
       composeFromArgs(withFacts({ repo: 'other/private', pr: '1' }), base),
     ).rejects.toThrow('unsupported argument(s): repo')
+  })
+
+  it('runs live facts for a numeric pr and for a selector without one', async () => {
+    const partial = {
+      ...base,
+      feedbackCoverage: { status: 'partial' as const, sources: [], droppedCount: 0 },
+    }
+    for (const facts of [{ pr: 7 }, { noPr: true }])
+      await expect(composeFromArgs({ ...compose(unassessed), facts }, partial)).resolves.toContain(
+        '## Verifiable Facts',
+      )
   })
 })

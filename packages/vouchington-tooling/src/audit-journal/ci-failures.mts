@@ -43,6 +43,18 @@ function omissionGroup(count: number): string {
   ].join('\n')
 }
 
+/** Journal text that names a CI failure group but does not match the block grammar. */
+const UNPARSED = {
+  marker: /`(?:recurring|one-off)` — `GitHub Actions`/,
+  note: (count: number) =>
+    [
+      `- \`one-off\` — \`GitHub Actions\` — ${count} journal blocks named a CI failure but did not match the block grammar; see journal`,
+      '  - Evidence: unparsed blocks remain in the session journal',
+      '  - Root diagnostic: not parsed; the journal text did not match the documented block grammar',
+      '  - Disposition: see journal for the unparsed failure blocks',
+    ].join('\n'),
+}
+
 export function isConformingCiFailureBlock(markdown: string): boolean {
   if (
     markdown.length > CI_FAILURE_BLOCK_MAX_BYTES ||
@@ -63,6 +75,7 @@ export function getConformingGroups(
     Math.min(maxBytes, CI_SECTION_MAX_BYTES),
     redact,
     omissionGroup,
+    UNPARSED,
   )
 }
 

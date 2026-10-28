@@ -52,25 +52,37 @@ function retainHighWater(previous: TokenTotals, current: TokenTotals): TokenTota
   }
 }
 
-export function segmentCodex(lines: string[]): CodexSegment | undefined {
+export type CodexSegmentOutcome = { segment: CodexSegment } | { reason: string }
+
+/** Segments a Codex rollout, or says why its owned boundary cannot be established. */
+export function explainCodexSegment(lines: string[]): CodexSegmentOutcome {
   const content = lines.filter(Boolean)
   const sessionMeta = parseLines(content.slice(0, 1))[0]
-  if (sessionMeta?.type !== 'session_meta') return { lines: content, baseline: emptyTokens() }
-  if (!hasInheritedParent(sessionMeta)) return { lines: content.slice(1), baseline: emptyTokens() }
+  if (sessionMeta?.type !== 'session_meta')
+    return { segment: { lines: content, baseline: emptyTokens() } }
+  if (!hasInheritedParent(sessionMeta))
+    return { segment: { lines: content.slice(1), baseline: emptyTokens() } }
   const timestamp = asRecord(sessionMeta.payload)?.timestamp
   const timestampMs = typeof timestamp === 'string' ? Date.parse(timestamp) : Number.NaN
-  if (!Number.isFinite(timestampMs)) return undefined
+  if (!Number.isFinite(timestampMs))
+    return { reason: 'the inherited child session_meta has no valid timestamp' }
   const ownedIndex = content.findIndex((line, index) => {
     if (index === 0) return false
     const record = parseLines([line])[0]
     return record ? isOwnedTaskStart(record, timestampMs) : false
   })
-  if (ownedIndex === -1) return undefined
-  let baseline: TokenTotals | undefined
+  if (ownedIndex === -1)
+    return { reason: 'no task_started at or after the child session start was recorded' }
+  // A child that inherited no token totals starts from zero, as a fresh subagent does.
+  let baseline = emptyTokens()
   for (const record of parseLines(content.slice(1, ownedIndex))) {
     const current = usage(record)
-    if (current) baseline = retainHighWater(baseline ?? emptyTokens(), current)
+    if (current) baseline = retainHighWater(baseline, current)
   }
-  if (!baseline) return undefined
-  return { lines: content.slice(ownedIndex), baseline }
+  return { segment: { lines: content.slice(ownedIndex), baseline } }
+}
+
+export function segmentCodex(lines: string[]): CodexSegment | undefined {
+  const outcome = explainCodexSegment(lines)
+  return 'segment' in outcome ? outcome.segment : undefined
 }

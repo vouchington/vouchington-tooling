@@ -1163,9 +1163,14 @@ await composeRetrospective({ ...input, journal: { journalLoader } })
 `journalLoader` is a `JournalLoader`; `JournalLoader`, `JournalLoadResult`,
 `JournalEntry`, and `JournalAuditOptions` are exported as types from
 `vouchington-tooling/agent-blackboard`. The `## CI Failures` block grammar has three status
-lines (`failures observed`, `none observed`, `unavailable (<reason>)`).
-Journal-only sandbox and permission entries are journal Markdown entries that hold exactly one
-block, escaped and length-bounded like CI failures, and other entries are ignored:
+lines (`failures observed`, `none observed`, `unavailable (<reason>)`). An entry may hold several
+CI-failure blocks, and each top-level block line (`` - ` ``) starts one. A block that names
+`recurring` or `one-off` with `GitHub Actions` but does not match the grammar is reported as one
+`unparsed` note counting such blocks, never silently dropped.
+Journal-only sandbox and permission entries are journal Markdown entries that hold one or more
+blocks, split the same way, escaped and length-bounded like CI failures. A block that names
+`sandbox-escalation`, `sandbox-failure`, or `ambiguous-failure` but does not match the grammar is
+reported as an `unparsed` note; other text is ignored:
 
 ```markdown
 - `sandbox-escalation` — git push — network write blocked
