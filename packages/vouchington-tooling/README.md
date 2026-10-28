@@ -993,6 +993,11 @@ random suffixes, viewport sizes, a 1x1 PNG fixture, RFC 6238 TOTP codes, and a t
 reporter. The reporter prints one JSON line per test with the marker `playwright-test-lifecycle`.
 `@playwright/test` is an optional peer. TOTP setup and cleanup stay with the caller.
 
+`storybookBundleHasStory` returns `false` for a readable index without the requested story.
+An index request failure or non-OK HTTP response throws `StorybookIndexAccessError`, with
+`kind` (`request` or `http`) and an HTTP `status` when available. Its diagnostic omits request
+credentials and response bodies. Malformed JSON remains a hard failure.
+
 `createBrowserErrorsFixture`, `withMonitoredPage`, and `BrowserIssueMonitor` take the narrow
 exported `MonitoredTestInfo` type (`attach`, `status`, `expectedStatus`, `timeout`) instead of
 Playwright's full `TestInfo`. A real `TestInfo` is assignable to it, so no cast is needed.
