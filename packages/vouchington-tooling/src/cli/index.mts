@@ -16,6 +16,7 @@ import { runScript } from './commands/spawn-script.mts'
 import { runNugetCentralVersionCommand } from './commands/nuget-central-version.mts'
 import { runDeadCodeCli } from '../dead-code/cli.mts'
 import { runVerifyWorkflowSecretsCli } from '../workflow-secrets-drift/cli.mts'
+import { runRunnerPolicyCli } from '../runner-policy/cli.mts'
 import { runVitestBlobManifestCommand } from './commands/vitest-blob-manifest.mts'
 import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.mts'
 import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
@@ -83,6 +84,8 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runNugetCentralVersionCommand(parsed.args)
     case 'verify-workflow-secrets':
       return runVerifyWorkflowSecretsCli(parsed.args)
+    case 'runner-policy':
+      return runRunnerPolicyCli(parsed.args)
     case 'dead-code':
       return runDeadCodeCli(parsed.args)
     case 'swift-semantic-equal':

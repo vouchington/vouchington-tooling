@@ -7,6 +7,7 @@ const FORWARDED = [
   'prepare-vitest-reports',
   'nuget-central-version',
   'verify-workflow-secrets',
+  'runner-policy',
   'dead-code',
   'swift-semantic-equal',
   'post-review',

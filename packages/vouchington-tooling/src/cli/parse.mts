@@ -34,6 +34,7 @@ export type ParsedCli =
   | { kind: 'prepare-vitest-reports'; args: string[] }
   | { kind: 'nuget-central-version'; args: string[] }
   | { kind: 'verify-workflow-secrets'; args: string[] }
+  | { kind: 'runner-policy'; args: string[] }
   | { kind: 'dead-code'; args: string[] }
   | { kind: 'swift-semantic-equal'; args: string[] }
   | { kind: 'post-review'; args: string[] }
