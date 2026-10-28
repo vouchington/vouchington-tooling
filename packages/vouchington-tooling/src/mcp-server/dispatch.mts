@@ -14,6 +14,7 @@ import { handlePrCreate, handlePrUpdate, handlePrValidate } from './handlers-pr.
 import type { GhRunner } from './pr-gh.mts'
 import type { PolicySpawner } from './policy-spawn.mts'
 import { createSnapshotRegistry, type SnapshotRegistry } from './snapshot-registry.mts'
+import { captureInstall, installSuffix, type InstallInfo } from './install-info.mts'
 import { TOOLS } from './tools.mts'
 import { resolveWorktree } from './worktree.mts'
 
@@ -36,9 +37,12 @@ export type ServerEnvironment = {
   device?: () => { user: string; host: string }
   /** Test seam: a fresh registry stands in for a server restart. Defaults to the process's own. */
   snapshots?: SnapshotRegistry
+  /** The server's own version and install location, captured at startup. */
+  install?: InstallInfo
 }
 
 const PROCESS_SNAPSHOTS = createSnapshotRegistry()
+const PROCESS_INSTALL = captureInstall()
 
 export type ToolCallResult = {
   content: Array<{ type: 'text'; text: string }>
@@ -124,6 +128,10 @@ export async function callTool(
     })
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   } catch (error) {
-    return { isError: true, content: [{ type: 'text', text: describeError(error) }] }
+    const install = environment.install ?? PROCESS_INSTALL
+    return {
+      isError: true,
+      content: [{ type: 'text', text: describeError(error) + installSuffix(error, install) }],
+    }
   }
 }

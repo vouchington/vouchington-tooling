@@ -337,6 +337,7 @@ describe('journal_entries', () => {
   it('turns a non-Error rejection into a tool error', async () => {
     const h = harness(fixture(), { entriesError: 'backend exploded' })
     const result = await h.call('journal_entries', { sessionId: 'native:owner' })
-    expect(result).toEqual({ isError: true, content: [{ type: 'text', text: 'backend exploded' }] })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toMatch(/^backend exploded\n\[vouchington-tooling /)
   })
 })

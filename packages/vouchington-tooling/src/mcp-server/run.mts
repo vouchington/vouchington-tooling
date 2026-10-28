@@ -3,6 +3,7 @@ import type { BlackboardClientDependencies } from '../agent-blackboard/client.mt
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import type { ServerEnvironment } from './dispatch.mts'
 import { assertBlackboardInstalled, loadMcpSdk, type SdkImporter } from './sdk.mts'
+import { captureInstall } from './install-info.mts'
 import { createMcpServer } from './server.mts'
 import { launchWorktreeRoot, runIsolatedGit } from './worktree.mts'
 
@@ -33,6 +34,7 @@ export async function runMcpServer(options: RunMcpServerOptions): Promise<void> 
     launchRoot,
     env: options.env,
     runGit,
+    install: captureInstall(options.version),
     ...(options.resolveFrom === undefined ? {} : { resolveFrom: options.resolveFrom }),
     ...(options.blackboard === undefined ? {} : { blackboard: options.blackboard }),
   }
