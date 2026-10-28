@@ -198,6 +198,12 @@ describe('runCli', () => {
     error.mockRestore()
   })
 
+  it('routes runner-policy', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await expect(runCli(['node', 'vouchington', 'runner-policy', '--bogus'])).resolves.toBe(2)
+    error.mockRestore()
+  })
+
   it('routes dead-code', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     await expect(runCli(['node', 'vouchington', 'dead-code', '--bogus'])).resolves.toBe(2)

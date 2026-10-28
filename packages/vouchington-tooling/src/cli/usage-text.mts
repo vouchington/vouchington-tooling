@@ -44,6 +44,7 @@ Commands:
   gha-collaborator-trust        Classify authors as write-access collaborators or not
   nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
   verify-workflow-secrets       Check a secret inventory against live repository and environment secrets
+  runner-policy                 Check workflow runner labels and jobs against a config
   dead-code                     Gate unused code against a committed jscpd baseline
   swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
   post-review                   Post one COMMENT review from a staged payload file
@@ -130,6 +131,7 @@ harness-assert-gates <gate>...
 gha-collaborator-trust <owner/repo> [--allow-bot <login>]... < authors.json
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
 verify-workflow-secrets [--repo OWNER/NAME] [--confirm NAME,...] [--inventory MODULE] [--export NAME] [--branch NAME]
+runner-policy [--config FILE] [--root DIR]
 dead-code --baseline PATH [--seed|--update] [--config PATH] [--binary PATH] [--repo-root PATH] [--entry GLOB]... [--snapshot-ignore GLOB]... [--exclude GLOB]...
 swift-semantic-equal <base> <head> <file.swift>
 post-review

@@ -86,6 +86,7 @@ vouchington harness-assert-gates HARNESS_DISPATCH_ENABLED HARNESS_SHEPHERD_ENABL
 echo '[{"login":"octocat","type":"User"}]' | vouchington gha-collaborator-trust owner/repo --allow-bot github-actions[bot]
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington verify-workflow-secrets --repo owner/name --inventory .github/workflows/workflow-secrets-inventory.mts
+vouchington runner-policy --config .github/runner-policy.json --root .github/workflows
 vouchington tmux up --config tmux.json --no-attach
 vouchington tmux name my-topic
 vouchington tmux read-title
@@ -704,6 +705,7 @@ import { runAstGrepExamples } from 'vouchington-tooling/ast-grep-examples'
 import { astGrepPackPaths } from 'vouchington-tooling/ast-grep-pack'
 import { validateNugetUpdate } from 'vouchington-tooling/nuget-central-version'
 import { runVerifyWorkflowSecretsCli } from 'vouchington-tooling/workflow-secrets-drift'
+import { evaluateRunnerPolicy } from 'vouchington-tooling/runner-policy'
 import { launchSession, loadTmuxConfig } from 'vouchington-tooling/tmux'
 import { runDeadCodeGate } from 'vouchington-tooling/dead-code'
 import { normalizeSwiftSource } from 'vouchington-tooling/swift-semantic-equal'
@@ -1444,3 +1446,51 @@ const { result, error } = await withPostgresQueryFailureForTest(
 The package's own tests start a throwaway cluster with `initdb`/`pg_ctl` found through
 `POSTGRES_BIN_DIR`, `PATH` or a standard install location. They skip where no server can run and
 fail under `CI`.
+
+## Runner policy
+
+`vouchington runner-policy [--config <file>] [--root <directory>]` checks GitHub Actions runner
+policy for a consumer's workflows. `--config` defaults to `.github/runner-policy.json` and `--root`
+to `.github/workflows` (only `*.yml` / `*.yaml` files directly under the root are read). It prints
+each violation and exits 1 on any violation, 0 when clean, and 2 on a usage error. The library
+subpath `vouchington-tooling/runner-policy` exports the pure
+`evaluateRunnerPolicy(inputs: {path, text}[], config)` plus `parseRunnerPolicyConfig`,
+`discoverWorkflows` and `loadRunnerPolicyConfig`. A workflow is identified by its path relative to
+the root (for example `checks.yml`).
+
+```json
+{
+  "allowedLabels": ["runner-small", "runner-large"],
+  "requiredJobs": [{ "workflow": "ci.yml", "job": "gate", "runsOn": "runner-large" }],
+  "exactLabelJobs": [{ "label": "runner-arm", "jobs": ["ci.yml#build", "ci.yml#test"] }],
+  "restrictedLabels": [
+    {
+      "label": "runner-small",
+      "forbidServices": true,
+      "forbiddenActions": {
+        "prefixes": ["docker/"],
+        "contains": ["/docker/"],
+        "exact": ["./.github/actions/setup-db"]
+      }
+    }
+  ]
+}
+```
+
+Only `allowedLabels` (non-empty) is required; unknown keys are rejected and every config problem is
+reported at once. Policies:
+
+- `allowedLabels`: every non-delegate job's `runs-on` must be a literal string in the set, or
+  `${{ matrix.<field> }}` resolving from `strategy.matrix.<field>` plus `strategy.matrix.include[].<field>`
+  to a non-empty candidate list whose members are all in the set. Missing `runs-on`, unresolved or
+  expression matrices, other computed expressions, array label sets and object forms are rejected.
+- Jobs with `uses:` (reusable-workflow delegates) must not set `runs-on`.
+- `requiredJobs`: each job must exist in its workflow and use exactly the literal `runsOn`.
+- `exactLabelJobs`: the `workflow#job` entries running on `label` (literally or through any matrix
+  candidate) must equal `jobs`; missing and extra entries are both reported.
+- `restrictedLabels`: jobs using `label` literally must not declare non-empty `services`
+  (`forbidServices`, default `true`) nor use a step `uses` value matching `forbiddenActions`
+  `prefixes`, `contains` substrings or `exact` values.
+
+The check fails closed: no discovered workflows, a missing root, an unreadable config or workflow,
+a YAML parse error, or a config entry naming an undiscovered workflow is a failure, never a pass.

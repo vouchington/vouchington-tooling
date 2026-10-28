@@ -356,6 +356,11 @@
       "import": "./dist/tmux/index.mjs",
       "default": "./dist/tmux/index.mjs"
     },
+    "./runner-policy": {
+      "types": "./dist/runner-policy/index.d.mts",
+      "import": "./dist/runner-policy/index.mjs",
+      "default": "./dist/runner-policy/index.mjs"
+    },
     "./workflow-secrets-drift": {
       "types": "./dist/workflow-secrets-drift/index.d.mts",
       "import": "./dist/workflow-secrets-drift/index.mjs",
