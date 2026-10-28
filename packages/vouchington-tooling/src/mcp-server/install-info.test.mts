@@ -29,6 +29,27 @@ describe('install info', () => {
       path: '/elsewhere/x',
     })
     expect(installSuffix(other, install)).not.toContain('underneath')
+    const importer = Object.assign(
+      new Error("Cannot find package 'dep' imported from /opt/pkg/dist/handler.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    expect(installSuffix(importer, install)).not.toContain('underneath')
+    const outsideTarget = Object.assign(
+      new Error("Cannot find module '/elsewhere/x.mjs' imported from /opt/pkg/dist/handler.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    expect(installSuffix(outsideTarget, install)).not.toContain('underneath')
+    const insideTarget = Object.assign(
+      new Error("Cannot find module '/opt/pkg/dist/x.mjs' imported from /elsewhere/y.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    expect(installSuffix(insideTarget, install)).toContain('underneath')
+    const sibling = Object.assign(new Error("Cannot find module '/opt/pkg-other/x.mjs'"), {
+      code: 'ERR_MODULE_NOT_FOUND',
+    })
+    expect(installSuffix(sibling, install)).not.toContain('underneath')
+    const root = Object.assign(new Error('x'), { code: 'ENOENT', path: '/opt/pkg' })
+    expect(installSuffix(root, install)).not.toContain('underneath')
     expect(installSuffix('plain string', install)).not.toContain('underneath')
     expect(installSuffix(null, install)).not.toContain('underneath')
     expect(installSuffix(new Error('permission denied /opt/pkg/x'), install)).not.toContain(
