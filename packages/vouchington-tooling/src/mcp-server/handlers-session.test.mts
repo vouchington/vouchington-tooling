@@ -50,10 +50,8 @@ describe('session_ensure', () => {
       },
     })
     const result = await h.call('session_ensure', identity)
-    expect(result).toEqual({
-      isError: true,
-      content: [{ type: 'text', text: 'session identity differs' }],
-    })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toMatch(/^session identity differs\n\[vouchington-tooling /)
   })
 
   it('reports missing blackboard credentials', async () => {
