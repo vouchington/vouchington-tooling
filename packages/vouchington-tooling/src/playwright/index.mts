@@ -55,7 +55,7 @@ export { assertNoHorizontalScroll, getHorizontalOverflowState } from './mobile-a
 export type { HorizontalOverflowState } from './mobile-assertions.mts'
 export { openRadixDropdown } from './radix-select.mts'
 export { randomSuffix } from './random-id.mts'
-export { storybookBundleHasStory } from './storybook.mts'
+export { StorybookIndexAccessError, storybookBundleHasStory } from './storybook.mts'
 export { TEST_PNG } from './test-fixtures.mts'
 export { TestLifecycleReporter }
 export type { TestLifecycleReporterOptions } from './test-lifecycle-reporter.mts'
