@@ -1,6 +1,11 @@
 name: Gitleaks
 
 # Reusable git-history scan. This runs gitleaks git over the caller event range.
+# The range comes from the compare API (merge base and ahead_by), and only that
+# range is fetched: the head to depth ahead_by + 1, never --unshallow. The range
+# is the compare API commit set; the log range excludes its boundary parents
+# explicitly, and the step fails unless rev-list yields exactly that set, so
+# the scan can never silently narrow or widen.
 # gitleaks-directory-scan remains the separate directory mode.
 on:
   workflow_call:
@@ -24,7 +29,7 @@ permissions:
 jobs:
   gitleaks:
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 2
@@ -33,6 +38,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout tooling scripts
+        timeout-minutes: 2
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ job.workflow_repository }}
@@ -42,7 +48,7 @@ jobs:
           fetch-depth: 1
 
       - name: Determine Gitleaks scan range
-        timeout-minutes: 2
+        timeout-minutes: 5
         id: gitleaks_scan
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -50,7 +56,7 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
-          TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
@@ -67,21 +73,56 @@ jobs:
                 exit 2
               fi
             done
-            if [[ -z "$TOKEN" ]]; then
+            if [[ -z "$GH_TOKEN" ]]; then
               echo "::error::GITHUB_TOKEN is required for exact history fetch"
               exit 2
             fi
-            TOKEN_B64="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+            # S is the range commit set from the compare API, paged explicitly.
+            COMPARE_URL="repos/$GITHUB_REPOSITORY/compare/$BASE_SHA...$HEAD_SHA"
+            AHEAD_BY=$(gh api "$COMPARE_URL?per_page=1" --jq '.ahead_by')
+            if [[ ! "$AHEAD_BY" =~ ^[0-9]+$ ]]; then
+              echo "::error::Compare API returned an invalid ahead_by"
+              exit 2
+            fi
+            RANGE_DIR=$(mktemp -d)
+            : > "$RANGE_DIR/pages"
+            for ((PAGE = 1; PAGE <= (AHEAD_BY + 99) / 100; PAGE++)); do
+              gh api "$COMPARE_URL?per_page=100&page=$PAGE" --jq '.commits[].sha' >> "$RANGE_DIR/pages"
+            done
+            if grep -qvE '^[0-9a-f]{40}$' "$RANGE_DIR/pages"; then
+              echo "::error::Compare API returned a commit that is not a full OID"
+              exit 2
+            fi
+            sort -u "$RANGE_DIR/pages" > "$RANGE_DIR/range"
+            if [[ "$(wc -l < "$RANGE_DIR/range" | tr -d ' ')" != "$AHEAD_BY" ]]; then
+              echo "::error::Compare API listed a different number of commits than ahead_by=$AHEAD_BY"
+              exit 2
+            fi
+            TOKEN_B64="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
             GIT_CONFIG_COUNT=1 \
               GIT_CONFIG_KEY_0=http.extraheader \
               GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $TOKEN_B64" \
-              git fetch --no-tags --unshallow origin "$BASE_SHA" "$HEAD_SHA"
-          fi
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            MERGE_BASE=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")
-            LOG_OPTS="${MERGE_BASE}..${PR_HEAD_SHA}"
-          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
-            LOG_OPTS="${MERGE_GROUP_BASE_SHA}..${MERGE_GROUP_HEAD_SHA}"
+              git fetch --no-tags --depth=$((AHEAD_BY + 1)) origin "$HEAD_SHA"
+            # Exclude by explicit boundary parents: shallow ancestry cannot be trusted.
+            : > "$RANGE_DIR/parents"
+            if [[ "$AHEAD_BY" != "0" ]]; then
+              git rev-list --no-walk --parents --stdin < "$RANGE_DIR/range" > "$RANGE_DIR/parents"
+            fi
+            awk 'NR == FNR { s[$1] = 1; next } { for (i = 2; i <= NF; i++) if (!($i in s)) p[$i] = 1 } END { for (k in p) print k }' \
+              "$RANGE_DIR/range" "$RANGE_DIR/parents" | sort > "$RANGE_DIR/boundary"
+            LOG_OPTS="$HEAD_SHA"
+            if [[ "$AHEAD_BY" == "0" ]]; then
+              LOG_OPTS="$HEAD_SHA ^$HEAD_SHA"
+            fi
+            while read -r BOUNDARY; do
+              LOG_OPTS="$LOG_OPTS ^$BOUNDARY"
+            done < "$RANGE_DIR/boundary"
+            read -ra REV_ARGS <<< "$LOG_OPTS"
+            git rev-list "${REV_ARGS[@]}" | sort > "$RANGE_DIR/actual"
+            if ! cmp -s "$RANGE_DIR/range" "$RANGE_DIR/actual"; then
+              echo "::error::Fetched history does not match the compare range"
+              exit 1
+            fi
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             LOG_OPTS="--all"
           else
