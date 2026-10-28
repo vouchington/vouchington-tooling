@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { codexChildren, codexIdentity, computeCodex } from './codex.mts'
-import { ChildSegmentError, explainCodexSegment } from './codex-segment.mts'
+import { explainCodexSegment } from './codex-segment.mts'
 import { computeClaude } from './claude.mts'
 import { formatTranscriptFacts, formatUnavailable } from './format.mts'
 import {
@@ -87,7 +87,8 @@ async function codexSubagents(
   lines: string[],
   sessionsDir: string,
   ownerPath: string,
-  visited = new Set<string>(),
+  visited: Set<string>,
+  failure: { reason?: string },
 ): Promise<CapturedSegment[] | undefined> {
   const result: CapturedSegment[] = []
   for (const edge of codexChildren(lines, ownerPath)) {
@@ -104,9 +105,18 @@ async function codexSubagents(
     )
       return undefined
     const outcome = explainCodexSegment(child)
-    if ('reason' in outcome) throw new ChildSegmentError(outcome.reason)
+    if ('reason' in outcome) {
+      failure.reason = outcome.reason
+      return undefined
+    }
     result.push({ ...outcome.segment, partial: partialCapture(child) })
-    const nested = await codexSubagents(outcome.segment.lines, sessionsDir, edge.agentPath, visited)
+    const nested = await codexSubagents(
+      outcome.segment.lines,
+      sessionsDir,
+      edge.agentPath,
+      visited,
+      failure,
+    )
     if (!nested) return undefined
     result.push(...nested)
   }
@@ -147,21 +157,20 @@ export async function runRetrospectiveTranscriptReport(
   const root = rootOutcome.segment
   const codexHome = (options.env ?? process.env).CODEX_HOME
   const unresolved = 'could not resolve a referenced Codex child transcript'
-  let subagents: CapturedSegment[] | undefined
-  try {
-    subagents = await codexSubagents(
-      root.lines,
-      options.codexSessionsDir ??
-        (options.jsonlPath ? dirname(resolved.path) : undefined) ??
-        join(codexHome || join(homedir(), '.codex'), 'sessions'),
-      identity.agentPath,
-      new Set([identity.threadId ?? resolved.sessionId].filter((id) => SESSION_ID.test(id))),
+  const failure: { reason?: string } = {}
+  const subagents = await codexSubagents(
+    root.lines,
+    options.codexSessionsDir ??
+      (options.jsonlPath ? dirname(resolved.path) : undefined) ??
+      join(codexHome || join(homedir(), '.codex'), 'sessions'),
+    identity.agentPath,
+    new Set([identity.threadId ?? resolved.sessionId].filter((id) => SESSION_ID.test(id))),
+    failure,
+  )
+  if (!subagents)
+    return unavailable(
+      failure.reason ? `${unresolved}: could not segment it (${failure.reason})` : unresolved,
     )
-  } catch (error) {
-    if (!(error instanceof ChildSegmentError)) throw error
-    return unavailable(`${unresolved}: could not segment it (${error.message})`)
-  }
-  if (!subagents) return unavailable(unresolved)
   return {
     markdown: formatTranscriptFacts(
       resolved.sessionId,

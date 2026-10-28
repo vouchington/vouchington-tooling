@@ -188,4 +188,15 @@ describe('composeFromArgs transcript', () => {
       composeFromArgs(withFacts({ repo: 'other/private', pr: '1' }), base),
     ).rejects.toThrow('unsupported argument(s): repo')
   })
+
+  it('runs live facts for a numeric pr and for a selector without one', async () => {
+    const partial = {
+      ...base,
+      feedbackCoverage: { status: 'partial' as const, sources: [], droppedCount: 0 },
+    }
+    for (const facts of [{ pr: 7 }, { noPr: true }])
+      await expect(composeFromArgs({ ...compose(unassessed), facts }, partial)).resolves.toContain(
+        '## Verifiable Facts',
+      )
+  })
 })

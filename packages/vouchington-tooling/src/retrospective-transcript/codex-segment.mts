@@ -52,9 +52,6 @@ function retainHighWater(previous: TokenTotals, current: TokenTotals): TokenTota
   }
 }
 
-/** Thrown when a referenced child's owned boundary cannot be established; carries the reason. */
-export class ChildSegmentError extends Error {}
-
 export type CodexSegmentOutcome = { segment: CodexSegment } | { reason: string }
 
 /** Segments a Codex rollout, or says why its owned boundary cannot be established. */
