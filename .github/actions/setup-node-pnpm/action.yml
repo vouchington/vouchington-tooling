@@ -1,7 +1,8 @@
 name: Setup Node.js and pnpm
 description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
-  without a pnpm store cache.
+  without a pnpm store cache. The install uses tight fetch settings and a wall-clock limit per
+  attempt, and retries an attempt that times out.
   The caller must run actions/checkout before invoking this action.
   Set timeout-minutes on the calling step to cap the combined operations.
 inputs:
@@ -11,6 +12,12 @@ inputs:
   node-version-file:
     description: 'Version file, relative to the workspace root, that selects the Node.js version'
     default: '.nvmrc'
+  install-attempt-timeout-seconds:
+    description: 'Wall-clock limit, in seconds, for each pnpm install attempt'
+    default: '150'
+  install-attempts:
+    description: 'Maximum pnpm install attempts; only an attempt that times out is retried'
+    default: '2'
 runs:
   using: composite
   steps:
@@ -32,14 +39,26 @@ runs:
         node-version-file: false
     # No pnpm store cache: on hosted runners a fresh install is fast enough, and restoring and
     # saving the store costs more than it saves.
-    # --loglevel=warn drops the progress bar and package summary but still prints warnings and
-    # errors. From pnpm 12.8.0 (pnpm/pnpm#16076) it also keeps a failed lifecycle script's full
-    # output and a failed supply-chain verdict, so the quiet log stays diagnosable.
+    # pnpm's fetchTimeout is an idle timeout (the clock resets on every chunk since 12.4.0) with a
+    # slow default backoff, so one stalled request can take ~250s and a trickling one is
+    # unbounded. install.mjs therefore passes tight fetch settings and bounds each attempt by
+    # wall-clock time, killing the process group and retrying. A real failure (lockfile mismatch,
+    # script error) is not retried. Attempt 1 uses --loglevel=warn, which drops the progress bar
+    # and package summary but keeps warnings and errors (from pnpm 12.8.0, pnpm/pnpm#16076, also
+    # a failed lifecycle script's full output and a failed supply-chain verdict); retries log
+    # append-only at info level to show where a repeated stall happened.
     - name: pnpm install
       if: inputs.install-scripts != 'false'
       shell: bash
-      run: pnpm install --frozen-lockfile --loglevel=warn
+      env:
+        INSTALL_ATTEMPT_TIMEOUT_SECONDS: ${{ inputs.install-attempt-timeout-seconds }}
+        INSTALL_ATTEMPTS: ${{ inputs.install-attempts }}
+      run: node "$GITHUB_ACTION_PATH/install.mjs"
     - name: pnpm install without lifecycle scripts
       if: inputs.install-scripts == 'false'
       shell: bash
-      run: pnpm install --frozen-lockfile --ignore-scripts --loglevel=warn
+      env:
+        INSTALL_ATTEMPT_TIMEOUT_SECONDS: ${{ inputs.install-attempt-timeout-seconds }}
+        INSTALL_ATTEMPTS: ${{ inputs.install-attempts }}
+        INSTALL_IGNORE_SCRIPTS: 'true'
+      run: node "$GITHUB_ACTION_PATH/install.mjs"
