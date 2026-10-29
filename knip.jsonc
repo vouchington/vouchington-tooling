@@ -66,6 +66,7 @@
         "src/sandbox-command-audit/index.mts!",
         "src/cloc/index.mts!",
         "src/markdown-article-links/index.mts!",
+        "src/ast-grep-config-parity/index.mts!",
         "src/coverage-scope/index.mts!",
         "src/trivy-policy/index.mts!",
         "src/docker-image-mirror/index.mts!",
