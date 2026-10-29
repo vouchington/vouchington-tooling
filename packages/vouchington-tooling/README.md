@@ -679,6 +679,10 @@ import {
   checkMarkdownArticleLinks,
   discoverMarkdownArticles,
 } from 'vouchington-tooling/markdown-article-links'
+import {
+  checkAstGrepConfigParity,
+  discoverAstGrepConfig,
+} from 'vouchington-tooling/ast-grep-config-parity'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
@@ -792,6 +796,48 @@ exceedsLargeDiffThreshold(countDiffLineChanges(diffText), {
   deletedLines: 20_000,
 })
 ```
+
+`vouchington-tooling/ast-grep-config-parity` checks an ast-grep setup against the rule pack it loads
+at run time. The checker does no I/O; the discovery adapter reads the files.
+
+```ts
+const input = await discoverAstGrepConfig(process.cwd(), {
+  localRuleDir: 'ast-grep-rules',
+  packRulesDir: 'node_modules/some-pack/rules',
+})
+const offenders = checkAstGrepConfigParity({
+  ...input,
+  languageExceptions: { 'data/json-rule.yml': 'Json' },
+})
+// [{ name: 'copy.yml', reason: 'copied-pack-rule', detail: '…' }]
+```
+
+`checkAstGrepConfigParity({ sgconfig, localRuleDir, localRules, packRulePaths, expectedLanguageGlobs,
+defaultLanguage, languageExceptions })` is synchronous and returns offenders `{ name, reason, detail }`.
+`sgconfig` is `{ name, source }` (raw YAML), `localRules` is `{ path, source }[]` with paths relative to
+`localRuleDir`, and `packRulePaths` are relative to the pack rules directory. `expectedLanguageGlobs`
+defaults to `{ Tsx: ['**/*.ts', '**/*.mts', '**/*.cts', '**/*.tsx'] }`, `defaultLanguage` to `'Tsx'`
+and `languageExceptions` (rule path to language) to `{}`. Reasons:
+
+- `rule-dirs`: `ruleDirs` does not deep-equal `[localRuleDir]`. The pack directory is added at run
+  time, not committed.
+- `language-globs`: `languageGlobs` does not deep-equal `expectedLanguageGlobs` as a whole object.
+- `copied-pack-rule`: a local rule's relative path, or its basename, matches a pack rule's relative
+  path or basename, so a copy is caught whether or not the directory layout matches.
+- `empty-local-rules`: no local rules were provided.
+- `rule-language`: a rule's `language` differs from its exception's language, or from
+  `defaultLanguage` when none is listed. A missing `language` is an offender. An exception that names
+  no local rule is reported too, so a stale exception cannot hide.
+- `tsx-companion`: a local rule path matches `-tsx.yml` or `-tsx.yaml`.
+- `invalid-yaml`: `sgconfig` or a local rule does not parse. Other checks on that file are skipped.
+
+`discoverAstGrepConfig(root, { localRuleDir, sgconfigPath, packRulesDir, allowEmpty, listTrackedFiles })`
+returns the checker's inputs. It reads `sgconfigPath` (default `sgconfig.yml`) and the git-tracked
+`*.yml` and `*.yaml` files under `localRuleDir`, recursively, through `git ls-files -z` with an argv
+array and no shell, so untracked files are ignored. `packRulesDir` is listed from the filesystem
+because the installed pack is not tracked. Paths are sorted by code unit. Empty local discovery
+throws unless `allowEmpty` is set; an empty pack directory always throws, so a wrong `packRulesDir`
+cannot pass. `listTrackedFiles(root, dir)` replaces the git runner, for example in tests.
 
 `vouchington-tooling/markdown-article-links` checks rendered article links statically. It bundles no
 markdown parser or renderer: the caller supplies all three callbacks.

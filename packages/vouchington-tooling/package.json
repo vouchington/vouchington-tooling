@@ -231,6 +231,11 @@
       "import": "./dist/markdown/index.mjs",
       "default": "./dist/markdown/index.mjs"
     },
+    "./ast-grep-config-parity": {
+      "types": "./dist/ast-grep-config-parity/index.d.mts",
+      "import": "./dist/ast-grep-config-parity/index.mjs",
+      "default": "./dist/ast-grep-config-parity/index.mjs"
+    },
     "./markdown-article-links": {
       "types": "./dist/markdown-article-links/index.d.mts",
       "import": "./dist/markdown-article-links/index.mjs",
