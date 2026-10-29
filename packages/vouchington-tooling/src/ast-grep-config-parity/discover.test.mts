@@ -69,14 +69,22 @@ describe('discoverAstGrepConfig', () => {
     })
   })
 
-  it('tolerates a trailing slash and an absolute pack directory', async () => {
+  it('tolerates an absolute pack directory', async () => {
     const input = await discoverAstGrepConfig(repo, {
-      localRuleDir: 'rules/',
+      localRuleDir: 'rules',
       packRulesDir: join(repo, 'pack/rules'),
     })
-    expect(input.localRuleDir).toBe('rules')
     expect(input.packRulePaths).toHaveLength(2)
   })
+
+  it.each(['rules/', './rules', './rules/', 'rules//'])(
+    'discovers rules for localRuleDir %s and keeps the configured spelling',
+    async (localRuleDir) => {
+      const input = await discoverAstGrepConfig(repo, { localRuleDir, packRulesDir: 'pack/rules' })
+      expect(input.localRuleDir).toBe(localRuleDir)
+      expect(input.localRules.map((rule) => rule.path)).toEqual(['a.yaml', 'b.yml', 'nested/c.yml'])
+    },
+  )
 
   it('reads a custom sgconfig path', async () => {
     const input = await discoverAstGrepConfig(repo, {

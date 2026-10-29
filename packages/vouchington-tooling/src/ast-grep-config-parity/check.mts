@@ -1,6 +1,6 @@
 import { posix } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { parse } from 'yaml'
+import { parse, parseAllDocuments } from 'yaml'
 
 export type AstGrepConfigParityReason =
   | 'rule-dirs'
@@ -93,19 +93,29 @@ function checkSgconfig(options: CheckAstGrepConfigParityOptions, out: Out): void
 }
 
 function checkRuleLanguage(rule: AstGrepConfigParityFile, expected: string, out: Out): void {
-  const parsed = tryParse(rule.source)
-  if (!parsed.ok) {
-    out.push({ name: rule.path, reason: 'invalid-yaml', detail: parsed.message })
+  const documents = parseAllDocuments(rule.source)
+  const failed = documents.find((document) => document.errors.length > 0)
+  if (failed) {
+    out.push({ name: rule.path, reason: 'invalid-yaml', detail: failed.errors[0]!.message })
     return
   }
-  const language = field(parsed.value, 'language')
-  if (language !== expected) {
+  if (documents.length === 0) {
     out.push({
       name: rule.path,
       reason: 'rule-language',
-      detail: `language is ${show(language)}, expected ${show(expected)}`,
+      detail: `language is undefined (no YAML documents), expected ${show(expected)}`,
     })
   }
+  documents.forEach((document, index) => {
+    const language = field(document.toJS(), 'language')
+    if (language !== expected) {
+      out.push({
+        name: rule.path,
+        reason: 'rule-language',
+        detail: `document ${index}: language is ${show(language)}, expected ${show(expected)}`,
+      })
+    }
+  })
 }
 
 /**

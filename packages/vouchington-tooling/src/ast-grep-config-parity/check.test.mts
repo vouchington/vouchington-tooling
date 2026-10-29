@@ -131,7 +131,7 @@ describe('checkAstGrepConfigParity', () => {
         expect.objectContaining({
           name: 'a.yml',
           reason: 'rule-language',
-          detail: 'language is "Json", expected "Tsx"',
+          detail: 'document 0: language is "Json", expected "Tsx"',
         }),
       ])
     })
@@ -140,7 +140,7 @@ describe('checkAstGrepConfigParity', () => {
       const offenders = checkAstGrepConfigParity(
         options({ localRules: [{ path: 'a.yml', source: 'id: x' }] }),
       )
-      expect(offenders[0]?.detail).toBe('language is undefined, expected "Tsx"')
+      expect(offenders[0]?.detail).toBe('document 0: language is undefined, expected "Tsx"')
     })
 
     it('flags a scalar rule document as missing language', () => {
@@ -196,6 +196,59 @@ describe('checkAstGrepConfigParity', () => {
 
     it.each(['tsx.yml', 'a-tsx-extra.yml', 'a_tsx.yml'])('allows %s', (path) => {
       expect(reasons(options({ localRules: [{ path, source: 'language: Tsx' }] }))).toEqual([])
+    })
+  })
+
+  describe('multi-document rule files', () => {
+    const rules = (source: string) => options({ localRules: [{ path: 'multi.yml', source }] })
+
+    it('passes when every document has the expected language', () => {
+      expect(reasons(rules('id: a\nlanguage: Tsx\n---\nid: b\nlanguage: Tsx\n'))).toEqual([])
+    })
+
+    it('flags a wrong second document with its index', () => {
+      const offenders = checkAstGrepConfigParity(
+        rules('id: a\nlanguage: Tsx\n---\nid: b\nlanguage: Json\n'),
+      )
+      expect(offenders).toEqual([
+        {
+          name: 'multi.yml',
+          reason: 'rule-language',
+          detail: 'document 1: language is "Json", expected "Tsx"',
+        },
+      ])
+    })
+
+    it('reports each mismatching document', () => {
+      const offenders = checkAstGrepConfigParity(rules('id: a\n---\nid: b\n'))
+      expect(offenders.map((offender) => offender.detail)).toEqual([
+        'document 0: language is undefined, expected "Tsx"',
+        'document 1: language is undefined, expected "Tsx"',
+      ])
+    })
+
+    it('applies a listed exception to every document', () => {
+      const multi = options({
+        languageExceptions: { 'multi.yml': 'Json' },
+        localRules: [{ path: 'multi.yml', source: 'language: Json\n---\nlanguage: Json\n' }],
+      })
+      expect(reasons(multi)).toEqual([])
+    })
+
+    it.each(['', '# only a comment\n'])('treats %j as a missing language', (source) => {
+      const offenders = checkAstGrepConfigParity(rules(source))
+      expect(offenders).toEqual([
+        expect.objectContaining({ name: 'multi.yml', reason: 'rule-language' }),
+      ])
+    })
+
+    it('flags invalid-yaml when any document is invalid', () => {
+      const offenders = checkAstGrepConfigParity(
+        rules('language: Tsx\n---\na: [unterminated\n---\nlanguage: Json\n'),
+      )
+      expect(offenders).toEqual([
+        expect.objectContaining({ name: 'multi.yml', reason: 'invalid-yaml' }),
+      ])
     })
   })
 

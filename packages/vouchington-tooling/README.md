@@ -826,7 +826,9 @@ and `languageExceptions` (rule path to language) to `{}`. Reasons:
   path or basename, so a copy is caught whether or not the directory layout matches.
 - `empty-local-rules`: no local rules were provided.
 - `rule-language`: a rule's `language` differs from its exception's language, or from
-  `defaultLanguage` when none is listed. A missing `language` is an offender. An exception that names
+  `defaultLanguage` when none is listed. Every `---` document in a rule file is checked and each
+  mismatch is reported with its document index; an empty file counts as a missing `language`. A
+  missing `language` is an offender. An exception that names
   no local rule is reported too, so a stale exception cannot hide.
 - `tsx-companion`: a local rule path matches `-tsx.yml` or `-tsx.yaml`.
 - `invalid-yaml`: `sgconfig` or a local rule does not parse. Other checks on that file are skipped.

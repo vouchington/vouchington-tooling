@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join, posix, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { AstGrepConfigParityFile } from './check.mts'
 
@@ -49,16 +49,17 @@ export async function discoverAstGrepConfig(
   root: string,
   options: DiscoverAstGrepConfigOptions,
 ): Promise<AstGrepConfigParityInput> {
-  const localRuleDir = options.localRuleDir.replace(/\/+$/, '')
+  const { localRuleDir } = options
+  const dir = posix.normalize(localRuleDir).replace(/\/+$/, '')
   const sgconfigPath = options.sgconfigPath ?? 'sgconfig.yml'
-  const tracked = await (options.listTrackedFiles ?? gitLsFiles)(root, localRuleDir)
-  const prefix = `${localRuleDir}/`
+  const tracked = await (options.listTrackedFiles ?? gitLsFiles)(root, dir)
+  const prefix = `${dir}/`
   const paths = tracked
     .filter((path) => path.startsWith(prefix) && YAML_FILE.test(path))
     .map((path) => path.slice(prefix.length))
     .sort(byCodeUnit)
   if (paths.length === 0 && !options.allowEmpty) {
-    throw new Error(`No git-tracked ast-grep rule files found under ${join(root, localRuleDir)}`)
+    throw new Error(`No git-tracked ast-grep rule files found under ${join(root, dir)}`)
   }
   const packDir = resolve(root, options.packRulesDir)
   const packRulePaths = (await readdir(packDir, { recursive: true }))
@@ -73,7 +74,7 @@ export async function discoverAstGrepConfig(
     Promise.all(
       paths.map(async (path) => ({
         path,
-        source: await readFile(join(root, localRuleDir, path), 'utf8'),
+        source: await readFile(join(root, dir, path), 'utf8'),
       })),
     ),
   ])
