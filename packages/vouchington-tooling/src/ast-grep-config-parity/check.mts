@@ -106,8 +106,15 @@ function checkRuleLanguage(rule: AstGrepConfigParityFile, expected: string, out:
       detail: `language is undefined (no YAML documents), expected ${show(expected)}`,
     })
   }
-  documents.forEach((document, index) => {
-    const language = field(document.toJS(), 'language')
+  let values: unknown[]
+  try {
+    values = documents.map((document) => document.toJS() as unknown)
+  } catch (error) {
+    out.push({ name: rule.path, reason: 'invalid-yaml', detail: (error as Error).message })
+    return
+  }
+  values.forEach((value, index) => {
+    const language = field(value, 'language')
     if (language !== expected) {
       out.push({
         name: rule.path,

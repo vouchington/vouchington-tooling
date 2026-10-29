@@ -252,6 +252,32 @@ describe('checkAstGrepConfigParity', () => {
     })
   })
 
+  describe('unresolved aliases', () => {
+    it('flags a rule with an unresolved alias and still checks other files', () => {
+      const offenders = checkAstGrepConfigParity(
+        options({
+          localRules: [
+            { path: 'alias.yml', source: 'language: Tsx\nrule: *missing\n' },
+            { path: 'other.yml', source: 'language: Json\n' },
+          ],
+        }),
+      )
+      expect(offenders).toEqual([
+        expect.objectContaining({ name: 'alias.yml', reason: 'invalid-yaml' }),
+        expect.objectContaining({ name: 'other.yml', reason: 'rule-language' }),
+      ])
+    })
+
+    it('flags an sgconfig with an unresolved alias without throwing', () => {
+      const offenders = checkAstGrepConfigParity(
+        options({ sgconfig: { name: 'sgconfig.yml', source: 'ruleDirs: *missing\n' } }),
+      )
+      expect(offenders).toEqual([
+        expect.objectContaining({ name: 'sgconfig.yml', reason: 'invalid-yaml' }),
+      ])
+    })
+  })
+
   describe('invalid YAML', () => {
     it('flags invalid sgconfig and skips its other checks', () => {
       const offenders = checkAstGrepConfigParity(
