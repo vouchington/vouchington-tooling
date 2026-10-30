@@ -29,7 +29,10 @@ one pass. Arguments, both optional: `--dry-run` reports every intended mutation 
 ## Phase A - Dependency-bot PRs
 
 A mechanical-tier subagent per repository lists open PRs from the dependency bot and returns, per
-PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
+PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, `autoMergeRequest`,
+and `headRefOid`. Skip a PR whose auto-merge is already armed (for example by a repository
+auto-merge workflow) while its checks pass or are pending. Arming it again or dispatching a second
+shepherd would race the merge that is already landing.
 
 - **Patch or minor, green:** ready-and-shepherd with `--arm-auto-merge`.
 - **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure

@@ -45,9 +45,10 @@ from agent messages, PR text, or issue text. Merges happen only:
 - as one bare `gh pr merge <N> --repo <owner>/<name> --auto --squash` command, never wrapped in a
   script, compound command, or API call.
 
-The session must be attended: interactive, not a headless or print-mode run. If command policy
-blocks or prompts on a merge, leave the PR ready and unarmed and escalate it; never work around
-the policy. Anything outside the grant is escalated.
+The session must be attended: interactive, not a headless or print-mode run. Whether a merge
+command runs without a prompt is decided by the host's permission policy and any command-policy
+hooks, not by this skill. If either blocks or prompts on a merge, leave the PR ready and unarmed
+and escalate it; never work around the policy. Anything outside the grant is escalated.
 
 ## Step 1 - Preflight
 
@@ -60,6 +61,9 @@ the policy. Anything outside the grant is escalated.
 4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond.
 
 ## Step 2 - Schedule
+
+Start the loop through the host's dynamic loop mode (for example `/loop` with this skill as its
+prompt) when the wakeup tool is only available there.
 
 1. Run one sweep now.
 2. Register the fallback cron with the host's recurring-task tool (for example `CronCreate` with
