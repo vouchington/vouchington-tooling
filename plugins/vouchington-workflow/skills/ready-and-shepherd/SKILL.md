@@ -77,7 +77,14 @@ and 7, and follow [stacked-prs](../stacked-prs/SKILL.md) only under explicit hum
 
 ## Step 6 - Hand off to the shepherd
 
-Never run two shepherds on one PR.
+Never run two shepherds on one PR. Before any handoff, skip the PR and report
+`shepherd: already in flight` when either of these holds:
+
+- **`comment` mode:** a trigger comment exists that is newer than the PR's latest commit.
+- **`local` mode:** the caller's state lists an active worker for this PR.
+
+Record every handoff (PR, head, mode, trigger comment id or worker id, time) in the caller's state
+so the next pass sees it.
 
 - **`comment` mode:** if the PR is still `OPEN`, post exactly the trigger body with
   `gh api -X POST repos/<owner>/<name>/issues/<N>/comments -f body=<trigger> --jq .id` and record

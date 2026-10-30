@@ -57,7 +57,8 @@ and escalate it; never work around the policy. Anything outside the grant is esc
    `gh repo list <org> --limit 1000 --no-archived --json name,defaultBranchRef` and apply the filter.
 3. Open the state directory. Create `state.json` if absent with: `lastSweepAt`, a per-repository
    `mergedCursor` (ISO time), `retroCursor`, `escalations` (key to first-notified time, used for
-   dedupe), and `intake` (queued agent reports).
+   dedupe), `shepherds` (in-flight handoffs, so no PR gets a second shepherd), and `intake`
+   (queued agent reports).
 4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond.
 
 ## Step 2 - Schedule
