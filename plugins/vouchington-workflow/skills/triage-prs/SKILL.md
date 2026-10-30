@@ -21,8 +21,8 @@ to ask when one this run needs is missing; never guess a value.
 - **Automation label:** the label that marks machine-created PRs. It defines the default scope.
 - **Orphan-issue rules:** the labels or title prefix that identify automation-created issues, and
   the label that marks intentional PR-free backlog items.
-- **Ready-and-shepherd skill:** the skill or command that marks a PR ready, posts steering, arms
-  auto-merge, and dispatches the shepherd, with its flags and activation preflight.
+- **Ready-and-shepherd values:** the [ready-and-shepherd](../ready-and-shepherd/SKILL.md) adapter
+  values (shepherd mode, trigger, activation gates), or a consumer skill that replaces it.
 - **Prompt-source paths:** the exact paths that may be edited from PR-creation feedback, and the
   rubric for that feedback.
 - **Feedback marker:** the PR-body marker that identifies a feedback PR from this flow.
