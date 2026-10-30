@@ -91,9 +91,14 @@ so the next pass sees it.
   the comment id. Dispatch is fire-and-forget: a `running` checkpoint proves acceptance, not
   success. Never poll the dispatch workflow or arm later from a `queued` or `running` state.
 - **`local` mode:** return `shepherd: local` to the caller, which starts one background worker in
-  an isolated worktree. The worker loops `pr-shepherd <owner>/<name>#<N> --until-terminal`, fixes
-  each TRIAGE result, and stops at CANCEL or ESCALATE. A worker that ends in ESCALATE reports back
-  to the caller, which escalates. The worker never merges.
+  an isolated worktree. The worker reruns `pr-shepherd <owner>/<name>#<N> --until-terminal` after
+  every result except CANCEL and ESCALATE:
+  - TRIAGE: fix the items, then rerun.
+  - READY or a quota warning: rerun after the delay the output names.
+  - MERGE: the worker never merges. It reports the PR as mergeable to the caller and stops.
+
+  On ESCALATE, it reports back to the caller, which escalates. Remove the worker from the caller's
+  state when it stops.
 
 ## Step 7 - Verify and report
 

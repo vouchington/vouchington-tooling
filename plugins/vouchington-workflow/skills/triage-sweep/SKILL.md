@@ -34,6 +34,15 @@ and `headRefOid`. Skip a PR whose auto-merge is already armed (for example by a 
 auto-merge workflow) while its checks pass or are pending. Arming it again or dispatching a second
 shepherd would race the merge that is already landing.
 
+Steered handoffs stay unarmed (see [ready-and-shepherd](../ready-and-shepherd/SKILL.md) Step 5)
+and are reported as `shepherding, manual-verification-required`. A later sweep arms one only when:
+
+- its shepherd is no longer in flight;
+- its current head passes every required check;
+- a fresh review of that head still fits the same category.
+
+Arming then uses one bare `gh pr merge` command, as in the grant.
+
 - **Patch or minor, green:** ready-and-shepherd with `--arm-auto-merge`.
 - **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure
   with [review-ci-logs](../review-ci-logs/SKILL.md) and classifies it as trivial (lockfile,
@@ -52,14 +61,17 @@ shepherd would race the merge that is already landing.
 ## Phase B - Automation PRs
 
 For each repository, run [triage-prs](../triage-prs/SKILL.md) on the default automation-label
-scope, with this extra MERGE gate applied by an implementation-tier reviewer. The diff must:
+scope. Apply this extra gate to every Step 3 decision before its Step 3b exclusion set is built.
+An implementation-tier reviewer checks that the diff does both of these:
 
 - not change business behavior (user-visible behavior, data shape, or product logic);
 - stay bounded: a focused fix, with no new abstractions or broad rewrites, proportional to the
   failure it fixes.
 
-A PR that fails the gate, or that the reviewer is unsure about, is escalated, not closed. Only
-PRs that carry the adapter's automation label and pass the gate get `--arm-auto-merge`.
+A PR that fails the gate, or that the reviewer is unsure about, joins the exclusion set and is
+escalated. The grant covers merging, not closing. Every `CLOSE` decision also joins the exclusion
+set and is escalated with its reason, so `triage-prs` closes nothing in this phase. Only PRs that
+carry the adapter's automation label and pass the gate get `--arm-auto-merge`.
 
 ## Phase C - Intake queue
 
@@ -89,16 +101,18 @@ succeeds.
 
 ## Phase F - Missed code reviews
 
-For each repository, a mechanical-tier subagent lists PRs merged after `mergedCursor` and harvests
-review comments, review threads, and review bodies that either:
+For each repository, a mechanical-tier subagent lists PRs merged within the adapter's late-review
+window (default the last 14 days), paginating fully. It harvests review comments, review threads,
+and review bodies that are not yet in the state file's `reviewedComments` and that either:
 
 - were created after the PR's `mergedAt`, or
 - were unresolved at merge.
 
 An implementation-tier subagent verifies each comment against the current default branch and drops
 anything already addressed, non-actionable, or a duplicate of an open issue. File one issue per
-root cause through [github-issue](../github-issue/SKILL.md), linking the PR and comment. Advance
-`mergedCursor` to the latest `mergedAt` processed.
+root cause through [github-issue](../github-issue/SKILL.md), linking the PR and comment. Add every
+harvested comment id to `reviewedComments`, and prune ids whose PR has left the window. A comment
+posted days after merge is still found.
 
 ## Phase G - Report and escalate
 
@@ -121,7 +135,8 @@ actions:
 - update check requested
 - needs decision
 
-Set `lastSweepAt`, release the lock, and return the next suggested wake delay to the loop.
+Set `lastSweepAt`, except on `--dry-run`, which writes no state. Release the lock and return the
+next suggested wake delay to the loop.
 
 Consumer wrapper owns: every value listed under the triage-loop adapter, plus any per-repository
 exclusions from a phase.

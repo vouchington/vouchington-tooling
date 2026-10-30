@@ -33,6 +33,7 @@ Resolve these first and stop to ask when one is missing; never guess.
 - **Dispatch targets:** isolated-worktree subagents, and any terminal workspace manager whose
   agents accept prompts.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
+- **Late-review window:** how far back Phase F rescans merged PRs (default 14 days).
 
 ## The grant
 
@@ -54,11 +55,15 @@ and escalate it; never work around the policy. Anything outside the grant is esc
 
 1. Confirm the session is interactive and the launch directory is the adapter's parent directory.
 2. Enumerate repositories, exhausting the list:
-   `gh repo list <org> --limit 1000 --no-archived --json name,defaultBranchRef` and apply the filter.
-3. Open the state directory. Create `state.json` if absent with: `lastSweepAt`, a per-repository
-   `mergedCursor` (ISO time), `retroCursor`, `escalations` (key to first-notified time, used for
-   dedupe), `shepherds` (in-flight handoffs, so no PR gets a second shepherd), and `intake`
-   (queued agent reports).
+   `gh api --paginate 'orgs/<org>/repos?per_page=100' --jq '.[] | select(.archived | not) | .name'`
+   and apply the filter.
+3. Open the state directory. Create `state.json` if absent, with these fields:
+   - `lastSweepAt`
+   - a per-repository `reviewedComments` (late-review comment ids already harvested)
+   - `retroCursor`
+   - `escalations` (key to first-notified time, used for dedupe)
+   - `shepherds` (in-flight handoffs, so no PR gets a second shepherd)
+   - `intake` (queued agent reports)
 4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond.
 
 ## Step 2 - Schedule
