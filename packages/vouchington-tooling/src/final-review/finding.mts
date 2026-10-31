@@ -86,7 +86,9 @@ function parseLocation(record: Json, where: string): Partial<Finding> {
     record.side === undefined ? 'RIGHT' : oneOf(['LEFT', 'RIGHT'], record.side, `${where}.side`)
   if (record.startLine === undefined) return { path, line, side }
   const startLine = positiveInt(record.startLine, `${where}.startLine`)
-  if (startLine >= line) throw new FinalReviewError(`${where}.startLine must be below line.`)
+  // Models often send a one-line range or reversed bounds; normalize instead of rejecting.
+  if (startLine === line) return { path, line, side }
+  if (startLine > line) return { path, line: startLine, side, startLine: line }
   return { path, line, side, startLine }
 }
 

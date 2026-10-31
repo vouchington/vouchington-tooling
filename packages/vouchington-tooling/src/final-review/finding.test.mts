@@ -97,6 +97,14 @@ describe('finding locations', () => {
     expect(parseOne({ path: 'a.ts', line: 3, startLine: 1 })).toMatchObject({ startLine: 1 })
   })
 
+  it('normalizes one-line and reversed ranges', () => {
+    expect(parseOne({ path: 'a.ts', line: 3, startLine: 3 })).not.toHaveProperty('startLine')
+    expect(parseOne({ path: 'a.ts', line: 3, startLine: 7 })).toMatchObject({
+      line: 7,
+      startLine: 3,
+    })
+  })
+
   it('rejects invalid locations', () => {
     const message = (extra: Record<string, unknown>) => failure({ findings: [finding(extra)] })
     expect(message({ line: 3 })).toBe('findings[0].line needs a path.')
@@ -106,9 +114,6 @@ describe('finding locations', () => {
     expect(message({ path: 'a', line: 1.5 })).toBe('findings[0].line must be a positive integer.')
     expect(message({ path: 'a', line: '1' })).toBe('findings[0].line must be a positive integer.')
     expect(message({ path: 'a', line: 2, side: 'MID' })).toContain('findings[0].side')
-    expect(message({ path: 'a', line: 2, startLine: 2 })).toBe(
-      'findings[0].startLine must be below line.',
-    )
     expect(message({ path: 'a', line: 2, startLine: 0 })).toBe(
       'findings[0].startLine must be a positive integer.',
     )
