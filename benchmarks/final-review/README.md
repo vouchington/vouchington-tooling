@@ -18,6 +18,9 @@ Use a line range only when the defect lives on specific lines. Approach-level cl
 congruence, and history findings) use `"lines": null`, so any finding on the file counts: a
 reviewer may rightly raise the same concern far from where a labeler guessed.
 
+This repository is public, so `cases.json` holds only cases from public repositories. Keep cases
+from private repositories in a private location and pass that file with `--cases`.
+
 Labels are written by people or agents from the revert and fix history. Add cases by mining new
 reverts and regression fixes, and keep negatives at roughly a third of the set.
 
