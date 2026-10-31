@@ -48,7 +48,13 @@ case "$mode" in
 esac
 `
 
-async function install(behavior: string, env: Record<string, string> = {}) {
+async function install(behavior: string, env: Record<string, string | undefined> = {}) {
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    INSTALL_ATTEMPT_TIMEOUT_SECONDS: '1',
+    ...env,
+  }
+  for (const [key, value] of Object.entries(env)) if (value === undefined) delete childEnv[key]
   const dir = mkdtempSync(join(tmpdir(), 'fake-pnpm-'))
   const log = join(dir, 'log')
   writeFileSync(log, '')
@@ -58,13 +64,11 @@ async function install(behavior: string, env: Record<string, string> = {}) {
     (done) => {
       const child = spawn(process.execPath, [script], {
         env: {
-          ...process.env,
-          PATH: `${dir}${delimiter}${process.env.PATH}`,
+          ...childEnv,
+          PATH: env.PATH ?? `${dir}${delimiter}${process.env.PATH}`,
           FAKE_LOG: log,
           FAKE_PID: join(dir, 'pid'),
           FAKE_BEHAVIOR: behavior,
-          INSTALL_ATTEMPT_TIMEOUT_SECONDS: '1',
-          ...env,
         },
       })
       let stdout = ''
@@ -183,7 +187,7 @@ describe('setup-node-pnpm install.mjs', () => {
   })
 
   it('does not retry a timed-out attempt when INSTALL_ATTEMPTS is unset', async () => {
-    const result = await install('hang,ok')
+    const result = await install('hang,ok', { INSTALL_ATTEMPTS: undefined })
     expect(result.code).toBe(1)
     expect(result.calls).toEqual([buildArgs(1, false).join(' ')])
     expect(result.stdout).not.toContain('::warning::')

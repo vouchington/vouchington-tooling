@@ -135,7 +135,11 @@ describe('install deadline arithmetic', () => {
       { timedOut: true, code: 1 },
     ])
     expect(
-      await install.main({ ...env, INSTALL_ATTEMPTS: '2', SETUP_NODE_PNPM_DEADLINE_SECONDS: '270' }, h.clock, h.run),
+      await install.main(
+        { ...env, INSTALL_ATTEMPTS: '2', SETUP_NODE_PNPM_DEADLINE_SECONDS: '270' },
+        h.clock,
+        h.run,
+      ),
     ).toBe(1)
     expect(h.calls.map(([, ms]) => ms)).toEqual([150_000, 109_000])
     h.calls.forEach(([, ms, grace], index) => {
