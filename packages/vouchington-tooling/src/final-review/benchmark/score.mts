@@ -1,7 +1,7 @@
 import type { Finding, Pillar, Severity } from '../finding.mts'
 import type { EvalCase, ExpectedFinding } from './cases.mts'
 
-export const LINE_TOLERANCE = 10
+const LINE_TOLERANCE = 10
 
 export type CaseScore = {
   id: string

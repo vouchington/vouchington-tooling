@@ -81,8 +81,12 @@ async function runAll(
         .dir,
     )
   }
+  const contractPath = join(options.prompts, '_contract.md')
+  const contract = deps.exists(contractPath) ? deps.readFile(contractPath).trim() : ''
   const tasks = pillars.flatMap((pillar) => {
-    const pillarPrompt = deps.readFile(join(options.prompts, `${pillar}.md`))
+    const pillarPrompt = [contract, deps.readFile(join(options.prompts, `${pillar}.md`))]
+      .filter((part) => part.length > 0)
+      .join('\n\n')
     return casesForPillar(cases, pillar).map((item) => ({ pillar, pillarPrompt, item }))
   })
   await pool(tasks, options.jobs, async ({ pillar, pillarPrompt, item }) => {

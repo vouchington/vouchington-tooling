@@ -32,7 +32,7 @@ type Harness = {
   deps: BenchDeps
   files: Map<string, string>
   logs: string[]
-  execCalls: Array<{ command: string; cwd?: string | undefined }>
+  execCalls: Array<{ command: string; args: string[]; cwd?: string | undefined }>
   prepared: string[]
 }
 
@@ -45,8 +45,8 @@ function harness(
   const execCalls: Harness['execCalls'] = []
   const prepared: string[] = []
   const deps: BenchDeps = {
-    exec: async (command, _args, options) => {
-      execCalls.push({ command, cwd: options?.cwd })
+    exec: async (command, args, options) => {
+      execCalls.push({ command, args, cwd: options?.cwd })
       return exec(options?.cwd)
     },
     readFile: (path) => {
@@ -120,6 +120,18 @@ describe('runFinalReviewBenchCli runs', () => {
     expect(markdown).toContain('| security | 2 | 100% |')
     expect(markdown).not.toContain('Errors and skipped runs')
     expect(out).toHaveBeenCalledWith(`${markdown.trimEnd()}\n`)
+  })
+
+  it('prefixes each pillar prompt with the shared contract when present', async () => {
+    stdoutSpy()
+    const h = harness({
+      'cases.json': JSON.stringify(CASES),
+      'prompts/_contract.md': 'Shared contract\n',
+      'prompts/security.md': 'Security prompt',
+    })
+    await runFinalReviewBenchCli(BASE, h.deps)
+    const prompt = h.execCalls[0]?.args[1] ?? ''
+    expect(prompt.startsWith('Shared contract\n\nSecurity prompt')).toBe(true)
   })
 
   it('records run failures as errors and keeps going', async () => {

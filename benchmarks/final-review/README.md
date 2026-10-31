@@ -14,6 +14,10 @@ Labeled pull requests for benchmarking the `final-review` pillar prompts in
 - **Negative** cases are merged pull requests that stayed unreverted, with no fix to the same lines
   within 30 days. They have no expected findings and measure false alarms.
 
+Use a line range only when the defect lives on specific lines. Approach-level claims (most design,
+congruence, and history findings) use `"lines": null`, so any finding on the file counts: a
+reviewer may rightly raise the same concern far from where a labeler guessed.
+
 Labels are written by people or agents from the revert and fix history. Add cases by mining new
 reverts and regression fixes, and keep negatives at roughly a third of the set.
 
@@ -39,12 +43,12 @@ money and take minutes per case, so run only the pillars whose prompts changed.
 
 ## Metrics
 
-| Metric | Meaning |
-| --- | --- |
-| Recall | Expected findings matched by path and by a line within 10 of the expected range |
-| Severity agreement | Matched findings whose severity is within one level of the label |
-| False alarms | Negative cases with at least one `blocking` or `high` finding |
-| Findings per PR | Mean findings per case, to watch for noisy prompts |
+| Metric             | Meaning                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| Recall             | Expected findings matched by path and by a line within 10 of the expected range |
+| Severity agreement | Matched findings whose severity is within one level of the label                |
+| False alarms       | Negative cases with at least one `blocking` or `high` finding                   |
+| Findings per PR    | Mean findings per case, to watch for noisy prompts                              |
 
 The scoring is deliberately mechanical. A finding at the right place with a wrong claim still
 counts, so read the raw findings for any case whose result changes.
