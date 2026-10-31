@@ -22,8 +22,8 @@ inputs:
     description: 'Wall-clock limit, in seconds, for each pnpm install attempt'
     default: '150'
   install-attempts:
-    description: 'Maximum pnpm install attempts; only an attempt that times out is retried'
-    default: '2'
+    description: 'Maximum pnpm install attempts; only an attempt that times out is retried, so a caller may raise it above 1 to retry a timed-out attempt'
+    default: '1'
 runs:
   using: composite
   steps:

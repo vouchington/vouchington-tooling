@@ -43,7 +43,7 @@ describe('setup-node-pnpm composite action', () => {
       'install-attempts',
     ])
     expect(action.inputs['install-attempt-timeout-seconds']?.default).toBe('150')
-    expect(action.inputs['install-attempts']?.default).toBe('2')
+    expect(action.inputs['install-attempts']?.default).toBe('1')
     expect(action.inputs['deadline-seconds']?.default).toBe('270')
     expect(action.inputs['install-scripts']?.default).toBe('true')
     expect(action.inputs['node-version-file']?.default).toBe('.nvmrc')
