@@ -4,7 +4,7 @@ export const FINAL_REVIEW_COMMAND = `  final-review                  Post, revok
 export const FINAL_REVIEW_USAGE = `final-review post --repo owner/name --pr N --head-sha SHA --input findings.json [--dry-run]
 final-review revoke --repo owner/name --pr N
 final-review status --repo owner/name --pr N
-final-review bench --cases cases.json --prompts DIR --out DIR [--pillar NAME]... [--case ID]... [--model NAME] [--score-only]
+final-review bench --cases cases.json --prompts DIR --out DIR [--pillar NAME]... [--case ID]... [--model NAME] [--jobs N] [--max-turns N] [--score-only]
   post renders verified findings as one or more COMMENT reviews (verdict, reviewed SHA and effort in
   the header; inline comments where the diff allows, the rest in the body) and adds the "final
   approval" label on Approve or removes it otherwise. It refuses when the head moved. revoke removes
