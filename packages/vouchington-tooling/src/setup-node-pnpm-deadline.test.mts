@@ -191,7 +191,9 @@ describe('install deadline arithmetic', () => {
     const code = await install.main({ ...env, INSTALL_ATTEMPTS: '1' }, h.clock, h.run)
     expect(code).toBe(1)
     expect(err).toHaveBeenCalledWith(
-      expect.stringMatching(/attempt 1\/1 timed out after 151s; giving up/u),
+      expect.stringMatching(
+        /attempt 1\/1 timed out after 151s \(registry\.npmjs\.org\); giving up/u,
+      ),
     )
   })
 
