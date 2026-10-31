@@ -157,11 +157,14 @@ describe('setup-node-pnpm install.mjs', () => {
   })
 
   it('kills a hung attempt, warns, and retries with retry logging', async () => {
-    const result = await install('hang,ok', { INSTALL_ATTEMPTS: '2' })
+    const result = await install('hang,ok', {
+      INSTALL_ATTEMPTS: '2',
+      npm_config_registry: 'https://mirror.example:8443/npm/',
+    })
     expect(result.code).toBe(0)
     expect(result.calls).toEqual([buildArgs(1, false).join(' '), buildArgs(2, false).join(' ')])
     expect(result.stdout).toMatch(
-      /::warning::pnpm install attempt 1\/2 timed out after \d+s \([^)]+\); retrying/u,
+      /::warning::pnpm install attempt 1\/2 timed out after \d+s \(mirror\.example:8443\); retrying/u,
     )
     const pid = Number(readFileSync(result.pidFile, 'utf8').trim())
     let alive = true
