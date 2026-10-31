@@ -144,10 +144,10 @@ importers:
         version: 0.1.0
       '@vouchington/worker-runtime':
         specifier: 0.2.1
-        version: 0.2.1(glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)
+        version: 0.2.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)
       glide-mq:
-        specifier: ^0.19.0
-        version: 0.19.0(express@5.2.1(supports-color@7.2.0))
+        specifier: ^0.20.0
+        version: 0.20.0(express@5.2.1(supports-color@7.2.0))
       next:
         specifier: 16.4.3
         version: 16.4.3(@playwright/test@1.64.1)(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -2208,8 +2208,8 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  glide-mq@0.19.0:
-    resolution: {integrity: sha512-Qp2NgHPP5SgsDcYkBl1LZ4Wfh3yRVzW0eEpBdDQViw32L34+u8kQFQQzi/E2hfNRbDduVyzg/Y1gQq9qQUBD4A==}
+  glide-mq@0.20.0:
+    resolution: {integrity: sha512-fAdH8QQN/SgUsYaTrz7aQnewEAVWuFW7M9dgxunb3f3/T63Zmlhz0nEERaLBn6giYcvHK7XLDVm6uHIeQa78Vg==}
     engines: {node: '>=20'}
     peerDependencies:
       '@opentelemetry/api': ^1.0.0
@@ -4592,9 +4592,9 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
-  '@vouchington/worker-runtime@0.2.1(glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)':
+  '@vouchington/worker-runtime@0.2.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)':
     dependencies:
-      glide-mq: 0.19.0(express@5.2.1(supports-color@7.2.0))
+      glide-mq: 0.20.0(express@5.2.1(supports-color@7.2.0))
     optionalDependencies:
       vitest: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
@@ -5103,7 +5103,7 @@ snapshots:
       adm-zip: 0.5.18
       tar: 7.5.22
 
-  glide-mq@0.19.0(express@5.2.1(supports-color@7.2.0)):
+  glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)):
     dependencies:
       '@glidemq/speedkey': 0.4.2
     optionalDependencies:
