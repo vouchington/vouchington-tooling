@@ -9,7 +9,13 @@ import { expandWorkspaceGlob } from './workspace-glob.mts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-type Step = { id?: string; run?: string; uses?: string; with?: Record<string, unknown> }
+type Step = {
+  env?: Record<string, string>
+  id?: string
+  run?: string
+  uses?: string
+  with?: Record<string, unknown>
+}
 type StepList = { source: string; steps: Step[] }
 type Manifest = {
   devEngines?: { packageManager?: unknown }
@@ -78,7 +84,7 @@ describe('pnpm setup policy', () => {
   )
   const manifests = workspaceManifests()
 
-  it('installs pnpm through a SHA-pinned pnpm/setup in CI', () => {
+  it('installs pnpm through a SHA-pinned pnpm/setup in workflows', () => {
     expect(setups.length).toBeGreaterThan(0)
   })
 
@@ -97,6 +103,19 @@ describe('pnpm setup policy', () => {
       expect(step.with?.install, source).toBe(false)
       expect(step.with?.['node-version-file'], source).toBe(false)
     }
+  })
+
+  it('downloads pnpm in the setup action from the resolver output, never from pnpm/setup', () => {
+    const action = stepLists().find(({ source }) => source.endsWith('setup-node-pnpm/action.yml'))!
+    const download = action.steps.findIndex((step) => /download-pnpm\.mjs/.test(step.run ?? ''))
+    const resolved = action.steps.findIndex((step) => resolver.test(step.run ?? ''))
+    expect(action.steps.some((step) => pnpmSetup.test(step.uses ?? ''))).toBe(false)
+    expect(resolved).toBeGreaterThanOrEqual(0)
+    expect(download).toBeGreaterThan(resolved)
+    const id = action.steps[resolved]!.id
+    expect(action.steps[download]!.env?.PNPM_VERSION).toBe(`\${{ steps.${id}.outputs.version }}`)
+    expect(action.steps.findIndex((step) => nodeSetup.test(step.uses ?? ''))).toBeLessThan(download)
+    expect(read('.github/actions/setup-node-pnpm/download-pnpm.mjs')).not.toMatch(/\d+\.\d+\.\d+/)
   })
 
   it('never installs a runtime or caches the store through pnpm/setup', () => {

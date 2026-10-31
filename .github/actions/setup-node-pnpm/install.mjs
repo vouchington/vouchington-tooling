@@ -1,8 +1,10 @@
 // Runs `pnpm install --frozen-lockfile` with tight fetch settings, a wall-clock limit per
-// attempt, and a retry when an attempt times out. A non-timeout failure is never retried.
+// attempt inside one total deadline, and a retry when an attempt times out. A non-timeout failure is never retried.
 // Node >= 24, no dependencies, no GNU `timeout` (macOS runners have none).
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+
+import { deadlineMessage, parseDeadline, registryHost } from './deadline.mjs'
 
 // pnpm 12 accepts only --fetch-timeout as a flag; the retry settings go through --config.*.
 export const FETCH_FLAGS = [
@@ -96,24 +98,45 @@ export function runAttempt(
   })
 }
 
-export async function main(env = process.env) {
+// A retry starts only when at least this much of the total budget remains for it.
+export const MIN_ATTEMPT_MS = 30_000
+
+// Each attempt gets min(per-attempt limit, remaining budget minus the kill grace), so the
+// attempt and its kill grace together never run past the total deadline.
+export function attemptLimitMs(options, deadline, now) {
+  return Math.min(options.timeoutSeconds * 1000, deadline.endMs - now - options.graceMs)
+}
+
+// Attempt 1 needs any positive budget; a retry needs a meaningful one (a shorter per-attempt
+// limit lowers the bar so the retry is never required to be longer than a normal attempt).
+export function minimumMs(options, attempt) {
+  return attempt === 1 ? 1 : Math.min(MIN_ATTEMPT_MS, options.timeoutSeconds * 1000)
+}
+
+export async function main(env = process.env, clock = Date.now, run = runAttempt) {
   let options
+  let deadline
   try {
     options = parseOptions(env)
+    deadline = parseDeadline(env, clock())
   } catch (error) {
     console.error(`::error::${error.message}`)
     return 1
   }
+  const expired = () => {
+    const host = registryHost(env)
+    console.error(`::error::${deadlineMessage(deadline.seconds, 'pnpm install', host)}`)
+    return 1
+  }
   for (let attempt = 1; attempt <= options.attempts; attempt++) {
-    const started = Date.now()
-    const result = await runAttempt(
-      buildArgs(attempt, options.ignoreScripts),
-      options.timeoutSeconds * 1000,
-      options.graceMs,
-    )
+    const started = clock()
+    const limitMs = attemptLimitMs(options, deadline, started)
+    if (limitMs < minimumMs(options, attempt)) return expired()
+    const result = await run(buildArgs(attempt, options.ignoreScripts), limitMs, options.graceMs)
     if (!result.timedOut) return result.code
-    const elapsed = Math.round((Date.now() - started) / 1000)
+    const elapsed = Math.round((clock() - started) / 1000)
     const note = `pnpm install attempt ${attempt}/${options.attempts} timed out after ${elapsed}s`
+    if (limitMs < options.timeoutSeconds * 1000) return expired()
     if (attempt === options.attempts) {
       console.error(`::error::${note}; giving up`)
       return 1

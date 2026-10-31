@@ -1,11 +1,17 @@
 name: Setup Node.js and pnpm
 description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
-  without a pnpm store cache. The install uses tight fetch settings and a wall-clock limit per
-  attempt, and retries an attempt that times out.
+  without a pnpm store cache. One total deadline covers the pnpm binary download and the
+  install; the install uses tight fetch settings and a wall-clock limit per attempt inside
+  that deadline, and retries an attempt that times out only while budget remains.
   The caller must run actions/checkout before invoking this action.
-  Set timeout-minutes on the calling step to cap the combined operations.
+  Set deadline-seconds below the calling step's timeout-minutes.
 inputs:
+  deadline-seconds:
+    description: >
+      Total wall-clock limit, in seconds, from the start of this action, covering the pnpm
+      binary download and pnpm install together; set it below the calling step's timeout-minutes
+    default: '270'
   install-scripts:
     description: 'Set false when dependency lifecycle scripts are intentionally deferred'
     default: 'true'
@@ -21,29 +27,35 @@ inputs:
 runs:
   using: composite
   steps:
+    # timeout-minutes is not a documented key of composite action steps, so the single total
+    # deadline is enforced by our own scripts. Record its start before anything else.
+    - name: Start deadline
+      shell: bash
+      run: echo "SETUP_NODE_PNPM_STARTED_MS=$(date +%s)000" >> "$GITHUB_ENV"
     - uses: actions/setup-node@363be39a57dfa5801e05c6e0c549d622a376cf15 # v7
       with:
         node-version-file: ${{ inputs.node-version-file }}
         package-manager-cache: false
-    # pnpm/setup downloads pnpm's native binary and needs no Node. install: false keeps the
-    # explicit frozen install below; node-version-file: false with no runtime input stops it
-    # installing a second Node (no devEngines.runtime is declared); cache stays off.
     # The newest stable pnpm 12 release at least 24 hours old; pnpm stays unpinned in the repo.
     - id: pnpm-version
       shell: bash
       run: node "$GITHUB_ACTION_PATH/../resolve-pnpm-version/resolve.mjs"
-    - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
-      with:
-        version: ${{ steps.pnpm-version.outputs.version }}
-        install: false
-        node-version-file: false
+    # pnpm/setup has no wall-clock limit, so download-pnpm.mjs fetches the same native binary from
+    # the npm registry (verified against its published sha512 integrity) under the remaining
+    # deadline and adds it to GITHUB_PATH. Nothing else is activated: no second Node, no cache.
+    - name: Download pnpm
+      shell: bash
+      env:
+        PNPM_VERSION: ${{ steps.pnpm-version.outputs.version }}
+        SETUP_NODE_PNPM_DEADLINE_SECONDS: ${{ inputs.deadline-seconds }}
+      run: node "$GITHUB_ACTION_PATH/download-pnpm.mjs"
     # No pnpm store cache: on hosted runners a fresh install is fast enough, and restoring and
     # saving the store costs more than it saves.
     # pnpm's fetchTimeout is an idle timeout (the clock resets on every chunk since 12.4.0) with a
     # slow default backoff, so one stalled request can take ~250s and a trickling one is
     # unbounded. install.mjs therefore passes tight fetch settings and bounds each attempt by
-    # wall-clock time, killing the process group and retrying. A real failure (lockfile mismatch,
-    # script error) is not retried. Attempt 1 uses --loglevel=warn, which drops the progress bar
+    # wall-clock time (never past the total deadline), killing the process group and retrying.
+    # A real failure (lockfile mismatch, script error) is not retried. Attempt 1 uses --loglevel=warn, which drops the progress bar
     # and package summary but keeps warnings and errors (from pnpm 12.8.0, pnpm/pnpm#16076, also
     # a failed lifecycle script's full output and a failed supply-chain verdict); retries log
     # append-only at info level to show where a repeated stall happened.
@@ -53,6 +65,7 @@ runs:
       env:
         INSTALL_ATTEMPT_TIMEOUT_SECONDS: ${{ inputs.install-attempt-timeout-seconds }}
         INSTALL_ATTEMPTS: ${{ inputs.install-attempts }}
+        SETUP_NODE_PNPM_DEADLINE_SECONDS: ${{ inputs.deadline-seconds }}
       run: node "$GITHUB_ACTION_PATH/install.mjs"
     - name: pnpm install without lifecycle scripts
       if: inputs.install-scripts == 'false'
@@ -60,5 +73,6 @@ runs:
       env:
         INSTALL_ATTEMPT_TIMEOUT_SECONDS: ${{ inputs.install-attempt-timeout-seconds }}
         INSTALL_ATTEMPTS: ${{ inputs.install-attempts }}
+        SETUP_NODE_PNPM_DEADLINE_SECONDS: ${{ inputs.deadline-seconds }}
         INSTALL_IGNORE_SCRIPTS: 'true'
       run: node "$GITHUB_ACTION_PATH/install.mjs"
