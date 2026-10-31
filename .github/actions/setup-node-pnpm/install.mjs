@@ -35,7 +35,7 @@ export function parseOptions(env) {
       '150',
       Math.floor(MAX_TIMER_MS / 1000),
     ),
-    attempts: positiveInteger('install-attempts', env.INSTALL_ATTEMPTS, '2'),
+    attempts: positiveInteger('install-attempts', env.INSTALL_ATTEMPTS, '1'),
     ignoreScripts: env.INSTALL_IGNORE_SCRIPTS === 'true',
     graceMs: positiveInteger('kill grace ms', env.INSTALL_KILL_GRACE_MS, '10000', MAX_TIMER_MS),
   }

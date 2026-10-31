@@ -79,15 +79,15 @@ async function install(behavior: string, env: Record<string, string> = {}) {
 }
 
 describe('setup-node-pnpm install options', () => {
-  it('defaults to a 150s limit, 2 attempts, and scripts enabled', () => {
+  it('defaults to a 150s limit, 1 attempt, and scripts enabled', () => {
     expect(parseOptions({})).toEqual({
       timeoutSeconds: 150,
-      attempts: 2,
+      attempts: 1,
       ignoreScripts: false,
       graceMs: 10_000,
     })
     expect(parseOptions({ INSTALL_ATTEMPTS: ' ', INSTALL_IGNORE_SCRIPTS: 'true' })).toMatchObject({
-      attempts: 2,
+      attempts: 1,
       ignoreScripts: true,
     })
   })
@@ -153,7 +153,7 @@ describe('setup-node-pnpm install.mjs', () => {
   })
 
   it('kills a hung attempt, warns, and retries with retry logging', async () => {
-    const result = await install('hang,ok')
+    const result = await install('hang,ok', { INSTALL_ATTEMPTS: '2' })
     expect(result.code).toBe(0)
     expect(result.calls).toEqual([buildArgs(1, false).join(' '), buildArgs(2, false).join(' ')])
     expect(result.stdout).toMatch(
@@ -174,11 +174,21 @@ describe('setup-node-pnpm install.mjs', () => {
   })
 
   it('fails with an error after the final attempt times out', async () => {
-    const result = await install('hang,hang')
+    const result = await install('hang,hang', { INSTALL_ATTEMPTS: '2' })
     expect(result.code).toBe(1)
     expect(result.calls).toHaveLength(2)
     expect(result.stderr).toMatch(
       /::error::pnpm install attempt 2\/2 timed out after \d+s; giving up/u,
+    )
+  })
+
+  it('does not retry a timed-out attempt when INSTALL_ATTEMPTS is unset', async () => {
+    const result = await install('hang,ok')
+    expect(result.code).toBe(1)
+    expect(result.calls).toEqual([buildArgs(1, false).join(' ')])
+    expect(result.stdout).not.toContain('::warning::')
+    expect(result.stderr).toMatch(
+      /::error::pnpm install attempt 1\/1 timed out after \d+s; giving up/u,
     )
   })
 
