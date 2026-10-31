@@ -125,6 +125,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run actionlint
 
+  # Runs the composite action end to end so download-pnpm.mjs and install.mjs execute on real
+  # runners. ubuntu-slim has what the action needs (bash, Node from actions/setup-node).
+  setup-node-pnpm-smoke:
+    name: setup-node-pnpm-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-slim, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Resolved separately from the action's own resolution; both pick the same release unless
+      # a pnpm 12 release crosses the 24-hour age cutoff between the two steps.
+      - id: pnpm-version
+        uses: ./.github/actions/resolve-pnpm-version
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Verify the downloaded pnpm
+        env:
+          EXPECTED_PNPM_VERSION: ${{ steps.pnpm-version.outputs.version }}
+        run: |
+          actual="$(pnpm --version)"
+          location="$(command -v pnpm)"
+          echo "pnpm $actual at $location"
+          if [ "$actual" != "$EXPECTED_PNPM_VERSION" ]; then
+            echo "::error::pnpm --version is $actual, expected $EXPECTED_PNPM_VERSION"
+            exit 1
+          fi
+          case "$location" in
+            "$RUNNER_TEMP"/*) ;;
+            *)
+              echo "::error::pnpm resolves to $location, expected a path under $RUNNER_TEMP"
+              exit 1
+              ;;
+          esac
+
   tests:
     name: tests
     if: ${{ !cancelled() }}

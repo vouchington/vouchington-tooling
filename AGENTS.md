@@ -3,9 +3,13 @@
 pnpm workspace. Node >= 24. Two published packages live under `packages/`.
 
 pnpm 12 is required but never pinned: no `packageManager` or `devEngines.packageManager` field,
-no Corepack, and every `pnpm/setup` step takes only the resolved `version` after
+no Corepack, and every `pnpm/setup` step in a workflow takes only the resolved `version` after
 `actions/setup-node`, with `install: false` and `node-version-file: false` so it installs neither
-dependencies nor a second Node. The `version` is never a literal: it comes from the
+dependencies nor a second Node. The `setup-node-pnpm` action does not use `pnpm/setup`, because
+composite steps do not honour `timeout-minutes` and `pnpm/setup` has no wall-clock limit: its
+`download-pnpm.mjs` fetches the resolved version's native `@pnpm/exe.<platform>` binary from the
+npm registry under the remaining part of one total `deadline-seconds` (default 270) that also
+bounds `pnpm install`. The version is never a literal: it comes from the
 `resolve-pnpm-version` action, which picks the highest stable pnpm 12 release whose npm publish time
 is at least 24 hours old. CI therefore runs the newest pnpm 12 release that is at least one day old:
 12.x releases reach CI without a PR, and moving to pnpm 13 needs one.
