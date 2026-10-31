@@ -111,10 +111,13 @@ describe('pnpm setup policy', () => {
     const resolved = action.steps.findIndex((step) => resolver.test(step.run ?? ''))
     expect(action.steps.some((step) => pnpmSetup.test(step.uses ?? ''))).toBe(false)
     expect(resolved).toBeGreaterThanOrEqual(0)
+    expect(download).toBeGreaterThanOrEqual(0)
     expect(download).toBeGreaterThan(resolved)
     const id = action.steps[resolved]!.id
     expect(action.steps[download]!.env?.PNPM_VERSION).toBe(`\${{ steps.${id}.outputs.version }}`)
-    expect(action.steps.findIndex((step) => nodeSetup.test(step.uses ?? ''))).toBeLessThan(download)
+    const node = action.steps.findIndex((step) => nodeSetup.test(step.uses ?? ''))
+    expect(node).toBeGreaterThanOrEqual(0)
+    expect(node).toBeLessThan(download)
     expect(read('.github/actions/setup-node-pnpm/download-pnpm.mjs')).not.toMatch(/\d+\.\d+\.\d+/)
   })
 
