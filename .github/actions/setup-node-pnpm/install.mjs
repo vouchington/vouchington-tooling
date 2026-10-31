@@ -135,7 +135,7 @@ export async function main(env = process.env, clock = Date.now, run = runAttempt
     const result = await run(buildArgs(attempt, options.ignoreScripts), limitMs, options.graceMs)
     if (!result.timedOut) return result.code
     const elapsed = Math.round((clock() - started) / 1000)
-    const note = `pnpm install attempt ${attempt}/${options.attempts} timed out after ${elapsed}s`
+    const note = `pnpm install attempt ${attempt}/${options.attempts} timed out after ${elapsed}s (${registryHost(env)})`
     if (limitMs < options.timeoutSeconds * 1000) return expired()
     if (attempt === options.attempts) {
       console.error(`::error::${note}; giving up`)

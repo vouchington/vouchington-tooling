@@ -161,7 +161,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.code).toBe(0)
     expect(result.calls).toEqual([buildArgs(1, false).join(' '), buildArgs(2, false).join(' ')])
     expect(result.stdout).toMatch(
-      /::warning::pnpm install attempt 1\/2 timed out after \d+s; retrying/u,
+      /::warning::pnpm install attempt 1\/2 timed out after \d+s \([^)]+\); retrying/u,
     )
     const pid = Number(readFileSync(result.pidFile, 'utf8').trim())
     let alive = true
@@ -182,7 +182,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.code).toBe(1)
     expect(result.calls).toHaveLength(2)
     expect(result.stderr).toMatch(
-      /::error::pnpm install attempt 2\/2 timed out after \d+s; giving up/u,
+      /::error::pnpm install attempt 2\/2 timed out after \d+s \([^)]+\); giving up/u,
     )
   })
 
@@ -192,8 +192,29 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.calls).toEqual([buildArgs(1, false).join(' ')])
     expect(result.stdout).not.toContain('::warning::')
     expect(result.stderr).toMatch(
-      /::error::pnpm install attempt 1\/1 timed out after \d+s; giving up/u,
+      /::error::pnpm install attempt 1\/1 timed out after \d+s \([^)]+\); giving up/u,
     )
+  })
+
+  it('names the configured registry host when the final attempt times out', async () => {
+    const result = await install('hang', {
+      INSTALL_ATTEMPTS: '1',
+      npm_config_registry: 'https://mirror.example:8443/npm/',
+    })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toMatch(
+      /::error::pnpm install attempt 1\/1 timed out after \d+s \(mirror\.example:8443\); giving up/u,
+    )
+  })
+
+  it('names the default registry host when no registry is configured', async () => {
+    const result = await install('hang', {
+      INSTALL_ATTEMPTS: '1',
+      npm_config_registry: undefined,
+      NPM_CONFIG_REGISTRY: undefined,
+    })
+    expect(result.stderr).toContain('timed out after')
+    expect(result.stderr).toMatch(/\(registry\.npmjs\.org\); giving up/u)
   })
 
   it('escalates to SIGKILL when pnpm ignores SIGTERM', async () => {
