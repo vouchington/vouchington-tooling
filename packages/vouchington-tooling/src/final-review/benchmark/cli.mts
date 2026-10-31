@@ -1,0 +1,170 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { parseArgs } from 'node:util'
+
+import { PILLARS, type Finding, type Pillar } from '../finding.mts'
+import { casesForPillar, parseEvalCases, type EvalCase } from './cases.mts'
+import { runPillar } from './runner.mts'
+import { renderSummaryTable, scoreCase, summarizePillar, type CaseScore } from './score.mts'
+import { defaultExec, prepareSnapshot, type Exec } from './snapshot.mts'
+
+export type BenchDeps = {
+  exec: Exec
+  readFile(path: string): string
+  writeFile(path: string, text: string): void
+  exists(path: string): boolean
+  log(line: string): void
+  prepare: typeof prepareSnapshot
+}
+
+const defaultDeps: BenchDeps = {
+  exec: defaultExec,
+  readFile: (path) => readFileSync(path, 'utf8'),
+  writeFile: (path, text) => {
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, text)
+  },
+  exists: existsSync,
+  log: (line) => process.stderr.write(`${line}\n`),
+  prepare: prepareSnapshot,
+}
+
+type RawResult = { findings: Finding[] } | { error: string }
+
+function pickPillars(requested: string[], cases: readonly EvalCase[]): Pillar[] {
+  if (requested.length > 0) {
+    return requested.map((name) => {
+      const pillar = PILLARS.find((candidate) => candidate === name)
+      if (pillar === undefined) throw new Error(`Unknown pillar: ${name}`)
+      return pillar
+    })
+  }
+  const used = new Set(cases.flatMap((item) => item.expected.map((entry) => entry.pillar)))
+  return PILLARS.filter((pillar) => used.has(pillar))
+}
+
+async function pool<T>(
+  items: readonly T[],
+  jobs: number,
+  work: (item: T) => Promise<void>,
+): Promise<void> {
+  const queue = [...items]
+  const worker = async (): Promise<void> => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item)
+  }
+  await Promise.all(Array.from({ length: Math.max(1, jobs) }, worker))
+}
+
+type Options = {
+  out: string
+  prompts: string
+  model: string
+  maxTurns: number
+  jobs: number
+  scoreOnly: boolean
+}
+
+async function runAll(
+  cases: EvalCase[],
+  pillars: Pillar[],
+  options: Options,
+  deps: BenchDeps,
+): Promise<void> {
+  const rawPath = (pillar: Pillar, id: string) => join(options.out, 'raw', pillar, `${id}.json`)
+  if (options.scoreOnly) return
+  const snapshots = new Map<string, string>()
+  for (const item of new Set(pillars.flatMap((pillar) => casesForPillar(cases, pillar)))) {
+    deps.log(`snapshot ${item.id}`)
+    snapshots.set(
+      item.id,
+      (await deps.prepare(item, join(options.out, 'cache'), join(options.out, 'work'), deps.exec))
+        .dir,
+    )
+  }
+  const tasks = pillars.flatMap((pillar) => {
+    const pillarPrompt = deps.readFile(join(options.prompts, `${pillar}.md`))
+    return casesForPillar(cases, pillar).map((item) => ({ pillar, pillarPrompt, item }))
+  })
+  await pool(tasks, options.jobs, async ({ pillar, pillarPrompt, item }) => {
+    deps.log(`run ${pillar} ${item.id}`)
+    const dir = snapshots.get(item.id) as string
+    let result: RawResult
+    try {
+      const run = { pillar, pillarPrompt, model: options.model, maxTurns: options.maxTurns }
+      result = { findings: await runPillar(item, dir, run, deps.exec) }
+    } catch (error) {
+      result = { error: error instanceof Error ? error.message : String(error) }
+    }
+    deps.writeFile(rawPath(pillar, item.id), `${JSON.stringify(result, null, 2)}\n`)
+  })
+}
+
+function scoreAll(cases: EvalCase[], pillars: Pillar[], out: string, deps: BenchDeps): string {
+  const report = pillars.map((pillar) => {
+    const scores: CaseScore[] = []
+    const errors: string[] = []
+    for (const item of casesForPillar(cases, pillar)) {
+      const path = join(out, 'raw', pillar, `${item.id}.json`)
+      if (!deps.exists(path)) {
+        errors.push(`${item.id}: not run`)
+        continue
+      }
+      const raw = JSON.parse(deps.readFile(path)) as RawResult
+      if ('error' in raw) errors.push(`${item.id}: ${raw.error}`)
+      else scores.push(scoreCase(item, pillar, raw.findings))
+    }
+    return { summary: summarizePillar(pillar, scores), scores, errors }
+  })
+  deps.writeFile(join(out, 'summary.json'), `${JSON.stringify(report, null, 2)}\n`)
+  const errorLines = report.flatMap((entry) =>
+    entry.errors.map((line) => `- ${entry.summary.pillar} ${line}`),
+  )
+  const markdown = [
+    renderSummaryTable(report.map((entry) => entry.summary)),
+    ...(errorLines.length > 0 ? ['Errors and skipped runs:', errorLines.join('\n')] : []),
+  ].join('\n\n')
+  deps.writeFile(join(out, 'summary.md'), `${markdown}\n`)
+  return markdown
+}
+
+/** `vouchington final-review bench`: run pillar prompts over labeled cases and score them. */
+export async function runFinalReviewBenchCli(
+  args: string[],
+  deps: BenchDeps = defaultDeps,
+): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    strict: true,
+    options: {
+      cases: { type: 'string' },
+      prompts: { type: 'string' },
+      out: { type: 'string' },
+      pillar: { type: 'string', multiple: true },
+      case: { type: 'string', multiple: true },
+      model: { type: 'string' },
+      'max-turns': { type: 'string' },
+      jobs: { type: 'string' },
+      'score-only': { type: 'boolean' },
+    },
+  })
+  if (values.cases === undefined || values.out === undefined)
+    throw new Error('bench needs --cases and --out.')
+  if (values['score-only'] !== true && values.prompts === undefined)
+    throw new Error('bench needs --prompts.')
+  const ids = new Set(values.case ?? [])
+  const cases = parseEvalCases(JSON.parse(deps.readFile(values.cases)) as unknown).filter(
+    (item) => ids.size === 0 || ids.has(item.id),
+  )
+  const pillars = pickPillars(values.pillar ?? [], cases)
+  const options: Options = {
+    out: values.out,
+    prompts: values.prompts ?? '',
+    model: values.model ?? 'sonnet',
+    maxTurns: Number(values['max-turns'] ?? '40'),
+    jobs: Number(values.jobs ?? '3'),
+    scoreOnly: values['score-only'] === true,
+  }
+  await runAll(cases, pillars, options, deps)
+  process.stdout.write(`${scoreAll(cases, pillars, options.out, deps)}\n`)
+  return 0
+}

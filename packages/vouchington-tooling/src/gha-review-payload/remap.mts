@@ -47,7 +47,11 @@ function withoutRange(comment: ReviewComment): ReviewComment {
   }
 }
 
-function placeComment(comment: ReviewComment, index: CommentableIndex): ReviewComment | null {
+/** Places one finding on a commentable diff line, snapping when needed, or returns null. */
+export function placeReviewComment(
+  comment: ReviewComment,
+  index: CommentableIndex,
+): ReviewComment | null {
   const resolved = index.resolvePath(comment.path)
   if (resolved === undefined || !index.hasPatch(resolved)) return null
   const originalPath = comment.path
@@ -81,7 +85,7 @@ export function remapReviewComments(
 ): SanitizedReview {
   const kept: ReviewComment[] = []
   for (const comment of review.comments) {
-    const placed = placeComment(comment, index)
+    const placed = placeReviewComment(comment, index)
     if (!placed) {
       throw new ReviewPayloadError(
         `Inline finding cannot be placed on the pull request diff: ${comment.path}:${comment.line}.`,
