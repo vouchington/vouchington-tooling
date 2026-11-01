@@ -81,6 +81,16 @@ describe('matches', () => {
 })
 
 describe('scoreCase', () => {
+  it('uses a judge assignment instead of locations when given', () => {
+    const score = scoreCase(
+      item('positive', [exp(), exp(), exp(), exp()]),
+      'security',
+      [found({ path: 'elsewhere.ts', line: 900 }), found()],
+      [0, 0, 7, null],
+    )
+    expect(score).toMatchObject({ expected: 4, matched: 1, unmatched: 1 })
+  })
+
   it('matches each finding at most once and tracks severity agreement', () => {
     const score = scoreCase(
       item('positive', [exp(), exp({ severity: 'blocking' }), exp({ pillar: 'rules' })]),

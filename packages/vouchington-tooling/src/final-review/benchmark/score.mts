@@ -52,15 +52,26 @@ function isAlarm(finding: Finding): boolean {
   return RANK[finding.severity] <= RANK.high
 }
 
-/** Scores one pillar's findings for one case; each finding can satisfy one expectation. */
-export function scoreCase(item: EvalCase, pillar: Pillar, findings: readonly Finding[]): CaseScore {
+/**
+ * Scores one pillar's findings for one case; each finding can satisfy one expectation. A judge
+ * `assignment` (finding index per expected entry) replaces location matching when given.
+ */
+export function scoreCase(
+  item: EvalCase,
+  pillar: Pillar,
+  findings: readonly Finding[],
+  assignment?: ReadonlyArray<number | null>,
+): CaseScore {
   const targets = item.expected.filter((entry) => entry.pillar === pillar)
   const used = new Set<number>()
   let matched = 0
   let severityAgreed = 0
-  for (const target of targets) {
-    const at = findings.findIndex((finding, index) => !used.has(index) && matches(target, finding))
-    if (at === -1) continue
+  for (const [position, target] of targets.entries()) {
+    const at =
+      assignment === undefined
+        ? findings.findIndex((finding, index) => !used.has(index) && matches(target, finding))
+        : (assignment[position] ?? -1)
+    if (at === -1 || at >= findings.length || used.has(at)) continue
     used.add(at)
     matched += 1
     const found = findings[at] as Finding
