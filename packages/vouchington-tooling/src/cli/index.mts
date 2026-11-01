@@ -132,6 +132,10 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runWorktreeCommand(parsed.args)
     case 'tmux':
       return runTmuxCommand(parsed.args)
+    case 'final-review':
+      return import('./commands/final-review.mts').then((command) =>
+        command.runFinalReviewCommand(parsed.args),
+      )
     case 'require-up-to-date':
       return runRequireUpToDate(parsed)
     case 'fresh-base':

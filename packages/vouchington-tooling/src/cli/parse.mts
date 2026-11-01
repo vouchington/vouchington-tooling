@@ -56,6 +56,7 @@ export type ParsedCli =
   | { kind: 'workspace-registry-check'; args: string[] }
   | { kind: 'storybook-browser-runner'; args: string[] }
   | { kind: 'tmux'; args: string[] }
+  | { kind: 'final-review'; args: string[] }
   | { kind: 'require-up-to-date'; remote: string; branch: string }
   | { kind: 'fresh-base'; remote?: string; branch?: string; skipFetch: boolean }
   | { kind: 'gitleaks-directory-scan'; config: string; directory?: string }

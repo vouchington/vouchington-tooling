@@ -27,6 +27,7 @@ const FORWARDED = [
   'workspace-registry-check',
   'storybook-browser-runner',
   'tmux',
+  'final-review',
 ] as const
 
 type Name = (typeof FORWARDED)[number]

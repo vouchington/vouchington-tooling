@@ -12,6 +12,7 @@ export type { CommentableIndex, CommentableLine, LineKind, ReviewFile } from './
 
 export {
   nearestReviewLine,
+  placeReviewComment,
   remapReviewComments,
   rewriteSnappedSuggestion,
   snapReviewNote,
