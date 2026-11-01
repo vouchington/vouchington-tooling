@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { PILLARS, type Finding, type Pillar } from '../finding.mts'
+import { PILLARS, type Pillar } from '../finding.mts'
 import { casesForPillar, parseEvalCases, type EvalCase } from './cases.mts'
+import { currentAssignment, judgeAll, pool, type RawResult } from './judge-all.mts'
 import { runPillar } from './runner.mts'
 import { renderSummaryTable, scoreCase, summarizePillar, type CaseScore } from './score.mts'
 import { defaultExec, prepareSnapshot, type Exec } from './snapshot.mts'
@@ -29,8 +30,6 @@ const defaultDeps: BenchDeps = {
   prepare: prepareSnapshot,
 }
 
-type RawResult = { findings: Finding[] } | { error: string }
-
 function pickPillars(requested: string[], cases: readonly EvalCase[]): Pillar[] {
   if (requested.length > 0) {
     return requested.map((name) => {
@@ -43,18 +42,6 @@ function pickPillars(requested: string[], cases: readonly EvalCase[]): Pillar[] 
   return PILLARS.filter((pillar) => used.has(pillar))
 }
 
-async function pool<T>(
-  items: readonly T[],
-  jobs: number,
-  work: (item: T) => Promise<void>,
-): Promise<void> {
-  const queue = [...items]
-  const worker = async (): Promise<void> => {
-    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item)
-  }
-  await Promise.all(Array.from({ length: Math.max(1, jobs) }, worker))
-}
-
 type Options = {
   out: string
   prompts: string
@@ -62,6 +49,7 @@ type Options = {
   maxTurns: number
   jobs: number
   scoreOnly: boolean
+  judge: string | undefined
 }
 
 async function runAll(
@@ -103,7 +91,8 @@ async function runAll(
   })
 }
 
-function scoreAll(cases: EvalCase[], pillars: Pillar[], out: string, deps: BenchDeps): string {
+function scoreAll(cases: EvalCase[], pillars: Pillar[], options: Options, deps: BenchDeps): string {
+  const { out, judge } = options
   const report = pillars.map((pillar) => {
     const scores: CaseScore[] = []
     const errors: string[] = []
@@ -115,7 +104,14 @@ function scoreAll(cases: EvalCase[], pillars: Pillar[], out: string, deps: Bench
       }
       const raw = JSON.parse(deps.readFile(path)) as RawResult
       if ('error' in raw) errors.push(`${item.id}: ${raw.error}`)
-      else scores.push(scoreCase(item, pillar, raw.findings))
+      else if (judge === undefined) scores.push(scoreCase(item, pillar, raw.findings))
+      else {
+        const expected = item.expected.filter((entry) => entry.pillar === pillar)
+        const assignment = currentAssignment(raw, expected, judge)
+        // Unjudged cases stay out of judged metrics rather than falling back to locations.
+        if (assignment === undefined) errors.push(`${item.id}: not judged`)
+        else scores.push(scoreCase(item, pillar, raw.findings, assignment))
+      }
     }
     return { summary: summarizePillar(pillar, scores), scores, errors }
   })
@@ -123,7 +119,9 @@ function scoreAll(cases: EvalCase[], pillars: Pillar[], out: string, deps: Bench
   const errorLines = report.flatMap((entry) =>
     entry.errors.map((line) => `- ${entry.summary.pillar} ${line}`),
   )
+  const matching = judge === undefined ? 'file and line' : `claims judged by ${judge}`
   const markdown = [
+    `Matching: ${matching}.`,
     renderSummaryTable(report.map((entry) => entry.summary)),
     ...(errorLines.length > 0 ? ['Errors and skipped runs:', errorLines.join('\n')] : []),
   ].join('\n\n')
@@ -149,6 +147,7 @@ export async function runFinalReviewBenchCli(
       'max-turns': { type: 'string' },
       jobs: { type: 'string' },
       'score-only': { type: 'boolean' },
+      judge: { type: 'string' },
     },
   })
   if (values.cases === undefined || values.out === undefined)
@@ -167,8 +166,17 @@ export async function runFinalReviewBenchCli(
     maxTurns: Number(values['max-turns'] ?? '40'),
     jobs: Number(values.jobs ?? '3'),
     scoreOnly: values['score-only'] === true,
+    judge: values.judge,
   }
   await runAll(cases, pillars, options, deps)
-  process.stdout.write(`${scoreAll(cases, pillars, options.out, deps)}\n`)
+  if (options.judge !== undefined) {
+    await judgeAll(
+      cases,
+      pillars,
+      { out: options.out, model: options.judge, jobs: options.jobs },
+      deps,
+    )
+  }
+  process.stdout.write(`${scoreAll(cases, pillars, options, deps)}\n`)
   return 0
 }

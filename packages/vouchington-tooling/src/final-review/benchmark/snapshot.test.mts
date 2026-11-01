@@ -109,6 +109,15 @@ describe('defaultExec', () => {
   })
 
   it('rejects on a non-zero exit', async () => {
-    await expect(defaultExec(process.execPath, ['-e', 'process.exit(3)'])).rejects.toThrow()
+    const script = "process.stdout.write('out'); process.stderr.write('err'); process.exit(3)"
+    const failure = defaultExec(process.execPath, ['-e', script, 'SECRET-ARG'])
+    await expect(failure).rejects.toThrow(`${process.execPath} exited with 3\nout\nerr`)
+    await expect(failure).rejects.not.toThrow('SECRET-ARG')
+    await expect(defaultExec(process.execPath, ['-e', 'process.exit(4)'])).rejects.toThrow(
+      /exited with 4$/u,
+    )
+    await expect(defaultExec('final-review-missing-binary', [])).rejects.toThrow(
+      'final-review-missing-binary exited with ENOENT',
+    )
   })
 })

@@ -217,4 +217,40 @@ describe('runFinalReviewBenchCli --score-only', () => {
     expect(markdown).toContain('- security p2: boom')
     expect(markdown).toContain('| security | 1 | 100% |')
   })
+
+  it('judges results with --judge and labels the matching mode', async () => {
+    stdoutSpy()
+    const judgeOut = JSON.stringify({
+      structured_output: { matches: [{ expected: 0, finding: 0 }] },
+    })
+    const miss = { pillar: 'security', severity: 'low', title: 'T', body: 'B', path: 'x.ts' }
+    const h = harness(
+      {
+        'cases.json': JSON.stringify([...CASES, caseJson('p2', 'positive')]),
+        'out/raw/security/p1.json': JSON.stringify({ findings: [miss] }),
+        'out/raw/security/p2.json': JSON.stringify({ findings: [miss] }),
+      },
+      async () => {
+        if (h.execCalls.length > 1) throw new Error('judge down')
+        return judgeOut
+      },
+    )
+    await expect(runFinalReviewBenchCli([...scoreOnly, '--judge', 'haiku'], h.deps)).resolves.toBe(
+      0,
+    )
+    expect(h.execCalls).toHaveLength(2)
+    expect(h.execCalls[0]?.args).toContain('haiku')
+    const markdown = h.files.get('out/summary.md') as string
+    expect(markdown).toContain('Matching: claims judged by haiku.')
+    expect(markdown).toMatch(/- security p[12]: not judged/u)
+    // The unjudged case is excluded, not scored by location.
+    expect(markdown).toContain('| security | 1 | 100% |')
+  })
+
+  it('labels location matching without --judge', async () => {
+    stdoutSpy()
+    const h = harness({ 'cases.json': JSON.stringify(CASES) })
+    await runFinalReviewBenchCli(scoreOnly, h.deps)
+    expect(h.files.get('out/summary.md')).toContain('Matching: file and line.')
+  })
 })

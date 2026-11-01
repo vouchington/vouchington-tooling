@@ -35,7 +35,8 @@ pnpm exec vouchington final-review bench \
 ```
 
 For each case, the runner exports the pull request head with `git archive`, so the tree has no
-history. It writes the title, description, and diff into `.final-review/` inside that tree, then
+history. It writes the title, description, and a numbered diff (base and head line numbers on every
+line) into `.final-review/` inside that tree, then
 runs `claude -p` on Sonnet with only `Read`, `Grep`, and `Glob`. With no shell, network, or
 `gh`, the reviewer cannot look up the revert. Each pillar prompt is prefixed with the shared
 `_contract.md`.
@@ -44,14 +45,21 @@ Results are written to `<out>/raw/<pillar>/<case>.json`, then `summary.json` and
 `--score-only` to re-score existing raw results, and `--case <id>` to run one case. Runs cost
 money and take minutes per case, so run only the pillars whose prompts changed.
 
+Add `--judge sonnet` to grade by claim instead of location. A tool-less `claude -p` call per case
+decides which finding, if any, raises each labeled problem, even at a different file or line, and
+stores the assignment in the raw result. Judging is cached per model, so `--score-only --judge
+sonnet` re-scores for free after the first pass. Prefer judged numbers; location matching both
+credits unrelated findings at the right file and misses the right claim cited elsewhere.
+
 ## Metrics
 
-| Metric             | Meaning                                                                         |
-| ------------------ | ------------------------------------------------------------------------------- |
-| Recall             | Expected findings matched by path and by a line within 10 of the expected range |
-| Severity agreement | Matched findings whose severity is within one level of the label                |
-| False alarms       | Negative cases with at least one `blocking` or `high` finding                   |
-| Findings per PR    | Mean findings per case, to watch for noisy prompts                              |
+| Metric             | Meaning                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| Recall             | Expected findings matched by the judge, or by path and a line within 10 of the range |
+| Severity agreement | Matched findings whose severity is within one level of the label                     |
+| False alarms       | Negative cases with at least one `blocking` or `high` finding                        |
+| Findings per PR    | Mean findings per case, to watch for noisy prompts                                   |
 
-The scoring is deliberately mechanical. A finding at the right place with a wrong claim still
-counts, so read the raw findings for any case whose result changes.
+Without `--judge`, scoring is mechanical: a finding at the right place with a wrong claim still
+counts. Either way, read the raw findings for any case whose result changes. A finding that covers
+two labeled problems is credited once.

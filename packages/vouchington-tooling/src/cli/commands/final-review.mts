@@ -5,6 +5,7 @@ import {
   createGhFinalReviewIo,
   finalReviewStatus,
   parseFinalReviewInput,
+  numberDiff,
   postFinalReview,
   revokeFinalApproval,
   type FinalReviewIo,
@@ -64,6 +65,9 @@ async function run(
       print(values['dry-run'] === true ? outcome : { ...outcome, reviews: outcome.reviews.length })
       return 0
     }
+    case 'diff':
+      process.stdout.write(numberDiff(await io.diff()))
+      return 0
     case 'revoke':
       print({ removed: await revokeFinalApproval(io) })
       return 0
@@ -73,7 +77,7 @@ async function run(
       return status.approved ? 0 : 1
     }
     default:
-      throw new Error('final-review needs post, revoke, status, or bench.')
+      throw new Error('final-review needs post, diff, revoke, status, or bench.')
   }
 }
 

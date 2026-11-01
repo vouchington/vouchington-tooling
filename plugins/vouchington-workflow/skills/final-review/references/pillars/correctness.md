@@ -33,4 +33,20 @@ verifies it. Otherwise use `high` or lower.
 
 ## Method
 
+Hunt for defects first, then judge tests. For each changed function, ask:
+
+- **Identity and keys**: are values compared, hashed, locked, or cached in a normalized form
+  (case, whitespace, encoding, trailing slash)? Do two spellings of the same thing take
+  different paths?
+- **Shared state**: is one variable, key, or flag reused across users, accounts, requests, or
+  concurrent calls, so a second call overwrites the first?
+- **Allowlists and parsers**: does a new check reject real inputs the code elsewhere permits (file
+  modes, optional fields, other platforms, legacy formats)?
+- **Options threading**: when a function gained an option, does every caller and internal helper
+  forward it, or do some paths fall back to defaults?
+- **Lifecycle**: does cleanup remove something still in use (files, checkouts, handles) by later
+  steps or post-job hooks? Do failure paths skip cleanup or restore?
+- **Data shape**: does a new query's filter and order match an index? Does a loop read unbounded
+  rows?
+
 For each finding, write the failure scenario: inputs or state, then the wrong outcome.
