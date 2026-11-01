@@ -13,7 +13,8 @@ only step that writes the review.
    `LEFT` locations against the base side of the numbered diff (deleted code is not in the head).
    If the cited line does not hold the code the finding describes, correct `line` and `startLine`
    to the lines on the same side that do (pillars sometimes cite diff offsets), or drop the
-   location.
+   location. Read the cited ranges with an offset and limit, and grep the diff and large files
+   instead of reading them whole, so a large pull request fits in context.
 3. **Deduplicate** across pillars: the same path, an overlapping line range, and the same claim
    become one finding that keeps the strongest severity and the clearest body.
 4. **Re-review** (low effort): for each previous finding, decide fixed, still present, or no

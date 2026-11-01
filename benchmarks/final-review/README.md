@@ -71,18 +71,27 @@ pillar's findings, plants a copy of each real finding under a second pillar, and
 pillar, and the findings as indexed JSON. The verifier returns the review with `sources` on every
 finding: the input indexes it confirms or merges.
 
-Scoring is deterministic and uses `sources`, with no second judge:
+The verifier may add findings of its own (no `sources`). A correct addition is a win, so findings
+are graded on whether they are right rather than counted:
 
 - **Real kept**: real inputs that some output finding cites, directly or through the planted copy.
-- **Severity agreement**: kept real findings whose strongest output severity is within one level
-  of the label.
-- **Clean negatives**: negative cases with no `blocking` or `high` output finding.
+- **Label recall, pillars → verifier**: labeled problems raised by the pillar findings, and by the
+  verifier's output. The output credits a label through a kept real input, or through an added
+  finding that the `--judge` model matches to it.
+- **Severity agreement**: raised labels whose strongest output severity is within one level of the
+  label.
+- **Other blocking/high confirmed**: every `blocking` or `high` output finding not credited to a
+  label goes to an independent check (`--checker`, default Opus, read-only tools in the same
+  snapshot) that decides whether the claim is true at the head. Negative cases were only not
+  reverted, so a confirmed finding there is a real catch, not a false alarm.
 - **Duplicates merged**: planted pairs that end in exactly one output finding.
 - **Findings before → after**: mean pillar findings per case (copies excluded) and mean output
   findings.
 
-Results go to `<out>/raw/<case>.json` (input and output), `summary.json`, and `summary.md`.
-`--score-only` re-scores them.
+Results go to `<out>/raw/<case>.json` (input, output, and grade), `summary.json`, and
+`summary.md`. A saved verifier output is reused, so a rerun resumes and grades only what is
+missing; use a new `--out` after editing the verifier prompt. `--score-only` re-scores without
+model calls.
 
 ## Metrics
 

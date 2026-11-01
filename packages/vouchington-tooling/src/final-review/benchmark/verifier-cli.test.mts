@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BenchDeps } from './cli.mts'
 import { judgeInputs } from './judge-all.mts'
 import { runFinalReviewVerifierBenchCli } from './verifier-cli.mts'
+import { gradeInputs } from './verifier-grade.mts'
 
 const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)
@@ -93,8 +94,10 @@ describe('runFinalReviewVerifierBenchCli', () => {
     expect(h.logs).toContain('verify p1')
     expect(h.logs).toContain('judge design n1')
     const markdown = h.store.get('o/summary.md') as string
-    expect(markdown).toContain('Real findings: pillar findings judged by sonnet.')
-    expect(markdown).toContain('| 1 | 100% | 100% | n/a (0) | 100% | 1.0 → 1.0 |')
+    expect(markdown).toContain(
+      'Labels judged by sonnet; other blocking and high findings checked by opus.',
+    )
+    expect(markdown).toContain('| 1 | 100% | 100% → 100% | 100% | n/a (0) | 100% | 1.0 → 1.0 |')
     expect(markdown).toContain('- n1: verifier crashed')
     expect(out).toHaveBeenCalledWith(`${markdown.trimEnd()}\n`)
   })
@@ -104,16 +107,37 @@ describe('runFinalReviewVerifierBenchCli', () => {
     const exec = vi.fn(async () => '')
     const h = harness(exec)
     const input = { findings: [FINDING], real: [], planted: [] }
-    h.store.set(
-      'o/raw/n1.json',
-      JSON.stringify({ input, output: { summary: '', findings: [], sources: [] } }),
-    )
+    const output = { summary: '', findings: [], sources: [] }
+    const n1 = CASES[1] as never
+    const graded = {
+      judge: 'haiku',
+      checker: 'opus',
+      inputs: gradeInputs(n1, output, ['haiku', 'opus']),
+      added: [],
+      checks: [],
+    }
+    h.store.set('o/raw/n1.json', JSON.stringify({ input, output, graded }))
+    h.store.set('o/raw/x1.json', JSON.stringify({ input, output }))
     await runFinalReviewVerifierBenchCli([...BASE, '--score-only', '--judge', 'haiku'], h.deps)
     expect(exec).not.toHaveBeenCalled()
     const markdown = h.store.get('o/summary.md') as string
     expect(markdown).toContain('judged by haiku')
-    expect(markdown).toContain('| 1 | n/a | n/a | 100% (1) | n/a | 1.0 → 0.0 |')
-    expect(markdown).not.toContain('Errors:')
+    expect(markdown).toContain('| 1 | n/a | n/a → n/a | n/a | n/a (0) | n/a | 1.0 → 0.0 |')
+    expect(markdown).toContain('- x1: not graded')
+  })
+
+  it('reuses saved verifier outputs', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const exec = vi.fn(async () => '')
+    const h = harness(exec)
+    const output = { summary: '', findings: [], sources: [] }
+    h.store.set(
+      'o/raw/p1.json',
+      JSON.stringify({ input: { findings: [], real: [], planted: [] }, output }),
+    )
+    await runFinalReviewVerifierBenchCli([...BASE, '--prompts', 'refs', '--case', 'p1'], h.deps)
+    expect(exec).not.toHaveBeenCalled()
+    expect(JSON.parse(h.store.get('o/raw/p1.json') as string).graded.added).toEqual([null])
   })
 
   it('records non-crashing errors from Error instances', async () => {

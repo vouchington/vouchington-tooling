@@ -5,16 +5,15 @@ import { PILLARS } from '../finding.mts'
 import { parseEvalCases, type EvalCase } from './cases.mts'
 import { defaultBenchDeps, type BenchDeps } from './cli.mts'
 import { judgeAll, pool } from './judge-all.mts'
-import { collectVerifierInput, type VerifierInput } from './verifier-input.mts'
-import { runVerifier, type VerifierOutput } from './verifier-run.mts'
+import { gradeAll, gradeInputs, type VerifierRaw } from './verifier-grade.mts'
+import { collectVerifierInput } from './verifier-input.mts'
+import { runVerifier } from './verifier-run.mts'
 import {
   renderVerifierTable,
   scoreVerifierCase,
   summarizeVerifier,
   type VerifierCaseScore,
 } from './verifier-score.mts'
-
-type VerifierRaw = { input: VerifierInput } & ({ output: VerifierOutput } | { error: string })
 
 type Options = {
   findingsFrom: string
@@ -24,6 +23,11 @@ type Options = {
   maxTurns: number
   jobs: number
   judge: string
+  checker: string
+}
+
+function readRaw(path: string, deps: BenchDeps): VerifierRaw | undefined {
+  return deps.exists(path) ? (JSON.parse(deps.readFile(path)) as VerifierRaw) : undefined
 }
 
 /** verifier.md with the congruence pillar inlined, since the snapshot has no skill files. */
@@ -37,6 +41,9 @@ function verifierPrompt(prompts: string, deps: BenchDeps): string {
 async function runAll(cases: EvalCase[], options: Options, deps: BenchDeps): Promise<void> {
   const prompt = verifierPrompt(options.prompts, deps)
   const tasks = cases.flatMap((item) => {
+    // A saved output is reused, so an interrupted run resumes; use a new --out after edits.
+    const saved = readRaw(join(options.out, 'raw', `${item.id}.json`), deps)
+    if (saved !== undefined && 'output' in saved) return []
     const input = collectVerifierInput(item, options.findingsFrom, options.judge, deps)
     if (input === null) deps.log(`skip ${item.id}: no pillar findings`)
     return input === null ? [] : [{ item, input }]
@@ -60,11 +67,12 @@ function scoreAll(cases: EvalCase[], options: Options, deps: BenchDeps): string 
   const scores: VerifierCaseScore[] = []
   const errors: string[] = []
   for (const item of cases) {
-    const path = join(options.out, 'raw', `${item.id}.json`)
-    if (!deps.exists(path)) continue
-    const raw = JSON.parse(deps.readFile(path)) as VerifierRaw
+    const raw = readRaw(join(options.out, 'raw', `${item.id}.json`), deps)
+    if (raw === undefined) continue
     if ('error' in raw) errors.push(`- ${item.id}: ${raw.error}`)
-    else scores.push(scoreVerifierCase(item, raw.input, raw.output))
+    else if (raw.graded?.inputs !== gradeInputs(item, raw.output, [options.judge, options.checker]))
+      errors.push(`- ${item.id}: not graded`)
+    else scores.push(scoreVerifierCase(item, raw.input, raw.output, raw.graded))
   }
   const summary = summarizeVerifier(scores)
   deps.writeFile(
@@ -72,7 +80,7 @@ function scoreAll(cases: EvalCase[], options: Options, deps: BenchDeps): string 
     `${JSON.stringify({ summary, scores, errors }, null, 2)}\n`,
   )
   const markdown = [
-    `Real findings: pillar findings judged by ${options.judge}.`,
+    `Labels judged by ${options.judge}; other blocking and high findings checked by ${options.checker}.`,
     renderVerifierTable(summary),
     ...(errors.length > 0 ? ['Errors:', errors.join('\n')] : []),
   ].join('\n\n')
@@ -102,6 +110,7 @@ export async function runFinalReviewVerifierBenchCli(
       jobs: { type: 'string' },
       'score-only': { type: 'boolean' },
       judge: { type: 'string' },
+      checker: { type: 'string' },
     },
   })
   const { cases: casesPath, out } = values
@@ -122,6 +131,7 @@ export async function runFinalReviewVerifierBenchCli(
     maxTurns: Number(values['max-turns'] ?? '60'),
     jobs: Number(values.jobs ?? '3'),
     judge: values.judge ?? 'sonnet',
+    checker: values.checker ?? 'opus',
   }
   if (!scoreOnly) {
     await judgeAll(
@@ -131,6 +141,7 @@ export async function runFinalReviewVerifierBenchCli(
       deps,
     )
     await runAll(cases, options, deps)
+    await gradeAll(cases, options, deps)
   }
   process.stdout.write(`${scoreAll(cases, options, deps)}\n`)
   return 0

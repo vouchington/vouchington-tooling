@@ -6,7 +6,7 @@ final-review diff --repo owner/name --pr N
 final-review revoke --repo owner/name --pr N
 final-review status --repo owner/name --pr N
 final-review bench --cases cases.json --prompts DIR --out DIR [--pillar NAME]... [--case ID]... [--model NAME] [--jobs N] [--max-turns N] [--score-only] [--judge MODEL]
-final-review bench-verifier --cases cases.json --findings-from DIR --prompts DIR --out DIR [--case ID]... [--model NAME] [--jobs N] [--max-turns N] [--score-only] [--judge MODEL]
+final-review bench-verifier --cases cases.json --findings-from DIR --prompts DIR --out DIR [--case ID]... [--model NAME] [--jobs N] [--max-turns N] [--score-only] [--judge MODEL] [--checker MODEL]
   post renders verified findings as one or more COMMENT reviews (verdict, reviewed SHA and effort in
   the header; inline comments where the diff allows, the rest in the body) and adds the "final
   approval" label on Approve or removes it otherwise. It refuses when the head moved. diff prints the pull request
