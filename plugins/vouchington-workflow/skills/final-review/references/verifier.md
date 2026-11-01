@@ -9,9 +9,11 @@ only step that writes the review.
 2. **Verify each finding** against the code at the reviewed head: open the cited lines and their
    callers. Mark it confirmed, downgraded (wrong severity for the pillar's blocking bar), or
    rejected (not true, out of scope, or speculative). Drop rejected findings; never post a
-   finding you could not confirm in the code. If the cited line does not hold the code the
-   finding describes, correct `line` and `startLine` to the head file lines that do (pillars
-   sometimes cite diff offsets), or drop the location.
+   finding you could not confirm in the code. Check `RIGHT` locations against the head file and
+   `LEFT` locations against the base side of the numbered diff (deleted code is not in the head).
+   If the cited line does not hold the code the finding describes, correct `line` and `startLine`
+   to the lines on the same side that do (pillars sometimes cite diff offsets), or drop the
+   location.
 3. **Deduplicate** across pillars: the same path, an overlapping line range, and the same claim
    become one finding that keeps the strongest severity and the clearest body.
 4. **Re-review** (low effort): for each previous finding, decide fixed, still present, or no

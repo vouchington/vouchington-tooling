@@ -41,6 +41,35 @@ describe('numberDiff', () => {
     ])
   })
 
+  it('numbers empty context lines from diff.suppressBlankEmpty and stops at the hunk length', () => {
+    const blank = [
+      '@@ -1,3 +1,3 @@',
+      ' a',
+      '',
+      '-b',
+      '+c',
+      '',
+      '-- ',
+      'sig',
+      '@@ -9 +9 @@',
+      '-x',
+      '+y',
+    ].join('\n')
+    expect(numberDiff(blank).split('\n')).toEqual([
+      '@@ -1,3 +1,3 @@',
+      '     1      1  a',
+      '     2      2 ',
+      '     3        -b',
+      '            3 +c',
+      '',
+      '-- ',
+      'sig',
+      '@@ -9 +9 @@',
+      '     9        -x',
+      '            9 +y',
+    ])
+  })
+
   it('explains the format', () => {
     expect(NUMBERED_DIFF_LEGEND).toContain('RIGHT')
   })

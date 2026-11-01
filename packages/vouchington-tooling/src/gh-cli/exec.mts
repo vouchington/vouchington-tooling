@@ -5,6 +5,9 @@ import { ghSpawnEnv } from './env.mts'
 
 const execFileAsync = promisify(execFile)
 
+/** Pull request diffs and paginated API output can exceed execFile's 1 MiB default. */
+const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
+
 /** A text-mode command runner: argv in, stdout out. Rejects on a non-zero exit. */
 export type RunTextCommand = (args: string[]) => Promise<string>
 
@@ -24,7 +27,7 @@ export type ExecFileText = (
 export function createCommandRunner(
   command: string,
   exec: ExecFileText = (cmd, args, options) =>
-    execFileAsync(cmd, args, { ...options, encoding: 'utf8' }),
+    execFileAsync(cmd, args, { ...options, encoding: 'utf8', maxBuffer: MAX_OUTPUT_BYTES }),
   buildEnv: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv = (env) => env,
 ): RunTextCommand {
   return async (args) => {

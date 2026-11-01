@@ -29,13 +29,16 @@ checkout). Run it with `--help` for the flags.
    outlives a new head.
 3. For a follow-up, run `vouchington final-review status --repo <repo> --pr <n>` to get the last
    reviewed SHA, and read the unresolved threads of the previous final review.
-4. Check out the reviewed head as a detached worktree in the OS temp directory, from a local clone
-   when one exists (`git -C <clone> fetch origin <head> && git -C <clone> worktree add --detach
-   "$TMPDIR/final-review/<name>-<n>-<sha12>" <head>`), otherwise from a blobless clone there.
-   Remove the worktree when the review is posted.
-5. Save the numbered diff next to the worktree: `vouchington final-review diff --repo <repo> --pr
-   <n> > "$TMPDIR/final-review/<name>-<n>-<sha12>.diff"`. Every line carries its base and head line
-   numbers, so pillars cite real file lines.
+4. Create a private run directory: `run=$(mktemp -d "$TMPDIR/final-review-<name>-<n>-XXXXXX")`
+   (`mktemp -d` makes it readable only by you). Everything for this review lives under it.
+5. Check out the reviewed head as a detached worktree at `"$run/tree"`, from a local clone when one
+   exists (`git -C <clone> fetch origin <head> && git -C <clone> worktree add --detach "$run/tree"
+   <head>`), otherwise from a blobless clone under `"$run"`.
+6. Save the numbered diff: `vouchington final-review diff --repo <repo> --pr <n> >
+   "$run/diff.patch"`. Every line carries its base and head line numbers, so pillars cite real file
+   lines.
+7. When the review is posted, or if it fails, remove the worktree (`git -C <clone> worktree remove
+   --force "$run/tree"`) and then `rm -rf "$run"`, so no private pull request content is left behind.
 
 ## Step 2 - Dispatch pillars
 

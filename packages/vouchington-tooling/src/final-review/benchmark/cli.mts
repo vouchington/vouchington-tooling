@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util'
 
 import { PILLARS, type Pillar } from '../finding.mts'
 import { casesForPillar, parseEvalCases, type EvalCase } from './cases.mts'
-import { judgeAll, pool, type RawResult } from './judge-all.mts'
+import { currentAssignment, judgeAll, pool, type RawResult } from './judge-all.mts'
 import { runPillar } from './runner.mts'
 import { renderSummaryTable, scoreCase, summarizePillar, type CaseScore } from './score.mts'
 import { defaultExec, prepareSnapshot, type Exec } from './snapshot.mts'
@@ -104,10 +104,13 @@ function scoreAll(cases: EvalCase[], pillars: Pillar[], options: Options, deps: 
       }
       const raw = JSON.parse(deps.readFile(path)) as RawResult
       if ('error' in raw) errors.push(`${item.id}: ${raw.error}`)
+      else if (judge === undefined) scores.push(scoreCase(item, pillar, raw.findings))
       else {
-        const assignment = judge === undefined ? undefined : raw.judged?.assignment
-        if (judge !== undefined && assignment === undefined) errors.push(`${item.id}: not judged`)
-        scores.push(scoreCase(item, pillar, raw.findings, assignment))
+        const expected = item.expected.filter((entry) => entry.pillar === pillar)
+        const assignment = currentAssignment(raw, expected, judge)
+        // Unjudged cases stay out of judged metrics rather than falling back to locations.
+        if (assignment === undefined) errors.push(`${item.id}: not judged`)
+        else scores.push(scoreCase(item, pillar, raw.findings, assignment))
       }
     }
     return { summary: summarizePillar(pillar, scores), scores, errors }

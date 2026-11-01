@@ -5,7 +5,8 @@ import type { Exec } from './snapshot.mts'
 /** For each expected finding (by index), the index of the finding that raises it, or null. */
 export type Assignment = Array<number | null>
 
-export type Judged = { model: string; assignment: Assignment }
+/** A cached judgement: `inputs` fingerprints the expected claims and findings it indexes. */
+export type Judged = { model: string; inputs: string; assignment: Assignment }
 
 const JUDGE_SCHEMA = {
   type: 'object',

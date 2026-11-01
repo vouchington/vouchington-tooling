@@ -15,9 +15,11 @@ Every pillar reviewer follows this contract. The pillar file adds its scope and 
 
 - Read the surrounding code, not only changed lines. Confirm a claim in the code before you
   report it; cite the exact path and line.
-- Line numbers are file line numbers at the head, as the numbered diff's second column or a read
-  of the file shows them. Never cite a line number of the diff file itself. Before you report,
-  open the file at that line and check the cited code is there.
+- Line numbers are file line numbers, never line numbers of the diff file itself. A `RIGHT`
+  finding (the default) cites the head file line, the numbered diff's second column. A `LEFT`
+  finding, about deleted or replaced code, cites the base file line, the first column. Before you
+  report, check that the cited line holds the code: read the head file for `RIGHT`, and the diff's
+  `-` lines for `LEFT`.
 - Report the defect, not its symptom. A missing test for a bug is part of the bug's finding, not
   a separate one. Report a test gap alone only when no defect is known and the gap matters.
 - Clean pull requests are common. Raise a finding only when you can name what goes wrong or what

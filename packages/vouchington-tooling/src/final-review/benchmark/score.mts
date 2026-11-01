@@ -71,7 +71,7 @@ export function scoreCase(
       assignment === undefined
         ? findings.findIndex((finding, index) => !used.has(index) && matches(target, finding))
         : (assignment[position] ?? -1)
-    if (at === -1 || at >= findings.length || used.has(at)) continue
+    if (!Number.isInteger(at) || at < 0 || at >= findings.length || used.has(at)) continue
     used.add(at)
     matched += 1
     const found = findings[at] as Finding

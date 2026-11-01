@@ -86,9 +86,15 @@ describe('scoreCase', () => {
       item('positive', [exp(), exp(), exp(), exp()]),
       'security',
       [found({ path: 'elsewhere.ts', line: 900 }), found()],
-      [0, 0, 7, null],
+      [0, 0, 7, -2],
     )
     expect(score).toMatchObject({ expected: 4, matched: 1, unmatched: 1 })
+    expect(scoreCase(item('positive', [exp()]), 'security', [found()], [0.5])).toMatchObject({
+      matched: 0,
+    })
+    expect(scoreCase(item('positive', [exp()]), 'security', [found()], [])).toMatchObject({
+      matched: 0,
+    })
   })
 
   it('matches each finding at most once and tracks severity agreement', () => {

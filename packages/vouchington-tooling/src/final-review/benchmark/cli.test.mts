@@ -243,7 +243,8 @@ describe('runFinalReviewBenchCli --score-only', () => {
     const markdown = h.files.get('out/summary.md') as string
     expect(markdown).toContain('Matching: claims judged by haiku.')
     expect(markdown).toMatch(/- security p[12]: not judged/u)
-    expect(markdown).toContain('| security | 2 | 50% |')
+    // The unjudged case is excluded, not scored by location.
+    expect(markdown).toContain('| security | 1 | 100% |')
   })
 
   it('labels location matching without --judge', async () => {
