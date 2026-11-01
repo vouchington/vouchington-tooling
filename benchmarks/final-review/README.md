@@ -51,6 +51,39 @@ stores the assignment in the raw result. Judging is cached per model, so `--scor
 sonnet` re-scores for free after the first pass. Prefer judged numbers; location matching both
 credits unrelated findings at the right file and misses the right claim cited elsewhere.
 
+## Verifier
+
+The verifier is benchmarked on its own, without re-running pillars or dispatching subagents:
+
+```bash
+pnpm exec vouchington final-review bench-verifier \
+  --cases benchmarks/final-review/cases.json \
+  --findings-from "$TMPDIR/final-review-bench" \
+  --prompts plugins/vouchington-workflow/skills/final-review/references \
+  --out "$TMPDIR/final-review-verifier" --jobs 3
+```
+
+`--findings-from` is the `--out` directory of an earlier `bench` run. The command first judges any
+of those pillar results that lack a current `--judge` assignment (default `sonnet`), so each input
+finding is labeled real (it raises a labeled problem) or noise. For each case it gathers every
+pillar's findings, plants a copy of each real finding under a second pillar, and makes one
+`claude -p` call (default Opus) in the same git-free snapshot with `verifier.md`, the congruence
+pillar, and the findings as indexed JSON. The verifier returns the review with `sources` on every
+finding: the input indexes it confirms or merges.
+
+Scoring is deterministic and uses `sources`, with no second judge:
+
+- **Real kept**: real inputs that some output finding cites, directly or through the planted copy.
+- **Severity agreement**: kept real findings whose strongest output severity is within one level
+  of the label.
+- **Clean negatives**: negative cases with no `blocking` or `high` output finding.
+- **Duplicates merged**: planted pairs that end in exactly one output finding.
+- **Findings before → after**: mean pillar findings per case (copies excluded) and mean output
+  findings.
+
+Results go to `<out>/raw/<case>.json` (input and output), `summary.json`, and `summary.md`.
+`--score-only` re-scores them.
+
 ## Metrics
 
 | Metric             | Meaning                                                                              |

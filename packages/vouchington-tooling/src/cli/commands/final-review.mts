@@ -16,6 +16,7 @@ export type FinalReviewDeps = {
   createIo(target: PullTarget): FinalReviewIo
   readFile(path: string): string
   runBench(args: string[]): Promise<number>
+  runVerifierBench(args: string[]): Promise<number>
 }
 
 const defaultDeps: FinalReviewDeps = {
@@ -23,6 +24,10 @@ const defaultDeps: FinalReviewDeps = {
   readFile: (path) => readFileSync(path, 'utf8'),
   runBench: async (args) =>
     (await import('../../final-review/benchmark/cli.mts')).runFinalReviewBenchCli(args),
+  runVerifierBench: async (args) =>
+    (await import('../../final-review/benchmark/verifier-cli.mts')).runFinalReviewVerifierBenchCli(
+      args,
+    ),
 }
 
 function target(values: { repo?: string; pr?: string }): PullTarget {
@@ -41,6 +46,7 @@ async function run(
   deps: FinalReviewDeps,
 ): Promise<number> {
   if (subcommand === 'bench') return deps.runBench(args)
+  if (subcommand === 'bench-verifier') return deps.runVerifierBench(args)
   const { values } = parseArgs({
     args,
     strict: true,
@@ -77,7 +83,7 @@ async function run(
       return status.approved ? 0 : 1
     }
     default:
-      throw new Error('final-review needs post, diff, revoke, status, or bench.')
+      throw new Error('final-review needs post, diff, revoke, status, bench, or bench-verifier.')
   }
 }
 
