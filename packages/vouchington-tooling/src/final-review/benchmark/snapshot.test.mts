@@ -38,11 +38,13 @@ function fakeExec(calls: Array<[string, string[]]>): Exec {
       writeFileSync(join(args[args.indexOf('-C') + 1] as string, 'src', 'a.ts'), 'x')
       return ''
     }
-    if (command === 'git' && args.includes('diff')) return 'DIFF'
+    if (command === 'git' && args.includes('diff')) return DIFF
     if (command === 'gh' && args[0] === 'pr') return '  PR body \n'
     return ''
   }
 }
+
+const DIFF = 'diff --git a/a.ts b/a.ts'
 
 describe('prepareSnapshot', () => {
   it('clones once, exports a git-free tree, and writes context files', async () => {
@@ -53,7 +55,7 @@ describe('prepareSnapshot', () => {
     const repoDir = join(cache, 'acme__widgets')
     expect(snapshot).toEqual({
       dir: join(work, 'case-1', 'tree'),
-      diff: 'DIFF',
+      diff: DIFF,
       body: '  PR body \n',
     })
     expect(calls.map(([command, args]) => [command, args[0]])).toEqual([
@@ -67,7 +69,16 @@ describe('prepareSnapshot', () => {
     expect(calls[0]?.[1].slice(0, 4)).toEqual(['repo', 'clone', 'acme/widgets', repoDir])
     expect(calls[1]?.[1]).toContain('fetch')
     expect(readFileSync(join(snapshot.dir, 'src', 'a.ts'), 'utf8')).toBe('x')
-    expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'diff.patch'), 'utf8')).toBe('DIFF')
+    expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'diff.patch'), 'utf8')).toBe(DIFF)
+    expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'diff', '0001.patch'), 'utf8')).toBe(
+      `${DIFF}\n`,
+    )
+    expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'files.md'), 'utf8')).toContain(
+      '`.final-review/diff/0001.patch` +0 -0 a.ts',
+    )
+    expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'files.md'), 'utf8')).toContain(
+      '.final-review/diff/0001.patch` +0 -0 a.ts',
+    )
     expect(readFileSync(join(snapshot.dir, CONTEXT_DIR, 'pr.md'), 'utf8')).toBe(
       '# My title\n\nPR body\n',
     )

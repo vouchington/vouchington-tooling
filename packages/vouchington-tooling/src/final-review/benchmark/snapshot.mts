@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { diffFileName, renderDiffIndex, splitDiff } from '../diff-files.mts'
 import { numberDiff } from '../numbered-diff.mts'
 import type { EvalCase } from './cases.mts'
 
@@ -101,7 +102,15 @@ export async function prepareSnapshot(
   ])
   const context = join(dir, CONTEXT_DIR)
   mkdirSync(context, { recursive: true })
-  writeFileSync(join(context, 'diff.patch'), numberDiff(diff))
+  const numbered = numberDiff(diff)
+  writeFileSync(join(context, 'diff.patch'), numbered)
+  // Per-file patches and an index let a reviewer of a large diff read one file at a time.
+  const files = splitDiff(numbered)
+  mkdirSync(join(context, 'diff'), { recursive: true })
+  files.forEach((file, index) => {
+    writeFileSync(join(context, 'diff', diffFileName(index)), file.text)
+  })
+  writeFileSync(join(context, 'files.md'), renderDiffIndex(files, `${CONTEXT_DIR}/diff`))
   writeFileSync(join(context, 'pr.md'), `# ${item.title}\n\n${body.trim()}\n`)
   return { dir, diff, body }
 }
