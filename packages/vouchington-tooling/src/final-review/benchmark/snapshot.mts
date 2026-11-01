@@ -11,13 +11,31 @@ export type Exec = (command: string, args: string[], options?: { cwd?: string })
 
 const execFileAsync = promisify(execFile)
 
+const TAIL = 600
+
+function tail(text: string): string {
+  return text.trim().slice(-TAIL)
+}
+
+/** Runs a binary; a failure reports the exit code and output tails, never the (long) arguments. */
 export const defaultExec: Exec = async (command, args, options = {}) => {
-  const { stdout } = await execFileAsync(command, args, {
-    ...options,
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-  })
-  return stdout
+  try {
+    const { stdout } = await execFileAsync(command, args, {
+      ...options,
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024 * 1024,
+    })
+    return stdout
+  } catch (error) {
+    // execFile errors carry the captured output as strings (empty when the binary never ran).
+    const failure = error as { code?: unknown; stdout: string; stderr: string }
+    const parts = [
+      `${command} exited with ${String(failure.code)}`,
+      tail(failure.stdout),
+      tail(failure.stderr),
+    ]
+    throw new Error(parts.filter((part) => part.length > 0).join('\n'), { cause: error })
+  }
 }
 
 export type Snapshot = {

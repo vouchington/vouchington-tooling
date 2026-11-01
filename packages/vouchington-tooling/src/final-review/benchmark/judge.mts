@@ -7,7 +7,7 @@ export type Assignment = Array<number | null>
 
 export type Judged = { model: string; assignment: Assignment }
 
-export const JUDGE_SCHEMA = {
+const JUDGE_SCHEMA = {
   type: 'object',
   required: ['matches'],
   additionalProperties: false,
