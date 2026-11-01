@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { numberDiff } from '../numbered-diff.mts'
 import type { EvalCase } from './cases.mts'
 
 /** Runs a binary and resolves stdout; rejects on a non-zero exit. */
@@ -82,7 +83,7 @@ export async function prepareSnapshot(
   ])
   const context = join(dir, CONTEXT_DIR)
   mkdirSync(context, { recursive: true })
-  writeFileSync(join(context, 'diff.patch'), diff)
+  writeFileSync(join(context, 'diff.patch'), numberDiff(diff))
   writeFileSync(join(context, 'pr.md'), `# ${item.title}\n\n${body.trim()}\n`)
   return { dir, diff, body }
 }

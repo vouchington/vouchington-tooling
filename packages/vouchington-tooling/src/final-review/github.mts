@@ -13,6 +13,8 @@ import { FINAL_APPROVAL_LABEL } from './render.mts'
 /** The GitHub reads and writes a final review needs, injectable for tests. */
 export type FinalReviewIo = {
   headSha(): Promise<string>
+  /** The pull request's unified diff against its base. */
+  diff(): Promise<string>
   listFiles(): Promise<ReviewFile[]>
   listReviewBodies(): Promise<string[]>
   hasApprovalLabel(): Promise<boolean>
@@ -61,6 +63,9 @@ export function createGhFinalReviewIo(
           '.headRefOid',
         ])
       ).trim()
+    },
+    async diff() {
+      return run(['pr', 'diff', String(pr), '-R', repo, '--color', 'never'])
     },
     async listFiles() {
       return parseReviewFilesJson(await run(['api', '--paginate', `${pull}/files?per_page=100`]))

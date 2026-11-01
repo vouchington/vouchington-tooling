@@ -13,6 +13,7 @@ type MockIo = { [K in keyof FinalReviewIo]: Mock<FinalReviewIo[K]> }
 function fakeIo(overrides: Partial<MockIo> = {}): MockIo {
   return {
     headSha: vi.fn(async () => SHA),
+    diff: vi.fn(async () => ''),
     listFiles: vi.fn(async () => [{ filename: 'a.ts', patch: '@@ -1 +1 @@\n+x\n' }]),
     listReviewBodies: vi.fn(async () => []),
     hasApprovalLabel: vi.fn(async () => false),

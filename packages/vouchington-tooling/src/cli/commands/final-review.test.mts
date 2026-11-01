@@ -18,6 +18,7 @@ type MockIo = { [K in keyof FinalReviewIo]: Mock<FinalReviewIo[K]> }
 function fakeIo(overrides: Partial<MockIo> = {}): MockIo {
   return {
     headSha: vi.fn(async () => SHA),
+    diff: vi.fn(async () => ''),
     listFiles: vi.fn(async () => []),
     listReviewBodies: vi.fn(async () => []),
     hasApprovalLabel: vi.fn(async () => true),
@@ -108,6 +109,13 @@ describe('runFinalReviewCommand', () => {
     )
   })
 
+  it('prints the numbered diff', async () => {
+    const { out } = capture()
+    const io = fakeIo({ diff: vi.fn(async () => '@@ -1 +1 @@\n+x') })
+    await expect(runFinalReviewCommand(['diff', ...PR], deps(io))).resolves.toBe(0)
+    expect(out.join('')).toBe('@@ -1 +1 @@\n            1 +x')
+  })
+
   it('revokes the approval label', async () => {
     const { out } = capture()
     const io = fakeIo()
@@ -138,7 +146,7 @@ describe('runFinalReviewCommand', () => {
     await expect(runFinalReviewCommand(['status', '--bogus'], d)).resolves.toBe(2)
     expect(err.join('')).toContain('final-review: --repo and --pr are required.')
     expect(err.join('')).toContain(
-      'final-review: final-review needs post, revoke, status, or bench.',
+      'final-review: final-review needs post, diff, revoke, status, or bench.',
     )
   })
 

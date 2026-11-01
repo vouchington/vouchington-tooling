@@ -33,13 +33,16 @@ checkout). Run it with `--help` for the flags.
    when one exists (`git -C <clone> fetch origin <head> && git -C <clone> worktree add --detach
    "$TMPDIR/final-review/<name>-<n>-<sha12>" <head>`), otherwise from a blobless clone there.
    Remove the worktree when the review is posted.
+5. Save the numbered diff next to the worktree: `vouchington final-review diff --repo <repo> --pr
+   <n> > "$TMPDIR/final-review/<name>-<n>-<sha12>.diff"`. Every line carries its base and head line
+   numbers, so pillars cite real file lines.
 
 ## Step 2 - Dispatch pillars
 
 Choose the effort and the pillars with [dispatch](references/dispatch.md). Run the selected
 pillars as parallel background subagents on the implementation tier, one per pillar, each with
-its pillar file, [the contract](references/pillars/_contract.md), the worktree path, the base and
-head SHAs, the repository list for cross-repository search, and the follow-up context at low
+its pillar file, [the contract](references/pillars/_contract.md), the worktree path, the numbered
+diff path, the base and head SHAs, the repository list for cross-repository search, and the follow-up context at low
 effort.
 
 | Pillar       | File                                               | Covers                                                                                 |

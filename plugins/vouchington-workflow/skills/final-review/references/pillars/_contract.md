@@ -15,6 +15,13 @@ Every pillar reviewer follows this contract. The pillar file adds its scope and 
 
 - Read the surrounding code, not only changed lines. Confirm a claim in the code before you
   report it; cite the exact path and line.
+- Line numbers are file line numbers at the head, as the numbered diff's second column or a read
+  of the file shows them. Never cite a line number of the diff file itself. Before you report,
+  open the file at that line and check the cited code is there.
+- Report the defect, not its symptom. A missing test for a bug is part of the bug's finding, not
+  a separate one. Report a test gap alone only when no defect is known and the gap matters.
+- Clean pull requests are common. Raise a finding only when you can name what goes wrong or what
+  it costs; style preferences and speculative "could be cleaner" notes are not findings.
 - Stay inside your pillar's scope. Another pillar owns everything listed under "Not in scope".
 - Prefer few, real findings. An empty list is a good result when nothing meets the bar.
 

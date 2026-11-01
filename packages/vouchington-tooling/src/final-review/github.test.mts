@@ -47,6 +47,12 @@ describe('createGhFinalReviewIo', () => {
     ])
   })
 
+  it('reads the diff', async () => {
+    const { io, calls } = setup(['@@ -1 +1 @@\n'])
+    await expect(io.diff()).resolves.toBe('@@ -1 +1 @@\n')
+    expect(calls[0]).toEqual(['pr', 'diff', '7', '-R', 'acme/widgets', '--color', 'never'])
+  })
+
   it('lists files', async () => {
     const { io, calls } = setup(['[{"filename":"a.ts","patch":"@@ -1 +1 @@\\n+x\\n"}]'])
     await expect(io.listFiles()).resolves.toEqual([
