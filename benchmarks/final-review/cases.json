@@ -453,5 +453,265 @@
     "reason": "",
     "expected": [],
     "relation": null
+  },
+  {
+    "id": "vouchington-1145",
+    "repo": "vouchington/vouchington",
+    "pr": 1145,
+    "title": "feat(copyright): add acknowledgeable review and delivery alerts",
+    "baseSha": "691460a38c76ebbe335c53377713c3e8b84a6a93",
+    "headSha": "00349300ff8ec3878a0e4018f62da9864038fb20",
+    "kind": "positive",
+    "reason": "Added staff-alert tables and services that no route, UI or notifier reached and that stayed closed until a policy row existed that nothing could create; deleted two days later as unreached machinery.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "medium",
+        "path": "backend/data-stores/psql/migrations/0737-00-00-copyright-staff-alerts.sql",
+        "lines": null,
+        "claim": "This adds alert and acknowledgement tables (registered as unbounded-growth tables) plus read, acknowledge, sync and recovery services, but nothing wires them to a route, UI or notifier, and sync does nothing until an approved policy row exists that no code path can create. The whole subsystem is dead on arrival, so it adds schema, growth-inventory and sweep-stage maintenance with no reachable behavior. Ship it with a caller or leave it out."
+      }
+    ],
+    "revertedBy": {
+      "pr": 1440,
+      "sha": "5529ed1c5ced47cafe1de392b36a19d12726b2d1"
+    },
+    "relation": "undo",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-1146",
+    "repo": "vouchington/vouchington",
+    "pr": 1146,
+    "title": "fix/copyright retention preview 1101",
+    "baseSha": "91f80f835910c4af8c64c59a877be65e10a0297e",
+    "headSha": "9bb90f618e571bbe0c238dbf0761ff843742c54b",
+    "kind": "positive",
+    "reason": "Added evidence-retention preview, disposition and case-closure tables that record a refused or not-destroyed outcome but never delete anything and have no production caller; deleted two days later.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "medium",
+        "path": "backend/data-stores/psql/migrations/0738-00-00-copyright-evidence-retention.sql",
+        "lines": null,
+        "claim": "The retention gate, preview and disposition tables only ever record 'refused' or 'not_destroyed'; no code deletes an evidence object or email, and previewCopyrightEvidenceRetention, recordCopyrightEvidenceRetentionDisposition and closeCopyrightNoticeCase have no route or production caller. This is schema and services for a destruction workflow that does not exist yet, so it should wait for the real retention feature rather than land as unreachable tables."
+      }
+    ],
+    "revertedBy": {
+      "pr": 1440,
+      "sha": "5529ed1c5ced47cafe1de392b36a19d12726b2d1"
+    },
+    "relation": "undo",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-1144",
+    "repo": "vouchington/vouchington",
+    "pr": 1144,
+    "title": "fix(media): authorize OG dependencies and sideload bytes before cache delivery",
+    "baseSha": "36e3c48e423318ac2481e1c5ffa18a35b9aed17a",
+    "headSha": "2ad26d4b7db7895cc6f9206a0cec85ec410a93bb",
+    "kind": "positive",
+    "reason": "Persisted OG dependency manifests in two new PostgreSQL tables although OG cards already carry signed placement tuples; the manifest service and tables were unused and deleted ten days later.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "medium",
+        "path": "backend/data-stores/psql/migrations/0737-00-00-og-dependency-manifests.sql",
+        "lines": null,
+        "claim": "The two OG dependency manifest tables store, per card, which placements an OG image depends on, but OG cards already carry signed placement tuples that the authorizer can check directly. Persisting a second copy adds unbounded-growth tables and a write path whose consumer (the registry authorizer) does not exist in this change, so the tables are unused state that can drift from the signed tuples."
+      }
+    ],
+    "revertedBy": {
+      "pr": 2392,
+      "sha": "58d8c30e085f69bc028f01dfc3864119ffa3b15c"
+    },
+    "relation": "undo",
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-1143",
+    "repo": "vouchington/vouchington",
+    "pr": 1143,
+    "title": "feat(copyright): add fail-closed EU and UK notice contracts",
+    "baseSha": "36e3c48e423318ac2481e1c5ffa18a35b9aed17a",
+    "headSha": "0cb6df523a489faa89dd3b543682da7c0886db74",
+    "kind": "positive",
+    "reason": "Created 16 parallel per-jurisdiction copyright_eu_* and copyright_uk_* tables with duplicated guard triggers; four days later collapsed into 7 shared copyright_territorial_* tables using a jurisdiction column and composite foreign keys instead of triggers.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "high",
+        "path": "backend/data-stores/psql/migrations/0737-00-00-copyright-eu-uk-contracts.sql",
+        "lines": null,
+        "claim": "The EU and UK contracts are modelled as parallel table sets (copyright_eu_* and copyright_uk_*) with near-identical columns, plus duplicated fn_guard_* trigger functions to stop a child row pointing at another notice or the wrong jurisdiction. The jurisdictions differ by a value, not by shape: use shared tables with a jurisdiction column and enforce notice/jurisdiction and notice/decision consistency with composite foreign keys (UNIQUE (id, jurisdiction) on notices) instead of triggers. Duplicating every table, trigger and service doubles the maintenance surface and invites the two sides to drift."
+      }
+    ],
+    "revertedBy": {
+      "pr": 1682,
+      "sha": "a48e25ced1e29333be972b33dc99b13ccda85b08"
+    },
+    "relation": "rework",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-platform-57",
+    "repo": "vouchington/vouchington-platform",
+    "pr": 57,
+    "title": "[codex] extract generic media upload orchestration",
+    "baseSha": "967ff3fac7b8234fa4e46e04f7806ad2002cab52",
+    "headSha": "4dbcac657963a84b9108f3a4011fb0a8a1e7ddfd",
+    "kind": "positive",
+    "reason": "Extracted the direct-upload lifecycle (create, complete, cleanup, metadata) into a shared package; consumers had to adapt authorization, transactions, queues and retries to it, so it was cut back to utilities within a day.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "high",
+        "path": "packages/media/src/create-upload.mts",
+        "lines": null,
+        "claim": "createUpload, completeUpload and cleanup encode an application-owned upload workflow (authorization, persistence transitions, queueing, retry and cleanup ordering) behind injected hooks. Every consumer must reshape its own transaction and state machine to fit the abstraction, so the shared boundary adds adapter code rather than removing it. The platform repo should publish generic utilities (validation, hashing, spooling, S3 operations), not the lifecycle."
+      }
+    ],
+    "revertedBy": {
+      "pr": 96,
+      "sha": "3adf4e4e24a8b480d586375e326e5d85b672e4ba"
+    },
+    "relation": "rework",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-platform-59",
+    "repo": "vouchington/vouchington-platform",
+    "pr": 59,
+    "title": "feat(memberships): add provider-neutral engine",
+    "baseSha": "e7e710afaa5677953c37574300cffdf15999b6ba",
+    "headSha": "01208647ddab98408d791c476d46286560564861",
+    "kind": "positive",
+    "reason": "Shipped provider capability contracts and a package-owned lifecycle transition policy with no shared orchestrator consuming them; removed two days later to keep the repo utility-only.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "medium",
+        "path": "packages/memberships/src/lifecycle.mts",
+        "lines": null,
+        "claim": "Fixed lifecycle transitions and provider-neutral capability types (subscription create/update/cancel, webhook normalization, refunds) prescribe application workflow, but no shared orchestrator consumes them. State transitions and payment-provider contracts are application policy; publishing them as a package freezes a speculative API. Keep only reusable catalog, SKU grouping and status predicate helpers."
+      }
+    ],
+    "revertedBy": {
+      "pr": 98,
+      "sha": "99a56b3c4dfd8c61c10c77dac1ffce04a576793d"
+    },
+    "relation": "rework",
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-platform-62",
+    "repo": "vouchington/vouchington-platform",
+    "pr": 62,
+    "title": "feat(auth): add injected authentication engine",
+    "baseSha": "27f23c4a1784cfd8586e3d3076cea66d760d1a18",
+    "headSha": "7265f2f3b600248f2e93cb4db759c21cf0a3c025",
+    "kind": "positive",
+    "reason": "Published email OTP, MFA/TOTP, OAuth, JWT session issuance and HTTP handler factories; the consumer only used passkey primitives, so the orchestration was deleted five weeks later.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "high",
+        "path": "packages/auth/src/authentication.mts",
+        "lines": null,
+        "claim": "This packages whole login flows (OTP, MFA, OAuth connect/continue, session issuance) behind injected hooks and adds api-server handler factories. Login-state transitions, cookies and persistence are application-owned, so every consumer must adapt its own policy to the engine while the package has no independent reuse. Only protocol-level primitives such as WebAuthn passkey ceremonies belong in a shared utility package."
+      }
+    ],
+    "revertedBy": {
+      "pr": 112,
+      "sha": "85ce55a94206c97164c5743f4c8fbeb975094920"
+    },
+    "relation": "rework",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-platform-66",
+    "repo": "vouchington/vouchington-platform",
+    "pr": 66,
+    "title": "feat(reviews): add policy-injected review engine",
+    "baseSha": "9c4e38cb155d54024ec14e49f63d34556bfd828b",
+    "headSha": "65ab5a259863efaa0fc53857aff12c3e85a71e46",
+    "kind": "positive",
+    "reason": "Extracted a transaction-locked review lifecycle with injected authorization, policy and post-commit hooks; the product adopted then reverted it because its adapter grew and duplicated validation, and the package was removed.",
+    "expected": [
+      {
+        "pillar": "design",
+        "severity": "high",
+        "path": "packages/reviews/src/engine.mts",
+        "lines": null,
+        "claim": "createReviewsEngine owns the review lifecycle (transaction, locking, authorization, target eligibility, rating and deletion policy, post-commit effects) behind many injected callbacks, plus optional route registration. The abstraction is shaped around one application's flow, so a consumer must build a large adapter and re-validate inputs it cannot fully delegate. With a single consumer, this orchestration should stay in the application rather than become a shared package."
+      }
+    ],
+    "revertedBy": {
+      "pr": 112,
+      "sha": "85ce55a94206c97164c5743f4c8fbeb975094920"
+    },
+    "relation": "undo",
+    "confidence": "high"
+  },
+  {
+    "id": "vouchington-402",
+    "repo": "vouchington/vouchington",
+    "pr": 402,
+    "title": "fix(copyright): paginate staff review queue (#330)",
+    "baseSha": "a01875451aac7fc6da22ab0a743183a6bc98deb3",
+    "headSha": "4540a7203c2b66159e2dca3c17f9779ac4b65ebf",
+    "kind": "negative",
+    "reason": "Schema PR whose migration 0657 was not reshaped by any later change through 2026-11-01 (about 38 days; the repo is too young for a 60-day window).",
+    "expected": [],
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-613",
+    "repo": "vouchington/vouchington",
+    "pr": 613,
+    "title": "fix(copyright-notices): page the action reconcile sweeps by UUID keyset",
+    "baseSha": "025e484106be14d5969df2875beb98a64e1c3f5a",
+    "headSha": "a0cf5d04c66de83cd518175662745420ba4b2fe1",
+    "kind": "negative",
+    "reason": "Added keyset indexes in migration 0727; no later PR touched that file through 2026-11-01 (about 36 days).",
+    "expected": [],
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-620",
+    "repo": "vouchington/vouchington",
+    "pr": 620,
+    "title": "fix(copyright): paginate the staff email intake queue",
+    "baseSha": "dc4c2601d16726f2efa131dcfa67f3913eaf5657",
+    "headSha": "067bc920020824a478d40d77c7eb7fbcdf056fb4",
+    "kind": "negative",
+    "reason": "Pagination index migration 0728 untouched by any later PR through 2026-11-01 (about 36 days).",
+    "expected": [],
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-381",
+    "repo": "vouchington/vouchington",
+    "pr": 381,
+    "title": "fix(copyright): preserve overlapping legal hold bindings",
+    "baseSha": "a42029ae08cd06f85e995223d2dca5b39c9aa9dc",
+    "headSha": "e523b37989fc1319739e848973859615a3513f24",
+    "kind": "negative",
+    "reason": "Migrations 0653 and 0654 untouched by any later PR through 2026-11-01 (about 40 days).",
+    "expected": [],
+    "confidence": "medium"
+  },
+  {
+    "id": "vouchington-886",
+    "repo": "vouchington/vouchington",
+    "pr": 886,
+    "title": "fix(oauth): revoke account deletion authority and credentials",
+    "baseSha": "4090eec01fd2cdda510abb962c9c56bca178d893",
+    "headSha": "a870b17842b2d4aa0bb44696193b77a8ebae9959",
+    "kind": "negative",
+    "reason": "Migration 0735 untouched by any later PR through 2026-11-01 (about 35 days).",
+    "expected": [],
+    "confidence": "medium"
   }
 ]
