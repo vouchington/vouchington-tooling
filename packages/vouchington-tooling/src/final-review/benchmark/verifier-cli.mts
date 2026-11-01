@@ -30,10 +30,11 @@ function readRaw(path: string, deps: BenchDeps): VerifierRaw | undefined {
   return deps.exists(path) ? (JSON.parse(deps.readFile(path)) as VerifierRaw) : undefined
 }
 
-/** verifier.md with the congruence pillar inlined, since the snapshot has no skill files. */
+/** verifier.md with the files it links inlined, since the snapshot has no skill files. */
 function verifierPrompt(prompts: string, deps: BenchDeps): string {
   return [
     deps.readFile(join(prompts, 'verifier.md')).trim(),
+    deps.readFile(join(prompts, 'pillars', '_contract.md')).trim(),
     deps.readFile(join(prompts, 'pillars', 'congruence.md')).trim(),
   ].join('\n\n')
 }

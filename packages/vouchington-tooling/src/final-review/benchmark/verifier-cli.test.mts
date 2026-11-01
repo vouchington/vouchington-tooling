@@ -30,6 +30,7 @@ function harness(exec: BenchDeps['exec']) {
   const store = new Map<string, string>([
     ['cases.json', JSON.stringify(CASES)],
     ['refs/verifier.md', 'VERIFIER'],
+    ['refs/pillars/_contract.md', 'CONTRACT'],
     ['refs/pillars/congruence.md', 'CONGRUENCE'],
     [
       'f/raw/design/p1.json',
@@ -89,7 +90,9 @@ describe('runFinalReviewVerifierBenchCli', () => {
     })
     const args = [...BASE, '--prompts', 'refs', '--jobs', '1', '--model', 'opus']
     await expect(runFinalReviewVerifierBenchCli(args, h.deps)).resolves.toBe(0)
-    expect(prompts[0]?.startsWith('VERIFIER\n\nCONGRUENCE\n\n## Benchmark run')).toBe(true)
+    expect(prompts[0]?.startsWith('VERIFIER\n\nCONTRACT\n\nCONGRUENCE\n\n## Benchmark run')).toBe(
+      true,
+    )
     expect(h.logs).toContain('skip x1: no pillar findings')
     expect(h.logs).toContain('verify p1')
     expect(h.logs).toContain('judge design n1')
