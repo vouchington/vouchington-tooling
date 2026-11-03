@@ -120,8 +120,8 @@ export type VerifierRun = { verifierPrompt: string; model: string; maxTurns: num
 
 /** Identifies everything a verifier output depends on, so a changed run is not reused. */
 export function verifierRunInputs(item: EvalCase, input: VerifierInput, run: VerifierRun): string {
-  const { repo, headSha } = item
-  const payload = JSON.stringify({ repo, headSha, input, run })
+  const { repo, baseSha, headSha } = item
+  const payload = JSON.stringify({ repo, baseSha, headSha, input, run })
   return createHash('sha256').update(payload).digest('hex')
 }
 
