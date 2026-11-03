@@ -7,7 +7,7 @@ import { defaultBenchDeps, type BenchDeps } from './cli.mts'
 import { judgeAll, pool } from './judge-all.mts'
 import { gradeAll, gradeInputs, type VerifierRaw } from './verifier-grade.mts'
 import { collectVerifierInput } from './verifier-input.mts'
-import { runVerifier } from './verifier-run.mts'
+import { runVerifier, verifierRunInputs, type VerifierRun } from './verifier-run.mts'
 import {
   renderVerifierTable,
   scoreVerifierCase,
@@ -40,23 +40,30 @@ function verifierPrompt(prompts: string, deps: BenchDeps): string {
 }
 
 async function runAll(cases: EvalCase[], options: Options, deps: BenchDeps): Promise<void> {
-  const prompt = verifierPrompt(options.prompts, deps)
+  const run: VerifierRun = {
+    verifierPrompt: verifierPrompt(options.prompts, deps),
+    model: options.model,
+    maxTurns: options.maxTurns,
+  }
   const tasks = cases.flatMap((item) => {
-    // A saved output is reused, so an interrupted run resumes; use a new --out after edits.
-    const saved = readRaw(join(options.out, 'raw', `${item.id}.json`), deps)
-    if (saved !== undefined && 'output' in saved) return []
     const input = collectVerifierInput(item, options.findingsFrom, options.judge, deps)
-    if (input === null) deps.log(`skip ${item.id}: no pillar findings`)
-    return input === null ? [] : [{ item, input }]
+    if (input === null) {
+      deps.log(`skip ${item.id}: no pillar findings`)
+      return []
+    }
+    // A saved output is reused only for the same run, so a resume never reports stale results.
+    const inputs = verifierRunInputs(item, input, run)
+    const saved = readRaw(join(options.out, 'raw', `${item.id}.json`), deps)
+    if (saved !== undefined && 'output' in saved && saved.inputs === inputs) return []
+    return [{ item, input, inputs }]
   })
-  await pool(tasks, options.jobs, async ({ item, input }) => {
+  await pool(tasks, options.jobs, async ({ item, input, inputs }) => {
     deps.log(`verify ${item.id}`)
     let raw: VerifierRaw
     try {
       const cache = join(options.findingsFrom, 'cache')
       const { dir } = await deps.prepare(item, cache, join(options.out, 'work'), deps.exec)
-      const run = { verifierPrompt: prompt, model: options.model, maxTurns: options.maxTurns }
-      raw = { input, output: await runVerifier(item, dir, input.findings, run, deps.exec) }
+      raw = { input, inputs, output: await runVerifier(item, dir, input.findings, run, deps.exec) }
     } catch (error) {
       raw = { input, error: error instanceof Error ? error.message : String(error) }
     }

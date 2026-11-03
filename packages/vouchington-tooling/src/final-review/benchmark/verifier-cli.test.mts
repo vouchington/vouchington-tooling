@@ -129,9 +129,33 @@ describe('runFinalReviewVerifierBenchCli', () => {
     expect(markdown).toContain('- x1: not graded')
   })
 
-  it('reuses saved verifier outputs', async () => {
+  it('reuses a saved verifier output only while its run inputs match', async () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    const exec = vi.fn(async () => '')
+    const exec = vi.fn(async () =>
+      JSON.stringify({
+        structured_output: { summary: 's', findings: [{ ...FINDING, sources: [0, 1] }] },
+      }),
+    )
+    const h = harness(exec)
+    const args = [...BASE, '--prompts', 'refs', '--case', 'p1']
+    const callsAfter = async (extra: string[] = []) => {
+      await runFinalReviewVerifierBenchCli([...args, ...extra], h.deps)
+      return exec.mock.calls.length
+    }
+    expect(await callsAfter()).toBe(1)
+    expect(await callsAfter()).toBe(1)
+    expect(JSON.parse(h.store.get('o/raw/p1.json') as string).graded.added).toEqual([null])
+    expect(await callsAfter(['--model', 'sonnet'])).toBe(2)
+    expect(await callsAfter(['--model', 'sonnet', '--max-turns', '9'])).toBe(3)
+    h.store.set('refs/verifier.md', 'EDITED')
+    expect(await callsAfter(['--model', 'sonnet', '--max-turns', '9'])).toBe(4)
+  })
+
+  it('repeats a saved verifier output that has no run inputs', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const exec = vi.fn(async () =>
+      JSON.stringify({ structured_output: { summary: 's', findings: [] } }),
+    )
     const h = harness(exec)
     const output = { summary: '', findings: [], sources: [] }
     h.store.set(
@@ -139,8 +163,7 @@ describe('runFinalReviewVerifierBenchCli', () => {
       JSON.stringify({ input: { findings: [], real: [], planted: [] }, output }),
     )
     await runFinalReviewVerifierBenchCli([...BASE, '--prompts', 'refs', '--case', 'p1'], h.deps)
-    expect(exec).not.toHaveBeenCalled()
-    expect(JSON.parse(h.store.get('o/raw/p1.json') as string).graded.added).toEqual([null])
+    expect(exec).toHaveBeenCalled()
   })
 
   it('records non-crashing errors from Error instances', async () => {

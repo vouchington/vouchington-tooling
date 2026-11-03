@@ -68,13 +68,24 @@ export function checkArgs(prompt: string, model: string, maxTurns: number): stri
   ]
 }
 
-/** Maps verdicts to the listed indexes; verdicts for unlisted or repeated indexes are dropped. */
+type Verdict = Check & { index: number }
+
+function isVerdict(value: unknown): value is Verdict {
+  if (typeof value !== 'object' || value === null) return false
+  const { index, holds, reason } = value as Record<string, unknown>
+  return typeof index === 'number' && typeof holds === 'boolean' && typeof reason === 'string'
+}
+
+/**
+ * Maps verdicts to the listed indexes. Malformed verdicts and those for unlisted or repeated
+ * indexes are dropped, so their findings stay unchecked rather than counting as refuted.
+ */
 export function parseChecks(stdout: string, indexes: readonly number[]): Map<number, Check> {
   const parsed = JSON.parse(stdout) as { structured_output?: { verdicts?: unknown } } | null
   const verdicts = parsed?.structured_output?.verdicts
   if (!Array.isArray(verdicts)) throw new FinalReviewError('Check run returned no verdicts.')
   const checks = new Map<number, Check>()
-  for (const verdict of verdicts as Array<{ index: number; holds: boolean; reason: string }>) {
+  for (const verdict of (verdicts as unknown[]).filter(isVerdict)) {
     if (indexes.includes(verdict.index) && !checks.has(verdict.index)) {
       checks.set(verdict.index, { holds: verdict.holds, reason: verdict.reason })
     }

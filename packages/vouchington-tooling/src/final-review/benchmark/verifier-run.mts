@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import {
   FinalReviewError,
   PILLARS,
@@ -9,6 +11,7 @@ import { NUMBERED_DIFF_LEGEND } from '../numbered-diff.mts'
 import type { EvalCase } from './cases.mts'
 import { READ_ONLY_TOOLS } from './runner.mts'
 import { CONTEXT_DIR, type Exec } from './snapshot.mts'
+import type { VerifierInput } from './verifier-input.mts'
 
 const VERIFIER_OUTPUT_SCHEMA = {
   type: 'object',
@@ -114,6 +117,13 @@ export function parseVerifierOutput(stdout: string, inputCount: number): Verifie
 }
 
 export type VerifierRun = { verifierPrompt: string; model: string; maxTurns: number }
+
+/** Identifies everything a verifier output depends on, so a changed run is not reused. */
+export function verifierRunInputs(item: EvalCase, input: VerifierInput, run: VerifierRun): string {
+  const { repo, headSha } = item
+  const payload = JSON.stringify({ repo, headSha, input, run })
+  return createHash('sha256').update(payload).digest('hex')
+}
 
 /** Runs the verifier once in the snapshot directory with read-only tools. */
 export async function runVerifier(

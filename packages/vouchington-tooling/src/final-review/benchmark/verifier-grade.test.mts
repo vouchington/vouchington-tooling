@@ -64,7 +64,7 @@ describe('gradeAll', () => {
       sources: [[0], [], []],
     }
     const calls: string[] = []
-    const h = harness({ p1: { input, output } }, async (_command, args, options) => {
+    const h = harness({ p1: { input, inputs: 'run', output } }, async (_command, args, options) => {
       const prompt = args[1] as string
       if (options?.cwd === undefined) {
         calls.push('judge')
@@ -100,9 +100,9 @@ describe('gradeAll', () => {
     const thrower = { ...ITEM, id: 't1' }
     const h = harness(
       {
-        p2: { input, output: quiet },
+        p2: { input, inputs: 'run', output: quiet },
         e1: { input, error: 'x' },
-        t1: { input, output: strong },
+        t1: { input, inputs: 'run', output: strong },
       },
       async (_command, _args, options) => {
         if (options?.cwd !== undefined) throw 'check broke'

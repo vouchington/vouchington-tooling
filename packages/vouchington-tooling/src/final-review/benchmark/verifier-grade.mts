@@ -24,7 +24,7 @@ export type Graded = {
 }
 
 export type VerifierRaw = { input: VerifierInput } & (
-  | { output: VerifierOutput; graded?: Graded }
+  | { output: VerifierOutput; inputs: string; graded?: Graded }
   | { error: string }
 )
 
@@ -34,7 +34,7 @@ export function referencing(output: VerifierOutput, indexes: readonly number[]):
 }
 
 /** Output findings with no sources: the ones the verifier raised itself. */
-export function addedIndexes(output: VerifierOutput): number[] {
+function addedIndexes(output: VerifierOutput): number[] {
   return output.sources.flatMap((list, at) => (list.length === 0 ? [at] : []))
 }
 

@@ -71,8 +71,8 @@ pillar's findings, plants a copy of each real finding under a second pillar, and
 pillar, and the findings as indexed JSON. The verifier returns the review with `sources` on every
 finding: the input indexes it confirms or merges.
 
-The verifier may add findings of its own (no `sources`). A correct addition is a win, so findings
-are graded on whether they are right rather than counted:
+The verifier may add findings of its own, with an empty `sources` array. A correct addition is a
+win, so findings are graded on whether they are right rather than counted:
 
 - **Real kept**: real inputs that some output finding cites, directly or through the planted copy.
 - **Label recall, pillars → verifier**: labeled problems raised by the pillar findings, and by the
@@ -89,9 +89,9 @@ are graded on whether they are right rather than counted:
   findings.
 
 Results go to `<out>/raw/<case>.json` (input, output, and grade), `summary.json`, and
-`summary.md`. A saved verifier output is reused, so a rerun resumes and grades only what is
-missing; use a new `--out` after editing the verifier prompt. `--score-only` re-scores without
-model calls.
+`summary.md`. A saved verifier output is reused only while the case head, verifier prompt, model,
+turn limit, and input findings all match, so a rerun resumes, repeats what changed, and grades only
+what is missing. `--score-only` re-scores the saved outputs as they are, without model calls.
 
 ## Metrics
 

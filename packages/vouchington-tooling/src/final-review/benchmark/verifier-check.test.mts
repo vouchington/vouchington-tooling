@@ -43,6 +43,21 @@ describe('verifier check', () => {
     expect(() => parseChecks(out('x'), [1])).toThrow('no verdicts')
   })
 
+  it('drops malformed verdicts so their findings stay unchecked', () => {
+    const checks = parseChecks(
+      out([
+        null,
+        'x',
+        { index: '1', holds: true, reason: 'index' },
+        { index: 1, reason: 'no holds' },
+        { index: 1, holds: true },
+        { index: 2, holds: true, reason: 'valid' },
+      ]),
+      [1, 2],
+    )
+    expect([...checks]).toEqual([[2, { holds: true, reason: 'valid' }]])
+  })
+
   it('skips the call with nothing to check and runs in the snapshot otherwise', async () => {
     const cwds: Array<string | undefined> = []
     const exec = async (_command: string, _args: string[], options?: { cwd?: string }) => {
