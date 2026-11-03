@@ -166,6 +166,26 @@ describe('runFinalReviewVerifierBenchCli', () => {
     expect(exec).toHaveBeenCalled()
   })
 
+  it('records a case whose labeled pillar is not judged instead of verifying it', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const exec = vi.fn(async () => {
+      throw new Error('judge down')
+    })
+    const h = harness(exec)
+    h.store.set('f/raw/design/p1.json', JSON.stringify({ findings: [FINDING] }))
+    await runFinalReviewVerifierBenchCli([...BASE, '--prompts', 'refs', '--case', 'p1'], h.deps)
+    expect(exec).toHaveBeenCalledTimes(1)
+    expect(h.store.get('o/summary.md')).toContain('- p1: design findings are not judged by sonnet.')
+  })
+
+  it('reports cases with no saved run', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const h = harness(async () => '')
+    await runFinalReviewVerifierBenchCli([...BASE, '--score-only'], h.deps)
+    const markdown = h.store.get('o/summary.md') as string
+    for (const id of ['p1', 'n1', 'x1']) expect(markdown).toContain(`- ${id}: not run`)
+  })
+
   it('records non-crashing errors from Error instances', async () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     const h = harness(async () => {

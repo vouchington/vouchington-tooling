@@ -1,7 +1,8 @@
 /** One file's section of a (numbered) unified diff. */
 export type DiffFile = { path: string; text: string; added: number; removed: number }
 
-const HEADER = /^diff --git a\/.* b\/(.*)$/u
+// Git quotes a path holding a tab, quote, or non-ASCII byte; the index shows it as Git printed it.
+const HEADER = /^diff --git (?:"a\/.*"|a\/.*) (?:"b\/(.*)"|b\/(.*))$/u
 
 /**
  * Splits a unified diff (plain or numbered) into per-file sections, so a reviewer of a large pull
@@ -25,7 +26,7 @@ export function splitDiff(patch: string): DiffFile[] {
     const header = HEADER.exec(line)
     if (header !== null) {
       flush()
-      current = { path: header[1] as string, lines: [] }
+      current = { path: (header[1] ?? header[2]) as string, lines: [] }
     }
     current?.lines.push(line)
   }

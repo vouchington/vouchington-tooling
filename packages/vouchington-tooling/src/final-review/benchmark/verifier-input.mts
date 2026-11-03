@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { PILLARS, type Finding, type Pillar } from '../finding.mts'
+import { FinalReviewError, PILLARS, type Finding, type Pillar } from '../finding.mts'
 import type { EvalCase } from './cases.mts'
 import { currentAssignment, type RawResult } from './judge-all.mts'
 
@@ -22,7 +22,8 @@ function otherPillar(pillar: Pillar): Pillar {
 /**
  * Gathers every pillar's saved findings for one case from a pillar bench output directory. A
  * finding the judge matched to an expectation is "real"; each real finding gets a planted copy
- * under another pillar to test deduplication. Returns null when no pillar result exists.
+ * under another pillar to test deduplication. Returns null when no pillar result exists, and
+ * throws when a pillar with labels has no current judgement, since its real findings are unknown.
  */
 export function collectVerifierInput(
   item: EvalCase,
@@ -49,6 +50,9 @@ export function collectVerifierInput(
       targets.map(({ entry }) => entry),
       judgeModel,
     )
+    if (assignment === undefined && targets.length > 0) {
+      throw new FinalReviewError(`${pillar} findings are not judged by ${judgeModel}.`)
+    }
     assignment?.forEach((at, position) => {
       if (at !== null) real.push([offset + at, (targets[position] as { index: number }).index])
     })

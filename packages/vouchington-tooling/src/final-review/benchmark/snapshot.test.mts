@@ -85,6 +85,37 @@ describe('prepareSnapshot', () => {
     expect(calls.at(-2)?.[1]).toContain(`${item.baseSha}...${item.headSha}`)
   })
 
+  it('shares one clone between parallel cases of a repository', async () => {
+    const calls: Array<[string, string[]]> = []
+    const other = { ...item, id: 'case-2' }
+    const cache = join(root, 'cache')
+    const work = join(root, 'work')
+    const exec = fakeExec(calls)
+    await Promise.all([
+      prepareSnapshot(item, cache, work, exec),
+      prepareSnapshot(other, cache, work, exec),
+    ])
+    expect(calls.filter(([command, args]) => command === 'gh' && args[0] === 'repo')).toHaveLength(
+      1,
+    )
+  })
+
+  it('retries a clone after a failed one', async () => {
+    const calls: Array<[string, string[]]> = []
+    const exec = fakeExec(calls)
+    const failing: Exec = async (command, args, options) => {
+      if (command === 'gh' && args[0] === 'repo') throw new Error('clone failed')
+      return exec(command, args, options)
+    }
+    const cache = join(root, 'cache')
+    const work = join(root, 'work')
+    await expect(prepareSnapshot(item, cache, work, failing)).rejects.toThrow('clone failed')
+    await expect(prepareSnapshot(item, cache, work, exec)).resolves.toBeDefined()
+    expect(calls.filter(([command, args]) => command === 'gh' && args[0] === 'repo')).toHaveLength(
+      1,
+    )
+  })
+
   it('reuses an existing clone and clears stale work directories', async () => {
     const cache = join(root, 'cache')
     const work = join(root, 'work')

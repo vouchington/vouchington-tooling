@@ -34,6 +34,18 @@ describe('splitDiff', () => {
     expect(splitDiff('no headers')).toEqual([])
   })
 
+  it('splits at quoted Git paths', () => {
+    const patch = [
+      'diff --git a/a.ts b/a.ts',
+      '+one',
+      'diff --git "a/caf\\303\\251.ts" "b/caf\\303\\251.ts"',
+      '+two',
+    ].join('\n')
+    for (const text of [patch, numberDiff(patch)]) {
+      expect(splitDiff(text).map(({ path }) => path)).toEqual(['a.ts', 'caf\\303\\251.ts'])
+    }
+  })
+
   it('names patches by position and indexes the largest change first', () => {
     expect(diffFileName(0)).toBe('0001.patch')
     expect(renderDiffIndex(splitDiff(PATCH), 'd').split('\n')).toEqual([

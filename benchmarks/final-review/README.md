@@ -91,7 +91,9 @@ win, so findings are graded on whether they are right rather than counted:
 Results go to `<out>/raw/<case>.json` (input, output, and grade), `summary.json`, and
 `summary.md`. A saved verifier output is reused only while the case head, verifier prompt, model,
 turn limit, and input findings all match, so a rerun resumes, repeats what changed, and grades only
-what is missing. `--score-only` re-scores the saved outputs as they are, without model calls.
+what is missing. A case whose labeled pillar has no current judgement is recorded as an error
+rather than verified, and the summary lists any case with no saved run. `--score-only` re-scores
+the saved outputs as they are, without model calls.
 
 ## Metrics
 

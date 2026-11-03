@@ -23,10 +23,9 @@ export type Graded = {
   checks: Array<Check | null>
 }
 
-export type VerifierRaw = { input: VerifierInput } & (
-  | { output: VerifierOutput; inputs: string; graded?: Graded }
-  | { error: string }
-)
+export type VerifierRaw =
+  | { input: VerifierInput; output: VerifierOutput; inputs: string; graded?: Graded }
+  | { input?: VerifierInput; error: string }
 
 /** Output findings that cite any of `indexes` as a source. */
 export function referencing(output: VerifierOutput, indexes: readonly number[]): number[] {

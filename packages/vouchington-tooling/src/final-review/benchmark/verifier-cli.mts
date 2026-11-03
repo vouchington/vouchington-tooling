@@ -6,7 +6,7 @@ import { parseEvalCases, type EvalCase } from './cases.mts'
 import { defaultBenchDeps, type BenchDeps } from './cli.mts'
 import { judgeAll, pool } from './judge-all.mts'
 import { gradeAll, gradeInputs, type VerifierRaw } from './verifier-grade.mts'
-import { collectVerifierInput } from './verifier-input.mts'
+import { collectVerifierInput, type VerifierInput } from './verifier-input.mts'
 import { runVerifier, verifierRunInputs, type VerifierRun } from './verifier-run.mts'
 import {
   renderVerifierTable,
@@ -30,6 +30,14 @@ function readRaw(path: string, deps: BenchDeps): VerifierRaw | undefined {
   return deps.exists(path) ? (JSON.parse(deps.readFile(path)) as VerifierRaw) : undefined
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function writeRaw(item: EvalCase, raw: VerifierRaw, options: Options, deps: BenchDeps): void {
+  deps.writeFile(join(options.out, 'raw', `${item.id}.json`), `${JSON.stringify(raw, null, 2)}\n`)
+}
+
 /** verifier.md with the files it links inlined, since the snapshot has no skill files. */
 function verifierPrompt(prompts: string, deps: BenchDeps): string {
   return [
@@ -46,7 +54,14 @@ async function runAll(cases: EvalCase[], options: Options, deps: BenchDeps): Pro
     maxTurns: options.maxTurns,
   }
   const tasks = cases.flatMap((item) => {
-    const input = collectVerifierInput(item, options.findingsFrom, options.judge, deps)
+    let input: VerifierInput | null
+    try {
+      input = collectVerifierInput(item, options.findingsFrom, options.judge, deps)
+    } catch (error) {
+      // Without current labels the case can't be scored, so record it instead of verifying it.
+      writeRaw(item, { error: errorMessage(error) }, options, deps)
+      return []
+    }
     if (input === null) {
       deps.log(`skip ${item.id}: no pillar findings`)
       return []
@@ -65,9 +80,9 @@ async function runAll(cases: EvalCase[], options: Options, deps: BenchDeps): Pro
       const { dir } = await deps.prepare(item, cache, join(options.out, 'work'), deps.exec)
       raw = { input, inputs, output: await runVerifier(item, dir, input.findings, run, deps.exec) }
     } catch (error) {
-      raw = { input, error: error instanceof Error ? error.message : String(error) }
+      raw = { input, error: errorMessage(error) }
     }
-    deps.writeFile(join(options.out, 'raw', `${item.id}.json`), `${JSON.stringify(raw, null, 2)}\n`)
+    writeRaw(item, raw, options, deps)
   })
 }
 
@@ -76,8 +91,8 @@ function scoreAll(cases: EvalCase[], options: Options, deps: BenchDeps): string 
   const errors: string[] = []
   for (const item of cases) {
     const raw = readRaw(join(options.out, 'raw', `${item.id}.json`), deps)
-    if (raw === undefined) continue
-    if ('error' in raw) errors.push(`- ${item.id}: ${raw.error}`)
+    if (raw === undefined) errors.push(`- ${item.id}: not run`)
+    else if ('error' in raw) errors.push(`- ${item.id}: ${raw.error}`)
     else if (raw.graded?.inputs !== gradeInputs(item, raw.output, [options.judge, options.checker]))
       errors.push(`- ${item.id}: not graded`)
     else scores.push(scoreVerifierCase(item, raw.input, raw.output, raw.graded))

@@ -96,6 +96,13 @@ describe('collectVerifierInput', () => {
     ])
   })
 
+  it('refuses a labeled pillar whose findings are not judged', () => {
+    const deps = files({ 'f/raw/design/p1.json': { findings: [finding()] } })
+    expect(() => collectVerifierInput(ITEM, 'f', 'sonnet', deps)).toThrow(
+      'design findings are not judged by sonnet.',
+    )
+  })
+
   it('returns null when no pillar result exists', () => {
     expect(collectVerifierInput(ITEM, 'f', 'sonnet', files({}))).toBeNull()
     expect(
