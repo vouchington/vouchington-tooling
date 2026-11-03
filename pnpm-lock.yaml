@@ -24,8 +24,8 @@ importers:
         specifier: ^10.13.0
         version: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
       eslint-plugin-no-mistakes:
-        specifier: ^0.98.0
-        version: 0.98.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))
+        specifier: ^0.99.0
+        version: 0.99.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2)
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -2059,11 +2059,18 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-no-mistakes@0.98.0:
-    resolution: {integrity: sha512-5afSMS5PWOyJcQoR7mZrhtixo+MbWXhn4kX0hsRtyC3JwvuV6p/WUDM1GLyg4EYy4SF9EUvFYNQgHNIuGwPNFg==}
+  eslint-plugin-no-mistakes@0.99.0:
+    resolution: {integrity: sha512-aC4cXd/cgMFcvTJ5wd2onpPTEF7r9vHo4TKRXsNzc8eNHAsrY0iXZfSOBjswLrun42/034AZs3Ftps8IQrsCGg==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     peerDependencies:
+      '@typescript-eslint/parser': '>=8'
       eslint: '>=9'
+      typescript: '>=4.8.4'
+    peerDependenciesMeta:
+      '@typescript-eslint/parser':
+        optional: true
+      typescript:
+        optional: true
 
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
@@ -4924,9 +4931,11 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-no-mistakes@0.98.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0)):
+  eslint-plugin-no-mistakes@0.99.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2):
     dependencies:
       eslint: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
+    optionalDependencies:
+      typescript: 7.0.2
 
   eslint-scope@9.1.2:
     dependencies:
