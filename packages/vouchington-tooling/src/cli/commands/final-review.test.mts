@@ -6,9 +6,13 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 vi.mock('../../final-review/benchmark/cli.mts', () => ({
   runFinalReviewBenchCli: vi.fn(async () => 5),
 }))
+vi.mock('../../final-review/benchmark/verifier-cli.mts', () => ({
+  runFinalReviewVerifierBenchCli: vi.fn(async () => 6),
+}))
 
 import type { FinalReviewIo } from '../../final-review/index.mts'
 import { runFinalReviewBenchCli } from '../../final-review/benchmark/cli.mts'
+import { runFinalReviewVerifierBenchCli } from '../../final-review/benchmark/verifier-cli.mts'
 import { runFinalReviewCommand, type FinalReviewDeps } from './final-review.mts'
 
 const SHA = 'e'.repeat(40)
@@ -36,6 +40,7 @@ function deps(io: FinalReviewIo, input = '{}'): MockDeps {
     createIo: vi.fn(() => io),
     readFile: vi.fn(() => input),
     runBench: vi.fn(async () => 7),
+    runVerifierBench: vi.fn(async () => 8),
   }
 }
 
@@ -64,6 +69,8 @@ describe('runFinalReviewCommand', () => {
     const d = deps(fakeIo())
     await expect(runFinalReviewCommand(['bench', '--cases', 'c'], d)).resolves.toBe(7)
     expect(d.runBench).toHaveBeenCalledWith(['--cases', 'c'])
+    await expect(runFinalReviewCommand(['bench-verifier', '--out', 'o'], d)).resolves.toBe(8)
+    expect(d.runVerifierBench).toHaveBeenCalledWith(['--out', 'o'])
     expect(d.createIo).not.toHaveBeenCalled()
   })
 
@@ -146,7 +153,7 @@ describe('runFinalReviewCommand', () => {
     await expect(runFinalReviewCommand(['status', '--bogus'], d)).resolves.toBe(2)
     expect(err.join('')).toContain('final-review: --repo and --pr are required.')
     expect(err.join('')).toContain(
-      'final-review: final-review needs post, diff, revoke, status, or bench.',
+      'final-review: final-review needs post, diff, revoke, status, bench, or bench-verifier.',
     )
   })
 
@@ -178,6 +185,8 @@ describe('runFinalReviewCommand default dependencies', () => {
       expect(err.join('')).toContain('--repo must be owner/name.')
       await expect(runFinalReviewCommand(['bench', '--x'])).resolves.toBe(5)
       expect(runFinalReviewBenchCli).toHaveBeenCalledWith(['--x'])
+      await expect(runFinalReviewCommand(['bench-verifier', '--y'])).resolves.toBe(6)
+      expect(runFinalReviewVerifierBenchCli).toHaveBeenCalledWith(['--y'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

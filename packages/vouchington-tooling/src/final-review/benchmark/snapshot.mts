@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { diffFileName, renderDiffIndex, splitDiff } from '../diff-files.mts'
 import { numberDiff } from '../numbered-diff.mts'
 import type { EvalCase } from './cases.mts'
 
@@ -48,6 +49,31 @@ export type Snapshot = {
 /** Context files a pillar reads, kept inside the snapshot so read-only tools can reach them. */
 export const CONTEXT_DIR = '.final-review'
 
+const pendingClones = new Map<string, Promise<unknown>>()
+
+/** Clones a repository once, so parallel cases sharing one wait instead of cloning over it. */
+async function ensureClone(repo: string, repoDir: string, exec: Exec): Promise<void> {
+  const pending = pendingClones.get(repoDir)
+  if (pending !== undefined) {
+    await pending
+    return
+  }
+  if (existsSync(join(repoDir, '.git'))) return
+  const args = [
+    'repo',
+    'clone',
+    repo,
+    repoDir,
+    '--',
+    '--filter=blob:none',
+    '--no-checkout',
+    '--quiet',
+  ]
+  const clone = exec('gh', args).finally(() => pendingClones.delete(repoDir))
+  pendingClones.set(repoDir, clone)
+  await clone
+}
+
 /**
  * Exports the pre-merge head as a tree without `.git`, so the reviewer cannot read later history
  * (the revert, follow-up fixes) that would leak the answer.
@@ -59,19 +85,8 @@ export async function prepareSnapshot(
   exec: Exec = defaultExec,
 ): Promise<Snapshot> {
   const repoDir = join(cacheRoot, item.repo.replace('/', '__'))
-  if (!existsSync(join(repoDir, '.git'))) {
-    mkdirSync(cacheRoot, { recursive: true })
-    await exec('gh', [
-      'repo',
-      'clone',
-      item.repo,
-      repoDir,
-      '--',
-      '--filter=blob:none',
-      '--no-checkout',
-      '--quiet',
-    ])
-  }
+  mkdirSync(cacheRoot, { recursive: true })
+  await ensureClone(item.repo, repoDir, exec)
   await exec('git', ['-C', repoDir, 'fetch', '--quiet', 'origin', item.baseSha, item.headSha])
   const caseRoot = join(workRoot, item.id)
   const dir = join(caseRoot, 'tree')
@@ -101,7 +116,15 @@ export async function prepareSnapshot(
   ])
   const context = join(dir, CONTEXT_DIR)
   mkdirSync(context, { recursive: true })
-  writeFileSync(join(context, 'diff.patch'), numberDiff(diff))
+  const numbered = numberDiff(diff)
+  writeFileSync(join(context, 'diff.patch'), numbered)
+  // Per-file patches and an index let a reviewer of a large diff read one file at a time.
+  const files = splitDiff(numbered)
+  mkdirSync(join(context, 'diff'), { recursive: true })
+  files.forEach((file, index) => {
+    writeFileSync(join(context, 'diff', diffFileName(index)), file.text)
+  })
+  writeFileSync(join(context, 'files.md'), renderDiffIndex(files, `${CONTEXT_DIR}/diff`))
   writeFileSync(join(context, 'pr.md'), `# ${item.title}\n\n${body.trim()}\n`)
   return { dir, diff, body }
 }

@@ -29,7 +29,7 @@ checkout). Run it with `--help` for the flags.
    outlives a new head.
 3. For a follow-up, run `vouchington final-review status --repo <repo> --pr <n>` to get the last
    reviewed SHA, and read the unresolved threads of the previous final review.
-4. Create a private run directory: `run=$(mktemp -d "$TMPDIR/final-review-<name>-<n>-XXXXXX")`
+4. Create a private run directory: `run=$(mktemp -d "${TMPDIR:-/tmp}/final-review-<name>-<n>-XXXXXX")`
    (`mktemp -d` makes it readable only by you). Everything for this review lives under it.
 5. Check out the reviewed head as a detached worktree at `"$run/tree"`, from a local clone when one
    exists (`git -C <clone> fetch origin <head> && git -C <clone> worktree add --detach "$run/tree"

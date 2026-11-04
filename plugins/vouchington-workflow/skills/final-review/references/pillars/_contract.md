@@ -53,5 +53,9 @@ Return only JSON:
 - `blocking` means the pull request must not merge as is. Use it only when the pillar's blocking
   bar is met. Otherwise: `high` (should fix before merge), `medium` (worth fixing), `low` (nit or
   follow-up).
+- Rate by the effect when the code is used as declared, not by how likely that use is. An option,
+  parameter, or field the API accepts but ignores produces a wrong result for every caller who
+  sets it, even when the default path works. A pre-release or unpublished version does not lower
+  severity: a wrong boundary or contract costs the same to unwind once a consumer adopts it.
 - Put a GitHub `suggestion` block in the body only for an exact, minimal replacement of the
   commented lines.

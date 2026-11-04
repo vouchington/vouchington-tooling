@@ -18,7 +18,7 @@ export type BenchDeps = {
   prepare: typeof prepareSnapshot
 }
 
-const defaultDeps: BenchDeps = {
+export const defaultBenchDeps: BenchDeps = {
   exec: defaultExec,
   readFile: (path) => readFileSync(path, 'utf8'),
   writeFile: (path, text) => {
@@ -132,7 +132,7 @@ function scoreAll(cases: EvalCase[], pillars: Pillar[], options: Options, deps: 
 /** `vouchington final-review bench`: run pillar prompts over labeled cases and score them. */
 export async function runFinalReviewBenchCli(
   args: string[],
-  deps: BenchDeps = defaultDeps,
+  deps: BenchDeps = defaultBenchDeps,
 ): Promise<number> {
   const { values } = parseArgs({
     args,
