@@ -140,8 +140,8 @@ importers:
         specifier: 4.0.0
         version: 4.0.0
       '@vouchington/postgres':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.2
+        version: 0.1.2
       '@vouchington/worker-runtime':
         specifier: 0.2.1
         version: 0.2.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.0.5)
@@ -1772,8 +1772,8 @@ packages:
   '@vitest/spy@5.0.5':
     resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
 
-  '@vouchington/postgres@0.1.0':
-    resolution: {integrity: sha512-Uv2lSMIvkJrV92oHTO5J1i498PwXClKcSKiKGNsy+J0EU79fdeP5yZ2mE9qDGVCQeogKj7T+FpNI3EuTgb0hiw==}
+  '@vouchington/postgres@0.1.2':
+    resolution: {integrity: sha512-EeEiNkFT0qdBf2cIe2l2J14SKY+J2B7YYLxiQgoPpOlswUzjxxLh6stCy831Vv9mtEX+Oep2sRCW1Z4I+kaz1g==}
     engines: {node: '>=24.0.0'}
 
   '@vouchington/worker-runtime@0.2.1':
@@ -4626,7 +4626,7 @@ snapshots:
 
   '@vitest/spy@5.0.5': {}
 
-  '@vouchington/postgres@0.1.0':
+  '@vouchington/postgres@0.1.2':
     dependencies:
       '@libpg-query/parser': 18.0.0
       pg: 8.23.1
