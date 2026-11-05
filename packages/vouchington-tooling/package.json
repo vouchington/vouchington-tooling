@@ -540,7 +540,7 @@
     "@vouchington/worker-runtime": "0.2.1",
     "glide-mq": "^0.20.0",
     "next": "16.4.3",
-    "no-mistakes": "0.101.0",
+    "no-mistakes": "0.104.0",
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
