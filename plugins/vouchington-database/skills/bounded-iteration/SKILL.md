@@ -40,10 +40,10 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    keeps a static ceiling; the default and the effective maximum are runtime-tunable but never
    above it. (`postgres-no-offset`)
 8. **List and feed reads.** A list read is one walk over the entity being listed. Filters go in
-   `WHERE`, served by an index. Order with `ORDER BY key, id DESC` and `LIMIT page+1`, with a plain
-   keyset cursor. The page `LIMIT` plus a time window or the keyset bound the read; nothing else is
+   `WHERE`, served by an index. Order with `ORDER BY key DESC, id DESC` and `LIMIT page+1`, and
+   continue with a plain keyset cursor, `(key, id) < ($1, $2)`. The page `LIMIT` plus a time window or the keyset bound the read; nothing else is
    needed. No candidate pools: no capped or `MATERIALIZED` CTE over the listed entity that is
-   filtered or limited afterwards, no window loops or resume probes, no proof state in the
+   filtered or limited afterward, no window loops or resume probes, no proof state in the
    cursor, and no runtime-config fields that exist only to cap a read. A page is never short or
    empty while `has_next_page` is true. Small viewer-scoped sets (the viewer's follows, mutes,
    blocks and memberships) may be subqueries or semi-joins, because write limits bound them.
