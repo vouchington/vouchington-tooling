@@ -28,10 +28,11 @@ Read and return tables with explicit columns: no `SELECT *`, `alias.*`, or `RETU
 A view may use `*` when its reviewed column list is the reader contract.
 
 Use keyset pagination, never `OFFSET`. An optimizer fence is a `MATERIALIZED` CTE, not
-`OFFSET 0`. A `MATERIALIZED` CTE computes every row up to its own `LIMIT` before outer filters
-and the outer `LIMIT` run, so the planner cannot stop early. Use it only when the CTE holds the
-final `LIMIT`, or for a small viewer-scoped set. Never use it as a candidate pool before the page
-`LIMIT`. Constrain a partitioned table's partition key, or document the reason for a
+`OFFSET 0`. The fence keeps the outer query's filters and ordering away from the CTE's indexes.
+The outer query still reads CTE rows on demand and can stop at its `LIMIT`, but when its filters
+reject most CTE rows, or it sorts or aggregates them, it reads every row up to the CTE's own
+`LIMIT`. Use a `MATERIALIZED` CTE only when it holds the final `LIMIT`, or for a small
+viewer-scoped set. Never use it as a candidate pool before the page `LIMIT`. Constrain a partitioned table's partition key, or document the reason for a
 cross-partition query. Choose the partition key from dominant access patterns; a hot reader
 of `RANGE (id)` needs an id or time bound.
 
