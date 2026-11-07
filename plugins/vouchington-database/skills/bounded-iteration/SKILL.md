@@ -24,7 +24,8 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    a cap to infinity.
 3. **Bound every statement.** A SELECT, UPDATE, or DELETE that can touch many rows has a `LIMIT`.
    For writes the `LIMIT` goes in a CTE, with `FOR UPDATE SKIP LOCKED` when workers compete.
-   (`postgres-lock-ordering`)
+   (`postgres-lock-ordering`) For list reads, the bound is the page `LIMIT` plus a window or keyset,
+   not a separate candidate cap.
 4. **A stream is not a bound.** A cursor or stream bounds memory, not work. Cap the rows streamed
    per run.
 5. **Resume without restarting.** Keep a keyset position on the UUIDv7 key or a
@@ -38,32 +39,43 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
 7. **Keyset pagination.** No `OFFSET`. Clamp the client's page size on the server. The API schema
    keeps a static ceiling; the default and the effective maximum are runtime-tunable but never
    above it. (`postgres-no-offset`)
-8. **Tunables are runtime configuration.** Batch sizes, page sizes, caps, and windows come from
+8. **List and feed reads.** A list read is one walk over the entity being listed. Filters go in
+   `WHERE`, served by an index. Order with `ORDER BY key, id DESC` and `LIMIT page+1`, with a plain
+   keyset cursor. The page `LIMIT` plus a time window or the keyset bound the read; nothing else is
+   needed. No candidate pools: no capped or `MATERIALIZED` CTE over the listed entity that is
+   filtered or limited afterwards, no window loops or resume probes, no proof state in the
+   cursor, and no runtime-config fields that exist only to cap a read. A page is never short or
+   empty while `has_next_page` is true. Small viewer-scoped sets (the viewer's follows, mutes,
+   blocks and memberships) may be subqueries or semi-joins, because write limits bound them.
+   Measure a list-read change against the plain single walk, not only against the base branch. See
+   [`MATERIALIZED` CTEs](../postgres-node-performance-tuning/references/performance-patterns.md).
+9. **Tunables are runtime configuration.** Batch sizes, page sizes, caps, and windows come from
    the consumer's runtime configuration with a validated default and a hard maximum, and are bound
-   as SQL parameters. `LIMIT 1` and an external API's page maximum are contracts, not tunables.
-9. **One dispatcher per signal.** Split an `OR` of unrelated reasons into one dispatcher per
-   reason, each with its own index-served predicate, position, and schedule, all enqueuing the same
-   idempotent job. Writes that cause a signal enqueue directly; the sweep is the backstop. See
-   [one dispatcher per signal](references/sweep-patterns.md#one-dispatcher-per-signal).
-10. **Deduplicate jobs by entity and triggering event.** A job id keyed only by the entity drops a
+   as SQL parameters. `LIMIT 1` and an external API's page maximum are contracts, not tunables. For list reads, the bound is the page `LIMIT` plus a window or
+   keyset, not a separate candidate cap.
+10. **One dispatcher per signal.** Split an `OR` of unrelated reasons into one dispatcher per
+    reason, each with its own index-served predicate, position, and schedule, all enqueuing the same
+    idempotent job. Writes that cause a signal enqueue directly; the sweep is the backstop. See
+    [one dispatcher per signal](references/sweep-patterns.md#one-dispatcher-per-signal).
+11. **Deduplicate jobs by entity and triggering event.** A job id keyed only by the entity drops a
     new trigger while the last job runs or is retained. Key it by entity and event; dedup lasts
     only while the record is retained, and a failed retained job still claims its id. See
     [queue job ids](references/sweep-patterns.md#queue-job-ids-for-deduplication).
-11. **Repair through an existing reconciler.** Repeat a fire-and-forget side effect (cache fill,
+12. **Repair through an existing reconciler.** Repeat a fire-and-forget side effect (cache fill,
     filter add, enqueue) idempotently from the reconciler that already sweeps recently changed
     rows. Do not add a sweeper. See
     [repair](references/sweep-patterns.md#repair-through-an-existing-reconciler).
-12. **Membership filters are never rebuilt on a schedule.** Add on write, rebuild in full only on
+13. **Membership filters are never rebuilt on a schedule.** Add on write, rebuild in full only on
     an operator action or a detected failure, and stop trusting the filter after a failed add.
     Deleted keys and growth only cost false positives. See
     [membership filters](references/sweep-patterns.md#membership-filters).
-13. **Global rankings stay one periodic aggregate.** A result over every row needs every score;
+14. **Global rankings stay one periodic aggregate.** A result over every row needs every score;
     incremental per-row inputs move the cost to every write without freshening the ranking. Give
     the pass an EXPLAIN budget. See [global ranking](references/sweep-patterns.md#global-ranking).
-14. **External listings carry the provider's continuation token.** Cap pages per run and enqueue a
+15. **External listings carry the provider's continuation token.** Cap pages per run and enqueue a
     continuation with the token; restarting at page one lets failing front items starve the rest.
     See [external listing](references/sweep-patterns.md#external-listing-with-a-continuation-token).
-15. **Verify with a plan.** EXPLAIN at representative cardinality shows no Seq Scan on an
+16. **Verify with a plan.** EXPLAIN at representative cardinality shows no Seq Scan on an
     unbounded table, and an index that supplies the `ORDER BY`, so the scan stops at the
     `LIMIT` instead of reading and sorting every match. Compare rows read with rows returned.
 
