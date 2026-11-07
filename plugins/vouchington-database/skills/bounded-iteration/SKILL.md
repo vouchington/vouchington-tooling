@@ -41,18 +41,21 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    above it. (`postgres-no-offset`)
 8. **List and feed reads.** A list read is one walk over the entity being listed. Filters go in
    `WHERE`, served by an index. Order with `ORDER BY key DESC, id DESC` and `LIMIT page+1`, and
-   continue with a plain keyset cursor, `(key, id) < ($1, $2)`. The page `LIMIT` plus a time window or the keyset bound the read; nothing else is
-   needed. No candidate pools: no capped or `MATERIALIZED` CTE over the listed entity that is
-   filtered or limited afterward, no window loops or resume probes, no proof state in the
-   cursor, and no runtime-config fields that exist only to cap a read. A page is never short or
-   empty while `has_next_page` is true. Small viewer-scoped sets (the viewer's follows, mutes,
-   blocks and memberships) may be subqueries or semi-joins, because write limits bound them.
-   Measure a list-read change against the plain single walk, not only against the base branch. See
+   continue with a plain keyset cursor, `(key, id) < ($1, $2)`. The page `LIMIT` plus a time window
+   or the keyset bound the read. A keyset alone does not bound rows scanned. When a filter can
+   reject long runs, such as a viewer's blocks or mutes, the time window is the scan bound where the
+   sort has one, and EXPLAIN at representative cardinality compares rows read with rows returned. No
+   candidate pools: no capped or `MATERIALIZED` CTE over the listed entity that is filtered or
+   limited afterward, no window loops or resume probes, no proof state in the cursor, and no
+   runtime-config fields that exist only to cap a read. A page is never short or empty while
+   `has_next_page` is true. Small viewer-scoped sets (the viewer's follows, mutes, blocks and
+   memberships) may be subqueries or semi-joins, because write limits bound them. Measure a
+   list-read change against the plain single walk, not only against the base branch. See
    [`MATERIALIZED` CTEs](../postgres-node-performance-tuning/references/performance-patterns.md).
-9. **Tunables are runtime configuration.** Batch sizes, page sizes, caps, and windows come from
-   the consumer's runtime configuration with a validated default and a hard maximum, and are bound
-   as SQL parameters. `LIMIT 1` and an external API's page maximum are contracts, not tunables. For list reads, the bound is the page `LIMIT` plus a window or
-   keyset, not a separate candidate cap.
+9. **Tunables are runtime configuration.** Batch sizes, page sizes, caps, and windows come from the
+   consumer's runtime configuration with a validated default and a hard maximum, and are bound as
+   SQL parameters. `LIMIT 1` and an external API's page maximum are contracts, not tunables. For
+   list reads, the bound is the page `LIMIT` plus a window or keyset, not a separate candidate cap.
 10. **One dispatcher per signal.** Split an `OR` of unrelated reasons into one dispatcher per
     reason, each with its own index-served predicate, position, and schedule, all enqueuing the same
     idempotent job. Writes that cause a signal enqueue directly; the sweep is the backstop. See
