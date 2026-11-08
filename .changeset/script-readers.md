@@ -1,5 +1,5 @@
 ---
-'vouchington-tooling': patch
+'vouchington-tooling': minor
 ---
 
 `trivy-policy` no longer rejects Trivy package scans that live in tracked shell scripts. Those scans
