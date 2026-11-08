@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   assertNoUnsupportedTrivyAction,
-  assertNoUnsupportedTrivyShellSource,
   checkTrivyPolicy,
   isShellPolicySource,
   trivyPackageScanCommands,
@@ -167,20 +166,38 @@ describe('trivyPackageScanCommands', () => {
     )
   })
 
-  it('rejects package scans in shell scripts but allows database downloads', () => {
+  it('collects shell-script scans, including database downloads which the policy filters', () => {
     const { root } = repo({
       'ci/scan.sh': 'trivy image target\n',
       'ci/prepare': '#!/usr/bin/env bash\ntrivy image --download-db-only\n',
       'ci/bad': '#!/bin/sh\ntrivy fs .\n',
     })
+    expect(trivyPackageScanCommands(['ci/scan.sh'], root)).toEqual(['trivy image target'])
     expect(trivyPackageScanCommands(['ci/prepare'], root)).toEqual([])
     chmodSync(join(root, 'ci/prepare'), 0o755)
     chmodSync(join(root, 'ci/bad'), 0o755)
-    expect(trivyPackageScanCommands(['ci/prepare'], root)).toEqual([])
-    expect(() => trivyPackageScanCommands(['ci/scan.sh'], root)).toThrow(
-      'ci/scan.sh: unsupported Trivy shell-script scan',
-    )
-    expect(() => trivyPackageScanCommands(['ci/bad'], root)).toThrow('ci/bad: unsupported')
+    expect(trivyPackageScanCommands(['ci/prepare'], root)).toEqual([
+      'trivy image --download-db-only',
+    ])
+    expect(trivyPackageScanCommands(['ci/bad'], root)).toEqual(['trivy fs .'])
+  })
+
+  it('accepts script scans that meet the gate and reports script scans that violate it', () => {
+    const workflows = { '.github/workflows/build.yml': workflow(gate('other-'), sbom) }
+    expect(
+      check({
+        ...compliant,
+        ...workflows,
+        'ci/scan.sh': `#!/usr/bin/env bash\n${gate()}\n${sbom}\n`,
+      }),
+    ).toEqual([])
+    expect(
+      check({
+        ...compliant,
+        ...workflows,
+        'ci/scan.sh': `${gate().replace('--quiet', '')}\n${sbom}\n`,
+      }),
+    ).toEqual(['Trivy vulnerability scan must include --quiet'])
   })
 })
 
@@ -206,16 +223,5 @@ describe('shell source detection', () => {
       'fixture: unsupported Trivy action',
     )
     expect(() => assertNoUnsupportedTrivyAction(undefined)).not.toThrow()
-    expect(() => assertNoUnsupportedTrivyShellSource('trivy --version', 'x.sh')).not.toThrow()
-    for (const flag of ['--download-db-only=false', '--download-db-only --download-db-only'])
-      expect(() =>
-        assertNoUnsupportedTrivyShellSource(`trivy image ${flag} target`, 'x.sh'),
-      ).toThrow('x.sh: unsupported Trivy shell-script scan')
-    expect(() =>
-      assertNoUnsupportedTrivyShellSource('trivy image --download-db-only', 'x.sh'),
-    ).not.toThrow()
-    expect(() =>
-      assertNoUnsupportedTrivyShellSource('trivy image t; trivy image --download-db-only', 'x.sh'),
-    ).toThrow('x.sh: unsupported')
   })
 })

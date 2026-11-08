@@ -5,7 +5,9 @@ export function compileEnvVarReferenceMatchers(
 ): EnvVarReferenceMatcher[] {
   return [...envVars.keys()].map((name) => ({
     name,
-    pattern: new RegExp(`(?<![A-Za-z0-9_/-])${name}(?![A-Za-z0-9_/-])`),
+    pattern: new RegExp(
+      `(?<![A-Za-z0-9_/-])${name}(?![A-Za-z0-9_/-])|\\$\\{?${name}(?![A-Za-z0-9_])`,
+    ),
   }))
 }
 

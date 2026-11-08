@@ -11,7 +11,7 @@ export const POLICY_USAGE = `
 ${FINAL_REVIEW_USAGE}${COVERAGE_SCOPE_CHECK_USAGE}
 trivy-policy [--root <dir>] [--ignore-file <path>] [--findings-exit-code-env <NAME>] [--cleanup-url-prefix <url>] [--min-gates N] [--min-sboms N] [--max-expiry-days N]
   Reads git-tracked workflows, composite actions and shell scripts and prints each violation (exit 1).
-  Every Trivy package scan must be an auditable CLI run block (no action, wrapper, substitution or
+  Every Trivy package scan must be an auditable CLI command in a workflow run block or shell script (no action, wrapper, substitution or
   background). Vulnerability gates need --scanners vuln, --pkg-types os, --severity CRITICAL,HIGH,
   --ignore-unfixed, --skip-db-update, --quiet, table output to a file, --ignorefile <ignore-file>
   (default .trivyignore.yaml) and --exit-code "$<NAME>" (default TRIVY_FINDINGS_EXIT_CODE).

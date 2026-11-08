@@ -25,6 +25,24 @@ describe('configuration inventory', () => {
     )
     expect(result.envVars.map((row) => row.name)).toEqual(['DOLLAR_ENV', 'LEADING_DOLLAR'])
   })
+  it('counts shell parameter references in scripts for a step env var', () => {
+    const result = inventory(
+      {
+        '.github/workflows/ci.yml':
+          'jobs:\n  j:\n    steps:\n      - env:\n          GHCR_NAMESPACE: x\n          BRACED: y\n          NAME: z\n          NAMEX: w\n        run: ci/build.sh\n',
+        'ci/build.sh': 'docker build -t "$GHCR_NAMESPACE/backend" .\necho "${BRACED}/b" "$NAMEX"\n',
+      },
+      {
+        '.github/workflows/ci.yml': { workflow: true },
+        'ci/build.sh': { referenceBuckets: ['deployment'] },
+      },
+    )
+    const row = (name: string) => result.envVars.find((entry) => entry.name === name)
+    expect(row('GHCR_NAMESPACE')?.deployment).toEqual(['ci/build.sh'])
+    expect(row('BRACED')?.deployment).toEqual(['ci/build.sh'])
+    expect(row('NAMEX')?.deployment).toEqual(['ci/build.sh'])
+    expect(row('NAME')?.deployment).toEqual([])
+  })
   it('rejects malformed names before they enter reference matchers', () => {
     const values = new Map<string, EnvVarAccumulator>()
     addEnvVar(values, 'bad-name', 'source.ts', 'readers')
