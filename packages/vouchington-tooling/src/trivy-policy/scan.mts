@@ -3,7 +3,6 @@ import { join } from 'node:path'
 
 import { parse } from 'yaml'
 
-import { isDownloadDatabaseOnly } from './gate.mts'
 import { trivyPackageScanCommandSegments } from './invocations.mts'
 
 type WorkflowStep = { run?: unknown; uses?: unknown }
@@ -38,24 +37,24 @@ export function assertNoUnsupportedTrivyAction(uses: unknown, path = 'fixture'):
   }
 }
 
+function commandsIn(source: string, path: string): string[] {
+  try {
+    return trivyPackageScanCommandSegments(source)
+  } catch (error) {
+    throw new Error(`${path}: ${(error as Error).message.replace(/\s+/g, ' ')}`, { cause: error })
+  }
+}
+
 function assertSupportedWorkflowSteps(paths: readonly string[]): string[] {
   const commands: string[] = []
   for (const path of paths) {
     for (const step of workflowSteps(path)) {
       assertNoUnsupportedTrivyAction(step.uses, path)
       if (typeof step.run !== 'string') continue
-      commands.push(...trivyPackageScanCommandSegments(step.run))
+      commands.push(...commandsIn(step.run, path))
     }
   }
   return commands
-}
-
-export function assertNoUnsupportedTrivyShellSource(source: string, path = 'fixture'): void {
-  if (trivyPackageScanCommandSegments(source).some((command) => !isDownloadDatabaseOnly(command))) {
-    throw new Error(
-      `${path}: unsupported Trivy shell-script scan; use an auditable workflow run block`,
-    )
-  }
 }
 
 /** Every Trivy package-scan command in tracked workflows and composite actions. */
@@ -64,12 +63,15 @@ export function trivyPackageScanCommands(
   root: string,
 ): string[] {
   const present = repositoryFiles.filter((path) => existsSync(join(root, path)))
-  for (const path of present.filter((path) => isShellPolicySource(join(root, path)))) {
-    assertNoUnsupportedTrivyShellSource(readFileSync(join(root, path), 'utf8'), path)
-  }
+  const shellCommands = present
+    .filter((path) => isShellPolicySource(join(root, path)))
+    .flatMap((path) => commandsIn(readFileSync(join(root, path), 'utf8'), path))
   const yamlPaths = [
     ...present.filter((path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)),
     ...present.filter((path) => /^\.github\/actions\/.+\.ya?ml$/.test(path)),
   ]
-  return assertSupportedWorkflowSteps(yamlPaths.map((path) => join(root, path)))
+  return [
+    ...shellCommands,
+    ...assertSupportedWorkflowSteps(yamlPaths.map((path) => join(root, path))),
+  ]
 }

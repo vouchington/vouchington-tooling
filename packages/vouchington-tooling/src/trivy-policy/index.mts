@@ -24,7 +24,6 @@ export { parseIgnoreRegistry, validateIgnoreRegistry } from './registry.mts'
 export type { Ignore, IgnoreRegistry } from './registry.mts'
 export {
   assertNoUnsupportedTrivyAction,
-  assertNoUnsupportedTrivyShellSource,
   isShellPolicySource,
   trivyPackageScanCommands,
 } from './scan.mts'

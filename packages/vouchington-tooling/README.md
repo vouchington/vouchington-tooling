@@ -442,8 +442,9 @@ compliant, 2 on a usage error).
 `vouchington trivy-policy [--ignore-file <path>] [--findings-exit-code-env <NAME>]
 [--cleanup-url-prefix <url>] [--min-gates N] [--min-sboms N] [--max-expiry-days N]` requires every
 Trivy package scan in tracked workflows, composite actions and shell scripts to be an auditable CLI
-run block: no `trivy` action, wrapper, command or process substitution, `bash -c`, `eval`,
-background job or grouped scan (shell scripts may only run `--download-db-only`). Vulnerability
+command: no `trivy` action, wrapper, command or process substitution, `bash -c`, `eval`,
+background job or grouped scan. Scans in shell scripts count toward the same gate and SBOM
+requirements as scans in workflow run blocks. Vulnerability
 gates must pass `--scanners vuln`, `--pkg-types os`, `--severity CRITICAL,HIGH`, `--ignore-unfixed`,
 `--skip-db-update`, `--quiet`, `--format table --table-mode detailed`, one `--output`,
 `--ignorefile <ignore-file>` (default `.trivyignore.yaml`) and `--exit-code "$<NAME>"` (default
