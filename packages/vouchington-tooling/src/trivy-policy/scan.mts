@@ -37,13 +37,21 @@ export function assertNoUnsupportedTrivyAction(uses: unknown, path = 'fixture'):
   }
 }
 
+function commandsIn(source: string, path: string): string[] {
+  try {
+    return trivyPackageScanCommandSegments(source)
+  } catch (error) {
+    throw new Error(`${path}: ${(error as Error).message.replace(/\s+/g, ' ')}`, { cause: error })
+  }
+}
+
 function assertSupportedWorkflowSteps(paths: readonly string[]): string[] {
   const commands: string[] = []
   for (const path of paths) {
     for (const step of workflowSteps(path)) {
       assertNoUnsupportedTrivyAction(step.uses, path)
       if (typeof step.run !== 'string') continue
-      commands.push(...trivyPackageScanCommandSegments(step.run))
+      commands.push(...commandsIn(step.run, path))
     }
   }
   return commands
@@ -57,7 +65,7 @@ export function trivyPackageScanCommands(
   const present = repositoryFiles.filter((path) => existsSync(join(root, path)))
   const shellCommands = present
     .filter((path) => isShellPolicySource(join(root, path)))
-    .flatMap((path) => trivyPackageScanCommandSegments(readFileSync(join(root, path), 'utf8')))
+    .flatMap((path) => commandsIn(readFileSync(join(root, path), 'utf8'), path))
   const yamlPaths = [
     ...present.filter((path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)),
     ...present.filter((path) => /^\.github\/actions\/.+\.ya?ml$/.test(path)),

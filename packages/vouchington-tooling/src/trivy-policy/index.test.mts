@@ -182,6 +182,19 @@ describe('trivyPackageScanCommands', () => {
     expect(trivyPackageScanCommands(['ci/bad'], root)).toEqual(['trivy fs .'])
   })
 
+  it('names the file and keeps one line when a scan is unsupported', () => {
+    const { root } = repo({
+      'ci/scan.sh': '#!/usr/bin/env bash\nset -eu\nbash -c "trivy image x"\n',
+      '.github/workflows/a.yml': workflow('echo start\nbash -c "trivy image y"'),
+    })
+    expect(() => trivyPackageScanCommands(['ci/scan.sh'], root)).toThrow(
+      /^ci\/scan\.sh: [^\n]*unsupported indirect Trivy execution$/,
+    )
+    expect(() => trivyPackageScanCommands(['.github/workflows/a.yml'], root)).toThrow(
+      /a\.yml: [^\n]*unsupported indirect Trivy execution$/,
+    )
+  })
+
   it('accepts script scans that meet the gate and reports script scans that violate it', () => {
     const workflows = { '.github/workflows/build.yml': workflow(gate('other-'), sbom) }
     expect(
