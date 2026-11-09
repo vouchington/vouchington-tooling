@@ -17,13 +17,26 @@ export class DetailsScope {
     return this.frames.length === 0
   }
 
-  acceptHtml(html: string, startOffset: number): void {
+  acceptHtml(
+    html: string,
+    startOffset: number,
+    onVisibleFragment?: (value: string, offset: number) => void,
+  ): void {
     const tokens = /<!--[\s\S]*?(?:-->|$)|<\/?[a-z][a-z\d:-]*(?:[^"'<>]|"[^"]*"|'[^']*')*>/giu
+    let end = 0
+    const emit = (value: string, offset: number): void => {
+      if (this.visible && value.trim()) onVisibleFragment?.(value, offset)
+    }
     for (const token of html.matchAll(tokens)) {
+      emit(html.slice(end, token.index), startOffset + end)
+      end = token.index + token[0].length
       if (token[0].startsWith('<!--')) continue
       const tag = /^<(\/?)([a-z][a-z\d:-]*)/iu.exec(token[0])!
       const name = tag[2]!.toLowerCase()
-      if (name !== 'details' && name !== 'summary') continue
+      if (name !== 'details' && name !== 'summary') {
+        emit(token[0], startOffset + token.index)
+        continue
+      }
       const line = this.markdown.slice(0, startOffset + token.index).split('\n').length
       if (/\/\s*>$/u.test(token[0])) {
         this.problem(line, `${tag[2]} cannot be self-closing`)
@@ -31,6 +44,7 @@ export class DetailsScope {
       }
       this.acceptTag(name, tag[1] === '/', line)
     }
+    emit(html.slice(end), startOffset + end)
   }
 
   finish(): void {
