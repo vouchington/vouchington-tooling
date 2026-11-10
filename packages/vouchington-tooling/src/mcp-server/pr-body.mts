@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 import { formatReferenceKey } from '../gh-cli/closing-refs.mts'
 import type { PullRequestInput, RelatedIssue } from './pr-input.mts'
+import { assertNoOpenFence } from './pr-journal.mts'
 
 export type PullRequestProvenance = {
   sessionId: string
@@ -30,7 +31,7 @@ function defaultNoSourceStatement(reason: string): string {
  * provenance lines, collapsed in a Provenance disclosure because they serve audits, not reviewers.
  * With `noSourceIssue` the Related issues section ends with `noSourceStatement` (default
  * {@link defaultNoSourceStatement}), after any `Refs` lines, instead of `- None`. Pure; the caller
- * supplies the device and worktree facts.
+ * supplies the device and worktree facts. Throws when the fields leave a code fence open.
  */
 export function renderPullRequestBody(
   input: PullRequestInput,
@@ -41,7 +42,7 @@ export function renderPullRequestBody(
   if (input.noSourceIssue !== undefined)
     related.push(noSourceStatement ?? defaultNoSourceStatement(input.noSourceIssue.reason))
   if (!related.length) related.push('- None')
-  return [
+  const fields = [
     '## Summary',
     '',
     input.summary,
@@ -57,6 +58,11 @@ export function renderPullRequestBody(
     '## Details',
     '',
     input.details.join('\n\n'),
+  ].join('\n')
+  // An unclosed fence would turn the Provenance disclosure and its lines into visible code.
+  assertNoOpenFence(fields)
+  return [
+    fields,
     '',
     '<details>',
     '<summary>Provenance</summary>',

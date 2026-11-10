@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { worktreeLabel } from './pr-body.mts'
+import { renderPullRequestBody, worktreeLabel } from './pr-body.mts'
 import { createGhRunner, ghEnvironment, locateGh } from './pr-gh.mts'
 import { findShepherdJournal, preserveShepherdJournal } from './pr-journal.mts'
 
@@ -15,6 +15,29 @@ describe('worktreeLabel', () => {
     expect(worktreeLabel('/r', '/r')).toBe('main')
     expect(worktreeLabel('/x/other', '/r')).toBe('other')
     expect(worktreeLabel('/x/other', undefined)).toBe('other')
+  })
+})
+
+describe('renderPullRequestBody', () => {
+  const input = (details: string[]) => ({
+    title: 't',
+    summary: 's',
+    impact: 'i',
+    relatedIssues: [],
+    details,
+    base: 'main',
+    mode: 'interactive' as const,
+    workspaceSetup: 'w',
+  })
+  const provenance = { sessionId: 'x', user: 'u', host: 'H', worktree: 'main', agent: 'claude' }
+
+  it('collapses provenance, and refuses details that leave a code fence open', () => {
+    expect(renderPullRequestBody(input(['```\ncode\n```']), provenance)).toContain(
+      '```\n\n<details>\n<summary>Provenance</summary>\n\nWorkspace setup: w\n',
+    )
+    expect(() => renderPullRequestBody(input(['```\ncode']), provenance)).toThrow(
+      'leave a code fence open',
+    )
   })
 })
 

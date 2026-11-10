@@ -85,7 +85,12 @@ export function preserveShepherdJournal(rendered: string, live: string): string 
     )
   const journal = findShepherdJournal(live)
   if (journal === undefined) return rendered
-  if (outsideFences(rendered.replaceAll('\r\n', '\n').split('\n')).open)
-    throw new Error('the pull request fields leave a code fence open; close it')
+  assertNoOpenFence(rendered)
   return `${rendered.trimEnd()}\n\n${journal}\n`
+}
+
+/** Rejects text that ends inside an unclosed code fence: whatever follows would render as code. */
+export function assertNoOpenFence(text: string): void {
+  if (outsideFences(text.replaceAll('\r\n', '\n').split('\n')).open)
+    throw new Error('the pull request fields leave a code fence open; close it')
 }
