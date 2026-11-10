@@ -45,7 +45,7 @@ export function parseVisibleMarkdownContent(markdown: string): MarkdownVisibleCo
       return
     }
     if (node.type === 'code') {
-      const offset = node.position?.start.offset ?? 0
+      const offset = positionOf(node).start.offset
       if (scope.visible && /^(?:`{3,}|~{3,})/u.test(markdown.slice(offset))) {
         blocks.push({
           kind: 'fenced-code',
@@ -87,7 +87,7 @@ export function parseVisibleMarkdownContent(markdown: string): MarkdownVisibleCo
       if (rows.some((row) => row.cells.some(Boolean))) {
         blocks.push({
           kind: 'table',
-          headers: rows[0]?.cells ?? [],
+          headers: rows[0]!.cells,
           rows: rows.slice(1),
           position: positionOf(node),
         })

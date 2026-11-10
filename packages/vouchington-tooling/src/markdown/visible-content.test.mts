@@ -156,4 +156,37 @@ describe('visible Markdown content', () => {
       false,
     ])
   })
+
+  it('measures hard breaks, footnote references, unlabelled fences and leaf blocks', () => {
+    const markdown = [
+      'Line one  ',
+      'line two[^1]',
+      '',
+      '***',
+      '',
+      '-',
+      '',
+      '# ![only an image](i.png)',
+      '',
+      '~~~',
+      'plain',
+      '~~~',
+      '',
+      '[^1]: Footnote prose',
+    ].join('\n')
+    const result = parseVisibleMarkdownContent(markdown)
+    expect(result.text).toBe('Line one line two\nFootnote prose')
+    expect(result.blocks).toEqual([
+      expect.objectContaining({ kind: 'paragraph', text: 'Line one line two' }),
+      expect.objectContaining({ kind: 'fenced-code', language: null, value: 'plain' }),
+      expect.objectContaining({ kind: 'paragraph', text: 'Footnote prose' }),
+    ])
+  })
+
+  it('drops hard breaks inside a disclosure', () => {
+    const result = parseVisibleMarkdownContent(
+      '<details>\n<summary>More</summary>\n\nHidden  \nbreak\n\n</details>\n\nShown',
+    )
+    expect(result.text).toBe('Shown')
+  })
 })
