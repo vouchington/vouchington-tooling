@@ -74,7 +74,7 @@ Use when completed retrospectives or journals should become durable follow-up wo
    repository's retention rules. Archive with the `snapshot_archive` tool, passing the
    `cleanupToken` from `snapshot_export` and up to 100 `sessionIds` per call, which are the sessions
    to archive, not the caller. The server confirms each session is in that export, reads its live
-   entries, compares them with the exported ones by source identity (entries that differ only in
+   entries, compares them with the exported ones by content (entries that differ only in
    the server-assigned `timestamp` are one event), and archives only on an exact match. Do not read
    sessions with `journal_entries` to compare them yourself. It returns only
    `{archived, skipped: [{sessionId, reason}]}`: leave every skipped session for the next pass,
