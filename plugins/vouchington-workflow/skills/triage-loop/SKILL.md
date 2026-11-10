@@ -94,8 +94,15 @@ prompt) when the recurring-task tool is only available there.
    as a background command:
    `hook-harness wait --owner <o> --repo <list> --on ejection,main-failure,dependabot-pr,/shepherd,/plan,/fix --after <cursor> --no-payload --timeout 2h`.
    It prints one JSON object `{events, gap, timedOut?, cursor}` and exits 0. The wait's timeout is
-   the heartbeat; schedule no idle wakeups. Other agents' messages and subagent completions wake
-   the session directly.
+   the heartbeat. While it runs, schedule no idle wakeups: events, other agents' messages, and
+   subagent completions wake the session directly. Only scheduled runs remain (the fallback cron),
+   for periodic work such as the full sweep and retrospective distill.
+4. With no event source configured, or while the wait is failing, pace the loop with the host's
+   wakeup tool (for example `ScheduleWakeup`), passing this skill's invocation back as the prompt:
+   about 30-60 minutes while local shepherd workers or armed PRs are in flight, and 20-30 minutes
+   otherwise. An idle tick only checks the intake queue and in-flight PRs. The full sweep runs when
+   the cron fires, on demand, or when `lastSweepAt` is older than the fallback interval. Stop
+   wakeups once the wait is healthy again.
 
 Each sweep takes the lock in the state directory and skips if another sweep holds a fresh lock.
 
