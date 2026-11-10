@@ -143,6 +143,31 @@ export const TOOLS: readonly ToolDefinition[] = [
     ['cleanupToken'],
   ),
   tool(
+    'snapshot_archive',
+    'Archives, in one call, every listed session whose live entries still match the ones ' +
+      'snapshot_export recorded. Takes the cleanupToken snapshot_export returned and sessionIds ' +
+      '(the sessions to archive, not the caller; at most 100). For each, the server confirms the ' +
+      'session is in the export, reads its live entries, compares them with the exported ones by ' +
+      'content without the server-assigned timestamp, and archives only on an exact match; ' +
+      'otherwise it skips with a reason (not in the export, session not found, entries changed ' +
+      'since the export, or failed). Returns only { archived, skipped: [{ sessionId, reason }] }, ' +
+      'never entry content. Archiving makes session metadata immutable. The token stays valid for ' +
+      'snapshot_cleanup; keep the snapshot until the last archive call.',
+    MUTATING,
+    {
+      cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' },
+      sessionIds: {
+        type: 'array',
+        items: { type: 'string', pattern: ID_PATTERN, maxLength: 256 },
+        minItems: 1,
+        maxItems: 100,
+        uniqueItems: true,
+        description: 'Sessions to archive, from the export (at most 100 per call).',
+      },
+    },
+    ['cleanupToken', 'sessionIds'],
+  ),
+  tool(
     'snapshot_cleanup',
     'Deletes the snapshot file and the partition directory (from snapshot_partition) that ' +
       'snapshot_export produced. Takes only the cleanupToken it returned: the server resolves the ' +

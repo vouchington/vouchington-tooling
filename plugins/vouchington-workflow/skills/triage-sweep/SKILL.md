@@ -95,8 +95,11 @@ PR. For each one, under the adapter's taxonomy through
 ## Phase E - Retrospective distill
 
 Run [retrospective-distill](../retrospective-distill/SKILL.md) for sessions completed after
-`retroCursor`. File the verified follow-ups through [github-issue](../github-issue/SKILL.md). The
-grant covers archiving the sessions it distilled. Advance `retroCursor` only after cleanup
+`retroCursor`, with the adapter's distill cutoffs (`retroDays` and `sessionDays`; see the loop's
+[adapter parameters](../triage-loop/SKILL.md#adapter-parameters)). Stop and ask when either is
+missing. File the verified follow-ups through [github-issue](../github-issue/SKILL.md). The
+grant covers archiving the sessions it distilled, only when the adapter authorizes archival;
+otherwise skip step 7 and still clean up. Advance `retroCursor` only after cleanup
 succeeds.
 
 ## Phase F - Missed code reviews

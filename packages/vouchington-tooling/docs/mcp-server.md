@@ -82,6 +82,7 @@ as MCP tool errors (`isError: true`) with an actionable message rather than cras
 | `retrospective_save`  | `parentSessionId`, `agent`, `version`, `mode`, `workOutcome`, `feedbackCoverage`, exactly one of `markdown` or `compose`, optional `repositories`, `sourceEventId`, `category`, `dryRun`, `knownSensitiveValues` (markdown only); or `previewToken` with identity, `mode` and `sourceEventId` | as `journal_append` plus `policy.warnings`; with `dryRun`, `markdown`, `previewToken` and `policy.warnings`                                      |
 | `snapshot_export`     | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                                                                                                                               | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
 | `snapshot_partition`  | `cleanupToken`, optional `checksum`, `counts`, `maxSessions`, `maxBytes`                                                                                                                                                                                                                      | `sessionId`, `directory`, `partitions` (`path`, `counts`, `checksum`, `manifest` of each)                                                        |
+| `snapshot_archive`    | `cleanupToken`, `sessionIds` (1 to 100)                                                                                                                                                                                                                                                       | `sessionId`, `archived`, `skipped` (`sessionId`, `reason`; never entry content)                                                                  |
 | `snapshot_cleanup`    | `cleanupToken`                                                                                                                                                                                                                                                                                | `sessionId`, `cleaned: true`                                                                                                                     |
 | `session_archive`     | none                                                                                                                                                                                                                                                                                          | `sessionId`, `archived: true`                                                                                                                    |
 
@@ -157,6 +158,25 @@ returns), and the client requires the snapshot to sit directly in its own `os.tm
 - **Not spent.** The token stays valid for `snapshot_cleanup`, which removes the snapshot and the
   recorded partition directory together. A failed partition leaves the token valid for a retry, and a
   snapshot is partitioned once: a second call fails until a fresh export.
+
+### Snapshot archive
+
+`snapshot_archive` archives many distilled sessions in one call, verified by the server, so a pass
+neither reads every session's entries into the agent's context nor makes one `session_archive` call
+per session. It takes the `cleanupToken` `snapshot_export` returned and `sessionIds` (the sessions to
+archive, not the caller; at most 100 per call, duplicates ignored).
+
+- **Server-side comparison.** The server reads the snapshot from its own record (through a no-follow
+  descriptor, verified against the export's checksum when it reported one), and for each listed
+  session confirms it is in the export, reads the live entries, and compares the two sets by content
+  with the server-assigned `timestamp` left out, so entries that differ only in it are one event.
+  It archives on an exact match.
+- **Skips, not failures.** A session that is not in the export (`not in the export`), no longer
+  exists (`session not found`), gained, lost, or changed an entry (`entries changed since the
+  export`), or whose read or archive failed (`failed: ...`) is skipped with that reason and left for
+  the next pass. The result is only `{ archived, skipped: [{ sessionId, reason }] }`.
+- **Not spent.** The token stays valid for `snapshot_cleanup`. A snapshot that cannot be read or
+  verified fails the whole call before anything is archived, and the token stays valid.
 
 ### Snapshot cleanup
 

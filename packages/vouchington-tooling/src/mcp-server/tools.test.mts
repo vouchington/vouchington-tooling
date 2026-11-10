@@ -14,6 +14,7 @@ const EXPECTED = [
   'pr_update',
   'snapshot_export',
   'snapshot_partition',
+  'snapshot_archive',
   'snapshot_cleanup',
   'session_archive',
 ]
@@ -98,6 +99,7 @@ describe('tool contract', () => {
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
     expect(destructive.map((tool) => tool.name)).toEqual([
       'pr_update',
+      'snapshot_archive',
       'snapshot_cleanup',
       'session_archive',
     ])
