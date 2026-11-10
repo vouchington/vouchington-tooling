@@ -22,7 +22,7 @@ to ask when one this run needs is missing; never guess a value.
 - **Orphan-issue rules:** the labels or title prefix that identify automation-created issues, and
   the label that marks intentional PR-free backlog items.
 - **Ready-and-shepherd values:** the [ready-and-shepherd](../ready-and-shepherd/SKILL.md) adapter
-  values (shepherd mode, trigger, activation gates), or a consumer skill that replaces it.
+  values (the automation label), or a consumer skill that replaces it.
 - **Prompt-source paths:** the exact paths that may be edited from PR-creation feedback, and the
   rubric for that feedback.
 - **Feedback marker:** the PR-body marker that identifies a feedback PR from this flow.
@@ -121,10 +121,9 @@ from the [rubric](references/rubric.md) (an issue to file, link, or re-scope) in
 the Step 6 report so it is not dropped. Process MERGE decisions in
 ascending PR-number order through the adapter's ready-and-shepherd
 skill, passing the PR number, the auto-merge flag, and any steering file. That skill light-reviews
-the diff, posts steering before the trigger, readies the draft, verifies merge settings, and
-dispatches the shepherd. Run its activation preflight before every mutation. If activation is
-disabled, unset, or unreadable, record `activation disabled - unchanged` and do not describe the PR
-as ready, armed, or dispatched.
+the diff, posts steering, readies the draft, verifies merge settings, and
+dispatches the shepherd. Run its preflight before every mutation. If the preflight fails, record
+the reason and do not describe the PR as ready, armed, or dispatched.
 
 Classify the outcome:
 

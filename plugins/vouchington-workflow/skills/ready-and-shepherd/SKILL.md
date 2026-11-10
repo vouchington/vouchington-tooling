@@ -21,12 +21,8 @@ Arguments: a PR number or URL, `--repo <owner>/<name>`, optional `--arm-auto-mer
 ## Adapter parameters
 
 Resolve these before Step 1 and stop to ask when one this run needs is missing; never guess.
+Shepherding is local: the caller runs pr-shepherd in a background worker until CANCEL/ESCALATE.
 
-- **Shepherd mode:** `comment` (post an exact trigger comment that starts a CI-dispatched
-  shepherd, fire-and-forget) or `local` (the caller runs pr-shepherd in a background worker until
-  CANCEL/ESCALATE). Repositories without a CI shepherd workflow use `local`.
-- **Trigger comment and activation gates** (`comment` mode only): the exact trigger body and the
-  repository variables that must all read `true` before any mutation.
 - **Automation label:** applied idempotently to every PR this skill readies.
 - **Merge authority:** who authorizes `--arm-auto-merge` for which PR categories.
 
@@ -37,19 +33,15 @@ and CI state, and decide whether the shepherd needs direction (for example "pref
 over a narrow band-aid"). Write steering with a file-writing tool, never shell interpolation, and
 read it back in full. With `--steer-file`, use that file instead.
 
-## Step 2 - Activation preflight (fail closed)
+## Step 2 - Preflight
 
-Before any GitHub mutation, in `comment` mode read every adapter activation gate. An unset,
-unreadable, empty, or non-`true` gate is disabled: stop before Step 3 and report
-`activation disabled - unchanged`. Do not post steering, mark ready, add labels, arm, or trigger.
-`local` mode has no gates; its preflight is that the caller can start a background worker.
-
-Re-read `headRefOid` before every mutation below; if it moved, return to the caller for re-review.
+Check that the caller can start a background worker. Re-read `headRefOid` before every mutation
+below; if it moved, return to the caller for re-review.
 
 ## Step 3 - Steer (optional)
 
-Post the reviewed steering file as an ordinary comment with `--body-file`, **before** arming or
-triggering. Reject an empty file or one whose whole trimmed content equals the trigger comment.
+Post the reviewed steering file as an ordinary comment with `--body-file`, **before** arming.
+Reject an empty file.
 
 ## Step 4 - Mark ready and label
 
@@ -77,34 +69,26 @@ and 7, and follow [stacked-prs](../stacked-prs/SKILL.md) only under explicit hum
 
 ## Step 6 - Hand off to the shepherd
 
-Never run two shepherds on one PR. Before any handoff, skip the PR and report
-`shepherd: already in flight` when either of these holds:
+Never run two shepherds on one PR. Skip the PR and report `shepherd: already in flight` when the
+caller's state lists an active worker for it. Record every handoff (PR, head, worker id, time) in
+the caller's state so the next pass sees it.
 
-- **`comment` mode:** a trigger comment exists that is newer than the PR's latest commit.
-- **`local` mode:** the caller's state lists an active worker for this PR.
+Return `shepherd: local` to the caller, which starts one background worker in an isolated worktree
+(or a workspace agent the caller names). The worker reruns
+`pr-shepherd <owner>/<name>#<N> --until-terminal` after every result except CANCEL and ESCALATE:
 
-Record every handoff (PR, head, mode, trigger comment id or worker id, time) in the caller's state
-so the next pass sees it.
+- TRIAGE: fix the items, then rerun.
+- READY or a quota warning: rerun after the delay the output names.
+- MERGE: the worker never merges. It reports the PR as mergeable to the caller and stops.
 
-- **`comment` mode:** if the PR is still `OPEN`, post exactly the trigger body with
-  `gh api -X POST repos/<owner>/<name>/issues/<N>/comments -f body=<trigger> --jq .id` and record
-  the comment id. Dispatch is fire-and-forget: a `running` checkpoint proves acceptance, not
-  success. Never poll the dispatch workflow or arm later from a `queued` or `running` state.
-- **`local` mode:** return `shepherd: local` to the caller, which starts one background worker in
-  an isolated worktree. The worker reruns `pr-shepherd <owner>/<name>#<N> --until-terminal` after
-  every result except CANCEL and ESCALATE:
-  - TRIAGE: fix the items, then rerun.
-  - READY or a quota warning: rerun after the delay the output names.
-  - MERGE: the worker never merges. It reports the PR as mergeable to the caller and stops.
-
-  On ESCALATE, it reports back to the caller, which escalates. Remove the worker from the caller's
-  state when it stops.
+On ESCALATE, it reports back to the caller, which escalates. Remove the worker from the caller's
+state when it stops.
 
 ## Step 7 - Verify and report
 
 `gh pr view <N> --repo <owner>/<name> --json isDraft,autoMergeRequest,state`. Report per PR:
 `ready`, `steered`, `auto-merge armed` (yes, no, manual-verification-required, unavailable),
-`shepherd` (comment id, local, or no), and the reason for any `no`.
+`shepherd` (local or no), and the reason for any `no`.
 
-Consumer wrapper owns: shepherd mode, trigger body and activation gates, the automation label, merge
-authority by PR category, and any provider-specific handoff variants.
+Consumer wrapper owns: the automation label, merge authority by PR category, and any workspace
+agent that takes handoffs.
