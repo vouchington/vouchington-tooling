@@ -34,7 +34,7 @@
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.1.0",
     "agent-blackboard": "^0.7.0",
-    "dependency-cruiser": "^18.7.0",
+    "dependency-cruiser": "^18.7.2",
     "eslint": "^10.13.0",
     "eslint-plugin-no-mistakes": "^0.108.0",
     "github-actionlint": "^1.7.12",
