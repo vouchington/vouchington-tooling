@@ -152,7 +152,9 @@ export const TOOLS: readonly ToolDefinition[] = [
       'otherwise it skips with a reason (not in the export, session not found, entries changed ' +
       'since the export, or failed). Returns only { archived, skipped: [{ sessionId, reason }] }, ' +
       'never entry content. Archiving makes session metadata immutable. The token stays valid for ' +
-      'snapshot_cleanup; keep the snapshot until the last archive call.',
+      'snapshot_cleanup; keep the snapshot until the last archive call. Each call holds the token ' +
+      'while it runs, so send archive calls one at a time and call snapshot_cleanup only after ' +
+      'the last one returns.',
     MUTATING,
     {
       cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' },

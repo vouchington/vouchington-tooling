@@ -58,9 +58,6 @@ function writeSnapshot(sessions: Array<[string, Entry[]]>, extra: string[] = [])
   return path
 }
 
-const sha = (path: string, content: string) =>
-  createHash('sha256').update(content).digest('hex') + path
-
 async function setup(
   sessions: Array<[string, Entry[]]>,
   live: Entry[],
@@ -193,11 +190,11 @@ describe('snapshot_archive', () => {
     const link = await setup([['s:a', []]], [])
     rmSync(link.path)
     symlinkSync(tmpdir(), link.path)
-    expect(link.path && textOf(await link.call({ sessionIds: ['s:a'] }))).toContain('failed')
+    expect(textOf(await link.call({ sessionIds: ['s:a'] }))).toContain('ELOOP')
     const dir = await setup([['s:a', []]], [])
     rmSync(dir.path)
     mkdirSync(dir.path)
-    expect(textOf(await dir.call({ sessionIds: ['s:a'] }))).toContain('failed')
+    expect(textOf(await dir.call({ sessionIds: ['s:a'] }))).toContain('not a regular file')
   })
 
   it('rejects a malformed snapshot rather than trusting a partial read', async () => {
@@ -246,8 +243,6 @@ describe('snapshot_archive', () => {
     expect(JSON.stringify(result.skipped)).toContain('cannot archive sessions')
   })
 })
-
-void sha
 
 describe('snapshot_archive with legacy live entries', () => {
   it('compares an entry whose data is not an object by its own value', async () => {

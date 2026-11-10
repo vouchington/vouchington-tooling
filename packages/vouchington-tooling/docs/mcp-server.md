@@ -135,8 +135,9 @@ keeping its content. `rejectedCount` and `worktreeRejectedCount` report those re
 corrected retry with the same `sourceEventId` is accepted. `outbox_flush` also returns
 `rejected: [{ sourceEventId, diagnostic }]` for what it moved. Flushing an empty
 outbox does not create the directory. `snapshot_export` never accepts a destination: the
-`agent-blackboard` client chooses a private file and returns its path. `session_archive` is the one
-destructive tool; archived metadata is immutable, while entries stay appendable.
+`agent-blackboard` client chooses a private file and returns its path. `session_archive` and
+`snapshot_archive` are the destructive tools; archived metadata is immutable, while entries stay
+appendable.
 
 ### Snapshot partition
 
@@ -177,6 +178,9 @@ archive, not the caller; at most 100 per call, duplicates ignored).
   the next pass. The result is only `{ archived, skipped: [{ sessionId, reason }] }`.
 - **Not spent.** The token stays valid for `snapshot_cleanup`. A snapshot that cannot be read or
   verified fails the whole call before anything is archived, and the token stays valid.
+- **One call at a time.** A call holds the token while it runs, so a parallel `snapshot_archive`,
+  `snapshot_partition`, or `snapshot_cleanup` with the same token fails as unknown. Send archive
+  calls sequentially and call `snapshot_cleanup` only after the last one returns.
 
 ### Snapshot cleanup
 
