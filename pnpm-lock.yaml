@@ -152,8 +152,8 @@ importers:
         specifier: 16.4.3
         version: 16.4.3(@playwright/test@1.64.1)(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       no-mistakes:
-        specifier: 0.101.0
-        version: 0.101.0(vitest@5.1.0)
+        specifier: 0.108.0
+        version: 0.108.0(vitest@5.1.0)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -2756,30 +2756,30 @@ packages:
       sass:
         optional: true
 
-  no-mistakes-darwin-arm64@0.101.0:
-    resolution: {integrity: sha512-zXWxnKGxHY8WJdu6ANeLaAYp8InXUg+mbgCg7Yue0Ks6T7EIGSjZ/nxO5wuR04KzfSO8T5x+VTH80nfBc4fWNg==}
+  no-mistakes-darwin-arm64@0.108.0:
+    resolution: {integrity: sha512-Y/0F6zqkmvUz9zCBLdhmAfrfPGnFpwvMkuxWzwhOkPpeHWVGqmMrwS9b9wCpeDKaSZiATUwIt8wYTtIBEWz5RA==}
     cpu: [arm64]
     os: [darwin]
 
-  no-mistakes-linux-arm64-gnu@0.101.0:
-    resolution: {integrity: sha512-AZ1awtSUabDvYGIvULrE77tpM3n9lb6/2LdD8b2RYcuW3k7N+sLhP46eEwgZNDpCG2e0q5siX0TIdaOoVW/m/Q==}
+  no-mistakes-linux-arm64-gnu@0.108.0:
+    resolution: {integrity: sha512-ePQvU6rmZ4Z8ke064jtISi+v15s8nN5V1HKmLBLwI3y0sGSgdEMEFIPjhHjnLl7uJ6MG2Fa2JnFPZmiKoL3ujg==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-linux-x64-gnu@0.101.0:
-    resolution: {integrity: sha512-Ne1JJ8fsrW+s9gsAZjYJAfq8QznXbywVsJCm/PAQx/d0k3yZY2NQbdXuL8Agkf19efXQFw/gePjHf02VmunydA==}
+  no-mistakes-linux-x64-gnu@0.108.0:
+    resolution: {integrity: sha512-D2dJ75NbFqvd5bV1ur9oXLkrzvpx7BdjlU4mMjCM8Ht/E+8aoi9SIINqGgXFs8jW/R1Z7cChOjc459+2WaN2vA==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-win32-x64-msvc@0.101.0:
-    resolution: {integrity: sha512-FFJwm5OdQaLv0e+VeMNrwamAaVswNZjzZ95VsuETKUpFDaC8CJ9dkgHo1XTQhKaoXMzZXGZwvHze2qUjizMO7g==}
+  no-mistakes-win32-x64-msvc@0.108.0:
+    resolution: {integrity: sha512-epOh+8EZw20U2Vk4AUX0tkU9M7kMGpbvYXWfm/8LaS8+ZTvNSYnDS+9KWrwq+cFkS78t5ppY0dSbfPMLiN4VrQ==}
     cpu: [x64]
     os: [win32]
 
-  no-mistakes@0.101.0:
-    resolution: {integrity: sha512-nKi4EizsxJlyW90mJ7causmTCcIMEx89BOQKbH/xA7T5kQteDSlU0/88dyOZLtGS4pAD7ics94ed4Gbvsj9MCQ==}
+  no-mistakes@0.108.0:
+    resolution: {integrity: sha512-ISXL8s+SmwxrBziGPuGXEy0EFjVINP43hpgJIHucbiPi3cpUP9gQHBOx0+zPP3vBwQVO0TISKwuBhjBJQlIsQw==}
     hasBin: true
     peerDependencies:
       vitest: ^5.0.3
@@ -5777,24 +5777,24 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  no-mistakes-darwin-arm64@0.101.0:
+  no-mistakes-darwin-arm64@0.108.0:
     optional: true
 
-  no-mistakes-linux-arm64-gnu@0.101.0:
+  no-mistakes-linux-arm64-gnu@0.108.0:
     optional: true
 
-  no-mistakes-linux-x64-gnu@0.101.0:
+  no-mistakes-linux-x64-gnu@0.108.0:
     optional: true
 
-  no-mistakes-win32-x64-msvc@0.101.0:
+  no-mistakes-win32-x64-msvc@0.108.0:
     optional: true
 
-  no-mistakes@0.101.0(vitest@5.1.0):
+  no-mistakes@0.108.0(vitest@5.1.0):
     optionalDependencies:
-      no-mistakes-darwin-arm64: 0.101.0
-      no-mistakes-linux-arm64-gnu: 0.101.0
-      no-mistakes-linux-x64-gnu: 0.101.0
-      no-mistakes-win32-x64-msvc: 0.101.0
+      no-mistakes-darwin-arm64: 0.108.0
+      no-mistakes-linux-arm64-gnu: 0.108.0
+      no-mistakes-linux-x64-gnu: 0.108.0
+      no-mistakes-win32-x64-msvc: 0.108.0
       vitest: 5.1.0(@types/node@26.6.5)(@vitest/coverage-v8@5.1.0)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   object-assign@4.1.1: {}
