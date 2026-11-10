@@ -119,14 +119,14 @@ function writeNativeTests(
   }
 }
 function scanScopedRule(
-  loaded: ValidatedLoadedRule,
+  { invalid, rule }: ValidatedLoadedRule,
   root: string,
   languageGlobs: Record<string, string[]>,
   execute: AstGrepExamplesExecutor,
 ): void {
-  const { invalid, rule } = loaded
+  const { examples, ...scopedRule } = rule
   const expected = new Map<string, boolean>()
-  for (const example of rule.examples) {
+  for (const example of examples) {
     assertExample(rule, example)
     const file = example.file.replace(/\\/g, '/').replace(/^\.\//, '')
     expected.set(file, eligible(rule, file))
@@ -134,7 +134,7 @@ function scanScopedRule(
     fs.mkdirSync(dirname(path), { recursive: true })
     fs.writeFileSync(path, invalid)
   }
-  fs.copyFileSync(loaded.ruleFile, join(root, 'rule.yml'))
+  fs.writeFileSync(join(root, 'rule.yml'), yamlDump(scopedRule))
   fs.writeFileSync(join(root, 'sgconfig.yml'), yamlDump({ languageGlobs }))
   const result = execute(
     ['scan', '--rule', 'rule.yml', '--config', 'sgconfig.yml', '--json', '--no-ignore', 'hidden'],
