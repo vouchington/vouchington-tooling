@@ -14,6 +14,13 @@ Local policy overrides these portable conventions.
 - Split differing shapes, share identical values, and keep history documents as JSON.
 - Use canonical [table shapes](references/table-shapes.md) for revisions, changes, work, and cursors.
 - Default to finite retention for everything except user content; see [table shapes](references/table-shapes.md#retention).
+- No unnecessary locks. Owner's words: "do we have a rule? no unnecessary locks", "seems like we
+  have way too many locks for no reason", "keep things simple". Lock (`FOR UPDATE`) only when a
+  concurrent write would corrupt the rows this transaction writes. Never lock a read set or a
+  parent row, and never use advisory locks. Caps and "don't remove the last X" guards are best
+  effort: count up to the cap (`LIMIT cap+1`), then write. Never add counter or projection tables,
+  slot tables, claim tables, or constraints that exist only to make a cap exact. Remove a lock by
+  deleting it, not by swapping in another serializer.
 - Reuse parameterized trigger functions instead of copying bodies.
 - Comment every table, column, and view; document reviewed exceptions explicitly.
 

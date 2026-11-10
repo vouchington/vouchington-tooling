@@ -3,8 +3,8 @@
 Use pools and release checked-out clients in `finally`, especially for cursors, streams, and COPY.
 Route ordinary reads to a replica when its lag is acceptable; route read-after-write, locking, and
 transaction-consistent reads to the writer. Do not hold a client across unrelated application work.
-Never hold a transaction, connection, or advisory lock across an external call; take a token lease
-in a shared store instead, with a TTL, renewal, and compare-and-delete release. Stop work when
+Never use advisory locks, and never hold a transaction or connection across an external call; take
+a token lease in a shared store instead, with a TTL, renewal, and compare-and-delete release. Stop work when
 renewal fails, and guard any write a stale owner could make with the token.
 
 For large reads, use keyset pagination, cursors, or streams with cancellation and bounded batches.
@@ -21,6 +21,19 @@ data, but it does not replace suitable local indexes or predicates that permit p
 
 ## Query shapes
 
+### Simplest query first
+
+Owner's principle: "hot/best should just be a JOIN and an ORDER BY". A ranked sort joins the
+entity to its stored score and orders by it. Filters go in `WHERE`; membership is a keyed `EXISTS`,
+join, or subquery; then `ORDER BY` and `LIMIT`.
+
+These need `EXPLAIN ANALYZE` plans, at representative cardinality, showing they beat the simple
+query for the same result, not merely the previous version on the base branch: `MATERIALIZED` or
+capped candidate CTEs, `UNION`, `GROUP BY` or `DISTINCT` dedupe, `LATERAL` joins and planner
+fences, cohort or window ranking, and multi-stage cap-filter-rank pipelines. Never build a
+candidate pool. A walk that stops at an inspected-row cap and returns a short or empty page with a
+continuation cursor is fine.
+
 Test existence with `EXISTS`, not `COUNT(*) > 0`. Use correlated `NOT EXISTS` rather than
 `NOT IN (SELECT ...)`, whose NULL behavior can silently exclude expected rows. Filter and order
 UUIDv7 rows by `id`, not generated `created_at`, so the key's index supports the query.
@@ -32,7 +45,8 @@ Use keyset pagination, never `OFFSET`. An optimizer fence is a `MATERIALIZED` CT
 The outer query still reads CTE rows on demand and can stop at its `LIMIT`, but when its filters
 reject most CTE rows, or it sorts, aggregates or hash-joins them, it reads every row up to the CTE's own
 `LIMIT`. Use a `MATERIALIZED` CTE only when it holds the final `LIMIT`, or for a small
-viewer-scoped set. Never use it as a candidate pool before the page `LIMIT`. Constrain a partitioned table's partition key, or document the reason for a
+viewer-scoped set, and only with plans showing it beats the plain query. Never use it as a
+candidate pool before the page `LIMIT`. Constrain a partitioned table's partition key, or document the reason for a
 cross-partition query. Choose the partition key from dominant access patterns; a hot reader
 of `RANGE (id)` needs an id or time bound.
 
@@ -98,7 +112,8 @@ count over its output. A restriction on a grouping column can still be pushed be
 so let the plan decide. Confirm from the
 plan (large `Actual Rows` and `Actual Loops` inside the view's nodes), then choose the ids from the
 base tables first and read the view by its key, as a correlated `LATERAL` lookup so the page
-restriction can reach inside the view. This works for an aggregate or `GROUP BY` view whose key is
+restriction can reach inside the view. Reach for this only after the plan shows the simple
+query builds the whole view, and keep it only if its plan beats the simple query. This works for an aggregate or `GROUP BY` view whose key is
 a grouping column; a `LIMIT` in the view blocks pushdown of any qual, so rewrite that view's query
 against the base tables instead. A plain join to the page is a join clause, not a restriction
 inside the view, so the planner can still build the whole aggregate first.
@@ -148,7 +163,9 @@ Overlap independent cache and PostgreSQL reads with `Promise.all`, such as a rat
 alongside the user fetch. Serialize only true dependencies, where one result feeds the next call. Suppress the
 sequential-await lint only when each step consumes the previous step's result; a shared
 transaction client or lock ordering is not a data dependency. A lock that must be taken first
-stays a separate, earlier statement; never reorder or parallelize it. Audit every added suppression.
+stays a separate, earlier statement; never reorder or parallelize it. Do not keep a lock only
+because it exists: one that fails the lock rule in
+[schema design](../../postgres-schema-design/SKILL.md) is deleted. Audit every added suppression.
 
 Correctness comes before round trips. Before folding a statement away, state the guarantee it
 gave (what it locked, which snapshot it read) and reject the fold if that weakens. An `EXISTS`

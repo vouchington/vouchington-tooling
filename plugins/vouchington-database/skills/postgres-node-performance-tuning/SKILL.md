@@ -11,6 +11,12 @@ Local policy overrides these defaults; do not reload an already-read adapter or 
 
 Measure the query plan and the workload shape before changing code.
 
+Owner's principle: "the basic premise is to use the simplest query, and making it more complex
+requires explain analyze plans". Start with filters in `WHERE`, keyed `EXISTS`, joins or
+subqueries, `ORDER BY`, and `LIMIT`. A complex shape stays only with `EXPLAIN ANALYZE` plans showing
+it beats that simple query, not merely the previous version; see
+[simplest query first](references/performance-patterns.md#simplest-query-first).
+
 - Select only the required columns.
 - Bound each result set. Paginate or stream a large read. A stream bounds memory, not work: cap
   the rows per run as in [bounded iteration](../bounded-iteration/SKILL.md).

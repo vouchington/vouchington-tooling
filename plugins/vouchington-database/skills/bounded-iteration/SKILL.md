@@ -44,11 +44,13 @@ A run's cost is the rows it reads and the work it starts, not the memory it hold
    continue with a plain keyset cursor, `(key, id) < ($1, $2)`. The page `LIMIT` plus a time window
    or the keyset bound the read. A keyset alone does not bound rows scanned. When a filter can
    reject long runs, such as a viewer's blocks or mutes, the time window is the scan bound where the
-   sort has one, and EXPLAIN at representative cardinality compares rows read with rows returned. No
-   candidate pools: no capped or `MATERIALIZED` CTE over the listed entity that is filtered or
-   limited afterward, no window loops or resume probes, no proof state in the cursor, and no
-   runtime-config fields that exist only to cap a read. A page is never short or empty while
-   `has_next_page` is true. Small viewer-scoped sets (the viewer's follows, mutes, blocks and
+   sort has one, and EXPLAIN at representative cardinality compares rows read with rows returned. The
+   simplest query comes first; anything more complex needs `EXPLAIN ANALYZE` plans beating it. For a
+   ranked list that is a join and `ORDER BY` on the stored score. No candidate pools: no capped or
+   `MATERIALIZED` CTE over the listed entity that is filtered or limited afterward, no window loops
+   or resume probes, no proof state in the cursor, and no runtime-config fields that exist only to
+   cap a read. A single walk with an inspected-row cap is fine, and may return a short or empty page
+   with a continuation cursor and `has_next_page` true. Small viewer-scoped sets (the viewer's follows, mutes, blocks and
    memberships) may be subqueries or semi-joins, because write limits bound them. Measure a
    list-read change against the plain single walk, not only against the base branch. See
    [`MATERIALIZED` CTEs](../postgres-node-performance-tuning/references/performance-patterns.md).
