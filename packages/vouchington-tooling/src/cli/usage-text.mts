@@ -40,7 +40,6 @@ Commands:
   install-playwright-chromium-arm64  Install Playwright Chromium from browsers.json
   ghcr-package-retention        Delete old GHCR package versions (KEEP_MIN or --main-history)
   harness-admission-lane        Compute a GITHUB_RUN_ID admission lane for fleet fan-out
-  harness-assert-gates          Fail if any named HARNESS_*_ENABLED gate is enabled
   gha-collaborator-trust        Classify authors as write-access collaborators or not
   nuget-central-version         Validate a Directory.Packages.props PackageVersion delta
   verify-workflow-secrets       Check a secret inventory against live repository and environment secrets
@@ -127,7 +126,6 @@ wait-for-apt-locks
 install-playwright-chromium-arm64 [name:archive...]
 ghcr-package-retention [--main-history] [--apply|--dry-run] [<url-encoded-package>...]
 harness-admission-lane <lanes>
-harness-assert-gates <gate>...
 gha-collaborator-trust <owner/repo> [--allow-bot <login>]... < authors.json
 nuget-central-version <trusted-props> <candidate-props> <metadata-json> <output-props>
 verify-workflow-secrets [--repo OWNER/NAME] [--confirm NAME,...] [--inventory MODULE] [--export NAME] [--branch NAME]
