@@ -29,7 +29,9 @@ Default to a queue job whose job id is the durable row id, enqueued after commit
 sweep that re-enqueues rows with no recorded outcome. The queue already supplies attempts,
 backoff, locking, stall recovery and unique ids. A lease or outbox work-item table needs a stated
 reason: legal or payment records, old values that vanish at commit, or an outcome that must
-commit with domain rows.
+commit with domain rows. Making a cap exact is never a reason: no counter, slot, or claim table
+for a cap; count up to the cap and write, as in the lock rule in
+[schema design](../SKILL.md).
 
 When a table is justified, fence with one compare-and-set on the outcome or a generation
 (`WHERE completed_at IS NULL` / `AND generation = $n`) instead of a full set of lease columns.

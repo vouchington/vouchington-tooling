@@ -342,6 +342,9 @@ CROSS JOIN LATERAL (
 ) due;
 ```
 
+This is a complex shape: keep it only with `EXPLAIN ANALYZE` plans showing it beats the plain
+query.
+
 The loose scan beats a small thresholds table here because the intervals are chosen per row and
 there is no second source of truth to drift. If the intervals are a fixed, reviewed set, a
 thresholds table is just as bounded. Either way the bucket count must itself be bounded, for
