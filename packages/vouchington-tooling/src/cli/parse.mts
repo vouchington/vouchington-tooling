@@ -94,7 +94,6 @@ export type ScriptCommand =
   | 'install-playwright-chromium-arm64'
   | 'ghcr-package-retention'
   | 'harness-admission-lane'
-  | 'harness-assert-gates'
   | 'gha-collaborator-trust'
 
 const SCRIPT_COMMANDS = new Set<ScriptCommand>([
@@ -118,7 +117,6 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'install-playwright-chromium-arm64',
   'ghcr-package-retention',
   'harness-admission-lane',
-  'harness-assert-gates',
   'gha-collaborator-trust',
 ])
 

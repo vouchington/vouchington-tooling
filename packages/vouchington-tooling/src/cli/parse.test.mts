@@ -267,11 +267,6 @@ describe('parseCli', () => {
       command: 'harness-admission-lane',
       args: ['4'],
     })
-    expect(parseCli(['node', 'vouchington', 'harness-assert-gates', 'GATE'])).toEqual({
-      kind: 'script',
-      command: 'harness-assert-gates',
-      args: ['GATE'],
-    })
     expect(parseCli(['node', 'vouchington', 'gha-collaborator-trust', 'owner/repo'])).toEqual({
       kind: 'script',
       command: 'gha-collaborator-trust',
