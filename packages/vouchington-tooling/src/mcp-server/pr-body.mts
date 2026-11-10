@@ -27,9 +27,10 @@ function defaultNoSourceStatement(reason: string): string {
 
 /**
  * The pull request body: the Summary, Impact, Related issues and Details sections followed by the
- * provenance lines. With `noSourceIssue` the Related issues section ends with `noSourceStatement`
- * (default {@link defaultNoSourceStatement}), after any `Refs` lines, instead of `- None`. Pure;
- * the caller supplies the device and worktree facts.
+ * provenance lines, collapsed in a Provenance disclosure because they serve audits, not reviewers.
+ * With `noSourceIssue` the Related issues section ends with `noSourceStatement` (default
+ * {@link defaultNoSourceStatement}), after any `Refs` lines, instead of `- None`. Pure; the caller
+ * supplies the device and worktree facts.
  */
 export function renderPullRequestBody(
   input: PullRequestInput,
@@ -57,10 +58,15 @@ export function renderPullRequestBody(
     '',
     input.details.join('\n\n'),
     '',
+    '<details>',
+    '<summary>Provenance</summary>',
+    '',
     `Workspace setup: ${input.workspaceSetup}`,
     `Agent: ${provenance.agent} session ${provenance.sessionId}`,
     `Device: ${provenance.user}@${provenance.host.toLowerCase()}`,
     `Worktree: ${provenance.worktree}`,
+    '',
+    '</details>',
     '',
   ].join('\n')
 }

@@ -46,10 +46,15 @@ const BODY = [
   '',
   'First paragraph.\n\n- a bullet',
   '',
+  '<details>',
+  '<summary>Provenance</summary>',
+  '',
   'Workspace setup: fresh worktree',
   'Agent: unknown (caller-claimed agent: codex) session native:owner',
   'Device: Jong@laptop.local',
   'Worktree: linked',
+  '',
+  '</details>',
   '',
 ].join('\n')
 
