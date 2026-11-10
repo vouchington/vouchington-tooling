@@ -39,7 +39,7 @@
     "eslint-plugin-no-mistakes": "^0.108.1",
     "github-actionlint": "^1.7.12",
     "jscpd": "5.4.2",
-    "knip": "^6.43.0",
+    "knip": "^6.44.1",
     "oxfmt": "^0.75.0",
     "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
