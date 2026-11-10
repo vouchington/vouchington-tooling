@@ -83,7 +83,8 @@ const REQUIRED = ['title', 'summary', 'impact', 'relatedIssues', 'details', 'wor
 
 const RENDERING =
   'The server renders the body from the structured input (Summary, Impact, Related issues, ' +
-  'Details, then Workspace setup, Agent, Device and Worktree lines) and runs the checkout ' +
+  'Details, then Workspace setup, Agent, Device and Worktree lines in a collapsed Provenance ' +
+  'disclosure) and runs the checkout ' +
   'policy validatePullRequest export in a child process; the head branch is the ' +
   "worktree's current branch. Policy tools need a server launched inside a repository worktree. "
 

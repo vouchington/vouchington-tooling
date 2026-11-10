@@ -362,11 +362,19 @@ rule) and `pullRequestDefaults`.
 
 <details joined by blank lines>
 
+<details>
+<summary>Provenance</summary>
+
 Workspace setup: <workspaceSetup>
 Agent: <derived agent | unknown>[ (caller-claimed ...)] session <sessionId>
 Device: <os user>@<lowercased hostname>
 Worktree: <path after "/worktrees/", "main" for the main worktree, else the directory name>
+
+</details>
 ```
+
+The provenance lines are collapsed because they serve audits, not reviewers; each still starts its
+own line, so a policy can match them with line-anchored patterns.
 
 The head branch is the worktree's current branch (for `pr_validate` with `pr`, the live pull
 request's head, which may equal `base` for a fork); otherwise a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
