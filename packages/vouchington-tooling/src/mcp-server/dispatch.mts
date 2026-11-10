@@ -7,6 +7,7 @@ import { journalAppend, journalEntries } from './handlers-journal.mts'
 import { retrospectiveSave } from './handlers-retrospective.mts'
 import { retrospectiveCheck } from './retrospective-check.mts'
 import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
+import { snapshotArchive } from './handlers-snapshot-archive.mts'
 import { snapshotCleanup } from './handlers-snapshot-cleanup.mts'
 import { snapshotPartition } from './handlers-snapshot-partition.mts'
 import { sessionArchive, sessionEnsure, snapshotExport } from './handlers-session.mts'
@@ -62,6 +63,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   pr_update: handlePrUpdate,
   snapshot_export: snapshotExport,
   snapshot_partition: snapshotPartition,
+  snapshot_archive: snapshotArchive,
   snapshot_cleanup: snapshotCleanup,
   session_archive: sessionArchive,
 }

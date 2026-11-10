@@ -71,11 +71,14 @@ Use when completed retrospectives or journals should become durable follow-up wo
    denied-external tracking behavior.
 7. Archive only verified records fully processed across every represented repository, and never
    while any worktree's `outbox_status` reports a `worktreePendingCount` above 0, under the
-   repository's retention rules. Make one `session_archive` call per session, whose `sessionId` is the archived session,
-   not the caller. Immediately before each call, read that session with `journal_entries` and
-   archive only if its entries match the verified snapshot's by source identity; otherwise leave it
-   for the next pass, because an entry added after the export would never be distilled.
-   Archiving makes the session's metadata immutable, so it needs the archival authorization that
+   repository's retention rules. Archive with the `snapshot_archive` tool, passing the
+   `cleanupToken` from `snapshot_export` and up to 100 `sessionIds` per call, which are the sessions
+   to archive, not the caller. The server confirms each session is in that export, reads its live
+   entries, compares them with the exported ones by content (entries that differ only in
+   the server-assigned `timestamp` are one event), and archives only on an exact match. Do not read
+   sessions with `journal_entries` to compare them yourself. It returns only
+   `{archived, skipped: [{sessionId, reason}]}`: leave every skipped session for the next pass,
+   because an entry added after the export would never be distilled. Archiving makes the session's metadata immutable, so it needs the archival authorization that
    local policy requires. A one-repository pass leaves a multi-repository session active until the other
    repositories are reviewed. Report reviewed, fixed, duplicate, deferred, quarantined, and
    actionable dispositions with reasons. Keep the top five themes in human prose without dropping
@@ -128,7 +131,8 @@ difference is a conflicting payload and stays quarantined.
   summary: partition index, deduplicated themes with their session IDs, and each session's
   disposition. Inspectors hand-read only journal-only and retrospective sessions; every other shape
   is determined structurally.
-- Keep the verified snapshot until the last `session_archive`, because the archival check reads it.
+- Keep the verified snapshot until the last `snapshot_archive` call, because the server's archival
+  check reads it.
   Then call `snapshot_cleanup`, which removes the snapshot and the partitions
   `snapshot_partition` recorded, in a cleanup path that runs even when no session is archived.
 - Report reviewed, fixed, duplicate, deferred, quarantined, actionable, created, updated,
@@ -138,8 +142,9 @@ difference is a conflicting payload and stays quarantined.
 
 Cleanup, as a finally step: whether processing succeeded or failed, call `snapshot_cleanup` with
 the `cleanupToken` from `snapshot_export`, with the same `sessionId` and `worktree`, once the
-snapshot and its partitions are no longer needed. The token is single-use and server-restart-scoped; if cleanup fails,
-retry the same call.
+snapshot and its partitions are no longer needed. `snapshot_partition` and `snapshot_archive` leave the token valid, so cleanup comes after the last
+archive call. The token is single-use and server-restart-scoped; if cleanup fails, retry the same
+call.
 
 Use source records only for local verification and leave them in the repository's approved journal
 or retention system. Public issue bodies contain only the minimum bounded facts or redacted
@@ -150,5 +155,5 @@ copy its contents into an issue.
 
 This skill supplies no issue repository, labels, milestones, projects, or approval model; it reads
 sessions only from the snapshot file that `snapshot_export` writes, and archives them only with
-`session_archive`. Consumer wrappers cannot weaken this export
+`snapshot_archive`. Consumer wrappers cannot weaken this export
 boundary; they provide only those local details.

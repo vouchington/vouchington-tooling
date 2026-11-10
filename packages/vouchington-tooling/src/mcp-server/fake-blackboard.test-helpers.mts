@@ -23,6 +23,10 @@ export type FakeOptions = {
   conflictingSession?: { id: string; parentSessionId: null; agent: string; version: string }
   entries?: StoredEntry[]
   entriesError?: unknown
+  /** Fails the read of just these sessions, keyed by session id. */
+  entriesErrors?: Record<string, unknown>
+  /** Fails the archive of just these sessions, keyed by session id. */
+  archiveErrors?: Record<string, unknown>
   /** An entry another caller writes just before the next append, after that append's read. */
   lateEntry?: StoredEntry
 }
@@ -85,6 +89,8 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
       return options.conflictingSession
     }
     async archive(sessionId: string) {
+      if (options.archiveErrors && sessionId in options.archiveErrors)
+        throw options.archiveErrors[sessionId]
       calls.archive.push(sessionId)
     }
   }
@@ -105,7 +111,10 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     async *get(input: unknown) {
       calls.get.push(input)
       if (options.entriesError !== undefined) throw options.entriesError
-      yield* stored
+      const id = (input as { sessionId: string }).sessionId
+      if (options.entriesErrors && id in options.entriesErrors) throw options.entriesErrors[id]
+      // An entry with no sessionId belongs to whichever session is read, as before.
+      yield* stored.filter((entry) => entry.sessionId === undefined || entry.sessionId === id)
     }
   }
   class Snapshots {

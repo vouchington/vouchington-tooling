@@ -15,7 +15,7 @@ subagent-identity rules.
 
 Journal operations are tools of the `vouchington-tooling` MCP server (`vouchington mcp`):
 `journal_append`, `journal_entries`, `outbox_status`, `outbox_flush`, `session_ensure`,
-`snapshot_export`, and `session_archive`. Harnesses name them differently, so match the bare tool
+`snapshot_export`, `snapshot_archive`, and `session_archive`. Harnesses name them differently, so match the bare tool
 name: `mcp__vouchington-tooling__<tool>`, `mcp__vouchington_tooling__<tool>` (the hyphen becomes an
 underscore), or `vouchington-tooling__<tool>` reached through a `search_tool` and `use_tool` pair,
 or the `vouchington-tooling` namespace reached through `GetDynamicTools` and `CallDynamicTool`.
@@ -25,6 +25,8 @@ Every call takes an exact `sessionId`, never inferred, whose meaning depends on 
   session unless a runner ensures a child identity.
 - `journal_entries` and `session_archive`: the session read or archived, which during distillation
   belongs to another agent.
+- `snapshot_archive`: the caller, which also owns the `cleanupToken`; its `sessionIds` name the
+  sessions archived.
 - `snapshot_export`, `outbox_status`, and `outbox_flush`: only the caller. The outbox is per
   worktree, so `outbox_status` and `outbox_flush` report two counts: `pendingCount` is the unsent
   records of that `sessionId`, and `worktreePendingCount` is the unsent records of every session in

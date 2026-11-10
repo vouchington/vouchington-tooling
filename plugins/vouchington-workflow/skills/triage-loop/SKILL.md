@@ -32,6 +32,11 @@ Resolve these first and stop to ask when one is missing; never guess.
 - **Issue taxonomy:** milestone and project rules, and where sensitive issues go.
 - **Dispatch targets:** isolated-worktree subagents, and any terminal workspace manager whose
   agents accept prompts.
+- **Distill cutoffs:** `retroDays` and `sessionDays` (non-negative finite day counts), and whether
+  archiving the distilled sessions is authorized. The values come from the repository's
+  [retrospective-distill](../retrospective-distill/SKILL.md) adapter (the alias its `AGENTS.md`
+  declares, otherwise `.agents/skills/retrospective-distill/SKILL.md`); Phase E of
+  `triage-sweep` passes them through.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
 - **Late-review window:** how far back Phase F rescans merged PRs (default 14 days).
 
