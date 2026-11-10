@@ -13,6 +13,8 @@ export type {
 export { markdownSectionBetweenHeadings } from './sections.mts'
 export { extractMarkdownTables, parseMarkdownTables } from './tables.mts'
 export { markdownNodeText } from './text.mts'
+export { parseVisibleMarkdownContent } from './visible-content.mts'
+export type { MarkdownVisibleBlock, MarkdownVisibleContent } from './visible-content-types.mts'
 export { hasUncheckedMarkdownTask } from './tasks.mts'
 export type {
   LooseMarkdownTableRow,
