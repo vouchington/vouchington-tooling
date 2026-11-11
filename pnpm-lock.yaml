@@ -28,8 +28,8 @@ importers:
         specifier: ^10.14.0
         version: 10.14.0(jiti@2.7.0)(supports-color@7.2.0)
       eslint-plugin-no-mistakes:
-        specifier: ^0.108.1
-        version: 0.108.1(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2)
+        specifier: ^0.109.0
+        version: 0.109.0(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2)
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -2071,8 +2071,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-no-mistakes@0.108.1:
-    resolution: {integrity: sha512-Sh8T8G/OM24rpFHmH6gaCITGYEAnRWQzt2uP6Pr52UpgAq0iQzKpaJasDIFEzCFTlTGunNvgrEvLK1+8SXkSmA==}
+  eslint-plugin-no-mistakes@0.109.0:
+    resolution: {integrity: sha512-xuyP4PJcmS9IH5qNn4yDw1VkK2N1ciBy+kZ4QCS4MKjKK/rrEYsXlt8J4X+TbKH6A2jFiDq83KE0rjqerXcZtQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     peerDependencies:
       '@typescript-eslint/parser': '>=8'
@@ -4011,7 +4011,7 @@ snapshots:
     dependencies:
       '@hono/node-server': 2.1.5(hono@4.13.13)
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
       cors: 2.8.6
       cross-spawn: 7.0.6
@@ -4033,7 +4033,7 @@ snapshots:
     dependencies:
       '@hono/node-server': 2.1.5(hono@4.13.13)
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
       cors: 2.8.6
       cross-spawn: 7.0.6
@@ -4692,8 +4692,8 @@ snapshots:
       - supports-color
       - zod
 
-  ajv-formats@3.0.1:
-    dependencies:
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
       ajv: 8.20.0
 
   ajv@6.15.0:
@@ -4952,7 +4952,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-no-mistakes@0.108.1(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2):
+  eslint-plugin-no-mistakes@0.109.0(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2):
     dependencies:
       eslint: 10.14.0(jiti@2.7.0)(supports-color@7.2.0)
     optionalDependencies:
