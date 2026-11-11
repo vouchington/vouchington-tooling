@@ -33,6 +33,7 @@ export type SnapshotPartitionOptions = {
   counts?: SnapshotCounts
   maxSessions?: number
   maxBytes?: number
+  owner?: SnapshotCleanupOwner
 }
 
 export type SnapshotPartition = {
@@ -42,6 +43,9 @@ export type SnapshotPartition = {
   manifest: SnapshotManifest
 }
 
+/** Who exported a snapshot and the generated file it came from, signed into the receipt. */
+export type SnapshotCleanupOwner = { sessionId: string; worktree: string; source: string }
+
 export type SnapshotCleanupReceipt = {
   schemaVersion: 1
   directory: string
@@ -49,6 +53,7 @@ export type SnapshotCleanupReceipt = {
   directoryIno: number
   token: string
   partitions: Array<{ name: string; checksum: SnapshotChecksum }>
+  owner?: SnapshotCleanupOwner
   signature: string
 }
 

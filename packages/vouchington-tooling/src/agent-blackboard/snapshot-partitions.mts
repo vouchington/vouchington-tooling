@@ -112,7 +112,7 @@ export async function partitionSnapshot(
     return {
       directory: directory!,
       partitions,
-      cleanupReceipt: await writeCleanupReceipt(directory!, partitions),
+      cleanupReceipt: await writeCleanupReceipt(directory!, partitions, options.owner),
     }
   } catch (error) {
     if (directory) await rm(directory, { recursive: true, force: true })

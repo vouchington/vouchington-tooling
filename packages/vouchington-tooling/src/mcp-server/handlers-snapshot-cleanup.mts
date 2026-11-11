@@ -2,6 +2,7 @@ import { cleanupSnapshotPartitions } from '../agent-blackboard/index.mts'
 import { loadClient } from '../agent-blackboard/client.mts'
 import { requiredString } from './args.mts'
 import type { ToolHandler } from './context.mts'
+import { recoverSnapshot } from './snapshot-recovery.mts'
 
 /**
  * Deletes the files one `snapshot_export` recorded. The caller supplies only the token: the paths
@@ -9,6 +10,17 @@ import type { ToolHandler } from './context.mts'
  * caller's sessionId and resolved worktree before any filesystem call.
  */
 export const snapshotCleanup: ToolHandler = async (args, context) => {
+  if (args.cleanupToken !== undefined && args.recoveryDirectory !== undefined)
+    throw new Error('pass exactly one of cleanupToken or recoveryDirectory, not both')
+  if (args.recoveryDirectory !== undefined) {
+    // After a restart the registry is empty; the signed receipt, not the caller, proves ownership.
+    await recoverSnapshot(
+      requiredString(args, 'recoveryDirectory'),
+      context.sessionId,
+      context.worktree,
+    )
+    return { sessionId: context.sessionId, cleaned: true }
+  }
   const token = requiredString(args, 'cleanupToken')
   // Taking the record is synchronous, so a concurrent second call finds the token already spent.
   const record = context.snapshots.take(token, context.sessionId, context.worktree)

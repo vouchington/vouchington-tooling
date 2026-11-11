@@ -161,7 +161,12 @@ describe('resolveWorktree', () => {
     const gone = join(fixture.root, 'gone')
     fixture.git(fixture.main, 'worktree', 'add', '--quiet', '-b', 'gone', gone)
     rmSync(gone, { recursive: true, force: true })
-    await expect(resolve(undefined, gone)).rejects.toThrow(`worktree ${gone} is not the top level`)
+    await expect(resolve(undefined, gone)).rejects.toThrow(
+      `the launch worktree ${gone} no longer exists`,
+    )
+    await expect(resolve(undefined, gone)).rejects.toThrow('pass worktree as the absolute path')
+    // An explicit request for the removed path keeps the generic message.
+    await expect(resolve(gone)).rejects.toThrow(`worktree ${gone} is not the top level`)
     fixture.git(fixture.main, 'worktree', 'prune')
   })
 

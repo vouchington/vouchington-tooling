@@ -62,7 +62,8 @@ the Node version first: on Node older than 24 they print one line to stderr, suc
 The command takes no arguments and may be launched with any working directory, including one outside
 every git repository (for example `~`). When the working directory is inside a git worktree, that
 worktree's top level is the default for tools called without `worktree`. Otherwise those calls fail
-with a tool error asking for an explicit `worktree`. stdout carries only protocol frames, and
+with a tool error asking for an explicit `worktree`. If the launch worktree is later removed, those
+calls fail naming the removed path and asking for an explicit `worktree`. stdout carries only protocol frames, and
 diagnostics go to stderr.
 
 ## Tools
@@ -83,7 +84,7 @@ as MCP tool errors (`isError: true`) with an actionable message rather than cras
 | `snapshot_export`     | optional `agent`, `version`, `parentSessionId`, `data`, `dataArrayContains`, `inactiveForHours`                                                                                                                                                                                               | `sessionId`, `path`, `counts`, `checksum`, `manifest`, `cleanupToken`                                                                            |
 | `snapshot_partition`  | `cleanupToken`, optional `checksum`, `counts`, `maxSessions`, `maxBytes`                                                                                                                                                                                                                      | `sessionId`, `directory`, `partitions` (`path`, `counts`, `checksum`, `manifest` of each)                                                        |
 | `snapshot_archive`    | `cleanupToken`, `sessionIds` (1 to 100)                                                                                                                                                                                                                                                       | `sessionId`, `archived`, `skipped` (`sessionId`, `reason`; never entry content)                                                                  |
-| `snapshot_cleanup`    | `cleanupToken`                                                                                                                                                                                                                                                                                | `sessionId`, `cleaned: true`                                                                                                                     |
+| `snapshot_cleanup`    | one of `cleanupToken` or `recoveryDirectory`                                                                                                                                                                                                                                                  | `sessionId`, `cleaned: true`                                                                                                                     |
 | `session_archive`     | none                                                                                                                                                                                                                                                                                          | `sessionId`, `archived: true`                                                                                                                    |
 
 `journal_append` validates the whole feedback envelope with `validateFeedbackEnvelope` before
@@ -206,10 +207,22 @@ failure.
   the owner's token. If the cleanup itself fails, the token stays valid and the error carries the
   reason, including the retained tombstone path when a partition directory was half removed, so the
   same call can retry. A file that is already gone counts as cleaned.
-- **Server restart.** Bindings are in memory only. After a restart every earlier token is unknown, so
-  the file is left for the operating system to reap from its temp directory; run the distill pass
-  again to export a fresh snapshot. The registry also remembers at most 256 exports and forgets the
-  oldest first.
+- **Server restart.** Bindings are in memory only, so after a restart every earlier token is
+  unknown. Instead of persisting client capabilities, `recoveryDirectory` (the directory
+  `snapshot_partition` returned, used in place of `cleanupToken`) lets the server prove it generated
+  the output. The directory must be a non-symlink child of the OS temp directory with the generated
+  name; the `.agent-blackboard-cleanup-receipt.json` marker inside must carry a valid HMAC signature
+  under the server's persistent owner-only key; and the signed `owner` (`sessionId`, `worktree`, and
+  the source snapshot path, all signed into the receipt) must equal the caller's. Deletion then
+  reuses the receipt cleanup's checks (directory identity, partition checksums, no unexpected
+  content). The source snapshot is removed with it. Recovery is single use (the directory is gone
+  afterward, and a concurrent call is refused) and every rejection is one message that deletes
+  nothing.
+- **Not recoverable.** A plain unpartitioned export file has no receipt, so after a restart it is
+  left for the operating system to reap. So are directories partitioned by a newer client that
+  keeps its own ownership marker (its capability is never persisted), and directories whose
+  receipt predates the signed `owner` field. Run the distill pass again to export a fresh snapshot.
+  The registry remembers at most 256 exports and forgets the oldest first.
 
 The outbox lives at `<worktree>/.local/blackboard-outbox` and is used only in interactive mode.
 Autonomous mode forbids a filesystem outbox, so a failed delivery is an error.

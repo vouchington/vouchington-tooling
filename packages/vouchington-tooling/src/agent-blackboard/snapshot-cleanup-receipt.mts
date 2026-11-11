@@ -2,7 +2,11 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, lstat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { loadCleanupSigningKey } from './snapshot-cleanup-key.mts'
-import type { SnapshotCleanupReceipt, SnapshotPartition } from './snapshot-types.mts'
+import type {
+  SnapshotCleanupOwner,
+  SnapshotCleanupReceipt,
+  SnapshotPartition,
+} from './snapshot-types.mts'
 
 export const RECEIPT_NAME = '.agent-blackboard-cleanup-receipt.json'
 
@@ -12,23 +16,27 @@ function record(value: unknown): value is Record<string, unknown> {
 function exact(value: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(value).length === keys.length && keys.every((key) => key in value)
 }
+function canonicalOwner(receipt: Record<string, unknown>): Record<string, unknown> {
+  if (!('owner' in receipt)) return {}
+  const { owner } = receipt
+  if (
+    !record(owner) ||
+    !exact(owner, ['sessionId', 'worktree', 'source']) ||
+    !Object.values(owner).every((value) => typeof value === 'string' && value)
+  )
+    throw new Error('partition directory cleanup receipt is invalid')
+  const { sessionId, worktree, source } = owner
+  return { owner: { sessionId, worktree, source } }
+}
 function canonical(receipt: unknown, signature: boolean): string {
+  const base = ['schemaVersion', 'directory', 'directoryDev', 'directoryIno', 'token', 'partitions']
   if (
     !record(receipt) ||
-    !exact(
-      receipt,
-      signature
-        ? [
-            'schemaVersion',
-            'directory',
-            'directoryDev',
-            'directoryIno',
-            'token',
-            'partitions',
-            'signature',
-          ]
-        : ['schemaVersion', 'directory', 'directoryDev', 'directoryIno', 'token', 'partitions'],
-    )
+    !exact(receipt, [
+      ...base,
+      ...('owner' in receipt ? ['owner'] : []),
+      ...(signature ? ['signature'] : []),
+    ])
   )
     throw new Error('partition directory cleanup receipt is invalid')
   const { schemaVersion, directory, directoryDev, directoryIno, token, partitions } = receipt
@@ -76,6 +84,7 @@ function canonical(receipt: unknown, signature: boolean): string {
     directoryIno: normalizedDirectoryIno,
     token,
     partitions: normalized,
+    ...canonicalOwner(receipt),
   }
   if (!signature) return JSON.stringify(unsigned)
   if (typeof receipt.signature !== 'string' || !/^[0-9a-f]{64}$/.test(receipt.signature))
@@ -102,6 +111,7 @@ export function sameCleanupReceipt(left: unknown, right: SnapshotCleanupReceipt)
 export async function writeCleanupReceipt(
   directory: string,
   partitions: Array<Pick<SnapshotPartition, 'path' | 'checksum'>>,
+  owner?: SnapshotCleanupOwner,
 ): Promise<SnapshotCleanupReceipt> {
   const info = await lstat(directory)
   const unsigned: Omit<SnapshotCleanupReceipt, 'signature'> = {
@@ -111,6 +121,7 @@ export async function writeCleanupReceipt(
     directoryIno: info.ino,
     token: randomUUID(),
     partitions: partitions.map(({ path, checksum }) => ({ name: basename(path), checksum })),
+    ...(owner === undefined ? {} : { owner }),
   }
   const signature = createHmac('sha256', await loadCleanupSigningKey())
     .update(payload(unsigned))
