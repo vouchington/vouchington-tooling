@@ -1,6 +1,11 @@
-import { conformingBlocks, matchAuditBlock } from '../audit-journal/audit-block.mts'
+import {
+  conformingBlocks,
+  countConformingBlocks,
+  matchAuditBlock,
+} from '../audit-journal/audit-block.mts'
 import type { AuditRender } from '../audit-journal/audit-fit.mts'
 import type { AuditRedactor } from '../audit-journal/text.mts'
+import { lineOf } from '../audit-journal/ci-failures.mts'
 import type { JournalEntry } from '../audit-journal/types.mts'
 
 const SANDBOX_SECTION_HEADER = '## Sandbox & Permission Audit'
@@ -83,11 +88,24 @@ export function getConformingSandboxBlocks(
   )
 }
 
-export function unavailableSandboxSection(reason: string, blocks: string[] = []): string {
-  return [`${SANDBOX_SECTION_HEADER}\nStatus: unavailable (${reason})`, ...blocks].join('\n\n')
+/** How many sandbox blocks the entries hold, for reporting the ones a scope left out. */
+export function countSandboxBlocks(entries: Iterable<JournalEntry>): number {
+  return countConformingBlocks(entries, matchBlock)
 }
 
-export function journalSandboxSection(blocks: string[]): string {
-  if (blocks.length === 0) return `${SANDBOX_SECTION_HEADER}\nStatus: none observed (${SOURCE})`
-  return `${SANDBOX_SECTION_HEADER}\nStatus: events observed (${SOURCE})\n\n${blocks.join('\n\n')}`
+export function unavailableSandboxSection(
+  reason: string,
+  blocks: string[] = [],
+  note?: string,
+): string {
+  return [
+    `${SANDBOX_SECTION_HEADER}\nStatus: unavailable (${reason})${lineOf(note)}`,
+    ...blocks,
+  ].join('\n\n')
+}
+
+export function journalSandboxSection(blocks: string[], note?: string): string {
+  if (blocks.length === 0)
+    return `${SANDBOX_SECTION_HEADER}\nStatus: none observed (${SOURCE})${lineOf(note)}`
+  return `${SANDBOX_SECTION_HEADER}\nStatus: events observed (${SOURCE})${lineOf(note)}\n\n${blocks.join('\n\n')}`
 }

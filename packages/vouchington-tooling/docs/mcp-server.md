@@ -296,7 +296,11 @@ sessionId>` when that would exceed 256 bytes. Re-saving identical content return
 stored receipt and timestamp. Changed content under the same `sourceEventId` is an
 `event-conflict`; a revision needs a new `sourceEventId`. `compose` regenerates the document from
 the live journal and repository, so repeating a `compose` call is not a retry: when an interactive
-save is retained in the outbox, deliver it with `outbox_flush`.
+save is retained in the outbox, deliver it with `outbox_flush`. The CI Failures and Sandbox &
+Permission Audit sections use only the journal entries created after the session's newest earlier
+retrospective (by the blackboard's `createdAt`), and each section with excluded blocks adds an
+`Excluded: N blocks from before retrospective <sourceEventId>` line; a revision keeps its own
+blocks because the boundary is the newest retrospective older than the newest block.
 
 ### Policy module
 

@@ -78,6 +78,23 @@ function splitBlocks(markdown: string): string[] {
   return chunks.map((chunk) => chunk.join('\n'))
 }
 
+function journalBlocks(entries: Iterable<JournalEntry>): string[] {
+  return [...entries].flatMap((entry) => {
+    const data = (entry as JournalEntry | null)?.data
+    return data?.type === 'journal' && typeof data.markdown === 'string'
+      ? splitBlocks(data.markdown)
+      : []
+  })
+}
+
+/** How many blocks in the entries conform to the grammar `match` checks. */
+export function countConformingBlocks(
+  entries: Iterable<JournalEntry>,
+  match: (markdown: string, render: AuditRender) => string | null,
+): number {
+  return journalBlocks(entries).filter((markdown) => match(markdown, {}) !== null).length
+}
+
 /**
  * Matches every journal block whole while together they fit `totalBudgetBytes`. Otherwise it keeps
  * the leading blocks that fit an equal share of the total and appends `omission(count)` — itself a
@@ -93,18 +110,11 @@ export function conformingBlocks(
   unparsed?: UnparsedReport,
 ): string[] {
   let unparsedCount = 0
-  const markdowns = [...entries]
-    .flatMap((entry) => {
-      const data = (entry as JournalEntry | null)?.data
-      return data?.type === 'journal' && typeof data.markdown === 'string'
-        ? splitBlocks(data.markdown)
-        : []
-    })
-    .filter((markdown) => {
-      if (match(markdown, { redact }) !== null) return true
-      if (unparsed?.marker.test(markdown)) unparsedCount++
-      return false
-    })
+  const markdowns = journalBlocks(entries).filter((markdown) => {
+    if (match(markdown, { redact }) !== null) return true
+    if (unparsed?.marker.test(markdown)) unparsedCount++
+    return false
+  })
   const { rendered, omitted } = selectWithin(
     markdowns,
     totalBudgetBytes,

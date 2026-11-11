@@ -45,7 +45,34 @@ describe('scanJournal', () => {
         yield { data: { type: 'retrospective', markdown: 'ignored' } }
       })(),
     }))
-    expect(result).toEqual({ status: 'ok', entries: [journalEntry(block)], truncated: false })
+    expect(result).toEqual({
+      status: 'ok',
+      entries: [journalEntry(block)],
+      retrospectives: [],
+      truncated: false,
+    })
+  })
+
+  it('keeps createdAt on journal entries and records timed retrospectives', async () => {
+    const result = await scanJournal('s', () => ({
+      status: 'ok',
+      entries: [
+        { createdAt: '2026-01-01T00:00:00Z', data: { type: 'journal', markdown: block } },
+        { createdAt: 5, data: { type: 'journal', markdown: block } },
+        { createdAt: '2026-01-02T00:00:00Z', data: { type: 'retrospective', sourceEventId: 'r1' } },
+        { createdAt: '2026-01-03T00:00:00Z', data: { type: 'retrospective' } },
+        { data: { type: 'retrospective', sourceEventId: 'untimed' } },
+      ],
+    }))
+    expect(result).toEqual({
+      status: 'ok',
+      entries: [
+        { createdAt: '2026-01-01T00:00:00Z', data: { type: 'journal', markdown: block } },
+        journalEntry(block),
+      ],
+      retrospectives: [{ sourceEventId: 'r1', createdAt: '2026-01-02T00:00:00Z' }],
+      truncated: false,
+    })
   })
 
   it('skips hostile entry getters while retaining later evidence', async () => {
@@ -58,7 +85,12 @@ describe('scanJournal', () => {
       status: 'ok',
       entries: [{}, null as unknown as JournalEntry, hostile, journalEntry(block)],
     }))
-    expect(result).toEqual({ status: 'ok', entries: [journalEntry(block)], truncated: true })
+    expect(result).toEqual({
+      status: 'ok',
+      entries: [journalEntry(block)],
+      retrospectives: [],
+      truncated: true,
+    })
   })
 
   it('marks non-string journal markdown and oversized markdown as truncated', async () => {
@@ -66,7 +98,7 @@ describe('scanJournal', () => {
       status: 'ok',
       entries: [journalEntry(42), journalEntry('x'.repeat(10_001))],
     }))
-    expect(result).toEqual({ status: 'ok', entries: [], truncated: true })
+    expect(result).toEqual({ status: 'ok', entries: [], retrospectives: [], truncated: true })
   })
 
   it('bounds the entries consumed from an iterable', async () => {
