@@ -7,9 +7,14 @@ export type LivePullRequest = {
   headRefOid: string
   baseRefName: string
   state: string
+  additions: number
+  deletions: number
+  changedFiles: number
 }
 
-const FIELDS = ['body', 'headRefName', 'headRefOid', 'baseRefName', 'state'] as const
+const TEXT_FIELDS = ['body', 'headRefName', 'headRefOid', 'baseRefName', 'state'] as const
+const COUNT_FIELDS = ['additions', 'deletions', 'changedFiles'] as const
+const FIELDS = [...TEXT_FIELDS, ...COUNT_FIELDS] as const
 
 /** The live pull request as gh reports it, whatever its state. */
 export async function readLivePullRequest(
@@ -31,7 +36,13 @@ export async function livePullRequest(gh: RunTextCommand, pr: number): Promise<L
 }
 
 function isLive(value: Partial<Record<string, unknown>> | null): value is LivePullRequest {
-  return FIELDS.every((field) => typeof value?.[field] === 'string')
+  return (
+    TEXT_FIELDS.every((field) => typeof value?.[field] === 'string') &&
+    COUNT_FIELDS.every((field) => {
+      const count = value?.[field]
+      return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+    })
+  )
 }
 
 /**

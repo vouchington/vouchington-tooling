@@ -326,7 +326,7 @@ whole process group is killed, so nothing it started outlives the call. The runn
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------- |
 | `validateRetrospective` | `sessionId`, `parentSessionId`, `mode`, `workOutcome`, `feedbackCoverage`, `repositories`, `markdown`, `sourceEventId`, `metadata` (`date`, `issues`, `prs`, `description`) | `{ errors: string[], warnings?: string[] }`                    | 30 s    |
 | `pullRequestDefaults`   | `{}` from `retrospective_save`; `{ title, base, relatedIssues }` from `pr_create`                                                                                           | `{ repositories?, labels?, milestone?, project? }` (an object) | 120 s   |
-| `validatePullRequest`   | `title`, `body`, `base`, `head`, the trusted `mode`, `noSourceIssue` when given, and `pr` when set                                                                          | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
+| `validatePullRequest`   | `title`, `body`, `base`, `head`, the trusted `mode`, `noSourceIssue` when given, `pr` when set, and `diff` (see below)                                                      | `{ errors: string[], warnings?: string[] }`                    | 120 s   |
 
 Any `errors` reject the save and write nothing. A non-zero exit, a timeout (reported as
 `policy <export> timed out after <N>s`), output over 1 MB, malformed JSON, or a result of the wrong
@@ -370,6 +370,19 @@ that launched the server: `CODEX_THREAD_ID` (codex), `CLAUDECODE=1` or `CLAUDE_C
 `(caller-claimed agent: <value>)`, and `model` as `(caller-claimed model: <value>)`. When no agent
 is derivable the line says `unknown`. Making `agent` optional is compatible with existing callers,
 which may keep sending it.
+
+### Change size for the validator
+
+`validatePullRequest` receives `diff`, so a policy can bound the size of a change. It is
+`{ additions, deletions, changedFiles, source }` or `{ unavailable: reason }`. With a live pull
+request (`pr_update`, and `pr_validate` with `pr`) the counts are GitHub's own for that pull
+request, read in the same `gh pr view` as the body (`source: 'github'`), so they are right even
+when the worktree is on another commit; a live count that is not a non-negative integer rejects the
+call. Without one (`pr_create`, and `pr_validate` without `pr`) the server runs
+`git diff --numstat --no-ext-diff origin/<base>...HEAD --` in the worktree and sums it
+(`source: 'git'`; a binary file counts as a file with no lines). That git call is limited to 30 s and
+1 MiB of output; when it fails, times out, overflows, or `origin/<base>` is not fetched, `diff` is
+`{ unavailable }` and the call still succeeds.
 
 ### Pull requests with no source issue
 
@@ -427,7 +440,7 @@ with the repository's stack tooling instead.
 ### Tools
 
 - `pr_validate` (read-only): renders the body, runs the policy `validatePullRequest({ title, body,
-  base, head, mode, noSourceIssue?, pr? })` export and returns `{ ok, body, errors, warnings }`. Blocking errors do not fail the tool call: callers must
+  base, head, mode, noSourceIssue?, pr?, diff })` export and returns `{ ok, body, errors, warnings }`. Blocking errors do not fail the tool call: callers must
   check `ok` (true only when `errors` is empty) or `errors`. With
   `pr`, the live body is read (never written) so its Shepherd Journal is preserved as in
   `pr_update`. The liveness checks of `pr_update` do not apply: any state (merged or closed

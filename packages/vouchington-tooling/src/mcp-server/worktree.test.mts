@@ -206,3 +206,24 @@ describe('parseWorktreeList', () => {
     expect(parseWorktreeList(output)).toEqual(['/repo/evil\nworktree /x', '/repo/two'])
   })
 })
+
+describe('runIsolatedGit limits', () => {
+  it('kills the git process when the per-call timeout passes', async () => {
+    const started = Date.now()
+    const failure = await runIsolatedGit(
+      ['-c', 'alias.hang=!exec sleep 3 >/dev/null 2>&1', 'hang'],
+      {
+        timeout: 100,
+      },
+    ).catch((error: unknown) => error as { killed?: boolean; signal?: string })
+    expect(failure).toMatchObject({ killed: true, signal: 'SIGTERM' })
+    expect(Date.now() - started).toBeLessThan(2500)
+  })
+
+  it('fails with a buffer error when output passes maxBuffer', async () => {
+    const failure = await runIsolatedGit(['--version'], { maxBuffer: 1 }).catch(
+      (error: unknown) => error as { code?: string },
+    )
+    expect(failure).toMatchObject({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+  })
+})

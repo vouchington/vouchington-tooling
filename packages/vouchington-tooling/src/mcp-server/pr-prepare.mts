@@ -17,6 +17,7 @@ import {
   readLivePullRequest,
   redactCredentials,
 } from './pr-live.mts'
+import { diffFor } from './pr-diff-size.mts'
 import { noSourceStatement } from './pr-no-source.mts'
 import { runValidator } from './policy-run.mts'
 import { parseWorktreeList } from './worktree.mts'
@@ -39,7 +40,7 @@ export type Prepared = {
 export type PrepareKind = 'create' | 'update' | 'validate'
 
 export function gitIn(context: ToolContext): RunTextCommand {
-  return (args) => context.runGit(['-C', context.worktree, ...args])
+  return (args, limits) => context.runGit(['-C', context.worktree, ...args], limits)
 }
 
 export function ghIn(context: ToolContext): RunTextCommand {
@@ -169,6 +170,7 @@ export async function prepare(
       mode: input.mode,
       ...(input.noSourceIssue === undefined ? {} : { noSourceIssue: input.noSourceIssue }),
       ...(pr === undefined ? {} : { pr }),
+      diff: await diffFor(git, live, input.base),
     },
   })
   const errors = 'errors' in report ? report.errors : []
