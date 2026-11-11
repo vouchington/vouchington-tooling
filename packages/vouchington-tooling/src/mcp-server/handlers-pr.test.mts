@@ -27,6 +27,9 @@ const LIVE = {
   headRefOid: SHA,
   baseRefName: 'trunk',
   state: 'OPEN',
+  additions: 3,
+  deletions: 1,
+  changedFiles: 2,
 }
 
 const BODY = [
@@ -75,6 +78,7 @@ describe('pr_validate', () => {
           base: 'trunk',
           head: 'linked',
           mode: 'autonomous',
+          diff: { unavailable: 'git diff origin/trunk...HEAD failed' },
         },
       },
     ])
@@ -137,7 +141,13 @@ describe('pr_validate', () => {
     expect(result.body).toBe(`${BODY}\n${journal}\n`)
     expect(p.requests[0]!.input).toMatchObject({ pr: 5 })
     expect(gh.calls.map((call) => call.args)).toEqual([
-      ['pr', 'view', '5', '--json', 'body,headRefName,headRefOid,baseRefName,state'],
+      [
+        'pr',
+        'view',
+        '5',
+        '--json',
+        'body,headRefName,headRefOid,baseRefName,state,additions,deletions,changedFiles',
+      ],
     ])
   })
 
@@ -147,7 +157,7 @@ describe('pr_validate', () => {
       const gh = join(bin, 'gh')
       writeFileSync(
         gh,
-        `#!/bin/sh\necho '{"body":"live body","headRefName":"linked","headRefOid":"abc","baseRefName":"trunk","state":"OPEN"}'\n`,
+        `#!/bin/sh\necho '{"body":"live body","headRefName":"linked","headRefOid":"abc","baseRefName":"trunk","state":"OPEN","additions":3,"deletions":1,"changedFiles":2}'\n`,
       )
       chmodSync(gh, 0o755)
       const h = harness(fixture(), { device, env: { PATH: bin } })
@@ -161,11 +171,11 @@ describe('pr_validate', () => {
   it('rejects an unusable view of the live pull request', async () => {
     const broken = harness(fixture(), { runGh: fakeGh({ view: { body: 1 } }).runGh, device })
     expect(textOf(await broken.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return body, headRefName, headRefOid, baseRefName, state',
+      'did not return body, headRefName, headRefOid, baseRefName, state, additions, deletions, changedFiles',
     )
     const empty = harness(fixture(), { runGh: fakeGh({ view: null }).runGh, device })
     expect(textOf(await empty.call('pr_validate', args({ pr: 5 })))).toContain(
-      'did not return body, headRefName, headRefOid, baseRefName, state',
+      'did not return body, headRefName, headRefOid, baseRefName, state, additions, deletions, changedFiles',
     )
   })
 

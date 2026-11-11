@@ -25,6 +25,9 @@ const LIVE = {
   headRefOid: SHA,
   baseRefName: 'trunk',
   state: 'OPEN',
+  additions: 3,
+  deletions: 1,
+  changedFiles: 2,
 }
 
 async function modeSeen(env: NodeJS.ProcessEnv, extra: Record<string, unknown>) {
