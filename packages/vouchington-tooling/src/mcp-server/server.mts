@@ -14,7 +14,7 @@ const INSTRUCTIONS =
   'vouchington-tooling__<tool> (through search_tool and use_tool), Cursor the vouchington-tooling ' +
   'namespace (through GetDynamicTools and CallDynamicTool). Search for journal_append before ' +
   'concluding this server is unavailable. Tool errors are actionable; do not fall back to a CLI. ' +
-  'If the install directory was removed, reconnect the server (`/mcp` in Claude Code, or restart Codex).'
+  'If the install directory was removed, reinstall it first when it lives at a fixed path, then reconnect the server (`/mcp` in Claude Code, or restart Codex).'
 
 /**
  * Builds the server. The tool list and call handlers go on the low-level `server` because the

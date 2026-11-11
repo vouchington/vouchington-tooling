@@ -78,7 +78,7 @@ const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
   'blackboard-unavailable': 'the blackboard could not be reached or returned an error',
   'configuration-invalid': 'AGENT_BLACKBOARD_URL or AGENT_BLACKBOARD_TOKEN is missing or invalid',
   'client-unavailable':
-    'agent-blackboard is not installed next to vouchington-tooling; if the install directory was removed, reconnect the server (`/mcp` in Claude Code, or restart Codex)',
+    'agent-blackboard is not installed next to vouchington-tooling; if the install directory was removed, reinstall it first when it lives at a fixed path, then reconnect the server (`/mcp` in Claude Code, or restart Codex)',
   'readback-unconfirmed':
     'the write could not be confirmed; retry the same call (same sourceEventId and content)',
   'delivery-timeout': 'delivery timed out; retry the same call (same sourceEventId and content)',

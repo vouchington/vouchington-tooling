@@ -59,7 +59,7 @@ export function installSuffix(
 ): string {
   let hint = ''
   if (!exists(install.location))
-    hint = ` The server's install directory (${install.location}) was removed: ${RECONNECT}.`
+    hint = ` The server's install directory (${install.location}) was removed: if it was installed at a fixed path, reinstall it and its peer dependencies there first, then ${RECONNECT}.`
   else if (isInstallSwapped(error, install))
     hint = ` The server install changed underneath it: ${RECONNECT}.`
   return `${hint}\n[${describeInstall(install)}]`
