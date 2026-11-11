@@ -122,8 +122,9 @@ ascending PR-number order through the loop's
 [ready and shepherd](../triage-loop/references/shepherd.md) procedure, passing the PR number, the
 auto-merge flag, and any steering file. That procedure light-reviews the diff, posts steering,
 readies the draft, verifies merge settings, and starts a local shepherd. Run its preflight before
-every mutation. If the preflight fails, record the reason and do not describe the PR as ready,
-armed, or shepherded.
+every mutation. If the preflight fails, record the reason and report separately any mutation already
+completed (for example the PR was readied before the head moved) and the failed preflight; do
+not describe the PR as armed or shepherded.
 
 Classify the outcome:
 

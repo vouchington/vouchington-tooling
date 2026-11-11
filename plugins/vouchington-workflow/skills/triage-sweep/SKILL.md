@@ -126,10 +126,11 @@ posted days after merge is still found.
 ## Phase G - Queue ejections and default-branch failures
 
 The backstop for `ejection` and `main-failure` events, run on `gap: true`, on a failed wait, and
-each full sweep. A mechanical-tier subagent per repository lists PRs dequeued from the merge queue
-in the last 24 hours and failed default-branch workflow runs, paginating fully. Handle each as the
+each full sweep. A mechanical-tier subagent per repository lists PRs removed from the merge queue
+in the last 24 hours (keeping failure-driven removals, dropping user-requested ones and PRs
+currently queued) and failed default-branch workflow runs, paginating fully. Handle each as the
 loop's [Failures](../triage-loop/SKILL.md#failures) section describes: dedupe against fixes in
-flight, diagnose, re-enqueue an in-grant PR whose head is unchanged, and file or delegate flakes.
+flight, diagnose, re-enqueue an in-grant PR whose head is unchanged only after a flake or infra diagnosis, and file or delegate flakes. Skip run ids already in `handledFailures`, and record each one handled.
 Fix PRs follow the same merge rule: only a test-only diff merges.
 
 ## Phase G2 - Command comments

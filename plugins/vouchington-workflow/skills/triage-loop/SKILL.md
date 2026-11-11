@@ -32,7 +32,7 @@ Resolve these first and stop to ask when one is missing; never guess.
 - **Issue taxonomy:** milestone and project rules, and where sensitive issues go.
 - **Dispatch targets:** isolated-worktree subagents, and any terminal workspace manager whose
   agents accept prompts.
-- **Event wait:** the script that wraps `hook-harness wait` (owner, repository list, presets,
+- **Event wait (optional):** the script that wraps `hook-harness wait` (owner, repository list, presets,
   `--no-payload`, `--timeout 2h`), where it writes its result, and where the cursor and seen event
   ids live in `state.json`.
 - **Trusted logins:** the GitHub logins whose `/shepherd`, `/plan`, and `/fix` comments the loop
@@ -76,10 +76,12 @@ and escalate it; never work around the policy. Anything outside the grant is esc
    - a per-repository `reviewedComments` (late-review comment ids already harvested)
    - `retroCursor`
    - `escalations` (key to first-notified time, used for dedupe)
-   - `hookHarness` (`cursor` and recently `seen` event ids)
+   - `hookHarness` (`cursor`, recently `seen` event ids, and per-event progress)
+   - `handledFailures` (default-branch run ids already diagnosed, and the fix PR or issue each got)
    - `shepherds` (in-flight handoffs, so no PR gets a second shepherd)
    - `intake` (queued agent reports)
-4. Confirm `pr-shepherd`, `gh`, `hook-harness`, and the dispatch targets respond.
+4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond. Check `hook-harness` only when an
+   event wait is configured; if it is absent or fails, continue and use the fallback pacing in Step 2.
 
 ## Step 2 - Schedule and event wait
 
@@ -108,8 +110,12 @@ Each sweep takes the lock in the state directory and skips if another sweep hold
 
 ## Step 3 - Handle the wait result
 
-When the wait exits: read its result, dedupe events on `id` against `hookHarness.seen`, handle each
-event, and only then persist the new cursor and seen ids and relaunch the wait.
+When the wait exits: read its result and dedupe events on `id` against `hookHarness.seen`. Record
+each event in `hookHarness` as in progress before acting, mark it done after, and only then persist
+the new cursor and relaunch the wait. Every external action must be idempotent across an
+interruption and replay: before opening a PR, filing an issue, or posting a comment, look for an
+existing one from this event (a PR linking the issue, an issue citing the run id, the `eyes`
+reaction, a `shepherds` entry) and reuse it instead of creating another.
 
 - `gap: true`: events may have been missed. Run the backstop, triage-sweep Phase G.
 - Exit 1 (auth, cursor, or relay error): report it and fall back to sweeps until it is fixed.
@@ -129,11 +135,14 @@ private organization members.
 ### Failures
 
 For a merge-queue ejection or a default-branch CI failure, dedupe per repository and workflow (or
-PR) while a fix is in flight. A diagnosis subagent reads the logs with
+PR) while a fix is in flight, and against `handledFailures` so a completed incident is not
+diagnosed again. A diagnosis subagent reads the logs with
 [review-ci-logs](../review-ci-logs/SKILL.md) and classifies it: flake, infra, or real failure.
 
-- **Ejected PR:** when it is in the grant and its `headRefOid` still equals the event's `headSha`,
-  re-enqueue it (an ejection from a flake needs no change). Otherwise leave it to its shepherd and
+- **Ejected PR:** skip a user-requested removal; handle only failure-driven ejections. When the
+  diagnosis is a flake or infra failure, the PR is in the grant, and its `headRefOid` still equals
+  the event's `headSha`, re-enqueue it. For a real failure, never re-enqueue the unchanged head:
+  leave it to its shepherd or escalate it. Otherwise leave it to its shepherd and
   list it in the summary. Never re-enqueue or merge an out-of-grant PR.
 - **Flake:** dedupe or file an issue through [github-issue](../github-issue/SKILL.md). Then check
   the delegation rules: if a rule names a session for the area and that session is currently
