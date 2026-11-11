@@ -27,9 +27,9 @@ compaction, rebuild the queue from pending requests and the status of the pull r
 
 ## Hand-back
 
-Posting the review is the hand-back: the requesting agent's pull-request shepherd sees the review
-and its inline comments. Also reply to the requester with the verdict and the review link. Merge
-authority is separate: the human or the original agent merges, never the final reviewer.
+Posting the review is the hand-back: the PR's active shepherd (usually the triage loop's) sees
+the review and its inline comments. Also reply to the requester with the verdict and the review link. Merge
+authority is separate: the human, or the triage loop within its grant, merges, never the final reviewer.
 
 ## Presenting to the human
 

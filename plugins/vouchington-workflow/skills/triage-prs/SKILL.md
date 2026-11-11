@@ -18,11 +18,10 @@ The repository adapter (a consumer wrapper skill or `AGENTS.md`) owns every repo
 value. Resolve these before Step 1 and stop
 to ask when one this run needs is missing; never guess a value.
 
-- **Automation label:** the label that marks machine-created PRs. It defines the default scope.
+- **Automation label:** marks PRs created or readied by the triage loop or its subagents. It defines
+  the default scope.
 - **Orphan-issue rules:** the labels or title prefix that identify automation-created issues, and
   the label that marks intentional PR-free backlog items.
-- **Ready-and-shepherd values:** the [ready-and-shepherd](../ready-and-shepherd/SKILL.md) adapter
-  values (shepherd mode, trigger, activation gates), or a consumer skill that replaces it.
 - **Prompt-source paths:** the exact paths that may be edited from PR-creation feedback, and the
   rubric for that feedback.
 - **Feedback marker:** the PR-body marker that identifies a feedback PR from this flow.
@@ -119,21 +118,20 @@ never closed, in this run, whatever its Step 3 decision.
 Skip excluded PRs and re-check the reviewed head per the rules. Carry each root-cause follow-up
 from the [rubric](references/rubric.md) (an issue to file, link, or re-scope) into this pass and
 the Step 6 report so it is not dropped. Process MERGE decisions in
-ascending PR-number order through the adapter's ready-and-shepherd
-skill, passing the PR number, the auto-merge flag, and any steering file. That skill light-reviews
-the diff, posts steering before the trigger, readies the draft, verifies merge settings, and
-dispatches the shepherd. Run its activation preflight before every mutation. If activation is
-disabled, unset, or unreadable, record `activation disabled - unchanged` and do not describe the PR
-as ready, armed, or dispatched.
+ascending PR-number order through the loop's
+[ready and shepherd](../triage-loop/references/shepherd.md) procedure, passing the PR number, the
+auto-merge flag, and any steering file. That procedure light-reviews the diff, posts steering,
+readies the draft, verifies merge settings, and starts a local shepherd. Run its preflight before
+every mutation. If the preflight fails, record the reason and report separately any mutation already
+completed (for example the PR was readied before the head moved) and the failed preflight; do
+not describe the PR as armed or shepherded.
 
 Classify the outcome:
 
 - **Unsteered and arming succeeds:** already armed. Auto-merge may complete once requirements pass
-  while the asynchronous shepherd independently checks the PR.
-- **Steered, or arming fails on a conflict:** leave the PR ready and unarmed after dispatch.
-  Dispatch is fire-and-forget; a `running` checkpoint proves session acceptance, not success. A
-  human inspects the eventual state and decides whether to arm auto-merge. Do not wait for or infer
-  a `complete` checkpoint.
+  while the local shepherd independently checks the PR.
+- **Steered, or arming fails on a conflict:** leave the PR ready and unarmed after the shepherd
+  starts. A human inspects the eventual state and decides whether to arm auto-merge.
 - **Repository auto-merge disabled:** dispatch the shepherd, report that a manual merge is
   required, and leave auto-merge unchanged.
 - **Native GitHub stack:** shepherd the owned layers per
@@ -144,8 +142,7 @@ Classify the outcome:
   scope or not `MERGE`; never shepherd or merge a layer this run did not review. GitHub has no
   auto-merge for stacks, and an armed auto-merge does not authorize the drain on its own.
 
-Do not add a second pass that polls the dispatch workflow. It ends once the session is accepted or
-rejected and cannot attest that the remote agent consumed steering or left the branch mergeable.
+The loop records the local worker in `shepherds`, and nothing waits on it.
 
 ## Step 5 - Execute CLOSE
 
@@ -170,10 +167,10 @@ gh pr view <N> --repo <owner>/<name> --json isDraft,autoMergeRequest,state
 
 Emit a summary table with the columns PR, Decision, Action, and Steering. Actions are
 `ready + shepherd + auto-merge armed`, `ready + shepherd, manual verification required`,
-`ready + shepherd, manual merge required`, `activation disabled - unchanged`, and
+`ready + shepherd, manual merge required`, `preflight failed - unchanged`, and
 `closed + branch deleted`.
 
 After Steps 4 and 5, amend the Step 3 creation feedback with action-time steering and CI evidence.
-Do not wait for the newly dispatched shepherd; record only evidence available during this run.
+Do not wait for the newly started shepherd; record only evidence available during this run.
 Then publish [preauthorized prompt feedback](references/feedback.md), group the recommendations by
 root cause, and invoke [retrospective](../retrospective/SKILL.md) before the final report.

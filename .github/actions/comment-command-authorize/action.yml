@@ -1,5 +1,8 @@
 name: Authorize comment command
 description: >
+  DEPRECATED: hook-harness and the triage loop now own comment commands, and `author_association`
+  authorization is unreliable. No workflow in this repository uses it; it stays only for pinned
+  consumers.
   Decide whether the author of a comment-command trigger may run it. Mode `check` reads the
   association from the event payload and reports the result as an output. Mode `revalidate`
   refetches the comment by id, confirms it still belongs to the issue or pull request, and fails

@@ -49,8 +49,8 @@ failures make a retry rule invalid; the fix is the root cause.
 When a MERGE PR needs shepherd direction, write the exact reviewed comment body to a temporary file
 with a file-writing tool, then read it back in full. Do not build the file with shell
 interpolation, a heredoc, `echo`, or `printf`: file-based input keeps shell metacharacters and
-backticks in reviewed steering from being expanded. Pass the file to the ready-and-shepherd skill
-so it posts a separate ordinary PR comment before the shepherd trigger.
+backticks in reviewed steering from being expanded. Pass the file to the ready and shepherd procedure
+so it posts a separate ordinary PR comment before the shepherd starts.
 
 Examples:
 

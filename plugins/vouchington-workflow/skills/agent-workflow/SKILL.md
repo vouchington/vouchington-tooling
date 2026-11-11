@@ -32,9 +32,15 @@ blocker or follow-up does not authorize widening the task.
 This section is the single home for the hand-off retrospective and merge-note rules.
 
 - Report actual validation, open pull requests, and remaining blockers.
+- **Shepherding.** The agent that authored a pull request shepherds it itself with pr-shepherd.
+  When the session must end or the owner asks, delegate instead: mark the pull request ready, post
+  the fixed literal comment `/shepherd` once (`gh pr comment <N> --body '/shepherd'`), and stop. The
+  triage loop then owns the pull request (one `/shepherd` on the top pull request of a stack). Do
+  not post it again on re-runs. No other agent merges.
 - **Hand-off retrospective.** When you hand a pull request to the human as ready, write one
   [retrospective](../retrospective/SKILL.md) from the session that did the work, which reads that
-  session's transcripts and journal. A native stack gets one retrospective when the stack is handed
+  session's transcripts and journal. Write it before you stop, including when you delegate with
+  `/shepherd`. A native stack gets one retrospective when the stack is handed
   off, covering every layer; never one per layer or for an intermediate commit.
 - Give each hand-off its own `sourceEventId`, such as `handoff-pr<number>` (a stack uses its top
   pull request's number), on both `retrospective_check` and `retrospective_save`. The default ID

@@ -59,8 +59,8 @@ groups:
 - Do not add generic groups such as `other-minor-and-patch`, `minor-and-patch`,
   `security-minor-and-patch`, or `security-updates`. Do not use `patterns: ['*']` to force every
   update into a group. Narrow family wildcards are expected. Leave unrelated packages ungrouped.
-- Omit `update-types` so a family receives major, minor, and patch updates. Major updates stay
-  human-reviewed. Leaving majors out of the group splits the release train.
+- Omit `update-types` so a family receives major, minor, and patch updates. Major updates are never
+  auto-merged by the workflow. Leaving majors out of the group splits the release train.
 - Groups default to `applies-to: version-updates`. When the same family is also safe to upgrade
   together for security fixes, add a separate group such as `react-security` with the same patterns
   and `applies-to: security-updates`. Do not combine unrelated vulnerability fixes into one group.
@@ -91,7 +91,8 @@ groups:
   per local policy.
 - Auto-merge only a verified semver patch, or a stable minor whose old and new majors are both at
   least 1. Majors, pre-1.0 minors, prereleases, downgrades, malformed or inconsistent metadata, and
-  consumer-declared manual ecosystems need a human.
+  consumer-declared manual ecosystems need a human. The workflow never merges majors; the triage
+  loop may merge them under its grant, as triage-sweep Phase A describes.
 - Enable platform auto-merge. Do not auto-approve. Required checks and branch rules remain the gate.
 - Store `DEPENDABOT_AUTOMERGE_TOKEN` as a Dependabot secret, not only as an Actions secret. Grant
   only the Contents and Pull requests access needed to enable or disable auto-merge. Fail an

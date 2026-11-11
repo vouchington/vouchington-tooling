@@ -1,5 +1,8 @@
 name: Acknowledge comment command
 description: >
+  DEPRECATED: hook-harness and the triage loop now own comment commands, and `author_association`
+  authorization is unreliable. No workflow in this repository uses it; it stays only for pinned
+  consumers.
   React to a comment-command trigger with an eyes reaction and, on the first run attempt, post a
   comment linking to the workflow run. A failed reaction or comment only warns, so the workflow
   continues.

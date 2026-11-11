@@ -53,7 +53,6 @@ describe('vouchington-workflow plugin', () => {
       'package-json-checklist',
       'planning',
       'pr-description',
-      'ready-and-shepherd',
       'retrospective',
       'retrospective-distill',
       'review-ci-logs',
@@ -111,9 +110,18 @@ describe('vouchington-workflow plugin', () => {
       expect(skill).not.toContain('CLAUDE.md')
       expect(skill.replaceAll(/(?:AGENTS|CLAUDE)\.md/giu, '')).not.toMatch(/\b(?:claude|codex)\b/i)
       expect(skill).not.toMatch(/\.github\/workflows\/RUNNERS|filaments|voucha/i)
-      expect(skill).not.toMatch(/auto harness|agent hook|coverage (?:tooling|baseline)/i)
+      expect(skill).not.toMatch(
+        /auto harness|agent hook|coverage (?:tooling|baseline)|HARNESS_|activation (?:gate|disabled)|dispatch workflow|shepherd trigger|ready-and-shepherd/i,
+      )
       expect(skill).toMatch(/consumer\s+wrapper/i)
     }
+    const loop = skills[skillNames.indexOf('triage-loop')]
+    for (const term of ['hook-harness', '/shepherd', '/plan', '/fix']) {
+      expect(loop).toContain(term)
+    }
+    const handoff = skills[skillNames.indexOf('agent-workflow')]
+    expect(handoff).toContain('`/shepherd`')
+    expect(handoff).toContain('triage loop')
     expect(skills[0]).toContain('every applicable')
     expect(skills[0]).not.toContain('assigned non-main worktree')
   })

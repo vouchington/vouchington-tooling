@@ -10,8 +10,9 @@ Read applicable `AGENTS.md` and their declared adapter alias, otherwise
 Local policy overrides these defaults; do not reload an already-read adapter or canonical skill.
 
 One pass of [triage-loop](../triage-loop/SKILL.md). It uses that skill's adapter, state file, and
-grant. Run outside a loop, it still needs an explicit user request, which is the grant for that
-one pass. Arguments, both optional: `--dry-run` reports every intended mutation and makes none, and
+grant. It is the fallback and backstop for the loop's `hook-harness` event wait: it re-checks what
+events would have reported. Run outside a loop, it needs an explicit user request, which is the
+grant for that one pass. Arguments, both optional: `--dry-run` reports every intended mutation and makes none, and
 `--repo <name>` or `--phase <letter>` narrows the pass.
 
 ## Rules for every phase
@@ -34,7 +35,7 @@ and `headRefOid`. Skip a PR whose auto-merge is already armed (for example by a 
 auto-merge workflow) while its checks pass or are pending. Arming it again or dispatching a second
 shepherd would race the merge that is already landing.
 
-Steered handoffs stay unarmed (see [ready-and-shepherd](../ready-and-shepherd/SKILL.md) Step 5)
+Steered handoffs stay unarmed (see [ready and shepherd](../triage-loop/references/shepherd.md) step 5)
 and are reported as `shepherding, manual-verification-required`. A later sweep arms one only when:
 
 - its shepherd is no longer in flight;
@@ -43,16 +44,21 @@ and are reported as `shepherding, manual-verification-required`. A later sweep a
 
 Arming then uses one bare `gh pr merge` command, as in the grant.
 
-- **Patch or minor, green:** ready-and-shepherd with `--arm-auto-merge`.
+`dependabot-pr` events from the loop's wait enter this phase for the one PR.
+
+- **Patch or minor, green:** [ready and shepherd](../triage-loop/references/shepherd.md) with `--arm-auto-merge`.
 - **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure
   with [review-ci-logs](../review-ci-logs/SKILL.md) and classifies it as trivial (lockfile,
-  rebase, type or import rename, a config key) or non-trivial. Trivial: ready-and-shepherd with
+  rebase, type or import rename, a config key) or non-trivial. Trivial: ready and shepherd with
   `--arm-auto-merge`, with steering that names the fix. Non-trivial: escalate.
 - **Major:** an implementation-tier subagent reads the release notes, changelog, and migration
-  guide, and searches the repository for affected call sites. It returns `no-migration`,
-  `small-migration` (mechanical edits, no runtime-behavior change), or `significant-migration`
-  with evidence. The first two go through ready-and-shepherd with `--arm-auto-merge`, steered for
-  a small migration. A significant migration is escalated.
+  guide, searches the repository for affected call sites, and checks whether tests that ran in CI
+  exercise them. It returns `no-migration`, `small-migration` (mechanical edits, no
+  runtime-behavior change), or `significant-migration`, with evidence and the coverage finding.
+  Merge through ready and shepherd with `--arm-auto-merge` (steered for a small migration) only
+  when no migration or a small one is needed and the affected call sites are exercised by CI
+  tests. Escalate a significant migration, or affected code without sufficient test coverage, with
+  the evidence.
 - **No open dependency-bot PRs in a repository:** request a fresh update check. GitHub exposes no
   REST endpoint for this. Use the host browser on the repository's Dependabot updates page
   (`https://github.com/<owner>/<name>/network/updates`), choose "Check for updates" for each
@@ -75,7 +81,7 @@ carry the adapter's automation label and pass the gate get `--arm-auto-merge`.
 
 ## Phase C - Intake queue
 
-Process `intake` from the state file as described in triage-loop Step 3. Remove each report once
+Process `intake` from the state file as described in triage-loop Step 4. Remove each report once
 its issue exists and its dispatch is recorded.
 
 ## Phase D - Issue triage
@@ -117,7 +123,27 @@ root cause through [github-issue](../github-issue/SKILL.md), linking the PR and 
 harvested comment id to `reviewedComments`, and prune ids whose PR has left the window. A comment
 posted days after merge is still found.
 
-## Phase G - Report and escalate
+## Phase G - Queue ejections and default-branch failures
+
+The backstop for `ejection` and `main-failure` events, run on `gap: true`, on a failed wait, and
+each full sweep. A mechanical-tier subagent per repository lists PRs removed from the merge queue
+in the last 24 hours (keeping failure-driven removals, dropping user-requested ones and PRs
+currently queued) and failed default-branch workflow runs, paginating fully. Handle each as the
+loop's [Failures](../triage-loop/SKILL.md#failures) section describes: dedupe against fixes in
+flight, diagnose, re-enqueue an in-grant PR whose head is unchanged only after a flake or infra diagnosis, and file or delegate flakes. Skip run ids already in `handledFailures`, and record each one handled.
+Fix PRs follow the same merge rule: only a test-only diff merges.
+
+## Phase G2 - Command comments
+
+The backstop for `/shepherd`, `/plan`, and `/fix` events, run on `gap: true`, on a failed wait, and
+each full sweep. A mechanical-tier subagent per repository lists those comments on issues and PRs
+posted since `lastSweepAt` by the adapter's trusted logins (never trust `authorAssociation`),
+paginating fully, and keeps those with no `eyes` reaction from the loop and no `shepherds` entry
+for the PR. This covers commands missed while the loop was down. The loop handles each as the
+[Comment commands](../triage-loop/SKILL.md#comment-commands) section describes, including the
+acknowledgement.
+
+## Phase H - Report and escalate
 
 For each new escalation (dedupe on `escalations` in the state file):
 
@@ -130,7 +156,9 @@ actions:
 
 - merged
 - armed
-- shepherding (local or comment)
+- re-enqueued
+- fix PR opened
+- shepherding
 - escalated
 - issue filed
 - assigned
