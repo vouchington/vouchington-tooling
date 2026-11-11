@@ -149,13 +149,6 @@
       "path": "pr-description/SKILL.md"
     },
     {
-      "name": "ready-and-shepherd",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.17.0",
-      "path": "ready-and-shepherd/SKILL.md",
-      "prerequisites": ["stacked-prs"]
-    },
-    {
       "name": "retrospective",
       "plugin": "vouchington-workflow",
       "pluginVersion": "0.17.0",
@@ -227,7 +220,7 @@
       "plugin": "vouchington-workflow",
       "pluginVersion": "0.17.0",
       "path": "triage-loop/SKILL.md",
-      "prerequisites": ["ready-and-shepherd", "github-issue"]
+      "prerequisites": ["github-issue", "stacked-prs"]
     },
     {
       "name": "triage-prs",
@@ -239,8 +232,7 @@
         "retrospective",
         "review-ci-logs",
         "github-issue",
-        "stacked-prs",
-        "ready-and-shepherd"
+        "stacked-prs"
       ]
     },
     {

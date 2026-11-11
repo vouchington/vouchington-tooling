@@ -17,7 +17,9 @@ layer is ready, and it is never the agent's own decision.
 3. Partition by ownership, using that topology read plus each member's body from `pulls/<N>` (the
    stack response has no bodies). Shepherd only owned pull requests. Never
    poll, fix, rebase, or push the others, but list them in every report. Owned means this session
-   opened the pull request, or a human named it in this session.
+   opened the pull request, or a human named it in this session. After the owning worker posts
+   `/shepherd` on the top pull request, the triage loop's shepherd owns the stack and the worker
+   stops acting on it.
    - The opened-by-me half is a durable remote fact when the repository's pull request description
      tool stamps each body with the authoring harness and session id. Compare the stamp with the
      current session id.

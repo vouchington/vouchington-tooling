@@ -1,5 +1,7 @@
 name: Issue comment context
 description: >
+  DEPRECATED: the triage loop and hook-harness now own comment commands, and no workflow in this
+  repository uses this action; it stays only for pinned consumers.
   Snapshots an issue or pull request for an agent prompt: its body, label names, and its most
   recent comments, each truncated to a character cap, plus snapshot metadata (total comments,
   included comments, whether the list was capped, and the character cap). Writes the JSON to

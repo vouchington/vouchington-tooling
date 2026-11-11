@@ -31,4 +31,7 @@ diagram, independent reviewer, or separate issue are required by this skill.
 For cross-cutting changes, read [impact discovery](references/impact-discovery.md) before selecting
 tests or concluding that a surface has no dependents.
 
+On a `/plan` comment, the triage loop's subagent drafts the plan, the loop asks the human its
+open questions, then posts the plan on the source issue or PR as the durable record.
+
 Consumer wrapper owns: durable plan storage, repository, taxonomy, discovery tools, and approval.

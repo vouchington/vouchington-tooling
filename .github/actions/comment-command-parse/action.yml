@@ -1,5 +1,8 @@
 name: Parse comment command
 description: >
+  DEPRECATED: hook-harness and the triage loop now own comment commands, and `author_association`
+  authorization is unreliable. No workflow in this repository uses it; it stays only for pinned
+  consumers.
   Find a standalone slash command in an issue or pull request comment and extract the request
   text that follows it. Does not authorize the commenter or acknowledge the comment.
 inputs:

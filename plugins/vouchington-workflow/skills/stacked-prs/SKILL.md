@@ -38,7 +38,8 @@ a stack, and who may authorize a merge.
 - Work bottom-up. Write layers in stack order, and never start a layer before the one below it is
   in decent shape.
 - A lower layer is in decent shape when it is committed, its local checks have passed, its pull
-  request is open with an updated body, and shepherding has started. Decent shape does not mean
+  request is open with an updated body, and shepherding has started (the worker's own pr-shepherd
+  poll, or a delegation to the triage loop). Decent shape does not mean
   green CI, ready for review, or merged.
 - Start the next dependent layer once the lower layer is in decent shape. Do not wait for merge,
   a ready-delay, or green CI.
@@ -83,10 +84,15 @@ a stack, and who may authorize a merge.
 - One worker per native stack implements that stack and runs its shepherd poll. The parent does
   not poll. It reconciles stacks, starts a worker, and carries merge questions to the human.
 - Start shepherding when the first owned pull request exists.
+- The worker may instead delegate the stack to the triage loop: once every owned layer is ready it
+  posts the fixed literal comment `/shepherd` once, on the top pull request, and stops. The loop
+  then shepherds the whole stack with `pr-shepherd stack` and owns it. Never post `/shepherd` on a
+  lower layer.
 - Independent stacks run at the same time, one worker each. Dependent unmerged work is another
   layer of the same stack, not a second stack whose base is an unmerged head.
 - At most one poll process per stack. The parent does not run a second poll for the same stack.
-- This skill does not grant a merge. Merge authorization stays with the consumer.
+- This skill does not grant a merge. Merging stays human-approved, or within the triage loop's
+  grant once it owns the stack. Merge authorization stays with the consumer.
 
 Consumer wrapper owns: default branch, stacking tool and commands, merge-selector syntax, layer cap,
 pull request description tool, ownership stamp format, and merge authorization.

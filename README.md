@@ -150,10 +150,13 @@ check out or execute pull-request code.
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
 
-### Comment-command actions
+### Comment-command actions (deprecated)
 
-Three composite actions for workflows triggered by an `issue_comment` command. Pin them like the
-others and pass nothing through expressions in `run`; every input reaches the script through `env`.
+Deprecated: hook-harness and the triage loop now own comment commands, and `author_association`
+authorization is unreliable. No workflow in this repository uses these actions; they remain only
+because consumers may pin them. Three composite actions for workflows triggered by an
+`issue_comment` command. Pin them like the others and pass nothing through expressions in `run`;
+every input reaches the script through `env`.
 
 - `comment-command-authorize` takes `mode` (`check` by default, or `revalidate`),
   `allowed-associations` (default `OWNER,COLLABORATOR,MEMBER`), `association` (default the event
@@ -177,16 +180,6 @@ others and pass nothing through expressions in `run`; every input reaches the sc
   with `github-token` (default `github.token`, needs `pull-requests: read`) once the comment is
   accepted. It does not authorize the commenter or acknowledge the comment.
 
-```yaml
-steps:
-  - id: auth
-    uses: vouchington/vouchington-tooling/.github/actions/comment-command-authorize@<40-character-commit-sha> # vX.Y.Z
-  - if: steps.auth.outputs.authorized == 'true'
-    uses: vouchington/vouchington-tooling/.github/actions/comment-command-acknowledge@<40-character-commit-sha> # vX.Y.Z
-    with:
-      command: /fix
-```
-
 ### Setup and coverage actions
 
 Pin these composite actions the same way as the others (full commit SHA, trailing `# vX.Y.Z`).
@@ -199,7 +192,8 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   checked-out commit's ancestry (`refs/remotes/origin/ci-head`), deepening a shallow clone, so
   merge-base and diff tools resolve them without pulling every branch. The optional `filter` input
   (for example `blob:none`) adds a partial-clone filter. Run it after `actions/checkout`.
-- `issue-comment-context` snapshots an issue or pull request `number` for an agent prompt as JSON:
+- `issue-comment-context` (deprecated; the triage loop and hook-harness own comment commands)
+  snapshots an issue or pull request `number` for an agent prompt as JSON:
   `body`, `labels`, the newest `max-comments` comments (default 100; `id`, `author`, `body`,
   `bodyTruncated`, `created_at`, `updated_at`) with each body cut to `max-comment-chars` (default
   2000), and `commentSnapshot` (`total`, `included`, `capped`, `maxCommentChars`). It writes

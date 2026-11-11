@@ -38,5 +38,7 @@ Use when investigating a CI failure, repeated workflow noise, or misleading diag
    follow-up. Keep the distinction between omitted and locally passed checks explicit, and retain
    confirmed gap records after CI turns green. Classify CI-only and unknown coverage separately.
 
+The triage loop's failure handling uses this skill to diagnose ejections and default-branch failures.
+
 Consumer wrapper owns: workflow names, log retention, the CI provider command, retry policy, and
 scheduled automation.
