@@ -19,7 +19,7 @@ function rejectErrors(prepared: Prepared): void {
 
 export const handlePrValidate: ToolHandler = async (args, context) => {
   const { body, errors, warnings } = await prepare(args, context, 'validate', readPr(args, false))
-  return { body, errors, warnings }
+  return { ok: errors.length === 0, body, errors, warnings }
 }
 
 export const handlePrCreate: ToolHandler = async (args, context) => {

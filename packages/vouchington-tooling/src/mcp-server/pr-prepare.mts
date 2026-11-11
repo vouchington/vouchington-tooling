@@ -56,10 +56,10 @@ export function policyFor(context: ToolContext): Omit<PolicyRun, 'export' | 'inp
   }
 }
 
-async function currentBranch(git: RunTextCommand): Promise<string> {
+/** The checked-out branch, or undefined for a detached HEAD. */
+async function currentBranch(git: RunTextCommand): Promise<string | undefined> {
   const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'])).trim()
-  if (branch === 'HEAD') throw new Error('the worktree has a detached HEAD: check out a branch')
-  return branch
+  return branch === 'HEAD' ? undefined : branch
 }
 
 async function label(context: ToolContext, git: RunTextCommand): Promise<string> {
@@ -75,8 +75,9 @@ async function liveFor(kind: PrepareKind, context: ToolContext, pr: number | und
 }
 
 /**
- * The head to validate. An update accepts the worktree branch, or an alias branch whose HEAD is
- * the live head commit, and then uses the live head name; anything else is rejected.
+ * The head to validate. An update accepts the worktree branch, or an alias branch or detached HEAD
+ * at the live head commit, and then uses the live head name; anything else is rejected. A detached
+ * HEAD (worktreeHead undefined) is only acceptable that way, for an update of a live pull request.
  */
 async function headFor(
   kind: PrepareKind,
@@ -85,13 +86,18 @@ async function headFor(
   pr: number | undefined,
   worktreeHead: string | undefined,
 ): Promise<string> {
-  if (worktreeHead === undefined) return (live as LivePullRequest).headRefName
-  if (live === undefined || kind !== 'update' || live.headRefName === worktreeHead)
+  if (live === undefined || kind !== 'update') {
+    if (worktreeHead === undefined)
+      throw new Error('the worktree has a detached HEAD: check out a branch')
     return worktreeHead
+  }
+  if (live.headRefName === worktreeHead) return worktreeHead
   const sha = (await git(['rev-parse', 'HEAD'])).trim()
   if (sha !== live.headRefOid)
     throw new Error(
-      `pull request ${pr} has head ${live.headRefName} at ${live.headRefOid}, not the worktree branch ${worktreeHead} at ${sha}`,
+      `pull request ${pr} has head ${live.headRefName} at ${live.headRefOid}, not the worktree ${
+        worktreeHead === undefined ? 'detached HEAD' : `branch ${worktreeHead}`
+      } at ${sha}`,
     )
   return live.headRefName
 }
@@ -112,12 +118,14 @@ export async function prepare(
   const git = gitIn(context)
   const live = await liveFor(kind, context, pr)
   // A read-only validation of an existing pull request judges the head that pull request has.
-  const worktreeHead =
-    live !== undefined && kind === 'validate' ? undefined : await currentBranch(git)
+  const readOnly = live !== undefined && kind === 'validate'
+  const worktreeHead = readOnly ? undefined : await currentBranch(git)
   // The local branch is checked before any diagnostic or alias resolution can echo or drop it.
   if (worktreeHead !== undefined && secrets.some((secret) => worktreeHead.includes(secret)))
     throw new Error('the worktree branch name contains a server credential: rename the branch')
-  const head = await headFor(kind, git, live, pr, worktreeHead)
+  const head = readOnly
+    ? (live as LivePullRequest).headRefName
+    : await headFor(kind, git, live, pr, worktreeHead)
   // Branch names are refs passed to gh as is: redacting one would name a branch that does not exist.
   if (secrets.some((secret) => head.includes(secret)))
     throw new Error('the worktree branch name contains a server credential: rename the branch')
