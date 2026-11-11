@@ -1,5 +1,5 @@
 import type { JournalEntry } from './types.mts'
-import { conformingBlocks, matchAuditBlock } from './audit-block.mts'
+import { conformingBlocks, countConformingBlocks, matchAuditBlock } from './audit-block.mts'
 import type { AuditRender } from './audit-fit.mts'
 import type { AuditRedactor } from './text.mts'
 
@@ -7,6 +7,9 @@ const GROUP_HEADER = /^- `(recurring|one-off)` — `GitHub Actions` — .*[^\s]$
 const EVIDENCE = /^ {2}- Evidence: .*[^\s]$/
 const ROOT_DIAGNOSTIC = /^ {2}- Root diagnostic: .*[^\s]$/
 const DISPOSITION = /^ {2}- Disposition: .*[^\s]$/
+
+/** The optional scope line that follows a section's Status line. */
+export const lineOf = (note?: string): string => (note === undefined ? '' : `\n${note}`)
 
 const CI_FAILURES_HEADER = '## CI Failures'
 const CI_FAILURE_BLOCK_MAX_BYTES = 10_000
@@ -79,14 +82,20 @@ export function getConformingGroups(
   )
 }
 
-export function incompleteCiSection(markdownBlocks: string[]): string {
+/** How many CI failure blocks the entries hold, for reporting the ones a scope left out. */
+export function countCiFailureBlocks(entries: Iterable<JournalEntry>): number {
+  return countConformingBlocks(entries, matchBlock)
+}
+
+export function incompleteCiSection(markdownBlocks: string[], note?: string): string {
   return [
-    `${CI_FAILURES_HEADER}\nStatus: unavailable (journal scan incomplete)`,
+    `${CI_FAILURES_HEADER}\nStatus: unavailable (journal scan incomplete)${lineOf(note)}`,
     ...markdownBlocks,
   ].join('\n\n')
 }
 
-export function buildCiFailuresSection(markdownBlocks: string[]): string {
-  if (markdownBlocks.length === 0) return `${CI_FAILURES_HEADER}\nStatus: none observed`
-  return `${CI_FAILURES_HEADER}\nStatus: failures observed\n\n${markdownBlocks.join('\n\n')}`
+export function buildCiFailuresSection(markdownBlocks: string[], note?: string): string {
+  if (markdownBlocks.length === 0)
+    return `${CI_FAILURES_HEADER}\nStatus: none observed${lineOf(note)}`
+  return `${CI_FAILURES_HEADER}\nStatus: failures observed${lineOf(note)}\n\n${markdownBlocks.join('\n\n')}`
 }

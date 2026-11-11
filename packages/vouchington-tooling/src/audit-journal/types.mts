@@ -1,7 +1,10 @@
 export type JournalEntry = {
+  /** Service-generated ISO 8601 UTC time the entry was created, as the blackboard returns it. */
+  createdAt?: unknown
   data?: {
     type?: unknown
     markdown?: unknown
+    sourceEventId?: unknown
   }
 }
 

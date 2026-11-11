@@ -1,12 +1,15 @@
 import {
   buildCiFailuresSection,
+  countCiFailureBlocks,
   getConformingGroups,
   incompleteCiSection,
 } from '../audit-journal/ci-failures.mts'
 import { scanJournal, type JournalScan } from '../audit-journal/journal.mts'
+import { scopeSinceRetrospective } from '../audit-journal/scope.mts'
 import { validateSessionId } from '../audit-journal/session-id.mts'
 import type { AuditCoverage, JournalLoader } from '../audit-journal/types.mts'
 import {
+  countSandboxBlocks,
   getConformingSandboxBlocks,
   journalSandboxSection,
   unavailableSandboxSection,
@@ -63,18 +66,32 @@ export function renderJournalAuditReport(
 ): JournalAuditReport {
   if (scanned.status === 'unreachable') return unavailable('blackboard unreachable')
   if (scanned.status === 'not-found') return unavailable('no journal for session')
-  const ci = getConformingGroups(scanned.entries, options.redact, options.budgets?.ciBytes)
-  const sandbox = getConformingSandboxBlocks(
+  // Only what happened after the session's newest earlier retrospective is new to this one.
+  const { included, excluded, boundary } = scopeSinceRetrospective(
     scanned.entries,
+    scanned.retrospectives,
+  )
+  const excludedNote = (count: number) =>
+    count > 0 && boundary
+      ? `Excluded: ${count} blocks from before retrospective ${boundary.sourceEventId}`
+      : undefined
+  const ciNote = excludedNote(countCiFailureBlocks(excluded))
+  const sandboxNote = excludedNote(countSandboxBlocks(excluded))
+  const ci = getConformingGroups(included, options.redact, options.budgets?.ciBytes)
+  const sandbox = getConformingSandboxBlocks(
+    included,
     options.redact,
     options.budgets?.sandboxBytes,
   )
   if (scanned.truncated)
     return report(
       'partial',
-      `${incompleteCiSection(ci)}\n\n${unavailableSandboxSection('journal scan incomplete', sandbox)}`,
+      `${incompleteCiSection(ci, ciNote)}\n\n${unavailableSandboxSection('journal scan incomplete', sandbox, sandboxNote)}`,
     )
-  return report('complete', `${buildCiFailuresSection(ci)}\n\n${journalSandboxSection(sandbox)}`)
+  return report(
+    'complete',
+    `${buildCiFailuresSection(ci, ciNote)}\n\n${journalSandboxSection(sandbox, sandboxNote)}`,
+  )
 }
 
 export async function buildJournalAuditReport(

@@ -28,7 +28,8 @@ answer is `unknown — no journal`, never a guess.
    `feedbackCoverage`, and `repositories`. Pass `compose.transcript.harnessSessionId` whenever the
    harness session id differs from the call's `sessionId`. The composer builds the CI failures and
    sandbox audit sections from the session's hosted journal entries alone, so do not rerun
-   collectors to fill them. A session unknown to the journal reports both as unavailable, not as
+   collectors to fill them. Both sections cover only journal entries created after the session's
+   newest earlier retrospective and say how many earlier blocks were excluded. A session unknown to the journal reports both as unavailable, not as
    none observed. Put sensitive values only in
    `compose.knownSensitiveValues`, or `knownSensitiveValues` for a markdown save. Keep exact factual
    section markers generated, preserve unavailable counts, and never replace missing evidence with
