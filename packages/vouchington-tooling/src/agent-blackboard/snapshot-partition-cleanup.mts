@@ -28,6 +28,9 @@ function assertGeneratedPath(path: string, expression: RegExp, label: string): v
   )
     throw new Error(`${label} must be a generated temporary ${label}`)
 }
+export function assertGeneratedPartitionDirectory(path: string): void {
+  assertGeneratedPath(path, DIRECTORY_NAME, 'partition directory')
+}
 async function removeCaptured(
   path: string,
   expression: RegExp,

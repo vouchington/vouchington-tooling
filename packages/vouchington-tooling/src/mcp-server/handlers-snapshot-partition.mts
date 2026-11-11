@@ -69,7 +69,13 @@ export const snapshotPartition: ToolHandler = async (args, context) => {
     // A client that wrote an ownership marker partitions only with its own capability. An export
     // without one came from an older client, whose partitions the in-tree code splits and signs.
     let result: unknown
-    if (record.clientToken === undefined) result = await partitionSnapshot(options)
+    // The in-tree receipt is signed with the owner and source file, so a restarted server can
+    // prove who the directory belongs to; see `snapshot-recovery.mts`.
+    if (record.clientToken === undefined)
+      result = await partitionSnapshot({
+        ...options,
+        owner: { sessionId: context.sessionId, worktree: context.worktree, source: record.path },
+      })
     else if (client.partitionSnapshot)
       result = await client.partitionSnapshot({ ...options, cleanupToken: record.clientToken })
     else throw new Error('the installed agent-blackboard client cannot partition snapshots')

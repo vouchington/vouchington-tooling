@@ -35,7 +35,9 @@ const REJECTED =
 
 /**
  * Tokens live in memory only. A server restart forgets every binding, so an old token is then
- * rejected as unknown and the file is left for the operating system to reap from its temp directory.
+ * rejected as unknown. A partitioned snapshot can still be removed through `snapshot-recovery.mts`,
+ * which proves ownership from the signed receipt on disk; a plain export file has no receipt, so
+ * it is left for the operating system to reap from its temp directory.
  */
 export function createSnapshotRegistry(): SnapshotRegistry {
   const records = new Map<string, SnapshotRecord>()

@@ -172,14 +172,25 @@ export const TOOLS: readonly ToolDefinition[] = [
   tool(
     'snapshot_cleanup',
     'Deletes the snapshot file and the partition directory (from snapshot_partition) that ' +
-      'snapshot_export produced. Takes only the cleanupToken it returned: the server resolves the ' +
-      'paths from its own record, never from the caller. The token is bound to the sessionId and ' +
-      'worktree that exported, is single-use, and is forgotten when the server restarts (the ' +
-      'file is then left for the OS to reap). A failed cleanup keeps the token valid and names ' +
-      'any retained tombstone so the same call can retry. Call it as a finally step.',
+      'snapshot_export produced. Pass exactly one of cleanupToken or recoveryDirectory. ' +
+      'cleanupToken is the one snapshot_export returned: the server resolves the paths from its ' +
+      'own record, never from the caller. The token is bound to the sessionId and worktree that ' +
+      'exported, is single-use, and is forgotten when the server restarts. After a restart, pass ' +
+      'recoveryDirectory, the directory snapshot_partition returned: the server deletes it and ' +
+      'its source snapshot only if the signed receipt inside proves it generated them for this ' +
+      'sessionId and worktree in the temp directory. A plain unpartitioned snapshot has no ' +
+      'receipt and cannot be recovered. Recovery is single-use and every rejection is one ' +
+      'message. A failed cleanup keeps the token valid and names any retained tombstone so the ' +
+      'same call can retry. Call it as a finally step.',
     { ...MUTATING, idempotentHint: false },
-    { cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' } },
-    ['cleanupToken'],
+    {
+      cleanupToken: { type: 'string', description: 'The cleanupToken snapshot_export returned.' },
+      recoveryDirectory: {
+        type: 'string',
+        description: 'After a server restart, the partition directory snapshot_partition returned.',
+      },
+    },
+    [],
   ),
   tool(
     'session_archive',

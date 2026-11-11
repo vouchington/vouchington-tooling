@@ -110,6 +110,11 @@ export async function resolveWorktree(input: {
   const path = requested ?? (launchRoot as string)
   if (!isAbsolute(path)) throw new Error('worktree must be an absolute path to a git worktree')
   const target = await canonical(path)
+  if (requested === undefined && target === undefined)
+    throw new Error(
+      `the launch worktree ${path} no longer exists, so there is no default to fall back to: ` +
+        'pass worktree as the absolute path of an existing worktree',
+    )
   if (target !== undefined && (await launchWorktreeRoot(target, runGit)) === target) {
     if (launchRoot === undefined || (await repositoryWorktrees(launchRoot, runGit)).has(target))
       return target
