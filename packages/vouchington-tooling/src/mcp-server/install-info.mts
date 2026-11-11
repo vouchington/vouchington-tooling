@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { isAbsolute, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readInstalledVersion } from '../cli/installed-version.mts'
@@ -48,10 +49,18 @@ function isInstallSwapped(error: unknown, install: InstallInfo): boolean {
   return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)
 }
 
-/** The suffix appended to every tool error so a stale or swapped install is obvious. */
-export function installSuffix(error: unknown, install: InstallInfo): string {
-  const swapped = isInstallSwapped(error, install)
-    ? ' The server install changed underneath it: reconnect the server (`/mcp` in Claude Code, or restart Codex).'
-    : ''
-  return `${swapped}\n[${describeInstall(install)}]`
+const RECONNECT = 'reconnect the server (`/mcp` in Claude Code, or restart Codex)'
+
+/** The suffix appended to every tool error so a stale, swapped, or removed install is obvious. */
+export function installSuffix(
+  error: unknown,
+  install: InstallInfo,
+  exists: (path: string) => boolean = existsSync,
+): string {
+  let hint = ''
+  if (!exists(install.location))
+    hint = ` The server's install directory (${install.location}) was removed: if it was installed at a fixed path, reinstall it and its peer dependencies there first, then ${RECONNECT}.`
+  else if (isInstallSwapped(error, install))
+    hint = ` The server install changed underneath it: ${RECONNECT}.`
+  return `${hint}\n[${describeInstall(install)}]`
 }
