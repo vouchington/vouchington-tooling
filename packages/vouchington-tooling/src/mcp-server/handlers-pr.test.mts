@@ -65,7 +65,7 @@ describe('pr_validate', () => {
     const gh = fakeGh()
     const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device })
     const result = jsonOf(await h.call('pr_validate', args()))
-    expect(result).toEqual({ body: BODY, errors: ['bad'], warnings: ['soft'] })
+    expect(result).toEqual({ ok: false, body: BODY, errors: ['bad'], warnings: ['soft'] })
     expect(p.requests).toEqual([
       {
         name: 'validatePullRequest',
@@ -83,7 +83,11 @@ describe('pr_validate', () => {
 
   it('reports no errors when the worktree declares no policy', async () => {
     const h = harness(fixture(), { device })
-    expect(jsonOf(await h.call('pr_validate', args()))).toMatchObject({ errors: [], warnings: [] })
+    expect(jsonOf(await h.call('pr_validate', args()))).toMatchObject({
+      ok: true,
+      errors: [],
+      warnings: [],
+    })
   })
 
   it('renders the model, refs relations, no related issues, the main worktree and the default base', async () => {

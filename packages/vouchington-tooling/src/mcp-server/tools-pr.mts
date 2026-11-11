@@ -96,7 +96,8 @@ export const PR_TOOLS: readonly ToolDefinition[] = [
       'Pass pr to validate an update of that pull request: the live body is read and its Shepherd ' +
       'Journal preserved; the pull request may be in any state and on any head (the head given to ' +
       'the policy is its own, and no liveness check applies, unlike pr_update). Returns ' +
-      '{ body, errors, warnings }.',
+      '{ ok, body, errors, warnings }; blocking errors do not fail the tool call, so callers must ' +
+      'check ok (true only when errors is empty) or errors.',
     openWorld(READ_ONLY),
     { ...FIELDS, pr: PR_NUMBER },
     REQUIRED,

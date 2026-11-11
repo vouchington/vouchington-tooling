@@ -401,14 +401,17 @@ The provenance lines are collapsed because they serve audits, not reviewers; eac
 own line, so a policy can match them with line-anchored patterns.
 
 The head branch is the worktree's current branch (for `pr_validate` with `pr`, the live pull
-request's head, which may equal `base` for a fork); otherwise a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
+request's head, which may equal `base` for a fork). `pr_update` also accepts a detached HEAD whose
+commit is the live pull request's head commit and then uses the live head name; a detached HEAD at
+another commit is rejected naming both commits. Otherwise a detached HEAD, or a head equal to `base`, is rejected. The body must stay within GitHub's 65536 characters. `pr_create` sees no stack membership,
 so a consumer policy may reject any `base` other than the default branch; create stacked layers
 with the repository's stack tooling instead.
 
 ### Tools
 
 - `pr_validate` (read-only): renders the body, runs the policy `validatePullRequest({ title, body,
-  base, head, mode, noSourceIssue?, pr? })` export and returns `{ body, errors, warnings }`. With
+  base, head, mode, noSourceIssue?, pr? })` export and returns `{ ok, body, errors, warnings }`. Blocking errors do not fail the tool call: callers must
+  check `ok` (true only when `errors` is empty) or `errors`. With
   `pr`, the live body is read (never written) so its Shepherd Journal is preserved as in
   `pr_update`. The liveness checks of `pr_update` do not apply: any state (merged or closed
   included) and any head are accepted, and the policy sees the pull request's own head and base.

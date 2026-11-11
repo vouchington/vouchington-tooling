@@ -232,4 +232,33 @@ describe('pr_validate is read-only', () => {
     jsonOf(await h.call('pr_update', args({ pr: 5 })))
     expect(p.requests[0]!.input).toMatchObject({ head: 'upstream-name', pr: 5 })
   })
+
+  it('accepts a detached HEAD at the live head commit and uses the live head name', async () => {
+    declarePolicy(fixture())
+    const oid = execFileSync('git', ['-C', fixture().linked, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim()
+    fixture().git(fixture().linked, 'checkout', '--quiet', '--detach')
+    const p = policy(() => ({ errors: [] }))
+    const gh = fakeGh({ view: { ...LIVE, headRefName: 'upstream-name', headRefOid: oid } })
+    const h = harness(fixture(), { spawnPolicy: p.spawnPolicy, runGh: gh.runGh, device })
+    jsonOf(await h.call('pr_update', args({ pr: 5 })))
+    expect(p.requests[0]!.input).toMatchObject({ head: 'upstream-name', pr: 5 })
+  })
+
+  it('rejects a detached HEAD at another commit naming both commits', async () => {
+    declarePolicy(fixture())
+    fixture().git(fixture().linked, 'checkout', '--quiet', '--detach')
+    const h = harness(fixture(), { runGh: fakeGh({ view: LIVE }).runGh, device })
+    const text = textOf(await h.call('pr_update', args({ pr: 5 })))
+    expect(text).toContain(
+      `pull request 5 has head linked at ${SHA}, not the worktree detached HEAD at`,
+    )
+  })
+
+  it('still rejects a detached HEAD for pr_create', async () => {
+    fixture().git(fixture().linked, 'checkout', '--quiet', '--detach')
+    const h = harness(fixture(), { device })
+    expect(textOf(await h.call('pr_create', args()))).toContain('detached HEAD: check out a branch')
+  })
 })
