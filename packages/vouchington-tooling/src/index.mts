@@ -356,44 +356,21 @@ export {
   parsePatchCommentable,
   parseReviewFilesJson,
   parseReviewPayload,
-  readRegularReviewPayload,
   remapReviewComments,
   ReviewPayloadError,
   reviewCommentSubject,
   rewriteSnappedSuggestion,
   snapReviewNote,
-  stageReviewPayload,
-  writeStagedOutput,
 } from './gha-review-payload/index.mts'
 export type {
   CommentableIndex,
   CommentableLine,
   LineKind,
-  PayloadRequirement,
   ReviewComment,
   ReviewFile,
   ReviewSide,
   SanitizedReview,
 } from './gha-review-payload/index.mts'
-export {
-  PostReviewError,
-  requireEnv,
-  runPostReview,
-  runPostReviewCli,
-  postReviewWithTokenFromEnv,
-} from './gha-post-review/index.mts'
-export type { PostResult, PostReviewIo, PullFile } from './gha-post-review/index.mts'
-/** @deprecated Import Claude helpers from vouchington-tooling/gha-claude-post-review. */
-export {
-  CLAUDE_OIDC_AUDIENCE,
-  createActionsClaudeTokenIo,
-  mintClaudeAppToken,
-  resolveReviewPostToken,
-  revokeClaudeAppToken,
-  withClaudeAppToken,
-} from './gha-post-review/index.mts'
-/** @deprecated Import Claude helpers from vouchington-tooling/gha-claude-post-review. */
-export type { ClaudeTokenIo, ReviewPostToken } from './gha-post-review/index.mts'
 export {
   nextPageCursorFromLinkHeader,
   nextPageUrlFromLinkHeader,

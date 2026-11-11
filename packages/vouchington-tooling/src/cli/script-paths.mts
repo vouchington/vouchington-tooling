@@ -31,7 +31,6 @@ export const SCRIPT_PATHS: Record<ScriptCommand, { command: string; path: string
   'install-github-release': { command: 'bash', path: 'scripts/gha/install-github-release.sh' },
   'run-with-timeout': { command: 'bash', path: 'scripts/gha/run-with-timeout.sh' },
   'lint-links': { command: 'bash', path: 'scripts/gha/lint-links.sh' },
-  'materialize-pr-context': { command: 'bash', path: 'scripts/gha/materialize-pr-context.sh' },
   'wait-for-apt-locks': { command: 'bash', path: 'scripts/gha/wait-for-apt-locks.sh' },
   'install-playwright-chromium-arm64': {
     command: 'bash',

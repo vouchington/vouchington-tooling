@@ -256,21 +256,6 @@
       "import": "./dist/gha-review-payload/index.mjs",
       "default": "./dist/gha-review-payload/index.mjs"
     },
-    "./gha-post-review": {
-      "types": "./dist/gha-post-review/index.d.mts",
-      "import": "./dist/gha-post-review/index.mjs",
-      "default": "./dist/gha-post-review/index.mjs"
-    },
-    "./gha-claude-post-review": {
-      "types": "./dist/gha-claude-post-review/index.d.mts",
-      "import": "./dist/gha-claude-post-review/index.mjs",
-      "default": "./dist/gha-claude-post-review/index.mjs"
-    },
-    "./gha-check-run": {
-      "types": "./dist/gha-check-run/index.d.mts",
-      "import": "./dist/gha-check-run/index.mjs",
-      "default": "./dist/gha-check-run/index.mjs"
-    },
     "./provider-replay": {
       "types": "./dist/provider-replay/index.d.mts",
       "import": "./dist/provider-replay/index.mjs",

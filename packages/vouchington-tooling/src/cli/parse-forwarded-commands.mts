@@ -10,8 +10,6 @@ const FORWARDED = [
   'runner-policy',
   'dead-code',
   'swift-semantic-equal',
-  'post-review',
-  'stage-review-payload',
   'retrospective-transcript',
   'retrospective-facts',
   'agent-blackboard',

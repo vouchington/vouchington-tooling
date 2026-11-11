@@ -23,7 +23,6 @@ import {
   validateNugetUpdate,
   normalizeSwiftSource,
   validateOptionalHttpOrigin,
-  runPostReview,
   summarizeDiagnosticReport,
   waitForProcessGroupExit,
   checkGhaWorkspacePolicy,
@@ -84,7 +83,6 @@ describe('package exports', () => {
     ).toEqual({ harness: 'codex', sessionId: 'root-session' })
     expect(typeof validateNugetUpdate).toBe('function')
     expect(normalizeSwiftSource('let  x = 1')).toBe('letx=1')
-    expect(typeof runPostReview).toBe('function')
     expect(typeof summarizeDiagnosticReport).toBe('function')
     expect(typeof isProcessGroupAlive).toBe('function')
     expect(typeof waitForProcessGroupExit).toBe('function')

@@ -57,10 +57,10 @@ describe('subcommand help', () => {
   it('ignores help when the command is missing, unknown, or after --', () => {
     expect(parseCommandHelp(undefined, ['--help'])).toBeUndefined()
     expect(parseCommandHelp('nope', ['--help'])).toBeUndefined()
-    expect(parseCommandHelp('post-review', [])).toBeUndefined()
-    expect(parseCommandHelp('post-review', ['-h'])).toEqual({
+    expect(parseCommandHelp('swift-semantic-equal', [])).toBeUndefined()
+    expect(parseCommandHelp('swift-semantic-equal', ['-h'])).toEqual({
       kind: 'command-help',
-      command: 'post-review',
+      command: 'swift-semantic-equal',
     })
   })
 

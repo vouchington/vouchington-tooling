@@ -35,7 +35,6 @@ Commands:
   install-github-release        Download a checksum-verified GitHub Release binary
   run-with-timeout              Run a command with GNU timeout or a Perl fallback
   lint-links                    Two-pass lychee: internal links fail, external warn
-  materialize-pr-context        Dump PR title/body/files/diff/comments and #N crawl
   wait-for-apt-locks            Wait until apt/dpkg lock files are free
   install-playwright-chromium-arm64  Install Playwright Chromium from browsers.json
   ghcr-package-retention        Delete old GHCR package versions (KEEP_MIN or --main-history)
@@ -46,8 +45,6 @@ Commands:
   runner-policy                 Check workflow runner labels and jobs against a config
   dead-code                     Gate unused code against a committed jscpd baseline
   swift-semantic-equal          Compare Swift sources ignoring comments and whitespace
-  post-review                   Post one COMMENT review from a staged payload file
-  stage-review-payload          Validate a review payload file into a staging directory
   retrospective-transcript      Format facts from Claude-compatible, Codex, or Grok transcripts
   link-skill                    Link one packaged skill into an explicit consumer directory
   retrospective-facts           Gather immutable facts for a retrospective
@@ -121,7 +118,6 @@ clean-workspace
 install-github-release --repo owner/name --version X --asset 'name-{platform}.tar.gz' --bin name [--tag-prefix PREFIX] [--expected-sha256 SHA256] [--no-checksum] [--checksums-asset NAME] [--version-flag FLAG] [--bin-dir DIR]
 run-with-timeout <timeout-seconds> <kill-after-seconds> <command...>
 lint-links [--offline] [--config PATH] [--glob PATTERN] [files...]
-materialize-pr-context
 wait-for-apt-locks
 install-playwright-chromium-arm64 [name:archive...]
 ghcr-package-retention [--main-history] [--apply|--dry-run] [<url-encoded-package>...]
@@ -132,8 +128,6 @@ verify-workflow-secrets [--repo OWNER/NAME] [--confirm NAME,...] [--inventory MO
 runner-policy [--config FILE] [--root DIR]
 dead-code --baseline PATH [--seed|--update] [--config PATH] [--binary PATH] [--repo-root PATH] [--entry GLOB]... [--snapshot-ignore GLOB]... [--exclude GLOB]...
 swift-semantic-equal <base> <head> <file.swift>
-post-review
-stage-review-payload optional|required <source> <destination>
 retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
 link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>  Link a packaged or repository-local skill
 retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]

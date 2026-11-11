@@ -37,8 +37,6 @@ export type ParsedCli =
   | { kind: 'runner-policy'; args: string[] }
   | { kind: 'dead-code'; args: string[] }
   | { kind: 'swift-semantic-equal'; args: string[] }
-  | { kind: 'post-review'; args: string[] }
-  | { kind: 'stage-review-payload'; args: string[] }
   | { kind: 'http-origin'; field: string; value: string }
   | { kind: 'retrospective-transcript'; args: string[] }
   | { kind: 'link-skill'; name: string; sourceRoot: string; targetRoot: string }
@@ -89,7 +87,6 @@ export type ScriptCommand =
   | 'install-github-release'
   | 'run-with-timeout'
   | 'lint-links'
-  | 'materialize-pr-context'
   | 'wait-for-apt-locks'
   | 'install-playwright-chromium-arm64'
   | 'ghcr-package-retention'
@@ -112,7 +109,6 @@ const SCRIPT_COMMANDS = new Set<ScriptCommand>([
   'install-github-release',
   'run-with-timeout',
   'lint-links',
-  'materialize-pr-context',
   'wait-for-apt-locks',
   'install-playwright-chromium-arm64',
   'ghcr-package-retention',

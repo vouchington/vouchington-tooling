@@ -17,6 +17,3 @@ export {
   rewriteSnappedSuggestion,
   snapReviewNote,
 } from './remap.mts'
-
-export { readRegularReviewPayload, stageReviewPayload, writeStagedOutput } from './file.mts'
-export type { PayloadRequirement } from './file.mts'
