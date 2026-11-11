@@ -70,7 +70,6 @@ vouchington clean-workspace
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
-vouchington materialize-pr-context
 vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington retrospective-facts --pr 49 --repo vouchington/vouchington-infra --raw
@@ -93,8 +92,6 @@ vouchington tmux agent-reminder session-start
 vouchington tmux post-tool < hook-payload.json
 vouchington dead-code --baseline dead-code-baseline.json --config .jscpd.json --update
 vouchington swift-semantic-equal BASE HEAD App.swift
-vouchington post-review
-vouchington stage-review-payload optional|required <source> <destination>
 ```
 
 ### Running `allocate-browser-safe-ports` without an install
@@ -686,8 +683,6 @@ import {
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { runAstGrepRule } from 'vouchington-tooling/ast-grep-rule'
 import { parseReviewPayload, remapReviewComments } from 'vouchington-tooling/gha-review-payload'
-import { postReviewWithTokenFromEnv, runPostReview } from 'vouchington-tooling/gha-post-review'
-import { postClaudeReviewFromEnv } from 'vouchington-tooling/gha-claude-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import {
   cmdUpload,
@@ -990,9 +985,7 @@ previous process died first, including SIGKILL. Each workspace records its owner
 audit can delete directories whose owner is gone.
 
 The artifact, review-payload, HTTP body, and pagination APIs validate untrusted inputs at their
-boundaries. Neutral review posting lives in `gha-post-review` and requires a caller-supplied GitHub
-token. Claude App OIDC is an explicitly selected `gha-claude-post-review` adapter; the legacy
-token-source router remains deprecated for one release line.
+boundaries.
 
 `vitest-diagnostics` reads Node diagnostic report JSON from a caller-selected directory. It sorts
 filenames, tolerates partial files, returns only a bounded field allowlist, and never emits raw

@@ -2,8 +2,6 @@
 import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { runPostReviewCli } from '../gha-post-review/cli.mts'
-import { runStageReviewPayloadCli } from '../gha-review-payload/cli.mts'
 import { runSwiftSemanticEqualCli } from '../swift-semantic-equal/cli.mts'
 import { runAgentIssueLabels } from './commands/agent-issue-labels.mts'
 import { runGhaArtifactsCleanup } from './commands/gha-artifacts-cleanup.mts'
@@ -90,10 +88,6 @@ export function runCli(argv: readonly string[] = process.argv): number | Promise
       return runDeadCodeCli(parsed.args)
     case 'swift-semantic-equal':
       return runSwiftSemanticEqualCli(parsed.args)
-    case 'post-review':
-      return runPostReviewCli()
-    case 'stage-review-payload':
-      return runStageReviewPayloadCli(parsed.args)
     case 'http-origin':
       return runHttpOrigin(parsed.field, parsed.value)
     case 'gha-artifacts-cleanup':

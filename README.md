@@ -327,7 +327,6 @@ vouchington clean-workspace
 vouchington install-github-release --repo lycheeverse/lychee --version 0.24.2 --asset 'lychee-{platform}.tar.gz' --bin lychee
 vouchington run-with-timeout 120 10 docker push example
 vouchington lint-links --offline
-vouchington materialize-pr-context
 vouchington wait-for-apt-locks
 vouchington retrospective-transcript --jsonl /path/to/transcript.jsonl
 vouchington install-playwright-chromium-arm64
@@ -335,8 +334,6 @@ vouchington ghcr-package-retention example%2Fapi
 vouchington harness-admission-lane 4
 vouchington nuget-central-version trusted.props candidate.props metadata.json out.props
 vouchington swift-semantic-equal BASE HEAD App.swift
-vouchington post-review
-vouchington stage-review-payload optional|required <source> <destination>
 ```
 
 `pnpm-install` runs the `pnpm` on `PATH` and never reads the consumer's `packageManager` field, so
@@ -424,7 +421,6 @@ import { decide } from 'vouchington-tooling/transient-retry'
 import { parseCsvRows } from 'vouchington-tooling/csv'
 import { readResponseBody } from 'vouchington-tooling/http-body'
 import { parseReviewPayload } from 'vouchington-tooling/gha-review-payload'
-import { runPostReview } from 'vouchington-tooling/gha-post-review'
 import { nextPageUrlFromLinkHeader } from 'vouchington-tooling/http-link-pagination'
 import {
   cmdUpload,

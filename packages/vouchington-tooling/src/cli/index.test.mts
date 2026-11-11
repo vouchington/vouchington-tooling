@@ -155,7 +155,7 @@ describe('runCli', () => {
       expect(process.exitCode).toBe(0)
       await runMain(['node', 'vouchington', 'nope'])
       expect(process.exitCode).toBe(2)
-      await runMain(['node', 'vouchington', 'post-review'])
+      await runMain(['node', 'vouchington', 'nuget-central-version', 'a'])
       expect(process.exitCode).toBe(1)
       process.exitCode = 0
       await runMain([], () => Promise.reject(new Error('boom')))
@@ -177,11 +177,9 @@ describe('runCli', () => {
     expect(isMainModule(pathToFileURL(resolve(missing)).href, missing)).toBe(true)
   })
 
-  it('routes nuget, swift, and review commands', async () => {
+  it('routes nuget and swift commands', async () => {
     expect(runCli(['node', 'vouchington', 'swift-semantic-equal', 'base'])).toBe(1)
     expect(runCli(['node', 'vouchington', 'nuget-central-version', 'a'])).toBe(1)
-    expect(runCli(['node', 'vouchington', 'stage-review-payload', 'maybe'])).toBe(1)
-    await expect(runCli(['node', 'vouchington', 'post-review'])).resolves.toBe(1)
   })
 
   it('routes tmux', async () => {
