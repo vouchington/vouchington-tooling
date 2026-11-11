@@ -93,24 +93,25 @@ describe('diff size for the policy', () => {
     expect(p.requests[0]!.input.diff).toEqual({ unavailable: 'git diff output too large' })
   })
 
-  it('reports unavailable when git times out', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    try {
-      let hung = false
-      const hang: typeof runIsolatedGit = (argv) => {
+  it('bounds the git subprocess itself and reports its timeout or buffer overflow', async () => {
+    const limits: unknown[] = []
+    const failWith =
+      (failure: object): typeof runIsolatedGit =>
+      async (argv, given) => {
         if (!argv.includes('--numstat')) return runIsolatedGit(argv)
-        hung = true
-        return new Promise<string>(() => {})
+        limits.push(given)
+        throw Object.assign(new Error('git failed'), failure)
       }
-      const { p, call } = validate({}, hang)
-      const pending = call()
-      await vi.waitFor(() => expect(hung).toBe(true), { timeout: 3000, interval: 10 })
-      await vi.advanceTimersByTimeAsync(31_000)
-      expect(jsonOf(await pending).ok).toBe(true)
-      expect(p.requests[0]!.input.diff).toEqual({ unavailable: 'git diff timed out' })
-    } finally {
-      vi.useRealTimers()
-    }
+    const timedOut = validate({}, failWith({ killed: true, signal: 'SIGTERM' }))
+    expect(jsonOf(await timedOut.call()).ok).toBe(true)
+    expect(timedOut.p.requests[0]!.input.diff).toEqual({ unavailable: 'git diff timed out' })
+    const overflow = validate({}, failWith({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' }))
+    expect(jsonOf(await overflow.call()).ok).toBe(true)
+    expect(overflow.p.requests[0]!.input.diff).toEqual({ unavailable: 'git diff output too large' })
+    expect(limits).toEqual([
+      { timeout: 30_000, maxBuffer: DIFF_MAX_OUTPUT },
+      { timeout: 30_000, maxBuffer: DIFF_MAX_OUTPUT },
+    ])
   })
 
   it.each([

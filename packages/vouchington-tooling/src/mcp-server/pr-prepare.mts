@@ -40,7 +40,7 @@ export type Prepared = {
 export type PrepareKind = 'create' | 'update' | 'validate'
 
 export function gitIn(context: ToolContext): RunTextCommand {
-  return (args) => context.runGit(['-C', context.worktree, ...args])
+  return (args, limits) => context.runGit(['-C', context.worktree, ...args], limits)
 }
 
 export function ghIn(context: ToolContext): RunTextCommand {

@@ -16,8 +16,8 @@ export function isolatedGitEnv(): NodeJS.ProcessEnv {
   return { ...env, LC_ALL: 'C' }
 }
 
-export const runIsolatedGit: RunTextCommand = createCommandRunner('git', (command, args) =>
-  execFileAsync(command, args, { env: isolatedGitEnv() }),
+export const runIsolatedGit: RunTextCommand = createCommandRunner('git', (command, args, options) =>
+  execFileAsync(command, args, { ...options, env: isolatedGitEnv() }),
 )
 
 async function canonical(path: string): Promise<string | undefined> {

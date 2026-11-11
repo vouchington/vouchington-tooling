@@ -24,6 +24,18 @@ describe('createCommandRunner', () => {
     expect(calls).toEqual([{ args: ['one', 'two'], command: 'fake-bin' }])
   })
 
+  it('forwards per-call limits to exec and adds nothing without them', async () => {
+    const seen: unknown[] = []
+    const fakeExec: ExecFileText = async (_command, _args, options) => {
+      seen.push(Object.keys(options ?? {}).sort())
+      return { stdout: '' }
+    }
+    const run = createCommandRunner('fake-bin', fakeExec)
+    await run(['x'])
+    await run(['x'], { timeout: 5, maxBuffer: 9 })
+    expect(seen).toEqual([['env'], ['env', 'maxBuffer', 'timeout']])
+  })
+
   it('propagates a rejection from the underlying exec', async () => {
     const fakeExec: ExecFileText = async () => {
       throw new Error('boom')

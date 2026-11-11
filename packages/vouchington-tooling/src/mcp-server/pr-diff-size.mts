@@ -25,31 +25,28 @@ export function parseNumstat(output: string): DiffSize {
   return { additions, deletions, changedFiles, source: 'git' }
 }
 
-async function withTimeout<T>(work: Promise<T>): Promise<T> {
-  let timer: NodeJS.Timeout | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error('timed out')), DIFF_TIMEOUT_MS)
-  })
-  try {
-    return await Promise.race([work, timeout])
-  } finally {
-    clearTimeout(timer)
-  }
+/** execFile kills the child on its timeout (`killed`, with a signal) and fails on a full buffer. */
+function failureReason(error: unknown, base: string): string {
+  const { killed, code } = (error ?? {}) as { killed?: unknown; code?: unknown }
+  if (killed === true) return 'git diff timed out'
+  if (code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return 'git diff output too large'
+  return `git diff origin/${base}...HEAD failed`
 }
 
 /** The change a pull request with no live counterpart would carry: `origin/<base>...HEAD`. */
 async function localDiff(git: RunTextCommand, base: string): Promise<DiffSize> {
   try {
-    const output = await withTimeout(
-      git(['diff', '--numstat', '--no-ext-diff', `origin/${base}...HEAD`, '--']),
+    const output = await git(
+      ['diff', '--numstat', '--no-ext-diff', `origin/${base}...HEAD`, '--'],
+      {
+        timeout: DIFF_TIMEOUT_MS,
+        maxBuffer: DIFF_MAX_OUTPUT,
+      },
     )
     if (output.length > DIFF_MAX_OUTPUT) return { unavailable: 'git diff output too large' }
     return parseNumstat(output)
   } catch (error) {
-    const timedOut = error instanceof Error && error.message === 'timed out'
-    return {
-      unavailable: timedOut ? 'git diff timed out' : `git diff origin/${base}...HEAD failed`,
-    }
+    return { unavailable: failureReason(error, base) }
   }
 }
 

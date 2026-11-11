@@ -8,14 +8,17 @@ const execFileAsync = promisify(execFile)
 /** Pull request diffs and paginated API output can exceed execFile's 1 MiB default. */
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 
+/** Per-call limits: the child is killed after `timeout` ms, and output past `maxBuffer` bytes fails. */
+type CommandLimits = { timeout?: number; maxBuffer?: number }
+
 /** A text-mode command runner: argv in, stdout out. Rejects on a non-zero exit. */
-export type RunTextCommand = (args: string[]) => Promise<string>
+export type RunTextCommand = (args: string[], limits?: CommandLimits) => Promise<string>
 
 /** The `child_process.execFile` shape `createCommandRunner` wraps — injectable for tests. */
 export type ExecFileText = (
   command: string,
   args: string[],
-  options?: { env: NodeJS.ProcessEnv },
+  options?: { env: NodeJS.ProcessEnv } & CommandLimits,
 ) => Promise<{ stdout: string }>
 
 /**
@@ -27,11 +30,11 @@ export type ExecFileText = (
 export function createCommandRunner(
   command: string,
   exec: ExecFileText = (cmd, args, options) =>
-    execFileAsync(cmd, args, { ...options, encoding: 'utf8', maxBuffer: MAX_OUTPUT_BYTES }),
+    execFileAsync(cmd, args, { encoding: 'utf8', maxBuffer: MAX_OUTPUT_BYTES, ...options }),
   buildEnv: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv = (env) => env,
 ): RunTextCommand {
-  return async (args) => {
-    const { stdout } = await exec(command, args, { env: buildEnv(process.env) })
+  return async (args, limits) => {
+    const { stdout } = await exec(command, args, { env: buildEnv(process.env), ...limits })
     return stdout
   }
 }
