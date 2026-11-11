@@ -8,3 +8,8 @@ allowBuilds:
 # Dependabot already holds updates for a week. Do not also fail CI when the
 # lockfile pins a toolchain release younger than pnpm's default 1-day cutoff.
 minimumReleaseAge: 0
+overrides:
+  # github-actionlint pins adm-zip ^0.5; 0.6.1 fixes the advisories. The symlink
+  # following advisory (<=0.6.0) has no patched release, so 0.6.1 is the best available.
+  adm-zip: ^0.6.1
+  minimatch@10: ^11.0.7
