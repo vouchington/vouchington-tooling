@@ -93,6 +93,18 @@ describe('diff size for the policy', () => {
     expect(p.requests[0]!.input.diff).toEqual({ unavailable: 'git diff output too large' })
   })
 
+  it('reports a generic failure when git rejects with a non-error value', async () => {
+    const reject: typeof runIsolatedGit = async (argv) => {
+      if (!argv.includes('--numstat')) return runIsolatedGit(argv)
+      throw undefined
+    }
+    const { p, call } = validate({}, reject)
+    expect(jsonOf(await call()).ok).toBe(true)
+    expect(p.requests[0]!.input.diff).toEqual({
+      unavailable: 'git diff origin/trunk...HEAD failed',
+    })
+  })
+
   it('bounds the git subprocess itself and reports its timeout or buffer overflow', async () => {
     const limits: unknown[] = []
     const failWith =
