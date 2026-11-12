@@ -13,7 +13,6 @@ const MODULE_MOCKING_TESTS = globSync(TESTS).filter((file) =>
 
 export default defineConfig({
   test: {
-    fileParallelism: false,
     server: { deps: { inline: [/@vouchington\/worker-runtime/] } },
     projects: [
       {
