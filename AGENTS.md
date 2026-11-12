@@ -69,6 +69,13 @@ without blackboard credentials. That child runs as the same user, so it is not a
 it could read the server's `/proc/<pid>/environ`): treat the policy module, and the worktree's `.git/config` that retrospective facts run `git` under, as trusted code. The source CLI here still sees the blackboard credentials when run
 with them, so review untrusted branches with the credentials unset.
 
+## Final reviewer
+
+The final reviewer lives in `vouchington/vouchington-reviewer`; the triage loop requests it and gates
+merges on `vouchington-reviewer status`. Its rules pillar reads this repository's review skills from
+`origin/HEAD` through an allowlist in vouchington-reviewer `src/final-review/rules/shared.mts`, so
+renaming or moving those skills needs a matching update there.
+
 ## Extracted modules
 
 Extracted code must contain no product identifiers. Repo-specific values are parameters, flags, or env vars (`HOST_LOCK_*`, not product-prefixed names).
