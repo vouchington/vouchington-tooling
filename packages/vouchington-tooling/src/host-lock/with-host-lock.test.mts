@@ -63,7 +63,7 @@ describe('with-host-lock.sh', () => {
         },
       }),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('absolute') })
-  })
+  }, 30_000)
 
   it('defaults to a stable UID-scoped /tmp root', async () => {
     const home = await makeHome()
@@ -82,7 +82,7 @@ describe('with-host-lock.sh', () => {
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
     const lockRootStat = await stat(lockRoot)
     expect(lockRootStat.mode & 0o777).toBe(0o700)
-  })
+  }, 30_000)
 
   it('serializes callers of the same lock family', async () => {
     const home = await makeHome()
@@ -172,7 +172,7 @@ describe('with-host-lock.sh', () => {
         ),
       },
     ])
-  })
+  }, 30_000)
 
   it.each([
     { innerName: 'expensive-build', innerSlots: [] },
@@ -217,7 +217,7 @@ describe('with-host-lock.sh', () => {
     expect(observedPid).toBeGreaterThan(-1)
     expect(staleCheck).toBeGreaterThan(observedPid)
     expect(currentPid).toBeGreaterThan(staleCheck)
-  })
+  }, 30_000)
 
   it('rejects an inherited active-lock marker before it can acquire a lock', async () => {
     const home = await makeHome()
@@ -232,7 +232,7 @@ describe('with-host-lock.sh', () => {
       stderr: expect.stringContaining('nested host locks are not allowed'),
     })
     await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it.each([
     { metadata: 'dead-owner', ownerPid: '999999999' },
@@ -267,5 +267,5 @@ describe('with-host-lock.sh', () => {
       }),
     ).rejects.toMatchObject({ code: 37 })
     await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 })

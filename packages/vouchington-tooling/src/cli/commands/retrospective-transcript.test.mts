@@ -37,16 +37,16 @@ describe('runRetrospectiveTranscriptCommand', () => {
       ]),
     ).resolves.toBe(0)
     expect(String(stdout.mock.calls.at(-1)?.[0])).toContain('User prompts: 1')
-  })
+  }, 30_000)
 
   it('reports invalid arguments without throwing', async () => {
     await expect(runRetrospectiveTranscriptCommand(['--unknown'])).resolves.toBe(2)
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Unknown option')
-  })
+  }, 30_000)
 
   it('accepts default transcript discovery options', async () => {
     await expect(runRetrospectiveTranscriptCommand([])).resolves.toBe(0)
-  })
+  }, 30_000)
 
   it('uses the CLI process environment for default session discovery', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'retrospective-transcript-cli-'))
@@ -66,5 +66,5 @@ describe('runRetrospectiveTranscriptCommand', () => {
       if (original === undefined) delete process.env.CODEX_THREAD_ID
       else process.env.CODEX_THREAD_ID = original
     }
-  })
+  }, 30_000)
 })

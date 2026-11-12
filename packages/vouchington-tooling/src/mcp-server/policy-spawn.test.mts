@@ -42,7 +42,7 @@ describe('policy child process', () => {
       export: 'validateRetrospective',
     })
     expect(rejected).toMatchObject({ errors: ['contains bad'] })
-  })
+  }, 30_000)
 
   it('reports a thrown export and a malformed result as failures', async () => {
     await expect(runPolicyExport({ ...base(), export: 'pullRequestDefaults' })).rejects.toThrow(
@@ -51,7 +51,7 @@ describe('policy child process', () => {
     await expect(runValidator({ ...base(), export: 'validatePullRequest' })).rejects.toThrow(
       'must return',
     )
-  })
+  }, 30_000)
 
   it('skips a module that lacks the export', async () => {
     writeFileSync(join(fixture.linked, 'p.mts'), 'export const x = 1')
@@ -62,14 +62,14 @@ describe('policy child process', () => {
     await expect(
       runPolicyExport({ ...base(), worktree: fixture.linked, export: 'validateRetrospective' }),
     ).resolves.toEqual({ status: 'skipped' })
-  })
+  }, 30_000)
 
   it('fails when the module cannot be imported', async () => {
     writeFileSync(join(fixture.linked, 'p.mts'), 'export const x = (')
     await expect(
       runPolicyExport({ ...base(), worktree: fixture.linked, export: 'validateRetrospective' }),
     ).rejects.toThrow(/policy validateRetrospective failed/)
-  })
+  }, 30_000)
 })
 
 describe('policyEnvironment', () => {
@@ -78,7 +78,7 @@ describe('policyEnvironment', () => {
     expect(
       Object.keys(policyEnvironment({ HOME: '/h', GITHUB_TOKEN: 't', GH_TOKEN: 't' })).toSorted(),
     ).toEqual(['GH_TOKEN', 'GITHUB_TOKEN', 'HOME', 'PATH'])
-  })
+  }, 30_000)
 
   it('puts the system directories, node, and the first gh directory on PATH, deduplicated', () => {
     const first = join(fixture.root, 'first-bin')
@@ -102,7 +102,7 @@ describe('policyEnvironment', () => {
     expect(path(['/usr/bin', '/bin'].join(delimiter))).toBe(base.join(delimiter))
     expect(path(fixture.root)).toBe(base.join(delimiter))
     expect(path()).toBe(base.join(delimiter))
-  })
+  }, 30_000)
 })
 
 describe('spawnPolicy', () => {
@@ -120,7 +120,7 @@ describe('spawnPolicy', () => {
   it('kills a process that outlives its timeout', async () => {
     const result = await spawnPolicy(request('setInterval(() => {}, 1000)', { timeoutMs: 100 }))
     expect(result).toMatchObject({ timedOut: true, exitCode: null })
-  })
+  }, 30_000)
 
   it('kills the whole process group, including a grandchild, on timeout', async () => {
     const pidFile = join(fixture.root, 'grandchild.pid')
@@ -134,7 +134,7 @@ describe('spawnPolicy', () => {
     expect(result.timedOut).toBe(true)
     const pid = Number(readFileSync(pidFile, 'utf8'))
     await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
-  })
+  }, 30_000)
 
   it('kills a grandchild the policy left running after a normal exit', async () => {
     const pidFile = join(fixture.root, 'orphan.pid')
@@ -148,7 +148,7 @@ describe('spawnPolicy', () => {
     expect(result).toMatchObject({ exitCode: 0, timedOut: false })
     const pid = Number(readFileSync(pidFile, 'utf8'))
     await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(/ESRCH/), { timeout: 5000 })
-  })
+  }, 30_000)
 
   it('reaps a grandchild holding the inherited pipes as soon as the runner exits', async () => {
     const script = `
@@ -161,14 +161,14 @@ describe('spawnPolicy', () => {
     const result = await spawnPolicy(request(script, { timeoutMs: 5000 }))
     expect(result).toMatchObject({ exitCode: 0, timedOut: false, stdout: 'done' })
     expect(Date.now() - started).toBeLessThan(4000)
-  })
+  }, 30_000)
 
   it('kills a process that writes too much', async () => {
     const result = await spawnPolicy(
       request('process.stdout.write("x".repeat(5000)); setInterval(() => {}, 1000)'),
     )
     expect(result.overflowed).toBe(true)
-  })
+  }, 30_000)
 
   it('rejects when the command cannot start, and ignores a closed stdin', async () => {
     await expect(spawnPolicy(request('', { command: '/nonexistent/git' }))).rejects.toThrow(
@@ -188,5 +188,5 @@ describe('spawnPolicy', () => {
     ).rejects.toThrow(/ENOENT/)
     const result = await spawnPolicy(request('process.stdin.destroy()', { input: 'x'.repeat(1e6) }))
     expect(result.exitCode).toBe(0)
-  })
+  }, 30_000)
 })

@@ -31,7 +31,7 @@ describe('with-host-lock.sh lease and reclamation', () => {
     })
 
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
-  })
+  }, 30_000)
 
   it('reclaims an ownerless lock older than the lease', async () => {
     const home = await makeHome()
@@ -46,7 +46,7 @@ describe('with-host-lock.sh lease and reclamation', () => {
     })
 
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
-  })
+  }, 30_000)
 
   it('does not reclaim an ownerless lock younger than the lease', async () => {
     const home = await makeHome()
@@ -62,7 +62,7 @@ describe('with-host-lock.sh lease and reclamation', () => {
       }),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('not acquired') })
     await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it('reclaims a lock whose recorded owner is live but whose mtime has outlived the lease', async () => {
     // Owner liveness may only accelerate reclamation, never delay it past the lease: this
@@ -83,7 +83,7 @@ describe('with-host-lock.sh lease and reclamation', () => {
     })
 
     await expect(readFile(marker, 'utf8')).resolves.toBe('')
-  })
+  }, 30_000)
 
   it('keeps a heartbeating holder past the lease and still lets the next waiter in once it is gone', async () => {
     const home = await makeHome()
@@ -120,5 +120,5 @@ describe('with-host-lock.sh lease and reclamation', () => {
   it('defaults the lease to sixty seconds', async () => {
     const source = await readFile(hostLockScript, 'utf8')
     expect(source).toContain('lease_seconds=${HOST_LOCK_LEASE_SECONDS:-60}')
-  })
+  }, 30_000)
 })

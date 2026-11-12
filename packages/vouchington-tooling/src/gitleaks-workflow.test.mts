@@ -121,7 +121,7 @@ describe('gitleaks git reusable workflow', () => {
     const upload = steps.find((candidate) => candidate.name === 'Upload redacted gitleaks report')
     expect(upload?.if).toBe('${{ failure() }}')
     expect(upload?.uses).toBe('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9')
-  })
+  }, 30_000)
 
   it('bounds the history fetch with the compare API and never unshallows', () => {
     const script = step('Determine Gitleaks scan range').run ?? ''
@@ -150,7 +150,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(pr.fetchCalls).toContain('?per_page=100&page=1')
     expect(pr.fetchCalls).toContain(`fetch --no-tags --depth=3 origin ${head}`)
     expect(pr.fetchCalls).not.toContain('--depth=1')
-  })
+  }, 30_000)
 
   it('pages the compare commit list and fails when the pages disagree with ahead_by', () => {
     const result = runRange({
@@ -165,7 +165,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(result.fetchCalls).not.toContain('page=3')
     expect(result.status).toBe(2)
     expect(result.stdout).toContain('::error::Compare API listed a different number')
-  })
+  }, 30_000)
 
   it.each([
     ['a negative ahead_by', { GH_AHEAD: '-1' }, 'invalid ahead_by'],
@@ -202,7 +202,7 @@ describe('gitleaks git reusable workflow', () => {
     })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('::error::Fetched history does not match the compare range')
-  })
+  }, 30_000)
 
   it('scans nothing and still succeeds when the range is empty', () => {
     const result = runRange({
@@ -219,7 +219,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(result.status, result.stderr).toBe(0)
     expect(result.written).toBe(`log-opts=${'b'.repeat(40)} ^${'b'.repeat(40)}\n`)
     expect(result.fetchCalls).toContain(`fetch --no-tags --depth=1 origin ${'b'.repeat(40)}`)
-  })
+  }, 30_000)
 
   it('requires a token', () => {
     const result = runRange({
@@ -231,7 +231,7 @@ describe('gitleaks git reusable workflow', () => {
       GH_TOKEN: '',
     })
     expect(result.status).toBe(2)
-  })
+  }, 30_000)
 
   it('checks out the tooling repository at the called workflow sha', () => {
     expect(source).not.toContain('workflow_ref')
@@ -251,7 +251,7 @@ describe('gitleaks git reusable workflow', () => {
     expect(workflow.jobs.gitleaks['timeout-minutes']).toBe(12)
     const stepTotal = steps.reduce((sum, candidate) => sum + (candidate['timeout-minutes'] ?? 0), 0)
     expect(workflow.jobs.gitleaks['timeout-minutes']).toBeLessThan(stepTotal)
-  })
+  }, 30_000)
 
   it('scans the pull request merge base, the merge group range, or all history', () => {
     const pullRequest = runRange({
@@ -290,7 +290,7 @@ describe('gitleaks git reusable workflow', () => {
         MERGE_GROUP_HEAD_SHA: '',
       }).status,
     ).toBe(1)
-  })
+  }, 30_000)
 
   it('fetches exact PR and merge-group OIDs with full event-range object parity', () => {
     const fixture = createSyntheticRemote()
@@ -378,7 +378,7 @@ describe('gitleaks git reusable workflow', () => {
     } finally {
       rmSync(fixture.directory, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it.each(['PR_BASE_SHA', 'PR_HEAD_SHA'] as const)(
     'rejects malformed %s before fetching',

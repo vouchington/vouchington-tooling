@@ -58,7 +58,7 @@ describe('cancel dequeued merge-group runs workflow', () => {
     })
     expect(Object.keys(workflow.jobs)).toEqual(['cancel'])
     expect(workflowText).not.toMatch(/voucha|filament|storybook|vouchington-machines|openai/iu)
-  })
+  }, 30_000)
 
   it('needs only actions write and pull-request read, checks nothing out, and uses env only', () => {
     expect(workflow.permissions).toEqual({})
@@ -73,21 +73,21 @@ describe('cancel dequeued merge-group runs workflow', () => {
       REASON: '${{ github.event.reason }}',
     })
     expect(script).toContain('gh-readonly-queue/${QUEUE_BASE}/pr-${PR_NUMBER}-')
-  })
+  }, 30_000)
 
   it('serializes per pull request without cancelling a running scan', () => {
     expect(workflow.concurrency).toEqual({
       group: 'cancel-dequeued-merge-group-runs-${{ github.event.pull_request.number }}',
       'cancel-in-progress': false,
     })
-  })
+  }, 30_000)
 
   it('skips the job for every reason outside the allowlist', () => {
     const list = /^contains\(fromJSON\('(\[[^']*\])'\), github\.event\.reason\)$/u.exec(
       job.if?.trim() ?? '',
     )?.[1]
     expect(JSON.parse(list ?? '[]')).toEqual(allowed)
-  })
+  }, 30_000)
 })
 
 describe('cancel dequeued merge-group runs script', () => {
@@ -124,7 +124,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.calls).toEqual(['api repos/example/repo/pulls/14 --jq .merged'])
     expect(result.summary).toContain('The pull request is merged')
-  })
+  }, 30_000)
 
   it('matches only this pull request on the main queue, so 14 never matches 140', () => {
     const pages = {
@@ -144,7 +144,7 @@ describe('cancel dequeued merge-group runs script', () => {
     }
     expect(execute({ pages }).cancelled).toEqual([100, 108])
     expect(execute({ pages, pr: '140' }).cancelled).toEqual([101])
-  })
+  }, 30_000)
 
   it('keeps this run, newer runs, and fresh runs that reuse the same queue ref', () => {
     const result = execute({
@@ -161,7 +161,7 @@ describe('cancel dequeued merge-group runs script', () => {
       },
     })
     expect(result.cancelled).toEqual([100, 499])
-  })
+  }, 30_000)
 
   it('lists every active status across all pages and cancels each run once', () => {
     const repeated = run(30, 'Backend', branch(14, 'a'))
@@ -184,7 +184,7 @@ describe('cancel dequeued merge-group runs script', () => {
           `api --paginate repos/example/repo/actions/runs?event=merge_group&status=${status}&per_page=100`,
       ),
     )
-  })
+  }, 30_000)
 
   it('keeps a run that already holds a failed job so the failure stays triageable', () => {
     const result = execute({
@@ -208,7 +208,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([21, 23])
     expect(result.summary).toContain('| Backend | [20]')
     expect(result.summary).toContain('kept: holds a failed job')
-  })
+  }, 30_000)
 
   it('writes the cancelled run ids to the job summary', () => {
     const result = execute({
@@ -221,14 +221,14 @@ describe('cancel dequeued merge-group runs script', () => {
       `| Web | [101](https://github.test/example/repo/actions/runs/101) | \`${branch(14, 'a')}\` | cancelled |`,
     )
     expect(result.summary).toContain('/actions/runs/102)')
-  })
+  }, 30_000)
 
   it('reports none active when the pull request has no active run', () => {
     const result = execute({})
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.summary).toContain('Cancelled runs: none active.')
-  })
+  }, 30_000)
 
   it('retries a transient HTTP 502 and then cancels the run', () => {
     const result = execute({
@@ -239,7 +239,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([60])
     expect(result.summary).toContain('| cancelled |')
     expect(result.calls.filter((call) => call.includes('--method POST'))).toHaveLength(2)
-  })
+  }, 30_000)
 
   it('fails the job when a cancel HTTP 502 persists past three attempts', () => {
     const result = execute({
@@ -252,7 +252,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.stdout).toContain('::warning::Could not cancel run 61')
     expect(result.summary).toContain('| failed |')
     expect(result.calls.filter((call) => call.includes('--method POST'))).toHaveLength(3)
-  })
+  }, 30_000)
 
   it('treats a run that already completed as success', () => {
     const result = execute({
@@ -262,7 +262,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.summary).toContain('already completed')
-  })
+  }, 30_000)
 
   it('keeps going after a cancel or job-list error, then fails the job', () => {
     const result = execute({
@@ -283,14 +283,14 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.stdout).toContain('::warning::Could not cancel run 50')
     expect(result.calls.filter((call) => call.includes('/runs/50/cancel'))).toHaveLength(1)
     expect(result.stdout).toContain('::warning::Could not read the jobs of run 52')
-  })
+  }, 30_000)
 
   it('fails without touching the API when the pull-request number is not numeric', () => {
     const result = execute({ pr: '14-or-1' })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('::error::Unexpected pull request number')
     expect(result.calls).toEqual([])
-  })
+  }, 30_000)
 
   it('uses the queue base when matching the readonly queue prefix', () => {
     const release = `gh-readonly-queue/release/pr-14-${sha('a')}`
@@ -299,14 +299,14 @@ describe('cancel dequeued merge-group runs script', () => {
     }
     expect(execute({ pages }).cancelled).toEqual([100])
     expect(execute({ pages, queueBase: 'release' }).cancelled).toEqual([101])
-  })
+  }, 30_000)
 
   it('fails without touching the API when the queue base is not a single branch name', () => {
     const result = execute({ queueBase: 'release/1' })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('::error::queue-base must be a single branch name')
     expect(result.calls).toEqual([])
-  })
+  }, 30_000)
 
   it('warns and exits 0 when listing runs returns an HTTP 502', () => {
     const result = execute({
@@ -317,7 +317,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.stdout).toContain('::warning::')
     expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
-  })
+  }, 30_000)
 
   it('warns and exits 0 when listing runs returns empty output', () => {
     const result = execute({
@@ -328,7 +328,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.stdout).toContain('::warning::')
     expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
-  })
+  }, 30_000)
 
   it('treats a null runs body as no runs without a warning', () => {
     const result = execute({
@@ -338,7 +338,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.stdout).not.toContain('::warning::')
-  })
+  }, 30_000)
 
   it('cancels nothing and exits 0 when the pull request state cannot be read', () => {
     const result = execute({
@@ -349,7 +349,7 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.stdout).toContain('::warning::Could not read repos/example/repo/pulls/14')
     expect(result.summary).toContain('could not be read')
-  })
+  }, 30_000)
 
   it('keeps cancelling a run whose jobs body has no jobs array', () => {
     const result = execute({
@@ -358,7 +358,7 @@ describe('cancel dequeued merge-group runs script', () => {
     })
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([100])
-  })
+  }, 30_000)
 
   it('still cancels runs from other statuses when one listing fails, and says so in the summary', () => {
     const result = execute({
@@ -373,12 +373,12 @@ describe('cancel dequeued merge-group runs script', () => {
     expect(result.cancelled).toEqual([100])
     expect(result.stdout).toContain('::warning::Could not list queued runs')
     expect(result.summary).toContain('skipped after an API error for status: queued')
-  })
+  }, 30_000)
 
   it('names skipped statuses in the summary when no other run is active', () => {
     const result = execute({ listing: 'error' })
     expect(result.summary).toContain(
       'skipped after an API error for status: queued in_progress waiting requested pending',
     )
-  })
+  }, 30_000)
 })

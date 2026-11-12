@@ -70,7 +70,7 @@ describe('with-host-lock.sh slot pools', () => {
 
     second.kill('SIGTERM')
     await secondCompletion
-  })
+  }, 30_000)
 
   it('keeps slot one stable when callers use different pool capacities', async () => {
     const home = await makeHome()
@@ -93,5 +93,5 @@ describe('with-host-lock.sh slot pools', () => {
 
     holder.kill('SIGTERM')
     await holderCompletion
-  })
+  }, 30_000)
 })

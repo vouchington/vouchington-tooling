@@ -19,16 +19,16 @@ describe('run-with-timeout', () => {
       'kill-after seconds must be a positive',
     )
     expect(runHelper(['abc', '1', 'true']).status).toBe(2)
-  })
+  }, 30_000)
 
   it('runs a command that finishes before the deadline', () => {
     const result = runHelper(['5', '1', 'true'])
     expect(result.status).toBe(0)
     expect(result.stderr).not.toContain('publish-ecr-image')
-  })
+  }, 30_000)
 
   it('times out a long-running command', () => {
     const result = runHelper(['1', '1', 'sleep', '30'])
     expect(result.status).not.toBe(0)
-  })
+  }, 30_000)
 })

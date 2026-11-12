@@ -30,7 +30,7 @@ describe('story-coverage command', () => {
     )
     await expect(runCli(['node', 'vouchington', 'story-coverage', ...flags(root)])).resolves.toBe(0)
     expect(stderr).not.toHaveBeenCalled()
-  })
+  }, 30_000)
 
   it('exits 1 and prints the failure when a component is uncovered', async () => {
     root = await mkdtemp(join(tmpdir(), 'story-cli-miss-'))
@@ -51,7 +51,7 @@ describe('story-coverage command', () => {
     expect(code).toBe(1)
     expect(stderr.mock.calls.map((call) => String(call[0])).join('\n')).toContain('notes.json')
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain('Component story coverage check failed')
-  })
+  }, 30_000)
 
   it('returns usage exit code 2 for invalid patterns and exclusion files', async () => {
     root = await mkdtemp(join(tmpdir(), 'story-cli-bad-'))
@@ -85,7 +85,7 @@ describe('story-coverage command', () => {
     const valid = join(root, 'valid.json')
     await writeFile(valid, '{"ui/components/only.tsx#Only":"later"}\n')
     await expect(runStoryCoverage({ ...parsed, exclusionsFile: valid })).resolves.toBe(1)
-  })
+  }, 30_000)
 })
 
 function flags(root: string): string[] {

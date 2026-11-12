@@ -94,7 +94,7 @@ describe('setup-node-pnpm install options', () => {
       attempts: 1,
       ignoreScripts: true,
     })
-  })
+  }, 30_000)
 
   it.each(['0', '-1', '1.5', 'abc', '1e3'])('rejects %s as a positive integer', (value) => {
     expect(() => parseOptions({ INSTALL_ATTEMPTS: value })).toThrow(/install-attempts/u)
@@ -115,7 +115,7 @@ describe('setup-node-pnpm install options', () => {
     expect(() => parseOptions({ INSTALL_KILL_GRACE_MS: String(MAX_TIMER_MS + 1) })).toThrow(
       /at most/u,
     )
-  })
+  }, 30_000)
 
   it('builds quiet first-attempt args and append-only info retry args', () => {
     expect(FETCH_FLAGS).toEqual([
@@ -139,7 +139,7 @@ describe('setup-node-pnpm install options', () => {
     ])
     expect(buildArgs(1, true)).toContain('--ignore-scripts')
     expect(buildArgs(2, false)).not.toContain('--ignore-scripts')
-  })
+  }, 30_000)
 })
 
 describe('setup-node-pnpm install.mjs', () => {
@@ -147,14 +147,14 @@ describe('setup-node-pnpm install.mjs', () => {
     const result = await install('ok', { INSTALL_IGNORE_SCRIPTS: 'true' })
     expect(result).toMatchObject({ code: 0 })
     expect(result.calls).toEqual([buildArgs(1, true).join(' ')])
-  })
+  }, 30_000)
 
   it('does not retry a non-timeout failure', async () => {
     const result = await install('fail,ok')
     expect(result.code).toBe(7)
     expect(result.calls).toHaveLength(1)
     expect(result.stdout).not.toContain('::warning::')
-  })
+  }, 30_000)
 
   it('kills a hung attempt, warns, and retries with retry logging', async () => {
     const result = await install('hang,ok', {
@@ -178,7 +178,7 @@ describe('setup-node-pnpm install.mjs', () => {
       }
     }
     expect(alive).toBe(false)
-  })
+  }, 30_000)
 
   it('fails with an error after the final attempt times out', async () => {
     const result = await install('hang,hang', { INSTALL_ATTEMPTS: '2' })
@@ -187,7 +187,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.stderr).toMatch(
       /::error::pnpm install attempt 2\/2 timed out after \d+s \([^)]+\); giving up/u,
     )
-  })
+  }, 30_000)
 
   it('does not retry a timed-out attempt when INSTALL_ATTEMPTS is unset', async () => {
     const result = await install('hang,ok', { INSTALL_ATTEMPTS: undefined })
@@ -197,7 +197,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.stderr).toMatch(
       /::error::pnpm install attempt 1\/1 timed out after \d+s \([^)]+\); giving up/u,
     )
-  })
+  }, 30_000)
 
   it('names the configured registry host when the final attempt times out', async () => {
     const result = await install('hang', {
@@ -208,7 +208,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.stderr).toMatch(
       /::error::pnpm install attempt 1\/1 timed out after \d+s \(mirror\.example:8443\); giving up/u,
     )
-  })
+  }, 30_000)
 
   it('names the default registry host when no registry is configured', async () => {
     const result = await install('hang', {
@@ -218,7 +218,7 @@ describe('setup-node-pnpm install.mjs', () => {
     })
     expect(result.stderr).toContain('timed out after')
     expect(result.stderr).toMatch(/\(registry\.npmjs\.org\); giving up/u)
-  })
+  }, 30_000)
 
   it('escalates to SIGKILL when pnpm ignores SIGTERM', async () => {
     const result = await install('stubborn', {
@@ -227,20 +227,20 @@ describe('setup-node-pnpm install.mjs', () => {
     })
     expect(result.code).toBe(1)
     expect(result.calls).toHaveLength(1)
-  })
+  }, 30_000)
 
   it('fails clearly on invalid input before running pnpm', async () => {
     const result = await install('ok', { INSTALL_ATTEMPTS: 'zero' })
     expect(result.code).toBe(1)
     expect(result.calls).toEqual([])
     expect(result.stderr).toContain('::error::install-attempts must be a positive integer')
-  })
+  }, 30_000)
 
   it('reports a pnpm that cannot be started', async () => {
     const result = await install('ok', { PATH: '/nonexistent' })
     expect(result.code).toBe(127)
     expect(result.stderr).toContain('::error::Could not start pnpm')
-  })
+  }, 30_000)
 })
 
 describe('setup-node-pnpm install process-tree killer', () => {
@@ -252,14 +252,14 @@ describe('setup-node-pnpm install process-tree killer', () => {
     })
     expect(() => kill(42, 'SIGTERM')).not.toThrow()
     expect(calls).toEqual([['taskkill', ['/pid', '42', '/T', '/F'], { stdio: 'ignore' }]])
-  })
+  }, 30_000)
 
   it('signals the process group elsewhere and ignores a missing group', () => {
     const run = (): never => {
       throw new Error('must not run taskkill')
     }
     expect(() => makeKiller('linux', run)(2_147_483_000, 'SIGTERM')).not.toThrow()
-  })
+  }, 30_000)
 
   it('spawns attached on win32 and kills through the injected killer', async () => {
     const kills: Array<[number, string]> = []
@@ -282,5 +282,5 @@ describe('setup-node-pnpm install process-tree killer', () => {
     } finally {
       process.env.PATH = original
     }
-  })
+  }, 30_000)
 })

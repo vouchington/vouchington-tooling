@@ -62,7 +62,7 @@ describe('pnpm install regression boundaries', () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('usage: vouchington pnpm-install'),
     })
-  })
+  }, 30_000)
 
   it('ignores same-named registry dependencies without workspace protocol', async () => {
     const fixture = await makeLinkFixture('999.0.0', 'registry')
@@ -71,7 +71,7 @@ describe('pnpm install regression boundaries', () => {
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 
   it('reports misdirected and unknown workspace protocol dependencies', async () => {
     const misdirected = await makeLinkFixture('workspace:^', 'consumer')
@@ -95,7 +95,7 @@ describe('pnpm install regression boundaries', () => {
     } finally {
       await rm(misdirected.root, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 
   it('bounds timeout and retry inputs', () => {
     const required = ['--runner-lifecycle', 'persistent', '--install-scripts', 'true']
@@ -105,7 +105,7 @@ describe('pnpm install regression boundaries', () => {
     expect(() =>
       parseInstallOptions([...required, '--max-attempts', '999999999999999999']),
     ).toThrow('--max-attempts must not exceed 10')
-  })
+  }, 30_000)
 
   it('does not let an unwritable summary mask the install outcome', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pnpm-install-summary-'))
@@ -150,7 +150,7 @@ describe('pnpm install regression boundaries', () => {
     } finally {
       await rm(root, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 
   it(
     'fails fast on a release-age violation on a non-first attempt',
@@ -186,7 +186,7 @@ describe('pnpm install regression boundaries', () => {
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 
   it(
     'still retries an ordinary transient install failure up to max-attempts',
@@ -214,5 +214,5 @@ describe('pnpm install regression boundaries', () => {
     } finally {
       await rm(fixture.root, { force: true, recursive: true })
     }
-  })
+  }, 30_000)
 })

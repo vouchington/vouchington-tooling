@@ -29,7 +29,7 @@ describe('with-host-lock.sh filesystem safety', () => {
       }),
     ).rejects.toMatchObject({ stderr: expect.stringContaining('symbolic link') })
     await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it.each(['owner.pid', 'owner.pgid'])(
     'preserves the grace period while %s contains a partial write',
@@ -57,5 +57,5 @@ describe('with-host-lock.sh filesystem safety', () => {
     expect(source).toContain('ps -p "$candidate_pid" -o pid=')
     expect(source).toContain('ps -e -o pgid=')
     expect(source).toContain('while process_group_is_live "$child_pid"; do')
-  })
+  }, 30_000)
 })

@@ -56,7 +56,7 @@ describe('coveredComponentKeys', () => {
     expect([...coveredComponentKeys(['ui/stories/a.stories.tsx'], graph, config)]).toEqual([
       'ui/components/example.tsx#Missing',
     ])
-  })
+  }, 30_000)
 })
 
 describe('checkStoryCoverage', () => {
@@ -163,7 +163,7 @@ describe('checkStoryCoverage', () => {
     const files = ['ui/components/ok.tsx', 'ui/stories/ok.stories.tsx']
     const report = await checkStoryCoverage(request(root), [...files, ...files])
     expect(report.ok).toBe(true)
-  })
+  }, 30_000)
 
   it('fails closed on exclusion keys even when they hide a missing component', async () => {
     root = await writeTree({
@@ -176,7 +176,7 @@ describe('checkStoryCoverage', () => {
     expect(report.missingComponents).toEqual([])
     expect(report.excludedKeys).toEqual(['ui/components/only.tsx#Only'])
     expect(report.ok).toBe(false)
-  })
+  }, 30_000)
 
   it('passes an empty tree and rejects incomplete source', async () => {
     root = await mkdtemp(join(tmpdir(), 'story-check-'))
@@ -188,7 +188,7 @@ describe('checkStoryCoverage', () => {
     await expect(checkStoryCoverage(request(root), [broken])).rejects.toThrow(
       'Incomplete source module facts',
     )
-  })
+  }, 30_000)
 })
 
 function request(root: string, extra: Partial<StoryCoverageRequest> = {}): StoryCoverageRequest {

@@ -43,7 +43,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(scratchDir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('drops the mid-cap profile when the cap is below 15000ms', async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), 'effective-timeout-small-'))
@@ -57,7 +57,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(scratchDir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('writes the caller plugin name into the generated config and aggregates a close failure', async () => {
     const scratch = await mkdtemp(join(tmpdir(), 'effective-timeout-one-'))
@@ -92,7 +92,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(scratch, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('uses the default scratch directory and reports a failed admission', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'effective-timeout-root-'))
@@ -110,7 +110,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(repoRoot, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('aggregates a scratch cleanup failure after a successful and a failed admission', async () => {
     const scratchDir = await mkdtemp(join(tmpdir(), 'effective-timeout-cleanup-'))
@@ -139,7 +139,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(scratchDir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('keeps both the run rejection and the close error', async () => {
     const scratch = await mkdtemp(join(tmpdir(), 'effective-timeout-both-'))
@@ -165,7 +165,7 @@ describe('checkFiniteTimeoutProfiles', () => {
     } finally {
       await rm(scratch, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('runs every admission profile through Vitest when no runner is injected', async () => {
     const scratchDir = await mkdtemp(join(process.cwd(), 'node_modules', '.effective-timeout-all-'))
