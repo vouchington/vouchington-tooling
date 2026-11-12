@@ -50,11 +50,11 @@ and the merge authority per PR category; stop and ask when one is missing.
    delay; MERGE means the worker never merges, it reports the PR mergeable and stops. For a stack,
    use `pr-shepherd stack`. Record the handoff (PR, head, worker id, time) in `shepherds`. Nothing
    waits on the worker; on ESCALATE it reports back and the loop escalates. Remove the entry when
-   the worker stops. After any push to the PR, the worker or loop disables auto-merge
-   (`gh pr merge <N> --repo <owner>/<name> --disable-auto`) and requests a new final review (the
-   label again, as in step 5); a push does not disarm it, and the PR could otherwise merge at an
-   unreviewed head. A later sweep re-arms only when `vouchington-reviewer status` exits 0 for the
-   new head.
+   the worker stops. Before any push to an armed PR, the worker or loop runs
+   `gh pr merge <N> --repo <owner>/<name> --disable-auto` and confirms `autoMergeRequest` is now
+   null; if disarming fails, it does not push and reports instead. After the push it requests a new
+   final review (the label again, as in step 5). A later sweep re-arms only when
+   `vouchington-reviewer status` exits 0 for the new head.
 8. **Verify and report.** `gh pr view <N> --repo <owner>/<name> --json
    isDraft,autoMergeRequest,state`. Report per PR: ready, steered, auto-merge (armed, no,
    manual-verification-required, awaiting-final-review, unavailable), shepherd (local or no), and the reason for any `no`.

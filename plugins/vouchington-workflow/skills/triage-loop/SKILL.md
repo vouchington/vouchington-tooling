@@ -214,7 +214,7 @@ An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
   that links the issue. Loop-created PRs (this one and flake-fix PRs from [Failures](#failures))
   get the adapter's automation label at creation, so Phase B and the grant see them.
 - **`/fix` on a PR:** the subagent pushes the fix to that PR's branch, only when the branch is in the
-  same repository; never push to a fork.
+  same repository; never push to a fork. The loop disarms an armed PR first, as in [ready and shepherd](references/shepherd.md) step 7.
 - A `/fix` result merges only when it falls in a grant category; otherwise escalate it.
 
 ### Agent handoff
