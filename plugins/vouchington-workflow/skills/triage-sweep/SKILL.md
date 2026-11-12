@@ -131,11 +131,15 @@ parts, paginating fully:
 1. **New merges:** fully scan every PR merged after `scannedThrough` and within the adapter's
    late-review window (default the last 14 days).
 2. **Active older merges:** for PRs merged earlier but still in the window, use a cheap change
-   signal and rescan only PRs with new review activity since `lastSweepAt`. Examples:
+   signal and rescan only PRs with new review activity since `activityThrough` (falling back to
+   `scannedThrough` when unset). Never use `lastSweepAt`: it advances even when Phase F is skipped
+   or fails, so activity in that gap would be missed. Examples:
    - the repository-level review-comment and issue-comment lists sorted by `updated`
      (`gh api --paginate 'repos/<o>/<r>/pulls/comments?sort=updated&direction=desc&since=<ts>'`
      and `repos/<o>/<r>/issues/comments?sort=updated&since=<ts>`), mapped back to their PRs;
-   - reviews submitted since then, through search or the event-wait stream when configured.
+   - reviews submitted since then, through search or the event-wait stream when configured. A
+     review with only a body and no inline comments is absent from the comment lists, so without
+     the event-wait stream the periodic full rescan is what catches it.
 3. **Backstop:** when `fullScanAt` is unset or older than the adapter's full-rescan interval
    (default weekly), rescan every PR in the window as before.
 
@@ -150,7 +154,8 @@ anything already addressed, non-actionable, or a duplicate of an open issue. Fil
 root cause through [github-issue](../github-issue/SKILL.md), linking the PR and comment. Add every
 harvested comment id to `reviewedComments`, and prune ids whose PR has left the window. A comment
 posted days after merge is still found. Advance `scannedThrough` to the newest `mergedAt` scanned
-(or the sweep start) only after the scan succeeds, and set `fullScanAt` after a full rescan.
+(or the sweep start) only after the scan succeeds. Advance `activityThrough` to the sweep start only after step 2
+succeeds, and set `fullScanAt` after a full rescan.
 
 ## Phase G - Queue ejections and default-branch failures
 
@@ -216,8 +221,10 @@ jobs, such as session-only crons that auto-expire after some days:
 
 1. List the loop's recurring jobs.
 2. If the fallback sweep job is missing, or its expiry falls within the next fallback interval plus
-   a margin, delete the old job first (to avoid duplicates) and re-register it.
-3. Record the job id and registration time in the state file's `schedule` field.
+   a margin, register the replacement first, then delete the old job, so a failed create never
+   leaves the loop with no job. A brief duplicate is harmless: the sweep lock dedupes concurrent
+   sweeps.
+3. Record the new job id and registration time in the state file's `schedule` field.
 
 For each new escalation (dedupe on `escalations` in the state file):
 

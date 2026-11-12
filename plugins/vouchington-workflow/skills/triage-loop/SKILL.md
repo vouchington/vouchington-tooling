@@ -80,7 +80,9 @@ and escalate it; never work around the policy. Anything outside the grant is esc
    - `lastSweepAt`
    - a per-repository `reviewedComments` (late-review comment ids already harvested)
    - `lateReview.<repo>` with `scannedThrough` (ISO time; Phase F fully scans only PRs merged after
-     it) and `fullScanAt` (time of the last full window rescan)
+     it), `activityThrough` (ISO time; the `since` for Phase F's review-activity signal, advanced
+     only after that step succeeds, falling back to `scannedThrough`), and `fullScanAt` (time of
+     the last full window rescan)
    - `schedule` (the fallback sweep job's id and registration time)
    - `retroCursor`
    - `escalations` (key to first-notified time, used for dedupe)
