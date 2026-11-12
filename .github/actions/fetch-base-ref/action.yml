@@ -6,7 +6,8 @@ description: >
   actions/checkout never creates this ref by name, and fetch-depth: 0 alone only deepens the
   checked-out ref's own ancestry, not a separately-diverged base branch. Only these two refs are
   fetched: an unscoped fetch pulls every branch's history, so its cost grows with the repository's
-  branch count. The caller must run actions/checkout before invoking this action.
+  branch count. Each fetch attempt is bounded by a 45 second timeout and retried up to 3 attempts
+  with a short backoff, so a stalled git endpoint recovers instead of hanging the job. The caller must run actions/checkout before invoking this action.
 inputs:
   filter:
     description: >
@@ -24,13 +25,26 @@ runs:
         FILTER: ${{ inputs.filter }}
       run: |
         set -euo pipefail
-        args=(--no-tags)
-        if [ -n "$FILTER" ]; then
-          args+=("--filter=$FILTER")
-        fi
-        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-          args+=(--unshallow)
-        fi
-        git fetch "${args[@]}" origin \
-          "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" \
-          "+$(git rev-parse HEAD):refs/remotes/origin/ci-head"
+        attempts=3
+        for attempt in $(seq 1 "$attempts"); do
+          # Recomputed each attempt: a timed-out fetch may already have deepened the clone, and
+          # --unshallow fails on a repository that is no longer shallow.
+          args=(--no-tags)
+          if [ -n "$FILTER" ]; then
+            args+=("--filter=$FILTER")
+          fi
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            args+=(--unshallow)
+          fi
+          if timeout "${FETCH_TIMEOUT:-45}" git fetch "${args[@]}" origin \
+            "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" \
+            "+$(git rev-parse HEAD):refs/remotes/origin/ci-head"; then
+            exit 0
+          fi
+          echo "::warning::git fetch of ${BASE_REF} failed or timed out (attempt ${attempt}/${attempts})"
+          if [ "$attempt" -lt "$attempts" ]; then
+            sleep $((attempt * ${FETCH_BACKOFF:-5}))
+          fi
+        done
+        echo "::error::Could not fetch base ref '${BASE_REF}' after ${attempts} attempts"
+        exit 1

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -51,11 +51,17 @@ function clone(name: string, shallow: boolean) {
   return work
 }
 
-function run(cwd: string, baseRef: string, filter = '') {
+function run(cwd: string, baseRef: string, filter = '', extraEnv: Record<string, string> = {}) {
   return spawnSync('bash', ['-c', script], {
     cwd,
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, BASE_REF: baseRef, FILTER: filter },
+    env: {
+      PATH: process.env.PATH,
+      BASE_REF: baseRef,
+      FILTER: filter,
+      FETCH_BACKOFF: '0',
+      ...extraEnv,
+    },
   })
 }
 
@@ -115,5 +121,42 @@ describe('fetch-base-ref composite action', () => {
   it('fails when the base branch does not exist', () => {
     const work = clone('missing', false)
     expect(run(work, 'no-such-branch').status).not.toBe(0)
+  })
+
+  it('names the ref in an error after the attempts are exhausted', () => {
+    const result = run(clone('exhausted', false), 'no-such-branch')
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain(
+      "::error::Could not fetch base ref 'no-such-branch' after 3 attempts",
+    )
+  })
+
+  it('times out a hung fetch and retries, recomputing --unshallow each attempt', () => {
+    const work = clone('hung', true)
+    const stubs = join(scratch, 'stubs')
+    const counter = join(scratch, 'hung-count')
+    mkdirSync(stubs, { recursive: true })
+    const real = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim()
+    // First fetch deepens nothing and hangs; later ones delegate to the real git.
+    writeFileSync(
+      join(stubs, 'git'),
+      `#!/bin/bash
+if [ "$1" = fetch ]; then
+  echo "$@" >> "${counter}"
+  if [ "$(wc -l < "${counter}")" -eq 1 ]; then exec sleep 30; fi
+fi
+exec "${real}" "$@"
+`,
+      { mode: 0o755 },
+    )
+    const result = run(work, 'main', '', {
+      FETCH_TIMEOUT: '1',
+      PATH: `${stubs}:${process.env.PATH}`,
+    })
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('(attempt 1/3)')
+    const calls = readFileSync(counter, 'utf8').trim().split('\n')
+    expect(calls).toHaveLength(2)
+    expect(calls.every((call) => call.includes('--unshallow'))).toBe(true)
   })
 })
