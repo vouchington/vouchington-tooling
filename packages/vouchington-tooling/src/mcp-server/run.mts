@@ -1,5 +1,5 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
-import type { BlackboardClientDependencies } from '../agent-blackboard/client.mts'
+import { loadClient, type BlackboardClientDependencies } from '../agent-blackboard/client.mts'
 import type { RunTextCommand } from '../gh-cli/exec.mts'
 import type { ServerEnvironment } from './dispatch.mts'
 import { assertBlackboardInstalled, loadMcpSdk, type SdkImporter } from './sdk.mts'
@@ -22,13 +22,26 @@ export type RunMcpServerOptions = {
 }
 
 /**
+ * Imports the agent-blackboard client once, at startup, and hands every tool call that module.
+ * Re-importing per call would break a running server whose install directory was evicted.
+ */
+async function importBlackboard(
+  resolveFrom: string | URL | undefined,
+): Promise<BlackboardClientDependencies> {
+  assertBlackboardInstalled(resolveFrom)
+  // Resolve from this package's install, never the worktree, matching tool dispatch.
+  const client = await loadClient({ resolveFrom: resolveFrom ?? import.meta.url })
+  return { loadClient: () => Promise.resolve(client) }
+}
+
+/**
  * Starts the server and resolves once it is connected. Nothing on this path may write to stdout:
  * stdout is the protocol channel, so diagnostics go to stderr.
  */
 export async function runMcpServer(options: RunMcpServerOptions): Promise<void> {
   const runGit = options.runGit ?? runIsolatedGit
   const sdk = await loadMcpSdk(options.importSdk)
-  if (options.blackboard === undefined) assertBlackboardInstalled(options.resolveFrom)
+  const blackboard = options.blackboard ?? (await importBlackboard(options.resolveFrom))
   const launchRoot = await launchWorktreeRoot(options.cwd, runGit)
   const environment: ServerEnvironment = {
     launchRoot,
@@ -36,7 +49,7 @@ export async function runMcpServer(options: RunMcpServerOptions): Promise<void> 
     runGit,
     install: captureInstall(options.version),
     ...(options.resolveFrom === undefined ? {} : { resolveFrom: options.resolveFrom }),
-    ...(options.blackboard === undefined ? {} : { blackboard: options.blackboard }),
+    blackboard,
   }
   const server = createMcpServer(sdk, environment, options.version)
   /* v8 ignore next -- the stdio default is exercised by the spawned-process test */
