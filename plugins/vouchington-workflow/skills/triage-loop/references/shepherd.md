@@ -26,8 +26,12 @@ and the merge authority per PR category; stop and ask when one is missing.
    Run `pnpm --dir <reviewer-checkout> exec vouchington-reviewer status --repo <owner>/<name> --pr <N>`
    before arming, merging, or re-enqueueing: exit 0 means the newest final review approved the
    current head and the `final approval` label is present. Any other exit code means do not merge:
+   when `gh pr view <N> --repo <owner>/<name> --json autoMergeRequest --jq .autoMergeRequest` is
+   set (armed earlier), first run `gh pr merge <N> --repo <owner>/<name> --disable-auto`; then
    leave the PR ready and unarmed, report `awaiting-final-review`, and let a later sweep rerun the
-   check. Nothing waits on the reviewer.
+   check. Nothing waits on the reviewer. This gate is procedural: GitHub enforces it only through a
+   required status check, or branch protection that dismisses stale approvals, which the consuming
+   repository's adapter owns.
 6. **Arm auto-merge (only with `--arm-auto-merge`, and only when step 5 exited 0).** Pass the flag
    only for a category the grant covers. Check once per repository per run that
    `gh api repos/<owner>/<name> --jq .allow_auto_merge` is true; when `false`, report `manual merge required` and continue. When the
@@ -46,7 +50,11 @@ and the merge authority per PR category; stop and ask when one is missing.
    delay; MERGE means the worker never merges, it reports the PR mergeable and stops. For a stack,
    use `pr-shepherd stack`. Record the handoff (PR, head, worker id, time) in `shepherds`. Nothing
    waits on the worker; on ESCALATE it reports back and the loop escalates. Remove the entry when
-   the worker stops.
+   the worker stops. After any push to the PR, the worker or loop disables auto-merge
+   (`gh pr merge <N> --repo <owner>/<name> --disable-auto`) and requests a new final review (the
+   label again, as in step 5); a push does not disarm it, and the PR could otherwise merge at an
+   unreviewed head. A later sweep re-arms only when `vouchington-reviewer status` exits 0 for the
+   new head.
 8. **Verify and report.** `gh pr view <N> --repo <owner>/<name> --json
    isDraft,autoMergeRequest,state`. Report per PR: ready, steered, auto-merge (armed, no,
    manual-verification-required, awaiting-final-review, unavailable), shepherd (local or no), and the reason for any `no`.

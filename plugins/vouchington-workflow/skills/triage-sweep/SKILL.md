@@ -58,7 +58,7 @@ stays unarmed too. A later sweep arms one only when:
 - its shepherd is no longer in flight;
 - its current head passes every required check;
 - a fresh review of that head still fits the same category;
-- `vouchington-reviewer status` exits 0 for that head (see
+- `vouchington-reviewer status` exits 0 for that head, including after a push that disarmed it (see
   [ready and shepherd](../triage-loop/references/shepherd.md) step 5).
 
 Arming then uses one bare `gh pr merge` command, as in the grant.
