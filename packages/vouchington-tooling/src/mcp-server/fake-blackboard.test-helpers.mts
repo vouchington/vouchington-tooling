@@ -21,6 +21,8 @@ export type FakeOptions = {
   clientPartition?: (options: unknown) => Promise<unknown>
   /** Makes `ensure` fail for any other identity, and `get` report a session with this one. */
   conflictingSession?: { id: string; parentSessionId: null; agent: string; version: string }
+  /** Makes every `ensure` reject with this error. */
+  ensureError?: unknown
   entries?: StoredEntry[]
   entriesError?: unknown
   /** Fails the read of just these sessions, keyed by session id. */
@@ -68,6 +70,7 @@ export function fakeBlackboard(options: FakeOptions = {}): FakeBlackboard {
     async ensure(input: { id: string; parentSessionId: null; agent: string; version: string }) {
       calls.ensure.push(input)
       if (typeof input.id !== 'string') throw new Error('ensure requires id')
+      if (options.ensureError !== undefined) throw options.ensureError
       if (
         options.conflictingSession &&
         (options.conflictingSession.parentSessionId !== input.parentSessionId ||

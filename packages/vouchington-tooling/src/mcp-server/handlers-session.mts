@@ -35,12 +35,30 @@ function readSelection(args: Args): SnapshotSelection {
   }
 }
 
-export const sessionEnsure: ToolHandler = async (args, context) =>
-  ensureBlackboardSession({
-    ...readIdentity(args, context.sessionId),
-    env: context.env,
-    dependencies: context.dependencies,
-  })
+/** The blackboard client is loaded dynamically, so its error class is matched by shape. */
+function isParentNotFound(error: unknown): boolean {
+  if (!isObject(error) || error.status !== 404 || !isObject(error.body)) return false
+  return error.body.code === 'parent_not_found'
+}
+
+export const sessionEnsure: ToolHandler = async (args, context) => {
+  const identity = readIdentity(args, context.sessionId)
+  try {
+    return await ensureBlackboardSession({
+      ...identity,
+      env: context.env,
+      dependencies: context.dependencies,
+    })
+  } catch (error) {
+    if (identity.parentSessionId !== null && isParentNotFound(error))
+      throw new Error(
+        `parent session ${identity.parentSessionId} does not exist on the blackboard; ` +
+          'ensure the parent session first (session_ensure with its own id) and retry',
+        { cause: error },
+      )
+    throw error
+  }
+}
 
 export const sessionArchive: ToolHandler = async (_args, context) =>
   archiveBlackboardSession({

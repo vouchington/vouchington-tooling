@@ -54,6 +54,40 @@ describe('session_ensure', () => {
     expect(result.content[0]?.text).toMatch(/^session identity differs\n\[vouchington-tooling /)
   })
 
+  describe('parent_not_found', () => {
+    const child = { ...identity, sessionId: 'native:child', parentSessionId: 'native:parent' }
+    const fail = (status: number, body: unknown) =>
+      harness(fixture(), {
+        ensureError: Object.assign(new Error('POST /sessions'), { status, body }),
+      })
+
+    it('names the missing parent', async () => {
+      const result = await fail(404, { code: 'parent_not_found' }).call('session_ensure', child)
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toContain(
+        'parent session native:parent does not exist on the blackboard; ensure the parent session first (session_ensure with its own id) and retry',
+      )
+    })
+
+    it.each([
+      ['another 404 code', 404, { code: 'session_not_found' }],
+      ['another status', 500, { code: 'parent_not_found' }],
+      ['a non-object body', 404, 'parent_not_found'],
+      ['a null body', 404, null],
+    ])('leaves %s unchanged', async (_name, status, body) => {
+      const text = textOf(await fail(status, body).call('session_ensure', child))
+      expect(text).toContain('POST /sessions')
+      expect(text).not.toContain('does not exist on the blackboard')
+    })
+
+    it('leaves a non-object error and a null parent unchanged', async () => {
+      const bare = harness(fixture(), { ensureError: 'boom' })
+      expect(textOf(await bare.call('session_ensure', child))).not.toContain('does not exist')
+      const root = await fail(404, { code: 'parent_not_found' }).call('session_ensure', identity)
+      expect(textOf(root)).not.toContain('does not exist on the blackboard')
+    })
+  })
+
   it('reports missing blackboard credentials', async () => {
     const result = await harness(fixture(), { env: {} }).call('session_ensure', identity)
     expect(textOf(result)).toContain('AGENT_BLACKBOARD_URL is not set')
