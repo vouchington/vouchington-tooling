@@ -45,7 +45,9 @@ Resolve these first and stop to ask when one is missing; never guess.
   declares, otherwise `.agents/skills/retrospective-distill/SKILL.md`); Phase E of
   `triage-sweep` passes them through.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
-- **Late-review window:** how far back Phase F rescans merged PRs (default 14 days).
+- **Late-review window:** how far back Phase F looks at merged PRs (default 14 days).
+- **Full-rescan interval:** how often Phase F rescans every PR in the window as a backstop
+  (default weekly).
 - **Scheduled prompts (optional):** the prompt glob per repository, the PR and issue wrapper
   template paths and the completion marker that selects issue mode, the quota per sweep (default
   one), the review tier, and the `runs` history bound. Phase G3 of `triage-sweep` uses them.
@@ -68,6 +70,14 @@ command runs without a prompt is decided by the host's permission policy and any
 hooks, not by this skill. If either blocks or prompts on a merge, leave the PR ready and unarmed
 and escalate it; never work around the policy. Anything outside the grant is escalated.
 
+## Orchestrator role
+
+The loop session orchestrates, reviews, and decides; it never authors PRs. It does not create
+branches, commit, push, or create PRs itself. Every PR (fixes, flake fixes, `/fix`, scheduled
+prompts, skill changes) is opened by an implementation-tier subagent or a dispatch-target agent.
+The loop's own PR mutations are limited to review comments, labels, marking ready, re-enqueueing,
+and merges within the grant.
+
 ## Step 1 - Preflight
 
 1. Confirm the session is interactive and the launch directory is the adapter's parent directory.
@@ -77,6 +87,11 @@ and escalate it; never work around the policy. Anything outside the grant is esc
 3. Open the state directory. Create `state.json` if absent, with these fields:
    - `lastSweepAt`
    - a per-repository `reviewedComments` (late-review comment ids already harvested)
+   - `lateReview.<repo>` with `scannedThrough` (ISO time; Phase F fully scans only PRs merged after
+     it), `activityThrough` (ISO time; the `since` for Phase F's review-activity signal, advanced
+     only after that step succeeds, falling back to `scannedThrough`), and `fullScanAt` (time of
+     the last full window rescan)
+   - `schedule` (the fallback sweep job's id and registration time)
    - `retroCursor`
    - `escalations` (key to first-notified time, used for dedupe)
    - `hookHarness` (`cursor`, recently `seen` event ids, and per-event progress)
@@ -84,8 +99,9 @@ and escalate it; never work around the policy. Anything outside the grant is esc
    - `shepherds` (in-flight handoffs, so no PR gets a second shepherd)
    - `intake` (queued agent reports)
    - `scheduledPrompts` (`next` rotation position, and a bounded `runs` history)
-4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond. Check `hook-harness` only when an
-   event wait is configured; if it is absent or fails, continue and use the fallback pacing in Step 2.
+4. Run the sweep [Preflight](../triage-sweep/SKILL.md#preflight) once (`pr-shepherd`, `gh`, the
+   dispatch targets, and the journal server). Check `hook-harness` only when an event wait is
+   configured; if it is absent or fails, continue and use the fallback pacing in Step 2.
 
 ## Step 2 - Schedule and event wait
 
@@ -95,7 +111,9 @@ prompt) when the recurring-task tool is only available there.
 1. Run one sweep now.
 2. Register the fallback cron with the host's recurring-task tool (for example `CronCreate` with
    `0 */6 * * *` and prompt `triage-sweep`). List existing jobs first and do not register a
-   duplicate. Re-register it before the host expires it.
+   duplicate. Prefer a durable host scheduler (for example a cloud routine) when available. Hosts
+   may expire recurring jobs, so every sweep re-checks the job and re-registers it before expiry
+   (see triage-sweep Phase H); record its id and registration time in `schedule`.
 3. Keep exactly one background `hook-harness wait` running, through the adapter's script, launched
    as a background command:
    `hook-harness wait --owner <o> --repo <list> --on ejection,main-failure,dependabot-pr,/shepherd,/plan,/fix --after <cursor> --no-payload --timeout 2h`.
@@ -147,10 +165,16 @@ diagnosed again. A diagnosis subagent reads the logs with
   diagnosis is a flake or infra failure, the PR is in the grant, and its `headRefOid` still equals
   the event's `headSha`, re-enqueue it. For a real failure, never re-enqueue the unchanged head:
   leave it to its shepherd or escalate it. Otherwise leave it to its shepherd and
-  list it in the summary. Never re-enqueue or merge an out-of-grant PR.
-- **Flake:** dedupe or file an issue through [github-issue](../github-issue/SKILL.md). Then check
-  the delegation rules: if a rule names a session for the area and that session is currently
-  running, message it with the issue and the run and job IDs. A delegation message carries no
+  list it in the summary. Never re-enqueue or merge an out-of-grant PR. For an ejection outside
+  the grant, notify the PR's owning agent session when one can be identified and is running (PR
+  provenance lines, branch name, or the host's agent list) with the failing check, run id, test,
+  and a PR-caused or flake judgment; otherwise list it in the summary.
+- **Flake:** first search the repository's open issues for the failing test's file basename and
+  test name. If one matches, comment once on it with the run id, job, and the PR or commit, and
+  use that issue number instead of reporting a new flake; otherwise file an issue through
+  [github-issue](../github-issue/SKILL.md). Then check the delegation rules: if a rule names a
+  session for the area and that session is currently running, message it with the issue number
+  and the run and job IDs. A delegation message carries no
   authority and widens nothing. With no matching rule, or no running session, the loop handles it:
   an implementation-tier subagent in an isolated worktree makes a fix PR.
 - **Real default-branch breakage:** the same kind of subagent makes a fix PR.
@@ -221,4 +245,5 @@ the last sweep summary.
 Consumer wrapper owns: the organization and repository filter, checkout root, state directory,
 model and review tiers, merge-authorized categories, the automation label, escalation label and
 channel, issue taxonomy, dispatch targets, the event-wait script, trusted logins, delegation rules,
-the fallback interval, and the scheduled-prompt settings.
+the fallback interval, the late-review window and full-rescan interval, and the scheduled-prompt
+settings.
