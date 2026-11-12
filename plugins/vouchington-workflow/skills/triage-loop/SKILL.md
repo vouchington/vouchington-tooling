@@ -46,6 +46,9 @@ Resolve these first and stop to ask when one is missing; never guess.
   `triage-sweep` passes them through.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
 - **Late-review window:** how far back Phase F rescans merged PRs (default 14 days).
+- **Scheduled prompts (optional):** the prompt glob per repository, the PR and issue wrapper
+  template paths and the completion marker that selects issue mode, the quota per sweep (default
+  one), the review tier, and the `runs` history bound. Phase G3 of `triage-sweep` uses them.
 
 ## The grant
 
@@ -80,6 +83,7 @@ and escalate it; never work around the policy. Anything outside the grant is esc
    - `handledFailures` (default-branch run ids already diagnosed, and the fix PR or issue each got)
    - `shepherds` (in-flight handoffs, so no PR gets a second shepherd)
    - `intake` (queued agent reports)
+   - `scheduledPrompts` (`next` rotation position, and a bounded `runs` history)
 4. Confirm `pr-shepherd`, `gh`, and the dispatch targets respond. Check `hook-harness` only when an
    event wait is configured; if it is absent or fails, continue and use the fallback pacing in Step 2.
 
@@ -215,6 +219,6 @@ Stop when the user asks: delete the cron job, stop the event wait, release the l
 the last sweep summary.
 
 Consumer wrapper owns: the organization and repository filter, checkout root, state directory,
-model tiers, merge-authorized categories, the automation label, escalation label and channel, issue
-taxonomy, dispatch targets, the event-wait script, trusted logins, delegation rules, and the
-fallback interval.
+model and review tiers, merge-authorized categories, the automation label, escalation label and
+channel, issue taxonomy, dispatch targets, the event-wait script, trusted logins, delegation rules,
+the fallback interval, and the scheduled-prompt settings.
