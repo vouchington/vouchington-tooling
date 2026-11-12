@@ -80,8 +80,8 @@ export const TOOLS: readonly ToolDefinition[] = [
   ),
   tool(
     'session_ensure',
-    'Idempotently creates a session, or verifies that an existing one has the same identity. ' +
-      'Returns the session id and whether it was created.',
+    'Idempotently creates a session, or verifies an existing one has the same identity. Child or ' +
+      "worker sessions must pass their orchestrator's session id as parentSessionId.",
     IDEMPOTENT_ADDITIVE,
     IDENTITY,
     IDENTITY_REQUIRED,
