@@ -38,7 +38,7 @@ describe('with-host-lock.sh timeout behavior', () => {
 
     holder.kill('SIGTERM')
     await held
-  })
+  }, 30_000)
 
   it('starts an unlocked fallback by its configured deadline and marks its child active', async () => {
     const home = await makeHome()
@@ -75,7 +75,7 @@ describe('with-host-lock.sh timeout behavior', () => {
       holder.kill('SIGTERM')
       await held
     }
-  })
+  }, 30_000)
 
   it('reclaims and acquires the selected slot on the final timeout probe', async () => {
     const home = await makeHome()

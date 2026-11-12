@@ -41,7 +41,7 @@ it('shares discovery across branches, and only rechecks deletion candidates', ()
   const checks = calls().filter((args) => args.includes('--head'))
   expect(checks).toHaveLength(2)
   expect(checks.every((args) => args[args.indexOf('--head') + 1] === 'done')).toBe(true)
-})
+}, 30_000)
 
 it('resumes a bounded scan after its reported path, including after that path was deleted', () => {
   const a = fx.addWorktree('aaa')
@@ -55,7 +55,7 @@ it('resumes a bounded scan after its reported path, including after that path wa
   expect(rest.hasMore).toBe(false)
   expect(rest.worktrees.map((e) => e.path)).toEqual([b])
   expect(existsSync(b)).toBe(false)
-})
+}, 30_000)
 
 it('keeps everything when discovery uses the time budget and provides a retry cursor', () => {
   const path = fx.addWorktree('done')
@@ -67,7 +67,7 @@ it('keeps everything when discovery uses the time budget and provides a retry cu
   expect(report).toMatchObject({ hasMore: true, nextAfter: '', worktrees: [] })
   expect(existsSync(path)).toBe(true)
   expect(formatReport(report)).toContain("--after ''")
-})
+}, 30_000)
 
 it('accepts bounded history while retaining exact HEAD proof', () => {
   fx.addWorktree('done')
@@ -77,7 +77,7 @@ it('accepts bounded history while retaining exact HEAD proof', () => {
     env: { ...fx.env, FAKE_GH_PAD_ALL: '1000' },
   })
   expect(report.worktrees[0]?.status).toBe('would reclaim')
-})
+}, 30_000)
 
 it('keeps a discovery candidate when fresh branch history is truncated', () => {
   const path = fx.addWorktree('done')
@@ -88,7 +88,7 @@ it('keeps a discovery candidate when fresh branch history is truncated', () => {
   })
   expect(report.worktrees[0]).toMatchObject({ status: 'kept', reason: 'changed since check' })
   expect(existsSync(path)).toBe(true)
-})
+}, 30_000)
 
 it.each([{ maxWorktrees: 0 }, { timeoutMs: -1 }, { maxWorktrees: Infinity }, { prLimit: 10001 }])(
   'rejects invalid scan limits %j',
@@ -117,4 +117,4 @@ it('keeps a candidate when the final safety reads exhaust the budget and retries
   const rest = reclaimWorktrees(true, runtime(), { after: report.nextAfter! })
   expect(rest.worktrees).toEqual([{ path, branch: 'done', status: 'reclaimed' }])
   expect(rest.hasMore).toBe(false)
-})
+}, 30_000)

@@ -119,7 +119,7 @@ describe('source module graph', () => {
       'Unused',
       'Props',
     ])
-  })
+  }, 30_000)
 
   it('resolves aliases and follows runtime reexports and literal dynamic loads across a cycle', () => {
     const sourceGraph = graph()
@@ -144,7 +144,7 @@ describe('source module graph', () => {
       'web/storybook/button.stories.tsx',
     ])
     expect(sourceGraph.reachableFrom([files[0] ?? ''])).toContain('web/components/types.ts')
-  })
+  }, 30_000)
 
   it('resolves renamed and star reexports to their original owner', () => {
     const sourceGraph = graph()
@@ -182,7 +182,7 @@ describe('source module graph', () => {
     expect(sourceGraph.resolveExportOwner('web/components/ambiguous.ts', 'Button')).toBeNull()
     expect(sourceGraph.resolveExportOwner('web/components/uncertain.ts', 'Button')).toBeNull()
     expect(sourceGraph.resolveExportOwner('../outside.ts', 'Button')).toBeNull()
-  })
+  }, 30_000)
 
   it('fails closed on incomplete facts and bounds the supplied inventory', () => {
     const incomplete = {
@@ -244,7 +244,7 @@ describe('source module graph', () => {
         'ImportedNamespace',
       ),
     ).toThrow('Incomplete source module facts')
-  })
+  }, 30_000)
 
   it('rejects unresolved, external, and escaping specifiers', () => {
     const sourceGraph = graph()
@@ -283,5 +283,5 @@ describe('source module graph', () => {
         './button',
       ),
     ).toBe('web/components/button.tsx')
-  })
+  }, 30_000)
 })

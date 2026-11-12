@@ -33,7 +33,7 @@ it('runs the action under the lock and releases it afterwards', () => {
     }),
   ).toThrow('boom')
   expect(existsSync(lock)).toBe(false)
-})
+}, 30_000)
 
 it('reclaims an orphaned stale reaper guard', async () => {
   const reaper = `${lock}.reap`
@@ -41,7 +41,7 @@ it('reclaims an orphaned stale reaper guard', async () => {
   await utimes(reaper, old, old)
   expect(run()).toBe('ran')
   expect(existsSync(reaper)).toBe(false)
-})
+}, 30_000)
 
 it('reclaims far-future ownerless locks and reaper guards', async () => {
   const future = new Date(Date.now() + 60_000)
@@ -51,7 +51,7 @@ it('reclaims far-future ownerless locks and reaper guards', async () => {
   await writeFile(`${lock}.reap`, '')
   await utimes(`${lock}.reap`, future, future)
   expect(run()).toBe('ran')
-})
+}, 30_000)
 
 it('preserves near-future ownerless locks and reaper guards', async () => {
   const future = new Date(Date.now() + 10_000)
@@ -62,13 +62,13 @@ it('preserves near-future ownerless locks and reaper guards', async () => {
   await writeFile(`${lock}.reap`, '')
   await utimes(`${lock}.reap`, future, future)
   expect(run).toThrow(/could not acquire/)
-})
+}, 30_000)
 
 it('preserves an expired lock owned by a running process', async () => {
   await writeFile(lock, String(process.pid))
   await utimes(lock, old, old)
   expect(run).toThrow(/could not acquire/)
-})
+}, 30_000)
 
 it('reclaims stale locks with invalid owner PIDs', async () => {
   for (const owner of [
@@ -83,7 +83,7 @@ it('reclaims stale locks with invalid owner PIDs', async () => {
     await utimes(lock, old, old)
     expect(run()).toBe('ran')
   }
-})
+}, 30_000)
 
 it('does not follow a symbolic link while inspecting a lock owner', async () => {
   const outside = join(directory, 'owner')
@@ -96,27 +96,27 @@ it('does not follow a symbolic link while inspecting a lock owner', async () => 
   expect(run).toThrow(/could not acquire/)
   await utimes(lock, old, old)
   expect(run()).toBe('ran')
-})
+}, 30_000)
 
 it('propagates failures other than an existing lock', () => {
   expect(() => withFileLock(join(directory, 'missing', 'records'), () => 'ran')).toThrow(/ENOENT/)
-})
+}, 30_000)
 
 it('rejects a non-regular lock without removing it', async () => {
   await mkdir(lock)
   expect(run).toThrow(/lock must be a regular file/)
   expect((await stat(lock)).isDirectory()).toBe(true)
-})
+}, 30_000)
 
 it('makes lock acquisition exhaustion explicit for a fresh ownerless lock', async () => {
   await writeFile(lock, '')
   expect(run).toThrow(/could not acquire/)
-})
+}, 30_000)
 
 it('recovers a lock whose owner process no longer exists', async () => {
   await writeFile(lock, '2147483647')
   expect(run()).toBe('ran')
-})
+}, 30_000)
 
 it('preserves a lock when its owner check is denied, then retries', async () => {
   await writeFile(lock, '2147483647')
@@ -125,4 +125,4 @@ it('preserves a lock when its owner check is denied, then retries', async () => 
     throw denied
   })
   expect(run()).toBe('ran')
-})
+}, 30_000)

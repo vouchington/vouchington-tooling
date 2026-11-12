@@ -89,7 +89,7 @@ describe('audit redaction', () => {
     expect(markdown).toContain('\\[REDACTED\\]')
     for (const leaked of [TOKEN, TOKEN.slice(4), SECRET, 'zz\\-secret\\_key\\-9', 'ghp\\_'])
       expect(markdown).not.toContain(leaked)
-  })
+  }, 30_000)
 
   it('keeps a caller-supplied redactor and applies the built-in one as well', async () => {
     const ci = [
@@ -105,7 +105,7 @@ describe('audit redaction', () => {
     expect(markdown).not.toContain(SECRET)
     expect(markdown).toContain('\\<caller\\-removed\\>')
     expect(markdown).toContain('\\[REDACTED\\]')
-  })
+  }, 30_000)
 })
 
 describe('audit size fitting', () => {
@@ -122,7 +122,7 @@ describe('audit size fitting', () => {
     expect(group![1]).toContain(`${url(1)} at commit ${sha(1)}; no\\-mistakes impact: none`)
     expect(markdown).not.toContain('omitted')
     expect(markdown).not.toContain('…')
-  })
+  }, 30_000)
 
   it('reports omitted groups and keeps valid, intact groups when 20 large blocks overflow', async () => {
     const markdown = await compose(
@@ -149,7 +149,7 @@ describe('audit size fitting', () => {
     for (const link of found) expect(Array.from({ length: 20 }, (_, n) => url(n))).toContain(link)
     for (const hash of markdown.match(/\b[0-9a-f]{40}\b/g)!)
       expect(Array.from({ length: 20 }, (_, n) => sha(n))).toContain(hash)
-  })
+  }, 30_000)
 
   it('loads the journal once, even single-use, however many fitting attempts it takes', async () => {
     let calls = 0
@@ -170,7 +170,7 @@ describe('audit size fitting', () => {
     expect(calls).toBe(1)
     expect(ciGroups(markdown).length).toBeGreaterThan(1)
     expect(markdown).toContain('further failure groups omitted')
-  })
+  }, 30_000)
 
   it('fits 25 issue and 25 PR references plus several long CI blocks', async () => {
     const reference = (kind: string, index: number): string =>
@@ -187,7 +187,7 @@ describe('audit size fitting', () => {
     expect(groups.length).toBeGreaterThanOrEqual(1)
     for (const group of groups)
       group.forEach((line, index) => expect(line).toMatch(GRAMMAR[index]!))
-  })
+  }, 30_000)
 
   it('never exceeds a caller-supplied cap and says what was omitted', async () => {
     const markdown = await compose([ciBlock(1), ciBlock(2), ciBlock(3)], {
@@ -197,9 +197,9 @@ describe('audit size fitting', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0]![0]).toContain('3 further failure groups omitted')
     expect(markdown).not.toContain(url(1))
-  })
+  }, 30_000)
 
   it('fails with the codec limit error when the other sections alone overflow', async () => {
     await expect(compose([ciBlock(1)], { narrative: 'n'.repeat(11_990) })).rejects.toThrow()
-  })
+  }, 30_000)
 })

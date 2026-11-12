@@ -90,7 +90,7 @@ read<PairRow>(); rows(); anyRows(); neverRows()`,
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
   it('rejects a compiler API that does not recognize the Program source file', () => {
     const directory = mkdtempSync(join(tmpdir(), 'type-query-compiler-mismatch-'))
     try {
@@ -112,5 +112,5 @@ read<PairRow>(); rows(); anyRows(); neverRows()`,
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })

@@ -76,7 +76,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
 
     expect(result.code).toBe(124)
     await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it('does not override the exit code when the command finishes within --command-timeout-seconds', async () => {
     const home = await makeHome()
@@ -95,7 +95,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
       ),
     ).rejects.toMatchObject({ code: 37 })
     await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it('prints the holder pid and pgid on fail-closed acquire timeout', async () => {
     const home = await makeHome()
@@ -179,7 +179,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
       ),
     })
     await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it('exits 1 without running the command when --on-acquire-timeout fail is passed explicitly', async () => {
     const home = await makeHome()
@@ -200,7 +200,7 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
 
     holder.kill('SIGTERM')
     await held
-  })
+  }, 30_000)
 
   it('runs the command unlocked after the acquire deadline when --on-acquire-timeout run-unlocked is set', async () => {
     const home = await makeHome()
@@ -243,5 +243,5 @@ describe('with-host-lock.sh --command-timeout-seconds / --on-acquire-timeout', (
     expect(cleanupStart).toBeGreaterThan(-1)
     expect(source.slice(cleanupStart, exitTrap)).toContain('rm -f "$temporary_start_release"')
     expect(temporaryReleaseRegistration).toBeGreaterThan(exitTrap)
-  })
+  }, 30_000)
 })

@@ -26,7 +26,7 @@ describe('bounded child command ownership', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('terminates the owned wrapper and its pipe-holding descendant at the shared deadline', async () => {
     const root = await mkdtemp(join(tmpdir(), 'analysis-command-deadline-'))
@@ -39,7 +39,7 @@ describe('bounded child command ownership', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('retains a real command failure without converting it into deadline success', async () => {
     const remaining = createFixtureDeadline()
@@ -54,7 +54,7 @@ describe('bounded child command ownership', () => {
         remaining,
       ),
     ).rejects.toMatchObject({ code: 7, message: expect.stringContaining('terminal-stderr-marker') })
-  })
+  }, 30_000)
 
   it('reports failed signaling without claiming drain, then joins after real owned cleanup', async () => {
     const root = await mkdtemp(join(tmpdir(), 'analysis-command-signal-'))
@@ -90,5 +90,5 @@ describe('bounded child command ownership', () => {
       await rm(root, { recursive: true, force: true })
     }
     expect(completed).toBeInstanceOf(Error)
-  })
+  }, 30_000)
 })

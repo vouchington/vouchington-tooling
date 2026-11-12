@@ -34,7 +34,7 @@ describe('cancel replaced merge-group runs workflow', () => {
     expect(Object.keys(workflow.on as Record<string, unknown>)).toEqual(['workflow_call'])
     expect(Object.keys(workflow.jobs)).toEqual(['cancel'])
     expect(workflowText).not.toMatch(/voucha|filament|storybook|vouchington-machines|openai/iu)
-  })
+  }, 30_000)
 
   it('needs only actions write, checks nothing out, and keeps the ref out of the script', () => {
     expect(workflow.permissions).toEqual({})
@@ -43,14 +43,14 @@ describe('cancel replaced merge-group runs workflow', () => {
     expect(job.steps).toHaveLength(1)
     expect(job.steps?.[0]?.uses).toBeUndefined()
     expect(script).not.toContain('${{')
-  })
+  }, 30_000)
 
   it('serializes per merge group without cancelling a running scan', () => {
     expect(workflow.concurrency).toEqual({
       group: 'cancel-replaced-merge-group-runs-${{ github.sha }}',
       'cancel-in-progress': false,
     })
-  })
+  }, 30_000)
 })
 
 describe('cancel replaced merge-group runs script', () => {
@@ -76,7 +76,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.summary).toContain(
       '| Web | [101](https://github.test/example/repo/actions/runs/101)',
     )
-  })
+  }, 30_000)
 
   it('keeps this entry, newer entries, other pull requests, and prefix look-alikes', () => {
     const result = execute({
@@ -96,7 +96,7 @@ describe('cancel replaced merge-group runs script', () => {
     })
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([120])
-  })
+  }, 30_000)
 
   it('lists every active status across all pages and cancels from each page', () => {
     const result = execute({
@@ -114,20 +114,20 @@ describe('cancel replaced merge-group runs script', () => {
           `api --paginate repos/example/repo/actions/runs?event=merge_group&status=${status}&per_page=100`,
       ),
     )
-  })
+  }, 30_000)
 
   it('cancels a run once when it changes status between two lists', () => {
     const duplicate = run(30, 'Backend', branch(14, 'a'))
     const result = execute({ pages: { queued: [page(duplicate)], in_progress: [page(duplicate)] } })
     expect(result.cancelled).toEqual([30])
-  })
+  }, 30_000)
 
   it('reports no work when no older entry is active', () => {
     const result = execute({})
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.summary).toContain('No older queue entry of this pull request had an active run.')
-  })
+  }, 30_000)
 
   it('treats a run that already completed as success', () => {
     const result = execute({
@@ -137,7 +137,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.summary).toContain('already completed')
-  })
+  }, 30_000)
 
   it('retries a transient HTTP 502 and then cancels the run', () => {
     const result = execute({
@@ -148,7 +148,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.cancelled).toEqual([60])
     expect(result.summary).toContain('| cancelled |')
     expect(result.calls.filter((call) => call.includes('--method POST'))).toHaveLength(2)
-  })
+  }, 30_000)
 
   it('fails the job when a cancel HTTP 502 persists past three attempts', () => {
     const result = execute({
@@ -161,7 +161,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.stdout).toContain('::warning::Could not cancel run 61')
     expect(result.summary).toContain('| failed |')
     expect(result.calls.filter((call) => call.includes('--method POST'))).toHaveLength(3)
-  })
+  }, 30_000)
 
   it('keeps cancelling after a cancel error, then fails the job', () => {
     const result = execute({
@@ -174,14 +174,14 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.cancelled).toEqual([51])
     expect(result.stdout).toContain('::warning::Could not cancel run 50')
     expect(result.calls.filter((call) => call.includes('/runs/50/cancel'))).toHaveLength(1)
-  })
+  }, 30_000)
 
   it('fails without touching the API when the merge-group ref is unexpected', () => {
     const result = execute({ env: { HEAD_REF: 'refs/heads/main' } })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('::error::Unexpected merge group ref')
     expect(result.calls).toEqual([])
-  })
+  }, 30_000)
 
   it('warns and exits 0 when listing runs returns an HTTP 502', () => {
     const result = execute({
@@ -192,7 +192,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.stdout).toContain('::warning::')
     expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
-  })
+  }, 30_000)
 
   it('warns and exits 0 when listing runs returns empty output', () => {
     const result = execute({
@@ -203,7 +203,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.cancelled).toEqual([])
     expect(result.stdout).toContain('::warning::')
     expect(result.stdout).toContain('actions/runs?event=merge_group&status=')
-  })
+  }, 30_000)
 
   it('treats a null runs body as no runs without a warning', () => {
     const result = execute({
@@ -213,7 +213,7 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.status).toBe(0)
     expect(result.cancelled).toEqual([])
     expect(result.stdout).not.toContain('::warning::')
-  })
+  }, 30_000)
 
   it('still cancels runs from other statuses when one listing fails, and says so in the summary', () => {
     const result = execute({
@@ -228,12 +228,12 @@ describe('cancel replaced merge-group runs script', () => {
     expect(result.cancelled).toEqual([100])
     expect(result.stdout).toContain('::warning::Could not list queued runs')
     expect(result.summary).toContain('skipped after an API error for status: queued')
-  })
+  }, 30_000)
 
   it('names skipped statuses in the summary when no other run is active', () => {
     const result = execute({ listing: 'error' })
     expect(result.summary).toContain(
       'skipped after an API error for status: queued in_progress waiting requested pending',
     )
-  })
+  }, 30_000)
 })

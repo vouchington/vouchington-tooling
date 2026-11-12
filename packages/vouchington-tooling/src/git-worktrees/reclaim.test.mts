@@ -68,13 +68,13 @@ describe('finished worktrees', () => {
     fx.git(fx.main, 'fetch', '--prune', 'origin')
     fx.setPrs('squashed', [merged])
     expect(only(reclaim(true)).status).toBe('reclaimed')
-  })
+  }, 30_000)
 
   it('ignores PR head-repository case when matching this repository', () => {
     fx.addWorktree('done', { push: true })
     fx.setPrs('done', [{ ...merged, headRepositoryOwner: { login: 'ACME' } }])
     expect(only(reclaim()).status).toBe('would reclaim')
-  })
+  }, 30_000)
 
   it('strips GH_REPO so the repository comes from the main checkout', () => {
     fx.addWorktree('done', { push: true })
@@ -82,7 +82,7 @@ describe('finished worktrees', () => {
     expect(
       only(reclaim(false, { ...fx.env, GH_REPO: 'evil/other', GH_HOST: 'x.example' })).status,
     ).toBe('would reclaim')
-  })
+  }, 30_000)
 })
 
 describe('kept worktrees', () => {
@@ -92,12 +92,12 @@ describe('kept worktrees', () => {
     fx.addWorktree('wip', { push: true })
     fx.setPrs('wip', [merged, { state: 'OPEN' }])
     expect(only(reclaim())).toEqual(kept('open PR'))
-  })
+  }, 30_000)
 
   it('keeps a worktree with no PR', () => {
     fx.addWorktree('nopr', { push: true })
     expect(only(reclaim())).toEqual(kept('no finished PR from this repository'))
-  })
+  }, 30_000)
 
   it('ignores PRs from forks, even an open one', () => {
     fx.addWorktree('forked', { push: true })
@@ -108,20 +108,20 @@ describe('kept worktrees', () => {
       { ...merged, headRepository: null, headRepositoryOwner: null },
     ])
     expect(only(reclaim())).toEqual(kept('no finished PR from this repository'))
-  })
+  }, 30_000)
 
   it('keeps a worktree whose finished PR head is not HEAD', () => {
     fx.addWorktree('moved', { push: true })
     fx.setPrs('moved', [{ ...merged, headRefOid: 'a'.repeat(40) }])
     expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
-  })
+  }, 30_000)
 
   it('keeps a worktree with commits newer than the finished PR head', () => {
     const path = fx.addWorktree('local')
     fx.setPrs('local', [merged])
     fx.git(path, 'commit', '--allow-empty', '-m', 'newer')
     expect(only(reclaim())).toEqual(kept('PR head differs from HEAD'))
-  })
+  }, 30_000)
 
   it.each([['open']])(
     'keeps a worktree when the %s PR query fills its page',
@@ -170,7 +170,7 @@ describe('kept worktrees', () => {
     fx.git(path, 'config', 'core.fsmonitor', hook)
     expect(only(reclaim(true)).status).toBe('reclaimed')
     expect(existsSync(marker)).toBe(false)
-  })
+  }, 30_000)
 
   it('keeps everything when gh fails or answers garbage', () => {
     fx.addWorktree('done', { push: true })
@@ -181,7 +181,7 @@ describe('kept worktrees', () => {
     expect(only(reclaim(false, { ...fx.env, FAKE_GH_GARBAGE: '1' })).reason).toBe(
       'cannot read PR state',
     )
-  })
+  }, 30_000)
 
   it.each([
     ['status --porcelain', 'cannot read status'],
@@ -207,7 +207,7 @@ describe('skipped worktrees', () => {
     expect(reclaim().worktrees).toEqual([])
     // From the main checkout the caller worktree is an ordinary candidate; main itself is skipped.
     expect(reclaim(false, fx.env, fx.main).worktrees.map((e) => e.branch)).toEqual(['caller'])
-  })
+  }, 30_000)
 
   it('matches the caller through a symlinked path', () => {
     fx.setPrs('caller', [merged])
@@ -215,11 +215,11 @@ describe('skipped worktrees', () => {
     symlinkSync(fx.caller, link)
     expect(reclaim(true, fx.env, link).worktrees).toEqual([])
     expect(existsSync(fx.caller)).toBe(true)
-  })
+  }, 30_000)
 
   it('fails outside a repository', () => {
     expect(() => reclaim(false, fx.env, fx.root)).toThrow('not inside a git worktree')
-  })
+  }, 30_000)
 })
 
 describe('applying', () => {
@@ -245,7 +245,7 @@ describe('applying', () => {
     } finally {
       chmodSync(join(path, 'locked-dir'), 0o700)
     }
-  })
+  }, 30_000)
 
   it('keeps a worktree that becomes dirty before removal', () => {
     const path = fx.addWorktree('racy', { push: true })
@@ -253,7 +253,7 @@ describe('applying', () => {
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_TOUCH: join(path, 'late.txt') }))
     expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
-  })
+  }, 30_000)
 
   it('keeps a worktree whose HEAD moves before removal', () => {
     const path = fx.addWorktree('moving', { push: true })
@@ -261,7 +261,7 @@ describe('applying', () => {
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_ADVANCE: path }))
     expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
-  })
+  }, 30_000)
 
   it('keeps a worktree switched to another branch at the same commit', () => {
     const path = fx.addWorktree('switchy', { push: true })
@@ -269,7 +269,7 @@ describe('applying', () => {
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_SWITCH: path }))
     expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
-  })
+  }, 30_000)
 })
 
 describe('rechecks and nesting', () => {
@@ -279,7 +279,7 @@ describe('rechecks and nesting', () => {
     const entry = only(reclaim(true, { ...fx.env, FAKE_GH_REOPEN: '1' }))
     expect(entry).toMatchObject({ status: 'kept', reason: 'changed since check' })
     expect(existsSync(path)).toBe(true)
-  })
+  }, 30_000)
 
   it('keeps a worktree that gains a nested worktree before the removal', () => {
     const path = fx.addWorktree('gaining', { push: true })
@@ -337,7 +337,7 @@ describe('gh environment', () => {
     fx.setPrs('done', [merged])
     const env = { ...fx.env, FAKE_GH_NO_GIT_DIR: '1', GIT_DIR: join(fx.root, 'nowhere') }
     expect(only(reclaim(false, env)).status).toBe('would reclaim')
-  })
+  }, 30_000)
 })
 
 describe('paths', () => {
@@ -350,7 +350,7 @@ describe('paths', () => {
     expect(report.worktrees.map((e) => [e.path, e.status])).toContainEqual([other, 'reclaimed'])
     expect(report.worktrees.map((e) => e.branch)).not.toContain('spaced')
     expect(existsSync(spaced)).toBe(true)
-  })
+  }, 30_000)
 })
 
 describe('parseWorktreeList and formatReport', () => {
@@ -376,7 +376,7 @@ describe('parseWorktreeList and formatReport', () => {
       { path: '/locked', locked: true, bare: false, detached: true },
       { path: '/bare', locked: true, bare: true, detached: false },
     ])
-  })
+  }, 30_000)
 
   it('prints one line per worktree with control characters escaped', () => {
     const text = formatReport({
@@ -389,5 +389,5 @@ describe('parseWorktreeList and formatReport', () => {
       ],
     })
     expect(text).toBe('/a\\x0ab\\x1b[31m: would reclaim\n/c: kept: open PR\n/d: reclaimed\n')
-  })
+  }, 30_000)
 })

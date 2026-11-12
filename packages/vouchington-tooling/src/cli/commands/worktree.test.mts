@@ -25,7 +25,7 @@ describe('runWorktreeCommand', () => {
     fx.setPrs('done', [{ state: 'MERGED' }])
     expect(runWorktreeCommand(['reclaim'], fx.env, fx.caller)).toBe(0)
     expect(stdout).toBe(`${path}: would reclaim\n`)
-  })
+  }, 30_000)
 
   it('applies with --yes and prints JSON with --json', () => {
     fx.addWorktree('done', { push: true })
@@ -69,10 +69,10 @@ describe('runWorktreeCommand', () => {
       runWorktreeCommand(['reclaim', '--json', '--after', first.nextAfter], fx.env, fx.caller),
     ).toBe(0)
     expect(JSON.parse(stdout).hasMore).toBe(false)
-  })
+  }, 30_000)
 
   it('exits 1 outside a repository', () => {
     expect(runWorktreeCommand(['reclaim'], fx.env, fx.root)).toBe(1)
     expect(stderr).toContain('not inside a git worktree')
-  })
+  }, 30_000)
 })

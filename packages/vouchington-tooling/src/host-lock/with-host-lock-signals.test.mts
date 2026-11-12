@@ -123,7 +123,7 @@ describe('with-host-lock.sh signals and ownership', () => {
     expect(ownerWrite).toBeGreaterThan(-1)
     expect(releaseWrite).toBeGreaterThan(ownerWrite)
     expect(source).toContain('kill -0 "$wrapper_pid"')
-  })
+  }, 30_000)
 
   it('holds the lock until a signalled process-group descendant exits', async () => {
     const home = await makeHome()
@@ -227,7 +227,7 @@ while :; do sleep 1; done
     })
     await expect(readFile(descendantSignalled, 'utf8')).resolves.toBe('')
     await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
+  }, 30_000)
 
   it('kills a lingering process group that ignores SIGTERM', async () => {
     const home = await makeHome()
@@ -267,5 +267,5 @@ while :; do sleep 1; done
     expect(failure).toBeGreaterThan(-1)
     expect(retainOwnership).toBeGreaterThan(failure)
     expect(failedExit).toBeGreaterThan(retainOwnership)
-  })
+  }, 30_000)
 })

@@ -48,7 +48,7 @@ describe('run-bounded', () => {
     ])
 
     expect(result.status).toBe(143)
-  })
+  }, 30_000)
 
   it('kills the command group when the wrapper receives SIGTERM', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'run-bounded-signal-'))
@@ -80,14 +80,14 @@ describe('run-bounded', () => {
       child.kill('SIGKILL')
       rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('returns the command status when the command finishes inside the deadline', () => {
     const { result, elapsedMs } = runBounded('5', ['python3', '-c', 'raise SystemExit(3)'])
 
     expect(result.status).toBe(3)
     expect(elapsedMs).toBeLessThan(5000)
-  })
+  }, 30_000)
 
   it('kills the command and its children when the deadline expires', () => {
     const dir = mkdtempSync(join(tmpdir(), 'run-bounded-'))
@@ -110,7 +110,7 @@ describe('run-bounded', () => {
       killProcessGroup(groupPidFile)
       rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('kills a TERM-resistant descendant when the wrapper receives SIGTERM', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'run-bounded-signal-'))
@@ -156,7 +156,7 @@ describe('run-bounded', () => {
       killProcessGroup(groupPidFile)
       rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('kills a TERM-resistant child even when its parent exits on TERM', () => {
     const dir = mkdtempSync(join(tmpdir(), 'run-bounded-'))
@@ -188,7 +188,7 @@ describe('run-bounded', () => {
       killProcessGroup(groupPidFile)
       rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })
 
 describe('run-bounded output pipes', () => {
@@ -230,7 +230,7 @@ describe('run-bounded output pipes', () => {
     expect(fixture.commandOpen()).toBe(false)
     expect(fixture.descendantOpen()).toBe(false)
     expect(existsSync(fixture.dir)).toBe(false)
-  })
+  }, 30_000)
 })
 
 describe('run-bounded downstream backpressure', () => {

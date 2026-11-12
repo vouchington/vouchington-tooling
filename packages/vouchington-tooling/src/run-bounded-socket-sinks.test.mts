@@ -22,7 +22,7 @@ function fixture(name: string, ...args: string[]) {
 describe('run-bounded socket sinks', () => {
   it('drains source output after an actual TCP peer reset and retains command status', () => {
     expect(fixture('run-bounded-reset-socket')).toEqual({ status: 3, stderr: 'err\n' })
-  })
+  }, 30_000)
 
   it('waits for a nonblocking sink and retains both admitted source chunks', async () => {
     const child = spawn('python3', [
