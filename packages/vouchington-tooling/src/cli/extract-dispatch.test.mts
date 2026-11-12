@@ -45,9 +45,6 @@ vi.mock('./commands/workspace-registry-check.mts', () => ({
 vi.mock('./commands/storybook-browser-runner.mts', () => ({
   runStorybookBrowserRunnerCommand: vi.fn(async () => 0),
 }))
-vi.mock('./commands/final-review.mts', () => ({
-  runFinalReviewCommand: vi.fn(async () => 0),
-}))
 vi.mock('./commands/worktree.mts', () => ({
   runWorktreeCommand: vi.fn(() => 0),
 }))
@@ -60,7 +57,6 @@ import { runVitestReportAttemptCommand } from './commands/vitest-report-attempt.
 import { runPrepareVitestReportsCommand } from './commands/prepare-vitest-reports.mts'
 import { runRetrospectiveFactsCommand } from './commands/retrospective-facts.mts'
 import { runAgentBlackboardCommand } from './commands/agent-blackboard.mts'
-import { runFinalReviewCommand } from './commands/final-review.mts'
 import { runMcpCommand } from './commands/mcp.mts'
 import { runHookCommand } from './commands/hook.mts'
 import { runSandboxCommandAuditCommand } from './commands/sandbox-command-audit.mts'
@@ -108,13 +104,6 @@ describe('runCli extract command dispatch', () => {
     expect(runRetrospectiveFactsCommand).toHaveBeenCalledWith(['--no-pr'])
     await expect(runCli(['node', 'vouchington', 'agent-blackboard', 'probe'])).resolves.toBe(0)
     expect(runAgentBlackboardCommand).toHaveBeenCalledWith(['probe'])
-  })
-
-  it('forwards the final-review subcommand and its arguments', async () => {
-    await expect(
-      runCli(['node', 'vouchington', 'final-review', 'status', '--repo', 'a/b', '--pr', '1']),
-    ).resolves.toBe(0)
-    expect(runFinalReviewCommand).toHaveBeenCalledWith(['status', '--repo', 'a/b', '--pr', '1'])
   })
 
   it('forwards the hook subcommand and its arguments', async () => {

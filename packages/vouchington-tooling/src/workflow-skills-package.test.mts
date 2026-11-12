@@ -47,7 +47,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(36)
+      expect(packaged).toHaveLength(35)
       expect(packaged).toEqual(canonical)
       const resources = pluginRoots
         .flatMap((root) => skillPaths(root, root, false))

@@ -130,6 +130,8 @@ Classify the outcome:
 
 - **Unsteered and arming succeeds:** already armed. Auto-merge may complete once requirements pass
   while the local shepherd independently checks the PR.
+- **Final review not yet approved (`vouchington-reviewer status` exits non-zero):** the review was
+  requested; leave the PR ready and unarmed, report `awaiting-final-review`, and never merge it.
 - **Steered, or arming fails on a conflict:** leave the PR ready and unarmed after the shepherd
   starts. A human inspects the eventual state and decides whether to arm auto-merge.
 - **Repository auto-merge disabled:** dispatch the shepherd, report that a manual merge is

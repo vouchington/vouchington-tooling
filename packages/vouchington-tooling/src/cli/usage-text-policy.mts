@@ -1,14 +1,13 @@
 import { COVERAGE_SCOPE_CHECK_USAGE } from './usage-text-coverage-scope.mts'
-import { FINAL_REVIEW_COMMAND, FINAL_REVIEW_USAGE } from './usage-text-final-review.mts'
 
 export const POLICY_COMMANDS = `  coverage-scope-check          Check positive-threshold coverage rules against the Vitest scope
   trivy-policy                 Check tracked Trivy workflow scans and the exception registry
   docker-image-mirror           Require tracked Docker images to come from a Docker Hub mirror
   workspace-registry-check      Check syncpack, pnpm workspace and CI path-filter registries against tracked manifests
-${FINAL_REVIEW_COMMAND}`
+`
 
 export const POLICY_USAGE = `
-${FINAL_REVIEW_USAGE}${COVERAGE_SCOPE_CHECK_USAGE}
+${COVERAGE_SCOPE_CHECK_USAGE}
 trivy-policy [--root <dir>] [--ignore-file <path>] [--findings-exit-code-env <NAME>] [--cleanup-url-prefix <url>] [--min-gates N] [--min-sboms N] [--max-expiry-days N]
   Reads git-tracked workflows, composite actions and shell scripts and prints each violation (exit 1).
   Every Trivy package scan must be an auditable CLI command in a workflow run block or shell script (no action, wrapper, substitution or

@@ -43,7 +43,6 @@ describe('vouchington-workflow plugin', () => {
       'agent-workflow',
       'blackboard',
       'dependabot',
-      'final-review',
       'git-commit-checklist',
       'github-actions-authoring',
       'github-actions-checklist',
