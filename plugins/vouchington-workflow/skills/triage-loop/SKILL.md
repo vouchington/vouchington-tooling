@@ -70,6 +70,14 @@ command runs without a prompt is decided by the host's permission policy and any
 hooks, not by this skill. If either blocks or prompts on a merge, leave the PR ready and unarmed
 and escalate it; never work around the policy. Anything outside the grant is escalated.
 
+## Orchestrator role
+
+The loop session orchestrates, reviews, and decides; it never authors PRs. It does not create
+branches, commit, push, or create PRs itself. Every PR (fixes, flake fixes, `/fix`, scheduled
+prompts, skill changes) is opened by an implementation-tier subagent or a dispatch-target agent.
+The loop's own PR mutations are limited to review comments, labels, marking ready, re-enqueueing,
+and merges within the grant.
+
 ## Step 1 - Preflight
 
 1. Confirm the session is interactive and the launch directory is the adapter's parent directory.
