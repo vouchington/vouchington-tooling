@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BLACKBOARD_ENV, fakeBlackboard } from './fake-blackboard.test-helpers.mts'
@@ -209,6 +209,44 @@ describe('runMcpServer startup', () => {
       arguments: { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' },
     })
     expect(textOf(result)).toContain('from-machine-install')
+  })
+
+  it('reuses the client imported at startup after the install directory is deleted', async () => {
+    const machine = join(fixture().root, 'evicted')
+    const stub = join(machine, 'node_modules', 'agent-blackboard')
+    mkdirSync(stub, { recursive: true })
+    writeFileSync(
+      join(stub, 'package.json'),
+      JSON.stringify({ name: 'agent-blackboard', version: '0.0.0', main: 'index.mjs' }),
+    )
+    const counter = '__blackboardEvictedImports'
+    writeFileSync(
+      join(stub, 'index.mjs'),
+      `globalThis.${counter} = (globalThis.${counter} ?? 0) + 1
+      export class Sessions {
+        async ensure() { return { status: 'from-startup-import', session: { data: {} } } }
+      }
+      export class Entries {}`,
+    )
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await runMcpServer({
+      cwd: fixture().main,
+      env: BLACKBOARD_ENV,
+      version: '1',
+      transport: serverTransport,
+      resolveFrom: join(machine, 'server.mjs'),
+    })
+    rmSync(machine, { recursive: true, force: true })
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    clients.push(client)
+    await client.connect(clientTransport)
+    const args = { sessionId: 's', parentSessionId: null, agent: 'codex', version: '1' }
+    for (let call = 0; call < 2; call += 1) {
+      const result = await client.callTool({ name: 'session_ensure', arguments: args })
+      expect(textOf(result)).toContain('from-startup-import')
+    }
+    expect((globalThis as Record<string, unknown>)[counter]).toBe(1)
+    delete (globalThis as Record<string, unknown>)[counter]
   })
 
   it('starts outside a git worktree and needs an explicit worktree per call', async () => {
