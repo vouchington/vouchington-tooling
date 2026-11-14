@@ -91,8 +91,8 @@ Arming then uses one bare `gh pr merge` command, as in the grant.
      CSRF token).
   5. Re-fetch and report one line per config with the newest job status. Expect "Running now".
   6. Fall back to clicking only for a config with no form or a status that did not change.
-     If no browser tool is available, list the repository in the summary. The consumer adapter
-     supplies a ready script.
+     If no browser or JavaScript tool is available, list the repository in the summary. The
+     consumer adapter supplies a ready script.
 
 ## Phase B - Automation PRs
 
