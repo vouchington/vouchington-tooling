@@ -78,10 +78,21 @@ Arming then uses one bare `gh pr merge` command, as in the grant.
   when no migration or a small one is needed and the affected call sites are exercised by CI
   tests. Escalate a significant migration, or affected code without sufficient test coverage, with
   the evidence.
-- **No open dependency-bot PRs in a repository:** request a fresh update check. GitHub exposes no
-  REST endpoint for this. Use the host browser on the repository's Dependabot updates page
-  (`https://github.com/<owner>/<name>/network/updates`), choose "Check for updates" for each
-  ecosystem, and record it. If no browser tool is available, list the repository in the summary.
+- **Dependency-bot PRs merged this sweep, or none open in a repository:** request a fresh update
+  check for that repository and ecosystem. Merges free slots, so the bot may open new PRs. Do not
+  raise the bot's open-PR limit for this. GitHub exposes no REST endpoint, so use the host browser
+  with as few actions as possible and no clicks:
+  1. Use one signed-in tab on the GitHub origin. Run ONE in-page script with the host's JavaScript
+     tool, covering every target repository.
+  2. For each repository, fetch `/<owner>/<name>/network/updates` and collect each
+     `network/updates/<id>/jobs` config.
+  3. Skip a config whose newest job is already running or queued.
+  4. POST each remaining config's "Check for updates" form (same origin, using that form's own
+     CSRF token).
+  5. Re-fetch and report one line per config with the newest job status. Expect "Running now".
+  6. Fall back to clicking only for a config with no form or a status that did not change.
+     If no browser or JavaScript tool is available, list the repository in the summary. The
+     consumer adapter supplies a ready script.
 
 ## Phase B - Automation PRs
 
