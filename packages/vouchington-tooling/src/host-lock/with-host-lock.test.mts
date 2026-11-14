@@ -1,7 +1,9 @@
 import { mkdir, readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  assertWithLockDiagnostics,
   cleanupTestHomes,
   completion,
   execFileAsync,
@@ -110,7 +112,7 @@ describe('with-host-lock.sh', () => {
   it('serializes the same OS user across runner-specific TMPDIR values', async () => {
     const home = await makeHome()
     const guard = join(home, 'cross-runner-critical-section')
-    const lockName = `cross-runner-test-${process.pid}`
+    const lockName = `cross-runner-${randomUUID()}`
     const command = [
       'bash',
       '-c',
@@ -136,10 +138,14 @@ describe('with-host-lock.sh', () => {
       new RegExp(`^with-host-lock: ${lockName} acquired after \\d+s\\n$`),
     )
 
-    await expect(Promise.all([first, second])).resolves.toEqual([
-      { code: 0, stderr: acquired },
-      { code: 0, stderr: acquired },
-    ])
+    const results = await Promise.all([first, second])
+    const lockRoot = join('/tmp', `host-lock-${process.getuid?.() ?? 0}`)
+    await assertWithLockDiagnostics({ lockRoot, lockName, guard }, results, () =>
+      expect(results).toEqual([
+        { code: 0, stderr: acquired },
+        { code: 0, stderr: acquired },
+      ]),
+    )
   }, 30_000)
 
   it('allows separate lock families to run concurrently', async () => {
