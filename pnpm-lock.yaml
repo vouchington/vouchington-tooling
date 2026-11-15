@@ -153,8 +153,8 @@ importers:
         specifier: 16.4.5
         version: 16.4.5(@playwright/test@1.65.0)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       no-mistakes:
-        specifier: 0.109.26
-        version: 0.109.26(vitest@5.1.0)
+        specifier: 0.109.29
+        version: 0.109.29(vitest@5.1.0)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -2765,30 +2765,30 @@ packages:
       sass:
         optional: true
 
-  no-mistakes-darwin-arm64@0.109.26:
-    resolution: {integrity: sha512-cpDQ9yMyz2V0DGNA63ehdRh/dafggeKJUmmDJmVh6PU1mydZmN5P4mdCom5lDrwUYNi9S3+odfnfk/ReSbqVbA==}
+  no-mistakes-darwin-arm64@0.109.29:
+    resolution: {integrity: sha512-3Z3spUPcFSfMlW8qlj3N0LBTenCvChii7ko7/SR4VlO4dmf7yDCTcaYrqnVZbGLgfsI44SHvg4Q6sRavxmC3+g==}
     cpu: [arm64]
     os: [darwin]
 
-  no-mistakes-linux-arm64-gnu@0.109.26:
-    resolution: {integrity: sha512-+JGaczw9ZzSnVa6G2pBr5BbS8p3DEQVehIseFulJHnDCokw1rclo96Er8299CuBG9VpyNqDO0rKahoN3647pCQ==}
+  no-mistakes-linux-arm64-gnu@0.109.29:
+    resolution: {integrity: sha512-uJPFfAhHMmrxSwy9Kncu9zhlXva0CyL6net8jZQCMBV8nzMAEmtwoG9VOfSAZ5iTaSTknye63TQiuafeCNnR6Q==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-linux-x64-gnu@0.109.26:
-    resolution: {integrity: sha512-QWk2cbb/u13iMQdCdui2SJhTEfFuigEL3w6XXPvGL7NJuKBKIYiUHDp9fBCoPWkYeaKq8rCguR44uUZFoi1hJg==}
+  no-mistakes-linux-x64-gnu@0.109.29:
+    resolution: {integrity: sha512-umjfRupLUrwy76XYI3CMW3W2VO0Q+sOF1TbRFVOowRx1DGwcwp99F/9rUzpeXWp6qxo3iyviuD3PDOYEUpGFaw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  no-mistakes-win32-x64-msvc@0.109.26:
-    resolution: {integrity: sha512-hZXPgY01IrRZTiNg3yWHCE+zY+i5JjLdSDcFFrJo9faoEQRHw+pqHIR9rpPhhvOndtDkv82z4rXPz2w+60yLMw==}
+  no-mistakes-win32-x64-msvc@0.109.29:
+    resolution: {integrity: sha512-BOcRru+4DIztfVvk/I9NQiX4+I9ES5dEAQh2NbKIAc/0u33jNeOWRoKHHvkUUts+p5ILKRMwLSg/9zcOwK5grA==}
     cpu: [x64]
     os: [win32]
 
-  no-mistakes@0.109.26:
-    resolution: {integrity: sha512-jAwD0dVK30wKv/6a+CnS3RncYD+i3OdJplR88SIB1YrhkEQs0xO0V/bZPaof0H6tiVzRQF3eACKRlfm8rpSYgw==}
+  no-mistakes@0.109.29:
+    resolution: {integrity: sha512-OcONCEhGMriWDbyY8j+LA8GWMx/cyGylGVJJgw1PMvq5bskd1X6vHKcjhmoF0SoiwMM7mSrPcovAswrQhL9oXQ==}
     hasBin: true
     peerDependencies:
       vitest: ^5.0.3
@@ -3999,7 +3999,7 @@ snapshots:
     dependencies:
       '@hono/node-server': 2.1.8(hono@4.13.18)
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
       cors: 2.8.6
       cross-spawn: 7.0.6
@@ -4021,7 +4021,7 @@ snapshots:
     dependencies:
       '@hono/node-server': 2.1.8(hono@4.13.18)
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
       cors: 2.8.6
       cross-spawn: 7.0.6
@@ -4680,8 +4680,8 @@ snapshots:
       - supports-color
       - zod
 
-  ajv-formats@3.0.1:
-    dependencies:
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
       ajv: 8.20.0
 
   ajv@6.15.0:
@@ -5787,24 +5787,24 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  no-mistakes-darwin-arm64@0.109.26:
+  no-mistakes-darwin-arm64@0.109.29:
     optional: true
 
-  no-mistakes-linux-arm64-gnu@0.109.26:
+  no-mistakes-linux-arm64-gnu@0.109.29:
     optional: true
 
-  no-mistakes-linux-x64-gnu@0.109.26:
+  no-mistakes-linux-x64-gnu@0.109.29:
     optional: true
 
-  no-mistakes-win32-x64-msvc@0.109.26:
+  no-mistakes-win32-x64-msvc@0.109.29:
     optional: true
 
-  no-mistakes@0.109.26(vitest@5.1.0):
+  no-mistakes@0.109.29(vitest@5.1.0):
     optionalDependencies:
-      no-mistakes-darwin-arm64: 0.109.26
-      no-mistakes-linux-arm64-gnu: 0.109.26
-      no-mistakes-linux-x64-gnu: 0.109.26
-      no-mistakes-win32-x64-msvc: 0.109.26
+      no-mistakes-darwin-arm64: 0.109.29
+      no-mistakes-linux-arm64-gnu: 0.109.29
+      no-mistakes-linux-x64-gnu: 0.109.29
+      no-mistakes-win32-x64-msvc: 0.109.29
       vitest: 5.1.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   object-assign@4.1.1: {}
