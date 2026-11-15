@@ -241,8 +241,9 @@ rules are the loop's own:
   layers (a requested change or open `TRIAGE`, a pending human review, a blocker, or CI far longer
   than the wait so far), and state why in the report. A layer a poll or a ready-delay away is not a
   reason.
-- **Gate every layer.** Each layer a merge would land passes the step 5 final-review gate on its
-  current head. When one layer does not, none of the layers above it merge.
+- **Gate every layer (final-review gate on).** With the gate on, each layer a merge would land
+  passes the step 5 final-review gate on its current head. When one layer does not, none of the
+  layers above it merge.
 - **Merge only what this run reviewed.** Never shepherd or merge a layer outside the grant.
   Report such layers with their number and state.
 - **Derive the ledger.** Which stacks and layers exist, their order, and their state are read from
