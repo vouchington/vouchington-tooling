@@ -135,9 +135,8 @@ Classify the outcome:
   non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
 - **Steered:** leave the PR ready; a later sweep merges it through pr-shepherd, or a human
   inspects the eventual state first.
-- **Native GitHub stack:** shepherd the owned layers per
-  [stacked-prs](../stacked-prs/SKILL.md#ownership-and-workers) and merge the whole stack per
-  [Merge the whole stack](../stacked-prs/SKILL.md#merge-the-whole-stack), within explicit human
+- **Native GitHub stack:** follow the `pr-shepherd:pr-shepherd` skill and the loop's
+  [Stacks](../triage-loop/SKILL.md#stacks) rules, within explicit human
   approval and only as far as this run's decisions cover. Resolve the full stack against the Step 1
   scope and Step 3 decisions first. A bottom-up drain ends below the first layer that is out of
   scope or not `MERGE`; never shepherd or merge a layer this run did not review. Run

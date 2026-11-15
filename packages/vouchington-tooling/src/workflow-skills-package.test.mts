@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { linkSkill } from './skill-discovery/index.mts'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const pluginRoots = ['vouchington-workflow', 'vouchington-testing', 'vouchington-database'].map(
-  (plugin) => resolve(packageRoot, '../../plugins', plugin, 'skills'),
+const pluginRoots = ['vouchington-workflow'].map((plugin) =>
+  resolve(packageRoot, '../../plugins', plugin, 'skills'),
 )
 type SkillManifest = {
   version: number
@@ -47,7 +47,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(35)
+      expect(packaged).toHaveLength(16)
       expect(packaged).toEqual(canonical)
       const resources = pluginRoots
         .flatMap((root) => skillPaths(root, root, false))
@@ -96,10 +96,6 @@ describe('workflow skills package contract', () => {
         'retrospective',
         'review-ci-logs',
       ])
-      expect(prerequisites.get('backend-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
-      expect(prerequisites.get('dependabot')).toEqual(['github-actions-checklist'])
-      expect(prerequisites.get('nextjs-vitest-test-authoring')).toEqual(['vitest-test-authoring'])
-      expect(prerequisites.get('vitest-test-authoring')).toEqual(['test-authoring'])
       expect(prerequisites.get('github-issue')).toEqual([])
       for (const [name, required, closure = required] of [
         [
@@ -114,37 +110,24 @@ describe('workflow skills package contract', () => {
             'github-actions-checklist',
           ],
         ],
-        [
-          'backend-vitest-test-authoring',
-          ['vitest-test-authoring'],
-          ['vitest-test-authoring', 'test-authoring'],
-        ],
-        ['dependabot', ['github-actions-checklist']],
-        ['github-actions-authoring', ['github-actions-checklist']],
-        ['dotnet-test-authoring', ['test-authoring']],
-        ['playwright-authoring', ['test-authoring']],
-        ['storybook-authoring', ['test-authoring']],
-        ['swift-test-authoring', ['test-authoring']],
         ['planning', ['github-issue']],
         ['organize-github-issues', ['github-issue']],
         ['retrospective-distill', ['github-issue']],
         ['review-github-issue-taxonomy', ['github-issue']],
         ['revisit-followups', ['github-issue']],
         ['review-ci-logs', ['github-actions-checklist', 'pr-description']],
-        ['static-analysis-checklist', ['github-actions-checklist']],
         [
           'triage-prs',
-          ['pr-description', 'retrospective', 'review-ci-logs', 'github-issue', 'stacked-prs'],
+          ['pr-description', 'retrospective', 'review-ci-logs', 'github-issue'],
           [
             'pr-description',
             'retrospective',
             'review-ci-logs',
             'github-issue',
-            'stacked-prs',
             'github-actions-checklist',
           ],
         ],
-        ['triage-loop', ['github-issue', 'stacked-prs'], ['github-issue', 'stacked-prs']],
+        ['triage-loop', ['github-issue'], ['github-issue']],
       ] as const) {
         expect(prerequisites.get(name)).toEqual(required)
         const targetRoot = join(output, name)
@@ -157,14 +140,9 @@ describe('workflow skills package contract', () => {
           )
         }
       }
-      expect(
-        readFileSync(join(output, 'review-ci-logs/pr-description/references/examples.md'), 'utf8'),
-      ).toBe(
+      expect(readFileSync(join(output, 'review-ci-logs/pr-description/SKILL.md'), 'utf8')).toBe(
         readFileSync(
-          resolve(
-            packageRoot,
-            '../../plugins/vouchington-workflow/skills/pr-description/references/examples.md',
-          ),
+          resolve(packageRoot, '../../plugins/vouchington-workflow/skills/pr-description/SKILL.md'),
           'utf8',
         ),
       )

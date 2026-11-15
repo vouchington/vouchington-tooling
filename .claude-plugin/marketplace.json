@@ -8,30 +8,9 @@
   },
   "plugins": [
     {
-      "name": "security-triage",
-      "description": "Triage Codex Security findings with explicit approval waves.",
-      "source": "./plugins/security-triage",
-      "category": "security",
-      "homepage": "https://github.com/vouchington/vouchington-tooling"
-    },
-    {
       "name": "vouchington-workflow",
-      "description": "Repository-neutral implementation, dependency automation, publishing, planning, issue, retrospective, CI, and PR workflow skills.",
+      "description": "Repository-neutral implementation, planning, issue, retrospective, CI, triage, and PR workflow skills.",
       "source": "./plugins/vouchington-workflow",
-      "category": "productivity",
-      "homepage": "https://github.com/vouchington/vouchington-tooling"
-    },
-    {
-      "name": "vouchington-testing",
-      "description": "Repository-neutral testing guidance for common runners and application stacks.",
-      "source": "./plugins/vouchington-testing",
-      "category": "productivity",
-      "homepage": "https://github.com/vouchington/vouchington-tooling"
-    },
-    {
-      "name": "vouchington-database",
-      "description": "Repository-neutral PostgreSQL schema and performance guidance.",
-      "source": "./plugins/vouchington-database",
       "category": "productivity",
       "homepage": "https://github.com/vouchington/vouchington-tooling"
     }

@@ -23,8 +23,8 @@ Apply this baseline unless a stricter local rule overrides it.
   the same head, and `cancel-in-progress: true` replaces checks that already passed. Dependabot
   auto-merge may keep `ready_for_review`: it enables merge and does not rerun tests.
 - A privileged workflow must not check out or execute untrusted pull-request content.
-- When changing orchestration, load
-  [github-actions-authoring](../github-actions-authoring/SKILL.md). Do not poll remote workflow,
+- When changing orchestration, use the `github-actions-authoring` skill from the
+  `jonathanong/skills` plugin. Do not poll remote workflow,
   deployment, lease, service, or health state.
 - Required checks must be actual workflow jobs that run or aggregate the work they report.
 - Workflow code must not create or publish check runs or commit statuses to synthesize a required

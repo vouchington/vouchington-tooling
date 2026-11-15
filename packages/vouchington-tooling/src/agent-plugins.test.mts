@@ -2,7 +2,6 @@ import { access, readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { parse } from 'yaml'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const workflowPlugin = join(root, 'plugins/vouchington-workflow')
@@ -14,7 +13,6 @@ async function readJson(path: string): Promise<Record<string, unknown>> {
 describe('vouchington-workflow plugin', () => {
   const readSkill = (name: string): Promise<string> =>
     readFile(join(workflowPlugin, 'skills', name, 'SKILL.md'), 'utf8')
-  const readVersion = async () => (await readJson(join(workflowPlugin, 'plugin.json'))).version
 
   it('uses one canonical skill source in every supported host manifest', async () => {
     const [codex, claude, agent] = await Promise.all([
@@ -42,14 +40,10 @@ describe('vouchington-workflow plugin', () => {
     expect(skillNames).toEqual([
       'agent-workflow',
       'blackboard',
-      'dependabot',
       'git-commit-checklist',
-      'github-actions-authoring',
       'github-actions-checklist',
       'github-issue',
-      'npm-publishing',
       'organize-github-issues',
-      'package-json-checklist',
       'planning',
       'pr-description',
       'retrospective',
@@ -57,8 +51,6 @@ describe('vouchington-workflow plugin', () => {
       'review-ci-logs',
       'review-github-issue-taxonomy',
       'revisit-followups',
-      'stacked-prs',
-      'static-analysis-checklist',
       'triage-loop',
       'triage-prs',
       'triage-sweep',
@@ -95,9 +87,9 @@ describe('vouchington-workflow plugin', () => {
     expect(readme).toContain('vouchington-workflow@vouchington')
     expect(readme).toContain('plugins/vouchington-workflow')
     expect(readme).toContain(
-      'grok plugin install vouchington/vouchington-tooling#plugins/security-triage',
+      'grok plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow',
     )
-    expect(readme).toContain('~/.cursor/plugins/local/security-triage')
+    expect(readme).not.toMatch(/security-triage|vouchington-testing|vouchington-database/)
     expect(readme).toContain('~/.cursor/plugins/local/vouchington-workflow')
     await expect(access(workflowPlugin)).resolves.toBeUndefined()
 
@@ -123,117 +115,6 @@ describe('vouchington-workflow plugin', () => {
     expect(handoff).toContain('triage loop')
     expect(skills[0]).toContain('every applicable')
     expect(skills[0]).not.toContain('assigned non-main worktree')
-  })
-
-  it('requires event-driven GitHub Actions authoring', async () => {
-    const [skill, manifest] = await Promise.all([
-      readSkill('github-actions-authoring'),
-      readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
-    ])
-    const skills = manifest.skills as Array<Record<string, unknown>>
-
-    expect(skill).toContain('Never poll in CI')
-    expect(skill).toContain('event-driven')
-    expect(skill).toContain('workflow_call')
-    expect(skill).toContain('workflow_run')
-    expect(skill).toContain('repository_dispatch')
-    expect(skill).toContain('needs.<job>.result')
-    expect(skill).toContain('default branch')
-    expect(skill).toContain('three')
-    expect(skill).toContain('external callback')
-    expect(skill).toMatch(/repository_dispatch[\s\S]*default branch/)
-    expect(skill).toMatch(/bounded retries/i)
-    expect(skill).toMatch(/local process readiness/i)
-    expect(skills).toContainEqual(
-      expect.objectContaining({
-        name: 'github-actions-authoring',
-        plugin: 'vouchington-workflow',
-        pluginVersion: await readVersion(),
-        prerequisites: ['github-actions-checklist'],
-      }),
-    )
-  })
-
-  it('defines a portable fail-closed Dependabot policy', async () => {
-    const [skill, manifest] = await Promise.all([
-      readSkill('dependabot'),
-      readJson(join(root, 'packages/vouchington-tooling/skill-manifest.json')),
-    ])
-    const skills = manifest.skills as Array<Record<string, unknown>>
-    const exampleSource = skill.match(
-      /## Group package families\r?\n[\s\S]*?```yaml\r?\n([\s\S]*?)\r?\n```/,
-    )?.[1]
-    if (!exampleSource) throw new Error('Dependabot package-family YAML example is missing')
-    const example = parse(exampleSource) as {
-      cooldown?: { exclude?: string[] }
-      groups?: Record<
-        string,
-        { 'applies-to'?: string; patterns?: string[]; 'update-types'?: string[] }
-      >
-    } | null
-    const normalized = skill.replaceAll(/\s+/g, ' ')
-
-    expect(skill).toContain('open-pull-requests-limit')
-    expect(skill).toContain('security-updates')
-    expect(skill).toContain('minor')
-    expect(skill).toContain('patch')
-    expect(skill).toContain('major')
-    expect(skill).toContain('OIDC')
-    expect(skill).toContain('DEPENDABOT_AUTOMERGE_TOKEN')
-    expect(skill).toContain('pull_request_target')
-    expect(skill).toContain('consumer wrapper')
-    expect(example?.groups).toEqual({
-      'first-party': { patterns: ['@acme/*', 'acme-cli'] },
-      oxc: { patterns: ['oxlint', 'oxfmt', 'oxlint-tsgolint'] },
-      vitest: { patterns: ['vitest', '@vitest/*', '@vitejs/*'] },
-      react: { patterns: ['react', 'react-dom'] },
-      'react-security': {
-        'applies-to': 'security-updates',
-        patterns: ['react', 'react-dom'],
-      },
-      'react-email': { patterns: ['react-email', '@react-email/*'] },
-    })
-    expect(example?.cooldown?.exclude).toEqual(example?.groups?.['first-party']?.patterns)
-    const patterns = Object.values(example?.groups ?? {}).flatMap((group) => group.patterns ?? [])
-    expect(patterns).toContain('@vitest/*')
-    expect(patterns).toContain('@react-email/*')
-    expect(patterns).not.toContain('*')
-    for (const [name, group] of Object.entries(example?.groups ?? {})) {
-      expect(name).not.toMatch(
-        /(?:^|-)minor-and-patch$|^(?:security(?:-updates)?|all-patches|version-updates)$/,
-      )
-      expect(group).not.toHaveProperty('update-types')
-    }
-    expect(normalized).toMatch(/omit `update-types`[^.]*major, minor, and patch/i)
-    expect(normalized).toMatch(/first-party.*?`cooldown\.exclude`[^.]*zero-day/i)
-    expect(skills).toContainEqual(
-      expect.objectContaining({
-        name: 'dependabot',
-        plugin: 'vouchington-workflow',
-        pluginVersion: await readVersion(),
-        prerequisites: ['github-actions-checklist'],
-      }),
-    )
-  })
-
-  it('hands npm bootstrap mutations to a human with resolved working-directory and OTP prompts', async () => {
-    const skill = await readSkill('npm-publishing')
-    const cd = skill.indexOf('cd /absolute/repository/root')
-    const publish = skill.indexOf('npm publish ./relative/package-directory --access public --otp=')
-    const trust = skill.indexOf('npm trust github @scope/package')
-
-    expect(skill).toContain('Do not run a real `npm publish` or a mutating `npm trust` subcommand')
-    expect(skill).toContain('npm publish <package-directory> --access public --dry-run')
-    expect(skill).toContain('must include `prepublishOnly`')
-    expect(skill.match(/--otp=$/gm)).toHaveLength(2)
-    expect(cd).toBeGreaterThan(-1)
-    expect(publish).toBeGreaterThan(cd)
-    expect(trust).toBeGreaterThan(publish)
-    expect(skill).toContain('--allow-publish')
-    expect(skill).toContain('Omit the initial publish command')
-    expect(skill).toContain('npm trust list <package-name>')
-    expect(skill).toContain('`id-token: write`')
-    expect(skill).toContain('consumer wrapper')
   })
 
   it('defines portable GitHub Actions policy without freezing dependency updates', async () => {
@@ -307,11 +188,9 @@ describe('vouchington-workflow plugin', () => {
   })
 
   it('defines evidence-backed persistent-workspace prevention and recovery policy', async () => {
-    const [checklist, authoring, logs, analysis] = await Promise.all([
+    const [checklist, logs] = await Promise.all([
       readSkill('github-actions-checklist'),
-      readSkill('github-actions-authoring'),
       readSkill('review-ci-logs'),
-      readSkill('static-analysis-checklist'),
     ])
 
     expect(checklist).toMatch(/full tree[\s\S]*sparse checkout/i)
@@ -321,13 +200,9 @@ describe('vouchington-workflow plugin', () => {
     expect(checklist).toMatch(
       /failure-gated[\s\S]*same-filesystem[\s\S]*directory-only[\s\S]*batched/i,
     )
-    expect(authoring).toMatch(/persistent-workspace rules in[\s\S]*github-actions-checklist/i)
     expect(checklist).toMatch(/YAML-aware[\s\S]*tracked workflow and action files/i)
     expect(logs).toMatch(/producer[\s\S]*sparse state or unsafe ownership/i)
     expect(checklist).toMatch(/path count and timing/i)
-    expect(analysis).toMatch(/parse YAML[\s\S]*tracked\s+configuration files/i)
-    expect(analysis).toMatch(/sparse-checkout inputs[\s\S]*writable workspace mounts/i)
-    expect(analysis).toMatch(/accepted and rejected fixtures/i)
   })
 
   it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {

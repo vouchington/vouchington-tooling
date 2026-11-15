@@ -208,7 +208,7 @@ An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
 
 - **`/shepherd` on a PR:** skip it when `shepherds` already records the PR. Otherwise detect a
   native stack (the REST pull object's `stack` field, else `stacks?pull_request=<N>`) and merge the
-  whole stack with `pr-shepherd stack` per [stacked-prs](../stacked-prs/SKILL.md); an unstacked PR
+  whole stack with `pr-shepherd stack` per [Stacks](#stacks); an unstacked PR
   goes through [ready and merge](#ready-and-merge) step 6. Record it in `shepherds`.
 - **`/plan` on an issue or PR:** a planning subagent drafts a plan with
   [planning](../planning/SKILL.md). This is interactive: ask the human the plan's open questions
@@ -228,7 +228,34 @@ An agent that authored a PR shepherds it itself with pr-shepherd. When the sessi
 owner asks, it may instead delegate: it marks the PR ready, posts the fixed literal comment
 `/shepherd` (`gh pr comment <N> --body '/shepherd'`) once, and stops. Agent sessions post as the
 owner's login, which the adapter trusts. From then on the loop owns the PR and only the loop
-merges, within its grant. For a stack, the agent posts one `/shepherd` on the top PR.
+merges, within its grant. For a stack, the agent posts one `/shepherd` on the top PR, never on a
+lower layer.
+
+### Stacks
+
+The `pr-shepherd:pr-shepherd` skill owns stack mechanics, ordering, and the merge commands. These
+rules are the loop's own:
+
+- **Merge the whole stack at once.** Use `--merge`, so one command lands every ready layer. Drain
+  with `--merge-ready` only when the layers above will clearly take longer than the ready lower
+  layers (a requested change or open `TRIAGE`, a pending human review, a blocker, or CI far longer
+  than the wait so far), and state why in the report. A layer a poll or a ready-delay away is not a
+  reason.
+- **Gate every layer (final-review gate on).** With the gate on, each layer a merge would land
+  passes the step 5 final-review gate on its current head. When one layer does not, none of the
+  layers above it merge.
+- **Merge only what this run reviewed.** Never shepherd or merge a layer outside the grant.
+  Report such layers with their number and state.
+- **Derive the ledger.** Which stacks and layers exist, their order, and their state are read from
+  the forge every sweep (the `pr-shepherd stack` result, the stack list endpoint), never cached.
+  Reconcile unfiltered before opening or adding to a stack, so a new session does not start a
+  rival one. `state.json` and `shepherds` hold intent only.
+- **Layer cap.** An agent building a stack keeps at most 10 open layers (default; the adapter may
+  set another), counting every locally tracked layer not yet submitted. Beyond the cap, independent
+  work opens as its own PR on the default branch and dependent work waits for the bottom layers
+  to merge.
+- **Escalate per layer.** A layer that needs a human gets the `needs-human` label and one comment
+  per escalation event, with its position in the stack and what it needs.
 
 ## Ready and merge
 
@@ -269,9 +296,8 @@ automation label and the merge authority per PR category; stop and ask when one 
    later sweep merge it. Vouchington repositories allow squash merges only, a setting the
    repositories own. Never run two pr-shepherd commands on one PR, and record the PR in `shepherds`.
    - **Single PR:** `pr-shepherd '<owner/repo#N>' --merge --until-terminal`.
-   - **Stack:** `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal`. Draining means
-     merging the highest ready layer through what pr-shepherd prints, per
-     [stacked-prs](../stacked-prs/SKILL.md).
+   - **Stack:** `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal`, per
+     [Stacks](#stacks).
    - Run it as a background command in this session, so its exit wakes the loop. Read the full
      output and run exactly the commands it prints. Merge only through the printed head-pinned
      `gh pr merge` command, and only for a PR in the grant whose step 5 gate, when on, still holds for

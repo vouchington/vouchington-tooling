@@ -11,39 +11,31 @@ Both packages are published to npm. Releases go through the `Release` workflow (
 
 ## Agent plugins
 
-The repository also publishes the public [`security-triage`](./plugins/security-triage),
-[`vouchington-workflow`](./plugins/vouchington-workflow),
-[`vouchington-testing`](./plugins/vouchington-testing), and
-[`vouchington-database`](./plugins/vouchington-database) agent plugins. `security-triage` has one
-repository-neutral security-finding skill. `vouchington-workflow` provides reusable implementation,
-commit, GitHub Actions, Dependabot, package-metadata, npm-publishing, static-analysis, planning, issue-management,
-blackboard journaling, retrospective and follow-up review, CI-log review, stacked-pull-request draining, pull-request triage, and
-pull-request-description skills. All plugins use one canonical
+The repository also publishes the public [`vouchington-workflow`](./plugins/vouchington-workflow)
+agent plugin. It provides reusable implementation, commit, GitHub Actions checklist, planning,
+issue-management, blackboard journaling, retrospective and follow-up review, CI-log review,
+pull-request triage, and pull-request-description skills. The plugin uses one canonical
 `skills/` tree for every supported host; consumer repositories add their local mechanics and policy
 in repository-local instruction files or thin wrapper skills. The portable issue workflow verifies live
 collaborator authority before creation, routes denied external work to a verified consumer tracker,
 uses existing labels without extra approval, and requires explicit approval before creating labels.
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
 
+The generic skills that used to live here (testing, PostgreSQL, Dependabot, GitHub Actions
+authoring, npm publishing, package metadata, static analysis, security triage, stacked pull
+requests) now live in the [`jonathanong/skills`](https://github.com/jonathanong/skills) plugin.
+Stacked pull requests are covered by the `pr-shepherd:pr-shepherd` skill.
+
 Domain skill entrypoints read applicable `AGENTS.md` and a repository-local adapter when present.
 The default adapter is `.agents/skills/<canonical-name>/SKILL.md`; local instructions may name an
-alias, such as `nextjs-vitest-test-authoring` → `web-vitest-test-authoring`. A previously read
+alias, such as `git-commit-checklist` → `repo-git-commit-checklist`. A previously read
 adapter or canonical skill is not loaded again. This is agent guidance, not runtime concatenation
 or a new loader API; linked files and plugin installation alone do not prove an adapter was read.
 Workflow references load by phase. Plans are proportional and saved once outside Git, including
 in an existing issue or PR description; the skills do not require a separate Plan issue or template.
-The `github-actions-authoring` skill requires event-driven orchestration and prohibits remote-state
-polling in CI; it loads `github-actions-checklist` as a prerequisite. The checklist also defines the
-portable trigger, 30-minute timeout, runner, action-pinning, dependency-update testing, real required
-checks, domain-oriented test jobs, and branch-aware concurrency policies.
-
-`security-triage` is intentionally repository-neutral: it analyzes findings and returns a versioned
-handoff, while each consuming repository owns issue taxonomy and issue creation.
-
-`vouchington-testing` supplies shared test-authoring guidance plus Vitest, backend, Next.js,
-Playwright, Storybook, Swift, and .NET specializations. `vouchington-database` supplies PostgreSQL
-performance and UUIDv7 partitioning guidance. Consumer wrappers own runner configuration, fixtures,
-database policy, and commands.
+The `github-actions-checklist` skill defines the portable trigger, 30-minute timeout, runner,
+action-pinning, dependency-update testing, real required checks, domain-oriented test jobs, and
+branch-aware concurrency policies.
 
 These integrations are opt-in. Installing a package or cloning this repository does not enable an AI
 coding platform, transcript adapter, workflow, or CI provider. Select only the plugin directories,
@@ -64,32 +56,23 @@ Codex:
 
 ```bash
 codex plugin marketplace add vouchington/vouchington-tooling --ref main
-codex plugin add security-triage@vouchington
 codex plugin add vouchington-workflow@vouchington
-codex plugin add vouchington-testing@vouchington
-codex plugin add vouchington-database@vouchington
 ```
 
 Claude:
 
 ```bash
 claude plugin marketplace add vouchington/vouchington-tooling --sparse .claude-plugin plugins
-claude plugin install security-triage@vouchington
 claude plugin install vouchington-workflow@vouchington
-claude plugin install vouchington-testing@vouchington
-claude plugin install vouchington-database@vouchington
 ```
 
 Grok:
 
 ```bash
-grok plugin install vouchington/vouchington-tooling#plugins/security-triage
 grok plugin install vouchington/vouchington-tooling#plugins/vouchington-workflow
-grok plugin install vouchington/vouchington-tooling#plugins/vouchington-testing
-grok plugin install vouchington/vouchington-tooling#plugins/vouchington-database
 ```
 
-Other Claude-compatible clients that support the same direct-install syntax can select either
+Other Claude-compatible clients that support the same direct-install syntax can select the
 plugin directory.
 
 Cursor loads local Agent Plugins. Clone the source once and link its plugin directory into Cursor's
@@ -101,12 +84,6 @@ git clone --depth 1 https://github.com/vouchington/vouchington-tooling.git \
   ~/.cursor/plugins/sources/vouchington-tooling
 ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-workflow \
   ~/.cursor/plugins/local/vouchington-workflow
-ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/security-triage \
-  ~/.cursor/plugins/local/security-triage
-ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-testing \
-  ~/.cursor/plugins/local/vouchington-testing
-ln -s ~/.cursor/plugins/sources/vouchington-tooling/plugins/vouchington-database \
-  ~/.cursor/plugins/local/vouchington-database
 ```
 
 The clone and symlink commands intentionally fail if either target already exists, preventing an

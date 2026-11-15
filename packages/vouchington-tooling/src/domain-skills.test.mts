@@ -7,42 +7,15 @@ import { describe, expect, it } from 'vitest'
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 describe('domain skill plugins', () => {
-  it('publishes portable testing and database skills in every marketplace', async () => {
+  it('does not publish skills that moved to the upstream skills plugin', async () => {
     const [codex, claude] = await Promise.all([
       readJson('.agents/plugins/marketplace.json'),
       readJson('.claude-plugin/marketplace.json'),
     ])
-    for (const name of ['vouchington-testing', 'vouchington-database']) {
-      expect(codex.plugins).toContainEqual(expect.objectContaining({ name }))
-      expect(claude.plugins).toContainEqual(expect.objectContaining({ name }))
+    for (const marketplace of [codex, claude]) {
+      expect(marketplace.plugins.map((plugin) => plugin.name)).toEqual(['vouchington-workflow'])
     }
-    await expect(skillNames('vouchington-testing')).resolves.toEqual([
-      'backend-vitest-test-authoring',
-      'dotnet-test-authoring',
-      'nextjs-vitest-test-authoring',
-      'playwright-authoring',
-      'storybook-authoring',
-      'swift-test-authoring',
-      'test-authoring',
-      'vitest-test-authoring',
-    ])
-    await expect(skillNames('vouchington-database')).resolves.toEqual([
-      'bounded-iteration',
-      'glide-mq',
-      'postgres-node-performance-tuning',
-      'postgres-partitioning-uuid-v7',
-      'postgres-schema-design',
-    ])
-  })
-
-  it('provides Codex marketplace long descriptions for testing and database plugins', async () => {
-    for (const plugin of ['vouchington-testing', 'vouchington-database']) {
-      const manifest = await readRecordJson(`plugins/${plugin}/.codex-plugin/plugin.json`)
-      expect(manifest.interface).toMatchObject({ longDescription: expect.any(String) })
-      expect((manifest.interface as { longDescription: string }).longDescription).not.toHaveLength(
-        0,
-      )
-    }
+    await expect(readdir(join(root, 'plugins'))).resolves.toEqual(['vouchington-workflow'])
   })
 
   it('routes non-blocking bot feedback through durable follow-up issues', async () => {
@@ -74,33 +47,6 @@ describe('domain skill plugins', () => {
       readSkill('vouchington-workflow', 'agent-workflow/references/review.md'),
       readSkill('vouchington-workflow', 'agent-workflow/references/evidence-sweep.md'),
       readSkill('vouchington-workflow', 'agent-workflow/references/four-refs.md'),
-      readSkill('vouchington-testing', 'vitest-test-authoring/references/mock-boundaries.md'),
-      readSkill(
-        'vouchington-testing',
-        'backend-vitest-test-authoring/references/integration-boundaries.md',
-      ),
-      readSkill('vouchington-testing', 'playwright-authoring/references/browser-reliability.md'),
-      readSkill('vouchington-testing', 'swift-test-authoring/references/network-test-doubles.md'),
-      readSkill(
-        'vouchington-database',
-        'postgres-node-performance-tuning/references/performance-patterns.md',
-      ),
-      readSkill(
-        'vouchington-database',
-        'postgres-node-performance-tuning/references/reading-plans.md',
-      ),
-      readSkill(
-        'vouchington-database',
-        'postgres-partitioning-uuid-v7/references/partition-lifecycle.md',
-      ),
-      readSkill('vouchington-database', 'postgres-schema-design/SKILL.md'),
-      readSkill('vouchington-database', 'postgres-schema-design/references/naming.md'),
-      readSkill('vouchington-database', 'postgres-schema-design/references/relations.md'),
-      readSkill('vouchington-database', 'postgres-schema-design/references/table-shapes.md'),
-      readSkill('vouchington-database', 'bounded-iteration/SKILL.md'),
-      readSkill('vouchington-database', 'bounded-iteration/references/sweep-patterns.md'),
-      readSkill('vouchington-database', 'glide-mq/SKILL.md'),
-      readSkill('vouchington-database', 'glide-mq/references/lease-patterns.md'),
     ])
     expect(resources.join('\n')).toMatch(
       /accepted-decision ledger|failure paths|acceptance criterion|typed module shape|collision-safe|locator|stopLoading|read-after-write|partition key/i,
@@ -108,25 +54,6 @@ describe('domain skill plugins', () => {
     for (const resource of resources) {
       expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
     }
-  })
-
-  it('teaches reading plans and links them from the performance skill', async () => {
-    const dir = 'postgres-node-performance-tuning'
-    const [skill, plans, patterns, relations] = await Promise.all([
-      readSkill('vouchington-database', `${dir}/SKILL.md`),
-      readSkill('vouchington-database', `${dir}/references/reading-plans.md`),
-      readSkill('vouchington-database', `${dir}/references/performance-patterns.md`),
-      readSkill('vouchington-database', 'postgres-schema-design/references/relations.md'),
-    ])
-    expect(skill).toContain('references/reading-plans.md')
-    expect(plans).toMatch(/Rows Removed by Join Filter/)
-    expect(plans).toMatch(/pg_stat_xact_user_functions/)
-    expect(plans).toMatch(/Subplans Removed/)
-    expect(plans).toMatch(/plan_cache_mode/)
-    expect(patterns).toMatch(/## Volatile functions in predicates/)
-    expect(patterns).toMatch(/## Function inlining/)
-    expect(patterns).toMatch(/## Reading views by key/)
-    expect(relations).toMatch(/## Join on ids, never on text/)
   })
 
   it('keeps raw retrospective evidence out of durable records', async () => {
@@ -184,14 +111,6 @@ async function readJson(path: string): Promise<{ plugins: Array<{ name: string }
 
 async function readRecordJson(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(join(root, path), 'utf8')) as Record<string, unknown>
-}
-
-async function skillNames(plugin: string): Promise<string[]> {
-  const entries = await readdir(join(root, 'plugins', plugin, 'skills'), { withFileTypes: true })
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
 }
 
 function readSkill(plugin: string, path: string): Promise<string> {
