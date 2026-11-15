@@ -42,7 +42,7 @@ recommendation or root-cause identity on open feedback PRs:
 For a create, save the plan in the feedback issue through [github-issue](../../github-issue/SKILL.md)
 and write the draft PR with [pr-description](../../pr-description/SKILL.md). The PR body includes
 the marker, carries the automation label, and links the feedback issue with a closing keyword. Do
-not ready, shepherd, auto-merge, or merge a generated or reused feedback PR in the same run.
+not ready, shepherd, or merge a generated or reused feedback PR in the same run.
 
 ## Retrospective disposition
 
@@ -56,3 +56,15 @@ Group the Step 3 PR-creation recommendations by root cause and invoke
 [retrospective](../../retrospective/SKILL.md). It records findings for merged and closed PRs alike.
 Preserve `none` when no actionable generator improvement was found, and complete this flow before
 the final triage report.
+
+## Agent-authored PR creation feedback
+
+- In an authorized triage flow, assess verified agent-authored PRs for description quality,
+  root-cause completeness, scope, validation, and useful handoff context. Skip unknown provenance.
+- Resolve the producing prompt or skill from durable metadata: scheduled PRs name their exact
+  prompt; auto-fix and security PRs identify their corresponding template or triage skill.
+  Do not infer a source from a similar filename.
+- Each recommendation names the PR, concrete evidence, verified source, preventive change, and
+  whether the finding recurs. Group repeated causes for [retrospective](../../retrospective/SKILL.md).
+- Source changes require the calling workflow's authority. [PR triage](../SKILL.md)
+  owns its bounded feedback-PR behavior.

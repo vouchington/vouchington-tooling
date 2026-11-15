@@ -5,7 +5,7 @@ This rubric is a default, not a law. Session steering from the user overrides it
 - **MERGE:** a real bugfix, a general root-cause fix, or a safe chore. A CI failure caused by the
   PR's own change is fine; the shepherd drives it green. A merge conflict (`CONFLICTING` or
   `DIRTY`) does not by itself warrant a close. If the fix is good on the merits, salvage it through
-  the MERGE path: ready it, arm auto-merge, and let the shepherd rebase, resolve, and drive CI
+  the MERGE path: ready it, merge it through pr-shepherd, and let it rebase, resolve, and drive CI
   green. Salvage by default without asking the user.
 - **CLOSE:** a narrow per-fingerprint band-aid (prefer general solutions), stale, superseded, or
   scope already landed on the default branch. Close a conflicting branch only when it is also one
@@ -49,8 +49,8 @@ failures make a retry rule invalid; the fix is the root cause.
 When a MERGE PR needs shepherd direction, write the exact reviewed comment body to a temporary file
 with a file-writing tool, then read it back in full. Do not build the file with shell
 interpolation, a heredoc, `echo`, or `printf`: file-based input keeps shell metacharacters and
-backticks in reviewed steering from being expanded. Pass the file to the ready and shepherd procedure
-so it posts a separate ordinary PR comment before the shepherd starts.
+backticks in reviewed steering from being expanded. Pass the file to the [ready and merge](../../triage-loop/SKILL.md#ready-and-merge) procedure
+so it posts a separate ordinary PR comment before pr-shepherd starts.
 
 Examples:
 
