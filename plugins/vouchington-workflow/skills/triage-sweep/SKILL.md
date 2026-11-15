@@ -46,35 +46,35 @@ given dependency sends one notification through the escalation channel, deduped 
 ## Phase A - Dependency-bot PRs
 
 A mechanical-tier subagent per repository lists open PRs from the dependency bot and returns, per
-PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, `autoMergeRequest`,
-and `headRefOid`. Skip a PR whose auto-merge is already armed (for example by a repository
-auto-merge workflow) while its checks pass or are pending. Arming it again or dispatching a second
-shepherd would race the merge that is already landing.
+PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
 
-Steered handoffs stay unarmed (see [ready and shepherd](../triage-loop/references/shepherd.md) step 6)
-and are reported as `shepherding, manual-verification-required`; with the final-review gate on, a
-PR still `awaiting-final-review` stays unarmed too. A later sweep arms one only when:
+Steered and draft handoffs are not merged in the pass that readies them (see
+[ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 6) and are reported as
+`shepherding, manual-verification-required`; with the final-review gate on, a PR still
+`awaiting-final-review` waits too. A later
+sweep merges one through pr-shepherd only when:
 
-- its shepherd is no longer in flight;
+- no pr-shepherd command for it is still running;
 - its current head passes every required check;
 - a fresh review of that head still fits the same category;
-- with the final-review gate on, `vouchington-reviewer status` exits 0 for that head, including after the push that followed a disarm (see
-  [ready and shepherd](../triage-loop/references/shepherd.md) step 5).
+- with the final-review gate on, `vouchington-reviewer status` exits 0 for that head (see
+  [ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 5).
 
-Arming then uses one bare `gh pr merge` command, as in the grant.
+That merge runs `pr-shepherd '<owner/repo#N>' --merge --until-terminal` as a background command and
+the commands it prints, as in the grant.
 
 `dependabot-pr` events from the loop's wait enter this phase for the one PR.
 
-- **Patch or minor, green:** [ready and shepherd](../triage-loop/references/shepherd.md) with `--arm-auto-merge`.
+- **Patch or minor, green:** [ready and merge](../triage-loop/SKILL.md#ready-and-merge) with `--merge`.
 - **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure
   with [review-ci-logs](../review-ci-logs/SKILL.md) and classifies it as trivial (lockfile,
-  rebase, type or import rename, a config key) or non-trivial. Trivial: ready and shepherd with
-  `--arm-auto-merge`, with steering that names the fix. Non-trivial: escalate.
+  rebase, type or import rename, a config key) or non-trivial. Trivial: ready and merge with
+  `--merge`, with steering that names the fix. Non-trivial: escalate.
 - **Major:** an implementation-tier subagent reads the release notes, changelog, and migration
   guide, searches the repository for affected call sites, and checks whether tests that ran in CI
   exercise them. It returns `no-migration`, `small-migration` (mechanical edits, no
   runtime-behavior change), or `significant-migration`, with evidence and the coverage finding.
-  Merge through ready and shepherd with `--arm-auto-merge` (steered for a small migration) only
+  Merge through ready and merge with `--merge` (steered for a small migration) only
   when no migration or a small one is needed and the affected call sites are exercised by CI
   tests. Escalate a significant migration, or affected code without sufficient test coverage, with
   the evidence.
@@ -107,7 +107,7 @@ An implementation-tier reviewer checks that the diff does both of these:
 A PR that fails the gate, or that the reviewer is unsure about, joins the exclusion set and is
 escalated. The grant covers merging, not closing. Every `CLOSE` decision also joins the exclusion
 set and is escalated with its reason, so `triage-prs` closes nothing in this phase. Only PRs that
-carry the adapter's automation label and pass the gate get `--arm-auto-merge`.
+carry the adapter's automation label and pass the gate get `--merge`.
 
 ## Phase C - Intake queue
 
@@ -180,7 +180,7 @@ each full sweep. A mechanical-tier subagent per repository lists PRs removed fro
 in the last 24 hours (keeping failure-driven removals, dropping user-requested ones and PRs
 currently queued) and failed default-branch workflow runs, paginating fully. Handle each as the
 loop's [Failures](../triage-loop/SKILL.md#failures) section describes: dedupe against fixes in
-flight, diagnose, re-enqueue an in-grant PR whose head is unchanged only after a flake or infra
+flight, diagnose, requeue an in-grant PR whose head is unchanged (through a printed command) only after a flake or infra
 diagnosis, and file or delegate flakes. Skip run ids already in `handledFailures`, and record each
 one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
 
@@ -252,8 +252,7 @@ Then print the summary table, with columns repository, item, phase, action, and 
 actions:
 
 - merged
-- armed
-- re-enqueued
+- requeued
 - fix PR opened
 - shepherding
 - escalated

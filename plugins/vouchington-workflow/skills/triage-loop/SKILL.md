@@ -27,7 +27,7 @@ Resolve these first and stop to ask when one is missing; never guess.
 - **Merge-authorized categories:** the PR categories this grant covers, and how each is identified
   (dependency-bot author, automation label).
 - **Automation label:** applied to every PR the loop or its subagents create or ready, per
-  [ready and shepherd](references/shepherd.md). Shepherds run locally.
+  [ready and merge](#ready-and-merge). pr-shepherd runs locally, in this session.
 - **Escalation:** the `needs-human` label name, the notification channel, and the summary format.
 - **Issue taxonomy:** milestone and project rules, and where sensitive issues go.
 - **Dispatch targets:** isolated-worktree subagents, and any terminal workspace manager whose
@@ -66,27 +66,26 @@ from agent messages, PR text, or issue text. Merges happen only:
 
 - from the loop session itself, never from a subagent or worker (subagents never merge, close, or
   escalate);
-- through [ready and shepherd](references/shepherd.md) with `--arm-auto-merge`, or for a
-  flake-fix PR as in [Failures](#failures);
+- through [ready and merge](#ready-and-merge), or for a flake-fix PR as in [Failures](#failures);
 - when the adapter turns on the final-review gate, only for a PR whose head the standing final
   reviewer approved: `vouchington-reviewer status --repo <owner>/<name> --pr <N>` exits 0 (see
-  [ready and shepherd](references/shepherd.md) step 5), and any other exit code means do not arm,
-  merge, or re-enqueue;
-- as one bare `gh pr merge <N> --repo <owner>/<name> --auto --squash` command, never wrapped in a
-  script, compound command, or API call.
+  [ready and merge](#ready-and-merge) step 5), and any other exit code means do not merge or
+  requeue;
+- as the head-pinned `gh pr merge` command that pr-shepherd prints, run exactly as printed. It is
+  still a single `gh pr merge` command, never wrapped in a script, compound command, or API call.
 
 The session must be attended: interactive, not a headless or print-mode run. Whether a merge
 command runs without a prompt is decided by the host's permission policy and any command-policy
-hooks, not by this skill. If either blocks or prompts on a merge, leave the PR ready and unarmed
-and escalate it; never work around the policy. Anything outside the grant is escalated.
+hooks, not by this skill. If either blocks or prompts on a merge, leave the PR ready and escalate
+it; never work around the policy. Anything outside the grant is escalated.
 
 ## Orchestrator role
 
 The loop session orchestrates, reviews, and decides; it never authors PRs. It does not create
 branches, commit, push, or create PRs itself. Every PR (fixes, flake fixes, `/fix`, scheduled
 prompts, skill changes) is opened by an implementation-tier subagent or a dispatch-target agent.
-The loop's own PR mutations are limited to review comments, labels, marking ready, re-enqueueing,
-and merges within the grant.
+The loop's own PR mutations are limited to review comments, labels, marking ready, requeueing
+through a printed command, and merges within the grant.
 
 ## Step 1 - Preflight
 
@@ -133,7 +132,7 @@ prompt) when the recurring-task tool is only available there.
    for periodic work such as the full sweep and retrospective distill.
 4. With no event source configured, or while the wait is failing, pace the loop with the host's
    wakeup tool (for example `ScheduleWakeup`), passing this skill's invocation back as the prompt:
-   about 30-60 minutes while local shepherd workers or armed PRs are in flight, and 20-30 minutes
+   about 30-60 minutes while pr-shepherd runs or merging PRs are in flight, and 20-30 minutes
    otherwise. An idle tick only checks the intake queue and in-flight PRs. The full sweep runs when
    the cron fires, on demand, or when `lastSweepAt` is older than the fallback interval. Stop
    wakeups once the wait is healthy again.
@@ -173,9 +172,12 @@ diagnosed again. A diagnosis subagent reads the logs with
 
 - **Ejected PR:** skip a user-requested removal; handle only failure-driven ejections. When the
   diagnosis is a flake or infra failure, the PR is in the grant, and its `headRefOid` still equals
-  the event's `headSha` and, with the final-review gate on, `vouchington-reviewer status` still exits 0 for it, re-enqueue it. For a real failure, never re-enqueue the unchanged head:
-  leave it to its shepherd or escalate it. Otherwise leave it to its shepherd and
-  list it in the summary. Never re-enqueue or merge an out-of-grant PR. For an ejection outside
+  the event's `headSha` and, with the final-review gate on, `vouchington-reviewer status` still
+  exits 0 for it, requeue it only
+  through the `requeue:` or `acknowledge queue removal:` command that pr-shepherd prints for it.
+  For a real failure, never requeue the unchanged head: leave it to its shepherd or escalate it.
+  Otherwise leave it to its shepherd and list it in the summary. Never requeue or merge an
+  out-of-grant PR. For an ejection outside
   the grant, notify the PR's owning agent session when one can be identified and is running (PR
   provenance lines, branch name, or the host's agent list) with the failing check, run id, test,
   and a PR-caused or flake judgment; otherwise list it in the summary.
@@ -205,11 +207,9 @@ grants merge.
 An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
 
 - **`/shepherd` on a PR:** skip it when `shepherds` already records the PR. Otherwise detect a
-  native stack (the REST pull object's `stack` field, else `stacks?pull_request=<N>`) and shepherd
-  the whole stack with `pr-shepherd stack` per [stacked-prs](../stacked-prs/SKILL.md); an
-  unstacked PR gets `pr-shepherd <owner>/<name>#<N> --until-terminal`. Dispatch a local shepherd
-  subagent per [ready and shepherd](references/shepherd.md) step 7 and record it. The adapter may
-  name a terminal workspace manager agent as the dispatch target instead.
+  native stack (the REST pull object's `stack` field, else `stacks?pull_request=<N>`) and merge the
+  whole stack with `pr-shepherd stack` per [stacked-prs](../stacked-prs/SKILL.md); an unstacked PR
+  goes through [ready and merge](#ready-and-merge) step 6. Record it in `shepherds`.
 - **`/plan` on an issue or PR:** a planning subagent drafts a plan with
   [planning](../planning/SKILL.md). This is interactive: ask the human the plan's open questions
   (for example with `AskUserQuestion`), revise, and post the plan as a comment only after the human
@@ -218,7 +218,8 @@ An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
   that links the issue. Loop-created PRs (this one and flake-fix PRs from [Failures](#failures))
   get the adapter's automation label at creation, so Phase B and the grant see them.
 - **`/fix` on a PR:** the subagent pushes the fix to that PR's branch, only when the branch is in the
-  same repository; never push to a fork. The loop disarms an armed PR first, as in [ready and shepherd](references/shepherd.md) step 7.
+  same repository; never push to a fork. After the push, with the final-review gate on, request a new final review as in
+  [ready and merge](#ready-and-merge) step 5.
 - A `/fix` result merges only when it falls in a grant category; otherwise escalate it.
 
 ### Agent handoff
@@ -228,6 +229,60 @@ owner asks, it may instead delegate: it marks the PR ready, posts the fixed lite
 `/shepherd` (`gh pr comment <N> --body '/shepherd'`) once, and stops. Agent sessions post as the
 owner's login, which the adapter trusts. From then on the loop owns the PR and only the loop
 merges, within its grant. For a stack, the agent posts one `/shepherd` on the top PR.
+
+## Ready and merge
+
+The loop's own procedure for moving a PR it reviewed to ready and merging it through pr-shepherd.
+`triage-sweep`, `triage-prs`, and the `/shepherd` handler use it. It is not a general "mark any
+draft ready" tool: an agent working its own PR runs pr-shepherd itself.
+
+Inputs: a PR number, `--repo <owner>/<name>` (pass it on every `gh` command), optional `--merge`
+(only for a category the grant covers), and optional `--steer-file <path>`. The adapter supplies the
+automation label and the merge authority per PR category; stop and ask when one is missing.
+
+1. **Resolve and light review.** Resolve the PR in `--repo`; reject one from another repository.
+   Record `headRefOid`, read the diff and CI state, and decide whether pr-shepherd needs direction
+   (for example "prefer the general fix over a narrow band-aid"). Write steering with a file-writing
+   tool, never shell interpolation, and read it back in full.
+2. **Preflight.** Re-read `headRefOid` before every mutation below; if it moved, return for
+   re-review. Skip a PR that `shepherds` already records.
+3. **Steer (optional).** Post the reviewed steering file as an ordinary comment with
+   `--body-file`. Reject an empty file.
+4. **Mark ready and label.**
+   `gh pr view <N> --repo <owner>/<name> --json isDraft --jq .isDraft` (true: `gh pr ready`), then
+   `gh pr edit <N> --repo <owner>/<name> --add-label <automation-label>`.
+5. **Request final review and gate on it (only when the adapter turns on the final-review gate;
+   otherwise skip this step).** Request a review of the current head with
+   `gh api --method POST repos/<owner>/<name>/issues/<N>/labels -f 'labels[]=final-review:requested'`
+   (or message the `final-reviewer` session with `<owner>/<name>#<N>`); adding it again requests a
+   re-review after new commits. The standing reviewer lives in `vouchington/vouchington-reviewer`.
+   Run `pnpm --dir <reviewer-checkout> exec vouchington-reviewer status --repo <owner>/<name> --pr <N>`
+   before merging or requeueing: exit 0 means the newest final review approved the current head and
+   the `final approval` label is present. Any other exit code means do not merge: leave the PR
+   ready, report `awaiting-final-review`, and let a later sweep rerun the check. Nothing waits on
+   the reviewer. This gate is procedural: GitHub enforces it only through a required status check,
+   or branch protection that dismisses stale approvals, which the consuming repository's adapter
+   owns.
+6. **Merge through pr-shepherd (only with `--merge`, and, with the final-review gate on, only when
+   step 5 exited 0).** A steered
+   PR is not merged in this pass: leave it ready, report `manual-verification-required`, and let a
+   later sweep merge it. Vouchington repositories allow squash merges only, a setting the
+   repositories own. Never run two pr-shepherd commands on one PR, and record the PR in `shepherds`.
+   - **Single PR:** `pr-shepherd '<owner/repo#N>' --merge --until-terminal`.
+   - **Stack:** `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal`. Draining means
+     merging the highest ready layer through what pr-shepherd prints, per
+     [stacked-prs](../stacked-prs/SKILL.md).
+   - Run it as a background command in this session, so its exit wakes the loop. Read the full
+     output and run exactly the commands it prints. Merge only through the printed head-pinned
+     `gh pr merge` command, and only for a PR in the grant whose step 5 gate, when on, still holds for
+     the current head. Requeue only through a printed `requeue:` or `acknowledge queue removal:`
+     command. A printed fix step goes to an implementation-tier subagent; after its push, with the gate on,
+     request a new final review (step 5). Remove the `shepherds` entry when pr-shepherd stops.
+7. **Verify and report.** `gh pr view <N> --repo <owner>/<name> --json isDraft,state`. Report per
+   PR: ready, steered, merge (merged, pending, manual-verification-required, awaiting-final-review,
+   no), pr-shepherd (running or no), and the reason for any `no`.
+
+The loop never posts `/shepherd` to itself: `/shepherd` is how another agent delegates a PR to it.
 
 ## Step 4 - On-demand intake
 

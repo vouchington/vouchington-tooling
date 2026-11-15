@@ -32,7 +32,7 @@ to ask when one this run needs is missing; never guess a value.
 
 - **Repository:** triage works one repository, `<owner>/<name>`. Pass `--repo <owner>/<name>` on
   every `gh` command. Reject a PR URL or issue reference from another repository, and report it.
-- **Reviewed head:** every mutation of a PR (ready, steer, arm, dispatch, close, branch delete)
+- **Reviewed head:** every mutation of a PR (ready, steer, merge, dispatch, close, branch delete)
   first re-reads `gh pr view <N> --repo <owner>/<name> --json headRefOid`. If it differs from the
   head recorded in Step 3, re-review or skip; never act on an unreviewed head.
 - **Exclusions:** build one exclusion set in Step 3b. It applies to every mutation pass: merge,
@@ -110,7 +110,7 @@ overrides the rubric, including flipping a green PR to CLOSE; present it as cont
 
 Before any mutation, resolve [feedback duplicates](references/feedback.md#duplicate-resolution).
 Every feedback PR this run generates or reuses, and its source issue, joins the exclusion set. A
-member is never readied, shepherded, armed, merged, closed, or branch-deleted, and its issue is
+member is never readied, shepherded, merged, closed, or branch-deleted, and its issue is
 never closed, in this run, whatever its Step 3 decision.
 
 ## Step 4 - Execute MERGE
@@ -119,33 +119,32 @@ Skip excluded PRs and re-check the reviewed head per the rules. Carry each root-
 from the [rubric](references/rubric.md) (an issue to file, link, or re-scope) into this pass and
 the Step 6 report so it is not dropped. Process MERGE decisions in
 ascending PR-number order through the loop's
-[ready and shepherd](../triage-loop/references/shepherd.md) procedure, passing the PR number, the
-auto-merge flag, and any steering file. That procedure light-reviews the diff, posts steering,
-readies the draft, verifies merge settings, and starts a local shepherd. Run its preflight before
-every mutation. If the preflight fails, record the reason and report separately any mutation already
-completed (for example the PR was readied before the head moved) and the failed preflight; do
-not describe the PR as armed or shepherded.
+[ready and merge](../triage-loop/SKILL.md#ready-and-merge) procedure, passing the PR number, the
+merge flag, and any steering file. That procedure light-reviews the diff, posts steering, readies
+the draft, gates on the final review when the adapter turns that gate on, and merges through pr-shepherd. Vouchington repositories
+allow squash merges only, a setting the repositories own. Run its preflight before every mutation.
+If the preflight fails, record the reason and report separately any mutation already completed
+(for example the PR was readied before the head moved) and the failed preflight; do not describe
+the PR as merging.
 
 Classify the outcome:
 
-- **Unsteered and arming succeeds:** already armed. Auto-merge may complete once requirements pass
-  while the local shepherd independently checks the PR.
+- **Unsteered (and, with the final-review gate on, final review approved):** pr-shepherd runs in the background; the loop runs the
+  commands it prints and the PR merges once requirements pass.
 - **Final-review gate on and review not yet approved (`vouchington-reviewer status` exits
-  non-zero):** the review was
-  requested; leave the PR ready and unarmed, report `awaiting-final-review`, and never merge it.
-- **Steered, or arming fails on a conflict:** leave the PR ready and unarmed after the shepherd
-  starts. A human inspects the eventual state and decides whether to arm auto-merge.
-- **Repository auto-merge disabled:** dispatch the shepherd, report that a manual merge is
-  required, and leave auto-merge unchanged.
+  non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
+- **Steered:** leave the PR ready; a later sweep merges it through pr-shepherd, or a human
+  inspects the eventual state first.
 - **Native GitHub stack:** shepherd the owned layers per
   [stacked-prs](../stacked-prs/SKILL.md#ownership-and-workers) and merge the whole stack per
   [Merge the whole stack](../stacked-prs/SKILL.md#merge-the-whole-stack), within explicit human
   approval and only as far as this run's decisions cover. Resolve the full stack against the Step 1
   scope and Step 3 decisions first. A bottom-up drain ends below the first layer that is out of
-  scope or not `MERGE`; never shepherd or merge a layer this run did not review. GitHub has no
-  auto-merge for stacks, and an armed auto-merge does not authorize the drain on its own.
+  scope or not `MERGE`; never shepherd or merge a layer this run did not review. Run
+  `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal` as a background command and
+  merge the highest ready layer through the commands it prints.
 
-The loop records the local worker in `shepherds`, and nothing waits on it.
+The loop records each pr-shepherd run in `shepherds`, and its exit wakes the loop.
 
 ## Step 5 - Execute CLOSE
 
@@ -165,15 +164,15 @@ Report every close that kept its branch, with the reason. Branch deletion, linke
 Check that merge and close actions landed:
 
 ```bash
-gh pr view <N> --repo <owner>/<name> --json isDraft,autoMergeRequest,state
+gh pr view <N> --repo <owner>/<name> --json isDraft,state
 ```
 
 Emit a summary table with the columns PR, Decision, Action, and Steering. Actions are
-`ready + shepherd + auto-merge armed`, `ready + shepherd, manual verification required`,
-`ready + shepherd, manual merge required`, `preflight failed - unchanged`, and
+`ready + pr-shepherd merge`, `ready, manual verification required`,
+`ready, awaiting final review`, `preflight failed - unchanged`, and
 `closed + branch deleted`.
 
 After Steps 4 and 5, amend the Step 3 creation feedback with action-time steering and CI evidence.
-Do not wait for the newly started shepherd; record only evidence available during this run.
+Do not wait for the newly started pr-shepherd run; record only evidence available during this run.
 Then publish [preauthorized prompt feedback](references/feedback.md), group the recommendations by
 root cause, and invoke [retrospective](../retrospective/SKILL.md) before the final report.
