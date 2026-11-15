@@ -54,6 +54,21 @@ answer is `unknown — no journal`, never a guess.
    online and never uses that outbox to authorize an attempt or completion. Report the acknowledged
    record/receipt, or the actual pending/blocked state and next replay action.
 
+## Hand-off
+
+- When you hand a pull request to the human as ready, write one retrospective from the session
+  that did the work, before you stop, including when you delegate the pull request with
+  `/shepherd`. A native stack gets one retrospective for the whole stack, never one per layer.
+- Give each hand-off its own `sourceEventId`, such as `handoff-pr<number>` (a stack uses its top
+  pull request's number), on both `retrospective_check` and `retrospective_save`. The default ID
+  fits only the first hand-off in a session; a second would be mistaken for it.
+- If you are still running when the merge happens and it changes the outcome (a merge-queue
+  ejection and its fix, a follow-up push, review comments addressed after hand-off), append one
+  short note with the [blackboard skill](../blackboard/SKILL.md). Name the pull request and the
+  retrospective's source event, and give the note its own `sourceEventId`, such as
+  `merge-pr<number>`: the writer rejects the retrospective's ID reused for different content.
+  Never write a second retrospective.
+
 Read [ci-failures](references/ci-failures.md) when the session observed CI failures, and
 [sandbox-audit](references/sandbox-audit.md) when it hit denied or escalated commands.
 

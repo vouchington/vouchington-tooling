@@ -67,7 +67,7 @@ the commands it prints, as in the grant.
 
 - **Patch or minor, green:** [ready and merge](../triage-loop/SKILL.md#ready-and-merge) with `--merge`.
 - **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure
-  with [review-ci-logs](../review-ci-logs/SKILL.md) and classifies it as trivial (lockfile,
+  with the `review-ci-logs` skill (`skills` plugin) and classifies it as trivial (lockfile,
   rebase, type or import rename, a config key) or non-trivial. Trivial: ready and merge with
   `--merge`, with steering that names the fix. Non-trivial: escalate.
 - **Major:** an implementation-tier subagent reads the release notes, changelog, and migration
@@ -133,7 +133,7 @@ PR. For each one, under the adapter's taxonomy through
 Run [retrospective-distill](../retrospective-distill/SKILL.md) for sessions completed after
 `retroCursor`, with the adapter's distill cutoffs (`retroDays` and `sessionDays`; see the loop's
 [adapter parameters](../triage-loop/SKILL.md#adapter-parameters)). Stop and ask when either is
-missing. File the verified follow-ups through [github-issue](../github-issue/SKILL.md). The
+missing. File the verified follow-ups through the `github-issue` skill (`skills` plugin). The
 grant covers archiving the sessions it distilled, only when the adapter authorizes archival;
 otherwise skip step 7 and still clean up. Advance `retroCursor` only after cleanup
 succeeds.
@@ -167,7 +167,9 @@ the state file's `reviewedComments` and that either:
 
 An implementation-tier subagent verifies each comment against the current default branch and drops
 anything already addressed, non-actionable, or a duplicate of an open issue. File one issue per
-root cause through [github-issue](../github-issue/SKILL.md), linking the PR and comment. Add every
+root cause through the `github-issue` skill (`skills` plugin), linking the PR and comment with a non-closing, fully qualified reference. The issue carries the
+exact existing `follow-up` label; re-fetch it and verify the label and link. When labeling or
+linking is unavailable or unauthorized, report the blocker instead of filing it unlabeled. Add every
 harvested comment id to `reviewedComments`, and prune ids whose PR has left the window. A comment
 posted days after merge is still found. Advance `scannedThrough` to the newest `mergedAt` scanned
 (or the sweep start) only after the scan succeeds. Advance `activityThrough` to the sweep start only after step 2

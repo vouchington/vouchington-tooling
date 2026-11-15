@@ -37,4 +37,8 @@ a finding in your own words; never paste a command line or stderr, and strip any
 `VAR=value` assignment, or credential-bearing URL. Checking a claim against the remote default branch
 verifies its accuracy; it does not sanitize the text.
 
-Apply the path rules of [github-issue](../../github-issue/SKILL.md) to `## Files / areas`.
+Apply the path rules of the `github-issue` skill (`skills` plugin) to `## Files / areas`.
+
+A stop condition in an issue names a real decision for a human. Adding or changing an index, or a
+rewrite that returns the same rows, is never one: the worker makes the change and records the plan
+before and after.

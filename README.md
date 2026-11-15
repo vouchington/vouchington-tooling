@@ -12,30 +12,25 @@ Both packages are published to npm. Releases go through the `Release` workflow (
 ## Agent plugins
 
 The repository also publishes the public [`vouchington-workflow`](./plugins/vouchington-workflow)
-agent plugin. It provides reusable implementation, commit, GitHub Actions checklist, planning,
-issue-management, blackboard journaling, retrospective and follow-up review, CI-log review,
-pull-request triage, and pull-request-description skills. The plugin uses one canonical
-`skills/` tree for every supported host; consumer repositories add their local mechanics and policy
-in repository-local instruction files or thin wrapper skills. The portable issue workflow verifies live
-collaborator authority before creation, routes denied external work to a verified consumer tracker,
-uses existing labels without extra approval, and requires explicit approval before creating labels.
+agent plugin. It provides blackboard journaling, retrospective and follow-up review, issue
+organization and taxonomy review, pull-request triage, and pull-request-description skills. The
+plugin uses one canonical `skills/` tree for every supported host; consumer repositories add their
+local mechanics and policy in repository-local instruction files or thin wrapper skills. Issue
+organization applies existing labels, milestones, and projects without extra approval, and
+taxonomy review requires explicit approval before creating labels.
 Consumers still own repository defaults, taxonomy definitions, templates, and stricter policy.
 
-The generic skills that used to live here (testing, PostgreSQL, Dependabot, GitHub Actions
-authoring, npm publishing, package metadata, static analysis, security triage, stacked pull
-requests) now live in the [`jonathanong/skills`](https://github.com/jonathanong/skills) plugin.
-Stacked pull requests are covered by the `pr-shepherd:pr-shepherd` skill.
+The generic skills that used to live here (implementation, commits, planning, issues, CI logs,
+follow-up review, testing, PostgreSQL, Dependabot, GitHub Actions, npm publishing, package metadata,
+static analysis, security triage, stacked pull requests) now live in the
+[`jonathanong/skills`](https://github.com/jonathanong/skills) plugin. Stacked pull requests are
+covered by the `pr-shepherd:pr-shepherd` skill.
 
 Domain skill entrypoints read applicable `AGENTS.md` and a repository-local adapter when present.
-The default adapter is `.agents/skills/<canonical-name>/SKILL.md`; local instructions may name an
-alias, such as `git-commit-checklist` → `repo-git-commit-checklist`. A previously read
-adapter or canonical skill is not loaded again. This is agent guidance, not runtime concatenation
-or a new loader API; linked files and plugin installation alone do not prove an adapter was read.
-Workflow references load by phase. Plans are proportional and saved once outside Git, including
-in an existing issue or PR description; the skills do not require a separate Plan issue or template.
-The `github-actions-checklist` skill defines the portable trigger, 30-minute timeout, runner,
-action-pinning, dependency-update testing, real required checks, domain-oriented test jobs, and
-branch-aware concurrency policies.
+The default adapter is `.agents/skills/<canonical-name>/SKILL.md`. A previously read adapter or
+canonical skill is not loaded again. This is agent guidance, not runtime concatenation or a new
+loader API; linked files and plugin installation alone do not prove an adapter was read. Workflow
+references load by phase.
 
 These integrations are opt-in. Installing a package or cloning this repository does not enable an AI
 coding platform, transcript adapter, workflow, or CI provider. Select only the plugin directories,

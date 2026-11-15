@@ -38,19 +38,12 @@ describe('vouchington-workflow plugin', () => {
       .map((entry) => entry.name)
       .sort()
     expect(skillNames).toEqual([
-      'agent-workflow',
       'blackboard',
-      'git-commit-checklist',
-      'github-actions-checklist',
-      'github-issue',
       'organize-github-issues',
-      'planning',
       'pr-description',
       'retrospective',
       'retrospective-distill',
-      'review-ci-logs',
       'review-github-issue-taxonomy',
-      'revisit-followups',
       'triage-loop',
       'triage-prs',
       'triage-sweep',
@@ -110,174 +103,49 @@ describe('vouchington-workflow plugin', () => {
     for (const term of ['hook-harness', '/shepherd', '/plan', '/fix']) {
       expect(loop).toContain(term)
     }
-    const handoff = skills[skillNames.indexOf('agent-workflow')]
-    expect(handoff).toContain('`/shepherd`')
-    expect(handoff).toContain('triage loop')
-    expect(skills[0]).toContain('every applicable')
-    expect(skills[0]).not.toContain('assigned non-main worktree')
+    const retrospective = skills[skillNames.indexOf('retrospective')]
+    for (const term of ['`/shepherd`', 'handoff-pr<number>', 'merge-pr<number>']) {
+      expect(retrospective).toContain(term)
+    }
   })
 
-  it('defines portable GitHub Actions policy without freezing dependency updates', async () => {
-    const skill = await readSkill('github-actions-checklist')
-    const normalized = skill.replaceAll(/\s+/g, ' ')
-
-    expect(skill).toMatch(/`pull_request`[\s\S]*private repositories?/i)
-    expect(skill).toMatch(/`pull_request_target`[\s\S]*untrusted pull-request content/i)
-    expect(skill).toMatch(/30 minutes/i)
-    expect(normalized).toMatch(/Prefer GitHub-hosted runners for public and private repositories/i)
-    expect(normalized).toMatch(/Choose the smallest hosted runner the job fits/i)
-    expect(normalized).toMatch(
-      /full VM or native-architecture runner only for work the smaller runner cannot do/i,
-    )
-    expect(normalized).toMatch(
-      /self-hosted or disposable runners names its approved labels in repository-local policy/i,
-    )
-    expect(normalized).toMatch(/`timeout-minutes` below any hard platform limit/i)
-    expect(normalized).toMatch(
-      /no more than 14 minutes on a runner with a 15-minute hard cap that `timeout-minutes` cannot raise/i,
-    )
-    expect(normalized).toMatch(
-      /the job's own cancellation fires first and `always\(\)`\/`cancelled\(\)` cleanup steps still run/i,
-    )
-    expect(normalized).toMatch(
-      /every long-running, network-bound, or waiting step its own `timeout-minutes`/i,
-    )
-    expect(normalized).toMatch(/bound every network call/i)
-    expect(normalized).toMatch(
-      /Do not add workspace-cleanup steps for them, and check out with `persist-credentials: false` unless a later step must push with that token\./i,
-    )
-    expect(normalized).toMatch(
-      /Moving a job from a self-hosted or other persistent runner to a GitHub-hosted one drops every piece of runner-local state/i,
-    )
-    expect(normalized).toMatch(/browser installs \(a Playwright, Cypress, or Puppeteer cache\)/i)
-    expect(normalized).toMatch(
-      /package-manager stores \(pnpm\/npm, Go modules, a Rust `target\/` directory, Gradle\)/i,
-    )
-    expect(normalized).toMatch(
-      /`apt-get install` steps that used to be a no-op because the package was already present/i,
-    )
-    expect(normalized).toMatch(/Docker image pulls that used to hit a warm local image store/i)
-    expect(normalized).toMatch(
-      /"persists between runs so caching is not needed" describes the old runner and becomes false the moment `runs-on` changes/i,
-    )
-    expect(normalized).toMatch(
-      /replace that assumption with a keyed `actions\/cache` step instead/i,
-    )
-    expect(normalized).toMatch(
-      /Re-derive `timeout-minutes` from a real passing run on the new runner rather than carrying over a budget calibrated on a warm host/i,
-    )
-    expect(skill).toMatch(
-      /repository-backed external `uses:` reference[\s\S]*40-character Git SHA/i,
-    )
-    expect(skill).toMatch(/machine-maintainable\s+version[\s\S]*# v\d+\.\d+\.\d+/i)
-    expect(skill).toMatch(/`docker:\/\/\.\.\.` actions[\s\S]*`@sha256:` image digest/i)
-    expect(skill).toMatch(/Dependabot/i)
-    expect(skill).toMatch(/tests?[\s\S]*must not assert[^\n]*exact SHA or version/i)
-    expect(skill).toMatch(/exact source revision[\s\S]*`with\.ref`/i)
-    expect(skill).toMatch(/required job or check name[\s\S]*fan-in/i)
-    expect(skill).toMatch(/underlying phase[\s\S]*deadline of no more than 30 minutes/i)
-    expect(skill).toMatch(/must not hide a longer-running[\s\S]*another service/i)
-    expect(skill).toMatch(/top-level `jobs\.<job_id>\.uses`[\s\S]*cannot accept `timeout-minutes`/i)
-    expect(normalized).toMatch(/required checks?.*actual workflow jobs?/i)
-    expect(normalized).toMatch(/must not (create|publish|synthesize).*check (runs?|statuses?)/i)
-    expect(normalized).toMatch(/main.*test jobs?.*domain/i)
-    expect(normalized).toMatch(/pull requests?.*cancel-in-progress/i)
-    expect(normalized).toMatch(/main.*cancel-in-progress: false/i)
-    expect(normalized).toMatch(/older pending main run.*newest pending revision/i)
-    expect(normalized).toMatch(/preserving every intermediate queued revision is not required/i)
-  })
-
-  it('defines evidence-backed persistent-workspace prevention and recovery policy', async () => {
-    const [checklist, logs] = await Promise.all([
-      readSkill('github-actions-checklist'),
-      readSkill('review-ci-logs'),
-    ])
-
-    expect(checklist).toMatch(/full tree[\s\S]*sparse checkout/i)
-    expect(checklist).toMatch(/writable workspace bind mount[\s\S]*non-root identity/i)
-    expect(checklist).toMatch(/unconditional[\s\S]*pre-checkout[\s\S]*workspace-wide/i)
-    expect(checklist).toMatch(/bounded known generated paths/i)
-    expect(checklist).toMatch(
-      /failure-gated[\s\S]*same-filesystem[\s\S]*directory-only[\s\S]*batched/i,
-    )
-    expect(checklist).toMatch(/YAML-aware[\s\S]*tracked workflow and action files/i)
-    expect(logs).toMatch(/producer[\s\S]*sparse state or unsafe ownership/i)
-    expect(checklist).toMatch(/path count and timing/i)
-  })
-
-  it('keeps issue creation and taxonomy changes behind the portable safety contract', async () => {
-    const [issue, organize, taxonomy, revisit, distill, planning] = await Promise.all([
-      readSkill('github-issue'),
+  it('keeps project rules in organize-github-issues and taxonomy review linked to them', async () => {
+    const [organize, taxonomy, distill, sweep] = await Promise.all([
       readSkill('organize-github-issues'),
       readSkill('review-github-issue-taxonomy'),
-      readSkill('revisit-followups'),
       readSkill('retrospective-distill'),
-      readSkill('planning'),
+      readSkill('triage-sweep'),
     ])
-    const normalizedIssue = issue.replaceAll(/\s+/g, ' ')
-    const normalizedPlanning = planning.replaceAll(/\s+/g, ' ')
-    const normalizedTaxonomy = taxonomy.replaceAll(/\s+/g, ' ')
     const normalizedOrganize = organize.replaceAll(/\s+/g, ' ')
+    const normalizedTaxonomy = taxonomy.replaceAll(/\s+/g, ' ')
 
-    expect(normalizedIssue).toMatch(
-      /Immediately before every write, refetch the exact target\. Its canonical identity must still match, and the repository must not be archived\./i,
-    )
-    expect(normalizedIssue).toMatch(/`TRIAGE`, `WRITE`, `MAINTAIN`, or `ADMIN`/)
-    expect(normalizedIssue).toMatch(
-      /viewerCanCreateIssues.*does not require issues to be enabled.*taxonomy definitions requires `WRITE`/i,
-    )
-    expect(normalizedIssue).toMatch(/is a hard deny\. Approval cannot override it/i)
-    expect(normalizedIssue).toMatch(/denied external creation target[\s\S]*tracking issue/i)
-    expect(normalizedIssue).toMatch(/copy-ready report/i)
-    expect(normalizedIssue).toMatch(/tracking fallback unless the caller opts/i)
-    expect(normalizedIssue).toMatch(/refetch the destination and apply the issue-operation gate/i)
-    expect(normalizedIssue).toMatch(
-      /less-restricted destination, remove private repository identity/i,
-    )
-    expect(normalizedIssue).toMatch(/If no tracker passes, return the draft without mutation/i)
-    expect(normalizedIssue).toMatch(/Before editing[\s\S]*refetch the issue and its discussion/i)
-    expect(normalizedIssue).toMatch(/acceptance evidence show the work is resolved/i)
-    expect(normalizedIssue).toMatch(/matching existing labels and a selected existing milestone/i)
-    expect(normalizedIssue).toMatch(/with no separate approval/i)
-    expect(normalizedIssue).toMatch(
-      /already has a milestone, apply that same milestone.*already has a project.*exactly one accessible open membership exists.*skip the project and report the conflict/i,
-    )
-    expect(normalizedIssue).toMatch(/exact repository, name, description, and color/i)
-    expect(normalizedIssue).toMatch(/Pull-request creation authority stays separate/i)
-    expect(normalizedIssue).toMatch(/native sub-issues only for a real hierarchy/i)
-    expect(normalizedIssue).toMatch(/preflight every entry before writing any issue/i)
-    expect(normalizedIssue).toMatch(
-      /existing open project for strategic, initiative-level tracking.*milestone for repo-local release or sequencing.*not by how many repositories it touches.*single-repo strategic initiative can have a project.*can have both.*at most one project, and not every issue needs one/i,
-    )
-    expect(normalizedIssue).toMatch(
-      /denies the project step only.*issue and its other metadata still proceed/i,
-    )
-    expect(normalizedIssue).toMatch(
-      /plus project-write.*project's automation could pull in.*Creating, renaming, or closing a project is a separate taxonomy operation/i,
-    )
-    expect(normalizedIssue).toMatch(
-      /project status that closes the issue unless closing is separately authorized.*Auto-close issue workflow.*re-read the project/i,
-    )
     expect(organize).toMatch(/existing labels[\s\S]*without requesting separate label approval/i)
+    expect(normalizedOrganize).toMatch(/\[Projects and milestones\]\(#projects-and-milestones\)/)
     expect(normalizedOrganize).toMatch(
-      /existing labels, milestones, and projects.*\[github-issue\].*single-project membership/i,
+      /existing open project for strategic, initiative-level tracking.*milestone for repo-local release or sequencing.*not by how many repositories it touches.*can have both.*at most one project, and not every issue needs one/i,
     )
-    expect(normalizedOrganize).toMatch(/status that closes the issue/i)
-    expect(organize).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(normalizedOrganize).toMatch(
+      /project's automation could pull in.*skip the add and report the conflict.*re-read the project/i,
+    )
+    expect(normalizedOrganize).toMatch(
+      /Missing project scope or permission skips the project step only/i,
+    )
+    expect(normalizedOrganize).toMatch(
+      /project status that closes the issue unless closing is separately authorized.*Auto-close issue workflow/i,
+    )
+    expect(normalizedOrganize).toMatch(
+      /plan issue takes its source's milestone.*exactly one accessible open membership exists.*skip the project and report the conflict/i,
+    )
     expect(taxonomy).toMatch(/Before creating a label[\s\S]*explicit approval/i)
     expect(normalizedTaxonomy).toMatch(
       /duplicated across repositories is a candidate project.*only routine, non-initiative work is a candidate milestone.*Repository count is not the signal/i,
     )
     expect(taxonomy).toMatch(/auto-add of a parent issue's sub-issues/i)
-    expect(taxonomy).toContain('[github-issue](../github-issue/SKILL.md)')
-    expect(revisit).toContain('[github-issue](../github-issue/SKILL.md)')
-    expect(distill).toContain('[github-issue](../github-issue/SKILL.md)')
+    expect(taxonomy).toContain('(../organize-github-issues/SKILL.md#projects-and-milestones)')
     expect(distill).toMatch(/labels, milestones, projects/i)
-    expect(normalizedPlanning).toMatch(
-      /plan issue from a source issue that already has a milestone or project.*same existing milestone or project/i,
-    )
-    expect(planning).toContain('[github-issue](../github-issue/SKILL.md)')
-    for (const skill of [issue, organize, taxonomy, revisit, distill, planning]) {
+    expect(distill).toContain('`github-issue` skill (`skills` plugin)')
+    expect(sweep.replaceAll(/\s+/g, ' ')).toMatch(/exact existing `follow-up` label/)
+    for (const skill of [organize, taxonomy, distill]) {
       expect(skill).not.toMatch(/filaments|voucha|jonathanong|vouchington\//i)
     }
   })

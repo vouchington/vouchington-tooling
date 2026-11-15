@@ -18,44 +18,6 @@ describe('domain skill plugins', () => {
     await expect(readdir(join(root, 'plugins'))).resolves.toEqual(['vouchington-workflow'])
   })
 
-  it('routes non-blocking bot feedback through durable follow-up issues', async () => {
-    const [response, manifest] = await Promise.all([
-      readSkill('vouchington-workflow', 'agent-workflow/references/review-response.md'),
-      readRecordJson('packages/vouchington-tooling/skill-manifest.json'),
-    ])
-    const normalized = response.replaceAll(/\s+/g, ' ')
-    const agentWorkflow = (manifest.skills as Array<Record<string, unknown>>).find(
-      (skill) => skill.name === 'agent-workflow',
-    )
-
-    expect(normalized).toMatch(/automated reviewer[^.]*valid[^.]*non-blocking/i)
-    expect(normalized).toMatch(/do not[^.]*code[^.]*push/i)
-    expect(normalized).toMatch(/invalid[^.]*reason[^.]*no code change[^.]*no follow-up/i)
-    expect(normalized).toMatch(/blocking[^.]*fixed[^.]*pushed[^.]*confirmed/i)
-    expect(normalized).toMatch(/human feedback[^.]*already-planned push[^.]*cheap/i)
-    expect(normalized).toMatch(/search[^.]*existing[^.]*follow-up/i)
-    expect(normalized).toContain('`follow-up`')
-    expect(normalized).toMatch(/non-closing[^.]*originating pull request/i)
-    expect(normalized).toMatch(/re-fetch[^.]*verify[^.]*replying[^.]*only then resolve/i)
-    expect(normalized).toMatch(/reply[^.]*unauthorized[^.]*fail closed[^.]*unresolved/i)
-    expect(agentWorkflow).toMatchObject({ prerequisites: expect.arrayContaining(['github-issue']) })
-  })
-
-  it('keeps reusable practices in canonical resources without product policy', async () => {
-    const resources = await Promise.all([
-      readSkill('vouchington-workflow', 'agent-workflow/references/implementation.md'),
-      readSkill('vouchington-workflow', 'agent-workflow/references/review.md'),
-      readSkill('vouchington-workflow', 'agent-workflow/references/evidence-sweep.md'),
-      readSkill('vouchington-workflow', 'agent-workflow/references/four-refs.md'),
-    ])
-    expect(resources.join('\n')).toMatch(
-      /accepted-decision ledger|failure paths|acceptance criterion|typed module shape|collision-safe|locator|stopLoading|read-after-write|partition key/i,
-    )
-    for (const resource of resources) {
-      expect(resource).not.toMatch(/filaments|voucha|@data-stores|glidemq/i)
-    }
-  })
-
   it('keeps raw retrospective evidence out of durable records', async () => {
     const retrospective = await readSkill('vouchington-workflow', 'retrospective/SKILL.md')
     const normalized = retrospective.replaceAll(/\s+/g, ' ')
@@ -107,10 +69,6 @@ async function readJson(path: string): Promise<{ plugins: Array<{ name: string }
   return JSON.parse(await readFile(join(root, path), 'utf8')) as {
     plugins: Array<{ name: string }>
   }
-}
-
-async function readRecordJson(path: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await readFile(join(root, path), 'utf8')) as Record<string, unknown>
 }
 
 function readSkill(plugin: string, path: string): Promise<string> {
