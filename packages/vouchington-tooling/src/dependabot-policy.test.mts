@@ -89,11 +89,8 @@ describe('Dependabot policy', () => {
     }
   })
 
-  it('exempts only the verified first-party npm release', () => {
+  it('exempts no npm package from the cooldown', () => {
     const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
-    expect(npm?.cooldown.exclude).toEqual(['pr-shepherd'])
-    expect(Object.values(npm?.groups ?? {}).flatMap((group) => group.patterns)).not.toContain(
-      'pr-shepherd',
-    )
+    expect(npm?.cooldown.exclude).toBeUndefined()
   })
 })
