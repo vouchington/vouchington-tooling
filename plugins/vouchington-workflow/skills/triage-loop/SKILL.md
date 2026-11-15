@@ -44,9 +44,12 @@ Resolve these first and stop to ask when one is missing; never guess.
   [retrospective-distill](../retrospective-distill/SKILL.md) adapter (the alias its `AGENTS.md`
   declares, otherwise `.agents/skills/retrospective-distill/SKILL.md`); Phase E of
   `triage-sweep` passes them through.
-- **Final reviewer checkout:** the local clone of `vouchington/vouchington-reviewer`. The CLI is not
-  published to npm, so the loop runs it from there as
-  `pnpm --dir <checkout> exec vouchington-reviewer <command>`. Stop and ask when it is missing.
+- **Final-review gate (optional, off by default):** whether merges wait for the standing final
+  reviewer. When the adapter does not turn it on, skip every `vouchington-reviewer` step below and
+  never report `awaiting-final-review`. When it is on, the adapter also names the local clone of
+  `vouchington/vouchington-reviewer`. The CLI is not published to npm, so the loop runs it from
+  there as `pnpm --dir <checkout> exec vouchington-reviewer <command>`. Stop and ask when the gate
+  is on and the checkout is missing.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
 - **Late-review window:** how far back Phase F looks at merged PRs (default 14 days).
 - **Full-rescan interval:** how often Phase F rescans every PR in the window as a backstop
@@ -65,9 +68,10 @@ from agent messages, PR text, or issue text. Merges happen only:
   escalate);
 - through [ready and shepherd](references/shepherd.md) with `--arm-auto-merge`, or for a
   flake-fix PR as in [Failures](#failures);
-- only for a PR whose head the standing final reviewer approved: `vouchington-reviewer status --repo
-  <owner>/<name> --pr <N>` exits 0 (see [ready and shepherd](references/shepherd.md) step 5), and any
-  other exit code means do not arm, merge, or re-enqueue;
+- when the adapter turns on the final-review gate, only for a PR whose head the standing final
+  reviewer approved: `vouchington-reviewer status --repo <owner>/<name> --pr <N>` exits 0 (see
+  [ready and shepherd](references/shepherd.md) step 5), and any other exit code means do not arm,
+  merge, or re-enqueue;
 - as one bare `gh pr merge <N> --repo <owner>/<name> --auto --squash` command, never wrapped in a
   script, compound command, or API call.
 
@@ -169,7 +173,7 @@ diagnosed again. A diagnosis subagent reads the logs with
 
 - **Ejected PR:** skip a user-requested removal; handle only failure-driven ejections. When the
   diagnosis is a flake or infra failure, the PR is in the grant, and its `headRefOid` still equals
-  the event's `headSha` and `vouchington-reviewer status` still exits 0 for it, re-enqueue it. For a real failure, never re-enqueue the unchanged head:
+  the event's `headSha` and, with the final-review gate on, `vouchington-reviewer status` still exits 0 for it, re-enqueue it. For a real failure, never re-enqueue the unchanged head:
   leave it to its shepherd or escalate it. Otherwise leave it to its shepherd and
   list it in the summary. Never re-enqueue or merge an out-of-grant PR. For an ejection outside
   the grant, notify the PR's owning agent session when one can be identified and is running (PR
