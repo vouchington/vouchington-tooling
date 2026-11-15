@@ -57,7 +57,7 @@ sweep merges one through pr-shepherd only when:
 - no pr-shepherd command for it is still running;
 - its current head passes every required check;
 - a fresh review of that head still fits the same category;
-- with the final-review gate on, `vouchington-reviewer status` exits 0 for that head (see
+- with the final-review gate on, the adapter's `<review-status>` exits 0 for that head (see
   [ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 5).
 
 That merge runs `pr-shepherd '<owner/repo#N>' --merge --until-terminal` as a background command and
