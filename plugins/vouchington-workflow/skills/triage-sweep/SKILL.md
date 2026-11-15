@@ -52,13 +52,13 @@ auto-merge workflow) while its checks pass or are pending. Arming it again or di
 shepherd would race the merge that is already landing.
 
 Steered handoffs stay unarmed (see [ready and shepherd](../triage-loop/references/shepherd.md) step 6)
-and are reported as `shepherding, manual-verification-required`; a PR still `awaiting-final-review`
-stays unarmed too. A later sweep arms one only when:
+and are reported as `shepherding, manual-verification-required`; with the final-review gate on, a
+PR still `awaiting-final-review` stays unarmed too. A later sweep arms one only when:
 
 - its shepherd is no longer in flight;
 - its current head passes every required check;
 - a fresh review of that head still fits the same category;
-- `vouchington-reviewer status` exits 0 for that head, including after the push that followed a disarm (see
+- with the final-review gate on, `vouchington-reviewer status` exits 0 for that head, including after the push that followed a disarm (see
   [ready and shepherd](../triage-loop/references/shepherd.md) step 5).
 
 Arming then uses one bare `gh pr merge` command, as in the grant.

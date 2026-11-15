@@ -19,7 +19,8 @@ and the merge authority per PR category; stop and ask when one is missing.
 4. **Mark ready and label.**
    `gh pr view <N> --repo <owner>/<name> --json isDraft --jq .isDraft` (true: `gh pr ready`), then
    `gh pr edit <N> --repo <owner>/<name> --add-label <automation-label>`.
-5. **Request final review and gate on it.** Request a review of the current head with
+5. **Request final review and gate on it (only when the adapter turns on the final-review gate;
+   otherwise skip this step).** Request a review of the current head with
    `gh api --method POST repos/<owner>/<name>/issues/<N>/labels -f 'labels[]=final-review:requested'`
    (or message the `final-reviewer` session with `<owner>/<name>#<N>`); adding it again requests a
    re-review after new commits. The standing reviewer lives in `vouchington/vouchington-reviewer`.
@@ -32,7 +33,8 @@ and the merge authority per PR category; stop and ask when one is missing.
    check. Nothing waits on the reviewer. This gate is procedural: GitHub enforces it only through a
    required status check, or branch protection that dismisses stale approvals, which the consuming
    repository's adapter owns.
-6. **Arm auto-merge (only with `--arm-auto-merge`, and only when step 5 exited 0).** Pass the flag
+6. **Arm auto-merge (only with `--arm-auto-merge`, and, with the final-review gate on, only when
+   step 5 exited 0).** Pass the flag
    only for a category the grant covers. Check once per repository per run that
    `gh api repos/<owner>/<name> --jq .allow_auto_merge` is true; when `false`, report `manual merge required` and continue. When the
    REST pull object has a `stack` field, auto-merge is unavailable: report `stacked; needs explicit
@@ -52,9 +54,9 @@ and the merge authority per PR category; stop and ask when one is missing.
    waits on the worker; on ESCALATE it reports back and the loop escalates. Remove the entry when
    the worker stops. Before any push to an armed PR, the worker or loop runs
    `gh pr merge <N> --repo <owner>/<name> --disable-auto` and confirms `autoMergeRequest` is now
-   null; if disarming fails, it does not push and reports instead. After the push it requests a new
-   final review (the label again, as in step 5). A later sweep re-arms only when
-   `vouchington-reviewer status` exits 0 for the new head.
+   null; if disarming fails, it does not push and reports instead. With the final-review gate on,
+   after the push it requests a new final review (the label again, as in step 5), and a later sweep
+   re-arms only when `vouchington-reviewer status` exits 0 for the new head.
 8. **Verify and report.** `gh pr view <N> --repo <owner>/<name> --json
    isDraft,autoMergeRequest,state`. Report per PR: ready, steered, auto-merge (armed, no,
    manual-verification-required, awaiting-final-review, unavailable), shepherd (local or no), and the reason for any `no`.
