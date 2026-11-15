@@ -30,8 +30,7 @@ local configuration edits or a live taxonomy mutation. Read local `AGENTS.md` fi
    need product or scheduling judgment. Applying an existing label is not taxonomy creation and
    needs no separate approval from the authorized issue operation.
 5. Before creating a label, stop for explicit approval of its exact repository, name, description,
-   and color. Re-fetch current state and apply the taxonomy-definition gate of the `github-issue`
-   skill (`skills` plugin): require `WRITE`, `MAINTAIN`, or `ADMIN` and the
+   and color. Re-fetch current state, then require `WRITE`, `MAINTAIN`, or `ADMIN` and the
    label-specific API capability immediately before the approved mutation. `viewerCanCreateIssues`
    applies only to issue creation. Approval for an issue or another label does not transfer.
 

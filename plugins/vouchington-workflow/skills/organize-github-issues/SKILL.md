@@ -14,7 +14,7 @@ local `AGENTS.md`, and live taxonomy guidance before acting.
 
 1. Confirm repository identity. Fetch live labels, milestone descriptions, open project
    descriptions, and the in-scope issue or pull-request evidence. Before a mutation, apply the
-   operation-specific gate from the `github-issue` skill (`skills` plugin). Pull-request metadata
+   "Authority to write" section of the `github-issue` skill (`skills` plugin). Pull-request metadata
    does not require issues to be enabled.
 2. Classify from the permitted metadata and discussion. Do not guess from the implementation. Keep
    automation, ownership, and provenance labels unless local policy explicitly allows a change.
