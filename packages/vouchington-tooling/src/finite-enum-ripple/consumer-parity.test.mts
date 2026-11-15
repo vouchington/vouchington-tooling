@@ -38,7 +38,9 @@ function parse(content: string) {
 
 const route = "const routes = { all: { singular: 'item', plural: 'items', kinds: undefined } }"
 
-describe('released consumer parity', () => {
+// Every case type-checks a full TypeScript program, which can exceed the default timeout on a
+// busy CI shard.
+describe('released consumer parity', { timeout: 30_000 }, () => {
   it('accepts explicit intrinsic undefined optional arrays', () => {
     expect(
       parse(`export {}; ${route}`).map(({ key, pluralPath, singularPath, unionTypes }) => ({
