@@ -5,46 +5,10 @@
   },
   "plugins": [
     {
-      "name": "security-triage",
-      "source": {
-        "source": "local",
-        "path": "./plugins/security-triage"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Security"
-    },
-    {
       "name": "vouchington-workflow",
       "source": {
         "source": "local",
         "path": "./plugins/vouchington-workflow"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Productivity"
-    },
-    {
-      "name": "vouchington-testing",
-      "source": {
-        "source": "local",
-        "path": "./plugins/vouchington-testing"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_USE"
-      },
-      "category": "Productivity"
-    },
-    {
-      "name": "vouchington-database",
-      "source": {
-        "source": "local",
-        "path": "./plugins/vouchington-database"
       },
       "policy": {
         "installation": "AVAILABLE",
