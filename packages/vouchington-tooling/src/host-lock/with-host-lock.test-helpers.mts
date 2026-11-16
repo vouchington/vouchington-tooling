@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { mkdtemp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -62,6 +62,13 @@ export function spawnHostLock(
   })
 }
 
+// macOS Bash 3.2 (`set -m`) can race the parent and forked child both calling
+// setpgid under CPU load and print this warning. The process group is still
+// established by the winner, and the warning is owned by the shell, not by
+// with-host-lock, so assertions on the wrapper's own stderr drop it.
+const benignJobControlWarning =
+  /^.*: (?:child )?setpgid \(\d+ to \d+\): Operation not permitted\n/gm
+
 export function completion(child: ChildProcess): Promise<{ code: number | null; stderr: string }> {
   return new Promise((resolve, reject) => {
     let stderr = ''
@@ -69,7 +76,9 @@ export function completion(child: ChildProcess): Promise<{ code: number | null; 
       stderr += String(chunk)
     })
     child.once('error', reject)
-    child.once('close', (code) => resolve({ code, stderr }))
+    child.once('close', (code) =>
+      resolve({ code, stderr: stderr.replace(benignJobControlWarning, '') }),
+    )
   })
 }
 
@@ -161,40 +170,5 @@ exec "$HOST_LOCK_REAL_SLEEP" "$@"
     owner.kill('SIGKILL')
     contender?.kill('SIGKILL')
     await Promise.all([ownerDone, ...(contenderDone ? [contenderDone] : [])])
-  }
-}
-
-type Completion = { code: number | null; stderr: string }
-
-async function describePath(path: string): Promise<string> {
-  try {
-    await stat(path)
-  } catch {
-    return 'absent'
-  }
-  const entries = await readdir(path).catch(() => undefined)
-  return entries === undefined ? 'present' : `present [${entries.join(', ')}]`
-}
-
-// On failure, rethrows with the lock dir, guard, and both wrappers' exit codes
-// and stderr so a recurrence of an overlapping-holders flake names the cause.
-export async function assertWithLockDiagnostics(
-  { lockRoot, lockName, guard }: { lockRoot: string; lockName: string; guard: string },
-  results: Completion[],
-  assertion: () => void,
-): Promise<void> {
-  try {
-    assertion()
-  } catch (error) {
-    const diagnostics = [
-      `lock dir ${lockRoot}/${lockName}.lock.d: ${await describePath(`${lockRoot}/${lockName}.lock.d`)}`,
-      `reap dir: ${await describePath(`${lockRoot}/${lockName}.lock.reap.d`)}`,
-      `guard ${guard}: ${await describePath(guard)}`,
-      ...results.map(
-        (result, index) =>
-          `wrapper ${index + 1}: code=${result.code} stderr=${JSON.stringify(result.stderr)}`,
-      ),
-    ]
-    throw new Error(`${String(error)}\n${diagnostics.join('\n')}`, { cause: error })
   }
 }

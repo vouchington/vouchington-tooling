@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  assertWithLockDiagnostics,
   cleanupTestHomes,
   completion,
   execFileAsync,
@@ -13,6 +12,7 @@ import {
   makeHome,
   spawnHostLock,
 } from './with-host-lock.test-helpers.mts'
+import { assertWithLockDiagnostics } from './with-host-lock-diagnostics.test-helpers.mts'
 
 describe('with-host-lock.sh', () => {
   afterEach(async () => {

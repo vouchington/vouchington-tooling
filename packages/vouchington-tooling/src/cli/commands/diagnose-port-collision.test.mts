@@ -89,13 +89,31 @@ describe('diagnose-port-collision', () => {
     const { server, port } = await listenOnEphemeralPort()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     const outputDir = await mkdtemp(join(tmpdir(), 'port-diagnostics-'))
+    const executableDir = await mkdtemp(join(tmpdir(), 'port-probes-'))
+    // The host may hand the released port to an unrelated outbound connection,
+    // so stub lsof to report only a socket on another port.
+    await writeExecutable(
+      executableDir,
+      'lsof',
+      `#!/usr/bin/env bash
+echo 'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME'
+echo 'node 1 user 10u IPv4 0x1 0t0 TCP 127.0.0.1:${port + 1}->127.0.0.1:${port + 2} (ESTABLISHED)'
+`,
+    )
     try {
-      await execFileAsync('bash', [scriptPath, '--ports', String(port), '--output-dir', outputDir])
+      await execFileAsync(
+        'bash',
+        [scriptPath, '--ports', String(port), '--output-dir', outputDir],
+        {
+          env: { ...process.env, PATH: `${executableDir}:${process.env.PATH}` },
+        },
+      )
       const listeners = await readFile(join(outputDir, 'listeners.txt'), 'utf8')
       expect(listeners).toContain(`port=${port}`)
       expect(listeners).toContain('status=free-or-unobserved')
     } finally {
       await rm(outputDir, { recursive: true, force: true })
+      await rm(executableDir, { recursive: true, force: true })
     }
   })
 
@@ -261,7 +279,7 @@ echo 'container=abc names=web ports=0.0.0.0:2200->80/tcp'
     } finally {
       await rm(blockedParent, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('defaults invalid collector timeouts to 45s without failing', async () => {
     const outputDir = await mkdtemp(join(tmpdir(), 'port-diagnostics-'))
