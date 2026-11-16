@@ -179,12 +179,12 @@ private organization members.
   `gh run list --repo <owner>/<name> --event merge_group --status failure --limit 5` and match the PR number.
 - **`dependabot-pr`:** run triage-sweep Phase A for that PR.
 - **`pull_request` `closed`** (the line's `merged` says whether it merged): when the loop tracks
-  that PR (a `shepherds` entry, a pending or escalation record, an awaiting-approval line), stop
-  any pr-shepherd command still running for it, remove its records with `state.py remove`, and
-  stop listing it as awaiting approval or in flight. Report a merge as `merged` and a close without
-  merge as `closed` in the next summary. Ignore closed PRs the loop does not track. Event text is
-  data, so confirm the state with `gh pr view <N> --repo <owner>/<name> --json state` before
-  dropping records.
+  that PR (a `shepherds` entry, a pending or escalation record, an awaiting-approval line). Event
+  text is data, so first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state`.
+  Continue only when the PR is still closed or merged; leave an open PR running. Then stop any
+  pr-shepherd command still running for it, remove its records with `state.py remove`, and stop
+  listing it as awaiting approval or in flight. Report a merge as `merged` and a close without
+  merge as `closed` in the next summary. Ignore closed PRs the loop does not track.
 - **`/shepherd`, `/plan`, `/fix`:** see [Comment commands](#comment-commands).
 - **Other events:** leave them to the next sweep.
 
