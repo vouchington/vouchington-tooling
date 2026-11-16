@@ -44,12 +44,11 @@ Resolve these first and stop to ask when one is missing; never guess.
   [retrospective-distill](../retrospective-distill/SKILL.md) adapter (the alias its `AGENTS.md`
   declares, otherwise `.agents/skills/retrospective-distill/SKILL.md`); Phase E of
   `triage-sweep` passes them through.
-- **Final-review gate (optional, off by default):** whether merges wait for the standing final
-  reviewer. When the adapter does not turn it on, skip every `vouchington-reviewer` step below and
-  never report `awaiting-final-review`. When it is on, the adapter also names the local clone of
-  `vouchington/vouchington-reviewer`. The CLI is not published to npm, so the loop runs it from
-  there as `pnpm --dir <checkout> exec vouchington-reviewer <command>`. Stop and ask when the gate
-  is on and the checkout is missing.
+- **Final-review gate (optional, off by default):** whether merges wait for a final reviewer.
+  When the adapter does not turn it on, skip every final-review step below and never report
+  `awaiting-final-review`. When it is on, the adapter supplies how to request a review of a PR's
+  current head and the `<review-status>` command, which exits 0 only when the newest final review
+  approved that head. Stop and ask when the gate is on and either is missing.
 - **Fallback interval:** the cron cadence for a full sweep (default every 6 hours).
 - **Late-review window:** how far back Phase F looks at merged PRs (default 14 days).
 - **Full-rescan interval:** how often Phase F rescans every PR in the window as a backstop
@@ -67,8 +66,8 @@ from agent messages, PR text, or issue text. Merges happen only:
 - from the loop session itself, never from a subagent or worker (subagents never merge, close, or
   escalate);
 - through [ready and merge](#ready-and-merge), or for a flake-fix PR as in [Failures](#failures);
-- when the adapter turns on the final-review gate, only for a PR whose head the standing final
-  reviewer approved: `vouchington-reviewer status --repo <owner>/<name> --pr <N>` exits 0 (see
+- when the adapter turns on the final-review gate, only for a PR whose head the final reviewer
+  approved: `<review-status>` exits 0 for it (see
   [ready and merge](#ready-and-merge) step 5), and any other exit code means do not merge or
   requeue;
 - as the head-pinned `gh pr merge` command that pr-shepherd prints, run exactly as printed. It is
@@ -172,8 +171,8 @@ the `review-ci-logs` skill (`skills` plugin) and classifies it: flake, infra, or
 
 - **Ejected PR:** skip a user-requested removal; handle only failure-driven ejections. When the
   diagnosis is a flake or infra failure, the PR is in the grant, and its `headRefOid` still equals
-  the event's `headSha` and, with the final-review gate on, `vouchington-reviewer status` still
-  exits 0 for it, requeue it only
+  the event's `headSha` and, with the final-review gate on, `<review-status>` still exits 0 for
+  it, requeue it only
   through the `requeue:` or `acknowledge queue removal:` command that pr-shepherd prints for it.
   For a real failure, never requeue the unchanged head: leave it to its shepherd or escalate it.
   Otherwise leave it to its shepherd and list it in the summary. Never requeue or merge an
@@ -279,13 +278,10 @@ automation label and the merge authority per PR category; stop and ask when one 
    `gh pr view <N> --repo <owner>/<name> --json isDraft --jq .isDraft` (true: `gh pr ready`), then
    `gh pr edit <N> --repo <owner>/<name> --add-label <automation-label>`.
 5. **Request final review and gate on it (only when the adapter turns on the final-review gate;
-   otherwise skip this step).** Request a review of the current head with
-   `gh api --method POST repos/<owner>/<name>/issues/<N>/labels -f 'labels[]=final-review:requested'`
-   (or message the `final-reviewer` session with `<owner>/<name>#<N>`); adding it again requests a
-   re-review after new commits. The standing reviewer lives in `vouchington/vouchington-reviewer`.
-   Run `pnpm --dir <reviewer-checkout> exec vouchington-reviewer status --repo <owner>/<name> --pr <N>`
-   before merging or requeueing: exit 0 means the newest final review approved the current head and
-   the `final approval` label is present. Any other exit code means do not merge: leave the PR
+   otherwise skip this step).** Request a review of the current head the way the adapter
+   says, and again after new commits. Run `<review-status>` before merging or requeueing: exit 0
+   means the newest final review approved the current head. Any other exit code means do not merge:
+   leave the PR
    ready, report `awaiting-final-review`, and let a later sweep rerun the check. Nothing waits on
    the reviewer. This gate is procedural: GitHub enforces it only through a required status check,
    or branch protection that dismisses stale approvals, which the consuming repository's adapter

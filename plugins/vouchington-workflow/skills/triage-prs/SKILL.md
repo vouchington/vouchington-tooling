@@ -131,8 +131,8 @@ Classify the outcome:
 
 - **Unsteered (and, with the final-review gate on, final review approved):** pr-shepherd runs in the background; the loop runs the
   commands it prints and the PR merges once requirements pass.
-- **Final-review gate on and review not yet approved (`vouchington-reviewer status` exits
-  non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
+- **Final-review gate on and review not yet approved (the adapter's `<review-status>`
+  exits non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
 - **Steered:** leave the PR ready; a later sweep merges it through pr-shepherd, or a human
   inspects the eventual state first.
 - **Native GitHub stack:** follow the `pr-shepherd:pr-shepherd` skill and the loop's
