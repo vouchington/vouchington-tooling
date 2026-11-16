@@ -14,13 +14,13 @@ local `AGENTS.md`, and live taxonomy guidance before acting.
 
 1. Confirm repository identity. Fetch live labels, milestone descriptions, open project
    descriptions, and the in-scope issue or pull-request evidence. Before a mutation, apply the
-   operation-specific gate from [github-issue](../github-issue/SKILL.md). Pull-request metadata
+   "Authority to write" section of the `github-issue` skill (`skills` plugin). Pull-request metadata
    does not require issues to be enabled.
 2. Classify from the permitted metadata and discussion. Do not guess from the implementation. Keep
    automation, ownership, and provenance labels unless local policy explicitly allows a change.
 3. Apply only existing labels, milestones, and projects without requesting separate label approval.
-   Follow [github-issue](../github-issue/SKILL.md) for single-project membership, auto-added
-   sub-issues, and a status that closes the issue. Do not create taxonomy, close work, rewrite
+   Follow [Projects and milestones](#projects-and-milestones) for single-project membership,
+   auto-added sub-issues, and a status that closes the issue. Do not create taxonomy, close work, rewrite
    bodies, or change titles unless the caller separately authorizes that scope.
 4. In review mode, report the exact proposed metadata changes and do not mutate. In apply mode,
    make only necessary, idempotent updates.
@@ -28,6 +28,23 @@ local `AGENTS.md`, and live taxonomy guidance before acting.
    confirm protected metadata stayed intact. After a project add, report any additional item the
    project's automation pulled in, such as a parent issue's sub-issues. Report changed, unchanged,
    and ambiguous items separately.
+
+## Projects and milestones
+
+- Use an existing open project for strategic, initiative-level tracking and a milestone for
+  repo-local release or sequencing. Choose by the initiative, not by how many repositories it
+  touches. An initiative can have both. An issue belongs to at most one project, and not every
+  issue needs one.
+- Before adding a project item, check that item and any item the project's automation could pull
+  in with it, such as a parent issue's sub-issues. If any already belongs to a different project,
+  skip the add and report the conflict. After the add, re-read the project.
+- Missing project scope or permission skips the project step only. Report the gap; the issue and
+  its other metadata still proceed.
+- Do not set a project status that closes the issue unless closing is separately authorized.
+  GitHub's Auto-close issue workflow closes the issue when status becomes Done.
+- A plan issue takes its source's milestone. When the source already has a project, refetch
+  memberships and apply that project only when exactly one accessible open membership exists;
+  otherwise skip the project and report the conflict.
 
 Consumer wrapper owns: priorities, labels, milestones, projects, clarification policy, default
 scope, and permissions.

@@ -67,7 +67,7 @@ Use when completed retrospectives or journals should become durable follow-up wo
    evidence.
 6. Draft self-contained issues with the problem, concrete proposed work, relevant areas, and
    validation, using the [issue body template](references/issue-body.md). Route every authorized creation through
-   [github-issue](../github-issue/SKILL.md), including its repository gate, label approval, and
+   the `github-issue` skill (`skills` plugin), including its repository gate, label approval, and
    denied-external tracking behavior.
 7. Archive only verified records fully processed across every represented repository, and never
    while any worktree's `outbox_status` reports a `worktreePendingCount` above 0, under the

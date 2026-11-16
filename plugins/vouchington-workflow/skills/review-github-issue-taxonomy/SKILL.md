@@ -17,8 +17,8 @@ local configuration edits or a live taxonomy mutation. Read local `AGENTS.md` fi
 2. Identify automation-owned labels. Inspect local label automation before recommending a rename,
    deletion, or rule change.
 3. Audit aliases, ambiguity, unused labels, missing descriptions, color consistency, milestone
-   overlap, delivery gaps, and path-label coverage. Audit projects against
-   [github-issue](../github-issue/SKILL.md):
+   overlap, delivery gaps, and path-label coverage. Audit projects against the
+   [project rules](../organize-github-issues/SKILL.md#projects-and-milestones):
    - A milestone theme duplicated across repositories is a candidate project.
    - A project that holds only routine, non-initiative work is a candidate milestone. Repository
      count is not the signal.
@@ -30,8 +30,7 @@ local configuration edits or a live taxonomy mutation. Read local `AGENTS.md` fi
    need product or scheduling judgment. Applying an existing label is not taxonomy creation and
    needs no separate approval from the authorized issue operation.
 5. Before creating a label, stop for explicit approval of its exact repository, name, description,
-   and color. Re-fetch current state and apply the taxonomy-definition gate from
-   [github-issue](../github-issue/SKILL.md): require `WRITE`, `MAINTAIN`, or `ADMIN` and the
+   and color. Re-fetch current state, then require `WRITE`, `MAINTAIN`, or `ADMIN` and the
    label-specific API capability immediately before the approved mutation. `viewerCanCreateIssues`
    applies only to issue creation. Approval for an issue or another label does not transfer.
 

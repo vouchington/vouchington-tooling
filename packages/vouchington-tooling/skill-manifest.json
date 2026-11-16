@@ -2,122 +2,65 @@
   "version": 1,
   "skills": [
     {
-      "name": "agent-workflow",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "agent-workflow/SKILL.md",
-      "prerequisites": [
-        "blackboard",
-        "github-issue",
-        "pr-description",
-        "retrospective",
-        "review-ci-logs"
-      ]
-    },
-    {
       "name": "blackboard",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "blackboard/SKILL.md"
-    },
-    {
-      "name": "git-commit-checklist",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "git-commit-checklist/SKILL.md"
-    },
-    {
-      "name": "github-actions-checklist",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "github-actions-checklist/SKILL.md"
-    },
-    {
-      "name": "github-issue",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "github-issue/SKILL.md"
     },
     {
       "name": "organize-github-issues",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "organize-github-issues/SKILL.md",
-      "prerequisites": ["github-issue"]
-    },
-    {
-      "name": "planning",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "planning/SKILL.md",
-      "prerequisites": ["github-issue"]
+      "pluginVersion": "0.23.0",
+      "path": "organize-github-issues/SKILL.md"
     },
     {
       "name": "pr-description",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "pr-description/SKILL.md"
     },
     {
       "name": "retrospective",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "retrospective/SKILL.md"
     },
     {
       "name": "retrospective-distill",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "retrospective-distill/SKILL.md",
-      "prerequisites": ["github-issue"]
-    },
-    {
-      "name": "review-ci-logs",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "review-ci-logs/SKILL.md",
-      "prerequisites": ["github-actions-checklist", "pr-description"]
+      "pluginVersion": "0.23.0",
+      "path": "retrospective-distill/SKILL.md"
     },
     {
       "name": "review-github-issue-taxonomy",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "review-github-issue-taxonomy/SKILL.md",
-      "prerequisites": ["github-issue"]
-    },
-    {
-      "name": "revisit-followups",
-      "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "revisit-followups/SKILL.md",
-      "prerequisites": ["github-issue"]
+      "prerequisites": ["organize-github-issues"]
     },
     {
       "name": "triage-loop",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
-      "path": "triage-loop/SKILL.md",
-      "prerequisites": ["github-issue"]
+      "pluginVersion": "0.23.0",
+      "path": "triage-loop/SKILL.md"
     },
     {
       "name": "triage-prs",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "triage-prs/SKILL.md",
-      "prerequisites": ["pr-description", "retrospective", "review-ci-logs", "github-issue"]
+      "prerequisites": ["pr-description", "retrospective"]
     },
     {
       "name": "triage-sweep",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.22.0",
+      "pluginVersion": "0.23.0",
       "path": "triage-sweep/SKILL.md",
       "prerequisites": [
         "triage-loop",
-        "review-ci-logs",
         "triage-prs",
         "organize-github-issues",
-        "retrospective-distill",
-        "github-issue"
+        "retrospective-distill"
       ]
     }
   ]

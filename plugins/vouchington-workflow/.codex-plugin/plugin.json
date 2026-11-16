@@ -1,7 +1,7 @@
 {
   "name": "vouchington-workflow",
-  "version": "0.22.0",
-  "description": "Portable implementation, planning, issue, retrospective, CI, triage, and PR workflow skills for Codex and Claude.",
+  "version": "0.23.0",
+  "description": "Portable blackboard journaling, retrospective, issue organization, triage, and PR description workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington",
     "url": "https://github.com/vouchington"
@@ -9,21 +9,12 @@
   "homepage": "https://github.com/vouchington/vouchington-tooling",
   "repository": "https://github.com/vouchington/vouchington-tooling",
   "license": "MIT",
-  "keywords": [
-    "workflow",
-    "git",
-    "github-actions",
-    "planning",
-    "issues",
-    "retrospective",
-    "pull-requests",
-    "triage"
-  ],
+  "keywords": ["workflow", "blackboard", "issues", "retrospective", "pull-requests", "triage"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Workflow foundations",
     "shortDescription": "Portable repository workflow guidance.",
-    "longDescription": "Repository-neutral skills for implementation, commits, Actions checks, planning, issue management, retrospectives, CI-log review, pull-request triage, and pull-request descriptions.",
+    "longDescription": "Repository-neutral skills for blackboard journaling, retrospectives, issue organization and taxonomy review, pull-request triage, and pull-request descriptions.",
     "developerName": "Vouchington",
     "category": "Productivity",
     "capabilities": [],

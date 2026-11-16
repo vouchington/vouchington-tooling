@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "vouchington-workflow",
-      "description": "Repository-neutral implementation, planning, issue, retrospective, CI, triage, and PR workflow skills.",
+      "description": "Repository-neutral blackboard journaling, retrospective, issue organization, triage, and PR description workflow skills.",
       "source": "./plugins/vouchington-workflow",
       "category": "productivity",
       "homepage": "https://github.com/vouchington/vouchington-tooling"

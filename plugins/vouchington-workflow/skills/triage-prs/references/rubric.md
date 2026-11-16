@@ -41,7 +41,7 @@ failures make a retry rule invalid; the fix is the root cause.
   of the disposition, reusing an open issue for the same pair rather than duplicating it. A PR
   whose follow-ups say `None` while the cause is repository-owned is a signal to push back. For
   deterministic and repository-owned failures, close the band-aid and file a follow-up issue for
-  the general fix under [github-issue](../../github-issue/SKILL.md), or re-scope an existing one.
+  the general fix under the `github-issue` skill (`skills` plugin), or re-scope an existing one.
   Generalize-or-elevate beats a plain close.
 
 ## What steering looks like

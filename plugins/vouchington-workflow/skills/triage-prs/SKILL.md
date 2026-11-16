@@ -87,7 +87,7 @@ Run one call per PR, or filter one `gh pr list --json ...` result with
 ## Step 3 - Review and steering assessment
 
 Batch the in-scope PRs across up to three parallel read-only agents. Each reads the PR
-description and full diff, loads [review-ci-logs](../review-ci-logs/SKILL.md) for failing required
+description and full diff, loads the `review-ci-logs` skill (`skills` plugin) for failing required
 checks, and returns per PR:
 
 - **Head:** the reviewed `headRefOid`, bound to the diff: read `gh pr view <N> --repo <owner>/<name>

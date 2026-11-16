@@ -47,7 +47,7 @@ describe('workflow skills package contract', () => {
       const packaged = tarPaths(gunzipSync(readFileSync(tarball)))
         .filter((path) => path.startsWith('package/skills/') && path.endsWith('/SKILL.md'))
         .sort()
-      expect(packaged).toHaveLength(16)
+      expect(packaged).toHaveLength(9)
       expect(packaged).toEqual(canonical)
       const resources = pluginRoots
         .flatMap((root) => skillPaths(root, root, false))
@@ -89,45 +89,24 @@ describe('workflow skills package contract', () => {
       const prerequisites = new Map(
         manifest.skills.map((skill) => [skill.name, skill.prerequisites ?? []]),
       )
-      expect(prerequisites.get('agent-workflow')).toEqual([
-        'blackboard',
-        'github-issue',
-        'pr-description',
-        'retrospective',
-        'review-ci-logs',
-      ])
-      expect(prerequisites.get('github-issue')).toEqual([])
       for (const [name, required, closure = required] of [
+        ['organize-github-issues', []],
+        ['retrospective-distill', []],
+        ['review-github-issue-taxonomy', ['organize-github-issues']],
+        ['triage-prs', ['pr-description', 'retrospective']],
         [
-          'agent-workflow',
-          ['blackboard', 'github-issue', 'pr-description', 'retrospective', 'review-ci-logs'],
+          'triage-sweep',
+          ['triage-loop', 'triage-prs', 'organize-github-issues', 'retrospective-distill'],
           [
-            'blackboard',
-            'github-issue',
+            'triage-loop',
+            'triage-prs',
+            'organize-github-issues',
+            'retrospective-distill',
             'pr-description',
             'retrospective',
-            'review-ci-logs',
-            'github-actions-checklist',
           ],
         ],
-        ['planning', ['github-issue']],
-        ['organize-github-issues', ['github-issue']],
-        ['retrospective-distill', ['github-issue']],
-        ['review-github-issue-taxonomy', ['github-issue']],
-        ['revisit-followups', ['github-issue']],
-        ['review-ci-logs', ['github-actions-checklist', 'pr-description']],
-        [
-          'triage-prs',
-          ['pr-description', 'retrospective', 'review-ci-logs', 'github-issue'],
-          [
-            'pr-description',
-            'retrospective',
-            'review-ci-logs',
-            'github-issue',
-            'github-actions-checklist',
-          ],
-        ],
-        ['triage-loop', ['github-issue'], ['github-issue']],
+        ['triage-loop', []],
       ] as const) {
         expect(prerequisites.get(name)).toEqual(required)
         const targetRoot = join(output, name)
@@ -140,7 +119,7 @@ describe('workflow skills package contract', () => {
           )
         }
       }
-      expect(readFileSync(join(output, 'review-ci-logs/pr-description/SKILL.md'), 'utf8')).toBe(
+      expect(readFileSync(join(output, 'triage-prs/pr-description/SKILL.md'), 'utf8')).toBe(
         readFileSync(
           resolve(packageRoot, '../../plugins/vouchington-workflow/skills/pr-description/SKILL.md'),
           'utf8',

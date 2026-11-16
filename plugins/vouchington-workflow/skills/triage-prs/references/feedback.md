@@ -39,7 +39,7 @@ recommendation or root-cause identity on open feedback PRs:
 - `duplicate: ambiguous`: fail closed. Any partial overlap, more than one exact match, or any
   uncertain provenance or source set creates nothing.
 
-For a create, save the plan in the feedback issue through [github-issue](../../github-issue/SKILL.md)
+For a create, save the plan in the feedback issue through the `github-issue` skill (`skills` plugin)
 and write the draft PR with [pr-description](../../pr-description/SKILL.md). The PR body includes
 the marker, carries the automation label, and links the feedback issue with a closing keyword. Do
 not ready, shepherd, or merge a generated or reused feedback PR in the same run.
