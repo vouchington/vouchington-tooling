@@ -70,7 +70,11 @@ describe('with-host-lock.sh timeout behavior', () => {
       ).resolves.toMatchObject({
         stderr: expect.stringContaining('running unlocked'),
       })
-      expect(Date.now() - start).toBeLessThan(1800)
+      // The wrapper's deadline is whole-second (`date +%s`), so a 1s timeout can
+      // take up to ~2s plus process startup. The holder sleeping 10s still being
+      // alive proves the fallback did not wait for the lock.
+      expect(holder.exitCode).toBeNull()
+      expect(Date.now() - start).toBeLessThan(5000)
     } finally {
       holder.kill('SIGTERM')
       await held
