@@ -270,8 +270,9 @@ timestamp; a `timestamp` argument is rejected). The document comes from `markdow
 `compose`, the input of `composeRetrospective` (`narrative`, `date`, `issues`, `prs`,
 `description`, `facts`, `transcript`, `tools`, `architecture`, optional `knownSensitiveValues`;
 unknown keys are rejected, and the journal audit reads through the server's own client).
-`compose.transcript` accepts only `{ sessionId?, harnessSessionId? }` (`sessionId` must equal the
-call's `sessionId`) or `{ status, reason }` for an unassessed transcript. The transcript is found by
+`compose.transcript` accepts only `{ sessionId?, harnessSessionId?, since?, until? }` (`sessionId`
+must equal the call's `sessionId`; `since` and `until` are ISO 8601 timestamps, `since` exclusive and
+`until` inclusive, that count only transcript events inside the window) or `{ status, reason }` for an unassessed transcript. The transcript is found by
 `harnessSessionId`, the harness's own session UUID, else by the call's `sessionId` when that is a
 UUID; otherwise the call fails rather than reporting the transcript unavailable. When the server's environment names its harness session (`CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, and so on), only that session's transcript is read (after `/clear` or a thread switch, reconnect the server, or pass `{ status, reason }`); `jsonlPath`, `projectsDir`, `codexSessionsDir`,
 `grokSessionsDir`, and `cwd` are rejected, and the server reads the transcript from the worktree
@@ -311,7 +312,11 @@ stored receipt and timestamp. Changed content under the same `sourceEventId` is 
 the live journal and repository, so repeating a `compose` call is not a retry: when an interactive
 save is retained in the outbox, deliver it with `outbox_flush`. The CI Failures and Sandbox &
 Permission Audit sections use only the journal entries created after the session's newest earlier
-retrospective (by the blackboard's `createdAt`), and each section with excluded blocks adds an
+retrospective (by the blackboard's `createdAt`), and the Transcript Facts count only the transcript
+events after that retrospective's `createdAt` (the newest retrospective older than the session's
+newest journal entry, found in the same journal scan), adding `Window:` and `Excluded: N events
+outside the window` lines; an explicit `compose.transcript.since` or `until` replaces that default,
+and a session with no earlier retrospective reports the whole thread exactly as before. Each section with excluded blocks adds an
 `Excluded: N blocks from before retrospective <sourceEventId>` line; a revision keeps its own
 blocks because the boundary is the newest retrospective older than the newest block.
 

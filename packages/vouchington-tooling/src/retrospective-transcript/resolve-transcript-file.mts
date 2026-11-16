@@ -14,6 +14,11 @@ export type ResolveOptions = {
   codexSessionsDir?: string
   grokSessionsDir?: string
   cwd?: string
+  /** Count only events after this ISO time (exclusive) and up to `until` (inclusive). */
+  since?: string
+  until?: string
+  /** Names the retrospective that set `since` in the report. */
+  boundary?: string
   env?: NodeJS.ProcessEnv
 }
 

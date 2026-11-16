@@ -158,6 +158,40 @@ describe('composeFromArgs transcript', () => {
     ).rejects.toThrow('may read only the harness session that launched the server')
   })
 
+  it('validates the since and until window and keeps it exclusive with status', async () => {
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    await expect(
+      composeFromArgs(compose({ harnessSessionId: id, since: 'yesterday' }), base),
+    ).rejects.toThrow('compose.transcript.since must be an ISO 8601 timestamp')
+    await expect(
+      composeFromArgs(
+        compose({
+          harnessSessionId: id,
+          since: '2026-01-02T00:00:00Z',
+          until: '2026-01-01T00:00:00Z',
+        }),
+        base,
+      ),
+    ).rejects.toThrow('compose.transcript.since must be before until')
+    await expect(
+      composeFromArgs(compose({ ...unassessed, until: '2026-01-01T00:00:00Z' }), base),
+    ).rejects.toThrow('exclusive with status')
+    const partial = {
+      ...base,
+      feedbackCoverage: { status: 'partial' as const, sources: [], droppedCount: 0 },
+    }
+    await expect(
+      composeFromArgs(
+        compose({
+          harnessSessionId: id,
+          since: '2026-01-01T00:00:00Z',
+          until: '2026-02-01T00:00:00Z',
+        }),
+        partial,
+      ),
+    ).resolves.toContain('## Transcript Facts')
+  })
+
   it('treats facts as an exclusive union of unassessed status and live selectors', async () => {
     const withFacts = (facts: unknown) => ({ ...compose(unassessed), facts })
     await expect(composeFromArgs(withFacts({ reason: 'x' }), base)).rejects.toThrow(

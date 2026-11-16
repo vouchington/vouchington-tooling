@@ -8,6 +8,7 @@ import {
 } from '../retrospective-transcript/index.mts'
 import {
   auditAssessed,
+  defaultTranscriptWindow,
   loadAuditInputs,
   renderAuditReport,
   completeCoverageError,
@@ -108,13 +109,19 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
           coverage: input.transcript.status,
         }
       : undefined
+  const loaded = await loadAuditInputs(input.sessionId, input)
   const [facts, transcript] = await Promise.all([
     'status' in input.facts
       ? Promise.resolve(unavailableFacts!)
       : runRetrospectiveFactsReport({ ...input.facts, raw: false }),
     'status' in input.transcript
       ? Promise.resolve(unavailableTranscript!)
-      : runRetrospectiveTranscriptReport(input.transcript),
+      : runRetrospectiveTranscriptReport({
+          ...(input.transcript.since || input.transcript.until
+            ? {}
+            : defaultTranscriptWindow(loaded)),
+          ...input.transcript,
+        }),
   ])
   const assemble = (auditMarkdown: string): string =>
     [
@@ -151,7 +158,6 @@ export async function composeRetrospective(input: RetrospectiveCompositionInput)
   })
   // The audit sections are the only unbounded ones: render them, measure the real envelope against
   // its limits, and shrink the audit caps by the measured overflow until it fits.
-  const loaded = await loadAuditInputs(input.sessionId, input)
   let caps = UNBOUNDED_CAPS
   let audit: AuditReport
   let markdown: string

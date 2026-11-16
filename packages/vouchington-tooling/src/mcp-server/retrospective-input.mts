@@ -12,7 +12,7 @@ import {
 } from '../agent-harness-identity/index.mts'
 import { SESSION_ID } from '../retrospective-transcript/resolve-transcript-file.mts'
 import { serverJournalLoader } from './journal-read.mts'
-import { checkFactsInput, prNumber } from './retrospective-facts-input.mts'
+import { checkFactsInput, prNumber, transcriptWindow } from './retrospective-facts-input.mts'
 import { spawnPolicy, type PolicyOutcome } from './policy-spawn.mts'
 
 const HARNESSES = ['codex', 'claude', 'cursor', 'grok'] as const
@@ -32,7 +32,7 @@ const COMPOSE_REQUIRED = COMPOSE_KEYS.filter((key) => key !== 'knownSensitiveVal
 /** No `repo`: a caller must not aim the server's GitHub token at another repository. */
 const FACTS_KEYS = ['pr', 'branch', 'noPr', 'status', 'reason']
 /** No path overrides: the server reads the session's transcript from its own default roots. */
-const TRANSCRIPT_KEYS = ['sessionId', 'harnessSessionId', 'status', 'reason']
+const TRANSCRIPT_KEYS = ['sessionId', 'harnessSessionId', 'since', 'until', 'status', 'reason']
 /** The longest a facts subprocess may run before it is killed. */
 export const FACTS_TIMEOUT_MS = 120_000
 const MAX_OUTPUT_BYTES = 10_000_000
@@ -126,9 +126,9 @@ export function sensitiveValues(compose: Args | undefined, env: NodeJS.ProcessEn
  */
 function transcriptInput(transcript: Args, base: ComposeBase): Args {
   if ('status' in transcript) {
-    if ('sessionId' in transcript || 'harnessSessionId' in transcript)
+    if (['sessionId', 'harnessSessionId', 'since', 'until'].some((key) => key in transcript))
       throw new Error(
-        'compose.transcript: sessionId and harnessSessionId are exclusive with status',
+        'compose.transcript: sessionId, harnessSessionId, since and until are exclusive with status',
       )
     return transcript
   }
@@ -152,7 +152,7 @@ function transcriptInput(transcript: Args, base: ComposeBase): Args {
         'session changed since (/clear, a thread switch), reconnect the server (/mcp in Claude ' +
         'Code, or restart Codex), or pass { status, reason }',
     )
-  return { sessionId: harnessId, cwd: base.worktree }
+  return { sessionId: harnessId, cwd: base.worktree, ...transcriptWindow(transcript) }
 }
 
 function factsInput(facts: Args, base: ComposeBase): Args {

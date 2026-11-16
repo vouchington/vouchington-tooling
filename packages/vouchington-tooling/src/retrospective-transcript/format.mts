@@ -1,4 +1,5 @@
 import type { TranscriptFacts } from './shared.mts'
+import type { TranscriptWindow } from './window.mts'
 
 const LABEL_CHARACTER = /[^A-Za-z0-9._-]+/g
 
@@ -6,10 +7,15 @@ export function sessionLabel(value: string): string {
   return value.replace(/\s+/g, '_').replace(LABEL_CHARACTER, '_').slice(0, 128) || 'transcript'
 }
 
-export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts): string {
+export function formatTranscriptFacts(
+  sessionId: string,
+  facts: TranscriptFacts,
+  window?: TranscriptWindow,
+): string {
   return [
     '=== Transcript Facts ===',
     `Session: ${sessionLabel(sessionId)}`,
+    ...windowLines(facts, window),
     `User prompts: ${facts.userPrompts}`,
     `Assistant responses: ${facts.assistantResponses}`,
     `Tool calls: ${facts.toolCalls} (failed: ${facts.failedToolCalls})`,
@@ -23,6 +29,19 @@ export function formatTranscriptFacts(sessionId: string, facts: TranscriptFacts)
     ...escalationLines(facts),
     '',
   ].join('\n')
+}
+
+function windowLines(facts: TranscriptFacts, window?: TranscriptWindow): string[] {
+  if (!window) return []
+  const bounds = [
+    ...(window.since ? [`after ${window.since}`] : []),
+    ...(window.until ? [`until ${window.until}`] : []),
+  ].join(' ')
+  const boundary = window.boundary ? ` (retrospective ${window.boundary})` : ''
+  return [
+    `Window: ${bounds}${boundary}`,
+    `Excluded: ${facts.excludedEvents ?? 0} events outside the window`,
+  ]
 }
 
 function escalationLines(facts: TranscriptFacts): string[] {

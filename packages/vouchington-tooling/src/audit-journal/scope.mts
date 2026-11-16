@@ -31,6 +31,31 @@ function newest<T>(items: T[], at: (item: T) => string | undefined): T | undefin
   return best
 }
 
+/** The newest saved retrospective created before `at`. */
+function newestBefore(
+  retrospectives: SavedRetrospective[],
+  at: string | undefined,
+): SavedRetrospective | undefined {
+  if (at === undefined) return undefined
+  return newest(
+    retrospectives.filter((retrospective) => retrospective.createdAt < at),
+    (retrospective) => retrospective.createdAt,
+  )
+}
+
+/**
+ * The retrospective that bounds work reported by an earlier one: the newest saved retrospective
+ * created before the newest journal entry, by the same rule as `scopeSinceRetrospective` but
+ * anchored on any entry rather than only on audit blocks.
+ */
+export function retrospectiveBoundary(
+  entries: JournalEntry[],
+  retrospectives: SavedRetrospective[],
+): SavedRetrospective | undefined {
+  const latest = newest(entries, createdAtOf)
+  return newestBefore(retrospectives, latest && createdAtOf(latest))
+}
+
 /**
  * Keeps only the entries created after the boundary retrospective, so a later retrospective does
  * not repeat what an earlier one already reported.
@@ -49,13 +74,7 @@ export function scopeSinceRetrospective(
 ): JournalScope {
   const newestBlock = newest(entries.filter(hasAuditBlock), createdAtOf)
   const blockAt = newestBlock === undefined ? undefined : createdAtOf(newestBlock)
-  const boundary =
-    blockAt === undefined
-      ? undefined
-      : newest(
-          retrospectives.filter((retrospective) => retrospective.createdAt < blockAt),
-          (retrospective) => retrospective.createdAt,
-        )
+  const boundary = newestBefore(retrospectives, blockAt)
   if (boundary === undefined) return { included: entries, excluded: [] }
   const isLater = (entry: JournalEntry) => {
     const at = createdAtOf(entry)
