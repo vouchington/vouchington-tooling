@@ -169,8 +169,10 @@ An implementation-tier subagent verifies each comment against the current defaul
 anything already addressed, non-actionable, or a duplicate of an open issue. File one issue per
 root cause through the `github-issue` skill (`skills` plugin), linking the PR and comment with a non-closing, fully qualified reference. The issue carries the
 exact existing `follow-up` label; re-fetch it and verify the label and link. When labeling or
-linking is unavailable or unauthorized, report the blocker instead of filing it unlabeled. Add every
-harvested comment id to `reviewedComments`, and prune ids whose PR has left the window. A comment
+linking is unavailable or unauthorized, report the blocker instead of filing it unlabeled. Add a
+harvested comment id to `reviewedComments` only once it is dropped or its issue's label and link are
+verified; leave a blocked comment out so a later sweep retries it. Prune ids whose PR has left the
+window. A comment
 posted days after merge is still found. Advance `scannedThrough` to the newest `mergedAt` scanned
 (or the sweep start) only after the scan succeeds. Advance `activityThrough` to the sweep start only after step 2
 succeeds, and set `fullScanAt` after a full rescan.
