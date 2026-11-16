@@ -6,9 +6,11 @@ import { checkFiniteEnumRipple } from './check.mts'
 import type { FiniteEnumRippleConfig } from './model.mts'
 
 const file = '/synthetic/routes.ts'
+const options: ts.CompilerOptions = { target: ts.ScriptTarget.Latest, skipLibCheck: true }
+// Parsing the default lib files dominates each program; parse them once for the whole file.
+const libSourceFiles = new Map<string, ts.SourceFile | undefined>()
 
 function assertZeroDiagnostics(content: string): void {
-  const options: ts.CompilerOptions = { target: ts.ScriptTarget.Latest, skipLibCheck: true }
   const host = ts.createCompilerHost(options)
   const opaque = '/synthetic/opaque.ts'
   const opaqueContent = 'export const value = ["item"]'
@@ -22,7 +24,10 @@ function assertZeroDiagnostics(content: string): void {
       ? ts.createSourceFile(file, content, languageVersion, true)
       : path === opaque
         ? ts.createSourceFile(opaque, opaqueContent, languageVersion, true)
-        : getSourceFile(path, languageVersion, onError, shouldCreateNewSourceFile)
+        : (libSourceFiles.get(path) ??
+          libSourceFiles
+            .set(path, getSourceFile(path, languageVersion, onError, shouldCreateNewSourceFile))
+            .get(path))
   const program = ts.createProgram([file], options, host)
   expect(
     ts
@@ -38,9 +43,7 @@ function parse(content: string) {
 
 const route = "const routes = { all: { singular: 'item', plural: 'items', kinds: undefined } }"
 
-// Every case type-checks a full TypeScript program, which can exceed the default timeout on a
-// busy CI shard.
-describe('released consumer parity', { timeout: 30_000 }, () => {
+describe('released consumer parity', () => {
   it('accepts explicit intrinsic undefined optional arrays', () => {
     expect(
       parse(`export {}; ${route}`).map(({ key, pluralPath, singularPath, unionTypes }) => ({

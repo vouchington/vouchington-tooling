@@ -1,6 +1,6 @@
 ---
 name: retrospective
-description: Summarize completed work from verified facts and the session journal.
+description: Summarize completed work from verified facts and the session journal, including when handing a PR to a human.
 ---
 
 # Retrospective
