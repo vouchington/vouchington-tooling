@@ -28,8 +28,11 @@ distill cutoffs, scheduled-prompt paths, and issue taxonomy. These skills own th
   orchestrates and decides.
 - **State:** `state.json` and the sweep lock live in `stateDir`, outside any repository. Change
   `state.json` only through the bundled [`scripts/state.py`](scripts/state.py), which checks field
-  shapes and writes atomically. When it lacks an operation, add a subcommand rather than inlining
-  an ad hoc write.
+  shapes, holds a lock for each whole read-modify-write, and writes atomically. Its `set`,
+  `append`, and `remove` subcommands take a dotted path under any field listed in Step 1 (for
+  example `state.py set lateReview.<repo>.scannedThrough --json '"<ISO time>"'`); named
+  subcommands cover the common updates. When it lacks an operation, add a subcommand rather than
+  inlining an ad hoc write.
 - **Delegation rules:** an optional list of `{area, session, since, source}` in `state.json`
   `delegations` (for example a class of flaky test routed to a named agent session), changed only
   on the user's word. Sessions come and go, so never hardcode one.

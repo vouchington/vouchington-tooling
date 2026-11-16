@@ -2,12 +2,20 @@
 """Typed, atomic updates to the triage loop's state.json.
 
 The state directory comes from the loop configuration (.triage-loop.json in the launch directory,
-or the path in TRIAGE_LOOP_CONFIG). Every write checks the shape of the fields it touches, then
-replaces state.json atomically. Add a subcommand rather than editing state.json another way.
+or the path in TRIAGE_LOOP_CONFIG). Each command holds an exclusive lock on state.lock for its whole
+read-modify-write, checks the shape of the fields it touches, and replaces state.json atomically.
+Add a subcommand rather than editing state.json another way.
 """
-import argparse, datetime, json, os, sys, tempfile
+import argparse, contextlib, datetime, fcntl, json, os, sys, tempfile
 
 SEEN_MAX = 200
+# The top-level fields and their shapes; `set`, `append`, and `remove` touch only these.
+FIELDS = {
+    "lastSweepAt": str, "reviewedComments": dict, "lateReview": dict, "schedule": dict,
+    "retroCursor": str, "escalations": dict, "hookHarness": dict, "handledFailures": dict,
+    "shepherds": dict, "intake": list, "scheduledPrompts": dict, "delegations": list,
+    "routed": list,
+}
 
 
 def config():
@@ -47,6 +55,65 @@ def save(s):
         json.dump(s, f, indent=2)
         f.write("\n")
     os.replace(tmp, STATE)
+
+
+@contextlib.contextmanager
+def locked():
+    os.makedirs(DIR, exist_ok=True)
+    with open(os.path.join(DIR, "state.lock"), "a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def parse_path(path):
+    keys = path.split(".")
+    if keys[0] not in FIELDS or not all(keys):
+        sys.exit(f"state.py: {path!r} must start with one of {', '.join(sorted(FIELDS))}")
+    return keys
+
+
+def parent_of(s, keys, create):
+    node = s
+    for depth, key in enumerate(keys[:-1]):
+        kind = FIELDS[key] if depth == 0 else dict
+        if key not in node and create:
+            node[key] = kind()
+        node = expect(node.get(key), kind, ".".join(keys[: depth + 1]))
+    return expect(node, dict, ".".join(keys[:-1]) or "state.json")
+
+
+def set_value(a):
+    keys = parse_path(a.path)
+    value = json.loads(a.json)
+    if len(keys) == 1:
+        expect(value, FIELDS[keys[0]], keys[0])
+    s = load()
+    parent_of(s, keys, True)[keys[-1]] = value
+    save(s)
+    print(json.dumps({a.path: value}))
+
+
+def append_value(a):
+    keys = parse_path(a.path)
+    s = load()
+    parent = parent_of(s, keys, True)
+    items = expect(parent.setdefault(keys[-1], []), list, a.path)
+    items.append(json.loads(a.json))
+    if a.keep:
+        parent[keys[-1]] = items[-a.keep:]
+    save(s)
+    print(json.dumps({a.path: len(parent[keys[-1]])}))
+
+
+def remove_value(a):
+    keys = parse_path(a.path)
+    s = load()
+    removed = keys[0] in s and parent_of(s, keys, False).pop(keys[-1], None) is not None
+    save(s)
+    print(json.dumps({a.path: "removed" if removed else "absent"}))
 
 
 def expect(value, kind, name):
@@ -195,11 +262,24 @@ def main():
     x = sub.add_parser("reviewed", help="add harvested comment ids from a {repo: [ids]} file")
     x.add_argument("--file", required=True)
     x.set_defaults(fn=reviewed)
+    x = sub.add_parser("set", help="set a dotted path under a known field to a JSON value")
+    x.add_argument("path")
+    x.add_argument("--json", required=True)
+    x.set_defaults(fn=set_value)
+    x = sub.add_parser("append", help="append a JSON value to the list at a dotted path")
+    x.add_argument("path")
+    x.add_argument("--json", required=True)
+    x.add_argument("--keep", type=int, help="keep only the newest N entries")
+    x.set_defaults(fn=append_value)
+    x = sub.add_parser("remove", help="remove the key at a dotted path")
+    x.add_argument("path")
+    x.set_defaults(fn=remove_value)
     sh = sub.add_parser("show", help="print one key, or the top-level keys")
     sh.add_argument("key", nargs="?")
     sh.set_defaults(fn=show)
     args = p.parse_args()
-    args.fn(args)
+    with locked():
+        args.fn(args)
 
 
 if __name__ == "__main__":
