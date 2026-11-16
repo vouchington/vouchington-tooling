@@ -1,5 +1,6 @@
 import type { SharedContext } from '../shared-context/index.mts'
 import { checkDockerWorkspaceUserDocument } from './docker-workspace-user.mts'
+import { checkNoPullRequestTargetDocument } from './pull-request-target.mts'
 import { ghaFileKind, loadWorkflowDocument } from './shared.mts'
 import { checkNoSparseCheckoutDocument } from './sparse-checkout.mts'
 
@@ -20,6 +21,7 @@ export async function checkGhaWorkspacePolicy(
     const document = loadWorkflowDocument(ctx, file, errors)
     checkNoSparseCheckoutDocument(file, document, kind, errors)
     checkDockerWorkspaceUserDocument(file, document, kind, errors)
+    if (kind === 'workflow') checkNoPullRequestTargetDocument(file, document, errors)
   }
   return { errors }
 }

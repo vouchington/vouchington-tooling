@@ -188,6 +188,7 @@ normalization for language-specific differences.
 consumer `sgconfig.yml` `ruleDirs` at `rules` and keep product-specific YAML locally.
 `gha-workspace-policy` checks tracked workflow and composite-action files in the current repository;
 pass `--root`, `--workflow-directory`, or `--action-directory` for consumer-owned layouts.
+It also rejects any workflow triggered by `pull_request_target`; trigger on `pull_request` instead.
 
 `retrospective-transcript` discovers Codex and Claude transcripts by default. It also reads a
 Claude-compatible transcript when `CURSOR_SESSION_ID` is set, and Grok's `updates.jsonl` session
