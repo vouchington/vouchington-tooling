@@ -85,7 +85,7 @@ export function persistFeedbackOutbox(
     const current = records(path)
     const name = filename(record)
     const existing = current.find((item) => item.path === join(path, name))
-        if (existing) {
+    if (existing) {
       // A version-only difference is the same event: delivery accepts it into the stored session.
       const { version: _retained, ...retainedIdentity } = existing.record.identity
       const { version: _supplied, ...suppliedIdentity } = record.identity

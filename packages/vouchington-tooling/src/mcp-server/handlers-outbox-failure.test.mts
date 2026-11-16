@@ -86,9 +86,9 @@ describe('outbox failures and quarantine', () => {
   it('prune everything with olderThanDays 0 and reject an invalid age', async () => {
     const broken = harness(fixture(), { env: {}, ensureError: failure(400) })
     await broken.call('journal_append', OWNER)
-    expect(jsonOf(await broken.call('outbox_prune_rejected', { ...ARGS, olderThanDays: 0 }))).toMatchObject(
-      { prunedCount: 0, worktreePendingCount: 1 },
-    )
+    expect(
+      jsonOf(await broken.call('outbox_prune_rejected', { ...ARGS, olderThanDays: 0 })),
+    ).toMatchObject({ prunedCount: 0, worktreePendingCount: 1 })
     const bad = await broken.call('outbox_prune_rejected', { ...ARGS, olderThanDays: -1 })
     expect(bad.isError).toBe(true)
   })

@@ -33,7 +33,10 @@ export function configurationCause(env: NodeJS.ProcessEnv = process.env): Feedba
 export function statusCause(status: number): FeedbackCause {
   if (status >= 500) return { cause: 'http-5xx', httpStatus: status }
   const exact = [401, 403, 408, 429].includes(status)
-  return { cause: exact ? `http-${status}` : status >= 400 ? 'http-4xx' : 'http-other', httpStatus: status }
+  return {
+    cause: exact ? `http-${status}` : status >= 400 ? 'http-4xx' : 'http-other',
+    httpStatus: status,
+  }
 }
 
 /** Classifies a raw delivery error. Only the status, the error name, and a system code are read. */
@@ -48,7 +51,12 @@ export function causeOfError(error: unknown): FeedbackCause {
   const { name, message } = error
   if (code !== undefined) return { cause: 'network', code }
   if (name === 'TypeError' && message === 'fetch failed') return { cause: 'network' }
-  return { cause: typeof name === 'string' && /^[A-Za-z0-9]{1,40}$/.test(name) ? `error:${name}` : 'error:unknown' }
+  return {
+    cause:
+      typeof name === 'string' && /^[A-Za-z0-9]{1,40}$/.test(name)
+        ? `error:${name}`
+        : 'error:unknown',
+  }
 }
 
 function integer(value: unknown, min: number, max: number): number | undefined {

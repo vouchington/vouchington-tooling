@@ -117,7 +117,11 @@ export async function deliverFeedbackOnline(
         )
           throw new Error('invalid connection URL')
       } catch {
-        throw new FeedbackDeliveryError('configuration-invalid', undefined, configurationCause(input.env))
+        throw new FeedbackDeliveryError(
+          'configuration-invalid',
+          undefined,
+          configurationCause(input.env),
+        )
       }
       let client
       try {

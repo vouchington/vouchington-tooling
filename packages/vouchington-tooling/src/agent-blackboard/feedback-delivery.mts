@@ -70,9 +70,12 @@ export async function verifyFreshFeedback(
   const receipt = await deliverFeedbackOnline({ ...input, envelope }, true)
   return { status: 'delivered', sourceEventId: envelope.sourceEventId, pendingCount: 0, receipt }
 }
-type FeedbackRejected = { sourceEventId: string; diagnostic: FeedbackDiagnostic } & FeedbackCause & {
-  attempts?: number
-}
+type FeedbackRejected = {
+  sourceEventId: string
+  diagnostic: FeedbackDiagnostic
+} & FeedbackCause & {
+    attempts?: number
+  }
 export async function flushFeedbackOutbox(input: {
   directory: string
   env?: NodeJS.ProcessEnv

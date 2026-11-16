@@ -83,7 +83,8 @@ const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
   'readback-unconfirmed':
     'the write could not be confirmed; retry the same call (same sourceEventId and content)',
   'delivery-timeout': 'delivery timed out; retry the same call (same sourceEventId and content)',
-  'delivery-quarantined': 'delivery failed repeatedly and the record was moved to the rejected area',
+  'delivery-quarantined':
+    'delivery failed repeatedly and the record was moved to the rejected area',
 }
 
 function describeError(error: unknown): string {
