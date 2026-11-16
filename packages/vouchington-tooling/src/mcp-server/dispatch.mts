@@ -6,7 +6,7 @@ import { readSessionId, type ToolHandler } from './context.mts'
 import { journalAppend, journalEntries } from './handlers-journal.mts'
 import { retrospectiveSave } from './handlers-retrospective.mts'
 import { retrospectiveCheck } from './retrospective-check.mts'
-import { outboxFlush, outboxStatus } from './handlers-outbox.mts'
+import { outboxFlush, outboxPruneRejected, outboxStatus } from './handlers-outbox.mts'
 import { snapshotArchive } from './handlers-snapshot-archive.mts'
 import { snapshotCleanup } from './handlers-snapshot-cleanup.mts'
 import { snapshotPartition } from './handlers-snapshot-partition.mts'
@@ -55,6 +55,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   journal_entries: journalEntries,
   outbox_status: outboxStatus,
   outbox_flush: outboxFlush,
+  outbox_prune_rejected: outboxPruneRejected,
   session_ensure: sessionEnsure,
   retrospective_check: retrospectiveCheck,
   retrospective_save: retrospectiveSave,
@@ -82,6 +83,7 @@ const DIAGNOSTIC_HINTS: Record<FeedbackDiagnostic, string> = {
   'readback-unconfirmed':
     'the write could not be confirmed; retry the same call (same sourceEventId and content)',
   'delivery-timeout': 'delivery timed out; retry the same call (same sourceEventId and content)',
+  'delivery-quarantined': 'delivery failed repeatedly and the record was moved to the rejected area',
 }
 
 function describeError(error: unknown): string {

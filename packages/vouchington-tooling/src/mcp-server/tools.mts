@@ -14,6 +14,7 @@ import {
   VERSION,
   tool,
 } from './tools-schema.mts'
+import { OUTBOX_TOOLS } from './tools-outbox.mts'
 import { PR_TOOLS } from './tools-pr.mts'
 import { RETROSPECTIVE_TOOLS } from './tools-retrospective.mts'
 
@@ -62,22 +63,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       'non-journal types such as retrospective and legacy entries without a feedback envelope.',
     READ_ONLY,
   ),
-  tool(
-    'outbox_status',
-    'Reports unsent journal records in the worktree outbox. pendingCount and status (empty or ' +
-      'pending) cover the caller sessionId only; worktreePendingCount covers every session. ' +
-      'rejectedCount (and worktreeRejectedCount) counts permanently rejected records kept aside.',
-    READ_ONLY,
-  ),
-  tool(
-    'outbox_flush',
-    'Delivers every retained record in the worktree outbox, whichever session wrote it, and ' +
-      'returns deliveredCount for the whole flush. pendingCount and status cover the remaining ' +
-      'records of the caller sessionId; worktreePendingCount covers every session. ' +
-      'A record with a permanent rejection moves to the rejected area and is listed in rejected ' +
-      'as sourceEventId and diagnostic.',
-    IDEMPOTENT_ADDITIVE,
-  ),
+  ...OUTBOX_TOOLS,
   tool(
     'session_ensure',
     'Idempotently creates a session, or verifies an existing one has the same identity. Child or ' +

@@ -2,7 +2,9 @@ import type { BlackboardClientDependencies } from './client.mts'
 import { createFeedbackEnvelope, validateFeedbackEnvelope } from './feedback-codec.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { deliverFeedbackOnline } from './feedback-online.mts'
-import { feedbackDiagnostic } from './feedback-online-error.mts'
+import { feedbackDiagnostic, feedbackFailure } from './feedback-online-error.mts'
+import { isTransientCause, type FeedbackCause } from './feedback-failure.mts'
+import { recordFeedbackFailure, type FeedbackFailureReport } from './feedback-outbox-failure.mts'
 import {
   feedbackOutboxStatus,
   listFeedbackOutbox,
@@ -46,7 +48,10 @@ export async function writeFeedback(
   } catch (error) {
     const diagnostic = feedbackDiagnostic(error)
     if (PERMANENT.includes(diagnostic)) {
-      rejectFeedbackOutbox(input.outboxDirectory, record)
+      rejectFeedbackOutbox(input.outboxDirectory, record, {
+        diagnostic,
+        ...feedbackFailure(error),
+      })
       throw error
     }
     return {
@@ -65,6 +70,9 @@ export async function verifyFreshFeedback(
   const receipt = await deliverFeedbackOnline({ ...input, envelope }, true)
   return { status: 'delivered', sourceEventId: envelope.sourceEventId, pendingCount: 0, receipt }
 }
+type FeedbackRejected = { sourceEventId: string; diagnostic: FeedbackDiagnostic } & FeedbackCause & {
+  attempts?: number
+}
 export async function flushFeedbackOutbox(input: {
   directory: string
   env?: NodeJS.ProcessEnv
@@ -74,13 +82,16 @@ export async function flushFeedbackOutbox(input: {
   pendingCount: number
   deliveredCount: number
   diagnostic?: FeedbackDiagnostic
-  rejected?: Array<{ sourceEventId: string; diagnostic: FeedbackDiagnostic }>
+  rejected?: FeedbackRejected[]
+  /** Records still pending that failed this flush, with their non-secret cause and attempt count. */
+  failures?: FeedbackFailureReport[]
   cleanupDiagnostic?: 'outbox-cleanup-failed'
 }> {
   let deliveredCount = 0
   let diagnostic: FeedbackDiagnostic | undefined
   let cleanupDiagnostic: 'outbox-cleanup-failed' | undefined
-  const rejected: Array<{ sourceEventId: string; diagnostic: FeedbackDiagnostic }> = []
+  const rejected: FeedbackRejected[] = []
+  const failures: FeedbackFailureReport[] = []
   for (const record of listFeedbackOutbox(input.directory)) {
     try {
       await deliverFeedbackOnline({
@@ -93,13 +104,22 @@ export async function flushFeedbackOutbox(input: {
       deliveredCount++
     } catch (error) {
       const current = feedbackDiagnostic(error)
+      const cause = feedbackFailure(error)
+      const sourceEventId = record.envelope.sourceEventId
       if (PERMANENT.includes(current)) {
-        rejectFeedbackOutbox(input.directory, record)
-        rejected.push({ sourceEventId: record.envelope.sourceEventId, diagnostic: current })
+        rejectFeedbackOutbox(input.directory, record, { diagnostic: current, ...cause })
+        rejected.push({ sourceEventId, diagnostic: current, ...cause })
         continue
       }
+      const { failure, quarantined } = recordFeedbackFailure(input.directory, record, cause)
+      if (quarantined) {
+        rejected.push({ sourceEventId, diagnostic: 'delivery-quarantined', ...failure })
+        continue
+      }
+      failures.push({ sourceEventId, ...failure })
       diagnostic = current
-      break
+      // A record-specific failure must not starve the records behind it; an outage ends the flush.
+      if (isTransientCause(cause.cause)) break
     }
   }
   return {
@@ -108,6 +128,7 @@ export async function flushFeedbackOutbox(input: {
     ...(cleanupDiagnostic === undefined ? {} : { cleanupDiagnostic }),
     ...(diagnostic === undefined ? {} : { diagnostic }),
     ...(rejected.length === 0 ? {} : { rejected }),
+    ...(failures.length === 0 ? {} : { failures }),
   }
 }
 

@@ -6,6 +6,7 @@ const EXPECTED = [
   'journal_entries',
   'outbox_status',
   'outbox_flush',
+  'outbox_prune_rejected',
   'session_ensure',
   'retrospective_check',
   'retrospective_save',
@@ -98,6 +99,7 @@ describe('tool contract', () => {
     ])
     const destructive = TOOLS.filter((tool) => tool.annotations.destructiveHint)
     expect(destructive.map((tool) => tool.name)).toEqual([
+      'outbox_prune_rejected',
       'pr_update',
       'snapshot_archive',
       'snapshot_cleanup',

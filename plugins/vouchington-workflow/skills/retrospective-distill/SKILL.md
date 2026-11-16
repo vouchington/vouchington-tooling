@@ -20,7 +20,9 @@ Use when completed retrospectives or journals should become durable follow-up wo
    `git worktree list` reports, passing each path as `worktree`, and stop if any reports a
    `worktreePendingCount` above 0. Use the worktree count, never `pendingCount` or `status`, which
    cover only the caller's own session: the sessions to distill belong to other agents, and an
-   archived session refuses later delivery, so a retained record would never be distilled. Outboxes
+   archived session refuses later delivery, so a retained record would never be distilled. A record
+   that repeatedly fails delivery is quarantined by `outbox_flush` into the rejected area
+   (`delivery-quarantined`), so it stops counting as pending; report any such rejection. Outboxes
    in removed worktrees or on other machines cannot be drained this way, so apply the age cutoffs under
    [session shapes](#session-shapes-and-eligibility) to give them time to deliver. Leave in-progress sessions intact. If a search
    for `snapshot_export` (the tool names carry a harness prefix, see the

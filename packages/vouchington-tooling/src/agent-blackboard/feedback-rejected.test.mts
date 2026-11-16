@@ -19,6 +19,7 @@ afterEach(async () => {
 const env = { AGENT_BLACKBOARD_URL: 'https://provider.test', AGENT_BLACKBOARD_TOKEN: 'test-token' }
 const timestamp = '2026-01-01T00:00:00.000Z'
 const identity = { sessionId: 'native:owner', parentSessionId: null, agent: 'claude', version: '2' }
+const REJECTION = { diagnostic: 'event-conflict' }
 const wrongVersion = { ...identity, version: 'unknown' }
 const envelope = (sourceEventId = 'rejected:one') =>
   createFeedbackEnvelope({
@@ -109,7 +110,14 @@ it('moves a retained record that now gets identity-conflict during flush and rep
     status: 'empty',
     pendingCount: 0,
     deliveredCount: 0,
-    rejected: [{ sourceEventId: 'rejected:one', diagnostic: 'identity-conflict' }],
+    rejected: [
+      {
+        sourceEventId: 'rejected:one',
+        diagnostic: 'identity-conflict',
+        cause: 'http-4xx',
+        httpStatus: 409,
+      },
+    ],
   })
   expect(feedbackOutboxCounts(path, identity.sessionId)).toMatchObject({
     pendingCount: 0,
@@ -132,13 +140,14 @@ it('keeps transient failures pending and ignores records that are no longer pend
     pendingCount: 1,
     diagnostic: 'configuration-invalid',
   })
-  rejectFeedbackOutbox(path, { identity, envelope: envelope('absent') })
+  rejectFeedbackOutbox(path, { identity, envelope: envelope('absent') }, REJECTION)
   expect(feedbackOutboxCounts(path, identity.sessionId).rejectedCount).toBe(0)
   expect(() =>
-    rejectFeedbackOutbox(path, {
-      identity,
-      envelope: { ...envelope(), markdown: 'changed meanwhile' },
-    }),
+    rejectFeedbackOutbox(
+      path,
+      { identity, envelope: { ...envelope(), markdown: 'changed meanwhile' } },
+      REJECTION,
+    ),
   ).toThrow(/changed during delivery/)
   expect(readRejectedFeedbackOutbox(join(path, 'missing'))).toEqual([])
   persistFeedbackOutbox(path, { identity, envelope: envelope('two') })

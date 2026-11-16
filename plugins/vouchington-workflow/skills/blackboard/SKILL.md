@@ -14,7 +14,8 @@ record. Read local `AGENTS.md` for the provider, credential, retention, and
 subagent-identity rules.
 
 Journal operations are tools of the `vouchington-tooling` MCP server (`vouchington mcp`):
-`journal_append`, `journal_entries`, `outbox_status`, `outbox_flush`, `session_ensure`,
+`journal_append`, `journal_entries`, `outbox_status`, `outbox_flush`, `outbox_prune_rejected`,
+`session_ensure`,
 `snapshot_export`, `snapshot_archive`, and `session_archive`. Harnesses name them differently, so match the bare tool
 name: `mcp__vouchington-tooling__<tool>`, `mcp__vouchington_tooling__<tool>` (the hyphen becomes an
 underscore), or `vouchington-tooling__<tool>` reached through a `search_tool` and `use_tool` pair,
@@ -35,6 +36,14 @@ Every call takes an exact `sessionId`, never inferred, whose meaning depends on 
   of the pending set, not retained: `rejectedCount` and `worktreeRejectedCount` count the kept copies,
   `outbox_flush` reports them as `rejected` (`sourceEventId` and `diagnostic`), and a corrected retry
   with the same `sourceEventId` is accepted.
+  `outbox_flush` and `outbox_status` report why a pending record failed as `failures`
+  (`sourceEventId`, a non-secret `cause` such as `network`, `http-5xx`, or `missing-env:NAME`,
+  optional `httpStatus`, and `attempts`), so a stuck record is diagnosable without reading files.
+  A record that fails on the same record-specific cause (a 4xx other than 401, 403, 408, 429) for
+  5 consecutive flushes is quarantined into the rejected area as `delivery-quarantined` and no
+  longer counts as pending; transient and environment causes never quarantine. Rejections keep their
+  diagnostic, listed by `outbox_status` as `rejected`; `outbox_prune_rejected` (`olderThanDays`,
+  default 7, 0 for all) deletes the old ones.
 
 Every call may take `worktree`, the absolute path of a worktree of the current repository (the
 launch worktree by default). Writing or retrying an entry needs no provider skill, temporary file,
