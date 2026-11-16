@@ -16,7 +16,10 @@ scope: PR numbers, an author, a label, `all`, a title substring, or blank for th
 
 The repository adapter (a consumer wrapper skill or `AGENTS.md`) owns every repository-specific
 value. Resolve these before Step 1 and stop
-to ask when one this run needs is missing; never guess a value.
+to ask when one this run needs is missing; never guess a value. When the triage loop runs this
+skill, the loop's configuration (`.triage-loop.json`, see
+[triage-loop](../triage-loop/references/config.md)) supplies the automation label and the
+final-review gate.
 
 - **Automation label:** marks PRs created or readied by the triage loop or its subagents. It defines
   the default scope.
@@ -121,7 +124,7 @@ the Step 6 report so it is not dropped. Process MERGE decisions in
 ascending PR-number order through the loop's
 [ready and merge](../triage-loop/SKILL.md#ready-and-merge) procedure, passing the PR number, the
 merge flag, and any steering file. That procedure light-reviews the diff, posts steering, readies
-the draft, gates on the final review when the adapter turns that gate on, and merges through pr-shepherd. Vouchington repositories
+the draft, gates on the final review when the loop's configuration turns that gate on, and merges through pr-shepherd. Vouchington repositories
 allow squash merges only, a setting the repositories own. Run its preflight before every mutation.
 If the preflight fails, record the reason and report separately any mutation already completed
 (for example the PR was readied before the head moved) and the failed preflight; do not describe
@@ -131,7 +134,7 @@ Classify the outcome:
 
 - **Unsteered (and, with the final-review gate on, final review approved):** pr-shepherd runs in the background; the loop runs the
   commands it prints and the PR merges once requirements pass.
-- **Final-review gate on and review not yet approved (the adapter's `<review-status>`
+- **Final-review gate on and review not yet approved (the configured `<review-status>`
   exits non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
 - **Steered:** leave the PR ready; a later sweep merges it through pr-shepherd, or a human
   inspects the eventual state first.
