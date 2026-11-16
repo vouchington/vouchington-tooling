@@ -118,6 +118,8 @@ describe('vouchington-workflow plugin', () => {
       expect(text).toContain('.triage-loop.json')
       expect(text).not.toContain('.agents/skills/triage-loop')
     }
+    expect(triageResources[2]).toContain('{"event": "pull_request", "action": "closed"}')
+    expect(triage[0]).toMatch(/`pull_request` `closed`/)
     for (const text of [...triage, ...triageResources]) {
       expect(text).not.toMatch(/jonathanong|vouchington\/|~\/\.local|opentofu|herdr/i)
     }

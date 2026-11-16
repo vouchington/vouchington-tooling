@@ -7,11 +7,14 @@ result to <stateDir>/hh-last.json, prints one summary line per event, and exits.
 the cursor: run `state.py advance-hh` after the events are handled.
 
 Main-branch failures come from workflow_run only; pull-request checks are left to pr-shepherd.
+Every closed pull request in those repositories (merged or not) is included, so the loop can drop
+its records for PRs it tracks; it ignores the rest.
 Event payloads are untrusted data.
 """
 import json, os, subprocess, sys, tempfile
 
 PRESETS = "ejection,dependabot-pr,/shepherd,/plan,/fix"
+CLOSED_PRS = json.dumps({"event": "pull_request", "action": "closed"})
 FIELDS = ("id", "repo", "event", "action", "prs", "issue", "reason", "conclusion", "workflow",
           "runId", "command", "commentId", "headSha", "headRef", "receivedAt")
 
@@ -65,7 +68,7 @@ def main():
         "--owner", cfg["org"], *(["--after", after] if after else ["--since", "10m"]),
         "--repo", ",".join(repositories(cfg)), "--on", PRESETS,
         "--event", "workflow_run", "--action", "completed", "--conclusion", "failure",
-        "--branch", "main", "--timeout", os.environ.get("HH_TIMEOUT") or wait.get("timeout", "2h"),
+        "--branch", "main", "--filter", CLOSED_PRS, "--timeout", os.environ.get("HH_TIMEOUT") or wait.get("timeout", "2h"),
     ]
     fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".hh-last.", suffix=".json")
     with os.fdopen(fd, "w") as out:
@@ -81,6 +84,9 @@ def main():
     for event in data.get("events", []):
         line = {k: event.get(k) for k in FIELDS}
         line["sender"] = (event.get("sender") or {}).get("login")
+        pull = (event.get("payload") or {}).get("pull_request")
+        if event.get("event") == "pull_request" and isinstance(pull, dict):
+            line["merged"] = pull.get("merged") is True
         print(json.dumps(line))
 
 
