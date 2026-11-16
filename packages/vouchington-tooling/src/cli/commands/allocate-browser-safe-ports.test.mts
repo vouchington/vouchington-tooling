@@ -274,6 +274,14 @@ for runner_slot, max_attempts in ((1, 7), (None, 7)):
       'failed to allocate 1 ports after 7 bind attempts from non-ephemeral ports',
     ])
   })
+  it('skips Fetch-forbidden ports inside a runner slice', async () => {
+    const { stdout } = await runAllocator(
+      'allocator.CHROMIUM_RESTRICTED_PORTS = frozenset({2200})\ninstall()\nprint(*allocator.allocate_ports(2, 1000, runner_slot=1))',
+    )
+
+    expect(parsePorts(stdout)).toEqual([2201, 2202])
+  })
+
   it('skips a port that is only in use on ::1', async () => {
     const { stdout } = await runAllocator(
       'install(lambda family, address: refuse(errno.EADDRINUSE) if family == socket.AF_INET6 and address[1] == 1024 else None)\nprint(*allocator.allocate_ports(2, 1000))',

@@ -239,6 +239,8 @@ def allocate_ports(
         for candidate_port in candidates:
             if len(ports) == count:
                 break
+            if candidate_port in CHROMIUM_RESTRICTED_PORTS:
+                continue
             pair = open_loopback_pair(candidate_port)
             if pair is None:
                 continue
