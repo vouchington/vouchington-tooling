@@ -5,11 +5,11 @@ inputs:
     description: Token used only to enable eligible or disable stale auto-merge.
     required: true
   expected_base_sha:
-    description: 40-char lowercase hex SHA, or empty to use pull_request_target event base SHA.
+    description: 40-char lowercase hex SHA, or empty to use the pull_request event base SHA.
     required: false
     default: ''
   expected_head_sha:
-    description: 40-char lowercase hex SHA, or empty to use pull_request_target event head SHA.
+    description: 40-char lowercase hex SHA, or empty to use the pull_request event head SHA.
     required: false
     default: ''
   manual_update_rules:
