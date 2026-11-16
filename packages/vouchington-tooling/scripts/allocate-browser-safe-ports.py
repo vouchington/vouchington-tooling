@@ -5,9 +5,12 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
+import random
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -133,10 +136,93 @@ def runner_port_slice(slot: int) -> range:
     return range(start, start + RUNNER_PORT_POLICY["portsPerRunner"])
 
 
+MIN_UNPRIVILEGED_PORT = 1024
+IPV6_UNAVAILABLE_ERRNOS = frozenset(
+    {errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL, errno.EPROTONOSUPPORT}
+)
+
+
+def read_ephemeral_range() -> tuple[int, int] | None:
+    """Return the OS ephemeral (dynamic) port range, read from the running system."""
+    try:
+        if sys.platform.startswith("linux"):
+            first, last = Path("/proc/sys/net/ipv4/ip_local_port_range").read_text().split()
+        elif sys.platform == "darwin":
+            output = subprocess.run(
+                ["sysctl", "-n", "net.inet.ip.portrange.first", "net.inet.ip.portrange.last"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            first, last = output.split()
+        else:
+            return None
+        return int(first), int(last)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def candidate_pool() -> list[int]:
+    """Ports outside the OS ephemeral range, so a later `bind(port 0)` cannot receive them."""
+    ephemeral = read_ephemeral_range()
+    if ephemeral is None:
+        print(
+            "::warning::could not read the OS ephemeral port range; allocated ports may "
+            "overlap it and be handed to a later bind to port 0",
+            file=sys.stderr,
+        )
+    reserved_start = RUNNER_PORT_POLICY["reservedPortStart"]
+    reserved_end = RUNNER_PORT_POLICY["reservedPortEnd"]
+    return [
+        port
+        for port in range(MIN_UNPRIVILEGED_PORT, 65536)
+        if port not in CHROMIUM_RESTRICTED_PORTS
+        and not reserved_start <= port <= reserved_end
+        and (ephemeral is None or not ephemeral[0] <= port <= ephemeral[1])
+    ]
+
+
+IPV6_WARNING_PRINTED = False
+
+
+def open_loopback_pair(port: int) -> list[socket.socket] | None:
+    """Bind the port on IPv4 and on ::1; None when either is in use.
+
+    When ::1 is unavailable (no IPv6 stack, for example IPv6-less CI) the IPv4 check
+    alone is used and a warning is printed once: that environment has no ::1 listener
+    that could shadow the port.
+    """
+    global IPV6_WARNING_PRINTED
+    held: list[socket.socket] = []
+    for family, host in ((socket.AF_INET, ""), (socket.AF_INET6, "::1")):
+        candidate = None
+        try:
+            candidate = socket.socket(family, socket.SOCK_STREAM)
+            candidate.bind((host, port))
+        except OSError as error:
+            if candidate is not None:
+                candidate.close()
+            if family == socket.AF_INET6 and error.errno in IPV6_UNAVAILABLE_ERRNOS:
+                if not IPV6_WARNING_PRINTED:
+                    IPV6_WARNING_PRINTED = True
+                    print(
+                        "::warning::IPv6 loopback (::1) is unavailable; ports are "
+                        "checked on IPv4 only",
+                        file=sys.stderr,
+                    )
+                continue
+            for other in held:
+                other.close()
+            return None
+        held.append(candidate)
+    return held
+
+
 def allocate_ports(
     count: int, max_bind_attempts: int, runner_slot: int | None = None
 ) -> list[int]:
-    sockets: list[socket.socket] = []
+    held: list[socket.socket] = []
+    ports: list[int] = []
     try:
         if runner_slot is not None:
             port_slice = runner_port_slice(runner_slot)
@@ -144,41 +230,32 @@ def allocate_ports(
                 raise RuntimeError(
                     f"requested {count} ports exceeds runner slice capacity {len(port_slice)}"
                 )
-            candidates = port_slice
+            candidates: list[int] | range = port_slice
         else:
-            candidates = range(max_bind_attempts)
+            candidates = candidate_pool()
+            random.shuffle(candidates)
+            candidates = candidates[:max_bind_attempts]
 
         for candidate_port in candidates:
-            if len(sockets) == count:
+            if len(ports) == count:
                 break
-            candidate = socket.socket()
-            try:
-                candidate.bind(("", candidate_port if runner_slot is not None else 0))
-            except OSError:
-                candidate.close()
+            pair = open_loopback_pair(candidate_port)
+            if pair is None:
                 continue
-            port = candidate.getsockname()[1]
-            if port in CHROMIUM_RESTRICTED_PORTS or (
-                runner_slot is None
-                and RUNNER_PORT_POLICY["reservedPortStart"]
-                <= port
-                <= RUNNER_PORT_POLICY["reservedPortEnd"]
-            ):
-                candidate.close()
-                continue
-            sockets.append(candidate)
+            held.extend(pair)
+            ports.append(candidate_port)
 
-        if len(sockets) != count:
+        if len(ports) != count:
             location = (
-                f"runner slice {runner_slot}" if runner_slot is not None else "ephemeral ports"
+                f"runner slice {runner_slot}" if runner_slot is not None else "non-ephemeral ports"
             )
             raise RuntimeError(
                 f"failed to allocate {count} ports after {len(candidates)} bind attempts "
                 f"from {location}"
             )
-        return [candidate.getsockname()[1] for candidate in sockets]
+        return ports
     finally:
-        for candidate in sockets:
+        for candidate in held:
             candidate.close()
 
 
