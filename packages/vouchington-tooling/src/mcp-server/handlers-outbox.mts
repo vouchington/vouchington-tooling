@@ -1,4 +1,10 @@
-import { flushFeedbackOutbox, feedbackOutboxCounts } from '../agent-blackboard/index.mts'
+import {
+  flushFeedbackOutbox,
+  feedbackOutboxCounts,
+  pruneRejectedFeedbackOutbox,
+  readFeedbackFailures,
+  readRejectedDetails,
+} from '../agent-blackboard/index.mts'
 import { outboxDirectory, type ToolHandler } from './context.mts'
 
 /**
@@ -25,9 +31,40 @@ function sessionStatus(pendingCount: number): 'empty' | 'pending' {
   return pendingCount === 0 ? 'empty' : 'pending'
 }
 
+/** Why each pending record last failed and why each kept record was rejected: causes only. */
+function causes(worktree: string) {
+  const directory = outboxDirectory(worktree)
+  const failures = readFeedbackFailures(directory)
+  const rejected = readRejectedDetails(directory).map(({ record, rejection }) => ({
+    sourceEventId: record.envelope.sourceEventId,
+    ...rejection,
+  }))
+  return {
+    ...(failures.length === 0 ? {} : { failures }),
+    ...(rejected.length === 0 ? {} : { rejected }),
+  }
+}
+
 export const outboxStatus: ToolHandler = async (_args, context) => {
   const counts = statusCounts(context.worktree, context.sessionId)
-  return { sessionId: context.sessionId, status: sessionStatus(counts.pendingCount), ...counts }
+  return {
+    sessionId: context.sessionId,
+    status: sessionStatus(counts.pendingCount),
+    ...counts,
+    ...causes(context.worktree),
+  }
+}
+
+export const outboxPruneRejected: ToolHandler = async (args, context) => {
+  const days = args.olderThanDays ?? 7
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 0)
+    throw new Error('olderThanDays must be a non-negative integer')
+  const prunedCount = pruneRejectedFeedbackOutbox(outboxDirectory(context.worktree), days)
+  return {
+    sessionId: context.sessionId,
+    prunedCount,
+    ...statusCounts(context.worktree, context.sessionId),
+  }
 }
 
 export const outboxFlush: ToolHandler = async (_args, context) => {

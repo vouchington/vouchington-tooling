@@ -55,6 +55,7 @@ export type FeedbackDiagnostic =
   | 'event-conflict'
   | 'archived-session'
   | 'delivery-timeout'
+  | 'delivery-quarantined'
 export type FeedbackDeliveryResult =
   | {
       status: 'delivered'

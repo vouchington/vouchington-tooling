@@ -1,5 +1,6 @@
 import { feedbackDeadline } from './feedback-deadline.mts'
 import { FeedbackDeliveryError, feedbackDiagnostic } from './feedback-online-error.mts'
+import { causeOfError, configurationCause } from './feedback-failure.mts'
 import { canonicalFeedback, canonicalFeedbackEvent } from './feedback-canonical.mts'
 import { loadClient, resolveBlackboardConnection, type BlackboardClientModule } from './client.mts'
 import { normalizeRepositories, validateFeedbackEnvelope } from './feedback-codec.mts'
@@ -116,7 +117,11 @@ export async function deliverFeedbackOnline(
         )
           throw new Error('invalid connection URL')
       } catch {
-        throw new FeedbackDeliveryError('configuration-invalid')
+        throw new FeedbackDeliveryError(
+          'configuration-invalid',
+          undefined,
+          configurationCause(input.env),
+        )
       }
       let client
       try {
@@ -184,7 +189,7 @@ export async function deliverFeedbackOnline(
     } catch (error) {
       throw error instanceof FeedbackDeliveryError
         ? error
-        : new FeedbackDeliveryError(feedbackDiagnostic(error))
+        : new FeedbackDeliveryError(feedbackDiagnostic(error), undefined, causeOfError(error))
     }
   }, input.timeoutMs)
 }
