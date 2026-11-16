@@ -110,6 +110,15 @@ python3 extracted/package/scripts/allocate-browser-safe-ports.py <count> [--poli
 straddles the cutoff. CI jobs without an install should fetch the tarball instead. Tests enforce
 that the script stays stdlib-only and reads only its two sibling JSON files.
 
+Returned ports are free on both `127.0.0.1` and `::1`, and (outside a GitHub Actions runner slice)
+lie outside the OS ephemeral range, read from `/proc/sys/net/ipv4/ip_local_port_range` on Linux or
+`sysctl net.inet.ip.portrange.{first,last}` on macOS. A later `bind(port 0)` on either loopback
+family therefore cannot be handed the same number, so `localhost` (which Chromium resolves to `::1`
+first) cannot reach a different server than the one the port was allocated for. When `::1` is
+unavailable (no IPv6 stack, for example IPv6-less CI) the allocator prints a `::warning::` and
+checks IPv4 only; when the ephemeral range cannot be read it prints a warning and skips the range
+filter.
+
 ### Configuring `ghcr-package-retention`
 
 Packages come from the arguments, or from `GHCR_PACKAGES` (space separated) when none are given.
