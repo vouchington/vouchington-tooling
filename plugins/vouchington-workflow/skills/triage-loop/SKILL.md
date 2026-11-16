@@ -94,8 +94,10 @@ and adds nothing here. Merges happen only:
   approved: `<review-status>` exits 0 for it (see
   [ready and merge](#ready-and-merge) step 5), and any other exit code means do not merge or
   requeue;
-- as the head-pinned `gh pr merge` command that pr-shepherd prints, run exactly as printed. It is
-  still a single `gh pr merge` command, never wrapped in a script, compound command, or API call.
+- as the single merge command that pr-shepherd prints, run exactly as printed: the head-pinned
+  `gh pr merge` for one PR, or the guarded stack merge command for a stack (only after each layer
+  it would land passes the per-layer checks in [Stacks](#stacks)). It is never wrapped in a script,
+  compound command, or API call.
 
 The session must be attended: interactive, not a headless or print-mode run. Whether a merge
 command runs without a prompt is decided by the host's permission policy and any command-policy
@@ -331,14 +333,17 @@ automation label and the merge authority per PR category; stop and ask when one 
 6. **Merge through pr-shepherd (only with `--merge`, and, with the final-review gate on, only when
    step 5 exited 0).** A steered
    PR is not merged in this pass: leave it ready, report `manual-verification-required`, and let a
-   later sweep merge it. Vouchington repositories allow squash merges only, a setting the
+   later sweep merge it. Still start a non-merging shepherd for it (the commands below without
+   `--merge`), so its steering and any required fix are carried out. Vouchington repositories allow squash merges only, a setting the
    repositories own. Never run two pr-shepherd commands on one PR, and record the PR in `shepherds`.
    - **Single PR:** `pr-shepherd '<owner/repo#N>' --merge --until-terminal`.
    - **Stack:** `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal`, per
      [Stacks](#stacks).
-   - Run it as a background command in this session, so its exit wakes the loop. Read the full
+   - Run it as a background command in this session, so its exit wakes the loop, with the working
+     directory set to the adapter's checkout of the PR's repository, so the repository's own
+     pr-shepherd configuration loads (always pass the qualified `owner/repo#N` reference too). Read the full
      output and run exactly the commands it prints. Merge only through the printed head-pinned
-     `gh pr merge` command, and only for a PR in the grant whose step 5 gate, when on, still holds for
+     `gh pr merge` (or guarded stack merge) command, and only for a PR in the grant whose step 5 gate, when on, still holds for
      the current head. Requeue only through a printed `requeue:` or `acknowledge queue removal:`
      command. A printed fix step goes to an implementation-tier subagent; after its push, with the gate on,
      request a new final review (step 5). Remove the `shepherds` entry when pr-shepherd stops.
