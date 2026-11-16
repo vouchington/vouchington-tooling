@@ -115,9 +115,9 @@ The `automerge_token` must be a dedicated token because a
 repository Dependabot secret, or as an organization Dependabot secret selected for every consumer
 repository—not only as an Actions secret—and needs Contents and Pull requests read/write permission. Mutation failures intentionally fail the job
 so a broken or underprivileged token cannot look like successful automation. Both manual-rule fields
-must exactly match `dependabot/fetch-metadata`; ecosystems are lowercase and directories include the leading slash. Use the action only from a trusted
-`pull_request_target` workflow that checks out the exact base SHA with credentials disabled; never
-check out or execute pull-request code.
+must exactly match `dependabot/fetch-metadata`; ecosystems are lowercase and directories include the leading slash. Call the action from a `pull_request`
+workflow whose job runs only for `dependabot[bot]`, never from `pull_request_target`; never check
+out or execute pull-request code.
 
 The action never submits or requires an approval review. Branch-protection required checks remain
 the merge gate; consumers should not add a separate workflow that auto-approves Dependabot PRs.
@@ -228,7 +228,7 @@ event. Pin them by full commit SHA. Do not pass `secrets: inherit`.
   because a called workflow can only narrow the caller's token. The sweep step continues on error so
   a later schedule retries a failed lookup.
 - `cancel-dequeued-merge-group-runs` cancels active merge-group runs for a dequeued pull request.
-  Call it from `pull_request_target` `dequeued`. `queue-base` (default `main`) is the single branch
+  Call it from `pull_request` `dequeued`, not `pull_request_target`. `queue-base` (default `main`) is the single branch
   name in `gh-readonly-queue/<queue-base>/pr-<number>-`. The job needs `actions: write` and
   `pull-requests: read` from the caller.
 - `cancel-replaced-merge-group-runs` cancels older merge-group runs when a replacement entry's

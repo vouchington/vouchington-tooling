@@ -2,8 +2,8 @@ name: Cancel Dequeued Merge Group Runs
 
 # Reusable cancel for a merge queue that dropped a pull request without merging it. GitHub never
 # runs checks for that entry again, so its merge-group runs keep holding hosted runners. The
-# caller owns the trigger. The usual event is pull_request_target dequeued, limited to the queue
-# base branch. github.event here is that caller event. Cancel Replaced Merge Group Runs covers
+# caller owns the trigger: pull_request dequeued, limited to the queue base branch, never
+# pull_request_target. github.event here is that caller event. Cancel Replaced Merge Group Runs covers
 # entries rebuilt behind a removed one.
 #
 # The job checks out nothing. The pull-request number, reason, and queue base arrive through env.
