@@ -186,7 +186,9 @@ layout when `GROK_SESSION_ID` is set. Use `--grok-sessions-dir` to point discove
 Grok session root. Without `--session-id`, it reads those session identities from the host
 environment. `resolveTranscriptFile` is the canonical resolver: it lowercases and UUID-validates
 session ids, honors `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `GROK_HOME`, and errors when more than one
-transcript matches. The subpath also exports `normalizeCommandPrefix`, `splitCommandSegments`,
+transcript matches. `--since` and `--until` (ISO 8601; `since` exclusive, `until` inclusive) count
+only events whose record timestamp is inside the window and report how many were excluded; the
+Codex token totals continue from the last excluded cumulative counter. The subpath also exports `normalizeCommandPrefix`, `splitCommandSegments`,
 `isPackageRunner`, `asRecord`, `asArray` and `openTranscriptLines(path, { maxRecordBytes })`, which
 streams lines (2 MiB per record by default) and throws from the iterable on an oversized record.
 

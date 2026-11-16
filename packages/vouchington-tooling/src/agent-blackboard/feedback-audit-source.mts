@@ -1,4 +1,6 @@
 import type { JournalScan } from '../audit-journal/journal.mts'
+import { retrospectiveBoundary } from '../audit-journal/scope.mts'
+import type { TranscriptWindow } from '../retrospective-transcript/index.mts'
 import {
   loadJournalAuditInput,
   renderJournalAuditReport,
@@ -26,6 +28,17 @@ export async function loadAuditInputs(
   if (input.journal)
     return { kind: 'journal', scanned: await loadJournalAuditInput(sessionId, input.journal) }
   return { kind: 'none' }
+}
+
+/**
+ * The window of the session's newest earlier retrospective, found in the same journal scan that
+ * scopes the audit sections: events after it are new to the retrospective being composed.
+ */
+export function defaultTranscriptWindow(inputs: AuditInputs): TranscriptWindow | undefined {
+  if (inputs.kind !== 'journal' || inputs.scanned.status !== 'ok') return undefined
+  const { entries, retrospectives } = inputs.scanned
+  const boundary = retrospectiveBoundary(entries, retrospectives)
+  return boundary && { since: boundary.createdAt, boundary: boundary.sourceEventId }
 }
 
 /** Builds the CI-failure and sandbox sections from loaded inputs, with no further I/O. */

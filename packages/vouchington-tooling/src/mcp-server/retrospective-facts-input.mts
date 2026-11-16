@@ -1,3 +1,4 @@
+import { isTimestamp } from '../retrospective-transcript/window.mts'
 import type { Args } from './args.mts'
 
 /** A plain branch name: no scheme or colon, no leading dash, no `..`. */
@@ -8,6 +9,23 @@ export function prNumber(value: unknown): string | undefined {
   if (typeof value === 'number')
     return Number.isSafeInteger(value) && value > 0 ? String(value) : undefined
   return typeof value === 'string' && /^\d+$/.test(value) ? value : undefined
+}
+
+/**
+ * The optional `since`/`until` window of `compose.transcript`: ISO timestamps, `since` before
+ * `until`. Absent, the server defaults `since` to the session's newest earlier retrospective.
+ */
+export function transcriptWindow(transcript: Args): { since?: string; until?: string } {
+  const window: { since?: string; until?: string } = {}
+  for (const key of ['since', 'until'] as const) {
+    if (transcript[key] === undefined) continue
+    if (!isTimestamp(transcript[key]))
+      throw new Error(`compose.transcript.${key} must be an ISO 8601 timestamp`)
+    window[key] = transcript[key]
+  }
+  if (window.since && window.until && Date.parse(window.since) >= Date.parse(window.until))
+    throw new Error('compose.transcript.since must be before until')
+  return window
 }
 
 /**

@@ -18,6 +18,8 @@ export type TranscriptFacts = {
   subagentToolCalls: number
   subagentTokens: TokenTotals
   escalations: SandboxEscalation[]
+  /** Records outside the requested window; absent when no window was requested. */
+  excludedEvents?: number
 }
 export type ParsedLine = Record<string, unknown>
 export type CodexSegment = { lines: string[]; baseline: TokenTotals }

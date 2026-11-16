@@ -1,5 +1,6 @@
 import { asRecord, emptyFacts, parseLines, type TranscriptFacts } from './shared.mts'
 import { applyAssistantUsage, applyToolBlocks } from './claude-blocks.mts'
+import { windowRecords, type TranscriptWindow } from './window.mts'
 
 function hasPromptContent(content: unknown): boolean {
   if (typeof content === 'string') return true
@@ -12,12 +13,15 @@ function hasPromptContent(content: unknown): boolean {
   })
 }
 
-export function computeClaude(lines: string[][]): TranscriptFacts {
+export function computeClaude(lines: string[][], window?: TranscriptWindow): TranscriptFacts {
   const facts = emptyFacts()
   const seen = new Set<string>()
   const advisorIds = new Set<string>()
+  let skipped = 0
   for (const group of lines) {
-    for (const record of parseLines(group)) {
+    const { included, excluded } = windowRecords(parseLines(group), window)
+    skipped += excluded
+    for (const record of included) {
       if (typeof record.uuid === 'string' && (seen.has(record.uuid) || !seen.add(record.uuid)))
         continue
       const subagent = record.isSidechain === true
@@ -37,5 +41,6 @@ export function computeClaude(lines: string[][]): TranscriptFacts {
     }
   }
   facts.advisorCalls = advisorIds.size
+  if (window) facts.excludedEvents = skipped
   return facts
 }

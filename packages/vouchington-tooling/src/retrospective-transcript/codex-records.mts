@@ -46,6 +46,16 @@ function addDelta(current: TokenTotals, previous: TokenTotals, target: TokenTota
   }
 }
 
+/** The cumulative token counters after the records, so a window's first delta starts from them. */
+export function advanceBaseline(records: ParsedLine[], start = emptyTokens()): TokenTotals {
+  let previous = start
+  for (const record of records) {
+    const totals = usage(record)
+    if (totals) previous = addDelta(totals, previous, emptyTokens())
+  }
+  return previous
+}
+
 export function applyRecords(
   records: ParsedLine[],
   facts: TranscriptFacts,

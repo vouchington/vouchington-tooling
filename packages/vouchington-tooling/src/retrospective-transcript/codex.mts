@@ -6,7 +6,8 @@ import {
   type TokenTotals,
   type TranscriptFacts,
 } from './shared.mts'
-import { applyRecords } from './codex-records.mts'
+import { advanceBaseline, applyRecords } from './codex-records.mts'
+import { windowRecords, type TranscriptWindow } from './window.mts'
 
 export function codexChildren(
   lines: string[],
@@ -45,10 +46,17 @@ export function computeCodex(
   lines: string[],
   subagents: CodexSegment[] = [],
   baseline?: TokenTotals,
+  window?: TranscriptWindow,
 ): TranscriptFacts {
   const facts = emptyFacts()
-  applyRecords(parseLines(lines), facts, false, baseline)
-  for (const subagent of subagents)
-    applyRecords(parseLines(subagent.lines), facts, true, subagent.baseline)
+  let skipped = 0
+  const apply = (segment: string[], subagent: boolean, start?: TokenTotals): void => {
+    const { included, before, excluded } = windowRecords(parseLines(segment), window)
+    skipped += excluded
+    applyRecords(included, facts, subagent, advanceBaseline(before, start))
+  }
+  apply(lines, false, baseline)
+  for (const subagent of subagents) apply(subagent.lines, true, subagent.baseline)
+  if (window) facts.excludedEvents = skipped
   return facts
 }

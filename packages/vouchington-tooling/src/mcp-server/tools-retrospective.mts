@@ -30,7 +30,7 @@ export const RETROSPECTIVE_TOOLS: readonly ToolDefinition[] = [
       'each line key: <JSON>; any that repeat an argument must equal it) or compose (the retrospective ' +
       'composer input: narrative, date, issues, prs, description, facts, transcript, tools, ' +
       'architecture, optional knownSensitiveValues; the server adds the rest). compose.transcript ' +
-      'takes only { sessionId?, harnessSessionId? } (sessionId must be the call sessionId; the ' +
+      'takes only { sessionId?, harnessSessionId?, since?, until? } (since/until ISO times bound the counted events, default since is the newest earlier retrospective; sessionId must be the call sessionId; the ' +
       'transcript is found by harnessSessionId, the harness session UUID, else by sessionId when ' +
       'that is a UUID, in the default session roots of the worktree) or { status, reason } to report it ' +
       'unassessed; any path override is rejected. The server redacts its blackboard token and ' +

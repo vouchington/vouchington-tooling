@@ -128,7 +128,7 @@ verify-workflow-secrets [--repo OWNER/NAME] [--confirm NAME,...] [--inventory MO
 runner-policy [--config FILE] [--root DIR]
 dead-code --baseline PATH [--seed|--update] [--config PATH] [--binary PATH] [--repo-root PATH] [--entry GLOB]... [--snapshot-ignore GLOB]... [--exclude GLOB]...
 swift-semantic-equal <base> <head> <file.swift>
-retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH]
+retrospective-transcript [--session-id ID] [--jsonl PATH] [--projects-dir PATH] [--codex-sessions-dir PATH] [--grok-sessions-dir PATH] [--since ISO] [--until ISO]
 link-skill <name> --source-root <skills-dir> --target-root <consumer-skills-dir>  Link a packaged or repository-local skill
 retrospective-facts (--pr NUMBER | --branch NAME | --no-pr) [--repo OWNER/NAME] [--raw]
 agent-blackboard probe

@@ -12,11 +12,13 @@ import {
   SESSION_ID,
   type ResolveOptions,
 } from './resolve-transcript-file.mts'
+import { optionsWindow, type TranscriptWindow } from './window.mts'
 import { hasMalformedInteriorRecord } from './malformed-record.mts'
 import { emptyFacts, parseLines, type CodexSegment, type TranscriptFacts } from './shared.mts'
 export type { TokenTotals, TranscriptFacts } from './shared.mts'
 export { codexChildren, codexIdentity } from './codex.mts'
 export { formatTranscriptFacts, formatUnavailable } from './format.mts'
+export type { TranscriptWindow } from './window.mts'
 export type { ResolveOptions } from './resolve-transcript-file.mts'
 export { resolveTranscriptFile } from './resolve-transcript-file.mts'
 export { asRecord } from './shared.mts'
@@ -57,16 +59,17 @@ function schema(lines: string[]): 'claude' | 'codex' | undefined {
 export function computeTranscriptFacts(
   lines: string[],
   subagents: Array<string[] | CodexSegment> = [],
+  window?: TranscriptWindow,
 ): TranscriptFacts {
   const detected = schema(lines)
   if (!detected) return emptyFacts()
   if (detected === 'claude')
-    return computeClaude([
-      lines,
-      ...subagents.map((value) => (Array.isArray(value) ? value : value.lines)),
-    ])
+    return computeClaude(
+      [lines, ...subagents.map((value) => (Array.isArray(value) ? value : value.lines))],
+      window,
+    )
   if (subagents.some(Array.isArray)) throw new TypeError('Codex subagents must be segmented')
-  return computeCodex(lines, subagents as CodexSegment[])
+  return computeCodex(lines, subagents as CodexSegment[], undefined, window)
 }
 async function readLines(path: string): Promise<string[] | undefined> {
   return (await readFile(path, 'utf8').catch(() => undefined))?.split('\n')
@@ -128,6 +131,7 @@ export async function runRetrospectiveTranscript(options: ResolveOptions): Promi
 export async function runRetrospectiveTranscriptReport(
   options: ResolveOptions,
 ): Promise<RetrospectiveTranscriptReport> {
+  const window = optionsWindow(options)
   const resolved = resolveTranscriptFile(options)
   if ('error' in resolved) return unavailable(resolved.error)
   const lines = await readLines(resolved.path)
@@ -143,7 +147,11 @@ export async function runRetrospectiveTranscriptReport(
         value !== undefined && schema(value) === 'claude' && !hasMalformedInteriorRecord(value),
     )
     return {
-      markdown: formatTranscriptFacts(resolved.sessionId, computeTranscriptFacts(lines, valid)),
+      markdown: formatTranscriptFacts(
+        resolved.sessionId,
+        computeTranscriptFacts(lines, valid, window),
+        window,
+      ),
       coverage:
         valid.length === subagents.length && !partialCapture(lines) && !valid.some(partialCapture)
           ? 'complete'
@@ -174,7 +182,8 @@ export async function runRetrospectiveTranscriptReport(
   return {
     markdown: formatTranscriptFacts(
       resolved.sessionId,
-      computeCodex(root.lines, subagents, root.baseline),
+      computeCodex(root.lines, subagents, root.baseline, window),
+      window,
     ),
     coverage:
       partialCapture(lines) || subagents.some((segment) => segment.partial)
