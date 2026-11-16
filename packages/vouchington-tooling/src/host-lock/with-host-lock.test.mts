@@ -12,7 +12,7 @@ import {
   makeHome,
   spawnHostLock,
 } from './with-host-lock.test-helpers.mts'
-import { assertWithLockDiagnostics } from './with-host-lock.test-diagnostics.mts'
+import { assertWithLockDiagnostics } from './with-host-lock-diagnostics.test-helpers.mts'
 
 describe('with-host-lock.sh', () => {
   afterEach(async () => {
