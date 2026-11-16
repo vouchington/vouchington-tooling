@@ -1,7 +1,7 @@
 import { closeSync, constants, fstatSync } from 'node:fs'
 import { openLogFile, readLogContent } from '../private-files/log-file.mts'
 import { validateFeedbackEnvelope } from './feedback-codec.mts'
-import { parseFailure, parseRejection } from './feedback-failure.mts'
+import { parseFailure, parseRejection } from './feedback-failure-parse.mts'
 import type { FeedbackFailure, FeedbackRejection } from './feedback-failure.mts'
 import { validateFeedbackIdentity } from './feedback-identity.mts'
 import { isObject } from './snapshot-partition-guards.mts'

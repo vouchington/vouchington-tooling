@@ -13,8 +13,8 @@ export type FeedbackFailure = FeedbackCause & { attempts: number }
 export type FeedbackRejection = Partial<FeedbackCause> & { diagnostic: string; attempts?: number }
 
 export const QUARANTINE_ATTEMPTS = 5
-const CAUSE = /^[A-Za-z0-9_:.-]{1,80}$/
-const CODE = /^[A-Z][A-Z0-9_]{1,40}$/
+export const CAUSE = /^[A-Za-z0-9_:.-]{1,80}$/
+export const CODE = /^[A-Z][A-Z0-9_]{1,40}$/
 // Healing without touching the record: outages, throttling, credentials, and the environment.
 const HEALS = /^(network|timeout|http-5xx|http-(401|403|408|429)|missing-env:.*|invalid-url)$/
 const HEALS_TOO = /^(client-unavailable|readback-unconfirmed|delivery-timeout)$/
@@ -56,47 +56,5 @@ export function causeOfError(error: unknown): FeedbackCause {
       typeof name === 'string' && /^[A-Za-z0-9]{1,40}$/.test(name)
         ? `error:${name}`
         : 'error:unknown',
-  }
-}
-
-function integer(value: unknown, min: number, max: number): number | undefined {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
-    ? value
-    : undefined
-}
-
-function parseCause(value: Record<string, unknown>): Partial<FeedbackCause> {
-  const { cause, httpStatus, code } = value
-  const status = httpStatus === undefined ? undefined : integer(httpStatus, 100, 599)
-  if (
-    (cause !== undefined && !(typeof cause === 'string' && CAUSE.test(cause))) ||
-    (code !== undefined && !(typeof code === 'string' && CODE.test(code))) ||
-    (httpStatus !== undefined && status === undefined)
-  )
-    throw new Error('invalid feedback outbox failure')
-  return {
-    ...(typeof cause === 'string' ? { cause } : {}),
-    ...(status === undefined ? {} : { httpStatus: status }),
-    ...(typeof code === 'string' ? { code } : {}),
-  }
-}
-
-export function parseFailure(value: unknown): FeedbackFailure {
-  const attempts = isObject(value) ? integer(value.attempts, 1, 1000) : undefined
-  if (!isObject(value) || attempts === undefined || typeof value.cause !== 'string')
-    throw new Error('invalid feedback outbox failure')
-  return { ...(parseCause(value) as FeedbackCause), attempts }
-}
-
-export function parseRejection(value: unknown): FeedbackRejection {
-  if (!isObject(value) || typeof value.diagnostic !== 'string' || !CAUSE.test(value.diagnostic))
-    throw new Error('invalid feedback outbox rejection')
-  const attempts = value.attempts === undefined ? undefined : integer(value.attempts, 1, 1000)
-  if (value.attempts !== undefined && attempts === undefined)
-    throw new Error('invalid feedback outbox rejection')
-  return {
-    ...parseCause(value),
-    diagnostic: value.diagnostic,
-    ...(attempts === undefined ? {} : { attempts }),
   }
 }

@@ -8,10 +8,9 @@ import {
   causeOfError,
   configurationCause,
   isTransientCause,
-  parseFailure,
-  parseRejection,
   statusCause,
 } from './feedback-failure.mts'
+import { parseFailure, parseRejection } from './feedback-failure-parse.mts'
 import { readFeedbackFailures } from './feedback-outbox-failure.mts'
 import {
   pruneRejectedFeedbackOutbox,
