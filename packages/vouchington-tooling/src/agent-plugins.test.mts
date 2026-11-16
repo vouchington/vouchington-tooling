@@ -103,6 +103,24 @@ describe('vouchington-workflow plugin', () => {
     for (const term of ['hook-harness', '/shepherd', '/plan', '/fix']) {
       expect(loop).toContain(term)
     }
+    const triage = ['triage-loop', 'triage-sweep', 'triage-prs'].map(
+      (name) => skills[skillNames.indexOf(name)]!,
+    )
+    const triageResources = await Promise.all(
+      [
+        'triage-loop/references/config.md',
+        'triage-loop/scripts/state.py',
+        'triage-loop/scripts/wait.py',
+        'triage-sweep/references/dependency-update-check.md',
+      ].map((path) => readFile(join(workflowPlugin, 'skills', path), 'utf8')),
+    )
+    for (const text of triage) {
+      expect(text).toContain('.triage-loop.json')
+      expect(text).not.toContain('.agents/skills/triage-loop')
+    }
+    for (const text of [...triage, ...triageResources]) {
+      expect(text).not.toMatch(/jonathanong|vouchington\/|~\/\.local|opentofu|herdr/i)
+    }
     const retrospective = skills[skillNames.indexOf('retrospective')]
     for (const term of ['`/shepherd`', 'handoff-pr<number>', 'merge-pr<number>']) {
       expect(retrospective).toContain(term)
