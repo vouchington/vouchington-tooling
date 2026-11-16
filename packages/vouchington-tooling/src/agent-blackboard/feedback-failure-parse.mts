@@ -2,6 +2,7 @@ import { isObject } from './snapshot-partition-guards.mts'
 import {
   CAUSE,
   CODE,
+  MAX_ATTEMPTS,
   type FeedbackCause,
   type FeedbackFailure,
   type FeedbackRejection,
@@ -32,7 +33,7 @@ function parseCause(value: Record<string, unknown>): Partial<FeedbackCause> {
 }
 
 export function parseFailure(value: unknown): FeedbackFailure {
-  const attempts = isObject(value) ? integer(value.attempts, 1, 1000) : undefined
+  const attempts = isObject(value) ? integer(value.attempts, 1, MAX_ATTEMPTS) : undefined
   if (!isObject(value) || attempts === undefined || typeof value.cause !== 'string')
     throw new Error('invalid feedback outbox failure')
   return { ...(parseCause(value) as FeedbackCause), attempts }
@@ -41,7 +42,8 @@ export function parseFailure(value: unknown): FeedbackFailure {
 export function parseRejection(value: unknown): FeedbackRejection {
   if (!isObject(value) || typeof value.diagnostic !== 'string' || !CAUSE.test(value.diagnostic))
     throw new Error('invalid feedback outbox rejection')
-  const attempts = value.attempts === undefined ? undefined : integer(value.attempts, 1, 1000)
+  const attempts =
+    value.attempts === undefined ? undefined : integer(value.attempts, 1, MAX_ATTEMPTS)
   if (value.attempts !== undefined && attempts === undefined)
     throw new Error('invalid feedback outbox rejection')
   return {

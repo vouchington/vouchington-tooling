@@ -14,6 +14,7 @@ const RECORD_KEYS = ['identity', 'envelope', 'failure', 'rejection']
 
 export type LoadedRecord = {
   record: FeedbackOutboxRecord
+  /** The record payload size, excluding failure and rejection notes, as admission measures it. */
   bytes: number
   failure?: FeedbackFailure
   rejection?: FeedbackRejection
@@ -22,17 +23,17 @@ export type LoadedRecord = {
 export function readRecord(path: string): LoadedRecord {
   const descriptor = openLogFile(path, constants.O_RDONLY)
   try {
-    const bytes = fstatSync(descriptor).size
     const limit = RECORD_MAX_BYTES + NOTE_MAX_BYTES
-    if (bytes > limit) throw new Error('feedback outbox record is too large')
+    if (fstatSync(descriptor).size > limit) throw new Error('feedback outbox record is too large')
     const value: unknown = JSON.parse(readLogContent(descriptor, limit))
     if (!isObject(value) || Object.keys(value).some((key) => !RECORD_KEYS.includes(key)))
       throw new Error('invalid feedback outbox record')
     validateFeedbackIdentity(value.identity)
     validateFeedbackEnvelope(value.envelope)
+    const record = { identity: value.identity, envelope: value.envelope }
     return {
-      record: { identity: value.identity, envelope: value.envelope },
-      bytes,
+      record,
+      bytes: Buffer.byteLength(JSON.stringify(record)),
       ...(value.failure === undefined ? {} : { failure: parseFailure(value.failure) }),
       ...(value.rejection === undefined ? {} : { rejection: parseRejection(value.rejection) }),
     }

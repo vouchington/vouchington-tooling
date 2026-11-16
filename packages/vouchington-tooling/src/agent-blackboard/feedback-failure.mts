@@ -13,6 +13,8 @@ export type FeedbackFailure = FeedbackCause & { attempts: number }
 export type FeedbackRejection = Partial<FeedbackCause> & { diagnostic: string; attempts?: number }
 
 export const QUARANTINE_ATTEMPTS = 5
+/** The highest persisted attempt count; later attempts saturate here. */
+export const MAX_ATTEMPTS = 1000
 export const CAUSE = /^[A-Za-z0-9_:.-]{1,80}$/
 export const CODE = /^[A-Z][A-Z0-9_]{1,40}$/
 // Healing without touching the record: outages, throttling, credentials, and the environment.

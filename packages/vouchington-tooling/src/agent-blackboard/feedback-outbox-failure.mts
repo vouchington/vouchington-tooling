@@ -3,6 +3,7 @@ import { withFileLock } from '../private-files/lock.mts'
 import { canonicalFeedback } from './feedback-canonical.mts'
 import { ensureOutboxDirectory } from './feedback-outbox-directory.mts'
 import {
+  MAX_ATTEMPTS,
   QUARANTINE_ATTEMPTS,
   isTransientCause,
   type FeedbackCause,
@@ -28,7 +29,10 @@ export function recordFeedbackFailure(
   const path = outboxDirectory(directory, true)
   return withFileLock(join(path, '.records'), () => {
     const existing = records(path).find((item) => item.path === join(path, filename(record)))
-    const attempts = existing?.failure?.cause === cause.cause ? existing.failure.attempts + 1 : 1
+    const attempts =
+      existing?.failure?.cause === cause.cause
+        ? Math.min(existing.failure.attempts + 1, MAX_ATTEMPTS)
+        : 1
     const failure = { ...cause, attempts }
     if (!existing) return { failure, quarantined: false }
     if (canonicalFeedback(existing.record) !== canonicalFeedback(record))

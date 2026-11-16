@@ -1,9 +1,10 @@
 import { mkdtemp, rm } from 'node:fs/promises'
-import { readdirSync, utimesSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  MAX_ATTEMPTS,
   QUARANTINE_ATTEMPTS,
   causeOfError,
   configurationCause,
@@ -12,6 +13,7 @@ import {
 } from './feedback-failure.mts'
 import { parseFailure, parseRejection } from './feedback-failure-parse.mts'
 import { readFeedbackFailures } from './feedback-outbox-failure.mts'
+import { readRecord } from './feedback-outbox-read.mts'
 import {
   pruneRejectedFeedbackOutbox,
   readRejectedDetails,
@@ -207,6 +209,23 @@ describe('quarantine', () => {
       { sourceEventId: 'quarantine:two', cause: 'missing-env:AGENT_BLACKBOARD_URL', attempts: 7 },
     ])
     expect(readRejectedDetails(path)).toEqual([])
+  })
+
+  it('saturates the attempt count and keeps failure notes out of the byte capacity', async () => {
+    const path = await retain('saturate:one')
+    await flush(path)
+    const [name] = readdirSync(path).filter((file) => file.endsWith('.json'))
+    const file = join(path, name!)
+    const stored = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    writeFileSync(
+      file,
+      JSON.stringify({ ...stored, failure: { cause: 'http-5xx', attempts: MAX_ATTEMPTS } }),
+    )
+    expect((await flush(path)).failures?.[0]?.attempts).toBe(MAX_ATTEMPTS)
+    expect(readFeedbackFailures(path)[0]?.attempts).toBe(MAX_ATTEMPTS)
+    const loaded = readRecord(file)
+    expect(loaded.bytes).toBe(Buffer.byteLength(JSON.stringify(loaded.record)))
+    expect(loaded.bytes).toBeLessThan(statSync(file).size)
   })
 
   it('tries the records behind a record-specific failure but stops at an outage', async () => {
