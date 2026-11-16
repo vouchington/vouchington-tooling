@@ -45,7 +45,8 @@ given dependency sends one notification through the escalation channel, deduped 
 
 ## Phase A - Dependency-bot PRs
 
-A mechanical-tier subagent per repository lists open PRs from the dependency bot and returns, per
+A mechanical-tier subagent per repository lists open PRs from the dependency bot, plus open PRs on the adapter's lockfile-dedupe branch
+(whatever their author or label), and returns, per
 PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
 
 Steered and draft handoffs are not merged in the pass that readies them (see
@@ -132,8 +133,8 @@ PR. For each one, under the adapter's taxonomy through
   a comment and the right `state_reason`.
 - **Ask the human** about everything else except flakes: no fitting milestone, urgent work that
   should start now, or a reorganization. List it in the summary as `dispatch or reorganize`. Do not
-  dispatch it. Projects are cross-repository initiatives, milestones are per-repository, and an
-  issue belongs to at most one project. Sensitive issues go in the private repository the taxonomy
+  dispatch it. Follow the project and milestone rules in
+  `organize-github-issues`. Sensitive issues go in the private repository the taxonomy
   names. Never reopen a closed milestone, and a one-off issue may stay without one. This path never applies to a flake: dispatch a fixer or confirm its owner, with no
   milestone or dispatch decision asked first.
 
