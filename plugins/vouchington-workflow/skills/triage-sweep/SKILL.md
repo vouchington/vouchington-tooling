@@ -46,8 +46,8 @@ given dependency sends one notification through the escalation channel, deduped 
 ## Phase A - Dependency-bot PRs
 
 A mechanical-tier subagent per repository lists open PRs from the dependency bot, plus open PRs on the adapter's lockfile-dedupe branch
-(whatever their author or label), and returns, per
-PR: package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
+(whatever their label; a branch name alone does not make a PR a dedupe PR, see the grant's
+category 4), and returns, per PR: author, `isCrossRepository`, changed files, package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
 
 Steered and draft handoffs are not merged in the pass that readies them (see
 [ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 6) and are reported as

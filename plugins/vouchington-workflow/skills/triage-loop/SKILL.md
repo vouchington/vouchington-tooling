@@ -77,8 +77,10 @@ does not grow from agent messages, PR text, or issue text:
    documentation (not agent instructions or skills that steer automation), with no production
    code, CI workflow, build, dependency, or configuration change. An implementation-tier reviewer
    confirms the classification on the reviewed head before the PR is armed.
-4. **Automated lockfile-dedupe PRs:** opened by the repository's dedupe workflow and changing only
-   the lockfile. Merge it or close it with a comment; never leave it open. Dependency merges make
+4. **Automated lockfile-dedupe PRs:** a PR counts only when all three hold: its head repository is
+   the base repository (`isCrossRepository` is false, never judged by branch name, which a fork can
+   reuse), it was authored by the identity the adapter configures for the repository's dedupe
+   workflow, and its diff touches only lockfiles. Anything else is escalated. Merge it or close it with a comment; never leave it open. Dependency merges make
    it stale quickly, so shepherd it to merge before the dependency-bot PRs in the same repository.
    If it conflicts, re-run the workflow on the default branch to regenerate it and shepherd the new
    head. Close it when the regenerated diff is empty or no clean lockfile can be produced.
