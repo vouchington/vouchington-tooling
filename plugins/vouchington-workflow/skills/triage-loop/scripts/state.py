@@ -11,7 +11,7 @@ import argparse, contextlib, datetime, fcntl, json, os, sys, tempfile
 SEEN_MAX = 200
 # The top-level fields and their shapes; `set`, `append`, and `remove` touch only these.
 FIELDS = {
-    "lastSweepAt": str, "reviewedComments": dict, "lateReview": dict, "schedule": dict,
+    "lastSweepAt": str, "commandsThrough": str, "reviewedComments": dict, "lateReview": dict, "schedule": dict,
     "retroCursor": str, "escalations": dict, "hookHarness": dict, "handledFailures": dict,
     "shepherds": dict, "intake": list, "scheduledPrompts": dict, "delegations": list,
     "routed": list,

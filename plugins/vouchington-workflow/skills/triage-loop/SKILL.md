@@ -110,7 +110,10 @@ through a printed command, and merges within the grant.
      it), `activityThrough` (ISO time; the `since` for Phase F's review-activity signal, advanced
      only after that step succeeds, falling back to `scannedThrough`), and `fullScanAt` (time of
      the last full window rescan)
-   - `schedule` (the fallback sweep job's id and registration time)
+   - `commandsThrough` (ISO time; the `since` for triage-sweep Phase G2's command-comment scan,
+     advanced only after that phase succeeds, falling back to `lastSweepAt`)
+   - `schedule` (the fallback sweep job's id and registration time; its presence marks a standing
+     loop, and only a standing loop's sweep maintains the job)
    - `retroCursor`
    - `escalations` (key to first-notified time, used for dedupe)
    - `hookHarness` (`cursor`, recently `seen` event ids, and per-event progress)

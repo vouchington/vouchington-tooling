@@ -156,9 +156,13 @@ parts, paginating fully:
    - the repository-level review-comment and issue-comment lists sorted by `updated`
      (`gh api --paginate 'repos/<o>/<r>/pulls/comments?sort=updated&direction=desc&since=<ts>'`
      and `repos/<o>/<r>/issues/comments?sort=updated&since=<ts>`), mapped back to their PRs;
-   - reviews submitted since then, through search or the event-wait stream when configured. A
-     review with only a body and no inline comments is absent from the comment lists, so without
-     the event-wait stream the periodic full rescan is what catches it.
+   - and, on every sweep, a signal that catches reviews with only a body: such a review is
+     absent from both comment lists, and the weekly backstop can run after a PR has left the
+     window. Search for merged PRs in the window updated since then
+     (`gh search prs --repo <o>/<r> --merged --merged-at '>=<window start>' --updated '><ts>'
+     --limit 1000 --json number`) and, for each, keep it when
+     `gh api --paginate 'repos/<o>/<r>/pulls/<n>/reviews'` has a review whose `submitted_at` is
+     after `<ts>`. A failed search or listing fails step 2, so `activityThrough` stays put.
 3. **Backstop:** when `fullScanAt` is unset or older than `fullRescanDays`
    (default 7), rescan every PR in the window as before.
 
@@ -208,9 +212,14 @@ one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
 
 The backstop for `/shepherd`, `/plan`, and `/fix` events, run on `gap: true`, on a failed wait, and
 each full sweep. A mechanical-tier subagent per repository lists those comments on issues and PRs
-posted since `lastSweepAt` by the configured `trustedLogins` (never trust `authorAssociation`),
-paginating fully, and keeps those with no `eyes` reaction from the loop and no `shepherds` entry
-for the PR. This covers commands missed while the loop was down. The loop handles each as the
+posted since `commandsThrough` (falling back to `lastSweepAt` while it is unset) by the configured
+`trustedLogins` (never trust `authorAssociation`), paginating fully, and keeps those with no `eyes`
+reaction from the loop and no `shepherds` entry for the PR. This covers commands missed while the
+loop was down. Set `commandsThrough` to the sweep start (`state.py set commandsThrough --json
+'"<ISO time>"'`) only after G2 succeeds for every repository; never on a skip, a failure, or
+`--dry-run`. Never list from `lastSweepAt` once `commandsThrough` is set: it advances even when
+preflight skipped G2, so commands posted in that gap would be missed. `lastSweepAt` stays the
+pacing timestamp only. The loop handles each as the
 [Comment commands](../triage-loop/SKILL.md#comment-commands) section describes, including the
 acknowledgement.
 
@@ -248,8 +257,12 @@ in each selected repository.
 ## Phase H - Report and escalate
 
 Before exiting, keep the schedule alive (see triage-loop
-[Step 2](../triage-loop/SKILL.md#step-2---schedule-and-event-wait)). Hosts may expire recurring
-jobs, such as session-only crons that auto-expire after some days:
+[Step 2](../triage-loop/SKILL.md#step-2---schedule-and-event-wait)), but only inside a standing
+loop: the pass was started by triage-loop (its fallback cron, a wakeup, or its own event handling)
+and the state file's `schedule` field is set. A standalone pass, which the user's request grants
+for that one pass, never creates, replaces, or deletes a recurring job; it skips the steps below
+and says so in its summary. Registering the first job belongs to triage-loop Step 2. Hosts may
+expire recurring jobs, such as session-only crons that auto-expire after some days:
 
 1. List the loop's recurring jobs.
 2. If the fallback sweep job is missing, or its expiry falls within the next fallback interval plus

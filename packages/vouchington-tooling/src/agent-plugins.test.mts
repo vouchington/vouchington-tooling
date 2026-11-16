@@ -164,7 +164,15 @@ describe('vouchington-workflow plugin', () => {
     expect(taxonomy).toContain('(../organize-github-issues/SKILL.md#projects-and-milestones)')
     expect(distill).toMatch(/labels, milestones, projects/i)
     expect(distill).toContain('`github-issue` skill (`skills` plugin)')
-    expect(sweep.replaceAll(/\s+/g, ' ')).toMatch(/exact existing `follow-up` label/)
+    const flatSweep = sweep.replaceAll(/\s+/g, ' ')
+    expect(flatSweep).toMatch(/exact existing `follow-up` label/)
+    expect(flatSweep).toMatch(/pulls\/<n>\/reviews.*`submitted_at`/)
+    expect(flatSweep).toMatch(
+      /A standalone pass.*never creates, replaces, or deletes a recurring job/,
+    )
+    expect(flatSweep).toMatch(
+      /posted since `commandsThrough`.*never on a skip, a failure, or `--dry-run`/,
+    )
     for (const skill of [organize, taxonomy, distill]) {
       expect(skill).not.toMatch(/filaments|voucha|jonathanong|vouchington\//i)
     }
