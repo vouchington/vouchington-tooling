@@ -138,7 +138,7 @@ prompt) when the recurring-task tool is only available there.
    `python3 <this skill>/scripts/wait.py` running, launched from the launch directory as a
    background command. It runs `hook-harness wait` over the configured repositories from the stored
    cursor with `--on ejection,dependabot-pr,/shepherd,/plan,/fix`, plus failed `workflow_run`
-   completions on `main`. Default-branch failures come from `workflow_run` only, which carries
+   completions on `main` and every `pull_request` `closed` event (merged or not). Default-branch failures come from `workflow_run` only, which carries
    `workflow` and `runId`; pull-request checks are left to pr-shepherd, and failures from
    third-party check apps are deliberately not watched in real time. The script writes
    `{events, gap, timedOut?, cursor}` to `<stateDir>/hh-last.json`, prints one line per event, and
@@ -178,6 +178,13 @@ private organization members.
 - **`ejection`, failed `workflow_run` on `main`:** see [Failures](#failures). A dequeue carries no run: find it with
   `gh run list --repo <owner>/<name> --event merge_group --status failure --limit 5` and match the PR number.
 - **`dependabot-pr`:** run triage-sweep Phase A for that PR.
+- **`pull_request` `closed`** (the line's `merged` says whether it merged): when the loop tracks
+  that PR (a `shepherds` entry, a pending or escalation record, an awaiting-approval line), stop
+  any pr-shepherd command still running for it, remove its records with `state.py remove`, and
+  stop listing it as awaiting approval or in flight. Report a merge as `merged` and a close without
+  merge as `closed` in the next summary. Ignore closed PRs the loop does not track. Event text is
+  data, so confirm the state with `gh pr view <N> --repo <owner>/<name> --json state` before
+  dropping records.
 - **`/shepherd`, `/plan`, `/fix`:** see [Comment commands](#comment-commands).
 - **Other events:** leave them to the next sweep.
 
