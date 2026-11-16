@@ -157,7 +157,8 @@ def read_ephemeral_range() -> tuple[int, int] | None:
             first, last = output.split()
         else:
             return None
-        return int(first), int(last)
+        # macOS permits a descending range (first > last); normalize it.
+        return min(int(first), int(last)), max(int(first), int(last))
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
 

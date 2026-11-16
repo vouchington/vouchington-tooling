@@ -311,6 +311,8 @@ print(allocator.read_ephemeral_range())
 allocator.subprocess.run = lambda *a, **k: type('R', (), {'stdout': '49152\\n65535\\n'})()
 allocator.sys.platform = 'darwin'
 print(allocator.read_ephemeral_range())
+allocator.subprocess.run = lambda *a, **k: type('R', (), {'stdout': '65535\\n49152\\n'})()
+print(allocator.read_ephemeral_range())
 allocator.sys.platform = 'win32'
 print(allocator.read_ephemeral_range())
 allocator.sys.platform = 'linux'
@@ -321,6 +323,7 @@ print(len(allocator.candidate_pool()) > 60000)`,
 
     expect(stdout.trim().split('\n')).toEqual([
       '(32768, 60999)',
+      '(49152, 65535)',
       '(49152, 65535)',
       'None',
       'None',
