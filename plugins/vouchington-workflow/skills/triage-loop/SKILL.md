@@ -204,7 +204,8 @@ the `review-ci-logs` skill (`skills` plugin) and classifies it: flake, infra, or
   the event's `headSha` and, with the final-review gate on, `<review-status>` still exits 0 for
   it, requeue it only
   through the `requeue:` or `acknowledge queue removal:` command that `pr-shepherd --merge`
-  prints for it, and only after the flake has a fix PR or an issue (see the flake bullet below).
+  prints for it, and, for a flake diagnosis, only after the flake has a fix PR or an issue (see the flake
+  bullet below).
   For a real failure, never requeue the unchanged head: leave it to its shepherd or escalate it.
   Otherwise leave it to its shepherd and list it in the summary. Never requeue or merge an
   out-of-grant PR. For an ejection outside the grant with a flake fingerprint, file or update a
