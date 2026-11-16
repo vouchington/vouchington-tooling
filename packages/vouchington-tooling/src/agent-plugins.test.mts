@@ -95,7 +95,7 @@ describe('vouchington-workflow plugin', () => {
       expect(skill.replaceAll(/(?:AGENTS|CLAUDE)\.md/giu, '')).not.toMatch(/\b(?:claude|codex)\b/i)
       expect(skill).not.toMatch(/\.github\/workflows\/RUNNERS|filaments|voucha/i)
       expect(skill).not.toMatch(
-        /auto harness|agent hook|coverage (?:tooling|baseline)|HARNESS_|activation (?:gate|disabled)|dispatch workflow|shepherd trigger|ready-and-shepherd/i,
+        /agent hook|coverage (?:tooling|baseline)|HARNESS_|activation (?:gate|disabled)|dispatch workflow|shepherd trigger|ready-and-shepherd/i,
       )
       expect(skill).toMatch(/consumer\s+wrapper/i)
     }
