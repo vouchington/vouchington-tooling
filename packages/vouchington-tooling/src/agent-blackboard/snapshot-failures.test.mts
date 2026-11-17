@@ -7,6 +7,7 @@ import {
   open,
   readFile,
   readdir,
+  rename,
   rm,
   rmdir,
   stat,
@@ -396,21 +397,20 @@ describe('snapshot resource failures', () => {
         },
       },
     ])
+    const original = `${directory}-original`
     paths.add(directory)
+    paths.add(original)
     let replaced = false
     setSnapshotCleanupFilesystemForTest({
       lstat: (async (path: Parameters<typeof lstat>[0]) => {
         const info = await lstat(path)
         if (!replaced && path === directory) {
           replaced = true
-          await rm(directory, { recursive: true, force: true })
+          // Keep the original alive so the replacement cannot reuse its inode number.
+          await rename(directory, original)
           await mkdir(directory)
           await writeFile(join(directory, 'replacement'), 'keep')
         }
-        if (String(path).includes('.agent-blackboard-cleanup-'))
-          return Object.assign(Object.create(Object.getPrototypeOf(info)), info, {
-            ino: Number(info.ino) + 1,
-          }) as typeof info
         return info
       }) as typeof lstat,
     })
