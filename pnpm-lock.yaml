@@ -141,8 +141,8 @@ importers:
         specifier: 4.0.0
         version: 4.0.0
       '@vouchington/postgres':
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.6.1
+        version: 0.6.1
       '@vouchington/worker-runtime':
         specifier: 0.3.1
         version: 0.3.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.1.0)
@@ -1806,8 +1806,8 @@ packages:
   '@vitest/spy@5.1.0':
     resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
 
-  '@vouchington/postgres@0.4.0':
-    resolution: {integrity: sha512-n5d+W2bwvkEqu3D94lc4I7nuZndoSfK8qD47pFwiT2JZzla+Zk+Feg77i0x9GY6qOAfALSlixnGf3TOvsMg3uQ==}
+  '@vouchington/postgres@0.6.1':
+    resolution: {integrity: sha512-sjoD+Rdl8IilFUbl6MfgGuxB03by/HudVkRi/id1iNebq9+BingCx962d6yqzY+Ctpnm7tx/k1fK3tMGhLXo1Q==}
     engines: {node: '>=24.0.0'}
 
   '@vouchington/worker-runtime@0.3.1':
@@ -3005,8 +3005,8 @@ packages:
   pgpass@1.0.5:
     resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
 
-  pgvector@0.3.0:
-    resolution: {integrity: sha512-+t7qcQD2us8fO8YIq/3lA0gUrD+bVO70MG1MhcDcxJz/OlRGGIIHzFq/4x57Vn/LpzX5wFdfOTLQp9QMPd4ljQ==}
+  pgvector@0.3.1:
+    resolution: {integrity: sha512-POqnLYO9ZwdvUS/jsqDbOpaWAt1VfpKsoiZM7LHPB3RjSrVPEJYICL5pNju5GRhWZHKzNbQyjF1PyC21zi3gnA==}
     engines: {node: '>=22'}
 
   picocolors@1.1.1:
@@ -4772,12 +4772,12 @@ snapshots:
 
   '@vitest/spy@5.1.0': {}
 
-  '@vouchington/postgres@0.4.0':
+  '@vouchington/postgres@0.6.1':
     dependencies:
       '@libpg-query/parser': 18.0.0
       pg: 8.23.1
       pg-cursor: 2.22.1(pg@8.23.1)
-      pgvector: 0.3.0
+      pgvector: 0.3.1
       sql-template-strings: 2.2.2
     transitivePeerDependencies:
       - pg-native
@@ -6184,7 +6184,7 @@ snapshots:
     dependencies:
       split2: 4.2.0
 
-  pgvector@0.3.0: {}
+  pgvector@0.3.1: {}
 
   picocolors@1.1.1: {}
 
