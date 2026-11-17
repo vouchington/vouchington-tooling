@@ -6,6 +6,12 @@ updates:
       interval: daily
     cooldown:
       default-days: 7
+      exclude:
+        - '@vouchington/*'
+        - agent-blackboard
+        - coverage-check
+        - eslint-plugin-no-mistakes
+        - no-mistakes
     open-pull-requests-limit: 5
     groups:
       oxc:
