@@ -2,8 +2,9 @@ name: Setup Node.js and pnpm
 description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
   without a pnpm store cache. One total deadline covers the pnpm binary download and the
-  install; the install uses tight fetch settings and a wall-clock limit per attempt inside
-  that deadline, and retries an attempt that times out only while budget remains.
+  install; the download and the install each make a few short attempts inside that deadline and
+  retry (after a short fixed backoff, logging the reason) only an attempt that timed out or hit a
+  network/registry error, and only while budget remains.
   The caller must run actions/checkout before invoking this action.
   Set deadline-seconds below the calling step's timeout-minutes.
 inputs:
@@ -20,10 +21,10 @@ inputs:
     default: '.nvmrc'
   install-attempt-timeout-seconds:
     description: 'Wall-clock limit, in seconds, for each pnpm install attempt'
-    default: '150'
+    default: '80'
   install-attempts:
-    description: 'Maximum pnpm install attempts; only an attempt that times out is retried, so a caller may raise it above 1 to retry a timed-out attempt'
-    default: '1'
+    description: 'Maximum pnpm install attempts; only an attempt that timed out or failed with a network/registry error is retried, set 1 to disable retries'
+    default: '3'
 runs:
   using: composite
   steps:
@@ -55,7 +56,9 @@ runs:
     # slow default backoff, so one stalled request can take ~250s and a trickling one is
     # unbounded. install.mjs therefore passes tight fetch settings and bounds each attempt by
     # wall-clock time (never past the total deadline), killing the process group and retrying.
-    # A real failure (lockfile mismatch, script error) is not retried. Attempt 1 uses --loglevel=warn, which drops the progress bar
+    # Only a timeout or a network/registry error (network-errors.mjs) is retried, after a 5s
+    # backoff, and each retry is logged with its reason; a real failure (lockfile mismatch, 404,
+    # script error) is not retried. Attempt 1 uses --loglevel=warn, which drops the progress bar
     # and package summary but keeps warnings and errors (from pnpm 12.8.0, pnpm/pnpm#16076, also
     # a failed lifecycle script's full output and a failed supply-chain verdict); retries log
     # append-only at info level to show where a repeated stall happened.

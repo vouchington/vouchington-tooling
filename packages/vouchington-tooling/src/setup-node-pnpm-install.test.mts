@@ -18,6 +18,7 @@ const { buildArgs, parseOptions, makeKiller, runAttempt, FETCH_FLAGS, MAX_TIMER_
       attempts: number
       ignoreScripts: boolean
       graceMs: number
+      backoffMs: number
     }
     makeKiller: (
       platform: string,
@@ -29,7 +30,7 @@ const { buildArgs, parseOptions, makeKiller, runAttempt, FETCH_FLAGS, MAX_TIMER_
       graceMs: number,
       platform: string,
       kill: (pid: number, signal: string) => void,
-    ) => Promise<{ timedOut: boolean; code: number }>
+    ) => Promise<{ timedOut: boolean; code: number; output: string }>
     FETCH_FLAGS: string[]
     MAX_TIMER_MS: number
   }
@@ -43,6 +44,9 @@ mode=$(echo "$FAKE_BEHAVIOR" | cut -d, -f"$n")
 case "$mode" in
   ok) exit 0 ;;
   fail) exit 7 ;;
+  net) echo "ERR_PNPM_META_FETCH_FAIL GET https://registry.npmjs.org/x: ETIMEDOUT" >&2; exit 1 ;;
+  lock) echo "ERR_PNPM_OUTDATED_LOCKFILE ECONNRESET in a log line" >&2; exit 1 ;;
+  notfound) echo "ERR_PNPM_FETCH_404 GET https://registry.npmjs.org/x: Not Found - 404" >&2; exit 1 ;;
   stubborn) trap '' TERM; while :; do sleep 1; done ;;
   *) sleep 30 & echo $! > "$FAKE_PID"; wait ;;
 esac
@@ -52,6 +56,7 @@ async function install(behavior: string, env: Record<string, string | undefined>
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     INSTALL_ATTEMPT_TIMEOUT_SECONDS: '1',
+    INSTALL_RETRY_BACKOFF_MS: '10',
     ...env,
   }
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete childEnv[key]
@@ -83,15 +88,16 @@ async function install(behavior: string, env: Record<string, string | undefined>
 }
 
 describe('setup-node-pnpm install options', () => {
-  it('defaults to a 150s limit, 1 attempt, and scripts enabled', () => {
+  it('defaults to an 80s limit, 3 attempts, a 5s backoff, and scripts enabled', () => {
     expect(parseOptions({})).toEqual({
-      timeoutSeconds: 150,
-      attempts: 1,
+      timeoutSeconds: 80,
+      attempts: 3,
       ignoreScripts: false,
       graceMs: 10_000,
+      backoffMs: 5000,
     })
     expect(parseOptions({ INSTALL_ATTEMPTS: ' ', INSTALL_IGNORE_SCRIPTS: 'true' })).toMatchObject({
-      attempts: 1,
+      attempts: 3,
       ignoreScripts: true,
     })
   }, 30_000)
@@ -164,7 +170,7 @@ describe('setup-node-pnpm install.mjs', () => {
     expect(result.code).toBe(0)
     expect(result.calls).toEqual([buildArgs(1, false).join(' '), buildArgs(2, false).join(' ')])
     expect(result.stdout).toMatch(
-      /::warning::pnpm install attempt 1\/2 timed out after \d+s \(mirror\.example:8443\); retrying/u,
+      /::warning::pnpm install attempt 1\/2 timed out after \d+s \(mirror\.example:8443\); retrying in 0\.01s/u,
     )
     const pid = Number(readFileSync(result.pidFile, 'utf8').trim())
     let alive = true
@@ -189,8 +195,8 @@ describe('setup-node-pnpm install.mjs', () => {
     )
   }, 30_000)
 
-  it('does not retry a timed-out attempt when INSTALL_ATTEMPTS is unset', async () => {
-    const result = await install('hang,ok', { INSTALL_ATTEMPTS: undefined })
+  it('does not retry a timed-out attempt when INSTALL_ATTEMPTS is 1', async () => {
+    const result = await install('hang,ok', { INSTALL_ATTEMPTS: '1' })
     expect(result.code).toBe(1)
     expect(result.calls).toEqual([buildArgs(1, false).join(' ')])
     expect(result.stdout).not.toContain('::warning::')
@@ -198,6 +204,36 @@ describe('setup-node-pnpm install.mjs', () => {
       /::error::pnpm install attempt 1\/1 timed out after \d+s \([^)]+\); giving up/u,
     )
   }, 30_000)
+
+  it('retries a network failure, logging its reason, and forwards pnpm output', async () => {
+    const result = await install('net,net,ok')
+    expect(result.code).toBe(0)
+    expect(result.calls).toHaveLength(3)
+    expect(result.stdout).toContain(
+      '::warning::pnpm install attempt 1/3 failed with ERR_PNPM_META_FETCH_FAIL (registry.npmjs.org); retrying in 0.01s',
+    )
+    expect(result.stderr).toContain('ETIMEDOUT')
+  }, 30_000)
+
+  it("gives up with pnpm's exit code after the last network failure", async () => {
+    const result = await install('net,net', { INSTALL_ATTEMPTS: '2' })
+    expect(result.code).toBe(1)
+    expect(result.calls).toHaveLength(2)
+    expect(result.stderr).toMatch(
+      /::error::pnpm install attempt 2\/2 failed with ERR_PNPM_META_FETCH_FAIL \([^)]+\); giving up/u,
+    )
+  }, 30_000)
+
+  it.each(['lock', 'notfound'])(
+    'does not retry a %s failure',
+    async (mode) => {
+      const result = await install(`${mode},ok`)
+      expect(result.code).toBe(1)
+      expect(result.calls).toHaveLength(1)
+      expect(result.stdout).not.toContain('::warning::')
+    },
+    30_000,
+  )
 
   it('names the configured registry host when the final attempt times out', async () => {
     const result = await install('hang', {

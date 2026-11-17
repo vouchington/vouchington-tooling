@@ -1,10 +1,12 @@
 // Runs `pnpm install --frozen-lockfile` with tight fetch settings, a wall-clock limit per
-// attempt inside one total deadline, and a retry when an attempt times out. A non-timeout failure is never retried.
+// attempt inside one total deadline, and a short fixed backoff before a retry. Only an attempt that
+// times out or fails with a network/registry error is retried; any other failure fails at once.
 // Node >= 24, no dependencies, no GNU `timeout` (macOS runners have none).
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { deadlineMessage, parseDeadline, registryHost } from './deadline.mjs'
+import { networkFailureReason } from './network-errors.mjs'
 
 // pnpm 12 accepts only --fetch-timeout as a flag; the retry settings go through --config.*.
 export const FETCH_FLAGS = [
@@ -32,12 +34,18 @@ export function parseOptions(env) {
     timeoutSeconds: positiveInteger(
       'install-attempt-timeout-seconds',
       env.INSTALL_ATTEMPT_TIMEOUT_SECONDS,
-      '150',
+      '80',
       Math.floor(MAX_TIMER_MS / 1000),
     ),
-    attempts: positiveInteger('install-attempts', env.INSTALL_ATTEMPTS, '1'),
+    attempts: positiveInteger('install-attempts', env.INSTALL_ATTEMPTS, '3'),
     ignoreScripts: env.INSTALL_IGNORE_SCRIPTS === 'true',
     graceMs: positiveInteger('kill grace ms', env.INSTALL_KILL_GRACE_MS, '10000', MAX_TIMER_MS),
+    backoffMs: positiveInteger(
+      'retry backoff ms',
+      env.INSTALL_RETRY_BACKOFF_MS,
+      '5000',
+      MAX_TIMER_MS,
+    ),
   }
 }
 
@@ -67,6 +75,8 @@ export function makeKiller(platform = process.platform, run = spawnSync) {
   }
 }
 
+const OUTPUT_TAIL_CHARS = 65_536
+
 export function runAttempt(
   args,
   timeoutMs,
@@ -76,7 +86,21 @@ export function runAttempt(
 ) {
   return new Promise((resolve) => {
     // detached opens a new console on Windows; elsewhere it makes a killable process group.
-    const child = spawn('pnpm', args, { stdio: 'inherit', detached: platform !== 'win32' })
+    const child = spawn('pnpm', args, {
+      stdio: ['inherit', 'pipe', 'pipe'],
+      detached: platform !== 'win32',
+    })
+    // Forward pnpm's output unchanged and keep only its tail to classify a failure.
+    let output = ''
+    for (const [stream, sink] of [
+      [child.stdout, process.stdout],
+      [child.stderr, process.stderr],
+    ]) {
+      stream.on('data', (chunk) => {
+        sink.write(chunk)
+        output = (output + chunk).slice(-OUTPUT_TAIL_CHARS)
+      })
+    }
     let timedOut = false
     let killTimer
     const timer = setTimeout(() => {
@@ -87,13 +111,13 @@ export function runAttempt(
     child.on('error', (error) => {
       clearTimeout(timer)
       console.error(`::error::Could not start pnpm: ${error.message}`)
-      resolve({ timedOut: false, code: 127 })
+      resolve({ timedOut: false, code: 127, output: '' })
     })
     child.on('close', (code, signal) => {
       clearTimeout(timer)
       clearTimeout(killTimer)
       if (timedOut) kill(child.pid, 'SIGKILL')
-      resolve({ timedOut, code: code ?? (signal ? 1 : 0) })
+      resolve({ timedOut, code: code ?? (signal ? 1 : 0), output })
     })
   })
 }
@@ -113,7 +137,9 @@ export function minimumMs(options, attempt) {
   return attempt === 1 ? 1 : Math.min(MIN_ATTEMPT_MS, options.timeoutSeconds * 1000)
 }
 
-export async function main(env = process.env, clock = Date.now, run = runAttempt) {
+const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+
+export async function main(env = process.env, clock = Date.now, run = runAttempt, sleep = pause) {
   let options
   let deadline
   try {
@@ -123,8 +149,8 @@ export async function main(env = process.env, clock = Date.now, run = runAttempt
     console.error(`::error::${error.message}`)
     return 1
   }
+  const host = registryHost(env)
   const expired = () => {
-    const host = registryHost(env)
     console.error(`::error::${deadlineMessage(deadline.seconds, 'pnpm install', host)}`)
     return 1
   }
@@ -133,15 +159,23 @@ export async function main(env = process.env, clock = Date.now, run = runAttempt
     const limitMs = attemptLimitMs(options, deadline, started)
     if (limitMs < minimumMs(options, attempt)) return expired()
     const result = await run(buildArgs(attempt, options.ignoreScripts), limitMs, options.graceMs)
-    if (!result.timedOut) return result.code
-    const elapsed = Math.round((clock() - started) / 1000)
-    const note = `pnpm install attempt ${attempt}/${options.attempts} timed out after ${elapsed}s (${registryHost(env)})`
-    if (limitMs < options.timeoutSeconds * 1000) return expired()
+    if (!result.timedOut && result.code === 0) return 0
+    let reason
+    if (result.timedOut) {
+      reason = `timed out after ${Math.round((clock() - started) / 1000)}s`
+    } else {
+      const code = networkFailureReason(result.output ?? '')
+      if (code === undefined) return result.code
+      reason = `failed with ${code}`
+    }
+    const note = `pnpm install attempt ${attempt}/${options.attempts} ${reason} (${host})`
+    if (result.timedOut && limitMs < options.timeoutSeconds * 1000) return expired()
     if (attempt === options.attempts) {
       console.error(`::error::${note}; giving up`)
-      return 1
+      return result.timedOut ? 1 : result.code
     }
-    console.log(`::warning::${note}; retrying`)
+    console.log(`::warning::${note}; retrying in ${options.backoffMs / 1000}s`)
+    await sleep(options.backoffMs)
   }
   return 1
 }

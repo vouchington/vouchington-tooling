@@ -40,7 +40,11 @@ export function verifyIntegrity(bytes, integrity) {
 
 async function getBuffer(url, signal, fetchImpl) {
   const response = await fetchImpl(url, { signal })
-  if (!response.ok) throw new Error(`${url} responded ${response.status}`)
+  if (!response.ok) {
+    throw Object.assign(new Error(`${url} responded ${response.status}`), {
+      status: response.status,
+    })
+  }
   return Buffer.from(await response.arrayBuffer())
 }
 
@@ -61,7 +65,34 @@ export async function downloadPnpm(env, signal, fetchImpl, platform = process.pl
   return dir
 }
 
-export async function main(env = process.env, now = Date.now(), fetchImpl = fetch) {
+export const ATTEMPTS = 3
+export const ATTEMPT_TIMEOUT_MS = 30_000
+export const BACKOFF_MS = 3_000
+
+const NETWORK_CODES =
+  /^(?:ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ESOCKETTIMEDOUT|UND_ERR_\w+)$/u
+
+// Why a failed attempt is worth another one, or undefined when it is not: a per-attempt timeout,
+// a dropped connection, or a 408/429/5xx response. A 404 or an integrity failure is final.
+export function transientReason(error) {
+  if (error?.name === 'TimeoutError') return 'per-attempt timeout'
+  const status = error?.status
+  if (status === 408 || status === 429 || status >= 500) return `HTTP ${status}`
+  const code = error?.cause?.code ?? error?.code
+  return error instanceof TypeError || NETWORK_CODES.test(code ?? '')
+    ? `network error ${code ?? error.message}`
+    : undefined
+}
+
+const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+
+export async function main(
+  env = process.env,
+  now = Date.now(),
+  fetchImpl = fetch,
+  sleep = pause,
+  backoffMs = BACKOFF_MS,
+) {
   let deadline
   try {
     deadline = parseDeadline(env, now)
@@ -74,18 +105,30 @@ export async function main(env = process.env, now = Date.now(), fetchImpl = fetc
     console.error(`::error::${deadlineMessage(deadline.seconds, 'pnpm download', host)}`)
     return 1
   }
-  const remaining = deadline.endMs - now
-  if (remaining <= 0) return fail()
-  try {
-    const dir = await downloadPnpm(env, AbortSignal.timeout(remaining), fetchImpl)
-    if (env.GITHUB_PATH) appendFileSync(env.GITHUB_PATH, `${dir}\n`)
-    console.log(`Installed pnpm ${env.PNPM_VERSION} to ${dir}`)
-    return 0
-  } catch (error) {
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return fail()
-    console.error(`::error::setup-node-pnpm: pnpm download failed (${host}): ${error.message}`)
-    return 1
+  const total = AbortSignal.timeout(Math.max(deadline.endMs - now, 0))
+  if (deadline.endMs - now <= 0) return fail()
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const signal = AbortSignal.any([total, AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)])
+    try {
+      const dir = await downloadPnpm(env, signal, fetchImpl)
+      if (env.GITHUB_PATH) appendFileSync(env.GITHUB_PATH, `${dir}\n`)
+      console.log(`Installed pnpm ${env.PNPM_VERSION} to ${dir}`)
+      return 0
+    } catch (error) {
+      if (total.aborted) return fail()
+      const reason = transientReason(error)
+      const note = `pnpm download attempt ${attempt}/${ATTEMPTS} failed (${host}): ${error.message}`
+      if (reason === undefined || attempt === ATTEMPTS) {
+        console.error(`::error::setup-node-pnpm: ${note}`)
+        return 1
+      }
+      console.log(
+        `::warning::setup-node-pnpm: ${note}; ${reason}, retrying in ${backoffMs / 1000}s`,
+      )
+      await sleep(backoffMs)
+    }
   }
+  return 1
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
