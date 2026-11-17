@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -224,13 +224,28 @@ describe('composeFromArgs transcript', () => {
   })
 
   it('runs live facts for a numeric pr and for a selector without one', async () => {
+    // Facts shell out to git and gh. Point PATH at stubs that log the call and fail at once, so the
+    // test never touches the network, a credential helper, or the runner's real gh and git.
+    const bin = join(directory, 'bin')
+    const log = join(directory, 'calls.log')
+    mkdirSync(bin)
+    for (const name of ['git', 'gh']) {
+      const stub = join(bin, name)
+      writeFileSync(stub, `#!/bin/sh\necho "${name} $*" >> '${log}'\nexit 1\n`)
+      chmodSync(stub, 0o755)
+    }
     const partial = {
       ...base,
+      worktree: directory,
+      env: { PATH: bin },
       feedbackCoverage: { status: 'partial' as const, sources: [], droppedCount: 0 },
     }
     for (const facts of [{ pr: 7 }, { noPr: true }])
       await expect(composeFromArgs({ ...compose(unassessed), facts }, partial)).resolves.toContain(
         '## Verifiable Facts',
       )
+    const calls = readFileSync(log, 'utf8')
+    expect(calls).toContain('git fetch origin main:refs/remotes/origin/main')
+    expect(calls).toMatch(/^gh pr view 7 /m)
   })
 })
