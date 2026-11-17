@@ -29,13 +29,20 @@ const download = (await import(join(dir, 'download-pnpm.mjs'))) as {
     fetchImpl: unknown,
     platform?: string,
   ) => Promise<string>
-  main: (env: Env, now: number, fetchImpl: unknown) => Promise<number>
+  main: (
+    env: Env,
+    now: number,
+    fetchImpl: unknown,
+    sleep?: () => Promise<void>,
+    backoffMs?: number,
+  ) => Promise<number>
 }
 const install = (await import(join(dir, 'install.mjs'))) as {
   main: (
     env: Env,
     clock: () => number,
     run: (args: string[], limit: number, grace: number) => Promise<unknown>,
+    sleep?: () => Promise<void>,
   ) => Promise<number>
   attemptLimitMs: (
     options: { timeoutSeconds: number; graceMs: number },
@@ -125,7 +132,9 @@ describe('install deadline arithmetic', () => {
     }
     return { calls, starts, run, clock: () => now }
   }
-  const env = { SETUP_NODE_PNPM_STARTED_MS: '0' }
+  // 150s attempts keep these budget cases independent of the 80s default.
+  const env = { SETUP_NODE_PNPM_STARTED_MS: '0', INSTALL_ATTEMPT_TIMEOUT_SECONDS: '150' }
+  const noSleep = () => Promise.resolve()
 
   it('never lets attempts plus kill grace pass the total deadline', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -139,6 +148,7 @@ describe('install deadline arithmetic', () => {
         { ...env, INSTALL_ATTEMPTS: '2', SETUP_NODE_PNPM_DEADLINE_SECONDS: '270' },
         h.clock,
         h.run,
+        noSleep,
       ),
     ).toBe(1)
     expect(h.calls.map(([, ms]) => ms)).toEqual([150_000, 109_000])
@@ -164,6 +174,7 @@ describe('install deadline arithmetic', () => {
       },
       h.clock,
       h.run,
+      noSleep,
     )
     expect(code).toBe(1)
     expect(h.calls).toHaveLength(1)
@@ -318,10 +329,12 @@ describe('pnpm download', () => {
     expect(
       await download.main(env, Date.now(), registry({ integrity: 'sha512-AAAA' }).fetchImpl),
     ).toBe(1)
-    expect(await download.main(env, Date.now(), registry({ ok: false }).fetchImpl)).toBe(1)
+    expect(
+      await download.main(env, Date.now(), registry({ ok: false }).fetchImpl, async () => {}, 1),
+    ).toBe(1)
     expect(await download.main({ RUNNER_TEMP: tmp }, Date.now(), registry().fetchImpl)).toBe(1)
     expect(err).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm download failed (registry.npmjs.org)'),
+      expect.stringContaining('pnpm download attempt 1/3 failed (registry.npmjs.org)'),
     )
     expect(err).toHaveBeenCalledWith(expect.stringContaining('PNPM_VERSION is not set'))
   })
