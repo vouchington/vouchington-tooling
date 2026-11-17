@@ -501,7 +501,7 @@
     "@types/unist": "3.0.3",
     "@typescript-eslint/parser": "^8.72.2",
     "agent-blackboard": "^0.7.0",
-    "coverage-check": "0.18.0",
+    "coverage-check": "0.18.1",
     "csv-parse": "7.0.3",
     "csv-stringify": "6.9.0",
     "dockerfile-ast": "0.7.1",
