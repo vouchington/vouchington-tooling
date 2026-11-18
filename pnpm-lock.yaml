@@ -117,8 +117,8 @@ importers:
         version: 2.9.1
     devDependencies:
       '@ast-grep/cli':
-        specifier: 0.51.1
-        version: 0.51.1
+        specifier: 0.51.2
+        version: 0.51.2
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(supports-color@7.2.0)(zod@4.6.5)
@@ -180,52 +180,66 @@ importers:
 
 packages:
 
-  '@ast-grep/cli-darwin-arm64@0.51.1':
-    resolution: {integrity: sha512-C279HR4eytYkHrmqudMi+eUG3ZvuAqWc0zp9i5aPugFF389AE6N6SbiSFdKeVZXMaUVpwRbmBQbBTr5cA0Tugw==}
+  '@ast-grep/cli-darwin-arm64@0.51.2':
+    resolution: {integrity: sha512-KGvO4opuCvREiNOl8W/ZmG97rEfbUidoAgmj0+bgibQzJQ4hpLtdTeGWfD/4rdqeIDESv7yBaHbAaEY7SNdR/Q==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@ast-grep/cli-darwin-x64@0.51.1':
-    resolution: {integrity: sha512-i8wJd4amxXCvEgZDcU8QDnVE92oqJyDFPyTjaT1PVtBQ0Vb7Y55iTu1dwBwXVi0inFM2OJ4Ze57yCz1uNuXTbg==}
+  '@ast-grep/cli-darwin-x64@0.51.2':
+    resolution: {integrity: sha512-XwUi5mwn1pu8vZCPHC9tdJqJcHSeZ/EUi0Mnz0g0MIQk9puiXHb/VyY21GzHa7pWJZ5oyT2KE7JzZxTQwKmIDA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@ast-grep/cli-linux-arm64-gnu@0.51.1':
-    resolution: {integrity: sha512-ix/97iBUPGvf9KrhKRcooSJLmwBgAo7GhKHm7VH30kpxOMUrNLqiTXJj2eZVLiO2xQdUFnbwhVn+A7blSlYLJQ==}
+  '@ast-grep/cli-linux-arm64-gnu@0.51.2':
+    resolution: {integrity: sha512-T9otX6zk58rN5F9SIvGSM4QXVHmVb2N62L5L4ZpVY1f93FqzaS3y7OIQTSPrTpfvZuth3dyoL9kZXTVGcllkWg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@ast-grep/cli-linux-x64-gnu@0.51.1':
-    resolution: {integrity: sha512-FlaaRLyopXet+zFrWOdlTbyJb+QqZzgV9jxIbgz0FoVsJSaJ6jsenO/6bgYJk4zPOCUODuvoQ1/XFlB4r6BdcQ==}
+  '@ast-grep/cli-linux-arm64-musl@0.51.2':
+    resolution: {integrity: sha512-NxLmXQWHGxJp8j+Tlb0Vz/kOmVgQZAOJBYBmg3euhEtmZ4k/pc+3/GiRK4kYC9ryzdc0TuqREcn9CCo92/v2rQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@ast-grep/cli-linux-x64-gnu@0.51.2':
+    resolution: {integrity: sha512-1ToEMb1m/tzjyQNEOhPjRZ3xIUfvY1adR2uP76ZQTmtCPwFWdZdFjIFKiigbzTaH48XoZYUN9L2E7lKbRBZzBw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@ast-grep/cli-win32-arm64-msvc@0.51.1':
-    resolution: {integrity: sha512-WRgt7DX/APxJ6KwGopM0jiC1SN4okxXh2kXY5/YliNy0oPc7ayE5FdG7Dqz40iyOE3EpQN6SZVRquvkpJEagnQ==}
+  '@ast-grep/cli-linux-x64-musl@0.51.2':
+    resolution: {integrity: sha512-XuTizC8JqsbPOwcyXmIf9TMETQAy83uEm77uyzZY8GcvBj9PcSkcEykLFa4dHErKK2jnh7Ts9SUtEpppLSdrAw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@ast-grep/cli-win32-arm64-msvc@0.51.2':
+    resolution: {integrity: sha512-7SfwFvS9sJqoFcisxMh+mGKS9fixg0eCa7PhZZWLKB4MhGZydnoLJreVCg0ffHVZQJlYJItOUMzkuTb33kBbSQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@ast-grep/cli-win32-ia32-msvc@0.51.1':
-    resolution: {integrity: sha512-Nclj/nsZmiT1bg1jfVL9sqpv0dzcZv6lZu1uk/UrjtvXw832yewmJucvmpAOd0fcb6l57SQ69Jqvt9MNzKwFSQ==}
+  '@ast-grep/cli-win32-ia32-msvc@0.51.2':
+    resolution: {integrity: sha512-ih2meRyYNSfYyJIQHtEnRnY+obt96xNlOfTxbSZGEj6veU68BdpXhQKB/O5V9VTw7ip+IdRK5MKZPWikMocXIw==}
     engines: {node: '>= 10'}
     cpu: [ia32]
     os: [win32]
 
-  '@ast-grep/cli-win32-x64-msvc@0.51.1':
-    resolution: {integrity: sha512-98fN1gUWJ6AMcwfFdUAQV+4haq5HAzDZWyu3W5zCZXkhhvcT3GLY9oRcACrr7yefIQohHpj5GG0rUZNlwukrMQ==}
+  '@ast-grep/cli-win32-x64-msvc@0.51.2':
+    resolution: {integrity: sha512-YzSajn4h8XNOfpf8QD4wYlGSzqlIahwUSp+k/WA9UM8p1QRNbokm1WTI+FvK9dmocgHogQaAmvcDWKiEPabhBg==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  '@ast-grep/cli@0.51.1':
-    resolution: {integrity: sha512-xdX9+jHTZLwpYtHFRmK4Zzoe0UPmZrn037wwCHKBqaFJPC12xiGTwrZEZDMbBwRwmsGYcG1yHsb7yvEFU8EzNw==}
+  '@ast-grep/cli@0.51.2':
+    resolution: {integrity: sha512-iAtkqUeMwgmVUXy9XH5Bck0oe0Lo+1aN7MLKiNu0MoeifePo0kPe9zWtH7x8QgGfEHOdO3aBE0OtH4GzsChnqA==}
     engines: {node: '>= 12.0.0'}
     hasBin: true
 
@@ -3562,38 +3576,46 @@ packages:
 
 snapshots:
 
-  '@ast-grep/cli-darwin-arm64@0.51.1':
+  '@ast-grep/cli-darwin-arm64@0.51.2':
     optional: true
 
-  '@ast-grep/cli-darwin-x64@0.51.1':
+  '@ast-grep/cli-darwin-x64@0.51.2':
     optional: true
 
-  '@ast-grep/cli-linux-arm64-gnu@0.51.1':
+  '@ast-grep/cli-linux-arm64-gnu@0.51.2':
     optional: true
 
-  '@ast-grep/cli-linux-x64-gnu@0.51.1':
+  '@ast-grep/cli-linux-arm64-musl@0.51.2':
     optional: true
 
-  '@ast-grep/cli-win32-arm64-msvc@0.51.1':
+  '@ast-grep/cli-linux-x64-gnu@0.51.2':
     optional: true
 
-  '@ast-grep/cli-win32-ia32-msvc@0.51.1':
+  '@ast-grep/cli-linux-x64-musl@0.51.2':
     optional: true
 
-  '@ast-grep/cli-win32-x64-msvc@0.51.1':
+  '@ast-grep/cli-win32-arm64-msvc@0.51.2':
     optional: true
 
-  '@ast-grep/cli@0.51.1':
+  '@ast-grep/cli-win32-ia32-msvc@0.51.2':
+    optional: true
+
+  '@ast-grep/cli-win32-x64-msvc@0.51.2':
+    optional: true
+
+  '@ast-grep/cli@0.51.2':
     dependencies:
       detect-libc: 2.1.2
     optionalDependencies:
-      '@ast-grep/cli-darwin-arm64': 0.51.1
-      '@ast-grep/cli-darwin-x64': 0.51.1
-      '@ast-grep/cli-linux-arm64-gnu': 0.51.1
-      '@ast-grep/cli-linux-x64-gnu': 0.51.1
-      '@ast-grep/cli-win32-arm64-msvc': 0.51.1
-      '@ast-grep/cli-win32-ia32-msvc': 0.51.1
-      '@ast-grep/cli-win32-x64-msvc': 0.51.1
+      '@ast-grep/cli-darwin-arm64': 0.51.2
+      '@ast-grep/cli-darwin-x64': 0.51.2
+      '@ast-grep/cli-linux-arm64-gnu': 0.51.2
+      '@ast-grep/cli-linux-arm64-musl': 0.51.2
+      '@ast-grep/cli-linux-x64-gnu': 0.51.2
+      '@ast-grep/cli-linux-x64-musl': 0.51.2
+      '@ast-grep/cli-win32-arm64-msvc': 0.51.2
+      '@ast-grep/cli-win32-ia32-msvc': 0.51.2
+      '@ast-grep/cli-win32-x64-msvc': 0.51.2
 
   '@aws-sdk/checksums@3.1002.5':
     dependencies:
