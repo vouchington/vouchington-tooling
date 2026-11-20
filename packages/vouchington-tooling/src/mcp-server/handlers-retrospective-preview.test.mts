@@ -8,6 +8,7 @@ import {
   useRepoFixture,
 } from './harness.test-helpers.mts'
 import { previewRegistry } from './preview-registry.mts'
+import { ASSESSED_SECTIONS } from './retrospective-sections.test-helpers.mts'
 
 const fixture = useRepoFixture()
 useFixedClock()
@@ -26,6 +27,8 @@ const FRONT = (sources: string[]) =>
     '---',
     '',
     `Body mentions ${SECRET}.`,
+    '',
+    ASSESSED_SECTIONS,
   ].join('\n')
 const SAVE = {
   ...BASE,

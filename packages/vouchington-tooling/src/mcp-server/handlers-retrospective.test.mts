@@ -14,6 +14,7 @@ import {
   useRepoFixture,
 } from './harness.test-helpers.mts'
 import type { PolicyOutcome, PolicyRequest } from './policy-spawn.mts'
+import { ASSESSED_SECTIONS } from './retrospective-sections.test-helpers.mts'
 
 const fixture = useRepoFixture()
 const clock = useFixedClock()
@@ -29,7 +30,7 @@ const FRONT = [
   'feedback_coverage: {"status":"complete","sources":["tool-result"],"droppedCount":0}',
   '---',
   '',
-  'Body of the retrospective.',
+  `Body of the retrospective.\n\n${ASSESSED_SECTIONS}`,
 ].join('\n')
 
 const { markdown: _markdown, sourceEventId: _sourceEventId, ...BASE } = JOURNAL_ARGS

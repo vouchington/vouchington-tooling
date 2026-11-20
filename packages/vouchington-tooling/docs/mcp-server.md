@@ -285,6 +285,20 @@ repository configuration (which can select helpers that run code), so the worktr
 `.git/config`, must be as trusted as the policy module. `dryRun`
 runs every check and returns the document without writing, plus a `previewToken`.
 
+A `markdown` save is validated by default, with no policy module needed, after front matter and
+argument consistency and before any policy export; one error lists every problem and nothing is
+written. The document must contain the lines `## Verifiable Facts`, `=== Retrospective Facts ===`,
+`## Transcript Facts` and `=== Transcript Facts ===`. `## CI Failures` must appear once, directly
+after `## Transcript Facts`, with exactly one `Status:` line (`failures observed`, which needs a
+group, `none observed`, or `unavailable (<reason>)`), an optional `Excluded:` note, and groups
+written as ``- `recurring|one-off` — `GitHub Actions` — <text>`` followed by indented `Evidence:`,
+`Root diagnostic:` and `Disposition:` lines. `## Tool Findings` and `## Architecture Findings` must
+each appear once with one `Status:` line (`findings`, or `none observed`, `not assessed` or
+`unavailable` with a reason in parentheses); each finding is a `- ` bullet with indented
+`Evidence:` and `Disposition:` lines. A `feedbackCoverage` of `complete` is rejected when any
+`Status:` line starts `unavailable`, `not assessed` or `partial`. The `compose` input produces
+documents that pass these checks, so `compose` saves are not re-checked.
+
 `knownSensitiveValues` (each at least 4 characters) is also accepted beside `markdown`, and
 redacts the markdown, `category` and `feedbackCoverage` just as `compose.knownSensitiveValues`
 does; with `compose`, pass it inside `compose`. The `previewToken` is 32 random bytes (base64url),
@@ -324,7 +338,9 @@ blocks because the boundary is the newest retrospective older than the newest bl
 
 The consumer's root `package.json` may declare
 `"vouchington-tooling": { "policy": "dev/agent-policy.mts" }`. The path must be relative and, after
-resolving symlinks, stay inside the worktree. Without a declaration the policy checks are skipped.
+resolving symlinks, stay inside the worktree. Without a declaration the policy checks are skipped; the built-in
+`markdown` validation of `retrospective_save` runs either way, before the policy's
+`validateRetrospective`, which adds repository-specific checks.
 Policy tools also require a server launched inside a repository worktree on macOS or Linux (they
 refuse to run on Windows, where the server cannot reap a policy's descendants by process group),
 and refuse to run when `AGENT_BLACKBOARD_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set to a value

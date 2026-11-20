@@ -19,6 +19,7 @@ import {
   redactFeedbackText,
 } from '../agent-blackboard/feedback-codec.mts'
 import { composeFromArgs, sensitiveValues } from './retrospective-input.mts'
+import { validateRetrospectiveMarkdown } from './retrospective-validate.mts'
 import { checkFrontMatter, resolveRepositories } from './retrospective-resolve.mts'
 
 function readMarkdownSource(args: Args): { markdown?: string; compose?: Args } {
@@ -38,7 +39,7 @@ export function defaultSourceEventId(sessionId: string): string {
 
 /**
  * Saves the session's retrospective: composes it when `compose` is given, checks the arguments
- * against the document's front matter, runs the checkout's `validateRetrospective` policy (in a
+ * against the document's front matter, checks a hand-written document's sections, runs the checkout's `validateRetrospective` policy (in a
  * child process) and writes nothing if it reports errors, then writes through the same verified
  * path as `journal_append`.
  */
@@ -124,6 +125,15 @@ export const retrospectiveSave: ToolHandler = async (args, context) => {
   )
   const redactedFront = parseRetrospectiveFrontMatter(envelope.markdown)
   validateFeedbackEnvelope(envelope)
+  // Composed documents conform by construction; a hand-written one is checked before any policy.
+  if (given !== undefined) {
+    const problems = validateRetrospectiveMarkdown(
+      envelope.markdown,
+      envelope.feedbackCoverage.status,
+    )
+    if (problems.length)
+      throw new Error(`retrospective markdown is malformed:\n- ${problems.join('\n- ')}`)
+  }
   const report = await runValidator({
     ...policy,
     export: 'validateRetrospective',
