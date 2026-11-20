@@ -162,6 +162,8 @@ escalation reported only in the transcript facts leaves it saying none observed.
 
 ## Child identity for spawned agents
 
+- Read [session-id](references/session-id.md) for the harness environment variables that supply
+  the root session id, the precedence of an assigned child id, and why no hook starts a session.
 - Pass the parent's own session id in the assignment prompt. The child resolves its own id from its
   runtime through the consumer's identity policy, then calls `session_ensure` with it, the given
   `parentSessionId`, its `agent`, and its version before other work. With no id or a failed ensure,

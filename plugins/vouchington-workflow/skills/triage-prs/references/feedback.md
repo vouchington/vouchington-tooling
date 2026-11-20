@@ -50,7 +50,10 @@ not ready, shepherd, or merge a generated or reused feedback PR in the same run.
   exact-match reuse, or `same-paths-new-feedback` update of the canonical PR and issue.
 - `disposition: deferred`: record `deferred` with the concrete blocker after a failed, partial, or
   ambiguous publication. Do not ask the user or claim the feedback was handled.
-- `disposition: user-choice`: keep non-prompt feedback in the normal human follow-up flow.
+- `disposition: user-choice`: keep non-prompt feedback in the normal human follow-up flow. Outside
+  this preauthorized path, the retrospective asks the user to file issues, make a PR, or defer; see
+  [PR creation feedback](../../retrospective/references/pr-feedback.md) for the document shape and
+  those choices.
 
 Group the Step 3 PR-creation recommendations by root cause and invoke
 [retrospective](../../retrospective/SKILL.md). It records findings for merged and closed PRs alike.

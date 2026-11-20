@@ -69,8 +69,12 @@ answer is `unknown — no journal`, never a guess.
   `merge-pr<number>`: the writer rejects the retrospective's ID reused for different content.
   Never write a second retrospective.
 
-Read [ci-failures](references/ci-failures.md) when the session observed CI failures, and
-[sandbox-audit](references/sandbox-audit.md) when it hit denied or escalated commands.
+For a pull request in another repository, pass `compose.facts` as
+`{status:"not-assessed", reason}` instead of repository facts.
+
+Read [ci-failures](references/ci-failures.md) when the session observed CI failures,
+[sandbox-audit](references/sandbox-audit.md) when it hit denied or escalated commands, and
+[pr-feedback](references/pr-feedback.md) when a PR-triage caller supplied PR creation feedback.
 
 Use raw evidence only for local verification. Save only bounded structured facts or redacted summaries
 in durable retrospectives; never embed unredacted logs, command output, environment dumps, provider
