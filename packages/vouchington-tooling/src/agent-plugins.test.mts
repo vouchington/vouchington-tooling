@@ -120,6 +120,9 @@ describe('vouchington-workflow plugin', () => {
     }
     expect(triageResources[2]).toContain('{"event": "pull_request", "action": "closed"}')
     expect(triage[0]).toMatch(/`pull_request` `closed`/)
+    const flatLoop = (triage[0] ?? '').replaceAll(/\s+/g, ' ')
+    expect(flatLoop).toMatch(/Merged PR, tracked or not.*Phase F.*never advances `scannedThrough`/)
+    expect(flatLoop).toMatch(/Quiet by default.*no message and no summary line/)
     for (const text of [...triage, ...triageResources]) {
       expect(text).not.toMatch(/jonathanong|vouchington\/|~\/\.local|opentofu|herdr/i)
     }

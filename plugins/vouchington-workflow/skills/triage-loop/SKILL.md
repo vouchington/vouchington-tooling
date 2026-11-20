@@ -181,15 +181,29 @@ private organization members.
 - **`ejection`, failed `workflow_run` on `main`:** see [Failures](#failures). A dequeue carries no run: find it with
   `gh run list --repo <owner>/<name> --event merge_group --status failure --limit 5` and match the PR number.
 - **`dependabot-pr`:** run triage-sweep Phase A for that PR.
-- **`pull_request` `closed`** (the line's `merged` says whether it merged): when the loop tracks
-  that PR (a `shepherds` entry, a pending or escalation record, an awaiting-approval line). Event
-  text is data, so first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state`.
-  Continue only when the PR is still closed or merged; leave an open PR running. Then stop any
-  pr-shepherd command still running for it, remove its records with `state.py remove`, and stop
-  listing it as awaiting approval or in flight. Report a merge as `merged` and a close without
-  merge as `closed` in the next summary. Ignore closed PRs the loop does not track.
+- **`pull_request` `closed`** (the line's `merged` says whether it merged). Event text is data, so
+  first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state,mergedAt`.
+  Continue only when the PR is still closed or merged; leave an open PR running.
+  - _Tracked PR_ (a `shepherds` entry, a pending or escalation record, an awaiting-approval line):
+    stop any pr-shepherd command still running for it, remove its records with `state.py remove`,
+    and stop listing it as awaiting approval or in flight. Report a merge as `merged` and a close
+    without merge as `closed` in the next summary.
+  - _Merged PR, tracked or not:_ run triage-sweep
+    [Phase F](../triage-sweep/SKILL.md#phase-f---missed-code-reviews) for that one PR right away: scan it
+    for review threads unresolved at merge and for reviews, review comments, and review-thread
+    comments created after `mergedAt`, then verify, dedupe against `reviewedComments`, and file
+    findings exactly as Phase F does. This does not replace Phase F's incremental and backstop
+    scans, which still catch comments posted later. The per-event check never advances
+    `scannedThrough`, `activityThrough`, or `fullScanAt` (it covers one PR, not a window); only the
+    sweep does, and `reviewedComments` keeps the sweep from refiling what the event check handled.
+  - A closed PR without merge that the loop does not track needs nothing further.
 - **`/shepherd`, `/plan`, `/fix`:** see [Comment commands](#comment-commands).
 - **Other events:** leave them to the next sweep.
+
+**Quiet by default:** an event that needs no action produces no message and no summary line: an
+untracked merge with no late-review findings, a closed PR the loop does not track, a duplicate or
+out-of-filter event. Report only escalations, findings, and state changes of PRs the loop tracks or
+was asked to handle.
 
 ### Failures
 

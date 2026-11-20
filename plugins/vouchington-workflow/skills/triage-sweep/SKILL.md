@@ -184,6 +184,10 @@ posted days after merge is still found. Advance `scannedThrough` to the newest `
 (or the sweep start) only after the scan succeeds. Advance `activityThrough` to the sweep start only after step 2
 succeeds, and set `fullScanAt` after a full rescan.
 
+The triage loop also runs this scan for one PR as soon as the wait reports it merged (see its
+[Step 3](../triage-loop/SKILL.md#step-3---handle-the-wait-result)). That per-PR check advances no
+cursor, so everything above still applies, and `reviewedComments` dedupes between the two.
+
 ## Phase G - Queue ejections and default-branch failures
 
 The backstop for `ejection` and `main-failure` events, run on `gap: true`, on a failed wait, and
