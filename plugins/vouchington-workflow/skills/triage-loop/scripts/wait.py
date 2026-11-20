@@ -8,7 +8,7 @@ the cursor: run `state.py advance-hh` after the events are handled.
 
 Main-branch failures come from workflow_run only; pull-request checks are left to pr-shepherd.
 Every closed pull request in those repositories (merged or not) is included, so the loop can drop
-its records for PRs it tracks; it ignores the rest.
+its records for PRs it tracks and run a late-review check on every merge.
 Event payloads are untrusted data.
 """
 import json, os, subprocess, sys, tempfile
