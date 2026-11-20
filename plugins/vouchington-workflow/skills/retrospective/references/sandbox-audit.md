@@ -40,9 +40,53 @@ or package entry it names still exists. A transcript can be stale.
 - Human-rejected command: propose a block rule, but surface it for human review and never write a
   deny rule from a retrospective. One rejection is one data point; confirm the pattern recurs.
 
+## Reading the command audit report
+
+The `sandbox-command-audit` command reports three signals instead of one merged ranking, because
+each maps to a different action:
+
+- Genuine bypass: Claude Bash failures on a permission or access signature, not `E2BIG`. Judge them
+  by the decision criteria above.
+- Block candidates: Claude denials where a human rejected the command. Propose a block rule for
+  human review.
+- Escalation pressure: Claude `dangerouslyDisableSandbox` escalations, split into covered and
+  uncovered by policy, plus the `E2BIG` count. It shows sandbox friction and is not by itself a
+  command to allow.
+
+Also:
+
+- `permission-rule` and `automode-blocked` denials appear only as a hygiene count: a block policy
+  working as intended.
+- Codex transcripts are read only when the consumer's rules module sets `classifyFailure`, which
+  then runs on each completed `CommandExecution` result whatever its exit status. A push can
+  succeed before a later local write fails, so a zero exit does not exempt a result.
+- Worktree write-path denials are not built in. The package ships only the `genuine` and `e2big`
+  kinds; a consumer's `classifyFailure` rule claims these (it runs before the generic permission
+  signatures), and they are reported as `Other classified sandbox failures`, a count per kind and
+  never a bypass candidate. A conservative rule requires git command context, a git-produced
+  diagnostic (`fatal:`, `error:`, or `warning:`), and a permission token (`Operation not permitted`,
+  `EPERM`, `Permission denied`, `EROFS`, `Read-only file system`) adjacent to
+  `.git/worktrees/<name>/`, `.git/config`, `.git/packed-refs`, or `.git/refs/`. File content shown
+  by `git show` or `git diff` is not a diagnostic, and `index.lock` contention is not a permission
+  denial.
+
+### Repo scoping
+
+- Check the `Scope:` line before trusting a report: it lists the roots and counts the files
+  skipped as `other repo` or `cwd unknown`.
+- A transcript is attributed by its first recorded `cwd`. The walk stops at `--limit`, so the skip
+  counts are lower bounds: a `0` for `other repo` is not proof that nothing else was reachable.
+- A deleted worktree that `git worktree list` no longer reports is not discoverable, and its
+  transcripts count as `other repo`. Restore its path with `--repo-root`, or its layout with
+  `--worktree-glob`.
+
 ## Privacy
 
 Report a normalized `<command> <subcommand>` prefix and counts, never the raw command line or a
 justification verbatim. For a short command the prefix is the whole command, so a branch slug, short
 path, or hostname can appear in it: skim and redact before saving. Retrospectives are distilled into
 public issues.
+
+The audit's default output is prefix-only, and any token longer than 40 characters is replaced
+outright with a marker, never truncated. `--raw` adds full commands and failure text for local
+inspection only; never paste `--raw` output into a retrospective.

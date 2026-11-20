@@ -128,11 +128,14 @@ difference is a conflicting payload and stays quarantined.
   for sessions whose only themes were deferred, since deferral promises re-evaluation. Keep a theme
   tied to a closed-without-merge issue or change eligible; do not treat open state alone as
   conclusive. Preserve each theme's contributing session IDs through merging and deduplication.
-- Delegate partitions only to read-only inspectors, which must not call MCP, create issues, archive
+- Delegate partitions only to read-only inspectors (the host's read-only explore agent), which
+  must not call MCP, create issues, archive
   sessions, edit files, or keep a copy of a partition. Have each return a compact disposition
   summary: partition index, deduplicated themes with their session IDs, and each session's
-  disposition. Inspectors hand-read only journal-only and retrospective sessions; every other shape
-  is determined structurally.
+  disposition. Before hand-reading, each inspector runs
+  `vouchington agent-blackboard distill classify <partition> --retro-cutoff <retroCutoff> --session-cutoff <sessionCutoff>`
+  with the shared cutoffs. Inspectors hand-read only journal-only and retrospective sessions; every
+  other shape is determined structurally.
 - Keep the verified snapshot until the last `snapshot_archive` call, because the server's archival
   check reads it.
   Then call `snapshot_cleanup`, which removes the snapshot and the partitions

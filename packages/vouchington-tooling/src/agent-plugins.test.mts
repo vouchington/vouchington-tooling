@@ -180,4 +180,45 @@ describe('vouchington-workflow plugin', () => {
       expect(skill).not.toMatch(/filaments|voucha|jonathanong|vouchington\//i)
     }
   })
+
+  it('carries the upstreamed generic blackboard and retrospective guidance', async () => {
+    const read = (path: string): Promise<string> =>
+      readFile(join(workflowPlugin, 'skills', path), 'utf8')
+    const [sessionId, prFeedback, audit, feedback, retro, distill, triage, blackboard] =
+      await Promise.all([
+        read('blackboard/references/session-id.md'),
+        read('retrospective/references/pr-feedback.md'),
+        read('retrospective/references/sandbox-audit.md'),
+        read('triage-prs/references/feedback.md'),
+        readSkill('retrospective'),
+        readSkill('retrospective-distill'),
+        readSkill('triage-prs'),
+        readSkill('blackboard'),
+      ])
+    for (const name of ['CODEX_THREAD_ID', 'CLAUDE_CODE_SESSION_ID', 'GROK_SESSION_ID']) {
+      expect(sessionId).toContain(name)
+    }
+    expect(sessionId).toMatch(/child id[\s\S]*takes\s+precedence/)
+    expect(sessionId).toMatch(/No hook starts or journals a session/)
+    expect(blackboard).toContain('references/session-id.md')
+    expect(retro.replaceAll(/\s+/g, ' ')).toContain('`{status:"not-assessed", reason}`')
+    expect(retro).toContain('references/pr-feedback.md')
+    for (const text of ['## PR Creation Feedback', '### Per-PR findings', '### Grouped themes']) {
+      expect(prFeedback).toContain(text)
+    }
+    expect(prFeedback).toContain('No actionable feedback: none')
+    expect(prFeedback).toMatch(/\*\*File issues:\*\*[\s\S]*\*\*Make a PR:\*\*[\s\S]*\*\*Defer:\*\*/)
+    expect(feedback).toContain('../../retrospective/references/pr-feedback.md')
+    expect(audit).toMatch(/Worktree write-path denials are not built in/)
+    expect(audit).toContain('.git/worktrees/<name>/')
+    expect(audit).toMatch(/longer than 40 characters/)
+    expect(audit).toMatch(/never paste `--raw` output/)
+    expect(distill).toContain('distill classify <partition> --retro-cutoff')
+    expect(distill).toContain("the host's read-only explore agent")
+    expect(triage).not.toMatch(/squash/i)
+    expect(triage.replaceAll(/\s+/g, ' ')).toContain('parameter of the consumer wrapper')
+    for (const text of [sessionId, prFeedback, audit]) {
+      expect(text).not.toMatch(/filaments|voucha|jonathanong|vouchington\/|\.claude\/settings/i)
+    }
+  })
 })

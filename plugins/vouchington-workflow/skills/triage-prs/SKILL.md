@@ -124,8 +124,8 @@ the Step 6 report so it is not dropped. Process MERGE decisions in
 ascending PR-number order through the loop's
 [ready and merge](../triage-loop/SKILL.md#ready-and-merge) procedure, passing the PR number, the
 merge flag, and any steering file. That procedure light-reviews the diff, posts steering, readies
-the draft, gates on the final review when the loop's configuration turns that gate on, and merges through pr-shepherd. Vouchington repositories
-allow squash merges only, a setting the repositories own. Run its preflight before every mutation.
+the draft, gates on the final review when the loop's configuration turns that gate on, and merges through pr-shepherd. The merge method is a
+parameter of the consumer wrapper and a setting the repository owns. Run its preflight before every mutation.
 If the preflight fails, record the reason and report separately any mutation already completed
 (for example the PR was readied before the head moved) and the failed preflight; do not describe
 the PR as merging.
