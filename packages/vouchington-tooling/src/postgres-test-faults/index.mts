@@ -21,3 +21,27 @@ export type {
   PostgresFaultResult,
   QueryExecutor,
 } from './fault-types.mts'
+export { abortTestPostgresTransaction } from './aborted-transaction.mts'
+export {
+  createTestPostgresClientLoan,
+  discardTestPostgresClient,
+  reserveTestPostgresObserver,
+  trackTestPostgresClientEnd,
+} from './client-loan.mts'
+export {
+  assertTestOwnedPostgresWait,
+  getTestOwnedPostgresLock,
+  type TestHeldPostgresLock,
+  type TestOwnedPostgresWaitOptions,
+  type TestPostgresLockIdentity,
+} from './lock-identity.mts'
+export {
+  observePostgresLockNotice,
+  observeTestAdvisoryLockNotice,
+  observeTestTransactionLockNotice,
+  type LockNoticeClient,
+  type LockNoticeObservation,
+  type LockNoticeOptions,
+} from './lock-notice.mts'
+export { createTestPostgresMultiWait, type TestPostgresMultiWaitAction } from './multi-wait.mts'
+export { withTestOwnedPostgresWait } from './owned-wait.mts'

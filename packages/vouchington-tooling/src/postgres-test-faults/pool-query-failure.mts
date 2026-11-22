@@ -7,10 +7,9 @@ import {
   hasErrorCode,
   installProperty,
   isPlainTextConfig,
+  matchesFaultTarget,
   ownsRequest,
-  queryText,
   restoreProperty,
-  targetsStatement,
 } from './fault-support.mts'
 import type { PostgresFaultOptions, PostgresFaultResult } from './fault-types.mts'
 import { runPoolObservationExclusively } from './observation-queue.mts'
@@ -114,13 +113,12 @@ export async function withPostgresPoolQueryFailureForTest<Result>(
       connect: pg.Pool['connect'],
     ): pg.Pool['query'] {
       return ((...args: unknown[]) => {
-        const text = queryText(args[0])
         const ownsContext = failureContext.getStore() === context || ownsRequest(options)
         if (
           !ownsContext ||
           !context.active ||
           fired ||
-          !targetsStatement(text, queryMarker, options.command)
+          !matchesFaultTarget(args[0], queryMarker, options)
         )
           return Reflect.apply(query, pool, args)
         if (!isPlainTextConfig(args))

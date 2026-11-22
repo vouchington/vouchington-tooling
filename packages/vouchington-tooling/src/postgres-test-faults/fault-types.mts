@@ -14,6 +14,8 @@ export type PostgresFaultOptions = {
   pools: readonly pg.Pool[]
   /** Only fail a statement whose SQL, after the marker, starts with this command. */
   command?: FaultCommand
+  /** Only fail a statement whose bound values satisfy this predicate. */
+  matchesValues?: (values: readonly unknown[]) => boolean
   /** Own faults raised outside the async context of the operation, for example in a request handler. */
   requestId?: string
   /** Decides whether the current execution context belongs to `requestId`. Required with `requestId`. */

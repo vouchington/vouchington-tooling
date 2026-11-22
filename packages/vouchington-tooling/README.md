@@ -1536,6 +1536,29 @@ const { result, error } = await withPostgresQueryFailureForTest(
   blockedMarkers, observer?)`. The waiters poll `pg_stat_activity` and `pg_blocking_pids`; the
   observer is `'write'`, `'advisoryLock'` or a reserved executor.
 
+- `options.matchesValues(values)` narrows a fault to the marked statement whose bound `values`
+  satisfy the predicate (both fault helpers).
+- `withTestOwnedPostgresWait(options, action)` proves a real lock wait. `action` receives
+  `waitForLock(operation)`; call it once with the promise of the operation that must queue. Every
+  checkout of `options.pool` by the action (or by `requestId` when `isOwnedRequest(requestId)` is
+  true) is captured, promise or callback form. The wait is admitted only after PostgreSQL's own
+  `log_lock_waits` notice for the identified lock plus a `pg_locks` / `pg_blocking_pids` snapshot
+  taken on a connection from `options.observerPool`. `options` is `{ pool, observerPool,
+  holderProcessId, lock, queryMarker, releaseHolder, requestId?, isOwnedRequest?, notice? }` where
+  `lock` is `{ kind: 'advisory', key, namespace?, holderMode?, waiterMode? }`, `{ kind:
+  'advisory32', key }`, `{ kind: 'relation', name, waiterMode }` or `{ kind: 'transaction' }`.
+  `notice` is `{ eligible?, applicationNamePrefix?, serverVersionNum?, setupHint? }`; the observed
+  session needs `SET` privilege on `log_lock_waits` and `deadlock_timeout`, English notices and,
+  by default, PostgreSQL 18 (`serverVersionNum: { min, max }` overrides it).
+- `createTestPostgresMultiWait(pools)` does the same for several concurrent waiters:
+  `start(options, action)` resolves to `{ operation, waitForLock(), waiterProcessId() }`; dispose it
+  with `await using` (or at the end of the test). It uses vitest's `onTestFinished`.
+- Building blocks: `observePostgresLockNotice`, `observeTestAdvisoryLockNotice`,
+  `observeTestTransactionLockNotice` (session settings are restored on `close()`),
+  `createTestPostgresClientLoan`, `reserveTestPostgresObserver(pool)`,
+  `discardTestPostgresClient`, `getTestOwnedPostgresLock` and `assertTestOwnedPostgresWait`.
+- `abortTestPostgresTransaction(client)` poisons the transaction already begun on `client` with a
+  real division by zero so later statements answer `25P02`.
 - `runPoolObservationExclusively(operation)` is the queue the two helpers above share. Wrap your own
   fault injection or pool observation in it so it never overlaps theirs on the same pool; it
   rejects when nested.

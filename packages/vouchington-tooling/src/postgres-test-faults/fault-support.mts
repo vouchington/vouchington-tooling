@@ -33,6 +33,28 @@ export function targetsStatement(text: string, queryMarker: string, command?: st
   return !command || target.slice(queryMarker.length).trimStart().toUpperCase().startsWith(command)
 }
 
+/** Reads the bound values of a `{ text, values }` query config; anything else has none. */
+function queryValues(input: unknown): readonly unknown[] {
+  return typeof input === 'object' &&
+    input !== null &&
+    'values' in input &&
+    Array.isArray(input.values)
+    ? input.values
+    : []
+}
+
+/** True when a query is the marked statement, of the requested command, with matching bound values. */
+export function matchesFaultTarget(
+  input: unknown,
+  queryMarker: string,
+  options: Pick<PostgresFaultOptions, 'command' | 'matchesValues'>,
+): boolean {
+  return (
+    targetsStatement(queryText(input), queryMarker, options.command) &&
+    (!options.matchesValues || options.matchesValues(queryValues(input)))
+  )
+}
+
 /** The faulted call must be the adapter's plain `{ text }` config, never a callback or submittable. */
 export function isPlainTextConfig(args: unknown[]): boolean {
   const input = args[0]

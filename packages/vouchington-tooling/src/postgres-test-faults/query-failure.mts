@@ -6,10 +6,10 @@ import {
   hasErrorCode,
   installProperty,
   isPlainTextConfig,
+  matchesFaultTarget,
   ownsRequest,
   queryText,
   restoreProperty,
-  targetsStatement,
 } from './fault-support.mts'
 import type { PostgresFaultOptions, PostgresFaultResult } from './fault-types.mts'
 import { runPoolObservationExclusively } from './observation-queue.mts'
@@ -87,7 +87,7 @@ export async function withPostgresQueryFailureForTest<Result>(
         const owned = ownsContext()
         if (owned && /^(?:BEGIN|START\s+TRANSACTION)\b/i.test(command)) began = true
         if (owned && endsTransaction(command)) began = false
-        if (!owned || fired || !targetsStatement(text, queryMarker, options.command))
+        if (!owned || fired || !matchesFaultTarget(args[0], queryMarker, options))
           return Reflect.apply(originalQuery, client, args)
         if (!began || !isPlainTextConfig(args))
           throw new Error('Target fault requires the owned transaction adapter Promise query')

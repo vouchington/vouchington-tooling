@@ -92,6 +92,20 @@ describe.skipIf(!started)('withPostgresPoolQueryFailureForTest (real PostgreSQL)
     expect(error).toMatchObject({ code: '25P02' })
   })
 
+  it('only fails the statement whose bound values match', async () => {
+    const pool = cluster().createPool()
+    const { result } = await withPostgresPoolQueryFailureForTest(
+      MARKER,
+      async () => {
+        const text = `${MARKER} SELECT $1::int AS id`
+        expect((await pool.query({ text, values: [1] })).rows).toEqual([{ id: 1 }])
+        return pool.query({ text, values: [2] }).catch((err: unknown) => err)
+      },
+      { pools: [pool], matchesValues: (values) => values[0] === 2 },
+    )
+    expect(result).toMatchObject({ code: '25P02' })
+  })
+
   it('rejects query forms the adapter cannot fault', async () => {
     const pool = cluster().createPool()
     await expect(
