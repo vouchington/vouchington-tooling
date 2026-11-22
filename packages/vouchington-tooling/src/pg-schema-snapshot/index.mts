@@ -61,3 +61,8 @@ export type {
   SchemaViewSnapshot,
 } from './types.mts'
 export { extractStaticStringPairs } from './static-string-pairs.mts'
+export { loadSchemaSnapshot } from './load-snapshot.mts'
+export type { LoadSchemaSnapshotOptions } from './load-snapshot.mts'
+export { validateSchemaSnapshot } from './validate-snapshot.mts'
+export type { SchemaSnapshotValidationResult } from './validate-snapshot.mts'
+export type { PartitionPolicyOptions, ValidateSchemaSnapshotOptions } from './validator-types.mts'
