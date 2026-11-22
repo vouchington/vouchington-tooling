@@ -3,7 +3,7 @@ import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createFixtureDeadline } from './fixture-deadline.test-helpers.mts'
+import { createFixtureDeadline } from '../fixture-deadline/index.mts'
 import { createFindingFilter, scanDeadCode } from './scan.mts'
 import { copyTrackedWorkingTree } from './tracked-snapshot.mts'
 

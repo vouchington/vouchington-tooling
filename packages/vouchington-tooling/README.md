@@ -848,6 +848,14 @@ because the installed pack is not tracked. Paths are sorted by code unit. Empty 
 throws unless `allowEmpty` is set; an empty pack directory always throws, so a wrong `packRulesDir`
 cannot pass. `listTrackedFiles(root, dir)` replaces the git runner, for example in tests.
 
+`checkAstGrepIgnoresFreshness(repoRoot, trackedFiles, { localRuleDir })` (same subpath) reads each
+tracked `*.yml` rule under `localRuleDir` and returns `{ ruleFile, entry }[]` for every `ignores:`
+entry that names no tracked file and matches no tracked glob.
+
+`vouchington-tooling/fixture-deadline` exports `createFixtureDeadline(timeoutMs = 4000)`, a test
+helper that returns a function yielding the milliseconds left in a per-case budget and throwing once
+it is spent.
+
 `vouchington-tooling/markdown-article-links` checks rendered article links statically. It bundles no
 markdown parser or renderer: the caller supplies all three callbacks.
 

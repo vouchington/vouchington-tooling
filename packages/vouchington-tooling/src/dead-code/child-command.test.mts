@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { ChildCommandCleanupError, runChildCommand } from './child-command.mts'
-import { createFixtureDeadline } from './fixture-deadline.test-helpers.mts'
+import { createFixtureDeadline } from '../fixture-deadline/index.mts'
 
 const descendant = `
   const { spawn } = require('node:child_process')

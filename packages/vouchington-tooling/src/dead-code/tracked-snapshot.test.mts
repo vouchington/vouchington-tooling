@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createFixtureDeadline } from './fixture-deadline.test-helpers.mts'
+import { createFixtureDeadline } from '../fixture-deadline/index.mts'
 import { copyTrackedWorkingTree } from './tracked-snapshot.mts'
 
 let remaining: ReturnType<typeof createFixtureDeadline>

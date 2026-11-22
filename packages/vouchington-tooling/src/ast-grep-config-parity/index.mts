@@ -13,3 +13,10 @@ export {
   type DiscoverAstGrepConfigOptions,
   type GitLsFilesRunner,
 } from './discover.mts'
+export {
+  astGrepIgnoreEntries,
+  checkAstGrepIgnoresFreshness,
+  staleAstGrepIgnores,
+  type AstGrepStaleIgnore,
+  type CheckAstGrepIgnoresFreshnessOptions,
+} from './ignores-freshness.mts'
