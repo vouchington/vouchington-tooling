@@ -196,6 +196,27 @@ describe('wait.py tracked merges and the heartbeat', () => {
   })
 })
 
+describe('wait.py late-review failures', () => {
+  it('ignores a pending review without submittedAt', () => {
+    env = makeEnv()
+    env.gql('reviewThreads', 60, [])
+    env.gql('reviews', 60, [{ body: 'draft', submittedAt: null }])
+    env.hh(1, [mergeEvent('p1', 60)])
+    env.hh(2, [], { timedOut: true })
+    expect(json(env.run('wait.py').lines[0]).quiet).toEqual({ count: 1, merges: ['repo-a#60'] })
+  })
+
+  it('returns a merge as actionable when the check fails unexpectedly', () => {
+    env = makeEnv()
+    env.gql('reviewThreads', 61, [])
+    env.gql('reviews', 61, [{ submittedAt: '2026-11-20T11:00:00Z' }])
+    env.hh(1, [mergeEvent('p2', 61)])
+    const result = env.run('wait.py')
+    expect(result.code).toBe(0)
+    expect(json(result.lines[1])).toMatchObject({ id: 'p2', lateReviewError: expect.any(String) })
+  })
+})
+
 describe('wait.py watches', () => {
   it('returns a trigger once the last watched PR merges and marks the watch', () => {
     env = makeEnv()
@@ -253,7 +274,7 @@ describe('wait.py cursor and config', () => {
     env.hh(1, [ejection])
     const result = env.run('wait.py', '--advance')
     expect(json(result.lines[0])).toMatchObject({ advanced: true })
-    expect(env.state().hookHarness).toEqual({ seen: ['e1'], cursor: 'c1' })
+    expect(env.state().hookHarness).toEqual({ seen: [], cursor: 'c1' })
   })
 
   it('leaves the cursor alone by default and honors eventWait.advance', () => {

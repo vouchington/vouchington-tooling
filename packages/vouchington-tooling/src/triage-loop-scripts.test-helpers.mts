@@ -26,6 +26,14 @@ a, d = sys.argv[1:], os.environ["MOCK_DIR"]
 if a[:2] == ["api", "--paginate"]:
     print(open(d + "/repos").read())
     sys.exit(0)
+if a[0] == "api" and a[1].startswith("repos/"):
+    n = a[1].rsplit("/", 1)[1]
+    if os.path.exists(f"{d}/merged-{n}.fail"):
+        sys.stderr.write("HTTP 404")
+        sys.exit(1)
+    if os.path.exists(f"{d}/merged-{n}"):
+        print("2026-11-20T10:00:00Z")
+    sys.exit(0)
 v = {x.partition("=")[0]: x.partition("=")[2] for x in a if "=" in x}
 conn = "reviewThreads" if "reviewThreads(" in v["query"] else "reviews"
 name = f"{d}/gql-{conn}-{v['p']}-{v.get('c', 'first')}.json"

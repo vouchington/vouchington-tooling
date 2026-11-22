@@ -54,10 +54,22 @@ def check(ref):
     pull, threads, cut_threads = fetch(owner, name, number, "reviewThreads")
     _, reviews, cut_reviews = fetch(owner, name, number, "reviews")
     merged_at = pull["mergedAt"]
-    late = [r for r in reviews if merged_at and (r["body"] or "").strip() and r["submittedAt"] > merged_at]
+    late = [r for r in reviews if merged_at and (r["body"] or "").strip() and r["submittedAt"] and r["submittedAt"] > merged_at]
     return {"ref": ref, "state": pull["state"], "mergedAt": merged_at,
             "unresolved": sum(not t["isResolved"] for t in threads), "late": len(late),
             "truncated": cut_threads or cut_reviews}
+
+
+def is_merged(ref):
+    match = REF.match(ref)
+    if not match:
+        raise LateReviewError(f"{ref!r} must look like owner/repo#N")
+    owner, name, number = match.groups()
+    done = subprocess.run(["gh", "api", f"repos/{owner}/{name}/pulls/{number}", "--jq", ".merged_at // empty"],
+                          capture_output=True, text=True)
+    if done.returncode != 0:
+        raise LateReviewError(f"gh exited {done.returncode}: {done.stderr.strip()[:200]}")
+    return bool(done.stdout.strip())
 
 
 def line(result):

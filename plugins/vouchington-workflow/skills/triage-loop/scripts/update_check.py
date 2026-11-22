@@ -8,14 +8,16 @@ NAME = re.compile(r"^[\w.-]+$")
 
 def targets(repos):
     """`name` checks every ecosystem; `name:npm,pip` limits the check to those ecosystems."""
-    entries = []
+    merged = {}  # repeated --repo options combine; an unrestricted one (None) covers every ecosystem
     for repo in repos:
         name, _, ecos = repo.partition(":")
         listed = ecos.split(",") if ecos else []
         if not NAME.match(name) or not all(NAME.match(e) for e in listed):
             raise ValueError(f"{repo!r} must be name or name:ecosystem[,ecosystem]")
-        entries.append(f"'{name}': " + ("[" + ", ".join(f"'{e}'" for e in listed) + "]" if listed else "null"))
-    return "{ " + ", ".join(entries) + " }"
+        have = merged.get(name, [])
+        merged[name] = None if not listed or (name in merged and have is None) else have + [e for e in listed if e not in have]
+    return "{ " + ", ".join(
+        f"'{n}': " + ("[" + ", ".join(f"'{e}'" for e in v) + "]" if v else "null") for n, v in merged.items()) + " }"
 
 
 def script(org, repos, dry=False):

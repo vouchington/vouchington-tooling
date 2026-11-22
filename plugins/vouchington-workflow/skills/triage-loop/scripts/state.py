@@ -174,7 +174,12 @@ def watch(a):
         for ref in a.pr:
             if not late_review.REF.match(ref):
                 sys.exit(f"watch add: {ref!r} must look like owner/repo#N")
-        watches.append({"id": a.id, "prs": a.pr, "notify": a.notify, "note": a.note or "", "at": now()})
+        try:
+            merged = [ref for ref in a.pr if late_review.is_merged(ref)]
+        except late_review.LateReviewError as error:
+            sys.exit(f"watch add: {error}")
+        watches.append({"id": a.id, "prs": a.pr, "notify": a.notify, "note": a.note or "", "at": now(),
+                        "merged": sorted(r.lower() for r in merged)})
     elif a.action == "remove":
         watches[:] = [w for w in watches if w["id"] != a.id]
     elif a.action == "ack":

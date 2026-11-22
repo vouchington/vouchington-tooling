@@ -48,7 +48,7 @@ def triage_merge(event, cfg):
     line = compact(event)
     try:
         result = late_review.check(ref)
-    except late_review.LateReviewError as error:
+    except Exception as error:  # any failure returns the merge rather than killing the wait
         return {**line, "lateReviewError": str(error)[:200]}, ref, is_dependency_bot(event, cfg)
     if result["unresolved"] or result["late"] or result["truncated"]:
         found = {"unresolved": result["unresolved"], "late": result["late"]}

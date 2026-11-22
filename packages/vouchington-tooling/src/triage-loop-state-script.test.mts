@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { type Env, makeEnv, updateDoc } from './triage-loop-scripts.test-helpers.mts'
+import { type Env, makeEnv, mergeEvent, updateDoc } from './triage-loop-scripts.test-helpers.mts'
 
 let env: Env
 afterEach(() => env.cleanup())
@@ -100,6 +100,46 @@ describe('state.py watch', () => {
     expect(env.state().watches).toEqual([])
   })
 
+  it('seeds merged with PRs that already merged and completes on the last one', () => {
+    env = makeEnv()
+    env.mock('merged-1', 'x')
+    const add = env.run(
+      'state.py',
+      'watch',
+      'add',
+      '--id',
+      'w',
+      '--pr',
+      'org/repo-a#1',
+      '--pr',
+      'org/repo-a#2',
+      '--notify',
+      'n',
+    )
+    expect(JSON.parse(add.out)[0].merged).toEqual(['org/repo-a#1'])
+    env.clean(2)
+    env.hh(1, [mergeEvent('m2', 2)])
+    expect(JSON.parse(env.run('wait.py').lines[1])).toMatchObject({ event: 'watch', id: 'w' })
+  })
+
+  it('refuses to add a watch when a PR state cannot be read', () => {
+    env = makeEnv()
+    env.mock('merged-3.fail', '')
+    const add = env.run(
+      'state.py',
+      'watch',
+      'add',
+      '--id',
+      'w',
+      '--pr',
+      'org/repo-a#3',
+      '--notify',
+      'n',
+    )
+    expect(add.code).not.toBe(0)
+    expect(add.err).toContain('HTTP 404')
+  })
+
   it('lets set and append reach the new list keys', () => {
     env = makeEnv()
     expect(env.run('state.py', 'set', 'watches', '--json', '[]').code).toBe(0)
@@ -152,6 +192,17 @@ describe('state.py update-check-script', () => {
     expect(result.out).toContain("const ORG = 'org'\n")
     expect(result.out).toContain("const TARGETS = { 'a': null, 'b': ['npm', 'pip'] }\n")
     expect(result.out).toContain('const DRY = true\n')
+  })
+
+  it('combines repeated repositories and lets an unrestricted one win', () => {
+    env = makeEnv()
+    const targets = (...repos: string[]) =>
+      /const TARGETS = (.*)\n/.exec(
+        env.run('state.py', 'update-check-script', ...repos.flatMap((r) => ['--repo', r])).out,
+      )![1]
+    expect(targets('a:npm', 'a:pip', 'a:npm', 'b')).toBe("{ 'a': ['npm', 'pip'], 'b': null }")
+    expect(targets('a:npm', 'a')).toBe("{ 'a': null }")
+    expect(targets('a', 'a:npm')).toBe("{ 'a': null }")
   })
 
   it('rejects names that could inject script text', () => {

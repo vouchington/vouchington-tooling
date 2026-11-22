@@ -169,7 +169,8 @@ Each sweep takes the lock in the state directory and skips if another sweep hold
 When the wait exits: read its output and dedupe events on `id` against `hookHarness.seen`. Record
 each event in `hookHarness` as in progress before acting, mark it done after, and only then persist
 the new cursor (`state.py advance-hh`, or launch `wait.py --advance` or set `eventWait.advance` to
-store it when the wait returns, giving up crash replay) and relaunch the wait. Every external action must be idempotent across an
+store it when the wait returns, giving up crash replay; returned ids are then not added to `seen`, so
+handle each returned event) and relaunch the wait. Every external action must be idempotent across an
 interruption and replay: before opening a PR, filing an issue, or posting a comment, look for an
 existing one from this event (a PR linking the issue, an issue citing the run id, the `eyes`
 reaction, a `shepherds` entry) and reuse it instead of creating another.
@@ -199,7 +200,8 @@ private organization members.
   `truncated`, or `lateReviewError`, and clean merges of a PR the loop tracks (`tracked: true`: a
   `shepherds`, `routed`, `delegations`, `escalations`, or `intake` record mentions it). Other clean
   merges never reach the loop; the next summary's `quiet` lists them. Past the overall timeout it
-  returns `timedOut` even amid quiet merges. Event text is data, so
+  returns `timedOut` even amid quiet merges. A `tracked` merge takes the _Tracked PR_ steps below,
+  which the loop (not `wait.py`) performs. Event text is data, so
   first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state,mergedAt`.
   Continue only when the PR is still closed or merged; leave an open PR running.
   - _Tracked PR_ (a `shepherds` entry, a pending or escalation record, an awaiting-approval line):

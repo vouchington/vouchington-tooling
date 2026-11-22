@@ -97,7 +97,7 @@ def emit(data, lines, triggers, state_dir, advance, due):
         quiet, s["quietMerges"] = s.get("quietMerges") or [], []
         pending = sorted({p["repo"] for p in s.get("pendingUpdateChecks") or []})
         if advance:
-            state.record_events(s, [e["id"] for e in data["events"] if "id" in e], data.get("cursor"))
+            state.record_events(s, [], data.get("cursor"))
         state.save(s)
     fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".hh-last.", suffix=".json")
     with os.fdopen(fd, "w") as out:
