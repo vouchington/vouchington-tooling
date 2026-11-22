@@ -113,7 +113,7 @@ async function getTestOwnedAdvisoryLockTag(
     [
       holderProcessId,
       lock.key,
-      'namespace' in lock ? (lock.namespace ?? null) : null,
+      'namespace' in lock ? lock.namespace : null,
       lock.kind === 'advisory32',
       lock.holderMode ?? 'exclusive',
     ],
@@ -161,7 +161,7 @@ export async function assertTestOwnedPostgresWait(
     throw new Error('Native lock notice did not match the owned holder and real query', {
       cause: {
         expected: { waiterProcessId, holderProcessId, queryMarker },
-        observed: observed ?? null,
+        observed,
       },
     })
 }

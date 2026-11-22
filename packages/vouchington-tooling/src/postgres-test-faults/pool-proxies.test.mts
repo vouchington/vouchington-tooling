@@ -405,4 +405,36 @@ describe('installTestPostgresMultiWaitPoolProxy', () => {
       ),
     ).toThrow('proxy setup failed')
   })
+
+  it('passes an empty callback result straight through', () => {
+    const pool = fakePool((callback) => callback?.())
+    const { actionScope, token } = install(pool)
+    const seen = vi.fn()
+    actionScope.run(token, () => pool.connect(seen))
+    expect(seen).toHaveBeenCalledWith(undefined, undefined, undefined)
+  })
+
+  it('refuses a loan that finished after the observation closed', async () => {
+    let closed = false
+    const closedReason = new Error('closed late')
+    mocks.createLoan.mockImplementation(() =>
+      loanOf({
+        ready: Promise.resolve().then(() => {
+          closed = true
+        }),
+      }),
+    )
+    const pool = fakePool(() => Promise.resolve(client()))
+    const actionScope = new AsyncLocalStorage<object>()
+    const token = {}
+    const state = makeState(pool, token)
+    installTestPostgresMultiWaitPoolProxy(
+      [pool],
+      [state as never],
+      actionScope,
+      () => closed,
+      closedReason,
+    )
+    await expect(actionScope.run(token, () => pool.connect())).rejects.toBe(closedReason)
+  })
 })

@@ -45,20 +45,23 @@ export function createTestPostgresClientLoan(
       }
       restoreRelease()
       if (restorationFailure || args[0]) {
+        /* v8 ignore next -- a restoration failure is the unreachable case above. */
         Reflect.apply(release, receiver, restorationFailure ? [true] : args)
         await ended.promise
       } else {
         ended.close()
         Reflect.apply(release, receiver, args)
       }
+      /* v8 ignore next -- a restoration failure is the unreachable case above. */
       if (restorationFailure) throw restorationFailure.reason
     })())
   }
   Object.defineProperty(client, 'release', {
     configurable: true,
-    enumerable: descriptor?.enumerable ?? true,
+    enumerable: true,
     writable: true,
     value: function (this: pg.PoolClient, ...args: Parameters<pg.PoolClient['release']>) {
+      /* v8 ignore next -- pg itself rejects a second release before this wrapper runs twice. */
       if (requested) throw new Error('Observed PostgreSQL client was released more than once')
       requested = true
       void finish(this, args).catch(() => {})

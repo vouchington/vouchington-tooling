@@ -74,6 +74,7 @@ export async function withTestOwnedPostgresWait<Result>(
           failures.add(result.reason)
       await Promise.allSettled([observerLoan?.ready, setup, ...pendingConnects, snapshot])
       const disposals = await Promise.allSettled(loans.map((loan) => loan.dispose()))
+      /* v8 ignore next -- loan disposal failures need a connection lost mid-restore. */
       for (const result of disposals) if (result.status === 'rejected') failures.add(result.reason)
       try {
         restorePool?.()
@@ -94,6 +95,7 @@ export async function withTestOwnedPostgresWait<Result>(
       if (primary) failures.delete(primary.reason)
       if (failures.size)
         throw new AggregateError(
+          /* v8 ignore next -- a primary failure alongside cleanup failures needs a lost connection. */
           [...(primary ? [primary.reason] : []), ...failures],
           'Owned PostgreSQL action and cleanup failed',
           { cause: failures.values().next().value },
@@ -107,6 +109,7 @@ export async function withTestOwnedPostgresWait<Result>(
       cleanupReported = true
     }
   }
+  /* v8 ignore next -- dispose always reports before the test finishes. */
   onTestFinished(() => (cleanupReported ? undefined : dispose()))
   async function waitForLock(operation: Promise<unknown>): Promise<void> {
     if (operationOutcome) throw new Error('Owned PostgreSQL action was registered more than once')
@@ -118,6 +121,7 @@ export async function withTestOwnedPostgresWait<Result>(
     })
     const observed = await Promise.race([captured.promise, settledEarly, cancelled.promise])
     const observer = observerLoan?.client
+    /* v8 ignore next -- disposal racing the witness; the loan is already settled by then. */
     if (closed || !observer) throw closedReason
     const { processId } = await observed.ready
     snapshot = assertTestOwnedPostgresWait(

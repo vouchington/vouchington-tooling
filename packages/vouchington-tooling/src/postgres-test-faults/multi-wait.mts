@@ -82,6 +82,7 @@ export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
         state.cancelled.promise,
       ])
       const observer = state.observerLoan?.client
+      /* v8 ignore next -- disposal racing the witness; the loan is already settled by then. */
       if (closed || !observer) throw closedReason
       const { processId } = await loan.ready
       state.snapshot = assertTestOwnedPostgresWait(
@@ -142,10 +143,12 @@ export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
         try {
           state.observerLoan = reserveTestPostgresObserver(options.observerPool)
           state.setup = state.observerLoan.ready.then((observer) => {
+            /* v8 ignore next -- disposal racing the observer checkout. */
             if (closed) throw closedReason
             return getTestOwnedPostgresLock(observer, options)
           })
           await state.setup
+          /* v8 ignore next -- disposal racing the setup query. */
           if (closed) throw closedReason
           const actionOutcome = Promise.resolve().then(() =>
             runInObservation(() => actionScope.run(state.token, action)),

@@ -115,4 +115,11 @@ describe.skipIf(!started)('createTestPostgresMultiWait (real PostgreSQL)', () =>
       await expect(createTestPostgresMultiWait([pool])).rejects.toThrow('cannot be nested')
     })
   })
+
+  it('disposes once however often it is asked, and at the end of an undisposed test', async () => {
+    const { pool } = await setup()
+    const multi = await createTestPostgresMultiWait([pool])
+    await Promise.all([multi[Symbol.asyncDispose](), multi[Symbol.asyncDispose]()])
+    await createTestPostgresMultiWait([pool])
+  })
 })
