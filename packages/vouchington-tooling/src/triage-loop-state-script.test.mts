@@ -119,7 +119,10 @@ describe('state.py watch', () => {
     expect(JSON.parse(add.out)[0].merged).toEqual(['org/repo-a#1'])
     env.clean(2)
     env.hh(1, [mergeEvent('m2', 2)])
-    expect(JSON.parse(env.run('wait.py').lines[1])).toMatchObject({ event: 'watch', id: 'w' })
+    const trigger = env.run('wait.py').lines[1]
+    expect(trigger).toBeDefined()
+    if (trigger === undefined) throw new Error('wait.py returned no watch trigger')
+    expect(JSON.parse(trigger)).toMatchObject({ event: 'watch', id: 'w' })
   })
 
   it('refuses to add a watch when a PR state cannot be read', () => {
