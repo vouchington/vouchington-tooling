@@ -1,4 +1,4 @@
-import { AsyncLocalStorage, AsyncResource } from 'node:async_hooks'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type pg from 'pg'
 import { reserveTestPostgresObserver } from './client-loan.mts'
 import {
@@ -9,7 +9,7 @@ import {
 import { cleanupTestPostgresMultiWait } from './multi-wait-cleanup.mts'
 import { installTestPostgresMultiWaitPoolProxy } from './multi-wait-pool-proxy.mts'
 import type { TestPostgresClientLoan, TestPostgresMultiWaitState } from './multi-wait-types.mts'
-import { runPoolObservationExclusively } from './observation-queue.mts'
+import { bindPoolObservationScope, runPoolObservationExclusively } from './observation-queue.mts'
 
 export type TestPostgresMultiWaitAction<Result> = {
   operation: Promise<Result>
@@ -20,7 +20,8 @@ export type TestPostgresMultiWaitAction<Result> = {
 /**
  * Holds the package-wide pool observation lease while witnessing several real lock waits.
  * `pools` lists every pool an action may check out from; each `start` selects one of them through
- * its `options.pool`. Dispose with `await using`, or let the end of the test dispose it.
+ * its `options.pool`. Every action keeps one `options.observerPool` connection until disposal, so
+ * that pool needs at least as many connections as there are actions. Dispose with `await using`, or let the end of the test dispose it.
  */
 export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
   // Vitest is an optional peer, so it loads only when a helper that needs it runs.
@@ -41,7 +42,7 @@ export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
 
   const exclusive = runPoolObservationExclusively(async () => {
     try {
-      runInObservation = AsyncResource.bind((run: () => Promise<unknown>) => run())
+      runInObservation = bindPoolObservationScope()
       restorePool = installTestPostgresMultiWaitPoolProxy(
         pools,
         states,

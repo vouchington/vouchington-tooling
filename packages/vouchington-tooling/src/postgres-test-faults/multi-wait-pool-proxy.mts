@@ -66,6 +66,7 @@ function installPool(
   const stateForRequest = () =>
     states.find(
       (state) =>
+        state.options.pool === pool &&
         state.options.requestId !== undefined &&
         state.options.isOwnedRequest?.(state.options.requestId) === true,
     )

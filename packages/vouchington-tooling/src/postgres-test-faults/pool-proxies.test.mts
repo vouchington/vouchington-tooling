@@ -437,4 +437,28 @@ describe('installTestPostgresMultiWaitPoolProxy', () => {
     )
     await expect(actionScope.run(token, () => pool.connect())).rejects.toBe(closedReason)
   })
+
+  it('selects the request-owned state that belongs to the checked-out pool', async () => {
+    const first = fakePool(() => Promise.resolve(client()))
+    const second = fakePool(() => Promise.resolve(client()))
+    const leased = client()
+    second.connect.mockImplementation(() => Promise.resolve(leased))
+    const loan = loanOf()
+    mocks.createLoan.mockReturnValue(loan)
+    const states = [makeState(first, {}), makeState(second, {})]
+    for (const state of states)
+      Object.assign((state as never as { options: object }).options, {
+        requestId: 'req',
+        isOwnedRequest: () => true,
+      })
+    installTestPostgresMultiWaitPoolProxy(
+      [first, second],
+      states as never[],
+      new AsyncLocalStorage<object>(),
+      () => false,
+      new Error('closed'),
+    )
+    expect(await second.connect()).toBe(leased)
+    expect(await states[1]!.captured.promise).toBe(loan)
+  })
 })
