@@ -9,7 +9,10 @@ import argparse, collections, datetime, json, math, os, sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from extras import enrich, limits
 from ghlib import Exhausted, Gh, GhError, fail, fmt_seconds as fs, percentile, queue_pr, seconds
+
+JOBS_PER_RUN = 1000
 
 
 def multiplier(label):
@@ -83,28 +86,12 @@ def reruns(runs):
     return dict(out)
 
 
-def draft_split(runs, drafts):
-    out = collections.Counter()
-    for run in runs:
-        if run.get("event") != "pull_request":
-            continue
-        prs = run.get("pull_requests") or []
-        out["unknown" if not prs or prs[0]["number"] not in drafts else
-            "draft" if drafts[prs[0]["number"]] else "ready"] += 1
-    return dict(out)
-
-
 def sample(runs, size):
     """Failed runs first (up to half the sample), then the most recent others."""
     ordered = sorted(runs, key=lambda r: r.get("created_at") or "", reverse=True)
     failed = [r for r in ordered if r.get("conclusion") == "failure"][: size // 2]
     rest = [r for r in ordered if r not in failed and r.get("status") == "completed"]
     return failed + rest[: size - len(failed)]
-
-
-def limits(gh):
-    data = gh.api("rate_limit")["resources"]
-    return {k: {"remaining": data[k]["remaining"], "limit": data[k]["limit"]} for k in ("core", "graphql")}
 
 
 def collect(gh, args, since):
@@ -140,29 +127,19 @@ def main(argv=None, now=None):
         out["runs"] = len(runs)
         sampled = []
         for run in sample(runs, args.jobs_sample):
-            try:
-                sampled.append((run, gh.api(f"repos/{args.repo}/actions/runs/{run['id']}/jobs?per_page=100&filter=latest").get("jobs") or []))
-            except Exhausted:
-                out["truncated"].append(f"jobs: call cap {args.max_calls} reached after {len(sampled)} runs")
+            jobs, _, note = gh.pages(f"repos/{args.repo}/actions/runs/{run['id']}/jobs?filter=latest", "jobs", JOBS_PER_RUN)
+            if note:
+                out["truncated"].append(f"jobs run {run['id']}: {note}")
+            if jobs or not note:
+                sampled.append((run, jobs))
+            if "api-call cap" in note:
                 break
         out["workflows"] = run_stats(runs)
         out["jobs"], out["runnerMinutes"], out["signatures"] = job_stats(sampled)
         out["jobsSample"] = len(sampled)
         out["ejections"], out["rerunSuccess"] = ejections(runs), reruns(runs)
-        branch = gh.api(f"repos/{args.repo}")["default_branch"]
-        try:
-            rules = gh.api(f"repos/{args.repo}/rules/branches/{branch}")
-            out["requiredChecks"] = sorted({c["context"] for r in rules if r.get("type") == "required_status_checks"
-                                            for c in r["parameters"].get("required_status_checks", [])})
-        except GhError as error:
-            out["requiredChecks"] = None
-            out["truncated"].append(f"rules: {error}")
-        pulls, _, note = gh.pages(f"repos/{args.repo}/pulls?state=all&sort=updated&direction=desc", "", 300)
-        if note:
-            out["truncated"].append(f"pulls (draft state): {note}")
-        drafts = {p["number"]: bool(p.get("draft")) for p in pulls}
-        out["draftRuns"] = draft_split(runs, drafts)
-        out["rateAfter"] = limits(gh)
+        out.update(requiredChecks=None, draftRuns={}, rateAfter=None)
+        enrich(gh, args.repo, runs, out)
     except (Exhausted, GhError) as error:
         fail(f"{args.repo}: {error}")
     out["apiCalls"] = gh.calls
@@ -190,7 +167,7 @@ def render(o):
     lines.append("rerun-success " + (" ".join(f"{k}={v}" for k, v in o["rerunSuccess"].items()) or "none"))
     lines.append("required " + (",".join(o["requiredChecks"]) if o["requiredChecks"] is not None else "unavailable"))
     lines.append("draft-vs-ready " + (" ".join(f"{k}={v}" for k, v in sorted(o["draftRuns"].items())) or "none"))
-    for when in ("rateBefore", "rateAfter"):
+    for when in (w for w in ("rateBefore", "rateAfter") if o[w]):
         lines.append(f"rate {when[4:].lower()} " + " ".join(f"{k}={v['remaining']}/{v['limit']}" for k, v in o[when].items()))
     lines += [f"truncated {t}" for t in o["truncated"]]
     return "\n".join(lines)

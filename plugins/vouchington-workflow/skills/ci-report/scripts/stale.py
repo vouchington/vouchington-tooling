@@ -69,6 +69,10 @@ def stuck(gh, repo, statuses, threshold, now, limit):
 def cancel(gh, repo, run, statuses, threshold, now):
     base = f"repos/{repo}/actions/runs/{run['id']}"
     try:
+        current = gh.api(base)
+        age = age_of(current, now)
+        if current.get("status") not in statuses or age is None or age <= threshold:
+            return f"left alone: now {current.get('status')}"
         gh.api(f"{base}/cancel", "POST")
         return "cancelled"
     except GhError as error:
