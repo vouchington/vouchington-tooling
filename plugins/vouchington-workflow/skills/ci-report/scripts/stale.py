@@ -2,8 +2,9 @@
 """Cancel workflow runs stuck in queued/in_progress/waiting/pending longer than a threshold.
 
 By default it POSTs `cancel` for each run older than the threshold, and `force-cancel` only when
-cancel answers 409 and the run is still stuck. With --dry-run it only lists. One output line per
-run. Runs younger than the threshold are never listed or touched.
+cancel answers 409 and the run is still stuck and has jobs. A run that answers 409 and has no jobs
+never started: it is not retried and is summarised in one `never-started` line (count, oldest age,
+first ids). With --dry-run it only lists. One output line per other run. Runs younger than the threshold are never listed or touched.
 """
 import argparse, datetime, os, re, sys, urllib.parse
 
@@ -14,6 +15,8 @@ from ghlib import Exhausted, Gh, GhError, fail, parse_time, queue_pr
 STATUSES = ("queued", "in_progress", "waiting", "pending", "requested")
 MIN_SECONDS = 3600
 UNITS = {"m": 60, "h": 3600, "d": 86400}
+NEVER_STARTED = "never-started"
+SHOWN_IDS = 5
 
 
 def duration(text):
@@ -66,6 +69,10 @@ def stuck(gh, repo, statuses, threshold, now, limit):
 def cancel(gh, repo, run, statuses, threshold, now):
     base = f"repos/{repo}/actions/runs/{run['id']}"
     try:
+        current = gh.api(base)
+        age = age_of(current, now)
+        if current.get("status") not in statuses or age is None or age <= threshold:
+            return f"left alone: now {current.get('status')}"
         gh.api(f"{base}/cancel", "POST")
         return "cancelled"
     except GhError as error:
@@ -76,6 +83,9 @@ def cancel(gh, repo, run, statuses, threshold, now):
         age = age_of(current, now)
         if current.get("status") not in statuses or age is None or age <= threshold:
             return f"left alone: now {current.get('status')}"
+        jobs = gh.api(f"{base}/jobs?per_page=1").get("jobs")
+        if isinstance(jobs, list) and not jobs:
+            return NEVER_STARTED
         gh.api(f"{base}/force-cancel", "POST")
         return "force-cancelled"
     except GhError as error:
@@ -101,14 +111,24 @@ def main(argv=None, now=None):
         runs, notes = stuck(gh, args.repo, statuses, threshold, now, args.limit)
         print(f"stale {args.repo} older-than={args.older_than} status={','.join(statuses)} "
               f"n={len(runs)} mode={'dry-run' if args.dry_run else 'cancel'}")
+        zombies = []
         for run, age in runs:
             line = f"{run['id']} {run.get('name')} {run.get('event')} {where(run)} {run.get('status')} {human(age)}"
             if not args.dry_run:
                 try:
-                    line += f" -> {cancel(gh, args.repo, run, statuses, threshold, now)}"
+                    result = cancel(gh, args.repo, run, statuses, threshold, now)
+                    if result == NEVER_STARTED:
+                        zombies.append((run["id"], age))
+                        continue
+                    line += f" -> {result}"
                 except Exhausted as error:
                     line += f" -> skipped: {error}"
             print(line)
+        if zombies:
+            ids = [str(i) for i, _ in zombies]
+            shown = ",".join(ids[:SHOWN_IDS]) + (",..." if len(ids) > SHOWN_IDS else "")
+            print(f"never-started n={len(ids)} oldest={human(max(a for _, a in zombies))} ids={shown} "
+                  "(cannot be cancelled or deleted via the API; ask GitHub Support)")
     except (Exhausted, GhError) as error:
         fail(f"{args.repo}: {error}")
     for note in notes:

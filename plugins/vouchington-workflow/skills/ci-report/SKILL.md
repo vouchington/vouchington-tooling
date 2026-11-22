@@ -46,5 +46,11 @@ Runs stuck in those statuses longer than `--older-than` (default `6h`, minimum `
 shows the run still stuck. Runs younger than the threshold are never listed or touched. `--dry-run`
 only lists. One line per run: id, workflow, event, PR or branch, status, age, result.
 
+A run that answers 409 to `cancel` and has no jobs (`GET actions/runs/<id>/jobs` is empty) never
+started: GitHub refuses `cancel`, `force-cancel`, and `DELETE` for it (403). `stale.py` does not
+retry it and prints no per-run line; it prints one summary line instead, for example
+`never-started n=54 oldest=10.5d ids=1,2,3,4,5,... (cannot be cancelled or deleted via the API; ask
+GitHub Support)`. It is not a failure: report it, and ask GitHub Support to remove those runs.
+
 Cancelling is not reversible: pass `--dry-run` first unless the caller has asked for cancellation.
 Waiting runs can be legitimate environment approvals; narrow `--status` when that applies.

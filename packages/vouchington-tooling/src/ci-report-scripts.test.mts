@@ -54,11 +54,11 @@ function harness(routes: Route[]) {
         FAKE_GH_LOG: log,
       },
     })
-  const posts = () =>
+  const calls = (method: string) =>
     readFileSync(log, 'utf8')
       .split('\n')
-      .filter((line) => line.startsWith('POST'))
-  return { run, posts }
+      .filter((line) => line.startsWith(method))
+  return { run, posts: () => calls('POST'), deletes: () => calls('DELETE') }
 }
 
 const iso = (hoursAgo: number, extraSeconds = 0) =>
@@ -183,6 +183,91 @@ describe('ci-report report.py', () => {
   })
 })
 
+describe('ci-report limits and budget', () => {
+  const base: Route[] = [
+    ['rate_limit', limit],
+    ['rules/branches/main', []],
+    ['/pulls', []],
+    ['repos/o/r/actions/runs/', { total_count: 0, jobs: [] }],
+    ['repos/o/r', { default_branch: 'main' }],
+  ]
+
+  it('prints the partial report when the call cap runs out after sampling', () => {
+    const runs = { total_count: 1, workflow_runs: [wfRun(1)] }
+    const { run } = harness([
+      [
+        '/jobs',
+        {
+          total_count: 1,
+          jobs: [
+            {
+              name: 'a',
+              labels: ['x'],
+              conclusion: 'success',
+              started_at: iso(1),
+              completed_at: iso(1, 60),
+              steps: [],
+            },
+          ],
+        },
+      ],
+      ['actions/runs?', runs],
+      ...base,
+    ])
+    const result = run('report.py', '--repo', 'o/r', '--events', 'pull_request', '--max-calls', '3')
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('wf CI pull_request n=1')
+    expect(result.stdout).toContain('truncated enrichment: api-call cap 3 reached')
+    expect(result.stdout).toContain('required unavailable')
+  })
+
+  it('paginates the jobs of a sampled run and notes a cut', () => {
+    const page = Array.from({ length: 100 }, (_, i) => ({
+      name: `j${i}`,
+      labels: ['x'],
+      conclusion: 'success',
+      started_at: iso(1),
+      completed_at: iso(1, 60),
+      steps: [],
+    }))
+    const { run } = harness([
+      [
+        '/jobs?filter=latest&per_page=100&page=2',
+        { total_count: 101, jobs: [{ ...page[0], name: 'extra' }] },
+      ],
+      ['/jobs', { total_count: 101, jobs: page }],
+      ['actions/runs?', { total_count: 1, workflow_runs: [wfRun(1)] }],
+      ...base,
+    ])
+    const out = JSON.parse(
+      run('report.py', '--repo', 'o/r', '--events', 'pull_request', '--json').stdout,
+    )
+    expect(out.jobs).toHaveLength(101)
+    expect(out.truncated).toEqual([])
+  })
+
+  it('reports truncation when a short final page exceeds --max-runs', () => {
+    const runs = Array.from({ length: 80 }, (_, i) => wfRun(i + 1))
+    const { run } = harness([['actions/runs?', { total_count: 80, workflow_runs: runs }], ...base])
+    const out = JSON.parse(
+      run(
+        'report.py',
+        '--repo',
+        'o/r',
+        '--events',
+        'pull_request',
+        '--max-runs',
+        '50',
+        '--jobs-sample',
+        '1',
+        '--json',
+      ).stdout,
+    )
+    expect(out.runs).toBe(50)
+    expect(out.truncated[0]).toContain('limit 50 reached')
+  })
+})
+
 describe('ci-report stale.py', () => {
   const stuck = [
     wfRun(1, { status: 'queued', conclusion: null, created_at: iso(30), run_started_at: null }),
@@ -198,6 +283,9 @@ describe('ci-report stale.py', () => {
     }),
   ]
   const routes: Route[] = [
+    ...stuck
+      .map((run): Route => [`actions/runs/${run.id}`, run])
+      .filter(([key]) => !key.endsWith('/2')),
     ['actions/runs?status=queued', { total_count: 3, workflow_runs: stuck }],
     ['actions/runs?status', { total_count: 0, workflow_runs: [] }],
     ['/cancel', {}],
@@ -234,12 +322,21 @@ describe('ci-report stale.py', () => {
     const { run, posts } = harness([
       ['runs/1/cancel', { error: 409 }],
       ['runs/1/force-cancel', {}],
+      ['runs/1/jobs', { total_count: 1, jobs: [{ id: 7 }] }],
       ['actions/runs/1', stuck[0]],
       ...routes,
     ])
     const result = run('stale.py', '--repo', 'o/r', '--older-than', '24h')
     expect(result.stdout).toContain('-> force-cancelled')
     expect(posts().at(-1)).toBe('POST repos/o/r/actions/runs/1/force-cancel')
+  })
+
+  it('re-reads a run before the first cancel and leaves it alone once it has started', () => {
+    const started = { ...stuck[0], status: 'in_progress', run_started_at: iso(0.01) }
+    const { run, posts } = harness([['actions/runs/1', started], ...routes])
+    const result = run('stale.py', '--repo', 'o/r', '--older-than', '24h')
+    expect(result.stdout).toContain('-> left alone: now in_progress')
+    expect(posts()).toEqual([])
   })
 
   it('leaves a run alone when a 409 shows it already finished', () => {
@@ -250,6 +347,59 @@ describe('ci-report stale.py', () => {
     ])
     expect(run('stale.py', '--repo', 'o/r', '--older-than', '24h').stdout).toContain('left alone')
     expect(posts().some((call) => call.includes('force-cancel'))).toBe(false)
+  })
+
+  describe('never-started runs', () => {
+    const args: string[] = ['--repo', 'o/r', '--older-than', '1h']
+    const zombie = (id: number) =>
+      wfRun(id, { status: 'queued', conclusion: null, created_at: iso(30 + id) })
+    const zombies = (ids: number[], jobs: unknown[]): Route[] => [
+      ...ids.flatMap((id): Route[] => [
+        [`runs/${id}/cancel`, { error: 409 }],
+        [`runs/${id}/jobs`, { total_count: jobs.length, jobs }],
+        [`actions/runs/${id}`, zombie(id)],
+      ]),
+      ['actions/runs?status=queued', { total_count: 1, workflow_runs: ids.map(zombie) }],
+      ['actions/runs?status', { total_count: 0, workflow_runs: [] }],
+    ]
+
+    it('summarises a 409 with zero jobs once, not as a failure, and retries nothing', () => {
+      const { run, posts, deletes } = harness(zombies([1, 2], []))
+      const result = run('stale.py', ...args)
+      expect(result.stdout).toMatch(/^never-started n=2 oldest=32\.0h ids=2,1 \(cannot be/m)
+      expect(result.stdout).toContain('ask GitHub Support')
+      expect(result.stdout).not.toContain('failed')
+      expect(result.stdout).not.toContain('force-cancel')
+      expect(posts()).toEqual([
+        'POST repos/o/r/actions/runs/2/cancel',
+        'POST repos/o/r/actions/runs/1/cancel',
+      ])
+      expect(deletes()).toEqual([])
+    })
+
+    it('lists only the first five ids', () => {
+      const ids = [1, 2, 3, 4, 5, 6, 7]
+      const { run, deletes } = harness(zombies(ids, []))
+      expect(run('stale.py', ...args).stdout).toContain('n=7 oldest=')
+      expect(run('stale.py', ...args).stdout).toContain('ids=7,6,5,4,3,...')
+      expect(deletes()).toEqual([])
+    })
+
+    it('force-cancels a 409 run that has jobs', () => {
+      const { run, posts, deletes } = harness(zombies([1], [{ id: 7 }]))
+      const result = run('stale.py', ...args)
+      expect(result.stdout).toContain('-> force-cancelled')
+      expect(result.stdout).not.toContain('never-started n=')
+      expect(posts().at(-1)).toBe('POST repos/o/r/actions/runs/1/force-cancel')
+      expect(deletes()).toEqual([])
+    })
+
+    it('prints no summary on a dry run and sends nothing', () => {
+      const { run, posts, deletes } = harness(zombies([1], []))
+      expect(run('stale.py', ...args, '--dry-run').stdout).not.toContain('never-started n=')
+      expect(posts()).toEqual([])
+      expect(deletes()).toEqual([])
+    })
   })
 
   it('rejects a threshold under one hour and bad input', () => {

@@ -42,7 +42,7 @@ class Gh:
             total = None if isinstance(data, list) else data.get("total_count", total)
             items.extend(batch)
             if len(batch) < 100:
-                return items[:limit], total, ""
+                return items[:limit], total, f"limit {limit} reached" if len(items) > limit else ""
             page += 1
         more = total is None or total > limit
         return items[:limit], total, f"limit {limit} reached" if more else ""
