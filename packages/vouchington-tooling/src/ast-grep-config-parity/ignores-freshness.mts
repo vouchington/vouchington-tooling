@@ -27,9 +27,12 @@ export function astGrepIgnoreEntries(document: unknown): string[] {
   return ignores.filter((entry): entry is string => typeof entry === 'string')
 }
 
-/** ast-grep treats parentheses as literal path characters; picomatch would read them as groups. */
-function literalParentheses(glob: string): string {
-  return glob.replace(/[()]/gu, '\\$&')
+/**
+ * Rewrites a glob to ast-grep's semantics, which picomatch does not share: parentheses are literal
+ * path characters, and a single `*` also crosses `/`.
+ */
+function toAstGrepGlob(glob: string): string {
+  return glob.replace(/[()]/gu, '\\$&').replace(/(?<![*\\])\*(?!\*)/gu, '{*,**/*}')
 }
 
 /** Returns the ignore entries that name a missing file or match no tracked path. */
@@ -43,7 +46,7 @@ export function staleAstGrepIgnores(
     if (!GLOB_METACHARACTER.test(entry) || globState.has(entry)) continue
     globState.set(entry, {
       matched: false,
-      matches: picomatch(literalParentheses(entry), { dot: true }),
+      matches: picomatch(toAstGrepGlob(entry), { dot: true }),
     })
   }
   for (const file of trackedFiles) {

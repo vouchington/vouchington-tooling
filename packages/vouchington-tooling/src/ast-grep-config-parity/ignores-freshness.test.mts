@@ -33,6 +33,13 @@ describe('staleAstGrepIgnores', () => {
     expect(staleAstGrepIgnores(['web/(auth)/**'], ['web/auth/page.tsx'])).toEqual(['web/(auth)/**'])
   })
 
+  it('lets a single star cross directory separators', () => {
+    expect(staleAstGrepIgnores(['src/*.ts'], ['src/sub/a.ts'])).toEqual([])
+    expect(staleAstGrepIgnores(['src/*.ts'], ['src/a.ts'])).toEqual([])
+    expect(staleAstGrepIgnores(['src/*.ts'], ['lib/a.ts'])).toEqual(['src/*.ts'])
+    expect(staleAstGrepIgnores(['src/**/x.ts'], ['src/a/b/x.ts'])).toEqual([])
+  })
+
   it('reports nothing when there are no globs', () => {
     expect(staleAstGrepIgnores(['a.mts'], ['a.mts'])).toEqual([])
   })
