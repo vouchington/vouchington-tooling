@@ -140,6 +140,8 @@ export function createPlaywrightTimeoutGuard(options: PlaywrightTimeoutGuardOpti
     return test
   }
 
+  // `base` must be Playwright's own `test` or another test with no fixture timeout options: the
+  // public API cannot enumerate fixtures inherited from a prior `extend`, so those are not validated.
   function guardTestTimeouts(base: typeof PlaywrightBase) {
     const guards = { [fixtureName]: [timeoutFixture, { auto: true }] }
     return protectPublicMethods(base.extend(guards as Fixtures<Record<string, void>>))

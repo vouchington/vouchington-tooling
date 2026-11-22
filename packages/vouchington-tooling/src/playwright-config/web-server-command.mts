@@ -66,7 +66,7 @@ export function nodeServerCommand({
 }: NodeServerCommandOptions): string {
   const logPath = join(logDir, `${name}.log`)
   const envPrefix = [
-    `OTEL_SERVICE_NAME=${serviceName}`,
+    `OTEL_SERVICE_NAME=${shellQuote(serviceName)}`,
     ...(otelPreload ? ['OTEL_LOGS_EXPORTER=otlp'] : []),
   ].join(' ')
   const instrumentedCommand = `${envPrefix} ${withOtelNodeImport(command, otelPreload)}`

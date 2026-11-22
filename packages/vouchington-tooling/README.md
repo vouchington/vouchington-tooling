@@ -1058,7 +1058,9 @@ profile and can take a caller-supplied runner.
 returns `guardTestTimeouts(test)`, which rejects `setTimeout` and `slow` calls and fixture, `use`, and
 `describe.configure` timeouts above the cap (default 30,000 ms) and forbids overriding the automatic
 guard fixture. It also returns `validateConfigTimeouts` for config files, `assertResolvedTimeouts` for
-global setup, and `protectHookTimeouts` for `beforeAll` and `afterAll`. `runnablePlaywrightTest` removes
+global setup, and `protectHookTimeouts` for `beforeAll` and `afterAll`. Pass Playwright's own `test` (or a base
+with no fixture timeout options) to `guardTestTimeouts`: fixtures inherited from an earlier `extend`
+cannot be enumerated and are not validated. `runnablePlaywrightTest` removes
 whole-test skip methods from the public types. `createReporter`, `nodeServerCommand`, `shellQuote`,
 `withNodeOption`, `parseMaxWorkers`, and `assetHostResolverRule` build the reporter list and web-server
 commands; the OpenTelemetry preload path and extra reporters are parameters.

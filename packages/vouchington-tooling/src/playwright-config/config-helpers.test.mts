@@ -84,8 +84,12 @@ describe('server commands', () => {
       command: 'node serve.mts',
       logDir: '/logs',
     })
-    expect(plain).toContain('OTEL_SERVICE_NAME=svc node serve.mts')
+    expect(plain).toContain('OTEL_SERVICE_NAME=')
+    expect(plain).toContain("svc'")
     expect(plain).not.toContain('--import')
+    expect(
+      nodeServerCommand({ name: 'a', serviceName: 'api server', command: 'node x', logDir: '/l' }),
+    ).toContain(String.raw`OTEL_SERVICE_NAME='\''api server'\''`)
     const traced = nodeServerCommand({
       name: 'api',
       serviceName: 'svc',
