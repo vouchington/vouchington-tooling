@@ -241,6 +241,11 @@
       "import": "./dist/ast-grep-config-parity/index.mjs",
       "default": "./dist/ast-grep-config-parity/index.mjs"
     },
+    "./fixture-deadline": {
+      "types": "./dist/fixture-deadline/index.d.mts",
+      "import": "./dist/fixture-deadline/index.mjs",
+      "default": "./dist/fixture-deadline/index.mjs"
+    },
     "./markdown-article-links": {
       "types": "./dist/markdown-article-links/index.d.mts",
       "import": "./dist/markdown-article-links/index.mjs",
