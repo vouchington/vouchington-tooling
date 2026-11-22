@@ -406,6 +406,11 @@
       "import": "./dist/vitest-effective-timeout/index.mjs",
       "default": "./dist/vitest-effective-timeout/index.mjs"
     },
+    "./playwright-config": {
+      "types": "./dist/playwright-config/index.d.mts",
+      "import": "./dist/playwright-config/index.mjs",
+      "default": "./dist/playwright-config/index.mjs"
+    },
     "./playwright": {
       "types": "./dist/playwright/index.d.mts",
       "import": "./dist/playwright/index.mjs",
