@@ -195,7 +195,22 @@ describe('ci-report limits and budget', () => {
   it('prints the partial report when the call cap runs out after sampling', () => {
     const runs = { total_count: 1, workflow_runs: [wfRun(1)] }
     const { run } = harness([
-      ['/jobs', { total_count: 1, jobs: [{ name: 'a', labels: ['x'], conclusion: 'success', started_at: iso(1), completed_at: iso(1, 60), steps: [] }] }],
+      [
+        '/jobs',
+        {
+          total_count: 1,
+          jobs: [
+            {
+              name: 'a',
+              labels: ['x'],
+              conclusion: 'success',
+              started_at: iso(1),
+              completed_at: iso(1, 60),
+              steps: [],
+            },
+          ],
+        },
+      ],
       ['actions/runs?', runs],
       ...base,
     ])
@@ -207,14 +222,26 @@ describe('ci-report limits and budget', () => {
   })
 
   it('paginates the jobs of a sampled run and notes a cut', () => {
-    const page = Array.from({ length: 100 }, (_, i) => ({ name: `j${i}`, labels: ['x'], conclusion: 'success', started_at: iso(1), completed_at: iso(1, 60), steps: [] }))
+    const page = Array.from({ length: 100 }, (_, i) => ({
+      name: `j${i}`,
+      labels: ['x'],
+      conclusion: 'success',
+      started_at: iso(1),
+      completed_at: iso(1, 60),
+      steps: [],
+    }))
     const { run } = harness([
-      ['/jobs?filter=latest&per_page=100&page=2', { total_count: 101, jobs: [{ ...page[0], name: 'extra' }] }],
+      [
+        '/jobs?filter=latest&per_page=100&page=2',
+        { total_count: 101, jobs: [{ ...page[0], name: 'extra' }] },
+      ],
       ['/jobs', { total_count: 101, jobs: page }],
       ['actions/runs?', { total_count: 1, workflow_runs: [wfRun(1)] }],
       ...base,
     ])
-    const out = JSON.parse(run('report.py', '--repo', 'o/r', '--events', 'pull_request', '--json').stdout)
+    const out = JSON.parse(
+      run('report.py', '--repo', 'o/r', '--events', 'pull_request', '--json').stdout,
+    )
     expect(out.jobs).toHaveLength(101)
     expect(out.truncated).toEqual([])
   })
@@ -223,7 +250,18 @@ describe('ci-report limits and budget', () => {
     const runs = Array.from({ length: 80 }, (_, i) => wfRun(i + 1))
     const { run } = harness([['actions/runs?', { total_count: 80, workflow_runs: runs }], ...base])
     const out = JSON.parse(
-      run('report.py', '--repo', 'o/r', '--events', 'pull_request', '--max-runs', '50', '--jobs-sample', '1', '--json').stdout,
+      run(
+        'report.py',
+        '--repo',
+        'o/r',
+        '--events',
+        'pull_request',
+        '--max-runs',
+        '50',
+        '--jobs-sample',
+        '1',
+        '--json',
+      ).stdout,
     )
     expect(out.runs).toBe(50)
     expect(out.truncated[0]).toContain('limit 50 reached')
@@ -245,7 +283,9 @@ describe('ci-report stale.py', () => {
     }),
   ]
   const routes: Route[] = [
-    ...stuck.map((run): Route => [`actions/runs/${run.id}`, run]).filter(([key]) => !key.endsWith('/2')),
+    ...stuck
+      .map((run): Route => [`actions/runs/${run.id}`, run])
+      .filter(([key]) => !key.endsWith('/2')),
     ['actions/runs?status=queued', { total_count: 3, workflow_runs: stuck }],
     ['actions/runs?status', { total_count: 0, workflow_runs: [] }],
     ['/cancel', {}],
