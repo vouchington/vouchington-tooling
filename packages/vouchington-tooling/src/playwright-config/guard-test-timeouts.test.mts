@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { createPlaywrightTimeoutGuard } from './index.mts'
+import type { PlaywrightTimeoutGuardOptions } from './index.mts'
 import type { test as PlaywrightBase } from '@playwright/test'
 
 // A minimal stand-in for Playwright's TestType. The runtime tests cover the real runner.
@@ -56,6 +57,24 @@ describe('guardTestTimeouts', () => {
     const child = test.extend({ extra: 1 } as never)
     expect(() => child.setTimeout(0)).toThrow(RangeError)
     expect(() => test.extend({ myGuard: undefined })).toThrow(RangeError)
+  })
+
+  it('types the guarded test with the literal fixture name', () => {
+    const { base } = fakeBase()
+    const guard = createPlaywrightTimeoutGuard({ fixtureName: 'myGuard' })
+    expectTypeOf(guard.fixtureName).toEqualTypeOf<'myGuard'>()
+    const test = guard.guardTestTimeouts(base)
+    type UseFixtures = Parameters<typeof test.use>[0]
+    expectTypeOf<UseFixtures>().toHaveProperty('myGuard')
+    expectTypeOf<UseFixtures>().toHaveProperty('page')
+    // @ts-expect-error -- only the configured name becomes a fixture
+    expectTypeOf<UseFixtures>().toHaveProperty('otherGuard')
+    expectTypeOf(
+      createPlaywrightTimeoutGuard().fixtureName,
+    ).toEqualTypeOf<'playwrightTimeoutGuard'>()
+    const omitted: PlaywrightTimeoutGuardOptions<'myGuard'> = {}
+    // @ts-expect-error -- a custom name type needs the name itself, or the guard would mistype it
+    createPlaywrightTimeoutGuard(omitted)
   })
 
   it('uses the configured cap and the default fixture name', () => {
