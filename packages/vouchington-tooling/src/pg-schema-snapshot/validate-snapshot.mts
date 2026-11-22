@@ -29,8 +29,8 @@ export function validateSchemaSnapshot(
   const object =
     (check: (e: Fields, p: string, errs: Errors) => void) =>
     (entry: unknown, path: string, errs: Errors): void => {
-      if (!v.isRecord(entry)) return v.addError(errs, `${path} must be an object`)
-      check(entry, path, errs)
+      if (v.isRecord(entry)) check(entry, path, errs)
+      else v.addError(errs, `${path} must be an object`)
     }
   const view = object((e, p, errs) => {
     v.validateString(e.definition, `${p}.definition`, errs)

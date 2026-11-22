@@ -99,6 +99,31 @@ describe('validateSchemaSnapshot', () => {
     )
   })
 
+  it('rejects non-object entries at every nesting level', () => {
+    const value = {
+      ...emptySnapshot(),
+      tables: {
+        t: 1,
+        u: widgetsTable({
+          foreignKeys: { fk: 1 as never },
+          indexes: { i: { keys: [1] } as never },
+        }),
+      },
+      views: { v: 1 },
+      enums: { e: 1 },
+      extensions: { x: 1 },
+      functions: { f: 1 },
+      policies: { p: 1 },
+    }
+    const errors = validateSchemaSnapshot(value, options).errors.join('\n')
+    for (const path of ['tables.t', 'tables.u.foreignKeys.fk', 'tables.u.indexes.i.keys[0]']) {
+      expect(errors).toContain(`${snapshotPath}: ${path} must be an object`)
+    }
+    for (const path of ['views.v', 'enums.e', 'extensions.x', 'functions.f', 'policies.p']) {
+      expect(errors).toContain(`${snapshotPath}: ${path} must be an object`)
+    }
+  })
+
   it('reports malformed nested facts with their paths', () => {
     const table = widgetsTable({
       relationKind: 'bogus' as never,
