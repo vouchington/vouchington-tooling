@@ -642,7 +642,10 @@ import {
   writeSelectedFilesOutput,
 } from 'vouchington-tooling/gha-selected-files'
 import { createArtifactClassifier, runCleanup } from 'vouchington-tooling/gha-artifacts-cleanup'
-import { ensureLabels, labelsFromPaths } from 'vouchington-tooling/agent-issue-labels'
+import { ensureLabels, labelsFromPaths, runBatchCli } from 'vouchington-tooling/agent-issue-labels'
+// Batch issue preflight (read-only): `await runBatchCli({ allowedRepos: ['owner/name'] })` runs
+// `preflight --session-dir <dir> --repo owner/name` against <dir>/manifest.json, writes
+// <dir>/preflight-report.json, and sets the exit code; `labelerPath` defaults to .github/labeler.yml.
 import { validateOptionalHttpOrigin } from 'vouchington-tooling/http-origin'
 // Replay recorded raw `.http` responses through an SDK `fetch` or AWS SDK v3 `requestHandler`:
 // const replay = createProviderReplay({ chunkBytes: 3 })
