@@ -14,9 +14,12 @@ browser call.
 
 1. Read the host's open tabs, then open one tab on `https://github.com/<org>` (signed in, same
    origin, so the page's session and each form's own CSRF token are used).
-2. Copy the script below, set `ORG` to the configured `org` and `TARGETS` to the target
-   repositories (repository name to `null` for every ecosystem, or a list of ecosystem names such
-   as `['npm']`), and pass it as the text of ONE call to the host's in-page JavaScript tool.
+2. Print the script with `state.py update-check-script --repo <name>[:<ecosystem>,...]` from the
+   `triage-loop` skill's `scripts/` (repeat `--repo` for every target; `--dry` sets `DRY`) and pass
+   it as the text of ONE call to the host's in-page JavaScript tool. It fills `ORG` and `TARGETS`
+   in the script below, which stays the template; a test keeps the two in sync. By hand, set `ORG`
+   to the configured `org` and `TARGETS` to the target repositories (repository name to `null` for
+   every ecosystem, or a list of ecosystem names such as `['npm']`).
 3. It fetches each repository's update configs, skips those already running or queued, POSTs each
    remaining "Check for updates" form, and returns one line per config ending in the newest job
    status. Expect `Running now`.

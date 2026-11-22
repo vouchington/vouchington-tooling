@@ -88,7 +88,8 @@ the commands it prints, as in the grant.
   raise or propose raising `dependencyBot.openPullRequestLimit` for this. GitHub exposes no REST
   endpoint, so batch every target into one in-page script in the host browser, with no clicks,
   following [references/dependency-update-check.md](references/dependency-update-check.md), which
-  carries the script. Record `update check requested` per repository.
+  carries the script (`state.py update-check-script` prints it filled in). Record
+  `update check requested` per repository.
 
 ## Phase B - Automation PRs
 

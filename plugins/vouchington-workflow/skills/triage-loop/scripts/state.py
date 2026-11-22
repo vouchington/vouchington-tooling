@@ -8,13 +8,16 @@ Add a subcommand rather than editing state.json another way.
 """
 import argparse, contextlib, datetime, fcntl, json, os, sys, tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # python3 -I leaves it off the path
+import late_review, update_check
+
 SEEN_MAX = 200
 # The top-level fields and their shapes; `set`, `append`, and `remove` touch only these.
 FIELDS = {
     "lastSweepAt": str, "commandsThrough": str, "reviewedComments": dict, "lateReview": dict, "schedule": dict,
     "retroCursor": str, "escalations": dict, "hookHarness": dict, "handledFailures": dict,
     "shepherds": dict, "intake": list, "scheduledPrompts": dict, "delegations": list,
-    "routed": list,
+    "routed": list, "watches": list, "quietMerges": list, "pendingUpdateChecks": list,
 }
 
 
@@ -122,21 +125,71 @@ def expect(value, kind, name):
     return value
 
 
+def record_events(s, ids, cursor):
+    """Mark event ids seen and store the cursor, as `advance-hh` does for one wait result."""
+    hh = expect(s.setdefault("hookHarness", {}), dict, "hookHarness")
+    seen = expect(hh.setdefault("seen", []), list, "hookHarness.seen")
+    seen.extend(i for i in ids if i not in seen)
+    hh["seen"] = seen[-SEEN_MAX:]
+    if cursor:
+        hh["cursor"] = cursor
+
+
 def advance_hh(_):
     s = load()
     with open(HH_LAST) as f:
         d = json.load(f)
-    hh = expect(s.setdefault("hookHarness", {}), dict, "hookHarness")
-    seen = expect(hh.setdefault("seen", []), list, "hookHarness.seen")
-    ids = [e["id"] for e in d.get("events", [])]
-    for i in ids:
-        if i not in seen:
-            seen.append(i)
-    hh["seen"] = seen[-SEEN_MAX:]
-    if d.get("cursor"):
-        hh["cursor"] = d["cursor"]
+    ids = [e["id"] for e in d.get("events", []) if "id" in e]
+    record_events(s, ids, d.get("cursor"))
     save(s)
     print(json.dumps({"events": len(ids), "cursorAdvanced": bool(d.get("cursor"))}))
+
+
+def late_review_cmd(a):
+    failed = False
+    for ref in a.refs:
+        try:
+            print(late_review.line(late_review.check(ref)))
+        except late_review.LateReviewError as error:
+            failed = True
+            print(f"{ref} error: {error}")
+    sys.exit(1 if failed else 0)
+
+
+def update_check_script(a):
+    try:
+        print(update_check.script(a.org or CONFIG.get("org"), a.repo, a.dry), end="")
+    except ValueError as error:
+        sys.exit(f"update-check-script: {error}")
+
+
+def watch(a):
+    s = load()
+    watches = expect(s.setdefault("watches", []), list, "watches")
+    if a.action == "add":
+        if not a.id or not a.pr or not a.notify:
+            sys.exit("watch add needs --id, --notify, and at least one --pr")
+        if any(w["id"] == a.id for w in watches):
+            sys.exit(f"watch add: {a.id!r} already exists")
+        for ref in a.pr:
+            if not late_review.REF.match(ref):
+                sys.exit(f"watch add: {ref!r} must look like owner/repo#N")
+        try:
+            merged = [ref for ref in a.pr if late_review.is_merged(ref)]
+        except late_review.LateReviewError as error:
+            sys.exit(f"watch add: {error}")
+        watches.append({"id": a.id, "prs": a.pr, "notify": a.notify, "note": a.note or "", "at": now(),
+                        "merged": sorted(r.lower() for r in merged)})
+    elif a.action == "remove":
+        watches[:] = [w for w in watches if w["id"] != a.id]
+    elif a.action == "ack":
+        hits = [w for w in watches if w["id"] == a.id]
+        if not hits:
+            sys.exit(f"watch ack: no watch {a.id!r}")
+        hits[0]["ackedAt"] = now()
+    if a.action != "list":
+        save(s)
+    print(json.dumps(watches))
 
 
 def route(a):
@@ -274,11 +327,26 @@ def main():
     x = sub.add_parser("remove", help="remove the key at a dotted path")
     x.add_argument("path")
     x.set_defaults(fn=remove_value)
+    x = sub.add_parser("late-review", help="report unresolved threads and late reviews for merged PRs")
+    x.add_argument("refs", nargs="+", metavar="owner/repo#N")
+    x.set_defaults(fn=late_review_cmd, lock=False)
+    x = sub.add_parser("update-check-script", help="print the Check-for-updates browser script")
+    x.add_argument("--repo", action="append", required=True, help="name or name:ecosystem[,ecosystem]")
+    x.add_argument("--org")
+    x.add_argument("--dry", action="store_true")
+    x.set_defaults(fn=update_check_script, lock=False)
+    x = sub.add_parser("watch", help="add, list, or remove a merge watch (watches in state.json)")
+    x.add_argument("action", choices=["add", "list", "ack", "remove"])
+    x.add_argument("--id")
+    x.add_argument("--pr", action="append", metavar="owner/repo#N")
+    x.add_argument("--notify", help="session name wait.py reports for the trigger")
+    x.add_argument("--note", help="what to tell it")
+    x.set_defaults(fn=watch)
     sh = sub.add_parser("show", help="print one key, or the top-level keys")
     sh.add_argument("key", nargs="?")
     sh.set_defaults(fn=show)
     args = p.parse_args()
-    with locked():
+    with locked() if getattr(args, "lock", True) else contextlib.nullcontext():
         args.fn(args)
 
 
