@@ -330,4 +330,32 @@ describe('public source literals additional deployment forms', async () => {
     expect(await runGuard('docs/runbook.md', hostile)).toEqual([])
     expect(performance.now() - started).toBeLessThan(1000)
   })
+
+  it('detects uppercase and single-character home usernames', async () => {
+    const errors = await runGuard(
+      'docs/dev.md',
+      [['/', 'Users/Alice/project'].join(''), ['/', 'home/a/project'].join('')].join('\n'),
+    )
+    expect(errors).toHaveLength(2)
+    expect(await runGuard('docs/dev.md', ['/', 'home/node/app'].join(''))).toEqual([])
+  })
+
+  it('reports the assignment line, not a preceding blank line', async () => {
+    const [error] = await runGuard('config.yml', '\n\nSENTRY_ORG: private-org\n')
+    expect(error).toContain('line=3')
+    expect(await runGuard('config.yml', '\n  SENTRY_PROJECT: web-prod')).toHaveLength(1)
+  })
+
+  it('excludes surrounding Markdown syntax from S3 bucket names', async () => {
+    expect(
+      await runGuard('docs/a.md', '[uploads](s3://Partner-Uploads)', {
+        allowedS3Buckets: ['partner-uploads'],
+      }),
+    ).toEqual([])
+    expect(await runGuard('docs/a.md', '[example](s3://bucket)')).toEqual([])
+    expect(await runGuard('docs/a.md', '[private](s3://private-data)')).toHaveLength(1)
+    expect(await runGuard('docs/a.md', '[x](https://private-data.s3.amazonaws.com)')).toHaveLength(
+      1,
+    )
+  })
 })

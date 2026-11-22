@@ -15,7 +15,7 @@ export const AWS_EVENT_DISCRIMINATOR_RE =
 
 function maintainerHomeExpression(root: 'Users' | 'home', users: string): RegExp {
   return new RegExp(
-    `(?<![A-Za-z0-9._-])/${root}/(?!(?:${users})(?:/|(?![a-z0-9._-]))|<[^>]+>)[a-z][a-z0-9._-]+`,
+    `(?<![A-Za-z0-9._-])/${root}/(?!(?:${users})(?:/|(?![A-Za-z0-9._-]))|<[^>]+>)[A-Za-z][A-Za-z0-9._-]*`,
   )
 }
 
@@ -47,13 +47,13 @@ export const DEFAULT_PATTERNS: readonly LiteralPattern[] = [
   {
     category: 'Sentry configuration identifier',
     expression:
-      /^\s*(?:export\s+)?SENTRY_(?:ORG|PROJECT(?:_ID)?)\s*=\s*(?!(?:<|\$|\{))[A-Za-z][A-Za-z0-9_]*\s*(?:#.*)?$/im,
+      /^[ \t]*(?:export\s+)?SENTRY_(?:ORG|PROJECT(?:_ID)?)\s*=\s*(?!(?:<|\$|\{))[A-Za-z][A-Za-z0-9_]*\s*(?:#.*)?$/im,
     appliesTo: (file) => LITERAL_ASSIGNMENT_FILE_RE.test(file),
   },
   {
     category: 'Sentry configuration identifier',
     expression:
-      /^\s*SENTRY_(?:ORG|PROJECT(?:_ID)?)\s*:\s*(?!(?:["'<$]|\{))[A-Za-z0-9][A-Za-z0-9_-]*(?=\s*(?:#.*)?$)/im,
+      /^[ \t]*SENTRY_(?:ORG|PROJECT(?:_ID)?)\s*:\s*(?!(?:["'<$]|\{))[A-Za-z0-9][A-Za-z0-9_-]*(?=\s*(?:#.*)?$)/im,
     appliesTo: (file) => YAML_RE.test(file),
   },
   {
