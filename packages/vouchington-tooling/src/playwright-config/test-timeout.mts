@@ -12,23 +12,28 @@ import type {
 export const DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS = 30_000
 export const DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE = 'playwrightTimeoutGuard'
 
-export type PlaywrightTimeoutGuardOptions = {
+export type PlaywrightTimeoutGuardOptions<
+  Name extends string = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE,
+> = {
   /** Largest test, hook, project, fixture, and suite timeout in milliseconds. Defaults to 30,000. */
   maxTimeoutMs?: number
   /** Name of the automatic guard fixture. Callers must not override it in `extend` or `use`. */
-  fixtureName?: string
+  fixtureName?: Name
 }
 
 type TimeoutInfo = Pick<TestInfo, 'timeout' | 'setTimeout' | 'slow'>
 
-export function createPlaywrightTimeoutGuard(options: PlaywrightTimeoutGuardOptions = {}) {
+export function createPlaywrightTimeoutGuard<
+  const Name extends string = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE,
+>(options: PlaywrightTimeoutGuardOptions<Name> = {}) {
   const maxTimeoutMs = options.maxTimeoutMs ?? DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS
   if (!Number.isFinite(maxTimeoutMs) || maxTimeoutMs <= 0) {
     throw new RangeError(
       `Playwright timeout cap must be a positive finite number; got ${maxTimeoutMs}`,
     )
   }
-  const fixtureName = options.fixtureName ?? DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE
+  // Without `fixtureName`, `Name` defaults to the default fixture's literal type.
+  const fixtureName = (options.fixtureName ?? DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE) as Name
   const capText = `${maxTimeoutMs.toLocaleString('en-US')} ms`
   const protectedInfo = new WeakSet<TimeoutInfo>()
 
@@ -144,7 +149,7 @@ export function createPlaywrightTimeoutGuard(options: PlaywrightTimeoutGuardOpti
   // public API cannot enumerate fixtures inherited from a prior `extend`, so those are not validated.
   function guardTestTimeouts(base: typeof PlaywrightBase) {
     const guards = { [fixtureName]: [timeoutFixture, { auto: true }] }
-    return protectPublicMethods(base.extend(guards as Fixtures<Record<string, void>>))
+    return protectPublicMethods(base.extend(guards as Fixtures<Record<Name, void>>))
   }
 
   return {
@@ -159,4 +164,6 @@ export function createPlaywrightTimeoutGuard(options: PlaywrightTimeoutGuardOpti
   }
 }
 
-export type PlaywrightTimeoutGuard = ReturnType<typeof createPlaywrightTimeoutGuard>
+export type PlaywrightTimeoutGuard<
+  Name extends string = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE,
+> = ReturnType<typeof createPlaywrightTimeoutGuard<Name>>
