@@ -1037,9 +1037,10 @@ are `[vitest-file]` and `[vitest-browser-progress]`, exported as `DEFAULT_FILE_P
 `formatStorybookProgressMarker`, and `latestStorybookProgressSequence(text, prefix)` when parsing.
 These stay in the Node entry, never the browser entry.
 
-`new VitestNoSkipsReporter()` fails an otherwise `passed` run when any test result is skipped; a
-failed or interrupted run, or one with unhandled errors, keeps its own outcome. It does not alter
-results, so JUnit still records the skips. `createVitestTeardownOverrunReporter({ tag? })` writes a
+`new VitestNoSkipsReporter()` fails an otherwise `passed` run when any test result is skipped by
+setting `process.exitCode = 1` and writing a message to stderr; it never rejects, so coverage
+reports and thresholds still run. A failed or interrupted run, or one with unhandled errors, keeps
+its own outcome. It does not alter results, so JUnit still records the skips. `createVitestTeardownOverrunReporter({ tag? })` writes a
 process and active-resource snapshot to stderr from `onProcessTimeout`, which Vitest's exit watchdog
 fires at the `teardownTimeout` deadline just before it force-exits; `formatTeardownOverrunDiagnostics`
 builds the text and `tag` defaults to `DEFAULT_TEARDOWN_OVERRUN_TAG` (`[vitest-teardown-overrun]`).
