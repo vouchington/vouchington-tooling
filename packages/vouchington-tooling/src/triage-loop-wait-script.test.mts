@@ -166,6 +166,36 @@ describe('wait.py dependency-bot merges', () => {
   })
 })
 
+describe('wait.py tracked merges and the heartbeat', () => {
+  it('returns a clean merge of a PR the loop tracks', () => {
+    env = makeEnv()
+    env.clean(40)
+    env.clean(41)
+    env.seed({ shepherds: { 'org/repo-a#40': { by: 'x' } }, routed: [{ what: 'repo-a#41 stuck' }] })
+    env.hh(1, [mergeEvent('t1', 40), mergeEvent('t2', 41), mergeEvent('t3', 4)])
+    env.clean(4)
+    const result = env.run('wait.py')
+    expect(json(result.lines[0]).events).toBe(2)
+    expect(json(result.lines[1])).toMatchObject({ id: 't1', tracked: true })
+    expect(json(result.lines[2])).toMatchObject({ id: 't2', tracked: true })
+    expect(json(result.lines[0]).quiet).toEqual({ count: 1, merges: ['repo-a#4'] })
+  })
+
+  it('returns timedOut once the overall timeout passes despite a stream of quiet merges', () => {
+    env = makeEnv({ eventWait: { timeout: '1s' } })
+    env.clean(50)
+    env.hh(1, [mergeEvent('s1', 50)])
+    env.mock('hh-1.sleep', '1.2')
+    const result = env.run('wait.py')
+    expect(json(result.lines[0])).toMatchObject({
+      timedOut: true,
+      events: 0,
+      quiet: { count: 1, merges: ['repo-a#50'] },
+    })
+    expect(env.log('npx.log')).toHaveLength(1)
+  })
+})
+
 describe('wait.py watches', () => {
   it('returns a trigger once the last watched PR merges and marks the watch', () => {
     env = makeEnv()
@@ -196,11 +226,7 @@ describe('wait.py watches', () => {
       note: 'now rebase',
       prs: ['org/repo-a#20', 'org/repo-a#21'],
     })
-    const [watch] = env.state().watches
-    expect(watch).toMatchObject({
-      merged: ['org/repo-a#20', 'org/repo-a#21'],
-      triggeredAt: expect.any(String),
-    })
+    expect(env.state().watches[0].merged).toEqual(['org/repo-a#20', 'org/repo-a#21'])
     expect(npxArgs(1)).toContain('c1')
   })
 
@@ -209,7 +235,7 @@ describe('wait.py watches', () => {
     env.clean(30)
     env.seed({
       watches: [
-        { id: 'done', prs: ['org/repo-a#30'], notify: 'x', triggeredAt: 't' },
+        { id: 'done', prs: ['org/repo-a#30'], notify: 'x', ackedAt: 't' },
         { id: 'open', prs: ['org/repo-a#30', 'org/repo-a#31'], notify: 'y' },
       ],
     })
@@ -218,7 +244,6 @@ describe('wait.py watches', () => {
     const result = env.run('wait.py')
     expect(result.lines).toHaveLength(1)
     expect(env.state().watches[1]).toMatchObject({ merged: ['org/repo-a#30'] })
-    expect(env.state().watches[1].triggeredAt).toBeUndefined()
   })
 })
 

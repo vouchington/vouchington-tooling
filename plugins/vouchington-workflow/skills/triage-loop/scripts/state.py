@@ -177,6 +177,11 @@ def watch(a):
         watches.append({"id": a.id, "prs": a.pr, "notify": a.notify, "note": a.note or "", "at": now()})
     elif a.action == "remove":
         watches[:] = [w for w in watches if w["id"] != a.id]
+    elif a.action == "ack":
+        hits = [w for w in watches if w["id"] == a.id]
+        if not hits:
+            sys.exit(f"watch ack: no watch {a.id!r}")
+        hits[0]["ackedAt"] = now()
     if a.action != "list":
         save(s)
     print(json.dumps(watches))
@@ -326,7 +331,7 @@ def main():
     x.add_argument("--dry", action="store_true")
     x.set_defaults(fn=update_check_script, lock=False)
     x = sub.add_parser("watch", help="add, list, or remove a merge watch (watches in state.json)")
-    x.add_argument("action", choices=["add", "list", "remove"])
+    x.add_argument("action", choices=["add", "list", "ack", "remove"])
     x.add_argument("--id")
     x.add_argument("--pr", action="append", metavar="owner/repo#N")
     x.add_argument("--notify", help="session name wait.py reports for the trigger")

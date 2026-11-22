@@ -1,9 +1,10 @@
 """Event classification for wait.py: compact lines, quiet merges, dependency-bot merges, and watches."""
-import state, late_review
+import json, re, state, late_review
 
 FIELDS = ("id", "repo", "event", "action", "prs", "issue", "reason", "conclusion", "workflow",
           "runId", "command", "commentId", "headSha")
 QUIET_KEEP = 100
+TRACKING = ("shepherds", "routed", "delegations", "escalations", "intake")
 
 
 def compact(event):
@@ -55,16 +56,20 @@ def triage_merge(event, cfg):
     return None, ref, is_dependency_bot(event, cfg)
 
 
-def update_watches(s, merged, at):
-    """Record merged PRs in each open watch; return one trigger per watch whose PRs all merged."""
+def tracked(s, ref):
+    """True when a loop record (shepherd, routing, delegation, escalation, intake) mentions the PR."""
+    pattern = re.compile(re.escape(ref.split("/", 1)[1]) + r"(?!\d)", re.I)
+    return any(pattern.search(json.dumps(s.get(key) or "")) for key in TRACKING)
+
+
+def update_watches(s, merged):
+    """Record merged PRs in each watch; return a trigger for every complete watch not yet acked.
+    A trigger repeats on each wait until `state.py watch ack|remove`, so a crash cannot lose it."""
     triggers = []
     for w in s.get("watches") or []:
-        if w.get("triggeredAt"):
-            continue
-        done = {r.lower() for r in w.get("merged", [])} | {r.lower() for r in merged if r.lower() in {p.lower() for p in w["prs"]}}
-        w["merged"] = sorted(done)
-        if done >= {p.lower() for p in w["prs"]}:
-            w["triggeredAt"] = at
+        wanted = {p.lower() for p in w["prs"]}
+        w["merged"] = sorted({r.lower() for r in w.get("merged", [])} | {r.lower() for r in merged} & wanted)
+        if set(w["merged"]) >= wanted and not w.get("ackedAt"):
             triggers.append({"event": "watch", "id": w["id"], "notify": w["notify"], "note": w.get("note", ""), "prs": w["prs"]})
     return triggers
 
@@ -83,6 +88,8 @@ def sweep(events, cfg):
         if event.get("id") in seen:
             continue
         line, ref, bot = triage_merge(event, cfg)
+        if line is None and tracked(s, ref):
+            line = {**compact(event), "tracked": True}
         merged.append(ref)
         if bot:
             bots.append(ref.split("#")[0].split("/")[1])
@@ -98,7 +105,16 @@ def sweep(events, cfg):
         s["quietMerges"] = log[-QUIET_KEEP:]
         pending = s.setdefault("pendingUpdateChecks", [])
         pending.extend({"repo": r, "at": at} for r in dict.fromkeys(bots) if r not in {p["repo"] for p in pending})
-        triggers = update_watches(s, merged, at)
+        triggers = update_watches(s, merged)
         state.record_events(s, [i for i in quiet_ids if i], None)
         state.save(s)
     return lines, raw, triggers
+
+
+def watch_triggers():
+    """Triggers for watches already complete and unacked, without new events."""
+    with state.locked():
+        s = state.load()
+        triggers = update_watches(s, [])
+        state.save(s)
+    return triggers

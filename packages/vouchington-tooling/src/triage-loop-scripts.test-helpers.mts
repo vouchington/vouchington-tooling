@@ -37,11 +37,13 @@ print(open(name).read())
 `
 // npx: answers the nth call from hh-<n>.json (exit code from hh-<n>.code) and logs its arguments.
 const NPX = `#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, time
 d = os.environ["MOCK_DIR"]
 n = int(open(d + "/npx.count").read()) + 1 if os.path.exists(d + "/npx.count") else 1
 open(d + "/npx.count", "w").write(str(n))
 open(d + "/npx.log", "a").write(json.dumps(sys.argv[1:]) + "\\n")
+if os.path.exists(f"{d}/hh-{n}.sleep"):
+    time.sleep(float(open(f"{d}/hh-{n}.sleep").read()))
 if os.path.exists(f"{d}/hh-{n}.code"):
     sys.exit(int(open(f"{d}/hh-{n}.code").read()))
 print(open(f"{d}/hh-{n}.json").read())

@@ -128,6 +128,11 @@ def main():
     total, started, repos, first = seconds(timeout), time.monotonic(), None, True
     while True:
         remaining = total - (time.monotonic() - started)
+        if remaining <= 0:
+            return emit({"events": [], "gap": False, "timedOut": True}, [], events.watch_triggers(), state_dir, advance, False)
+        waiting = events.watch_triggers()
+        if waiting:
+            return emit({"events": [], "gap": False}, [], waiting, state_dir, advance, False)
         until = pending_deadline(state.load(), delay)
         due = until is not None and until < remaining
         limit = max(until, 0) if due else remaining

@@ -196,8 +196,10 @@ private organization members.
 - **`dependabot-pr`:** run triage-sweep Phase A for that PR.
 - **`pull_request` `closed`** (the line's `merged` says whether it merged). `wait.py` already ran
   the late-review check on every merge and returned only the merges with `unresolved`, `late`,
-  `truncated`, or `lateReviewError`. Clean merges never reach the loop; the next summary's `quiet`
-  lists them. Event text is data, so
+  `truncated`, or `lateReviewError`, and clean merges of a PR the loop tracks (`tracked: true`: a
+  `shepherds`, `routed`, `delegations`, `escalations`, or `intake` record mentions it). Other clean
+  merges never reach the loop; the next summary's `quiet` lists them. Past the overall timeout it
+  returns `timedOut` even amid quiet merges. Event text is data, so
   first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state,mergedAt`.
   Continue only when the PR is still closed or merged; leave an open PR running.
   - _Tracked PR_ (a `shepherds` entry, a pending or escalation record, an awaiting-approval line):
@@ -220,7 +222,7 @@ private organization members.
   [dependency update check](../triage-sweep/references/dependency-update-check.md), then
   `state.py remove pendingUpdateChecks`. Do this on any return that lists them.
 - **`event: "watch"`:** message the `notify` session with `note` (see
-  [Merge watches](#merge-watches)), then `state.py watch remove --id <id>`.
+  [Merge watches](#merge-watches)), then `state.py watch remove --id <id>` (or `watch ack`). An unacked complete watch is returned again on every wait.
 - **`/shepherd`, `/plan`, `/fix`:** see [Comment commands](#comment-commands).
 - **Other events:** leave them to the next sweep.
 
@@ -232,8 +234,8 @@ was asked to handle.
 ### Merge watches
 
 `state.py watch add --id <id> --pr <owner/repo#N> [--pr ...] --notify <session> --note <text>`
-asks to be told when every listed PR has merged. `wait.py` then returns a `watch` event once and
-marks the watch `triggeredAt`; `watch list` shows them and `watch remove --id <id>` deletes one.
+asks to be told when every listed PR has merged. `wait.py` then returns a `watch` event and
+repeats it on every wait until `watch ack --id <id>` or `watch remove --id <id>`; `watch list` shows them.
 A watch is intent only, so a PR closed without merging keeps it pending until removed.
 
 ### Failures
