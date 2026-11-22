@@ -1142,6 +1142,17 @@ loads no optional parser peer at runtime and implements no replay-safety policy.
 `GeneratedArbiterConflict` contract is structural, so importing snapshot declarations does not
 require the optional peer either.
 
+### Schema snapshot validation
+
+`validateSchemaSnapshot(value, { snapshotPath, partitionPolicy? })` from `pg-schema-snapshot` checks
+the full v2 snapshot contract and fails closed: it returns `{ snapshot, errors: [] }` with the typed
+`SchemaSnapshot`, or `{ snapshot: null, errors }` where each error is a
+`::error file=<snapshotPath>::` diagnostic. `loadSchemaSnapshot({ repoRoot, trackedFiles,
+snapshotPath, snapshot?, partitionPolicy? })` first requires `snapshotPath` in `trackedFiles`, reads and
+parses the JSON, then validates it; passing `snapshot` skips the file. By default every partition
+policy value the published `PartitionPolicy` type allows is accepted; `partitionPolicy` narrows
+`strategies`, `children`, `retentionOwners`, and `accessClasses` to the listed values.
+
 ### Contract schema type queries
 
 `getExportedTypeFacts` and `getCallRowTypeFacts` use an existing TypeScript `Program` from the
