@@ -30,6 +30,11 @@ describe('titleSimilarity', () => {
     expect(titleSimilarity('Fix the login bug', 'Fix the signup bug')).toBeCloseTo(3 / 5)
   })
 
+  it('keeps non-Latin titles distinct instead of collapsing them to empty token sets', () => {
+    expect(titleSimilarity('修复登录错误', '添加深色模式')).toBe(0)
+    expect(titleSimilarity('修复登录错误', '修复登录错误')).toBe(1)
+  })
+
   it('returns 0 for completely disjoint titles', () => {
     expect(titleSimilarity('Fix the login bug', 'Add dark mode toggle')).toBe(0)
   })

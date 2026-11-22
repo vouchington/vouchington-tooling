@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { labelsFromPaths } from '../labels-from-paths.mts'
 import { findIntraBatchCollisions, type IntraBatchCollision } from './intra-dedup.mts'
 import type { BatchEntry, BatchManifest } from './manifest.mts'
+import type { BatchPolicy } from './policy.mts'
 import { evaluateEntry, type EntryReport } from './resolve-entry.mts'
 import { fetchTaxonomy, searchDuplicates, type Taxonomy } from './taxonomy.mts'
 
@@ -11,6 +12,7 @@ export type PreflightDeps = {
   readBody: (path: string) => Promise<string>
   labelerPath: string
   sessionDir: string
+  policy?: BatchPolicy | undefined
 }
 
 export type PreflightReport = {
@@ -72,6 +74,7 @@ async function evaluateSingleEntry(
     intraBatchCollisions,
     missingPaths,
     bodyOk,
+    policy: deps.policy,
   })
 }
 

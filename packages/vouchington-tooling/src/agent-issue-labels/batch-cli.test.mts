@@ -106,7 +106,7 @@ describe('executeBatch', () => {
     )
     expect(result.exitCode).toBe(0)
     expect(result.summary).toContain('Preflight pass')
-    expect(calls).toHaveLength(4)
+    expect(calls).toHaveLength(3)
     expect(calls).not.toContainEqual(expect.arrayContaining(['issue', 'create']))
     expect(calls).not.toContainEqual(expect.arrayContaining(['graphql']))
     expect(artifacts).toEqual([

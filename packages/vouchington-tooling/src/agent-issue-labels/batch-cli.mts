@@ -5,6 +5,7 @@ import { runGh } from '../gh-cli/index.mts'
 import { DEFAULT_LABELER_PATH } from './labels-from-paths.mts'
 import { parseManifest } from './batch/manifest.mts'
 import { executePreflight } from './batch/preflight.mts'
+import type { BatchPolicy } from './batch/policy.mts'
 import { summarizePreflight } from './batch/summary.mts'
 
 const USAGE = 'Usage: batch-issues preflight --session-dir <path> --repo <owner/repo>'
@@ -52,11 +53,13 @@ export type BatchDeps = {
   pathExists: (path: string) => Promise<boolean>
   writeArtifact: (path: string, data: unknown) => Promise<void>
   labelerPath: string
+  policy?: BatchPolicy | undefined
 }
 
 async function loadManifest(sessionDir: string, deps: BatchDeps, expectedRepo: string) {
   const manifest = parseManifest(await deps.readManifest(sessionDir), {
     allowedRepos: deps.allowedRepos,
+    policy: deps.policy,
   })
   if (manifest.targetRepo !== expectedRepo) {
     throw new Error(
@@ -80,6 +83,7 @@ export async function executeBatch(
     readBody: deps.readBody,
     labelerPath: deps.labelerPath,
     sessionDir: args.sessionDir,
+    policy: deps.policy,
   })
   await deps.writeArtifact(preflightPath, report)
   return {
@@ -102,6 +106,8 @@ export type RunBatchCliOptions = {
   allowedRepos: readonly string[]
   /** `actions/labeler` config used to derive path labels; defaults to `.github/labeler.yml`. */
   labelerPath?: string
+  /** Priority and dependency label names; defaults to `DEFAULT_BATCH_POLICY`. */
+  policy?: BatchPolicy | undefined
   argv?: string[]
   /** Overrides for the filesystem and `gh` seams (defaults use the real ones). */
   deps?: Partial<BatchDeps>
@@ -113,6 +119,7 @@ export async function runBatchCli(options: RunBatchCliOptions): Promise<void> {
   const result = await executeBatch(argv, {
     allowedRepos,
     labelerPath,
+    policy: options.policy,
     readManifest: (sessionDir) => readFile(join(sessionDir, 'manifest.json'), 'utf8'),
     readBody: (path) => readFile(path, 'utf8'),
     runGh,

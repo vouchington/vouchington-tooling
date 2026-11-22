@@ -172,3 +172,40 @@ describe('executePreflight duplicate detection', () => {
     )
   })
 })
+
+describe('executePreflight saturated search and custom policy', () => {
+  it('blocks when the duplicate search hit its fetch limit', async () => {
+    const hits = Array.from({ length: 20 }, (_, index) => ({
+      number: index + 1,
+      title: `Other ${index}`,
+      url: `https://example.com/${index + 1}`,
+    }))
+    const manifest = makeManifest([
+      makeEntry({
+        duplicateSearch: {
+          query: 'Fix the thing',
+          acknowledgedHits: hits.map((hit) => hit.number),
+          acknowledgedSiblings: [],
+        },
+      }),
+    ])
+    const { runGh } = makeRunGh({ duplicatesByTitle: { 'Fix the thing': hits } })
+    const report = await executePreflight(manifest, makeDeps({ runGh }))
+
+    expect(report.entries[0]!.blocked).toEqual([
+      expect.objectContaining({ code: 'duplicate-search-saturated' }),
+    ])
+  })
+
+  it('uses a caller-supplied priority and dependencies label policy', async () => {
+    const manifest = makeManifest([makeEntry({ priority: 'P1', dependencies: ['e0'] })])
+    const { runGh } = makeRunGh({ labels: ['P0', 'P1', 'blocked-by'] })
+    const policy = { priorityLabels: ['P0', 'P1'], dependenciesLabel: 'blocked-by' }
+    const report = await executePreflight(manifest, makeDeps({ runGh, policy }))
+
+    expect(report.entries[0]).toMatchObject({
+      status: 'pass',
+      resolvedLabels: ['P1', 'blocked-by'],
+    })
+  })
+})

@@ -165,7 +165,7 @@ describe('executePreflight', () => {
     expect(codes).toEqual(['missing-paths', 'unknown-label', 'unknown-milestone'])
   })
 
-  it('fetches the taxonomy exactly once and bounds gh calls to 3 + N duplicate searches', async () => {
+  it('fetches the taxonomy exactly once and bounds gh calls to 2 + N duplicate searches', async () => {
     const manifest = makeManifest([
       makeEntry({ id: 'e1' }),
       makeEntry({ id: 'e2' }),
@@ -174,7 +174,6 @@ describe('executePreflight', () => {
     const { runGh, calls } = makeRunGh({})
     await executePreflight(manifest, makeDeps({ runGh }))
 
-    const authCalls = calls.filter((call) => call[0] === 'auth')
     const labelCalls = calls.filter(
       (call) => call[0] === 'api' && call.some((arg) => arg.includes('/labels')),
     )
@@ -183,11 +182,11 @@ describe('executePreflight', () => {
     )
     const searchCalls = calls.filter((call) => call[0] === 'issue' && call[1] === 'list')
 
-    expect(authCalls).toHaveLength(1)
+    expect(calls.some((call) => call[0] === 'auth')).toBe(false)
     expect(labelCalls).toHaveLength(1)
     expect(milestoneCalls).toHaveLength(1)
     expect(searchCalls).toHaveLength(3)
-    expect(calls).toHaveLength(6)
+    expect(calls).toHaveLength(5)
   })
 
   it('auto-adds the caller-required dependencies label when entry.dependencies is non-empty', async () => {

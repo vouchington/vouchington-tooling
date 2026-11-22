@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CANONICAL_PRIORITIES, parseManifest as parse } from './manifest.mts'
+import { parseManifest as parse } from './manifest.mts'
+import { CANONICAL_PRIORITIES } from './policy.mts'
 
 const OPTIONS = { allowedRepos: ['example/app'] }
 const parseManifest = (raw: string, options = OPTIONS) => parse(raw, options)
@@ -107,6 +108,16 @@ describe('parseManifest', () => {
       acknowledgedHits: [],
       acknowledgedSiblings: [],
     })
+  })
+
+  it('validates priorities against a caller-supplied policy', () => {
+    const [entry] = validManifest().entries
+    const policy = { priorityLabels: ['P0', 'P1'], dependenciesLabel: 'blocked-by' }
+    const raw = JSON.stringify(validManifest({ entries: [{ ...entry, priority: 'P1' }] }))
+    expect(parse(raw, { ...OPTIONS, policy }).entries[0]!.priority).toBe('P1')
+    expect(() => parse(JSON.stringify(validManifest()), { ...OPTIONS, policy })).toThrow(
+      'priority must be one of P0, P1',
+    )
   })
 
   it('rejects an empty entries array', () => {

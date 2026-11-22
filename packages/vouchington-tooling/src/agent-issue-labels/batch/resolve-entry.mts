@@ -1,19 +1,24 @@
 import type { IntraBatchCollision } from './intra-dedup.mts'
 import type { BatchEntry } from './manifest.mts'
-import type { DuplicateCandidate, Taxonomy } from './taxonomy.mts'
+import { DEFAULT_BATCH_POLICY, type BatchPolicy } from './policy.mts'
+import { DUPLICATE_SEARCH_LIMIT, type DuplicateCandidate, type Taxonomy } from './taxonomy.mts'
 
 /**
  * Merges the canonical priority, path-derived labels, manifest-declared extras, and the
  * caller-required `dependencies` label — auto-added whenever `entry.dependencies` is non-empty,
  * the same rule the one-at-a-time skill flow applies to dependency-owned issues.
  */
-function resolveEntryLabels(entry: BatchEntry, pathLabels: string[]): string[] {
+function resolveEntryLabels(
+  entry: BatchEntry,
+  pathLabels: string[],
+  policy: BatchPolicy,
+): string[] {
   return Array.from(
     new Set([
       entry.priority,
       ...pathLabels,
       ...entry.extraLabels,
-      ...(entry.dependencies.length > 0 ? ['dependencies'] : []),
+      ...(entry.dependencies.length > 0 ? [policy.dependenciesLabel] : []),
     ]),
   )
 }
@@ -25,6 +30,7 @@ type BlockedReason = {
     | 'missing-paths'
     | 'body-unreadable'
     | 'duplicate-existing'
+    | 'duplicate-search-saturated'
     | 'duplicate-in-batch'
     | 'duplicate-priority'
   detail: string
@@ -46,6 +52,7 @@ export type EvaluateEntryParams = {
   intraBatchCollisions: IntraBatchCollision[]
   missingPaths: string[]
   bodyOk: boolean
+  policy?: BatchPolicy | undefined
 }
 
 /**
@@ -56,8 +63,9 @@ export type EvaluateEntryParams = {
 export function evaluateEntry(params: EvaluateEntryParams): EntryReport {
   const { entry, pathLabels, taxonomy, duplicates, intraBatchCollisions, missingPaths, bodyOk } =
     params
+  const policy = params.policy ?? DEFAULT_BATCH_POLICY
   const blocked: BlockedReason[] = []
-  const resolvedLabels = resolveEntryLabels(entry, pathLabels)
+  const resolvedLabels = resolveEntryLabels(entry, pathLabels, policy)
 
   for (const label of resolvedLabels) {
     if (!taxonomy.labels.has(label)) {
@@ -68,7 +76,7 @@ export function evaluateEntry(params: EvaluateEntryParams): EntryReport {
     }
   }
 
-  const priorityLabels = resolvedLabels.filter((label) => label.startsWith('priority:'))
+  const priorityLabels = resolvedLabels.filter((label) => policy.priorityLabels.includes(label))
   if (priorityLabels.length > 1) {
     blocked.push({
       code: 'duplicate-priority',
@@ -100,6 +108,13 @@ export function evaluateEntry(params: EvaluateEntryParams): EntryReport {
   // Every search hit blocks unless the author explicitly acknowledged it as non-duplicate:
   // `gh issue list --search` returns related, not only duplicate, issues, so treating an
   // unacknowledged hit as safe would be fail-open for the exact case this check exists for.
+  if (duplicates.length >= DUPLICATE_SEARCH_LIMIT) {
+    blocked.push({
+      code: 'duplicate-search-saturated',
+      detail: `duplicate search returned ${duplicates.length} results (the fetch limit), so matches may be omitted; narrow duplicateSearch.query.`,
+    })
+  }
+
   for (const duplicate of duplicates) {
     if (!entry.duplicateSearch.acknowledgedHits.includes(duplicate.number)) {
       blocked.push({

@@ -3,7 +3,7 @@ export const INTRA_DEDUP_THRESHOLD = 0.7
 export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
     .filter(Boolean)
     .join(' ')

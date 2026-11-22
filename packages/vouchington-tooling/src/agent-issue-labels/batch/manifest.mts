@@ -1,19 +1,11 @@
 import { parseDuplicateSearch, type DuplicateSearchConfig } from './duplicate-search.mts'
-export const CANONICAL_PRIORITIES = [
-  'priority: critical',
-  'priority: high',
-  'priority: medium',
-  'priority: low',
-] as const
-
-type CanonicalPriority = (typeof CANONICAL_PRIORITIES)[number]
-
+import { DEFAULT_BATCH_POLICY, type BatchPolicy } from './policy.mts'
 export type BatchEntry = {
   id: string
   title: string
   bodyFile: string
   paths: string[]
-  priority: CanonicalPriority
+  priority: string
   dependencies: string[]
   milestone: string | null
   extraLabels: string[]
@@ -34,7 +26,7 @@ const ENTRY_ID = /^[A-Za-z_][A-Za-z0-9_]*$/
 // capture the author's explicit non-duplicate judgment inside the manifest; a hit or intra-batch
 // collision blocks unless acknowledged here. Omitting the field entirely defaults to the
 // strictest behavior (search by title, acknowledge nothing) rather than skipping the check.
-function parseEntry(raw: Record<string, unknown>, index: number): BatchEntry {
+function parseEntry(raw: Record<string, unknown>, index: number, policy: BatchPolicy): BatchEntry {
   const { id } = raw
   if (typeof id !== 'string' || !ENTRY_ID.test(id)) {
     throw new Error(
@@ -63,12 +55,9 @@ function parseEntry(raw: Record<string, unknown>, index: number): BatchEntry {
   }
 
   const { priority } = raw
-  if (
-    typeof priority !== 'string' ||
-    !CANONICAL_PRIORITIES.includes(priority as CanonicalPriority)
-  ) {
+  if (typeof priority !== 'string' || !policy.priorityLabels.includes(priority)) {
     throw new Error(
-      `entries[${index}] ("${id}").priority must be one of ${CANONICAL_PRIORITIES.join(', ')}, got ${JSON.stringify(priority)}.`,
+      `entries[${index}] ("${id}").priority must be one of ${policy.priorityLabels.join(', ')}, got ${JSON.stringify(priority)}.`,
     )
   }
 
@@ -96,7 +85,7 @@ function parseEntry(raw: Record<string, unknown>, index: number): BatchEntry {
     title,
     bodyFile,
     paths: paths as string[],
-    priority: priority as CanonicalPriority,
+    priority,
     dependencies: dependencies as string[],
     milestone: milestone as string | null,
     extraLabels: extraLabels as string[],
@@ -107,6 +96,8 @@ function parseEntry(raw: Record<string, unknown>, index: number): BatchEntry {
 export type ParseManifestOptions = {
   /** `owner/name` repositories a manifest may target; anything else is rejected. */
   allowedRepos: readonly string[]
+  /** Priority and dependency label names; defaults to `DEFAULT_BATCH_POLICY`. */
+  policy?: BatchPolicy | undefined
 }
 
 /** Parses and validates a batch manifest JSON document. Throws on any schema violation. */
@@ -126,7 +117,7 @@ export function parseManifest(raw: string, options: ParseManifestOptions): Batch
   }
 
   const entries = rawEntries.map((rawEntry, index) =>
-    parseEntry(rawEntry as Record<string, unknown>, index),
+    parseEntry(rawEntry as Record<string, unknown>, index, options.policy ?? DEFAULT_BATCH_POLICY),
   )
 
   const seenIds = new Set<string>()
