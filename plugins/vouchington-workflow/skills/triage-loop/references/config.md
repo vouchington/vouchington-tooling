@@ -94,5 +94,7 @@ Both read the configuration file, honor `TRIAGE_LOOP_CONFIG`, and need Python 3 
   rather than editing the file another way. `state.py --help` lists them.
 - [`scripts/wait.py`](../scripts/wait.py) runs one `hook-harness wait` from the stored cursor over
   the configured repositories, writes the result to `<stateDir>/hh-last.json`, prints one summary
-  line per event, and exits. It never advances the cursor; `state.py advance-hh` does that after
-  the events are handled.
+  line per event, and exits. Unless asked to, it never advances the cursor; `state.py advance-hh` does that after
+  the events are handled (or `wait.py --advance`, or `eventWait.advance: true`, does it at return).
+  Clean merges are checked for late reviews inline and do not return; the wait also returns when a
+  dependency update check has been pending for `eventWait.updateCheckDelay` (default `"10m"`).

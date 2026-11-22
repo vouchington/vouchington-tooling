@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vouchington-workflow",
-  "version": "0.26.1",
+  "version": "0.27.0",
   "description": "Portable blackboard journaling, retrospective, issue organization, triage, and PR description workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington"
