@@ -3,6 +3,7 @@ import pg from 'pg'
 import {
   assertFaultOptions,
   isPlainTextConfig,
+  matchesFaultTarget,
   queryText,
   targetsStatement,
 } from './fault-support.mts'
@@ -32,6 +33,32 @@ describe('targetsStatement', () => {
     expect(targetsStatement('/* m */ SELECT 1', '/* m */', 'INSERT')).toBe(false)
     expect(targetsStatement('SELECT 1', '/* m */')).toBe(false)
     expect(targetsStatement('/* m */ insert into t', '/* m */', 'INSERT')).toBe(true)
+  })
+})
+
+describe('matchesFaultTarget', () => {
+  const marker = '/* m */'
+  it('requires the marker, the command and matching bound values', () => {
+    const query = { text: `${marker} SELECT 1`, values: ['a', 2] }
+    expect(matchesFaultTarget(query, marker, {})).toBe(true)
+    expect(matchesFaultTarget(query, marker, { command: 'SELECT' })).toBe(true)
+    expect(matchesFaultTarget(query, marker, { command: 'INSERT' })).toBe(false)
+    expect(
+      matchesFaultTarget(query, marker, { matchesValues: (values) => values[0] === 'a' }),
+    ).toBe(true)
+    expect(
+      matchesFaultTarget(query, marker, { matchesValues: (values) => values[0] === 'b' }),
+    ).toBe(false)
+  })
+
+  it('hands an empty list to the predicate when the query binds no values', () => {
+    const seen: (readonly unknown[])[] = []
+    const matchesValues = (values: readonly unknown[]) => seen.push(values) > 0
+    expect(matchesFaultTarget(`${marker} SELECT 1`, marker, { matchesValues })).toBe(true)
+    expect(
+      matchesFaultTarget({ text: `${marker} SELECT 1`, values: 'x' }, marker, { matchesValues }),
+    ).toBe(true)
+    expect(seen).toEqual([[], []])
   })
 })
 

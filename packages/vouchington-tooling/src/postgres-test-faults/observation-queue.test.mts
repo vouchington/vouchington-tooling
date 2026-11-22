@@ -1,4 +1,6 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { describe, expect, it } from 'vitest'
+import { bindPoolObservationScope } from './observation-queue.mts'
 import { runPoolObservationExclusively } from './index.mts'
 
 describe('runPoolObservationExclusively', () => {
@@ -29,5 +31,35 @@ describe('runPoolObservationExclusively', () => {
     await expect(
       runPoolObservationExclusively(() => runPoolObservationExclusively(async () => 1)),
     ).rejects.toThrow('cannot be nested')
+  })
+})
+
+describe('bindPoolObservationScope', () => {
+  it('runs a callback outside any observation as is', () => {
+    expect(bindPoolObservationScope()(() => 7)).toBe(7)
+  })
+
+  it('makes nested instrumentation reject while keeping the caller stores', async () => {
+    const caller = new AsyncLocalStorage<string>()
+    let bound!: ReturnType<typeof bindPoolObservationScope>
+    await runPoolObservationExclusively(async () => {
+      bound = bindPoolObservationScope()
+    })
+    const inside = await runPoolObservationExclusively(async () => {
+      const run = bindPoolObservationScope()
+      return caller.run('request-1', () =>
+        run(async () => ({
+          store: caller.getStore(),
+          nested: await runPoolObservationExclusively(async () => 'ran').catch(
+            (e: Error) => e.message,
+          ),
+        })),
+      )
+    })
+    expect(inside).toEqual({
+      store: 'request-1',
+      nested: 'PostgreSQL pool instrumentation cannot be nested',
+    })
+    expect(bound(() => 'late')).toBe('late')
   })
 })
