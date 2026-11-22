@@ -101,6 +101,11 @@
       "import": "./dist/gha-runtime-audit/index.mjs",
       "default": "./dist/gha-runtime-audit/index.mjs"
     },
+    "./public-source-literals": {
+      "types": "./dist/public-source-literals/index.d.mts",
+      "import": "./dist/public-source-literals/index.mjs",
+      "default": "./dist/public-source-literals/index.mjs"
+    },
     "./gha-workspace-policy": {
       "types": "./dist/gha-workspace-policy/index.d.mts",
       "import": "./dist/gha-workspace-policy/index.mjs",
