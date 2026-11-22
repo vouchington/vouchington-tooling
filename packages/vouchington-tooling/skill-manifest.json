@@ -4,63 +4,63 @@
     {
       "name": "blackboard",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "blackboard/SKILL.md"
     },
     {
       "name": "ci-report",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "ci-report/SKILL.md"
     },
     {
       "name": "organize-github-issues",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "organize-github-issues/SKILL.md"
     },
     {
       "name": "pr-description",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "pr-description/SKILL.md"
     },
     {
       "name": "retrospective",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "retrospective/SKILL.md"
     },
     {
       "name": "retrospective-distill",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "retrospective-distill/SKILL.md"
     },
     {
       "name": "review-github-issue-taxonomy",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "review-github-issue-taxonomy/SKILL.md",
       "prerequisites": ["organize-github-issues"]
     },
     {
       "name": "triage-loop",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "triage-loop/SKILL.md"
     },
     {
       "name": "triage-prs",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "triage-prs/SKILL.md",
       "prerequisites": ["pr-description", "retrospective"]
     },
     {
       "name": "triage-sweep",
       "plugin": "vouchington-workflow",
-      "pluginVersion": "0.27.0",
+      "pluginVersion": "0.28.0",
       "path": "triage-sweep/SKILL.md",
       "prerequisites": [
         "triage-loop",
