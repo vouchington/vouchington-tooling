@@ -30,7 +30,9 @@ export function createTestPostgresClientLoan(
   let finishing: Promise<void> | undefined
   const restoreRelease = () => {
     if (descriptor) Object.defineProperty(client, 'release', descriptor)
-    else Reflect.deleteProperty(client, 'release')
+    /* v8 ignore start -- pg always defines `release` as an own property of a pooled client. */ else
+      Reflect.deleteProperty(client, 'release')
+    /* v8 ignore stop */
   }
   function finish(receiver: pg.PoolClient, args: Parameters<pg.PoolClient['release']>) {
     return (finishing ??= (async () => {
@@ -38,6 +40,7 @@ export function createTestPostgresClientLoan(
       try {
         await observation.close()
       } catch (err) {
+        /* v8 ignore next 2 -- only a connection lost mid-restore reaches this; the release then destroys it. */
         restorationFailure = { reason: err }
       }
       restoreRelease()

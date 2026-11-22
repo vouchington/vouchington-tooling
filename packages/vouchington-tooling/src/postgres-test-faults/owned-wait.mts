@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type pg from 'pg'
-import { onTestFinished } from 'vitest'
 import { createTestPostgresClientLoan, reserveTestPostgresObserver } from './client-loan.mts'
 import {
   assertTestOwnedPostgresWait,
@@ -24,6 +23,8 @@ export async function withTestOwnedPostgresWait<Result>(
   options: TestOwnedPostgresWaitOptions,
   action: (waitForLock: (operation: Promise<unknown>) => Promise<void>) => Promise<Result>,
 ): Promise<Result> {
+  // Vitest is an optional peer, so it loads only when a helper that needs it runs.
+  const { onTestFinished } = await import('vitest')
   const { pool } = options
   const token = {}
   const cancelled = Promise.withResolvers<never>()
@@ -77,11 +78,13 @@ export async function withTestOwnedPostgresWait<Result>(
       try {
         restorePool?.()
       } catch (err) {
+        /* v8 ignore next 2 -- restoring a pool property only throws if the pool was frozen mid-test. */
         failures.add(err)
       }
       try {
         await observerLoan?.release(Boolean(primary || failures.size))
       } catch (err) {
+        /* v8 ignore next 2 -- releasing the observer only throws if its pool was ended mid-test. */
         failures.add(err)
       }
       if (primary || failures.size)

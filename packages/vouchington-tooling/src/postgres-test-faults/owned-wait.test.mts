@@ -1,5 +1,6 @@
 import { AsyncResource } from 'node:async_hooks'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { runPoolObservationExclusively } from './observation-queue.mts'
 import { withTestOwnedPostgresWait } from './owned-wait.mts'
 import { ADVISORY_SQL, WAITER_SQL, createFixture } from './owned-wait.test-helpers.mts'
 import { tryStartTestCluster, type TestCluster } from './test-cluster.test-helpers.mts'
@@ -219,5 +220,25 @@ describe.skipIf(!started)('withTestOwnedPostgresWait (real PostgreSQL)', () => {
       'action failed',
       'release failed',
     ])
+  })
+
+  it('rejects a nested instrumentation helper in the action instead of deadlocking', async () => {
+    const { holder, options } = await setup()
+    const held = await holder([ADVISORY_SQL])
+    await expect(
+      withTestOwnedPostgresWait(options(held, { lock: advisory }), async () =>
+        runPoolObservationExclusively(async () => undefined),
+      ),
+    ).rejects.toThrow('cannot be nested')
+  })
+
+  it('fails without starting when the caller already holds the observation lease', async () => {
+    const { holder, options } = await setup()
+    const held = await holder([ADVISORY_SQL])
+    await runPoolObservationExclusively(async () => {
+      await expect(
+        withTestOwnedPostgresWait(options(held, { lock: advisory }), async () => undefined),
+      ).rejects.toThrow('cannot be nested')
+    })
   })
 })

@@ -1,6 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
+import { AsyncLocalStorage, AsyncResource } from 'node:async_hooks'
 import type pg from 'pg'
-import { onTestFinished } from 'vitest'
 import { reserveTestPostgresObserver } from './client-loan.mts'
 import {
   assertTestOwnedPostgresWait,
@@ -24,6 +23,8 @@ export type TestPostgresMultiWaitAction<Result> = {
  * its `options.pool`. Dispose with `await using`, or let the end of the test dispose it.
  */
 export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
+  // Vitest is an optional peer, so it loads only when a helper that needs it runs.
+  const { onTestFinished } = await import('vitest')
   const states: TestPostgresMultiWaitState[] = []
   const actionScope = new AsyncLocalStorage<object>()
   const entered = Promise.withResolvers<void>()
@@ -34,9 +35,13 @@ export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
   let cleanupPromise: Promise<void> | undefined
   let cleanupReported = false
   let primary: unknown
+  // Captured inside the exclusive callback so actions run in the observation scope: a nested
+  // instrumentation helper then rejects instead of queueing behind this owner's lease.
+  let runInObservation: (run: () => Promise<unknown>) => Promise<unknown> = (run) => run()
 
   const exclusive = runPoolObservationExclusively(async () => {
     try {
+      runInObservation = AsyncResource.bind((run: () => Promise<unknown>) => run())
       restorePool = installTestPostgresMultiWaitPoolProxy(
         pools,
         states,
@@ -142,8 +147,12 @@ export async function createTestPostgresMultiWait(pools: readonly pg.Pool[]) {
           })
           await state.setup
           if (closed) throw closedReason
-          const actionOutcome = Promise.resolve().then(() => actionScope.run(state.token, action))
-          void actionOutcome.then(operation.resolve).catch(operation.reject)
+          const actionOutcome = Promise.resolve().then(() =>
+            runInObservation(() => actionScope.run(state.token, action)),
+          )
+          void actionOutcome
+            .then((value) => operation.resolve(value as Result))
+            .catch(operation.reject)
         } catch (err) {
           primary ??= err
           state.captured.reject(err)

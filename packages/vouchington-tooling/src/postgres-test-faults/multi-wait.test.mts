@@ -1,6 +1,7 @@
 import { AsyncResource } from 'node:async_hooks'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { createTestPostgresMultiWait } from './multi-wait.mts'
+import { runPoolObservationExclusively } from './observation-queue.mts'
 import { ADVISORY_SQL, WAITER_SQL, createFixture } from './owned-wait.test-helpers.mts'
 import { tryStartTestCluster, type TestCluster } from './test-cluster.test-helpers.mts'
 
@@ -95,5 +96,23 @@ describe.skipIf(!started)('createTestPostgresMultiWait (real PostgreSQL)', () =>
       'did not report exactly the expected advisory lock',
     )
     await expect(multi[Symbol.asyncDispose]()).resolves.toBeUndefined()
+  })
+
+  it('rejects a nested instrumentation helper in an action instead of deadlocking', async () => {
+    const { pool, holder, options } = await setup()
+    const held = await holder([ADVISORY_SQL])
+    const multi = await createTestPostgresMultiWait([pool])
+    const action = await multi.start(options(held, { lock: advisory }), () =>
+      runPoolObservationExclusively(async () => undefined),
+    )
+    await expect(action.operation).rejects.toThrow('cannot be nested')
+    await multi[Symbol.asyncDispose]().catch(() => undefined)
+  })
+
+  it('fails creation when the observation lease is already held by the caller', async () => {
+    const { pool } = await setup()
+    await runPoolObservationExclusively(async () => {
+      await expect(createTestPostgresMultiWait([pool])).rejects.toThrow('cannot be nested')
+    })
   })
 })
