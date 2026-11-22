@@ -132,7 +132,8 @@ export const DEFAULT_PATTERNS: readonly LiteralPattern[] = [
   },
   {
     category: 'AWS CLI profile assignment',
-    expression: /(?:PROFILE|READ_PROFILE)=(?!(?:["']?(?:<|\$)))["']?[A-Za-z0-9][A-Za-z0-9_-]*["']?/,
+    expression:
+      /(?<![A-Za-z0-9_])(?:AWS_PROFILE|PROFILE|READ_PROFILE)=(?!(?:["']?(?:<|\$)))["']?[A-Za-z0-9][A-Za-z0-9_-]*["']?/,
     appliesTo: (file) => PUBLIC_DOCUMENT_RE.test(file),
   },
 ]

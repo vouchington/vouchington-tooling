@@ -46,7 +46,10 @@ export async function checkPublicSourceLiterals(
   const errors: string[] = []
   if (!ctx.isInsideGitRepo) return { errors }
   const patterns = [...DEFAULT_PATTERNS, ...(options.extraPatterns ?? [])]
-  const ignorePaths = options.ignorePaths ?? []
+  // Strip g/y so a stateful lastIndex cannot make matching depend on earlier files.
+  const ignorePaths = (options.ignorePaths ?? []).map(
+    (re) => new RegExp(re.source, re.flags.replace(/[gy]/g, '')),
+  )
   const allowedBuckets = new Set((options.allowedS3Buckets ?? []).map((b) => b.toLowerCase()))
   for (const file of ctx.trackedFiles) {
     if (DEFAULT_EXCLUDED_PATH_RE.test(file) || ignorePaths.some((re) => re.test(file))) continue

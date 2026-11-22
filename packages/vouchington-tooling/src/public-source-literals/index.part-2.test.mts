@@ -285,4 +285,49 @@ describe('public source literals additional deployment forms', async () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('applies stateful ignore expressions to every file', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'public-source-literals-'))
+    try {
+      const files = ['fixtures/a.md', 'fixtures/b.md']
+      mkdirSync(join(root, 'fixtures'))
+      for (const file of files) writeFileSync(join(root, file), FUNCTION_URL)
+      const ctx = buildContextFromTrackedFiles(root, files)
+      const options = { ignorePaths: [/^fixtures\//g] }
+      expect(await checkPublicSourceLiterals(ctx, options)).toEqual({ errors: [] })
+      expect(await checkPublicSourceLiterals(ctx, options)).toEqual({ errors: [] })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stops S3 bucket names at query strings and fragments', async () => {
+    const lines = [
+      'https://s3.amazonaws.com/example-bucket?list-type=2',
+      'https://s3.amazonaws.com/Partner-Uploads#top',
+    ].join('\n')
+    expect(
+      await runGuard('docs/runbook.md', lines, { allowedS3Buckets: ['partner-uploads'] }),
+    ).toEqual([])
+    expect(
+      await runGuard('docs/runbook.md', 'https://s3.amazonaws.com/private-data?x=1'),
+    ).toHaveLength(1)
+  })
+
+  it('does not treat unrelated variables ending in PROFILE as AWS profiles', async () => {
+    expect(
+      await runGuard(
+        'docs/build.md',
+        ['BUILD_PROFILE=release', 'DOTNET_LAUNCH_PROFILE=https'].join('\n'),
+      ),
+    ).toEqual([])
+    expect(await runGuard('docs/build.md', 'AWS_PROFILE=private-operator')).toHaveLength(1)
+  })
+
+  it('scans hyphen-heavy S3-like hostnames in linear time', async () => {
+    const hostile = `https://bucket.s3.${'a-'.repeat(60)}example.org/`
+    const started = performance.now()
+    expect(await runGuard('docs/runbook.md', hostile)).toEqual([])
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
 })

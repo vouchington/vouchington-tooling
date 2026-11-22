@@ -1,10 +1,10 @@
 import { GENERIC_S3_BUCKET_RE, INJECTED_S3_BUCKET_RE } from './patterns.mts'
 
 const S3_LOCATIONS = [
-  /s3:\/\/([^/\s`"']+)/gi,
-  /arn:aws(?:-[a-z0-9-]+)?:s3:::([^/\s`"']+)/gi,
-  /https?:\/\/([^/\s`"']+?)\.s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com(?:\.cn)?(?=[:/\s`"']|$)/gi,
-  /https?:\/\/s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com(?:\.cn)?\/([^/\s`"']+)/gi,
+  /s3:\/\/([^/\s`"'?#]+)/gi,
+  /arn:aws(?:-[a-z0-9-]+)?:s3:::([^/\s`"'?#]+)/gi,
+  /https?:\/\/([^/\s`"'?#]+?)\.s3[a-z0-9-]*(?:\.[a-z0-9-]+)*\.amazonaws\.com(?:\.cn)?(?=[:/\s`"']|$)/gi,
+  /https?:\/\/s3[a-z0-9-]*(?:\.[a-z0-9-]+)*\.amazonaws\.com(?:\.cn)?\/([^/\s`"'?#]+)/gi,
 ]
 
 /** Returns the string offset of every S3 bucket reference that is not injected or generic. */
