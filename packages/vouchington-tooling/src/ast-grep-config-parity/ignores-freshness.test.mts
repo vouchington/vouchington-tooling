@@ -37,6 +37,8 @@ describe('staleAstGrepIgnores', () => {
     expect(staleAstGrepIgnores(['src/*.ts'], ['src/sub/a.ts'])).toEqual([])
     expect(staleAstGrepIgnores(['src/*.ts'], ['src/a.ts'])).toEqual([])
     expect(staleAstGrepIgnores(['src/*.ts'], ['lib/a.ts'])).toEqual(['src/*.ts'])
+    expect(staleAstGrepIgnores(['src/**.ts'], ['src/sub/a.ts'])).toEqual([])
+    expect(staleAstGrepIgnores(['**/x.ts', 'src/**'], ['src/a/b/x.ts'])).toEqual([])
     expect(staleAstGrepIgnores(['src/**/x.ts'], ['src/a/b/x.ts'])).toEqual([])
   })
 

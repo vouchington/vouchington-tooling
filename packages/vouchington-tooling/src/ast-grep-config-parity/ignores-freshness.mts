@@ -29,10 +29,16 @@ export function astGrepIgnoreEntries(document: unknown): string[] {
 
 /**
  * Rewrites a glob to ast-grep's semantics, which picomatch does not share: parentheses are literal
- * path characters, and a single `*` also crosses `/`.
+ * path characters, and a star run that is not a whole `**` path segment also crosses `/`.
  */
 function toAstGrepGlob(glob: string): string {
-  return glob.replace(/[()]/gu, '\\$&').replace(/(?<![*\\])\*(?!\*)/gu, '{*,**/*}')
+  return glob.replace(/[()]/gu, '\\$&').replace(/\*+/gu, (stars, offset: number, whole: string) => {
+    const segment =
+      stars.length > 1 &&
+      (offset === 0 || whole[offset - 1] === '/') &&
+      (offset + stars.length === whole.length || whole[offset + stars.length] === '/')
+    return segment ? stars : '{*,**/*}'
+  })
 }
 
 /** Returns the ignore entries that name a missing file or match no tracked path. */
