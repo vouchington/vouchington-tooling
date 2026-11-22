@@ -1030,12 +1030,21 @@ reporter (`VITEST_STORYBOOK_BROWSER=1`), `github-actions`, `junit`, `extraReport
 `hanging-process`, and file progress (stdout with `VITEST_DIAGNOSTICS=1`, appended to
 `VITEST_FILE_PROGRESS_FILE` when set). Options: `env`, `envNames` (rename any variable; see
 `DEFAULT_CI_REPORTER_ENV_NAMES`), `fileProgressPrefix`, `storybookProgressPrefix`, `extraReporters`
-(for example a no-skips or teardown-overrun reporter), and `cwd`. The progress reporters print
+(for example the two reporters below), and `cwd`. The progress reporters print
 `<prefix> event=start|finish module="..."` and `<prefix> seq=N event=module-*` lines; the defaults
 are `[vitest-file]` and `[vitest-browser-progress]`, exported as `DEFAULT_FILE_PROGRESS_PREFIX` and
 `DEFAULT_STORYBOOK_PROGRESS_PREFIX`. Pass the same prefix to `formatFileProgress`,
 `formatStorybookProgressMarker`, and `latestStorybookProgressSequence(text, prefix)` when parsing.
 These stay in the Node entry, never the browser entry.
+
+`new VitestNoSkipsReporter()` fails an otherwise `passed` run when any test result is skipped; a
+failed or interrupted run, or one with unhandled errors, keeps its own outcome. It does not alter
+results, so JUnit still records the skips. `createVitestTeardownOverrunReporter({ tag? })` writes a
+process and active-resource snapshot to stderr from `onProcessTimeout`, which Vitest's exit watchdog
+fires at the `teardownTimeout` deadline just before it force-exits; `formatTeardownOverrunDiagnostics`
+builds the text and `tag` defaults to `DEFAULT_TEARDOWN_OVERRUN_TAG` (`[vitest-teardown-overrun]`).
+Pass both through `ciReporters({ extraReporters: [new VitestNoSkipsReporter(),
+createVitestTeardownOverrunReporter()] })`.
 
 `vouchington-tooling/vitest-diagnostics/browser` is the browser-safe entry for Storybook and Vitest
 browser projects, for example a root fake-timer setup file shared with a Node project. It exports
