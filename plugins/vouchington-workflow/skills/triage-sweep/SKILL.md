@@ -213,6 +213,14 @@ one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
   and is running (PR provenance lines, branch name, or the host's agent list). Send the failing
   check, run id, test, and a PR-caused or flake judgment. Otherwise list it in the summary.
 
+- **Stale runs (optional, on by default):** unless `staleRuns` is `false` in the configuration, on
+  every full sweep (never a `--dry-run` sweep), for each repository, run
+  `python3 <ci-report skill>/scripts/stale.py --repo <repo> --dry-run` (threshold `olderThan`,
+  default `6h`) and report what it lists. GitHub does not clear runs stuck in `queued`. Then run
+  `stale.py --repo <repo> --older-than <cancelAfter>` (default `24h`), which cancels runs older than
+  that. A one-line summary is enough; say nothing when none are listed. See
+  [ci-report](../ci-report/SKILL.md).
+
 ## Phase G2 - Command comments
 
 The backstop for `/shepherd`, `/plan`, and `/fix` events, run on `gap: true`, on a failed wait, and
