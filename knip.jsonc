@@ -45,6 +45,7 @@
         "src/jsdom-stubs/index.mts!",
         "src/input-otp-mock/index.mts!",
         "src/playwright/index.mts!",
+        "src/playwright-config/index.mts!",
         "src/config-inventory/index.mts!",
         "src/finite-enum-ripple/index.mts!",
         "src/coverage-transport/index.mts!",

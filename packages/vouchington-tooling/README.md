@@ -1053,6 +1053,16 @@ there at construction and leaves the directory and other files alone. Applicatio
 directory are parameters. `checkFiniteTimeoutProfiles` writes one scratch project per admission
 profile and can take a caller-supplied runner.
 
+`playwright-config` is the config-time counterpart of the `playwright` runtime helpers, and
+`@playwright/test` stays an optional peer. `createPlaywrightTimeoutGuard({ maxTimeoutMs, fixtureName })`
+returns `guardTestTimeouts(test)`, which rejects `setTimeout` and `slow` calls and fixture, `use`, and
+`describe.configure` timeouts above the cap (default 30,000 ms) and forbids overriding the automatic
+guard fixture. It also returns `validateConfigTimeouts` for config files, `assertResolvedTimeouts` for
+global setup, and `protectHookTimeouts` for `beforeAll` and `afterAll`. `runnablePlaywrightTest` removes
+whole-test skip methods from the public types. `createReporter`, `nodeServerCommand`, `shellQuote`,
+`withNodeOption`, `parseMaxWorkers`, and `assetHostResolverRule` build the reporter list and web-server
+commands; the OpenTelemetry preload path and extra reporters are parameters.
+
 `next-navigation-mock`, `jsdom-stubs` and `input-otp-mock` are test-only helpers for Vitest component
 tests; `next` and `react` are optional peers, and each subpath imports only what it needs.
 `vi.mock('next/navigation', () => navMockModule)` swaps in a singleton router whose spies and
