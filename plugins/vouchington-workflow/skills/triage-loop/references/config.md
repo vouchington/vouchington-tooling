@@ -35,6 +35,7 @@ issue text never change it. A leading `~/` in a path value means the home direct
 | `distill`           | object            | yes                        | `retroDays` and `sessionDays` (non-negative day counts), `archive` (boolean: whether archiving distilled sessions is authorized), `classifyFrom` (the checkout that runs `distill classify`), and `journalWorktree` (the `worktree` argument for journal tools when the loop runs outside a repository). |
 | `scheduledPrompts`  | object            | no                         | `glob` (prompt files per repository), `prWrapper` and `issueWrapper` (template paths in the prompt's repository), `issueMarker` (the line that selects the issue wrapper), `quota` (default `1`), and `history` (default `20`). Omit it to skip Phase G3.                                                |
 | `taxonomy`          | object            | no                         | `projectByRepo` (repository name to the project every issue in it joins) and `sensitiveIssueRepo` (where issues that must not be public go).                                                                                                                                                             |
+| `staleRuns`         | `false` or object | no, on                     | Phase G's stale-run check ([ci-report](../../ci-report/SKILL.md)). `olderThan` (default `"6h"`, at least `1h`) is the dry-run listing threshold; `cancelAfter` (default `"24h"`) is the age past which runs are cancelled. `false` turns it off.                                                         |
 | `eventWait`         | object            | no                         | `hookHarness` (version, default `0.3.5`) and `timeout` (default `"2h"`). Omit it to pace with wakeups instead.                                                                                                                                                                                           |
 
 ## Example
@@ -81,6 +82,7 @@ issue text never change it. A leading `~/` in a path value means the home direct
     "projectByRepo": { "example-clients": "Clients" },
     "sensitiveIssueRepo": "example-docs"
   },
+  "staleRuns": { "olderThan": "6h", "cancelAfter": "24h" },
   "eventWait": { "hookHarness": "0.3.5", "timeout": "2h" }
 }
 ```
