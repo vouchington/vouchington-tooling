@@ -23,17 +23,30 @@ export type PlaywrightTimeoutGuardOptions<
 
 type TimeoutInfo = Pick<TestInfo, 'timeout' | 'setTimeout' | 'slow'>
 
-export function createPlaywrightTimeoutGuard<
-  const Name extends string = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE,
->(options: PlaywrightTimeoutGuardOptions<Name> = {}) {
-  const maxTimeoutMs = options.maxTimeoutMs ?? DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS
+type DefaultFixtureName = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE
+
+/** Without `fixtureName`, the guard registers and is typed by the default fixture name. */
+export function createPlaywrightTimeoutGuard(
+  options?: PlaywrightTimeoutGuardOptions,
+): PlaywrightTimeoutGuard
+/** A custom fixture name must be passed, so the guard's type always names the registered fixture. */
+export function createPlaywrightTimeoutGuard<const Name extends string>(
+  options: PlaywrightTimeoutGuardOptions<Name> & { fixtureName: Name },
+): PlaywrightTimeoutGuard<Name>
+export function createPlaywrightTimeoutGuard<Name extends string>(
+  options: PlaywrightTimeoutGuardOptions<Name> = {},
+): PlaywrightTimeoutGuard<Name> {
+  // The overloads guarantee `Name` is the default name whenever `fixtureName` is omitted.
+  const fixtureName = (options.fixtureName ?? DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE) as Name
+  return buildTimeoutGuard(options.maxTimeoutMs ?? DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS, fixtureName)
+}
+
+function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureName: Name) {
   if (!Number.isFinite(maxTimeoutMs) || maxTimeoutMs <= 0) {
     throw new RangeError(
       `Playwright timeout cap must be a positive finite number; got ${maxTimeoutMs}`,
     )
   }
-  // Without `fixtureName`, `Name` defaults to the default fixture's literal type.
-  const fixtureName = (options.fixtureName ?? DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE) as Name
   const capText = `${maxTimeoutMs.toLocaleString('en-US')} ms`
   const protectedInfo = new WeakSet<TimeoutInfo>()
 
@@ -164,6 +177,6 @@ export function createPlaywrightTimeoutGuard<
   }
 }
 
-export type PlaywrightTimeoutGuard<
-  Name extends string = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE,
-> = ReturnType<typeof createPlaywrightTimeoutGuard<Name>>
+export type PlaywrightTimeoutGuard<Name extends string = DefaultFixtureName> = ReturnType<
+  typeof buildTimeoutGuard<Name>
+>
