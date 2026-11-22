@@ -692,6 +692,10 @@ import {
   discoverMarkdownArticles,
 } from 'vouchington-tooling/markdown-article-links'
 import {
+  checkCanonicalChildLinks,
+  readCanonicalMarkdownChildren,
+} from 'vouchington-tooling/markdown-canonical-children'
+import {
   checkAstGrepConfigParity,
   discoverAstGrepConfig,
 } from 'vouchington-tooling/ast-grep-config-parity'
@@ -859,6 +863,14 @@ entry that names no tracked file and matches no tracked glob.
 `vouchington-tooling/fixture-deadline` exports `createFixtureDeadline(timeoutMs = 4000)`, a test
 helper that returns a function yielding the milliseconds left in a per-case budget and throwing once
 it is spent.
+
+`vouchington-tooling/markdown-canonical-children` composes a split Markdown index with the children it
+lists as `- <a id="x"></a>[Title](child.md)` entries. `readCanonicalMarkdownChildren(repoRoot,
+rootFile, rootContent, trackedFiles, contentsByFile, errors)` pushes `::error` strings for missing,
+untracked, out-of-repo, or symlink-escaping children and returns the composed content with
+`sourceAtLine` and `sourceAtOffset` mapping back to the original file and line; children do not
+recurse. `checkCanonicalChildLinks(ctx, { parents })` requires every child linked with a `#fragment`
+in a listed parent to also have a whole-file link. The parent paths are the caller's.
 
 `vouchington-tooling/markdown-article-links` checks rendered article links statically. It bundles no
 markdown parser or renderer: the caller supplies all three callbacks.

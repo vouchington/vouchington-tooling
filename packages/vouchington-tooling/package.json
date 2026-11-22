@@ -251,6 +251,11 @@
       "import": "./dist/markdown-article-links/index.mjs",
       "default": "./dist/markdown-article-links/index.mjs"
     },
+    "./markdown-canonical-children": {
+      "types": "./dist/markdown-canonical-children/index.d.mts",
+      "import": "./dist/markdown-canonical-children/index.mjs",
+      "default": "./dist/markdown-canonical-children/index.mjs"
+    },
     "./http-body": {
       "types": "./dist/http-body/index.d.mts",
       "import": "./dist/http-body/index.mjs",
