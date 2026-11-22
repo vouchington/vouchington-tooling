@@ -713,6 +713,7 @@ import {
   evaluatePnpmLicenseReport,
 } from 'vouchington-tooling/dependency-license-policy'
 import { checkGhaWorkspacePolicy } from 'vouchington-tooling/gha-workspace-policy'
+import { checkPublicSourceLiterals } from 'vouchington-tooling/public-source-literals'
 import { requireUpToDate } from 'vouchington-tooling/require-up-to-date'
 import { checkFreshBase, classifyFreshBase } from 'vouchington-tooling/fresh-base'
 import { runGitleaksDirectoryScan } from 'vouchington-tooling/gitleaks-directory-scan'
