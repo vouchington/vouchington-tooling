@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import picomatch from 'picomatch'
-import { parse } from 'yaml'
+import { parseAllDocuments } from 'yaml'
 
 export interface CheckAstGrepIgnoresFreshnessOptions {
   /** The tracked local rule directory, for example `ast-grep-rules`. */
@@ -27,6 +27,11 @@ export function astGrepIgnoreEntries(document: unknown): string[] {
   return ignores.filter((entry): entry is string => typeof entry === 'string')
 }
 
+/** ast-grep treats parentheses as literal path characters; picomatch would read them as groups. */
+function literalParentheses(glob: string): string {
+  return glob.replace(/[()]/gu, '\\$&')
+}
+
 /** Returns the ignore entries that name a missing file or match no tracked path. */
 export function staleAstGrepIgnores(
   ignores: readonly string[],
@@ -36,16 +41,15 @@ export function staleAstGrepIgnores(
   const globState = new Map<string, { matched: boolean; matches: (file: string) => boolean }>()
   for (const entry of ignores) {
     if (!GLOB_METACHARACTER.test(entry) || globState.has(entry)) continue
-    globState.set(entry, { matched: false, matches: picomatch(entry, { dot: true }) })
+    globState.set(entry, {
+      matched: false,
+      matches: picomatch(literalParentheses(entry), { dot: true }),
+    })
   }
-  let remaining = globState.size
-  for (const file of remaining > 0 ? trackedFiles : []) {
+  for (const file of trackedFiles) {
     for (const glob of globState.values()) {
-      if (glob.matched || !glob.matches(file)) continue
-      glob.matched = true
-      remaining -= 1
+      if (!glob.matched && glob.matches(file)) glob.matched = true
     }
-    if (remaining === 0) break
   }
   return ignores.filter((entry) => {
     const glob = globState.get(entry)
@@ -67,9 +71,12 @@ export function checkAstGrepIgnoresFreshness(
   const stale: AstGrepStaleIgnore[] = []
   for (const ruleFile of trackedFiles) {
     if (!ruleFile.startsWith(prefix) || !ruleFile.endsWith('.yml')) continue
-    const document: unknown = parse(readFileSync(join(repoRoot, ruleFile), 'utf8'))
-    for (const entry of staleAstGrepIgnores(astGrepIgnoreEntries(document), trackedFiles)) {
-      stale.push({ ruleFile, entry })
+    const documents = parseAllDocuments(readFileSync(join(repoRoot, ruleFile), 'utf8'))
+    for (const document of documents) {
+      const entries = astGrepIgnoreEntries(document.toJS())
+      for (const entry of staleAstGrepIgnores(entries, trackedFiles)) {
+        stale.push({ ruleFile, entry })
+      }
     }
   }
   return stale

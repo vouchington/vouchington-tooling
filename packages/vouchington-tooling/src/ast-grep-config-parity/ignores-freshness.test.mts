@@ -28,6 +28,11 @@ describe('staleAstGrepIgnores', () => {
     ).toEqual(['x/**'])
   })
 
+  it('treats parentheses as literal path characters', () => {
+    expect(staleAstGrepIgnores(['web/(auth)/**'], ['web/(auth)/page.tsx'])).toEqual([])
+    expect(staleAstGrepIgnores(['web/(auth)/**'], ['web/auth/page.tsx'])).toEqual(['web/(auth)/**'])
+  })
+
   it('reports nothing when there are no globs', () => {
     expect(staleAstGrepIgnores(['a.mts'], ['a.mts'])).toEqual([])
   })
@@ -48,6 +53,9 @@ describe('checkAstGrepIgnoresFreshness', () => {
           "  - 'kept/file.mts'",
           "  - 'src/**/*.test.mts'",
           "  - 'present/**/*.mts'",
+          '---',
+          'id: second',
+          "ignores: 'gone.mts'",
           '',
         ].join('\n'),
       )
@@ -55,6 +63,7 @@ describe('checkAstGrepIgnoresFreshness', () => {
       expect(checkAstGrepIgnoresFreshness(dir, tracked, { localRuleDir: 'rules/' })).toEqual([
         { ruleFile, entry: 'missing/file.mts' },
         { ruleFile, entry: 'src/**/*.test.mts' },
+        { ruleFile, entry: 'gone.mts' },
       ])
       expect(checkAstGrepIgnoresFreshness(dir, tracked, { localRuleDir: 'other' })).toEqual([])
     } finally {
