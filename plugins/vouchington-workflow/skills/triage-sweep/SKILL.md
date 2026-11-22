@@ -218,7 +218,9 @@ one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
   `python3 <ci-report skill>/scripts/stale.py --repo <repo> --dry-run` (threshold `olderThan`,
   default `6h`) and report what it lists. GitHub does not clear runs stuck in `queued`. Then run
   `stale.py --repo <repo> --older-than <cancelAfter>` (default `24h`), which cancels runs older than
-  that. A one-line summary is enough; say nothing when none are listed. See
+  that. A one-line summary is enough; say nothing when none are listed. Runs it prints as a
+  `never-started` summary line cannot be cancelled or deleted through the API: report that line
+  as is (they need GitHub Support), do not retry them, and do not treat them as failures. See
   [ci-report](../ci-report/SKILL.md).
 
 ## Phase G2 - Command comments

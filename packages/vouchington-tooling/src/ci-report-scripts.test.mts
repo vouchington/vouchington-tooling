@@ -54,11 +54,11 @@ function harness(routes: Route[]) {
         FAKE_GH_LOG: log,
       },
     })
-  const posts = () =>
+  const calls = (method: string) =>
     readFileSync(log, 'utf8')
       .split('\n')
-      .filter((line) => line.startsWith('POST'))
-  return { run, posts }
+      .filter((line) => line.startsWith(method))
+  return { run, posts: () => calls('POST'), deletes: () => calls('DELETE') }
 }
 
 const iso = (hoursAgo: number, extraSeconds = 0) =>
@@ -234,6 +234,7 @@ describe('ci-report stale.py', () => {
     const { run, posts } = harness([
       ['runs/1/cancel', { error: 409 }],
       ['runs/1/force-cancel', {}],
+      ['runs/1/jobs', { total_count: 1, jobs: [{ id: 7 }] }],
       ['actions/runs/1', stuck[0]],
       ...routes,
     ])
@@ -250,6 +251,59 @@ describe('ci-report stale.py', () => {
     ])
     expect(run('stale.py', '--repo', 'o/r', '--older-than', '24h').stdout).toContain('left alone')
     expect(posts().some((call) => call.includes('force-cancel'))).toBe(false)
+  })
+
+  describe('never-started runs', () => {
+    const args: string[] = ['--repo', 'o/r', '--older-than', '1h']
+    const zombie = (id: number) =>
+      wfRun(id, { status: 'queued', conclusion: null, created_at: iso(30 + id) })
+    const zombies = (ids: number[], jobs: unknown[]): Route[] => [
+      ...ids.flatMap((id): Route[] => [
+        [`runs/${id}/cancel`, { error: 409 }],
+        [`runs/${id}/jobs`, { total_count: jobs.length, jobs }],
+        [`actions/runs/${id}`, zombie(id)],
+      ]),
+      ['actions/runs?status=queued', { total_count: 1, workflow_runs: ids.map(zombie) }],
+      ['actions/runs?status', { total_count: 0, workflow_runs: [] }],
+    ]
+
+    it('summarises a 409 with zero jobs once, not as a failure, and retries nothing', () => {
+      const { run, posts, deletes } = harness(zombies([1, 2], []))
+      const result = run('stale.py', ...args)
+      expect(result.stdout).toMatch(/^never-started n=2 oldest=32\.0h ids=2,1 \(cannot be/m)
+      expect(result.stdout).toContain('ask GitHub Support')
+      expect(result.stdout).not.toContain('failed')
+      expect(result.stdout).not.toContain('force-cancel')
+      expect(posts()).toEqual([
+        'POST repos/o/r/actions/runs/2/cancel',
+        'POST repos/o/r/actions/runs/1/cancel',
+      ])
+      expect(deletes()).toEqual([])
+    })
+
+    it('lists only the first five ids', () => {
+      const ids = [1, 2, 3, 4, 5, 6, 7]
+      const { run, deletes } = harness(zombies(ids, []))
+      expect(run('stale.py', ...args).stdout).toContain('n=7 oldest=')
+      expect(run('stale.py', ...args).stdout).toContain('ids=7,6,5,4,3,...')
+      expect(deletes()).toEqual([])
+    })
+
+    it('force-cancels a 409 run that has jobs', () => {
+      const { run, posts, deletes } = harness(zombies([1], [{ id: 7 }]))
+      const result = run('stale.py', ...args)
+      expect(result.stdout).toContain('-> force-cancelled')
+      expect(result.stdout).not.toContain('never-started n=')
+      expect(posts().at(-1)).toBe('POST repos/o/r/actions/runs/1/force-cancel')
+      expect(deletes()).toEqual([])
+    })
+
+    it('prints no summary on a dry run and sends nothing', () => {
+      const { run, posts, deletes } = harness(zombies([1], []))
+      expect(run('stale.py', ...args, '--dry-run').stdout).not.toContain('never-started n=')
+      expect(posts()).toEqual([])
+      expect(deletes()).toEqual([])
+    })
   })
 
   it('rejects a threshold under one hour and bad input', () => {
