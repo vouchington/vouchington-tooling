@@ -28,8 +28,8 @@ importers:
         specifier: ^10.15.0
         version: 10.15.0(jiti@2.7.0)(supports-color@7.2.0)
       eslint-plugin-no-mistakes:
-        specifier: ^0.109.109
-        version: 0.109.109(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2)
+        specifier: ^0.109.112
+        version: 0.109.112(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2)
       github-actionlint:
         specifier: ^1.7.12
         version: 1.7.12
@@ -2123,8 +2123,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-no-mistakes@0.109.109:
-    resolution: {integrity: sha512-hR4YIbDDQZex3WSrlYs4IePJ2xAcc2gTvJdnBKVlrt5jdEISl4GelhKWGBh37cyIsiivGlkBJoD1RnpmqDyVKA==}
+  eslint-plugin-no-mistakes@0.109.112:
+    resolution: {integrity: sha512-Yabbs65z29szVYzULEsAsMOmy7yZB1p1Iw6RouLiIfLEMj7b0Dx9fjr4ArUyMPmKZNko6vjLyWlD5BLeQHLlig==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     peerDependencies:
       '@typescript-eslint/parser': '>=8'
@@ -5110,7 +5110,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-no-mistakes@0.109.109(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2):
+  eslint-plugin-no-mistakes@0.109.112(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(typescript@7.0.2):
     dependencies:
       eslint: 10.15.0(jiti@2.7.0)(supports-color@7.2.0)
     optionalDependencies:
