@@ -134,8 +134,14 @@ describe('wait.py dependency-bot merges', () => {
     env = makeEnv({ eventWait: { updateCheckDelay: '60s' } })
     env.seed({ pendingUpdateChecks: [{ repo: 'repo-b', at: iso(-30) }] })
     env.hh(1, [], { timedOut: true })
+    const started = Date.now()
     const result = env.run('wait.py')
-    expect(npxArgs(0)[npxArgs(0).indexOf('--timeout') + 1]).toMatch(/^(29|30)s$/)
+    const elapsed = (Date.now() - started) / 1000
+    // The entry is 30s old when seeded, up to 1s older once its milliseconds are dropped, plus the
+    // time the subprocess took before wait.py read the clock; the timeout is the floored remainder.
+    const timeout = Number.parseInt(npxArgs(0)[npxArgs(0).indexOf('--timeout') + 1] ?? '', 10)
+    expect(timeout).toBeLessThanOrEqual(30)
+    expect(timeout).toBeGreaterThanOrEqual(Math.max(1, Math.floor(29 - elapsed)))
     expect(json(result.lines[0])).toMatchObject({
       timedOut: true,
       updateCheckDue: true,
