@@ -172,7 +172,11 @@ describe('repository scc complexity wiring', () => {
       const step = steps![mise]!
       expect(step.uses, `${file}#${job}`).toMatch(/^jdx\/mise-action@[0-9a-f]{40}$/)
       expect(source, `${file}#${job}`).toMatch(/jdx\/mise-action@[0-9a-f]{40} # v\d+\.\d+\.\d+/)
-      expect(step.with, `${file}#${job}`).toEqual({ cache: false })
+      // mise itself is pinned, not the newest release at run time.
+      expect(step.with, `${file}#${job}`).toEqual({
+        version: expect.stringMatching(/^\d+\.\d+\.\d+$/u),
+        cache: false,
+      })
       expect(step['timeout-minutes'], `${file}#${job}`).toBe(3)
     }
   })
