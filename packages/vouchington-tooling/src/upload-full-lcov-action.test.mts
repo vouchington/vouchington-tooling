@@ -30,10 +30,11 @@ function check(suite: string) {
 describe('upload-full-lcov composite action', () => {
   it('is a composite action that requires only the suite', () => {
     expect(action.runs.using).toBe('composite')
-    expect(Object.keys(action.inputs)).toEqual(['suite', 'name-suffix', 'path'])
+    expect(Object.keys(action.inputs)).toEqual(['suite', 'name-suffix', 'path', 'retention-days'])
     expect(action.inputs.suite?.required).toBe(true)
     expect(action.inputs['name-suffix']?.default).toBe('')
     expect(action.inputs.path?.default).toBe('coverage-full/lcov.info')
+    expect(action.inputs['retention-days']?.default).toBe('1')
     expect(source).not.toMatch(/vouchington|voucha/iu)
   })
 
@@ -48,7 +49,7 @@ describe('upload-full-lcov composite action', () => {
       overwrite: true,
       name: 'lcov-full-${{ inputs.suite }}${{ inputs.name-suffix }}',
       path: '${{ inputs.path }}',
-      'retention-days': 1,
+      'retention-days': '${{ inputs.retention-days }}',
       'if-no-files-found': 'error',
     })
   })

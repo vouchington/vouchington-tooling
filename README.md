@@ -173,7 +173,8 @@ Pin these composite actions the same way as the others (full commit SHA, trailin
   outputs. `repository` and `token` default to the current repository and `github.token`; the job
   needs `issues: read`.
 - `upload-full-lcov` validates a lowercase hyphen-delimited `suite` and uploads `path` (default
-  `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact.
+  `coverage-full/lcov.info`) as the `lcov-full-<suite><name-suffix>` artifact, kept `retention-days`
+  (default 1; public repositories may pass up to 7).
 - `setup-aws` assumes an OIDC `role-arn` in `aws-region` (default `us-east-1`); the calling job needs
   `id-token: write`.
 - `setup-playwright` restores `cache-path` (default `~/.cache/ms-playwright`), exports that
@@ -203,7 +204,8 @@ caller's `.mise.toml`, which must pin both `actionlint` and `zizmor`.
 - `actionlint` runs `actionlint`, then `zizmor --offline` at `min-severity` and `min-confidence`
   (both default `high`).
 - `gitleaks` runs `gitleaks git` over the caller pull request, merge group, or a full history on
-  `workflow_dispatch`. `version` defaults to `8.30.1` and `config` defaults to `.gitleaks.toml`.
+  `workflow_dispatch`. `version` defaults to `8.30.1` and `config` defaults to `.gitleaks.toml`. On failure it uploads a redacted
+  report kept `retention-days` (default 1; public repositories may pass up to 7).
   This is separate from `gitleaks-directory-scan`.
 - `lint-links` installs lychee `lychee-version` (default `0.24.2`) and checks tracked Markdown.
   `config` defaults to `lychee.toml`. Pass `excluded-urls` and `checked-urls` to probe that config
