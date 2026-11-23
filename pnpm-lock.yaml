@@ -144,8 +144,8 @@ importers:
         specifier: 0.6.2
         version: 0.6.2
       '@vouchington/worker-runtime':
-        specifier: 0.3.1
-        version: 0.3.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.1.0)
+        specifier: 0.3.2
+        version: 0.3.2(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.1.0)
       glide-mq:
         specifier: ^0.20.0
         version: 0.20.0(express@5.2.1(supports-color@7.2.0))
@@ -1817,13 +1817,13 @@ packages:
     resolution: {integrity: sha512-WWLP9fMHsIyCCC5y8I9eSdsaUOtCw0CBMXRm//v2Gfc0DME+QkM6AJYVqqD47rtDUfpDeFl9Sa+FkSYizmKJBg==}
     engines: {node: '>=24.0.0'}
 
-  '@vouchington/worker-runtime@0.3.1':
-    resolution: {integrity: sha512-vFI2W6EiCZcughUOijlQcI6Fe6QzNXKODAXUbgwDBUGwvzaBJrGAN0PsHbvl7e91nAYkKKDtqWHvIo9Aw010Rw==}
+  '@vouchington/worker-runtime@0.3.2':
+    resolution: {integrity: sha512-wJ7gFDNW6b7RD/JcDewmsz3Bq+EIKX8ATMBewEUl6R+nbv28FqbRQ4zKO70aralG/Y/LJcwjw75RZdXkLu8e7g==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
       '@aws-sdk/client-sqs': '>=3.1154.0 <4'
       glide-mq: ^0.20.0
-      vitest: ^5.0.5
+      vitest: ^5.1.0
     peerDependenciesMeta:
       '@aws-sdk/client-sqs':
         optional: true
@@ -4792,7 +4792,7 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
-  '@vouchington/worker-runtime@0.3.1(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.1.0)':
+  '@vouchington/worker-runtime@0.3.2(glide-mq@0.20.0(express@5.2.1(supports-color@7.2.0)))(vitest@5.1.0)':
     dependencies:
       glide-mq: 0.20.0(express@5.2.1(supports-color@7.2.0))
     optionalDependencies:
