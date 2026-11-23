@@ -73,6 +73,8 @@ jobs:
       - name: Install scc
         uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
+          # Pin mise itself; bump it in a reviewed PR to a release at least 7 days old.
+          version: 2026.11.8
           cache: false
         timeout-minutes: 3
       - run: pnpm run typecheck

@@ -172,8 +172,32 @@ describe('repository scc complexity wiring', () => {
       const step = steps![mise]!
       expect(step.uses, `${file}#${job}`).toMatch(/^jdx\/mise-action@[0-9a-f]{40}$/)
       expect(source, `${file}#${job}`).toMatch(/jdx\/mise-action@[0-9a-f]{40} # v\d+\.\d+\.\d+/)
-      expect(step.with, `${file}#${job}`).toEqual({ cache: false })
+      // mise itself is pinned, not the newest release at run time.
+      expect(step.with, `${file}#${job}`).toEqual({
+        version: expect.stringMatching(/^\d+\.\d+\.\d+$/u),
+        cache: false,
+      })
       expect(step['timeout-minutes'], `${file}#${job}`).toBe(3)
+    }
+  })
+
+  it('pins the mise version on every mise-action step in every workflow', () => {
+    const dir = resolve(moduleRoot, '.github/workflows')
+    const steps = readdirSync(dir)
+      .filter((file) => /\.ya?ml$/u.test(file))
+      .flatMap((file) => {
+        const workflow = parseYaml(readFileSync(join(dir, file), 'utf8')) as {
+          jobs?: Record<string, { steps?: (WorkflowStep & { with?: { version?: unknown } })[] }>
+        }
+        return Object.entries(workflow.jobs ?? {}).flatMap(([job, { steps = [] }]) =>
+          steps
+            .filter((step) => step.uses?.startsWith('jdx/mise-action@'))
+            .map((step) => ({ where: `${file}#${job}`, version: step.with?.version })),
+        )
+      })
+    expect(steps.length).toBeGreaterThan(0)
+    for (const { where, version } of steps) {
+      expect(version, where).toMatch(/^\d+\.\d+\.\d+$/u)
     }
   })
 })
