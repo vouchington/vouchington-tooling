@@ -519,7 +519,7 @@
   "dependencies": {
     "@types/mdast": "4.0.4",
     "@types/unist": "3.0.3",
-    "@typescript-eslint/parser": "^8.72.2",
+    "@typescript-eslint/parser": "^8.73.0",
     "agent-blackboard": "^0.7.0",
     "coverage-check": "0.18.1",
     "csv-parse": "7.0.3",
