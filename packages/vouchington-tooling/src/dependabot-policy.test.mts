@@ -92,11 +92,30 @@ describe('Dependabot policy', () => {
   it('exempts only first-party npm packages from the cooldown', () => {
     const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
     expect(npm?.cooldown.exclude).toEqual([
-      '@vouchington/*',
+      '@vouchington/postgres',
+      '@vouchington/worker-runtime',
       'agent-blackboard',
       'coverage-check',
       'eslint-plugin-no-mistakes',
       'no-mistakes',
+      'no-mistakes-darwin-arm64',
+      'no-mistakes-linux-arm64-gnu',
+      'no-mistakes-linux-x64-gnu',
+      'no-mistakes-win32-x64-msvc',
     ])
+  })
+
+  it('waits seven days in every ecosystem', () => {
+    for (const update of config.updates) {
+      expect(update.cooldown['default-days']).toBe(7)
+    }
+  })
+
+  it('exempts the same packages from the cooldown as pnpm exempts from minimumReleaseAge', () => {
+    const workspace = parse(readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8')) as {
+      minimumReleaseAgeExclude: string[]
+    }
+    const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
+    expect(npm?.cooldown.exclude).toEqual(workspace.minimumReleaseAgeExclude)
   })
 })

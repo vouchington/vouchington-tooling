@@ -6,7 +6,7 @@ import {
   parseReleaseAgeViolations,
 } from './release-age.mts'
 
-const minimumReleaseAge = 0
+const minimumReleaseAge = 10080
 
 const REAL_LOG = `✗ Lockfile failed supply-chain policy check (1857 entries in 3.7s)
 [ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 1 lockfile entries failed verification:

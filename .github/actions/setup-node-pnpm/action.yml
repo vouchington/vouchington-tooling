@@ -37,7 +37,7 @@ runs:
       with:
         node-version-file: ${{ inputs.node-version-file }}
         package-manager-cache: false
-    # The newest stable pnpm 12 release at least 24 hours old; pnpm stays unpinned in the repo.
+    # The newest stable pnpm 12 release at least 7 days old; pnpm stays unpinned in the repo.
     - id: pnpm-version
       shell: bash
       run: node "$GITHUB_ACTION_PATH/../resolve-pnpm-version/resolve.mjs"
