@@ -108,6 +108,7 @@ describe('gitleaks git reusable workflow', () => {
   it('takes a version and config and stays distinct from the directory scan', () => {
     expect(workflow.on.workflow_call.inputs.version?.default).toBe('8.30.1')
     expect(workflow.on.workflow_call.inputs.config?.default).toBe('.gitleaks.toml')
+    expect(workflow.on.workflow_call.inputs['retention-days']?.default).toBe(1)
     expect(step('Scan git history').run).toContain('gitleaks git')
     expect(step('Scan git history').run).not.toContain('gitleaks dir')
     expect(source).not.toMatch(/voucha|filament|storybook|vouchington-machines/iu)

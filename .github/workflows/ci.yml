@@ -50,7 +50,7 @@ jobs:
           name: coverage-${{ github.run_id }}-${{ github.run_attempt }}
           path: coverage/lcov.info
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   test-macos:
     runs-on: macos-latest

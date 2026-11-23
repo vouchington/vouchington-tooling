@@ -18,6 +18,12 @@ on:
         description: Path to the gitleaks config in the caller repository
         type: string
         default: .gitleaks.toml
+      retention-days:
+        description: >-
+          Days to keep the redacted report artifact. Public repositories may pass up to 7; private
+          repositories keep the default.
+        type: number
+        default: 1
       runs-on:
         description: Runner label
         type: string
@@ -190,4 +196,4 @@ jobs:
           name: gitleaks-report
           path: gitleaks-report.json
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ inputs.retention-days }}

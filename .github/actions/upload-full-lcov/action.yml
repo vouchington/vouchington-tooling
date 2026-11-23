@@ -19,6 +19,12 @@ inputs:
     description: LCOV report to upload, relative to the workspace root.
     required: false
     default: coverage-full/lcov.info
+  retention-days:
+    description: >-
+      Days to keep the artifact. Public repositories may pass up to 7; private repositories keep
+      the default.
+    required: false
+    default: '1'
 runs:
   using: composite
   steps:
@@ -39,5 +45,5 @@ runs:
         overwrite: true
         name: lcov-full-${{ inputs.suite }}${{ inputs.name-suffix }}
         path: ${{ inputs.path }}
-        retention-days: 1
+        retention-days: ${{ inputs.retention-days }}
         if-no-files-found: error
