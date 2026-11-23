@@ -153,7 +153,8 @@ prompt) when the recurring-task tool is only available there.
    for periodic work such as the full sweep and retrospective distill.
 4. With no event source configured, or while the wait is failing, pace the loop with the host's
    wakeup tool (for example `ScheduleWakeup`), passing this skill's invocation back as the prompt:
-   about 20-30 minutes. An idle tick only checks the intake queue. The full sweep runs when
+   about 20-30 minutes. An idle tick checks the intake queue and re-checks each open flake's owner
+   (see [Failures](#failures)). The full sweep runs when
    the cron fires, on demand, or when `lastSweepAt` is older than the fallback interval. Stop
    wakeups once the wait is healthy again.
 
