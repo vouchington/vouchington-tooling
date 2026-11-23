@@ -110,4 +110,12 @@ describe('Dependabot policy', () => {
       expect(update.cooldown['default-days']).toBe(7)
     }
   })
+
+  it('exempts the same packages from the cooldown as pnpm exempts from minimumReleaseAge', () => {
+    const workspace = parse(readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8')) as {
+      minimumReleaseAgeExclude: string[]
+    }
+    const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
+    expect(npm?.cooldown.exclude).toEqual(workspace.minimumReleaseAgeExclude)
+  })
 })
