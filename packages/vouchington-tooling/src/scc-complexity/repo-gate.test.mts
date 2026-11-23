@@ -180,4 +180,24 @@ describe('repository scc complexity wiring', () => {
       expect(step['timeout-minutes'], `${file}#${job}`).toBe(3)
     }
   })
+
+  it('pins the mise version on every mise-action step in every workflow', () => {
+    const dir = resolve(moduleRoot, '.github/workflows')
+    const steps = readdirSync(dir)
+      .filter((file) => /\.ya?ml$/u.test(file))
+      .flatMap((file) => {
+        const workflow = parseYaml(readFileSync(join(dir, file), 'utf8')) as {
+          jobs?: Record<string, { steps?: (WorkflowStep & { with?: { version?: unknown } })[] }>
+        }
+        return Object.entries(workflow.jobs ?? {}).flatMap(([job, { steps = [] }]) =>
+          steps
+            .filter((step) => step.uses?.startsWith('jdx/mise-action@'))
+            .map((step) => ({ where: `${file}#${job}`, version: step.with?.version })),
+        )
+      })
+    expect(steps.length).toBeGreaterThan(0)
+    for (const { where, version } of steps) {
+      expect(version, where).toMatch(/^\d+\.\d+\.\d+$/u)
+    }
+  })
 })
