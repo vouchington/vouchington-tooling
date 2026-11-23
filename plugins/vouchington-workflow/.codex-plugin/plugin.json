@@ -1,6 +1,6 @@
 {
   "name": "vouchington-workflow",
-  "version": "0.28.1",
+  "version": "0.28.2",
   "description": "Portable blackboard journaling, retrospective, issue organization, triage, and PR description workflow skills for Codex and Claude.",
   "author": {
     "name": "Vouchington",

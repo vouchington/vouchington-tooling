@@ -28,8 +28,7 @@ final-review gate.
 - **Prompt-source paths:** the exact paths that may be edited from PR-creation feedback, and the
   rubric for that feedback.
 - **Feedback marker:** the PR-body marker that identifies a feedback PR from this flow.
-- **Merge authority and CI-failure policy:** who may authorize a merge, how transient failures are
-  classified, and where retry rules live.
+- **Merge authority:** who may authorize a merge.
 
 ## Rules for every pass
 
@@ -132,8 +131,8 @@ the PR as merging.
 
 Classify the outcome:
 
-- **Unsteered (and, with the final-review gate on, final review approved):** pr-shepherd runs in the background; the loop runs the
-  commands it prints and the PR merges once requirements pass.
+- **Unsteered (and, with the final-review gate on, final review approved):** merges through ready
+  and merge step 6.
 - **Final-review gate on and review not yet approved (the configured `<review-status>`
   exits non-zero):** the review was requested; leave the PR ready, report `awaiting-final-review`, and never merge it.
 - **Steered:** leave the PR ready; a later sweep merges it through pr-shepherd, or a human
@@ -141,12 +140,9 @@ Classify the outcome:
 - **Native GitHub stack:** follow the `pr-shepherd:pr-shepherd` skill and the loop's
   [Stacks](../triage-loop/SKILL.md#stacks) rules, within explicit human
   approval and only as far as this run's decisions cover. Resolve the full stack against the Step 1
-  scope and Step 3 decisions first. A bottom-up drain ends below the first layer that is out of
-  scope or not `MERGE`; never shepherd or merge a layer this run did not review. Run
-  `pr-shepherd stack <PR | 'owner/repo#N'> --merge --until-terminal` as a background command and
-  merge the highest ready layer through the commands it prints.
-
-The loop records each pr-shepherd run in `shepherds`, and its exit wakes the loop.
+  scope and Step 3 decisions first. Merge only the reviewed
+  prefix: `pr-shepherd stack <reviewed PRs> --merge-through <top reviewed layer>`, as the
+  pr-shepherd skill's stack-merge rule directs.
 
 ## Step 5 - Execute CLOSE
 
@@ -170,7 +166,7 @@ gh pr view <N> --repo <owner>/<name> --json isDraft,state
 ```
 
 Emit a summary table with the columns PR, Decision, Action, and Steering. Actions are
-`ready + pr-shepherd merge`, `ready, manual verification required`,
+`ready + pr-shepherd merge`, `ready, steered-hold`,
 `ready, awaiting final review`, `preflight failed - unchanged`, and
 `closed + branch deleted`.
 

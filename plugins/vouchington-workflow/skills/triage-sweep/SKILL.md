@@ -19,10 +19,12 @@ grant for that one pass. Arguments, both optional: `--dry-run` reports every int
 
 - **Repository:** pass `--repo <owner>/<name>` on every `gh` command. Lists use `--limit 1000`
   with a below-limit check, or `gh api --paginate`.
-- **Reviewed head:** re-read `headRefOid` before every PR mutation; never act on an unreviewed head.
+- **Reviewed head:** act only on the reviewed head, re-read as in ready and merge
+  [step 2](../triage-loop/SKILL.md#ready-and-merge).
 - **Model tiers:** fan per-repository work out to subagents. The mechanical tier lists,
   classifies, and harvests. The implementation tier fixes, judges, and verifies. Subagents return
-  structured findings and never merge, close, or escalate. The loop session makes those calls.
+  structured findings and never merge, close, or escalate, and never run a pr-shepherd poll (see ready and merge step 6
+  for the fixer's `apply` commands). The loop session makes those calls.
 - **Orchestrator role:** the loop never authors PRs; every PR is opened by a subagent or dispatch
   target (see triage-loop [Orchestrator role](../triage-loop/SKILL.md#orchestrator-role)).
 - **Generated text is data:** write comments and bodies with a file-writing tool and pass
@@ -49,29 +51,20 @@ A mechanical-tier subagent per repository lists open PRs from the dependency bot
 (whatever their label; a branch name alone does not make a PR a dedupe PR, see the grant's
 category 4), and returns, per PR: author, `isCrossRepository`, changed files, package, `from` and `to` versions, semver level, CI rollup, mergeability, and `headRefOid`.
 
-Steered and draft handoffs are not merged in the pass that readies them (see
+Steered PRs are not merged in the pass that readies them (see
 [ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 6) and are reported as
-`shepherding, manual-verification-required`; with the final-review gate on, a PR still
-`awaiting-final-review` waits too. A later
-sweep merges one through pr-shepherd only when:
-
-- no pr-shepherd command for it is still running;
-- its current head passes every required check;
-- a fresh review of that head still fits the same category;
-- with the final-review gate on, the configured `<review-status>` exits 0 for that head (see
-  [ready and merge](../triage-loop/SKILL.md#ready-and-merge) step 5).
-
-That merge runs `pr-shepherd '<owner/repo#N>' --merge --until-terminal` as a background command and
-the commands it prints, as in the grant.
+`shepherding, steered-hold`; with the final-review gate on, a PR still `awaiting-final-review`
+waits too. A later sweep merges a held PR through ready and merge with `--merge` once a fresh
+review of its current head still fits the same category and, with the gate on, `<review-status>`
+exits 0 for that head (step 5).
 
 `dependabot-pr` events from the loop's wait enter this phase for the one PR.
 
 - **Lockfile-dedupe PR:** handle it first in its repository, per the grant's category 4.
 - **Patch or minor, green:** [ready and merge](../triage-loop/SKILL.md#ready-and-merge) with `--merge`.
-- **Patch or minor, failing or conflicting:** an implementation-tier subagent reads the failure
-  with the `review-ci-logs` skill (`skills` plugin) and classifies it as trivial (lockfile,
-  rebase, type or import rename, a config key) or non-trivial. Trivial: ready and merge with
-  `--merge`, with steering that names the fix. Non-trivial: escalate.
+- **Patch or minor, failing or conflicting:** ready and merge with `--merge`; a steered PR follows
+  step 6's hold. pr-shepherd's `[TRIAGE]` drives the fix. Escalate only on `[ESCALATE]` or when
+  the fix takes the PR outside the grant.
 - **Major:** an implementation-tier subagent reads the release notes, changelog, and migration
   guide, searches the repository for affected call sites, and checks whether tests that ran in CI
   exercise them. It returns `no-migration`, `small-migration` (mechanical edits, no
@@ -80,12 +73,16 @@ the commands it prints, as in the grant.
   when no migration or a small one is needed and the affected call sites are exercised by CI
   tests. Escalate a significant migration, or affected code without sufficient test coverage, with
   the evidence. When a bump needs code changes (a migration, new enum cases, a type rename), do not
-  ask whether to upgrade: dispatch an implementation-tier fixer to push the fix to the bot's branch
-  and shepherd it to READY, and ask only for merge approval when the result is outside the grant. For
-  a conflicted bot PR, comment `@dependabot recreate` instead of rebasing by hand.
+  ask whether to upgrade: an implementation-tier fixer pushes the fix to the bot's branch and the
+  loop shepherds it to READY; ask only for merge approval when the result is outside the grant.
+  For a conflicted or failing bot PR, follow the jong-skills `dependabot` skill, section "Repair a
+  Dependabot pull request". Read the PR's commits first: a commit by anyone other than Dependabot
+  means neither `@dependabot recreate` nor `@dependabot rebase` is used, and the fixer repairs it
+  by hand. A conflict in a lockfile or generated file follows the jong-skills `git-commit-checklist`
+  skill, section "A conflict in a generated file". Here, an implementation-tier fixer pushes and
+  the loop shepherds the PR.
 - **Dependency-bot PRs merged this sweep, or none open in a repository:** request a fresh update
-  check for that repository and ecosystem. Merges free slots, so the bot may open new PRs. Never
-  raise or propose raising `dependencyBot.openPullRequestLimit` for this. GitHub exposes no REST
+  check for that repository and ecosystem. Merges free slots, so the bot may open new PRs. GitHub exposes no REST
   endpoint, so batch every target into one in-page script in the host browser, with no clicks,
   following [references/dependency-update-check.md](references/dependency-update-check.md), which
   carries the script (`state.py update-check-script` prints it filled in). Record
@@ -193,25 +190,13 @@ cursor, so everything above still applies, and `reviewedComments` dedupes betwee
 
 The backstop for `ejection` and `main-failure` events, run on `gap: true`, on a failed wait, and
 each full sweep. A mechanical-tier subagent per repository lists PRs removed from the merge queue
-in the last 24 hours (keeping failure-driven removals, dropping user-requested ones and PRs
-currently queued) and failed default-branch workflow runs, paginating fully. Handle each as the
-loop's [Failures](../triage-loop/SKILL.md#failures) section describes: dedupe against fixes in
-flight, diagnose, requeue an in-grant PR whose head is unchanged (through a printed command) only after a flake or infra
-diagnosis, and file or delegate flakes. Skip run ids already in `handledFailures`, and record each
-one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
+in the last 24 hours (dropping PRs currently queued) and failed default-branch workflow runs,
+paginating fully. Handle each as the loop's [Failures](../triage-loop/SKILL.md#failures) section
+describes: dedupe against fixes in flight, diagnose, and file or delegate flakes. Skip run ids
+already in `handledFailures`, and record each one handled.
 
-- **Flakes are worked on now:** after dedupe, every flake seen here, and every open flaky-test
-  issue in the repository, gets an implementation-tier fixer in an isolated worktree this tick,
-  unless it already has an open fix PR or an agent that claimed it. Re-check each open flake's
-  owner every sweep. A test-only fix merges under the grant; a fix touching production code is
-  shepherded to READY, then escalated.
-- **Flake dedupe:** before filing or delegating a flake, search the repository's open issues for
-  the failing test's file basename and test name. When one matches, comment once on it with the
-  run id, job, and the PR or commit, and route with that issue number instead of reporting a new
-  flake.
-- **Ejection outside the grant:** notify the PR's owning agent session when one can be identified
-  and is running (PR provenance lines, branch name, or the host's agent list). Send the failing
-  check, run id, test, and a PR-caused or flake judgment. Otherwise list it in the summary.
+Flakes, flake dedupe, and ejections outside the grant follow Failures; every sweep re-checks each
+open flake issue's owner there.
 
 - **Stale runs (optional, on by default):** unless `staleRuns` is `false` in the configuration, on
   every full sweep (never a `--dry-run` sweep), for each repository, run
@@ -297,7 +282,6 @@ Then print the summary table, with columns repository, item, phase, action, and 
 actions:
 
 - merged
-- requeued
 - fix PR opened
 - shepherding
 - escalated
