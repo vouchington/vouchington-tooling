@@ -92,11 +92,16 @@ describe('Dependabot policy', () => {
   it('exempts only first-party npm packages from the cooldown', () => {
     const npm = config.updates.find((update) => update['package-ecosystem'] === 'npm')
     expect(npm?.cooldown.exclude).toEqual([
-      '@vouchington/*',
+      '@vouchington/postgres',
+      '@vouchington/worker-runtime',
       'agent-blackboard',
       'coverage-check',
       'eslint-plugin-no-mistakes',
       'no-mistakes',
+      'no-mistakes-darwin-arm64',
+      'no-mistakes-linux-arm64-gnu',
+      'no-mistakes-linux-x64-gnu',
+      'no-mistakes-win32-x64-msvc',
     ])
   })
 })

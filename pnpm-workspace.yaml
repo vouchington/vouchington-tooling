@@ -5,9 +5,22 @@ allowBuilds:
   '@launchql/protobufjs': true
   esbuild: false
   protobufjs: false
-# Dependabot already holds updates for a week. Do not also fail CI when the
-# lockfile pins a toolchain release younger than pnpm's default 1-day cutoff.
-minimumReleaseAge: 0
+# Seven days (10080 minutes), matching the Dependabot cooldown. First-party
+# packages are exempt by exact name (never a glob or pinned version) so a lockstep
+# release of our own tooling can be installed immediately. Keep this list in sync
+# with cooldown.exclude in .github/dependabot.yml.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@vouchington/postgres'
+  - '@vouchington/worker-runtime'
+  - agent-blackboard
+  - coverage-check
+  - eslint-plugin-no-mistakes
+  - no-mistakes
+  - no-mistakes-darwin-arm64
+  - no-mistakes-linux-arm64-gnu
+  - no-mistakes-linux-x64-gnu
+  - no-mistakes-win32-x64-msvc
 overrides:
   # github-actionlint pins adm-zip ^0.5; 0.6.1 fixes the advisories. The symlink
   # following advisory (<=0.6.0) has no patched release, so 0.6.1 is the best available.
