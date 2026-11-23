@@ -170,7 +170,7 @@ gh pr view <N> --repo <owner>/<name> --json isDraft,state
 ```
 
 Emit a summary table with the columns PR, Decision, Action, and Steering. Actions are
-`ready + pr-shepherd merge`, `ready, manual verification required`,
+`ready + pr-shepherd merge`, `ready, steered-hold`,
 `ready, awaiting final review`, `preflight failed - unchanged`, and
 `closed + branch deleted`.
 

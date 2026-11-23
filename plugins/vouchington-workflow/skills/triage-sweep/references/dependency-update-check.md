@@ -1,8 +1,8 @@
 # Dependency-bot update check
 
 GitHub exposes no REST endpoint for Dependabot's "Check for updates" button, so the sweep uses the
-host browser with as few actions as possible and no clicks. Keep the bot's open-PR limit at the
-configured `dependencyBot.openPullRequestLimit`; never propose raising it.
+host browser with as few actions as possible and no clicks. The open-PR limit stays as configured
+(see [config](../../triage-loop/references/config.md)).
 
 ## Targets
 
