@@ -75,10 +75,11 @@ exits 0 for that head (step 5).
   the evidence. When a bump needs code changes (a migration, new enum cases, a type rename), do not
   ask whether to upgrade: an implementation-tier fixer pushes the fix to the bot's branch and the
   loop shepherds it to READY; ask only for merge approval when the result is outside the grant.
-  A conflicted bot PR gets one rule: the fixer rebases and regenerates lockfiles and generated
-  files with `pnpm`, then pushes; never resolve them by hand and never comment
-  `@dependabot recreate`, which discards the push. For other bot interactions follow the
-  jong-skills `dependabot` skill.
+  Prefer `@dependabot recreate` for a conflicted or lockfile-only bot PR that needs no custom
+  commits, since the bot can regenerate it. Once a fixer has pushed to the bot's branch, never
+  comment `@dependabot recreate`, which discards the push: rebase it and regenerate lockfiles and
+  generated files with `pnpm`, never by hand. For other bot interactions follow the jong-skills
+  `dependabot` skill.
 - **Dependency-bot PRs merged this sweep, or none open in a repository:** request a fresh update
   check for that repository and ecosystem. Merges free slots, so the bot may open new PRs. GitHub exposes no REST
   endpoint, so batch every target into one in-page script in the host browser, with no clicks,
