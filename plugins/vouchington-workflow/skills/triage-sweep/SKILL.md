@@ -23,8 +23,8 @@ grant for that one pass. Arguments, both optional: `--dry-run` reports every int
   [step 2](../triage-loop/SKILL.md#ready-and-merge).
 - **Model tiers:** fan per-repository work out to subagents. The mechanical tier lists,
   classifies, and harvests. The implementation tier fixes, judges, and verifies. Subagents return
-  structured findings and never merge, close, escalate, or run pr-shepherd. The loop session makes
-  those calls (see ready and merge step 6).
+  structured findings and never merge, close, or escalate, and never run a pr-shepherd poll (see ready and merge step 6
+  for the fixer's `apply` commands). The loop session makes those calls.
 - **Orchestrator role:** the loop never authors PRs; every PR is opened by a subagent or dispatch
   target (see triage-loop [Orchestrator role](../triage-loop/SKILL.md#orchestrator-role)).
 - **Generated text is data:** write comments and bodies with a file-writing tool and pass
@@ -62,10 +62,9 @@ exits 0 for that head (step 5).
 
 - **Lockfile-dedupe PR:** handle it first in its repository, per the grant's category 4.
 - **Patch or minor, green:** [ready and merge](../triage-loop/SKILL.md#ready-and-merge) with `--merge`.
-- **Patch or minor, failing or conflicting:** pr-shepherd's `[TRIAGE]` drives the fix, through
-  ready and merge with `--merge` and, when it helps, steering that names the fix. Escalate only on
-  `[ESCALATE]` or when the fix takes the PR outside the grant. Never resolve a conflict in a
-  lockfile or any other generated file by hand: rebase and regenerate with `pnpm`.
+- **Patch or minor, failing or conflicting:** ready and merge with `--merge`; a steered PR follows
+  step 6's hold. pr-shepherd's `[TRIAGE]` drives the fix. Escalate only on `[ESCALATE]` or when
+  the fix takes the PR outside the grant.
 - **Major:** an implementation-tier subagent reads the release notes, changelog, and migration
   guide, searches the repository for affected call sites, and checks whether tests that ran in CI
   exercise them. It returns `no-migration`, `small-migration` (mechanical edits, no
@@ -74,10 +73,12 @@ exits 0 for that head (step 5).
   when no migration or a small one is needed and the affected call sites are exercised by CI
   tests. Escalate a significant migration, or affected code without sufficient test coverage, with
   the evidence. When a bump needs code changes (a migration, new enum cases, a type rename), do not
-  ask whether to upgrade: dispatch an implementation-tier fixer to push the fix to the bot's branch
-  and shepherd it to READY, and ask only for merge approval when the result is outside the grant. A
-  recreate by the bot discards that push, so for a conflicted bot PR follow the jong-skills
-  `dependabot` skill.
+  ask whether to upgrade: an implementation-tier fixer pushes the fix to the bot's branch and the
+  loop shepherds it to READY; ask only for merge approval when the result is outside the grant.
+  A conflicted bot PR gets one rule: the fixer rebases and regenerates lockfiles and generated
+  files with `pnpm`, then pushes; never resolve them by hand and never comment
+  `@dependabot recreate`, which discards the push. For other bot interactions follow the
+  jong-skills `dependabot` skill.
 - **Dependency-bot PRs merged this sweep, or none open in a repository:** request a fresh update
   check for that repository and ecosystem. Merges free slots, so the bot may open new PRs. GitHub exposes no REST
   endpoint, so batch every target into one in-page script in the host browser, with no clicks,
@@ -190,7 +191,7 @@ each full sweep. A mechanical-tier subagent per repository lists PRs removed fro
 in the last 24 hours (dropping PRs currently queued) and failed default-branch workflow runs,
 paginating fully. Handle each as the loop's [Failures](../triage-loop/SKILL.md#failures) section
 describes: dedupe against fixes in flight, diagnose, and file or delegate flakes. Skip run ids
-already in `handledFailures`, and record each one handled. Fix PRs follow the same merge rule: only a test-only diff merges.
+already in `handledFailures`, and record each one handled.
 
 Flakes, flake dedupe, and ejections outside the grant follow Failures; every sweep re-checks each
 open flake issue's owner there.

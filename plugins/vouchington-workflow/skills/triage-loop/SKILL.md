@@ -72,7 +72,7 @@ and adds nothing here. Merges happen only:
 
 - from the loop session itself, never from a subagent or worker (subagents never merge, close, or
   escalate);
-- through [ready and merge](#ready-and-merge), or for a flake-fix PR as in [Failures](#failures);
+- through [ready and merge](#ready-and-merge);
 - when the final-review gate is on, only for a PR whose head the final reviewer
   approved: `<review-status>` exits 0 for it (see
   [ready and merge](#ready-and-merge) step 5), and any other exit code means do not merge.
@@ -89,7 +89,7 @@ branches, commit, push, or create PRs itself. Every PR (fixes, flake fixes, `/fi
 prompts, skill changes) is opened by an implementation-tier subagent or a dispatch-target agent.
 The loop's own PR mutations are limited to review comments, labels, marking ready, and merges
 within the grant. A fix that pr-shepherd's `[TRIAGE]` asks for is pushed by an
-implementation-tier subagent, never the loop session.
+implementation-tier subagent, never the loop session (see ready and merge step 6).
 
 ## Step 1 - Preflight
 
@@ -200,8 +200,7 @@ private organization members.
   first confirm the state with `gh pr view <N> --repo <owner>/<name> --json state,mergedAt`.
   Continue only when the PR is still closed or merged; leave an open PR running.
   - _Tracked PR_ (a `shepherds` entry, a pending or escalation record, an awaiting-approval line):
-    stop any pr-shepherd command still running for it, remove its records with `state.py remove`,
-    and stop listing it as awaiting approval or in flight. Report a merge as `merged` and a close
+    remove its records with `state.py remove` and stop listing it as awaiting approval or in flight. Report a merge as `merged` and a close
     without merge as `closed` in the next summary.
   - _Merged PR, tracked or not, with findings:_ run triage-sweep
     [Phase F](../triage-sweep/SKILL.md#phase-f---missed-code-reviews) for that one PR right away: scan it
@@ -244,7 +243,7 @@ the `review-ci-logs` skill (`skills` plugin) and classifies it: flake, infra, or
 
 - **Ejected PR:** requeueing belongs to whichever agent shepherds the PR, through pr-shepherd's
   "Merge queue ejection" playbook. The loop never requeues a PR it is not shepherding (one with no
-  `shepherds` entry). It still diagnoses the failure for the flake handling below. Notify the PR's
+  `shepherds` entry). For a PR with no `shepherds` entry it still diagnoses the failure for the flake handling below. Notify the PR's
   owning agent session only when no shepherd is running for the PR and one can be identified and is
   running (PR provenance lines, branch name, or the host's agent list), with the failing check, run
   id, test, and a PR-caused or flake judgment; otherwise list it in the summary. An ejection with a
@@ -286,10 +285,9 @@ grants merge.
 
 An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
 
-- **`/shepherd` on a PR:** skip it when `shepherds` already records the PR. Otherwise detect a
-  native stack (the REST pull object's `stack` field, else `stacks?pull_request=<N>`) and merge the
-  whole stack with `pr-shepherd stack` per [Stacks](#stacks); an unstacked PR
-  goes through [ready and merge](#ready-and-merge) step 6. Record it in `shepherds`.
+- **`/shepherd` on a PR:** skip it when `shepherds` already records the PR. Otherwise run it through
+  [ready and merge](#ready-and-merge); the pr-shepherd skill routes a stack layer, and the loop's
+  [Stacks](#stacks) rules apply. Record it in `shepherds`.
 - **`/plan` on an issue or PR:** a planning subagent drafts a plan with
   the `planning` skill (`skills` plugin). This is interactive: ask the human the plan's open questions
   (for example with `AskUserQuestion`), revise, and post the plan as a comment only after the human
@@ -306,11 +304,15 @@ An agent delegates a PR with `/shepherd` as the [agent handoff](#agent-handoff).
 
 The loop is the external shepherd in pr-shepherd's "Draft handoff" playbook. Its adapter values:
 
-- **gate:** the loop is running and the comment's sender is in `trustedLogins`. Agent sessions post
-  as the owner's login, which `trustedLogins` lists.
+- **gate:** the loop is running (the sending agent reads this from the host's agent list showing
+  the triage-loop session) and the comment's sender is in `trustedLogins`. Agent sessions post as
+  the owner's login, which `trustedLogins` lists. The gate fails closed when it is unset or
+  unreadable: the agent keeps the PR and posts nothing.
 - **dispatch:** the fixed literal comment `/shepherd` (`gh pr comment <N> --body '/shepherd'`),
   posted once; the sender then stops.
 - **checkpoint:** the loop's `eyes` reaction on that comment (see [Comment commands](#comment-commands)).
+  An absent `eyes` on draft-handoff step 6's single read is not a failure; Phase G2 picks up
+  missed commands.
 
 From then on the loop owns the PR and only the loop merges, within its grant. The loop never arms
 auto-merge (skip draft-handoff step 5). For a stack, the agent posts one `/shepherd` on the top PR,
@@ -358,13 +360,14 @@ supplies the automation label and the enabled categories; stop and ask when one 
    tool, never shell interpolation, and read it back in full.
 2. **Preflight.** Re-read `headRefOid` before every mutation below; if it moved, return for
    re-review. Skip a PR that `shepherds` already records.
-3. **Steer (optional).** As in draft-handoff step 3: post the reviewed steering file as one
-   ordinary comment with `--body-file`. Reject an empty file.
-4. **Mark ready and label.** As in draft-handoff step 4 (`gh pr ready` for a draft), then
+3. **Steer (optional).** Post the reviewed steering file as an ordinary comment with
+   `gh pr comment <N> --repo <owner>/<name> --body-file <path>`. Reject an empty file.
+4. **Mark ready and label.** `gh pr ready <N> --repo <owner>/<name>` for a draft (the loop does
+   this itself: pr-shepherd's MARK_READY fires only for clean drafts with auto mark-ready on), then
    `gh pr edit <N> --repo <owner>/<name> --add-label <automation-label>`.
 5. **Request final review and gate on it (only when the final-review gate is on; otherwise skip
    this step).** Request a review of the current head as `finalReviewGate.request`
-   says, and again after new commits. Run `<review-status>` before merging: exit 0
+   says, and again after new commits. Run `<review-status>` before merging (a printed enqueue or requeue command counts as a merge): exit 0
    means the newest final review approved the current head. Any other exit code means do not merge:
    leave the PR
    ready, report `awaiting-final-review`, and let a later sweep rerun the check. Nothing waits on
@@ -372,13 +375,16 @@ supplies the automation label and the enabled categories; stop and ask when one 
    or branch protection that dismisses stale approvals, which the consuming repository owns.
 6. **Merge through pr-shepherd (only with `--merge`, and, with the final-review gate on, only when
    step 5 exited 0).** Run `pr-shepherd` as the `pr-shepherd:pr-shepherd` skill directs (a stack
-   per [Stacks](#stacks)). The loop session runs each PR's shepherd itself; a subagent never also
-   runs one for it. Run it from `<checkoutRoot>/<name>` so the repository's own configuration
-   loads, and record the PR in `shepherds` until the shepherd stops. After any push, with the gate
+   per [Stacks](#stacks)). The loop session runs each PR's shepherd poll itself. A subagent never runs a
+   pr-shepherd poll (`pr-shepherd [PR]` or `pr-shepherd stack`); the fixer runs the printed
+   post-push `pr-shepherd apply` commands from its own worktree, so `--require-sha HEAD` resolves
+   to the commit it pushed. Run the shepherd from `<checkoutRoot>/<name>` so the repository's own
+   configuration loads, and record the PR in `shepherds` until `[CANCEL]` or `[ESCALATE]`
+   (`--until-terminal` exits on every TRIAGE and is rerun). After any push, with the gate
    on, request a new final review (step 5). A steered PR is not merged in this pass: leave it
    ready, report `steered-hold`, and let a later sweep merge it. Still shepherd it without
    `--merge`, so its steering and any required fix are carried out.
-7. **Verify and report.** `gh pr view <N> --repo <owner>/<name> --json isDraft,state`. Report per
+7. **Verify and report.** For a PR with no shepherd running, `gh pr view <N> --repo <owner>/<name> --json isDraft,state`. Report per
    PR: ready, steered, merge (merged, pending, steered-hold, awaiting-final-review,
    no), pr-shepherd (running or no), and the reason for any `no`.
 
