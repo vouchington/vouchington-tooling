@@ -3,7 +3,7 @@
 import { appendFileSync } from 'node:fs'
 
 const major = process.env.PNPM_MAJOR ?? '12'
-const minAgeHours = Number(process.env.MIN_AGE_HOURS ?? '24')
+const minAgeHours = Number(process.env.MIN_AGE_HOURS ?? '168')
 const registry = process.env.PNPM_REGISTRY_URL ?? 'https://registry.npmjs.org/pnpm'
 const stable = new RegExp(`^${major}\\.(\\d+)\\.(\\d+)$`, 'u')
 

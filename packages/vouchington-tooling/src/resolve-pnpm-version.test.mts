@@ -62,7 +62,7 @@ describe('resolve-pnpm-version action', () => {
     })
   })
 
-  it('picks the highest stable 12.x release that is at least a day old', async () => {
+  it('picks the highest stable 12.x release that is at least seven days old', async () => {
     const result = await resolveFrom({
       versions: {
         '11.9.0': {},
@@ -74,11 +74,11 @@ describe('resolve-pnpm-version action', () => {
       },
       time: {
         '11.9.0': hoursAgo(900),
-        '12.9.0': hoursAgo(300),
-        '12.10.0': hoursAgo(48),
-        '12.11.0': hoursAgo(25),
-        '12.12.0-rc.1': hoursAgo(30),
-        '12.13.0': hoursAgo(2),
+        '12.9.0': hoursAgo(500),
+        '12.10.0': hoursAgo(300),
+        '12.11.0': hoursAgo(170),
+        '12.12.0-rc.1': hoursAgo(200),
+        '12.13.0': hoursAgo(167),
       },
     })
     expect(result.code).toBe(0)
@@ -92,7 +92,7 @@ describe('resolve-pnpm-version action', () => {
       time: { '12.1.0': hoursAgo(1) },
     })
     expect(result.code).toBe(1)
-    expect(result.stderr).toContain('No stable pnpm 12.x release is at least 24h old.')
+    expect(result.stderr).toContain('No stable pnpm 12.x release is at least 168h old.')
     expect(result.written).toBe('')
   })
 

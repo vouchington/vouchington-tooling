@@ -140,7 +140,7 @@ jobs:
         with:
           persist-credentials: false
       # Resolved separately from the action's own resolution; both pick the same release unless
-      # a pnpm 12 release crosses the 24-hour age cutoff between the two steps.
+      # a pnpm 12 release crosses the 7-day age cutoff between the two steps.
       - id: pnpm-version
         uses: ./.github/actions/resolve-pnpm-version
       - uses: ./.github/actions/setup-node-pnpm

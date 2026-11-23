@@ -11,7 +11,7 @@ composite steps do not honour `timeout-minutes` and `pnpm/setup` has no wall-clo
 npm registry under the remaining part of one total `deadline-seconds` (default 270) that also
 bounds `pnpm install`. The version is never a literal: it comes from the
 `resolve-pnpm-version` action, which picks the highest stable pnpm 12 release whose npm publish time
-is at least 24 hours old. CI therefore runs the newest pnpm 12 release that is at least one day old:
+is at least 7 days (168 hours) old, the same age as `minimumReleaseAge` and the Dependabot cooldown. CI therefore runs the newest pnpm 12 release that is at least seven days old:
 12.x releases reach CI without a PR, and moving to pnpm 13 needs one.
 `packages/vouchington-tooling/src/pnpm-setup-policy.test.mts` enforces this.
 

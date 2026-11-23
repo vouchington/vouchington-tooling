@@ -104,4 +104,10 @@ describe('Dependabot policy', () => {
       'no-mistakes-win32-x64-msvc',
     ])
   })
+
+  it('waits seven days in every ecosystem', () => {
+    for (const update of config.updates) {
+      expect(update.cooldown['default-days']).toBe(7)
+    }
+  })
 })

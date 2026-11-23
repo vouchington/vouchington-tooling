@@ -8,8 +8,8 @@ inputs:
     description: 'pnpm major version to resolve'
     default: '12'
   min-age-hours:
-    description: 'Minimum age of the release in hours'
-    default: '24'
+    description: 'Minimum age of the release in hours (168 is 7 days)'
+    default: '168'
 outputs:
   version:
     description: 'Exact pnpm version to pass to pnpm/setup'
