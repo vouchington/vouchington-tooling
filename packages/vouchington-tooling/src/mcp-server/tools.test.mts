@@ -109,4 +109,37 @@ describe('tool contract', () => {
     const openWorld = TOOLS.filter((tool) => tool.annotations.openWorldHint)
     expect(openWorld.map((tool) => tool.name)).toEqual(['pr_validate', 'pr_create', 'pr_update'])
   })
+
+  // Clients that check schemas with RE2 (Go) reject lookaround and backreferences, and
+  // then refuse the whole server. Advertised patterns stay in the RE2-compatible subset.
+  it('advertises only RE2-compatible patterns', () => {
+    const patterns: string[] = []
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) return value.forEach(walk)
+      if (value === null || typeof value !== 'object') return
+      for (const [key, child] of Object.entries(value)) {
+        if (key === 'pattern' && typeof child === 'string') patterns.push(child)
+        else walk(child)
+      }
+    }
+    TOOLS.forEach((tool) => walk(tool.inputSchema))
+    expect(patterns.length).toBeGreaterThan(0)
+    for (const pattern of patterns) {
+      expect(pattern).not.toMatch(/\(\?<?[=!]|\\[1-9]|\\k</u)
+      expect(() => new RegExp(pattern, 'u')).not.toThrow()
+    }
+  })
+
+  it('advertises a repository pattern that agrees with the parser on owner names', () => {
+    const repository = (
+      byName('pr_create').inputSchema.properties.relatedIssues as {
+        items: { properties: { repository: { pattern: string } } }
+      }
+    ).items.properties.repository
+    const advertised = new RegExp(repository.pattern, 'u')
+    for (const valid of ['octo/repo', 'a/b', 'a-b/c.d', `${'a'.repeat(39)}/r`])
+      expect(advertised.test(valid), valid).toBe(true)
+    for (const invalid of ['-a/b', 'a-/b', `${'a'.repeat(40)}/r`, 'a/b/c', 'a b/c'])
+      expect(advertised.test(invalid), invalid).toBe(false)
+  })
 })
