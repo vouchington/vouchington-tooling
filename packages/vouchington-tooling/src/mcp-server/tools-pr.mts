@@ -32,7 +32,9 @@ const FIELDS: Record<string, JsonSchema> = {
         reason: text('Why the issue is related.'),
         repository: {
           type: 'string',
-          pattern: '^(?=[^/]{1,39}/)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/[\\w.-]+$',
+          // No lookaround: RE2-based clients reject the whole schema. The server enforces the
+          // exact owner rule (no double hyphen) when it parses the input.
+          pattern: '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[\\w.-]+$',
           description:
             'Optional owner/name (lowercased) of the issue repository, rendered as ' +
             'owner/name#N; omit for an issue in this repository. Allowed for closes and refs.',
