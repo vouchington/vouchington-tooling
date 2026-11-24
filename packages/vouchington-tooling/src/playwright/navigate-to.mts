@@ -4,7 +4,9 @@ import { installTurnstileStub } from './turnstile-stub.mts'
 import { waitForBelowFoldHydration } from './wait-for-hydration.mts'
 
 /**
- * Navigate to a URL and wait for network idle (or a custom wait state).
+ * Navigate to a URL and wait for the `load` event plus a hydration idle probe.
+ * Never waits for `networkidle`: background requests (polling, streaming, analytics)
+ * can keep it from settling on a page that has already rendered.
  * Always use this instead of raw page.goto() to avoid flaky tests
  * caused by interacting with pages before they've fully loaded.
  *
@@ -13,10 +15,8 @@ import { waitForBelowFoldHydration } from './wait-for-hydration.mts'
  * timeout. Pass `dependencies.installTurnstileStub` to replace that install.
  *
  * Retries transient connection errors (ERR_CONNECTION_REFUSED / RESET) using
- * bounded retries and 5s backoff to absorb cold starts.
- *
- * Pass `waitUntil: 'load'` for pages with a connection that stays open and
- * never reaches networkidle.
+ * bounded retries and 5s backoff to absorb cold starts. A `page.goto` timeout is
+ * not retried: a slow but live server must be allowed to finish its load.
  *
  * Safe for URLs that redirect on the client — the readiness wait restarts against
  * whichever document the redirect lands on (see wait-for-hydration.mts).
@@ -24,7 +24,7 @@ import { waitForBelowFoldHydration } from './wait-for-hydration.mts'
 export async function navigateTo(
   page: Page,
   url: string,
-  { waitUntil = 'networkidle' as 'networkidle' | 'load' } = {},
+  { waitUntil = 'load' as const }: { waitUntil?: 'load' } = {},
   dependencies?: Partial<{
     installTurnstileStub: typeof installTurnstileStub
     retryOnConnectionLost: typeof retryOnConnectionLost
@@ -36,7 +36,7 @@ export async function navigateTo(
   await retry(async () => {
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.waitForLoadState(waitUntil)
-    // React 19 + React Compiler can attach above-fold handlers after networkidle on
+    // React 19 + React Compiler can attach above-fold handlers after load on
     // slower machines. This bounded idle probe reduces that race but cannot prove
     // every handler is wired; a control that rejects early interaction owns a
     // disabled-until-hydrated boundary, and tests assert that boundary is enabled.
