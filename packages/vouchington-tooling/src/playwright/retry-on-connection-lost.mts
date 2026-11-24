@@ -34,11 +34,14 @@ interface RetryOnConnectionLostOptions {
 
 const CONNECTION_LOST_PATTERN =
   /\bERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|SOCKET_NOT_CONNECTED|NETWORK_CHANGED|EMPTY_RESPONSE|ABORTED|INCOMPLETE_CHUNKED_ENCODING)\b/i
+const GOTO_TIMEOUT_PATTERN = /\bpage\.goto: Timeout \d+ms exceeded\b/
 
 // A page.goto timeout is deliberately not matched: it means the server is alive but
 // slow, and retrying aborts the in-flight load (ERR_ABORTED) and restarts it.
 function isConnectionLostError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
+  // The timeout's call log echoes the URL, which may contain a connection code.
+  if (GOTO_TIMEOUT_PATTERN.test(message)) return false
   return CONNECTION_LOST_PATTERN.test(message)
 }
 
