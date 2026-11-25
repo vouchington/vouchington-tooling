@@ -56,6 +56,29 @@ describe('storybook progress reporter', () => {
     expect(dropped.endsWith('module=""\n')).toBe(true)
   })
 
+  it('bounds a multibyte test name by bytes and keeps the module', () => {
+    const marker = formatStorybookProgressMarker(2, 'test-start', 'm', undefined, '漢'.repeat(160))
+    expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
+    expect(marker).toContain(' module="m" test="漢')
+    expect(marker).toContain('…"\n')
+    const emoji = formatStorybookProgressMarker(2, 'test-start', 'm', undefined, '😀'.repeat(160))
+    expect(JSON.parse(emoji.match(/test=(".*")\n$/u)![1]!)).toMatch(/^(?:😀)+…$/u)
+  })
+
+  it('spells a long module the same for every event', () => {
+    const moduleId = 'a'.repeat(300)
+    const moduleOf = (marker: string) => marker.match(/module=("[^"]*")/)![1]
+    const markers = [
+      formatStorybookProgressMarker(1, 'module-collected', moduleId),
+      formatStorybookProgressMarker(2, 'module-start', moduleId),
+      formatStorybookProgressMarker(3, 'test-start', moduleId, undefined, 'b'.repeat(160)),
+      formatStorybookProgressMarker(4, 'test-end', moduleId, undefined, 'b'.repeat(160)),
+      formatStorybookProgressMarker(5, 'module-end', moduleId),
+    ]
+    expect(new Set(markers.map(moduleOf)).size).toBe(1)
+    for (const marker of markers) expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
+  })
+
   it('writes to stdout by default and honors a custom prefix', () => {
     const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
     try {

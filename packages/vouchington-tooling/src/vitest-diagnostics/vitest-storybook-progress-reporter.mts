@@ -4,6 +4,9 @@ export const DEFAULT_STORYBOOK_PROGRESS_PREFIX = '[vitest-browser-progress]'
 const MAX_MARKER_BYTES = 512
 const MAX_MODULE_ID_CHARS = 400
 const MAX_TEST_NAME_CHARS = 160
+const MAX_SEQUENCE_DIGITS = 10
+// Bytes of the marker kept for the test field, taken from the module budget.
+const TEST_RESERVE_BYTES = 200
 
 /**
  * `module-*` events are semantic progress. `test-start` and `test-end` only name the running test
@@ -89,20 +92,28 @@ export function formatStorybookProgressMarker(
   testName?: string,
 ): string {
   const head = `${prefix} seq=${sequence} event=${event} module=`
-  const test =
-    testName == null ? '' : ` test=${JSON.stringify(boundText(testName, MAX_TEST_NAME_CHARS))}`
-  let boundedModuleId = moduleId.slice(0, MAX_MODULE_ID_CHARS)
-  while (boundedModuleId.length > 0) {
-    const suffix = boundedModuleId.length < moduleId.length ? '…' : ''
-    const marker = `${head}${JSON.stringify(`${boundedModuleId}${suffix}`)}${test}\n`
-    if (Buffer.byteLength(marker) <= MAX_MARKER_BYTES) return marker
-    boundedModuleId = boundedModuleId.slice(0, -16)
-  }
-  return `${head}""\n`
+  // The module budget assumes the longest event and sequence, so every event spells one module the
+  // same way and the tracker keys it consistently; the test gets what the module leaves.
+  const worstHead = `${prefix} seq=${'9'.repeat(MAX_SEQUENCE_DIGITS)} event=module-collected module=`
+  const moduleBudget = MAX_MARKER_BYTES - 1 - Buffer.byteLength(worstHead) - TEST_RESERVE_BYTES
+  const module = boundedJson(moduleId, MAX_MODULE_ID_CHARS, moduleBudget)
+  if (module == null) return `${head}""\n`
+  const prefixed = `${head}${module}`
+  if (testName == null) return `${prefixed}\n`
+  const testBudget = MAX_MARKER_BYTES - 1 - Buffer.byteLength(`${prefixed} test=`)
+  const test = boundedJson(testName, MAX_TEST_NAME_CHARS, testBudget)
+  return test == null ? `${prefixed}\n` : `${prefixed} test=${test}\n`
 }
 
-function boundText(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}…` : text
+/** `text` as a JSON string within `maxChars` characters and `maxBytes` bytes, or null if none fits. */
+function boundedJson(text: string, maxChars: number, maxBytes: number): string | null {
+  const points = Array.from(text)
+  for (let keep = Math.min(points.length, maxChars); keep >= 0; keep -= 1) {
+    const suffix = keep < points.length ? '…' : ''
+    const json = JSON.stringify(`${points.slice(0, keep).join('')}${suffix}`)
+    if (Buffer.byteLength(json) <= maxBytes) return json
+  }
+  return null
 }
 
 export function latestStorybookProgressSequence(

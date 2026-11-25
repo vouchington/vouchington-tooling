@@ -58,6 +58,7 @@ export class OutputObserver {
     stderr: new StringDecoder('utf8'),
     stdout: new StringDecoder('utf8'),
   }
+  private readonly progressTails = { stderr: '', stdout: '' }
   private state: OutputObserverState
   private readonly tracker: ProgressTracker
 
@@ -88,7 +89,10 @@ export class OutputObserver {
     // The marker can be split across chunks, so it is also matched against the previous tail.
     const joined = state.outputBuffer.slice(-OPTIMIZER_MARKER_OVERLAP) + text
     // Progress markers are read from the whole chunk, not the truncated rolling buffer.
-    const progressText = stripAnsi(state.outputBuffer.slice(-PROGRESS_MARKER_OVERLAP) + text)
+    // Per stream, so output on the other stream cannot split a marker that is still arriving.
+    const progressRaw = this.progressTails[source] + text
+    this.progressTails[source] = progressRaw.slice(-PROGRESS_MARKER_OVERLAP)
+    const progressText = stripAnsi(progressRaw)
     state.outputBuffer = (state.outputBuffer + text).slice(-BUFFER_CHARS)
     const plainBuffer = stripAnsi(state.outputBuffer)
     state.anyOutputSeen = true

@@ -75,6 +75,22 @@ describe('stall process-group diagnostics', () => {
     expect(harness.written[0]!.content.toString()).toContain(line)
   })
 
+  it('assembles a marker split across chunks even when the other stream writes between', async () => {
+    const { child, harness, run, tick } = setup()
+    child.stdout.emit('data', '[vitest-browser-progress] seq=1 event=module-start module="m"\n')
+    child.stdout.emit('data', '[vitest-browser-progress] seq=2 event=test-start module="m"')
+    child.stderr.emit('data', 'warning\n')
+    child.stdout.emit('data', ' test="t"\n')
+    tick(120_000)
+    const line = harness.stderr
+      .join('')
+      .split('\n')
+      .find((l) => l.includes('in flight:'))!
+    expect(JSON.parse(line.slice(line.indexOf('{'))).inFlight[0].test.name).toBe('t')
+    exitChild(child, null, 'SIGTERM')
+    await run
+  })
+
   it('completes a progress marker split across chunks', async () => {
     const { child, harness, run, tick } = setup()
     child.stdout.emit('data', '[vitest-browser-progress] seq=7 event=module-start')

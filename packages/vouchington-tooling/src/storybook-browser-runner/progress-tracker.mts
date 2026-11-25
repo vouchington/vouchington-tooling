@@ -120,6 +120,7 @@ export class ProgressTracker {
       tracked.test = { at, name: test ?? '' }
     }
     if (event === 'test-end' && tracked.test?.name === (test ?? '')) tracked.test = null
+    if (this.modules.size > MAX_TRACKED_MODULES) this.evict()
   }
 
   private track(module: string): TrackedModule {
@@ -127,10 +128,13 @@ export class ProgressTracker {
     if (!tracked) {
       tracked = { startedAt: null, test: null }
       this.modules.set(module, tracked)
-      if (this.modules.size > MAX_TRACKED_MODULES) {
-        this.modules.delete(this.modules.keys().next().value!)
-      }
     }
     return tracked
+  }
+
+  /** Drops the oldest collected-not-started module first, so running modules stay reported. */
+  private evict(): void {
+    const pending = [...this.modules].find(([, m]) => m.startedAt == null)
+    this.modules.delete(pending ? pending[0] : this.modules.keys().next().value!)
   }
 }

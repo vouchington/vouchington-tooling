@@ -92,6 +92,29 @@ describe('ProgressTracker', () => {
     expect(tracker.context(0).inFlight.map((m) => m.module)).toEqual(['bad\\u12'])
   })
 
+  it('clears a long module and test after a full lifecycle', () => {
+    const tracker = new ProgressTracker(PREFIX)
+    const moduleId = 'a'.repeat(300)
+    const test = 'b'.repeat(160)
+    tracker.observe(
+      marker(1, 'module-start', moduleId) +
+        marker(2, 'test-start', moduleId, test) +
+        marker(3, 'test-end', moduleId, test) +
+        marker(4, 'module-end', moduleId),
+      0,
+    )
+    expect(tracker.context(0).inFlight).toEqual([])
+  })
+
+  it('evicts collected modules before running ones', () => {
+    const tracker = new ProgressTracker(PREFIX)
+    tracker.observe(marker(1, 'module-start', 'active'), 0)
+    for (let i = 2; i <= 70; i += 1) tracker.observe(marker(i, 'module-collected', `c${i}`), 0)
+    expect(tracker.context(0).inFlight.map((m) => m.module)).toEqual(['active'])
+    for (let i = 71; i <= 140; i += 1) tracker.observe(marker(i, 'module-start', `s${i}`), 0)
+    expect(tracker.context(0).collectedNotStarted).toEqual([])
+  })
+
   it('bounds the recent markers, tracked modules and reported modules', () => {
     const tracker = new ProgressTracker(PREFIX)
     for (let i = 1; i <= 100; i += 1) tracker.observe(marker(i, 'module-start', `m${i}`), i)
@@ -102,6 +125,10 @@ describe('ProgressTracker', () => {
     expect(context.inFlight).toHaveLength(10)
     expect(context.inFlight[0]!.module).toBe('m37')
     for (let i = 101; i <= 170; i += 1) tracker.observe(marker(i, 'module-collected', `c${i}`), i)
-    expect(tracker.context(170).collectedNotStarted).toHaveLength(10)
+    expect(tracker.context(170).collectedNotStarted).toEqual([])
+    expect(tracker.context(170).inFlight[0]!.module).toBe('m37')
+    const pending = new ProgressTracker(PREFIX)
+    for (let i = 1; i <= 70; i += 1) pending.observe(marker(i, 'module-collected', `c${i}`), i)
+    expect(pending.context(70).collectedNotStarted).toHaveLength(10)
   })
 })
