@@ -27,13 +27,19 @@ describe('createPlaywrightTimeoutGuard options', () => {
     const guard = createPlaywrightTimeoutGuard({ maxTimeoutMs: 12_500, banOverrides: true })
     expect(guard.banOverrides).toBe(true)
     const original = vi.fn<(timeout: number) => void>()
-    const info = { timeout: 12_500, setTimeout: original } as unknown as TestInfo
+    const info = {
+      timeout: 12_500,
+      setTimeout: original,
+      project: { timeout: 10_000 },
+    } as unknown as TestInfo
     const use = vi.fn<() => Promise<void>>()
     await guard.timeoutFixture({}, use, info)
     expect(() => info.setTimeout(5_000)).toThrow(
       'Playwright runtime test timeout overrides are forbidden by the 12,500 ms test cap',
     )
     expect(original).not.toHaveBeenCalled()
+    info.setTimeout(10_000)
+    expect(original).toHaveBeenCalledExactlyOnceWith(10_000)
   })
 
   it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])('rejects cap %s', (cap) => {
@@ -107,7 +113,11 @@ describe('hook timeout protection', () => {
 
   it('protects the same info once and caps later setTimeout and slow calls', async () => {
     const original = vi.fn<(timeout: number) => void>()
-    const info = { timeout: 30_000, setTimeout: original } as unknown as TestInfo
+    const info = {
+      timeout: 30_000,
+      setTimeout: original,
+      project: { timeout: 30_000 },
+    } as unknown as TestInfo
     const use = vi.fn<() => Promise<void>>()
     await guard.timeoutFixture({}, use, info)
     const setter: unknown = Reflect.get(info, 'setTimeout')
