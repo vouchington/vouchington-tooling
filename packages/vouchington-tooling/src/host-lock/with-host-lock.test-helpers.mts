@@ -82,8 +82,23 @@ export function completion(child: ChildProcess): Promise<{ code: number | null; 
   })
 }
 
+// Each wrapper runs a dozen short-lived subprocesses (stat, chmod, sed, date,
+// a forked child) before it records owner.pgid. On a loaded CI runner that
+// startup alone outlasted the old 5s deadline while the wrapper was still
+// acquiring correctly (#969 run 45637724931). The deadline stays below the
+// 30s test timeout so a path that never appears still fails with this error.
+const pathWaitDeadlineMs = 20_000
+
+// A test that awaits waitForPath `waits` times in sequence can spend the full
+// deadline on each, so its Vitest timeout must exceed that sum plus the usual
+// 30s for the rest of the test. Otherwise Vitest reports a generic timeout
+// instead of the "Timed out waiting for <path>" error.
+export function sequentialWaitsTimeoutMs(waits: number): number {
+  return waits * pathWaitDeadlineMs + 30_000
+}
+
 export async function waitForPath(path: string): Promise<void> {
-  const deadline = Date.now() + 5e3
+  const deadline = Date.now() + pathWaitDeadlineMs
   while (Date.now() < deadline) {
     try {
       await stat(path)
