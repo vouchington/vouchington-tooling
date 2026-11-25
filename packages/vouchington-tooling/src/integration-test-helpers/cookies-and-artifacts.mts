@@ -153,11 +153,12 @@ export function createAssetMetadataCache(options: AssetMetadataCacheOptions) {
       return { status: response.status, contentType: response.headers.get('content-type') }
     })
     if (cacheable) cache.set(url, pending)
-    void pending
-      .then((metadata) => {
+    void pending.then(
+      (metadata) => {
         if (metadata.status >= 400) cache.delete(url)
-      })
-      .catch(() => cache.delete(url))
+      },
+      () => cache.delete(url),
+    )
     return pending
   }
 }
