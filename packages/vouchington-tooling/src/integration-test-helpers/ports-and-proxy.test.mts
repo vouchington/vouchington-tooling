@@ -297,7 +297,7 @@ describe('concurrency broker and trace proxy', () => {
         return
       }
       if (req.url === '/disconnect') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': '1000' })
         res.write('partial')
         setTimeout(() => res.socket?.destroy(new Error('upstream drop')), 20)
         return

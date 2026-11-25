@@ -165,17 +165,13 @@ export async function waitForService(
 }
 
 async function stopChild(child: ChildProcess, forceKillGraceMs: number): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) return
-
   child.kill('SIGTERM')
   await new Promise<void>((resolve) => {
     const forceKillTimer = setTimeout(() => {
-      if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
-        try {
-          process.kill(-child.pid, 'SIGKILL')
-        } catch {
-          child.kill('SIGKILL')
-        }
+      try {
+        process.kill(-child.pid!, 'SIGKILL')
+      } catch {
+        child.kill('SIGKILL')
       }
     }, forceKillGraceMs)
 

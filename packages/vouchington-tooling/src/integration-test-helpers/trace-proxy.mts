@@ -53,7 +53,7 @@ export async function createTraceProxy(
   )
 
   const server = http.createServer(async (incoming, outgoing) => {
-    const url = new URL(incoming.url ?? '/', `http://127.0.0.1:${port}`)
+    const url = new URL(incoming.url!, `http://127.0.0.1:${port}`)
 
     if (assetConcurrencyBroker.handle(url.pathname, outgoing)) return
 
@@ -70,6 +70,7 @@ export async function createTraceProxy(
     }
 
     const startedAt = Date.now()
+    const method = incoming.method!
     const requestUrl = new URL(url.pathname + url.search, targetOrigin)
     const headers = buildUpstreamHeaders(incoming.headers, requestUrl.host)
 
@@ -81,9 +82,9 @@ export async function createTraceProxy(
     let response: Response
     try {
       const requestInit: RequestInit & { duplex: 'half' } = {
-        method: incoming.method ?? 'GET',
+        method,
         headers,
-        body: shouldSendBody(incoming.method)
+        body: shouldSendBody(method)
           ? (Readable.toWeb(incoming) as unknown as globalThis.ReadableStream<Uint8Array>)
           : null,
         duplex: 'half',
@@ -95,12 +96,12 @@ export async function createTraceProxy(
       outgoing.off('close', abort)
       if (abortController.signal.aborted || outgoing.destroyed || outgoing.writableEnded) return
       outgoing.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
-      outgoing.end(`Trace proxy failed: ${err instanceof Error ? err.message : 'unknown error'}`)
+      outgoing.end(`Trace proxy failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
 
     tracedRequests.push({
-      method: incoming.method ?? 'GET',
+      method,
       path: `${url.pathname}${url.search}`,
       status: response.status,
       durationMs: Date.now() - startedAt,
@@ -184,8 +185,8 @@ async function listenOnExactLoopbackPort(server: http.Server, port: number): Pro
   return port
 }
 
-function shouldSendBody(method: string | undefined): boolean {
-  return !(method === 'GET' || method === 'HEAD' || method === undefined)
+function shouldSendBody(method: string): boolean {
+  return method !== 'GET' && method !== 'HEAD'
 }
 
 function stripHopByHopHeaders(headers: Headers): void {
