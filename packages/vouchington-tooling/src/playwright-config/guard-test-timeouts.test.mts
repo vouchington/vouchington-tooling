@@ -102,4 +102,28 @@ describe('guardTestTimeouts', () => {
     )
     expect(() => test.extend({ sample: [async () => {}, { timeout: 1 }] } as never)).not.toThrow()
   })
+
+  it('rejects under-cap test.setTimeout and describe.configure timeouts when banOverrides is true', () => {
+    const { base, calls } = fakeBase()
+    const guard = createPlaywrightTimeoutGuard({ maxTimeoutMs: 15_000, banOverrides: true })
+    const test = guard.guardTestTimeouts(base)
+
+    expect(() => test.setTimeout(5_000)).toThrow(
+      'Playwright public test timeout overrides are forbidden by the 15,000 ms test cap',
+    )
+    expect(calls.setTimeout).not.toHaveBeenCalled()
+
+    expect(() => test.describe.configure({ timeout: 5_000 })).toThrow(
+      'Playwright suite test timeout overrides are forbidden by the 15,000 ms test cap',
+    )
+    expect(calls.configure).not.toHaveBeenCalled()
+
+    test.describe.configure({ mode: 'serial' })
+    expect(calls.configure).toHaveBeenCalledOnce()
+
+    const child = test.extend({ sample: [async () => {}, { timeout: 5_000 }] } as never)
+    expect(() => child.setTimeout(1_000)).toThrow(
+      'Playwright public test timeout overrides are forbidden by the 15,000 ms test cap',
+    )
+  })
 })

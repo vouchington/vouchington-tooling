@@ -5,6 +5,8 @@ export {
   withNodeOption,
   withOptionalLaunchOptionArg,
 } from './config-helpers.mts'
+export { createPlaywrightConfig, DEFAULT_PLAYWRIGHT_USER_AGENT } from './create-config.mts'
+export type { CreatePlaywrightConfigOptions } from './create-config.mts'
 export type { FixtureTimeoutGuard } from './fixture-timeout.mts'
 export { runnablePlaywrightTest } from './public-test-contract.mts'
 export type {
@@ -21,8 +23,14 @@ export type { PlaywrightTimeoutGuard, PlaywrightTimeoutGuardOptions } from './te
 export {
   createReporter,
   definedEnv,
+  loggedShellCommand,
   nodeServerCommand,
+  playwrightWebServerLogDir,
   shellQuote,
   withOtelNodeOptions,
 } from './web-server-command.mts'
-export type { CreateReporterOptions, NodeServerCommandOptions } from './web-server-command.mts'
+export type {
+  CreateReporterOptions,
+  LoggedShellCommandOptions,
+  NodeServerCommandOptions,
+} from './web-server-command.mts'

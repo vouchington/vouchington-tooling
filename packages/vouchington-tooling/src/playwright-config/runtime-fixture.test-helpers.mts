@@ -17,6 +17,7 @@ export const capError =
   /positive finite number at most 30,000 ms|slow modifiers are forbidden|timeout guard overrides are forbidden/
 
 type RunOptions = {
+  banOverrides?: boolean
   collection?: string
   cliTimeout?: string
   extended?: boolean
@@ -65,11 +66,14 @@ export default createPlaywrightTimeoutGuard({ fixtureName: '${FIXTURE_NAME}' }).
     const fixture = options.workerFixture
       ? "[async ({}, use) => await use('fixture'), { scope: 'worker' }]"
       : "async ({}, use) => await use('fixture')"
+    const guardOptions = options.banOverrides
+      ? `{ fixtureName: '${FIXTURE_NAME}', banOverrides: true }`
+      : `{ fixtureName: '${FIXTURE_NAME}' }`
     const specSource = `
       import { test as raw } from '@playwright/test'
       import { writeFileSync } from 'node:fs'
       import { createPlaywrightTimeoutGuard } from ${JSON.stringify(guardPath)}
-      const { guardTestTimeouts, protectHookTimeouts } = createPlaywrightTimeoutGuard({ fixtureName: '${FIXTURE_NAME}' })
+      const { guardTestTimeouts, protectHookTimeouts } = createPlaywrightTimeoutGuard(${guardOptions})
       const guarded = guardTestTimeouts(raw)
       const test = ${options.extended ? `guarded.extend({ sample: ${fixture} })` : 'guarded'}
       ${options.collection ?? ''}

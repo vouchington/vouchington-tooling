@@ -3,9 +3,11 @@ import {
   assetHostResolverRule,
   createReporter,
   definedEnv,
+  loggedShellCommand,
   nodeServerCommand,
   originOrFallback,
   parseMaxWorkers,
+  playwrightWebServerLogDir,
   runnablePlaywrightTest,
   shellQuote,
   withNodeOption,
@@ -105,6 +107,24 @@ describe('server commands', () => {
   it('adds the preload to NODE_OPTIONS only when enabled', () => {
     expect(withOtelNodeOptions('--x', undefined)).toBe('--x')
     expect(withOtelNodeOptions('--x', '/otel.mts')).toBe('--x --import "/otel.mts"')
+  })
+
+  it('wraps a shell command with pipefail and log teeing', () => {
+    const command = loggedShellCommand({ name: 'web', command: 'node server.js', logDir: '/logs' })
+    expect(command).toBe(
+      `bash -lc 'set -o pipefail; mkdir -p '\\''/logs'\\''; node server.js 2>&1 | tee '\\''/logs/web.log'\\'''`,
+    )
+  })
+
+  it('resolves the web-server log directory from RUNNER_TEMP, TMPDIR, or /tmp', () => {
+    expect(playwrightWebServerLogDir({ RUNNER_TEMP: '/runner', TMPDIR: '/tmp-dir' })).toBe(
+      '/runner/playwright-web-server-logs',
+    )
+    expect(playwrightWebServerLogDir({ TMPDIR: '/tmp-dir' })).toBe(
+      '/tmp-dir/playwright-web-server-logs',
+    )
+    expect(playwrightWebServerLogDir({})).toBe('/tmp/playwright-web-server-logs')
+    expect(playwrightWebServerLogDir()).toContain('playwright-web-server-logs')
   })
 })
 

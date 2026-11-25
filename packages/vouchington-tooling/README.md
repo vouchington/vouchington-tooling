@@ -1087,17 +1087,22 @@ there at construction and leaves the directory and other files alone. Applicatio
 directory are parameters. `checkFiniteTimeoutProfiles` writes one scratch project per admission
 profile and can take a caller-supplied runner.
 
-`playwright-config` is the config-time counterpart of the `playwright` runtime helpers, and
-`@playwright/test` stays an optional peer. `createPlaywrightTimeoutGuard({ maxTimeoutMs, fixtureName })`
+`playwright-config` is the dev-only config-time counterpart of the `playwright` runtime helpers, and
+`@playwright/test` stays an optional peer. `createPlaywrightTimeoutGuard({ maxTimeoutMs, fixtureName, banOverrides })`
 returns `guardTestTimeouts(test)`, which rejects `setTimeout` and `slow` calls and fixture, `use`, and
 `describe.configure` timeouts above the cap (default 30,000 ms) and forbids overriding the automatic
-guard fixture. It also returns `validateConfigTimeouts` for config files, `assertResolvedTimeouts` for
-global setup, and `protectHookTimeouts` for `beforeAll` and `afterAll`. Pass Playwright's own `test` (or a base
-with no fixture timeout options) to `guardTestTimeouts`: fixtures inherited from an earlier `extend`
-cannot be enumerated and are not validated. `runnablePlaywrightTest` removes
-whole-test skip methods from the public types. `createReporter`, `nodeServerCommand`, `shellQuote`,
-`withNodeOption`, `parseMaxWorkers`, and `assetHostResolverRule` build the reporter list and web-server
-commands; the OpenTelemetry preload path and extra reporters are parameters.
+guard fixture. Set `banOverrides: true` to reject every `test.setTimeout`, `info.setTimeout`, and
+`describe.configure({ timeout })` override regardless of value while keeping project configuration
+and fixture tuple budgets validated against `maxTimeoutMs`. It also returns `validateConfigTimeouts`
+for config files, `assertResolvedTimeouts` for global setup, and `protectHookTimeouts` for
+`beforeAll` and `afterAll`. Pass Playwright's own `test` (or a base with no fixture timeout options)
+to `guardTestTimeouts`: fixtures inherited from an earlier `extend` cannot be enumerated and are not
+validated. `runnablePlaywrightTest` removes whole-test skip methods from the public types.
+`createPlaywrightConfig` assembles a validated `PlaywrightTestConfig` from caller-supplied
+`testDir`, `baseURL`, `projects`, `webServer`, `use`, and optional `timeoutGuard`, using
+`DEFAULT_PLAYWRIGHT_USER_AGENT`, `createReporter`, `loggedShellCommand`, `nodeServerCommand`,
+`playwrightWebServerLogDir`, `shellQuote`, `withNodeOption`, `parseMaxWorkers`, and
+`assetHostResolverRule`; the OpenTelemetry preload path and extra reporters are parameters.
 
 `next-navigation-mock`, `jsdom-stubs` and `input-otp-mock` are test-only helpers for Vitest component
 tests; `next` and `react` are optional peers, and each subpath imports only what it needs.
@@ -1125,11 +1130,14 @@ through an injectable Turnstile stub, and scrolls a caller-supplied sentinel int
 and `PLAYWRIGHT_TURNSTILE_TOKEN`. The scroll helper's sentinel test id defaults to
 `infinite-scroll-sentinel`.
 
-`playwright` provides small Playwright helpers: a virtual authenticator, a Radix dropdown opener,
-a Storybook index probe, required-value and mobile overflow assertions, an image-response guard,
-random suffixes, viewport sizes, a 1x1 PNG fixture, RFC 6238 TOTP codes, and a test-lifecycle
-reporter. The reporter prints one JSON line per test with the marker `playwright-test-lifecycle`.
-`@playwright/test` is an optional peer. TOTP setup and cleanup stay with the caller.
+`playwright` provides dev-only Playwright helpers: browser-state reset helpers
+(`clearCookiesPreservingLocalStorage`, `removeLocalStorageKeys`,
+`removeLocalStorageKeysBeforeNavigation`, `resetAnonymousBrowserStateBeforeNavigation`), a virtual
+authenticator, a Radix dropdown opener, a Storybook index probe, required-value and mobile overflow
+assertions, an image-response guard, random suffixes, viewport sizes, a 1x1 PNG fixture, RFC 6238
+TOTP codes, and a test-lifecycle reporter. The reporter prints one JSON line per test with the
+marker `playwright-test-lifecycle`. `@playwright/test` is an optional peer. TOTP setup and cleanup
+stay with the caller.
 
 `storybookBundleHasStory` returns `false` for a readable index without the requested story.
 An index request failure or non-OK HTTP response throws `StorybookIndexAccessError`, with

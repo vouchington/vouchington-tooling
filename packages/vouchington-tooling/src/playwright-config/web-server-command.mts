@@ -13,11 +13,18 @@ export function definedEnv(source: NodeJS.ProcessEnv): Record<string, string> {
   )
 }
 
+export function playwrightWebServerLogDir(env: NodeJS.ProcessEnv = process.env): string {
+  const tempRoot = env['RUNNER_TEMP'] || env['TMPDIR'] || '/tmp'
+  return join(tempRoot, 'playwright-web-server-logs')
+}
+
 export type CreateReporterOptions = {
   junitOutputFile: string
   ci: boolean
   /** Reporters appended after the built-in ones in both modes. */
   extraReporters?: ReporterDescription[]
+  /** Environment read for `PLAYWRIGHT_JUNIT_OUTPUT_FILE`. Defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv
 }
 
 // CI: GitHub annotations, JUnit (PLAYWRIGHT_JUNIT_OUTPUT_FILE wins), and a lifecycle reporter that
@@ -26,11 +33,12 @@ export function createReporter({
   junitOutputFile,
   ci,
   extraReporters = [],
+  env = process.env,
 }: CreateReporterOptions): ReporterDescription[] {
   return ci
     ? [
         ['github'],
-        ['junit', { outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT_FILE || junitOutputFile }],
+        ['junit', { outputFile: env['PLAYWRIGHT_JUNIT_OUTPUT_FILE'] || junitOutputFile }],
         [TestLifecycleReporter.modulePath, { failOnSkippedTests: ci }],
         ...extraReporters,
       ]
@@ -46,6 +54,17 @@ function withOtelNodeImport(command: string, otelPreload: string | undefined): s
 export function withOtelNodeOptions(nodeOptions: string, otelPreload: string | undefined): string {
   if (!otelPreload) return nodeOptions
   return withNodeOption(nodeOptions, `--import "${otelPreload}"`)
+}
+
+export type LoggedShellCommandOptions = {
+  name: string
+  command: string
+  logDir: string
+}
+
+export function loggedShellCommand({ name, command, logDir }: LoggedShellCommandOptions): string {
+  const logPath = join(logDir, `${name}.log`)
+  return `bash -lc ${shellQuote(`set -o pipefail; mkdir -p ${shellQuote(logDir)}; ${command} 2>&1 | tee ${shellQuote(logPath)}`)}`
 }
 
 export type NodeServerCommandOptions = {
@@ -64,11 +83,10 @@ export function nodeServerCommand({
   logDir,
   otelPreload,
 }: NodeServerCommandOptions): string {
-  const logPath = join(logDir, `${name}.log`)
   const envPrefix = [
     `OTEL_SERVICE_NAME=${shellQuote(serviceName)}`,
     ...(otelPreload ? ['OTEL_LOGS_EXPORTER=otlp'] : []),
   ].join(' ')
   const instrumentedCommand = `${envPrefix} ${withOtelNodeImport(command, otelPreload)}`
-  return `bash -lc ${shellQuote(`set -o pipefail; mkdir -p ${shellQuote(logDir)}; ${instrumentedCommand} 2>&1 | tee ${shellQuote(logPath)}`)}`
+  return loggedShellCommand({ name, command: instrumentedCommand, logDir })
 }

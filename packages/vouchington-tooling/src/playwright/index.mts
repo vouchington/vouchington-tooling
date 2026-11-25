@@ -30,6 +30,12 @@ export {
 } from './blocked-external-network.mts'
 export type { BlockedExternalNetworkRule } from './blocked-external-network.mts'
 export {
+  clearCookiesPreservingLocalStorage,
+  removeLocalStorageKeys,
+  removeLocalStorageKeysBeforeNavigation,
+  resetAnonymousBrowserStateBeforeNavigation,
+} from './browser-state.mts'
+export {
   createBrowserErrorsFixture,
   createBrowserTest,
   expect,
