@@ -17,6 +17,7 @@ import {
   type OutputObserverSnapshot,
   type OutputObserverState,
 } from './observer-state.mts'
+import { ProgressTracker, type StallContext } from './progress-tracker.mts'
 import type { StorybookQuietOutput } from './quiet-output.mts'
 import {
   hasStorybookBrowserViteDependencyReady,
@@ -58,14 +59,21 @@ export class OutputObserver {
     stdout: new StringDecoder('utf8'),
   }
   private state: OutputObserverState
+  private readonly tracker: ProgressTracker
 
   constructor(options: OutputObserverOptions) {
     this.options = options
     this.state = initialObserverState(options.startedAt)
+    this.tracker = new ProgressTracker(options.progressPrefix)
   }
 
   snapshot(): OutputObserverSnapshot {
     return { ...this.state, newOptimizeDeps: [...this.newOptimizeDeps] }
+  }
+
+  /** The modules and test still running, and the latest markers, for a stall message. */
+  stallContext(now: number): StallContext {
+    return this.tracker.context(now)
   }
 
   observe(source: Source, chunk: string | Buffer): void {
@@ -133,6 +141,7 @@ export class OutputObserver {
   ): void {
     const { patterns, progressPrefix } = this.options
     const state = this.state
+    this.tracker.observe(progressText, now)
     const sequence = latestStorybookProgressSequence(progressText, progressPrefix)
     if (sequence != null && sequence > this.lastSemanticSequence) {
       this.lastSemanticSequence = sequence

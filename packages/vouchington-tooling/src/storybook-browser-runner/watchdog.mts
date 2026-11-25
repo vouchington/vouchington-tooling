@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 
 import type { BrowserSessionWatchdog } from '../browser-session-runner/index.mts'
+import type { StorybookBrowserDiagnostics } from './diagnostics.mts'
 import type { OutputObserver } from './output-observer.mts'
 import type { OutputObserverSnapshot } from './observer-state.mts'
 import { writeProcessGroupSample } from './process-sample.mts'
@@ -20,6 +21,7 @@ export type StorybookWatchdogOptions = {
     StorybookBrowserRunnerDeps,
     'clearInterval' | 'cwd' | 'existsSync' | 'now' | 'sampleProcessGroup' | 'setInterval' | 'stderr'
   >
+  diagnostics: StorybookBrowserDiagnostics
   hangMs: number
   observer: OutputObserver
   outcome: WatchdogOutcome
@@ -58,6 +60,7 @@ export function createStorybookWatchdog(options: StorybookWatchdogOptions): Brow
         deps.stderr.write(
           `[storybook-browser] no semantic test progress for ${hangMs}ms; terminating terminal mid-suite stall (${lastMarkerNote(seen, now)})\n`,
         )
+        writeStallContext(options, now)
         decided = true
         writeProcessGroupSample(deps, options.processGroupId())
         controller.terminate()
@@ -98,6 +101,16 @@ export function isSpawnedProcessGroupId(
     processGroupId > 1 &&
     processGroupId <= 2_147_483_647
   )
+}
+
+/** Names what was running when the suite went quiet, as one JSON line on stderr and in the artifact. */
+function writeStallContext(options: StorybookWatchdogOptions, now: number): void {
+  const line = `[storybook-browser] semantic stall in flight: ${JSON.stringify({
+    hangMs: options.hangMs,
+    ...options.observer.stallContext(now),
+  })}\n`
+  options.deps.stderr.write(line)
+  options.diagnostics.recordAttempt(line)
 }
 
 function lastMarkerNote(seen: OutputObserverSnapshot, now: number): string {

@@ -1,10 +1,20 @@
-import type { Reporter, TestModule } from 'vitest/node'
+import type { Reporter, TestCase, TestModule } from 'vitest/node'
 
 export const DEFAULT_STORYBOOK_PROGRESS_PREFIX = '[vitest-browser-progress]'
 const MAX_MARKER_BYTES = 512
 const MAX_MODULE_ID_CHARS = 400
+const MAX_TEST_NAME_CHARS = 160
 
-export type StorybookProgressEvent = 'module-collected' | 'module-start' | 'module-end'
+/**
+ * `module-*` events are semantic progress. `test-start` and `test-end` only name the running test
+ * for the stall diagnostics and never count as progress.
+ */
+export type StorybookProgressEvent =
+  | 'module-collected'
+  | 'module-start'
+  | 'module-end'
+  | 'test-start'
+  | 'test-end'
 
 type WriteProgress = (chunk: string) => void
 
@@ -40,7 +50,15 @@ class VitestStorybookProgressReporter implements Reporter {
     this.emit('module-end', testModule)
   }
 
-  private emit(event: StorybookProgressEvent, testModule: TestModule): void {
+  onTestCaseReady(testCase: TestCase): void {
+    this.emit('test-start', testCase.module, testCase.fullName)
+  }
+
+  onTestCaseResult(testCase: TestCase): void {
+    this.emit('test-end', testCase.module, testCase.fullName)
+  }
+
+  private emit(event: StorybookProgressEvent, testModule: TestModule, testName?: string): void {
     this.sequence += 1
     this.write(
       formatStorybookProgressMarker(
@@ -48,6 +66,7 @@ class VitestStorybookProgressReporter implements Reporter {
         event,
         testModule.relativeModuleId || testModule.moduleId,
         this.prefix,
+        testName,
       ),
     )
   }
@@ -67,15 +86,23 @@ export function formatStorybookProgressMarker(
   event: StorybookProgressEvent,
   moduleId: string,
   prefix: string = DEFAULT_STORYBOOK_PROGRESS_PREFIX,
+  testName?: string,
 ): string {
+  const head = `${prefix} seq=${sequence} event=${event} module=`
+  const test =
+    testName == null ? '' : ` test=${JSON.stringify(boundText(testName, MAX_TEST_NAME_CHARS))}`
   let boundedModuleId = moduleId.slice(0, MAX_MODULE_ID_CHARS)
   while (boundedModuleId.length > 0) {
     const suffix = boundedModuleId.length < moduleId.length ? '…' : ''
-    const marker = `${prefix} seq=${sequence} event=${event} module=${JSON.stringify(`${boundedModuleId}${suffix}`)}\n`
+    const marker = `${head}${JSON.stringify(`${boundedModuleId}${suffix}`)}${test}\n`
     if (Buffer.byteLength(marker) <= MAX_MARKER_BYTES) return marker
     boundedModuleId = boundedModuleId.slice(0, -16)
   }
-  return `${prefix} seq=${sequence} event=${event} module=""\n`
+  return `${head}""\n`
+}
+
+function boundText(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
 export function latestStorybookProgressSequence(

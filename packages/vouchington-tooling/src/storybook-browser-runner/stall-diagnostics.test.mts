@@ -43,6 +43,38 @@ describe('stall process-group diagnostics', () => {
     await run
   })
 
+  it('names the in-flight module and test in a structured line and the artifact', async () => {
+    const { child, harness, run, tick } = setup()
+    const marker = (seq: number, event: string, module: string, test = '') =>
+      `[vitest-browser-progress] seq=${seq} event=${event} module="${module}"${test ? ` test="${test}"` : ''}\n`
+    child.stdout.emit('data', marker(1, 'module-start', 'scroll-area.stories.tsx'))
+    child.stdout.emit('data', marker(2, 'module-end', 'scroll-area.stories.tsx'))
+    child.stdout.emit('data', marker(3, 'module-start', 'tabs.stories.tsx'))
+    child.stdout.emit('data', marker(4, 'test-start', 'tabs.stories.tsx', 'Tabs > Default'))
+    tick(120_000)
+    const line = harness.stderr
+      .join('')
+      .split('\n')
+      .find((l) => l.includes('semantic stall in flight:'))!
+    expect(line.startsWith('[storybook-browser] semantic stall in flight: {')).toBe(true)
+    const context = JSON.parse(line.slice(line.indexOf('{')))
+    expect(context).toMatchObject({
+      hangMs: 120_000,
+      inFlight: [
+        {
+          module: 'tabs.stories.tsx',
+          runningForMs: 120_000,
+          test: { name: 'Tabs > Default', runningForMs: 120_000 },
+        },
+      ],
+      lastEnded: { endedAgoMs: 120_000, module: 'scroll-area.stories.tsx' },
+    })
+    expect(context.recentMarkers.map((m: { seq: number }) => m.seq)).toEqual([1, 2, 3, 4])
+    exitChild(child, null, 'SIGTERM')
+    await run
+    expect(harness.written[0]!.content.toString()).toContain(line)
+  })
+
   it('completes a progress marker split across chunks', async () => {
     const { child, harness, run, tick } = setup()
     child.stdout.emit('data', '[vitest-browser-progress] seq=7 event=module-start')

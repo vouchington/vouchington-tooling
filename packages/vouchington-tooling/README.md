@@ -550,7 +550,11 @@ group and its descendants, including the detached browser (pid, RSS in MB, %CPU,
 capped near 4KB), sampled with `ps -ax` and best effort. The semantic-stall message names the last
 progress marker and its age, and the attempt summary counts Playwright `Target.targetCrashed` and
 `Inspector.targetCrashed` (`targetCrashCount`) and `Target.detachedFromTarget`
-(`targetDetachCount`) protocol lines.
+(`targetDetachCount`) protocol lines. A semantic stall also logs, and records in the diagnostics file,
+one `[storybook-browser] semantic stall in flight: {...}` JSON line naming the modules that started
+but did not end (with the running test and how long each has run), the last ended module, modules
+collected but not started, and the last 10 markers with their age. The reporter's `test-start` and
+`test-end` markers feed this line only and never count as progress.
 
 Everything repository-specific is a parameter: the Vitest project name (also the browser-project
 output marker), the command and argv, the `--result-file` paths removed before each attempt, the

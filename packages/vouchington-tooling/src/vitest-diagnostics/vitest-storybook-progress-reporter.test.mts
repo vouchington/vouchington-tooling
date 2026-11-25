@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TestModule } from 'vitest/node'
+import type { TestCase, TestModule } from 'vitest/node'
 import {
   DEFAULT_STORYBOOK_PROGRESS_PREFIX,
   createVitestStorybookProgressReporter,
@@ -26,6 +26,34 @@ describe('storybook progress reporter', () => {
     ])
     expect(lines[3]).toContain('module="/abs/b.mts"')
     expect(lines[0]!.startsWith(DEFAULT_STORYBOOK_PROGRESS_PREFIX)).toBe(true)
+  })
+
+  it('names the running test on test-start and test-end without module events', () => {
+    const lines: string[] = []
+    const reporter = createVitestStorybookProgressReporter({ write: (c) => void lines.push(c) })
+    const testCase = { fullName: 'Button > Primary', module: mod } as TestCase
+    reporter.onTestCaseReady(testCase)
+    reporter.onTestCaseResult(testCase)
+    expect(lines).toEqual([
+      '[vitest-browser-progress] seq=1 event=test-start module="a.mts" test="Button > Primary"\n',
+      '[vitest-browser-progress] seq=2 event=test-end module="a.mts" test="Button > Primary"\n',
+    ])
+    expect(latestStorybookProgressSequence(lines.join(''))).toBeNull()
+  })
+
+  it('bounds a long test name inside the marker budget', () => {
+    const marker = formatStorybookProgressMarker(
+      1,
+      'test-start',
+      'a.mts',
+      undefined,
+      'é'.repeat(500),
+    )
+    expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
+    expect(marker).toContain('module="a.mts" test="')
+    expect(marker).toContain('…')
+    const dropped = formatStorybookProgressMarker(1, 'test-start', 'x', 'p'.repeat(600), 'name')
+    expect(dropped.endsWith('module=""\n')).toBe(true)
   })
 
   it('writes to stdout by default and honors a custom prefix', () => {
