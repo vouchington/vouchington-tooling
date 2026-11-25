@@ -10,7 +10,77 @@ export { withPostgresQueryFailureForTest } from './query-failure.mts'
  */
 export { runPoolObservationExclusively } from './observation-queue.mts'
 export { createPostgresLockObservers, type PostgresLockObservers } from './lock-observers.mts'
-export { getTestPostgresBackendProcessId } from './lock-wait.mts'
+export { getTestPostgresBackendProcessId, testBlockedBackendHoldsRelation } from './lock-wait.mts'
+export {
+  acquireTestPostgresAdvisoryLock,
+  type AcquireTestPostgresAdvisoryLockOptions,
+  type TestPostgresAdvisoryLock,
+} from './advisory-lock.mts'
+export {
+  createTestPostgresLockWaiter,
+  type CreateTestPostgresLockWaiterOptions,
+  type TestLockWaiterHeldLock,
+  type TestLockWaiterHolder,
+} from './borrowed-lock-waiter.mts'
+export {
+  createTestPostgresConnectionWaitPool,
+  type PostgresConnectionWaitPoolOptions,
+  type TestPostgresConnectionWaitPool,
+} from './connection-wait.mts'
+export {
+  getPublicBaseTableNamesForTest,
+  installPsqlPoolSocketTracking,
+  readTestDatabaseTimestamp,
+  registerPsqlPoolMetrics,
+  type PsqlPoolMetric,
+  type PsqlPoolSocketHandles,
+} from './database-utilities.mts'
+export {
+  observeTestPostgresLockQuery,
+  type TestPostgresLockQuery,
+  type TestPostgresLockQueryObservation,
+} from './lock-query-observation.mts'
+export {
+  answerPostgresReadsForTest,
+  answerPostgresWritesForTest,
+  observePostgresWritesForTest,
+  rejectNextPostgresTransactionForTest,
+  rejectPostgresReadForTest,
+  rejectPostgresWriteForTest,
+  runAfterPostgresWriteForTest,
+  type PoolQueryMethod,
+  type ReadQueryTarget,
+  type WriteQueryTarget,
+} from './query-interception.mts'
+export { clientQueryText, tapClientQueries, type ObservedClientQuery } from './client-query-tap.mts'
+export {
+  observeTestPostgresClientQueries,
+  observeTestPostgresQueryPools,
+} from './query-pool-observer.mts'
+export {
+  observePostgresReadRoutingForTest,
+  type PostgresReadRoutingObserver,
+} from './read-routing.mts'
+export {
+  extractSqlStatement,
+  rejectQuery,
+  withFailingTransactionQueryOptionsForTest,
+  withForcedTransactionRollbackForTest,
+  withRejectedPostgresQueryForTest,
+  type CallableSqlQueryExecutor,
+  type ManagedSqlTransaction,
+  type SqlQueryResult,
+  type SqlStatementInput,
+  type TransactionBeginTarget,
+} from './executor-faults.mts'
+export {
+  afterNextPostgresCommitForTest,
+  afterPostgresTransactionQueryForTest,
+  beforePostgresTransactionQueryForTest,
+  interceptPostgresTransactionQueriesForTest,
+  interceptPostgresTransactionsForTest,
+  rewritePostgresTransactionRowsForTest,
+} from './transaction-interception.mts'
 export type {
   FaultCommand,
   LockObserverConfig,

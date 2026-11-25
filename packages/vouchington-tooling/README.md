@@ -1627,6 +1627,64 @@ const { result, error } = await withPostgresQueryFailureForTest(
 - `runPoolObservationExclusively(operation)` is the queue the two helpers above share. Wrap your own
   fault injection or pool observation in it so it never overlaps theirs on the same pool; it
   rejects when nested.
+- Additional test-only PostgreSQL fault, observation, and pool helpers on the same subpath:
+  `acquireTestPostgresAdvisoryLock`, `observeTestPostgresLockQuery`, `createTestPostgresLockWaiter`,
+  `testBlockedBackendHoldsRelation`, `clientQueryText`, `tapClientQueries`,
+  `observeTestPostgresQueryPools`, `observeTestPostgresClientQueries`,
+  `observePostgresReadRoutingForTest`, `createTestPostgresConnectionWaitPool`, `extractSqlStatement`,
+  `rejectQuery`, `withRejectedPostgresQueryForTest`, `withForcedTransactionRollbackForTest`,
+  `withFailingTransactionQueryOptionsForTest`, `interceptPostgresTransactionsForTest`,
+  `rewritePostgresTransactionRowsForTest`, `afterNextPostgresCommitForTest`,
+  `afterPostgresTransactionQueryForTest`, `beforePostgresTransactionQueryForTest`,
+  `interceptPostgresTransactionQueriesForTest`, `rejectPostgresReadForTest`,
+  `rejectPostgresWriteForTest`, `rejectNextPostgresTransactionForTest`,
+  `answerPostgresReadsForTest`, `answerPostgresWritesForTest`, `runAfterPostgresWriteForTest`,
+  `observePostgresWritesForTest`, `readTestDatabaseTimestamp`, `getPublicBaseTableNamesForTest`,
+  `installPsqlPoolSocketTracking`, and `registerPsqlPoolMetrics`.
+
+## Shared-database scope guard (test-only)
+
+`vouchington-tooling/shared-db-scope-guard` is a dev/test-only Vitest helper (requiring the
+optional `vitest` and `@vouchington/postgres` peers) that fails tests whose shared-database calls
+omit an owned ID list, keyset cursor, transaction reservation, or proven owned keyset read.
+
+Pass the logical guarded database name (`database`) when constructing the guard and runner so
+process-global registries survive `vi.resetModules()` and stay isolated per database:
+
+```ts
+import {
+  configureTestPostgresSessions,
+  createSharedDbScopeGuard,
+  createSharedDbScopeGuardRunner,
+  getSharedOwnedKeysetReadPolicy,
+} from 'vouchington-tooling/shared-db-scope-guard'
+
+const keysetPolicy = getSharedOwnedKeysetReadPolicy({
+  database: 'myapp',
+  operation: 'searchInbox',
+  table: 'inbox_items',
+})
+const guard = createSharedDbScopeGuard({
+  database: 'myapp',
+  idsOnlyOperations: ['searchInbox'],
+  reservableOperations: [{ operation: 'cleanupCursors', table: 'cursor_table' }],
+  policies: [keysetPolicy],
+})
+
+// In a Vitest setup file:
+configureTestPostgresSessions(process.env, { extraSettings: { 'hnsw.ef_search': 1000 } })
+guard.installObserver()
+
+// In a Vitest runner file:
+export default createSharedDbScopeGuardRunner({ database: 'myapp' })
+```
+
+Exports: `createSharedDbScopeGuard`, `createSharedDbScopeGuardRunner`,
+`installSharedDbScopeObserver`, `OwnedKeysetReadPolicy`, `getSharedOwnedKeysetReadPolicy`,
+`isImmediateUuidPredecessor`, `assertGuardedDatabaseName`, `getSharedDbScopeViolationStore`,
+`getSharedDbTransactionReservationStore`, `sharedDbScopeTestIdentity`,
+`configureTestPostgresSessions`, `parseTestStatementTimeout`, `FAST_TEST_STATEMENT_TIMEOUT_MS`,
+`MIN_TEST_STATEMENT_TIMEOUT_MS`, and `MAX_TEST_STATEMENT_TIMEOUT_MS`.
 
 The package's own tests start a throwaway cluster with `initdb`/`pg_ctl` found through
 `POSTGRES_BIN_DIR`, `PATH` or a standard install location. They skip where no server can run and

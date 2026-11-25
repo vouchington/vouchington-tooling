@@ -70,3 +70,37 @@ export async function getAdvisoryLockHolderProcessId(
     throw new Error('PostgreSQL did not report the test advisory-lock holder')
   return processId
 }
+
+/** True when a backend blocked by `holderProcessId` already holds a lock on `relationName`. */
+export async function testBlockedBackendHoldsRelation(
+  executor: QueryExecutor,
+  holderProcessId: number,
+  relationName: string,
+): Promise<boolean> {
+  const { rows } = await executor<{ holds: boolean }>({
+    text: `
+    /* testBlockedBackendHoldsRelation */
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_locks waiting
+      WHERE NOT waiting.granted
+        AND $1 = ANY(pg_blocking_pids(waiting.pid))
+        AND EXISTS (
+          SELECT 1
+          FROM pg_locks held
+          WHERE held.pid = waiting.pid
+            AND held.granted
+            AND held.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+            AND (
+              held.relation = $2::regclass
+              OR held.relation IN (
+                SELECT relid FROM pg_partition_tree($2::regclass)
+              )
+            )
+        )
+    ) AS holds
+  `,
+    values: [holderProcessId, relationName],
+  })
+  return rows[0]?.holds ?? false
+}

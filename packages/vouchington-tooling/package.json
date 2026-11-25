@@ -516,6 +516,11 @@
       "types": "./dist/pr-description/index.d.mts",
       "import": "./dist/pr-description/index.mjs",
       "default": "./dist/pr-description/index.mjs"
+    },
+    "./shared-db-scope-guard": {
+      "types": "./dist/shared-db-scope-guard/index.d.mts",
+      "import": "./dist/shared-db-scope-guard/index.mjs",
+      "default": "./dist/shared-db-scope-guard/index.mjs"
     }
   },
   "publishConfig": {
