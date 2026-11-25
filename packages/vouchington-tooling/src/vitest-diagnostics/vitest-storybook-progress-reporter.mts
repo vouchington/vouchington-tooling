@@ -1,10 +1,25 @@
-import type { Reporter, TestModule } from 'vitest/node'
+import { createHash } from 'node:crypto'
+
+import type { Reporter, TestCase, TestModule } from 'vitest/node'
 
 export const DEFAULT_STORYBOOK_PROGRESS_PREFIX = '[vitest-browser-progress]'
 const MAX_MARKER_BYTES = 512
 const MAX_MODULE_ID_CHARS = 400
+const MAX_TEST_NAME_CHARS = 160
+const MAX_SEQUENCE_DIGITS = 10
+// Bytes of the marker kept for the test field, taken from the module budget.
+const TEST_RESERVE_BYTES = 200
 
-export type StorybookProgressEvent = 'module-collected' | 'module-start' | 'module-end'
+/**
+ * `module-*` events are semantic progress. `test-start` and `test-end` only name the running test
+ * for the stall diagnostics and never count as progress.
+ */
+export type StorybookProgressEvent =
+  | 'module-collected'
+  | 'module-start'
+  | 'module-end'
+  | 'test-start'
+  | 'test-end'
 
 type WriteProgress = (chunk: string) => void
 
@@ -40,7 +55,15 @@ class VitestStorybookProgressReporter implements Reporter {
     this.emit('module-end', testModule)
   }
 
-  private emit(event: StorybookProgressEvent, testModule: TestModule): void {
+  onTestCaseReady(testCase: TestCase): void {
+    this.emit('test-start', testCase.module, testCase.fullName)
+  }
+
+  onTestCaseResult(testCase: TestCase): void {
+    this.emit('test-end', testCase.module, testCase.fullName)
+  }
+
+  private emit(event: StorybookProgressEvent, testModule: TestModule, testName?: string): void {
     this.sequence += 1
     this.write(
       formatStorybookProgressMarker(
@@ -48,6 +71,7 @@ class VitestStorybookProgressReporter implements Reporter {
         event,
         testModule.relativeModuleId || testModule.moduleId,
         this.prefix,
+        testName,
       ),
     )
   }
@@ -67,15 +91,34 @@ export function formatStorybookProgressMarker(
   event: StorybookProgressEvent,
   moduleId: string,
   prefix: string = DEFAULT_STORYBOOK_PROGRESS_PREFIX,
+  testName?: string,
 ): string {
-  let boundedModuleId = moduleId.slice(0, MAX_MODULE_ID_CHARS)
-  while (boundedModuleId.length > 0) {
-    const suffix = boundedModuleId.length < moduleId.length ? '…' : ''
-    const marker = `${prefix} seq=${sequence} event=${event} module=${JSON.stringify(`${boundedModuleId}${suffix}`)}\n`
-    if (Buffer.byteLength(marker) <= MAX_MARKER_BYTES) return marker
-    boundedModuleId = boundedModuleId.slice(0, -16)
+  const head = `${prefix} seq=${sequence} event=${event} module=`
+  // The module budget assumes the longest event and sequence, so every event spells one module the
+  // same way and the tracker keys it consistently; the test gets what the module leaves.
+  const worstHead = `${prefix} seq=${'9'.repeat(MAX_SEQUENCE_DIGITS)} event=module-collected module=`
+  const moduleBudget = MAX_MARKER_BYTES - 1 - Buffer.byteLength(worstHead) - TEST_RESERVE_BYTES
+  // A shortened module ends in a hash of the full id, so two long ids that share a prefix differ.
+  const hash = `#${createHash('sha256').update(moduleId).digest('hex').slice(0, 8)}`
+  const module = boundedJson(moduleId, MAX_MODULE_ID_CHARS, moduleBudget, hash)
+  if (module == null) return `${head}""\n`
+  const prefixed = `${head}${module}`
+  if (testName == null) return `${prefixed}\n`
+  // A fixed budget, so test-start and test-end shorten one name identically.
+  // The budget always fits at least an ellipsis, so this never returns null.
+  const test = boundedJson(testName, MAX_TEST_NAME_CHARS, TEST_RESERVE_BYTES - ' test='.length)!
+  return `${prefixed} test=${test}\n`
+}
+
+/** `text` as a JSON string within `maxChars` characters and `maxBytes` bytes, or null if none fits. */
+function boundedJson(text: string, maxChars: number, maxBytes: number, tag = ''): string | null {
+  const points = Array.from(text)
+  for (let keep = Math.min(points.length, maxChars); keep >= 0; keep -= 1) {
+    const suffix = keep < points.length ? `…${tag}` : ''
+    const json = JSON.stringify(`${points.slice(0, keep).join('')}${suffix}`)
+    if (Buffer.byteLength(json) <= maxBytes) return json
   }
-  return `${prefix} seq=${sequence} event=${event} module=""\n`
+  return null
 }
 
 export function latestStorybookProgressSequence(

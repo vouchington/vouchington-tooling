@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TestModule } from 'vitest/node'
+import type { TestCase, TestModule } from 'vitest/node'
 import {
   DEFAULT_STORYBOOK_PROGRESS_PREFIX,
   createVitestStorybookProgressReporter,
@@ -26,6 +26,57 @@ describe('storybook progress reporter', () => {
     ])
     expect(lines[3]).toContain('module="/abs/b.mts"')
     expect(lines[0]!.startsWith(DEFAULT_STORYBOOK_PROGRESS_PREFIX)).toBe(true)
+  })
+
+  it('names the running test on test-start and test-end without module events', () => {
+    const lines: string[] = []
+    const reporter = createVitestStorybookProgressReporter({ write: (c) => void lines.push(c) })
+    const testCase = { fullName: 'Button > Primary', module: mod } as TestCase
+    reporter.onTestCaseReady(testCase)
+    reporter.onTestCaseResult(testCase)
+    expect(lines).toEqual([
+      '[vitest-browser-progress] seq=1 event=test-start module="a.mts" test="Button > Primary"\n',
+      '[vitest-browser-progress] seq=2 event=test-end module="a.mts" test="Button > Primary"\n',
+    ])
+    expect(latestStorybookProgressSequence(lines.join(''))).toBeNull()
+  })
+
+  it('bounds a long test name inside the marker budget', () => {
+    const marker = formatStorybookProgressMarker(
+      1,
+      'test-start',
+      'a.mts',
+      undefined,
+      'é'.repeat(500),
+    )
+    expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
+    expect(marker).toContain('module="a.mts" test="')
+    expect(marker).toContain('…')
+    const dropped = formatStorybookProgressMarker(1, 'test-start', 'x', 'p'.repeat(600), 'name')
+    expect(dropped.endsWith('module=""\n')).toBe(true)
+  })
+
+  it('bounds a multibyte test name by bytes and keeps the module', () => {
+    const marker = formatStorybookProgressMarker(2, 'test-start', 'm', undefined, '漢'.repeat(160))
+    expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
+    expect(marker).toContain(' module="m" test="漢')
+    expect(marker).toContain('…"\n')
+    const emoji = formatStorybookProgressMarker(2, 'test-start', 'm', undefined, '😀'.repeat(160))
+    expect(JSON.parse(emoji.match(/test=(".*")\n$/u)![1]!)).toMatch(/^(?:😀)+…$/u)
+  })
+
+  it('spells a long module the same for every event', () => {
+    const moduleId = 'a'.repeat(300)
+    const moduleOf = (marker: string) => marker.match(/module=("[^"]*")/)![1]
+    const markers = [
+      formatStorybookProgressMarker(1, 'module-collected', moduleId),
+      formatStorybookProgressMarker(2, 'module-start', moduleId),
+      formatStorybookProgressMarker(3, 'test-start', moduleId, undefined, 'b'.repeat(160)),
+      formatStorybookProgressMarker(4, 'test-end', moduleId, undefined, 'b'.repeat(160)),
+      formatStorybookProgressMarker(5, 'module-end', moduleId),
+    ]
+    expect(new Set(markers.map(moduleOf)).size).toBe(1)
+    for (const marker of markers) expect(Buffer.byteLength(marker)).toBeLessThanOrEqual(512)
   })
 
   it('writes to stdout by default and honors a custom prefix', () => {

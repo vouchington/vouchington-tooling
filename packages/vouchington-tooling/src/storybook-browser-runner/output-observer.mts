@@ -17,6 +17,7 @@ import {
   type OutputObserverSnapshot,
   type OutputObserverState,
 } from './observer-state.mts'
+import { ProgressTracker, type StallContext } from './progress-tracker.mts'
 import type { StorybookQuietOutput } from './quiet-output.mts'
 import {
   hasStorybookBrowserViteDependencyReady,
@@ -57,15 +58,23 @@ export class OutputObserver {
     stderr: new StringDecoder('utf8'),
     stdout: new StringDecoder('utf8'),
   }
+  private readonly progressTails = { stderr: '', stdout: '' }
   private state: OutputObserverState
+  private readonly tracker: ProgressTracker
 
   constructor(options: OutputObserverOptions) {
     this.options = options
     this.state = initialObserverState(options.startedAt)
+    this.tracker = new ProgressTracker(options.progressPrefix)
   }
 
   snapshot(): OutputObserverSnapshot {
     return { ...this.state, newOptimizeDeps: [...this.newOptimizeDeps] }
+  }
+
+  /** The modules and test still running, and the latest markers, for a stall message. */
+  stallContext(now: number): StallContext {
+    return this.tracker.context(now)
   }
 
   observe(source: Source, chunk: string | Buffer): void {
@@ -80,7 +89,10 @@ export class OutputObserver {
     // The marker can be split across chunks, so it is also matched against the previous tail.
     const joined = state.outputBuffer.slice(-OPTIMIZER_MARKER_OVERLAP) + text
     // Progress markers are read from the whole chunk, not the truncated rolling buffer.
-    const progressText = stripAnsi(state.outputBuffer.slice(-PROGRESS_MARKER_OVERLAP) + text)
+    // Per stream, so output on the other stream cannot split a marker that is still arriving.
+    const progressRaw = this.progressTails[source] + text
+    this.progressTails[source] = progressRaw.slice(-PROGRESS_MARKER_OVERLAP)
+    const progressText = stripAnsi(progressRaw)
     state.outputBuffer = (state.outputBuffer + text).slice(-BUFFER_CHARS)
     const plainBuffer = stripAnsi(state.outputBuffer)
     state.anyOutputSeen = true
@@ -133,6 +145,7 @@ export class OutputObserver {
   ): void {
     const { patterns, progressPrefix } = this.options
     const state = this.state
+    this.tracker.observe(progressText, now)
     const sequence = latestStorybookProgressSequence(progressText, progressPrefix)
     if (sequence != null && sequence > this.lastSemanticSequence) {
       this.lastSemanticSequence = sequence

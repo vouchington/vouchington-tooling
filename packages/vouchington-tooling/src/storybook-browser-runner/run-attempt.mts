@@ -103,6 +103,7 @@ export async function runUpstreamAttempt(input: RunAttemptInput): Promise<Attemp
         watchdog: createStorybookWatchdog({
           completionFile: project.completionFile,
           deps,
+          diagnostics,
           hangMs: options.hangMs,
           observer,
           outcome,
