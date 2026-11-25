@@ -5,6 +5,8 @@ export const FAST_TEST_STATEMENT_TIMEOUT_MS = 2_000
 /** Shared notice observers require a full second; smaller operation-local bounds stay separate. */
 export const MIN_TEST_STATEMENT_TIMEOUT_MS = 1_000
 
+const GUC_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_.]*$/u
+
 export interface StatementTimeoutBounds {
   defaultMs?: number
   minMs?: number
@@ -21,6 +23,12 @@ export function parseTestStatementTimeout(
   const minMs = bounds.minMs ?? MIN_TEST_STATEMENT_TIMEOUT_MS
   const maxMs = bounds.maxMs ?? MAX_TEST_STATEMENT_TIMEOUT_MS
   const envVarName = bounds.envVarName ?? 'PG_TEST_STATEMENT_TIMEOUT_MS'
+  if (!Number.isSafeInteger(minMs) || !Number.isSafeInteger(maxMs) || minMs < 1 || minMs > maxMs) {
+    throw new RangeError(`${envVarName} bounds must be safe integers with 1 <= minMs <= maxMs`)
+  }
+  if (!Number.isSafeInteger(defaultMs) || defaultMs < minMs || defaultMs > maxMs) {
+    throw new RangeError(`${envVarName} default must be an integer from ${minMs} to ${maxMs}`)
+  }
   if (raw === undefined) return defaultMs
   const value = Number(raw)
   if (!/^[1-9]\d*$/u.test(raw) || !Number.isSafeInteger(value) || value < minMs || value > maxMs) {
@@ -42,6 +50,19 @@ export interface TestPostgresSessionOptions {
   extraSettings?: Readonly<Record<string, string | number>>
 }
 
+function formatExtraSetting(name: string, settingValue: string | number): string {
+  if (!GUC_NAME_PATTERN.test(name)) {
+    throw new RangeError(`Invalid PostgreSQL GUC setting name: "${name}"`)
+  }
+  if (name.toLowerCase() === 'statement_timeout') {
+    throw new RangeError(
+      'Configure statement_timeout via statementTimeoutEnvVar or statementTimeoutBounds instead of extraSettings',
+    )
+  }
+  const escaped = String(settingValue).replaceAll('\\', '\\\\').replace(/\s/gu, '\\$&')
+  return `-c ${name}=${escaped}`
+}
+
 /**
  * Appends deterministic PostgreSQL startup `options` to configured connection URL environment
  * variables while preserving hostless socket URIs, fragments, `%20`, and raw `+` characters.
@@ -57,8 +78,8 @@ export function configureTestPostgresSessions(
     ...options.statementTimeoutBounds,
     envVarName: options.statementTimeoutBounds?.envVarName ?? timeoutEnvVar,
   })
-  const extraParts = Object.entries(options.extraSettings ?? {}).map(
-    ([name, settingValue]) => `-c ${name}=${String(settingValue)}`,
+  const extraParts = Object.entries(options.extraSettings ?? {}).map(([name, settingValue]) =>
+    formatExtraSetting(name, settingValue),
   )
   const settings = [`-c statement_timeout=${statementTimeoutMs}`, ...extraParts].join(' ')
   const initialPrefix = (options.jitOff ?? true) ? `-c jit=off ${settings}` : settings

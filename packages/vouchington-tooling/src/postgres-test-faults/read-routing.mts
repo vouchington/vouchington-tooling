@@ -28,6 +28,9 @@ export async function observePostgresReadRoutingForTest(pools: {
   primary: pg.Pool
   replica: pg.Pool
 }): Promise<PostgresReadRoutingObserver> {
+  if (pools.primary === pools.replica) {
+    throw new RangeError('Primary and replica pools must be distinct pg.Pool instances')
+  }
   let primaryAcquisitions = 0
   let replicaAcquisitions = 0
   const token = Symbol('postgres-read-routing')

@@ -13,7 +13,8 @@ export interface AcquireTestPostgresAdvisoryLockOptions {
 
 /**
  * Acquires a session-level PostgreSQL advisory lock on a leased `pg.PoolClient` under a
- * transaction-local `statement_timeout`, returning an idempotent `release()` handle.
+ * transaction-local `statement_timeout`, returning an idempotent `release()` handle whose
+ * concurrent callers await the same single-shot unlock.
  */
 export async function acquireTestPostgresAdvisoryLock(
   pool: pg.Pool,
@@ -46,28 +47,28 @@ function createTestPostgresAdvisoryLock(
   key: number,
   mode: 'shared' | 'exclusive',
 ): TestPostgresAdvisoryLock {
-  let released = false
+  let releasePromise: Promise<void> | undefined
 
   return {
-    async release(): Promise<void> {
-      if (released) return
-      released = true
-
-      try {
-        const result = await client.query<{ unlocked: boolean }>(
-          mode === 'shared'
-            ? '/* releaseTestPostgresAdvisoryLock */ SELECT pg_advisory_unlock_shared($1, $2) AS unlocked'
-            : '/* releaseTestPostgresAdvisoryLock */ SELECT pg_advisory_unlock($1, $2) AS unlocked',
-          [namespace, key],
-        )
-        if (!result.rows[0]?.unlocked) {
-          throw new Error('PostgreSQL did not release the test advisory lock')
+    release(): Promise<void> {
+      releasePromise ??= (async () => {
+        try {
+          const result = await client.query<{ unlocked: boolean }>(
+            mode === 'shared'
+              ? '/* releaseTestPostgresAdvisoryLock */ SELECT pg_advisory_unlock_shared($1, $2) AS unlocked'
+              : '/* releaseTestPostgresAdvisoryLock */ SELECT pg_advisory_unlock($1, $2) AS unlocked',
+            [namespace, key],
+          )
+          if (!result.rows[0]?.unlocked) {
+            throw new Error('PostgreSQL did not release the test advisory lock')
+          }
+          client.release()
+        } catch (err) {
+          client.release(toError(err))
+          throw err
         }
-        client.release()
-      } catch (err) {
-        client.release(toError(err))
-        throw err
-      }
+      })()
+      return releasePromise
     },
   }
 }

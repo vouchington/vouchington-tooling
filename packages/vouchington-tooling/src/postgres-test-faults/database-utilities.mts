@@ -112,7 +112,7 @@ export function registerPsqlPoolMetrics<Name extends string>(
 
   const host = globalThis as typeof globalThis & Record<symbol, unknown>
   host[poolMetricsKey] = (): Record<Name, PsqlPoolMetric> => {
-    const metrics = {} as Record<Name, PsqlPoolMetric>
+    const metrics = Object.create(null) as Record<Name, PsqlPoolMetric>
     for (const [name, pool] of entries) {
       metrics[name] = snapshotPool(pool)
     }
@@ -133,9 +133,10 @@ function markPoolTcpResource(tracker: TcpResourceTracker, client: unknown): void
   if (typeof connection !== 'object' || connection === null) return
   const stream: unknown = Reflect.get(connection, 'stream')
   if (typeof stream !== 'object' || stream === null) return
-  const streamHandle: unknown = Reflect.get(stream, '_handle')
-  if (typeof streamHandle === 'object' && streamHandle !== null) {
+  let streamHandle: unknown = Reflect.get(stream, '_handle')
+  while (typeof streamHandle === 'object' && streamHandle !== null) {
     tracker.owned.add(streamHandle)
+    streamHandle = Reflect.get(streamHandle, '_parent')
   }
 }
 

@@ -60,9 +60,7 @@ export interface SharedDbScopeGuard<
   installObserver(observer?: SharedDbScopeObserver<Operation, Table, KeysetRead>): () => void
   rejectUnscopedCall(event: SharedDbScopeEvent<Operation, Table, KeysetRead>): void
   recordViolation(event: SharedDbScopeEvent<Operation, Table, KeysetRead>, message: string): void
-  unreportedViolations(
-    filepath: string,
-  ): readonly SharedDbScopeViolation<SharedDbScopeEvent<Operation, Table, KeysetRead>>[]
+  unreportedViolations(filepath: string): readonly SharedDbScopeViolation<unknown>[]
   markViolationsReported(filepath: string): void
   currentTestIdentity(): string
   registerTransactionReservation(transaction: Transaction): () => void
@@ -86,6 +84,10 @@ export function createSharedDbScopeGuard<
   const idsOnly = new Set<Operation>(options.idsOnlyOperations ?? [])
   const reservable = options.reservableOperations ?? []
   const policies = options.policies ?? []
+  const admittedKeysetPolicies = new Map<
+    symbol,
+    SharedDbScopePolicy<Operation, Table, KeysetRead>
+  >()
   const store =
     getSharedDbScopeViolationStore<SharedDbScopeEvent<Operation, Table, KeysetRead>>(database)
   const reservations = getSharedDbTransactionReservationStore<Transaction>(database)
@@ -114,9 +116,20 @@ export function createSharedDbScopeGuard<
       return
     }
 
-    for (const policy of policies) {
+    const keysetRead = event.keysetRead
+    const admittedPolicy =
+      keysetRead?.phase === 'completed'
+        ? admittedKeysetPolicies.get(keysetRead.identity)
+        : undefined
+    const candidatePolicies = admittedPolicy ? [admittedPolicy] : policies
+    for (const policy of candidatePolicies) {
       try {
-        if (policy.observe(event, owner)) return
+        if (policy.observe(event, owner)) {
+          if (keysetRead?.phase === 'start') {
+            admittedKeysetPolicies.set(keysetRead.identity, policy)
+          }
+          return
+        }
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err)
         store.record(event, `${messagePrefix} ${detail}`)

@@ -50,6 +50,42 @@ describe('acquireTestPostgresAdvisoryLock', () => {
       expect(release).toHaveBeenCalledTimes(1)
       expect(release).toHaveBeenCalledWith()
     }
+
+    // Concurrent release() calls share one in-flight unlock promise instead of resolving early.
+    let resolveUnlock!: (value: { rows: Array<{ unlocked: boolean }> }) => void
+    const concurrentRelease = vi.fn()
+    let unlockCalls = 0
+    const concurrentPool = {
+      connect: vi.fn(async () => ({
+        query: vi.fn((text: string) => {
+          if (text.includes('pg_advisory_unlock')) {
+            unlockCalls += 1
+            return new Promise<{ rows: Array<{ unlocked: boolean }> }>((resolve) => {
+              resolveUnlock = resolve
+            })
+          }
+          return Promise.resolve({ rows: [] })
+        }),
+        release: concurrentRelease,
+      })),
+    } as unknown as pg.Pool
+    const concurrentLock = await acquireTestPostgresAdvisoryLock(concurrentPool, {
+      namespace: 3,
+      key: 4,
+      timeout: '500ms',
+    })
+    let secondDone = false
+    const firstRelease = concurrentLock.release()
+    const secondRelease = concurrentLock.release().then(() => {
+      secondDone = true
+    })
+    await Promise.resolve()
+    expect(secondDone).toBe(false)
+    expect(unlockCalls).toBe(1)
+    resolveUnlock({ rows: [{ unlocked: true }] })
+    await Promise.all([firstRelease, secondRelease])
+    expect(secondDone).toBe(true)
+    expect(concurrentRelease).toHaveBeenCalledTimes(1)
   })
 
   it('destroys the client when acquire or release fails or PostgreSQL reports unlocked=false', async () => {
@@ -173,6 +209,16 @@ describe('observeTestPostgresLockQuery', () => {
     ).toThrow('did not target the expected bound identity')
     obs2.restore()
     expect(Reflect.get(ownClient, 'query')).toBe(ownQuery)
+
+    // Restoring does not clobber a newer replacement wrapper on client.query.
+    const obs3 = observeTestPostgresLockQuery(ownClient, {
+      marker: '/* str */',
+      binding: { index: 0, value: 'v' },
+    })
+    const replacement = vi.fn(async () => ({ rows: [] }))
+    ;(ownClient as unknown as { query: unknown }).query = replacement
+    obs3.restore()
+    expect(Reflect.get(ownClient, 'query')).toBe(replacement)
   })
 })
 
@@ -242,7 +288,9 @@ describe('database utilities and testBlockedBackendHoldsRelation', () => {
       new Set(['users', 'orders']),
     )
 
-    const holdsExecutor: QueryExecutor = async ({ values }) => {
+    const holdsExecutor: QueryExecutor = async ({ text, values }) => {
+      expect(text).toContain('current_database()')
+      expect(text).toContain('pg_partition_tree($2::regclass)')
       expect(values).toEqual([42, 'orders'])
       return { rows: [{ holds: true }] } as never
     }
@@ -257,6 +305,7 @@ describe('database utilities and testBlockedBackendHoldsRelation', () => {
   it('registers pool metrics and tracks owned TCP handles across connect events and pre-existing clients', async () => {
     const handleA = { id: 'tcp-a' }
     const handleB = { id: 'tcp-b' }
+    const tlsWrappedHandle = { id: 'tls-wrap', _parent: handleB }
     const poolA = Object.assign(new EventEmitter(), {
       totalCount: 3,
       idleCount: 1,
@@ -279,26 +328,35 @@ describe('database utilities and testBlockedBackendHoldsRelation', () => {
     // Exercise TCPWRAP init/destroy hook callbacks without binding a socket.
     const syntheticTcp = new AsyncResource('TCPWRAP')
     const syntheticNonTcp = new AsyncResource('OTHER')
-    registerPsqlPoolMetrics({
+    const poolsInput: Record<string, pg.Pool> = {
       primary: poolA as unknown as pg.Pool,
       replica: poolB as unknown as pg.Pool,
+    }
+    Object.defineProperty(poolsInput, '__proto__', {
+      value: poolB as unknown as pg.Pool,
+      enumerable: true,
+      configurable: true,
     })
+    registerPsqlPoolMetrics(poolsInput)
     // Re-registering skips duplicate listener attachment.
-    registerPsqlPoolMetrics({
-      primary: poolA as unknown as pg.Pool,
-      replica: poolB as unknown as pg.Pool,
-    })
+    registerPsqlPoolMetrics(poolsInput)
 
-    poolB.emit('connect', { connection: { stream: { _handle: handleB } } })
+    poolB.emit('connect', { connection: { stream: { _handle: tlsWrappedHandle } } })
 
     const host = globalThis as typeof globalThis & Record<symbol, unknown>
     const readMetrics = host[Symbol.for('vitest-fork-leak-pool-metrics')] as () => Record<
       string,
       PsqlPoolMetric
     >
-    expect(readMetrics()).toEqual({
-      primary: { total: 3, idle: 1, nonIdleOrConnecting: 2, waiting: 2 },
-      replica: { total: 1, idle: 1, nonIdleOrConnecting: 0, waiting: 0 },
+    const metrics = readMetrics()
+    expect(Object.getPrototypeOf(metrics)).toBeNull()
+    expect(metrics.primary).toEqual({ total: 3, idle: 1, nonIdleOrConnecting: 2, waiting: 2 })
+    expect(metrics.replica).toEqual({ total: 1, idle: 1, nonIdleOrConnecting: 0, waiting: 0 })
+    expect(Object.getOwnPropertyDescriptor(metrics, '__proto__')?.value).toEqual({
+      total: 1,
+      idle: 1,
+      nonIdleOrConnecting: 0,
+      waiting: 0,
     })
 
     const readSockets = host[

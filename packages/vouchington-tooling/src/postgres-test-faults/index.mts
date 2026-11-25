@@ -52,12 +52,10 @@ export {
   type ReadQueryTarget,
   type WriteQueryTarget,
 } from './query-interception.mts'
+export { clientQueryText, tapClientQueries, type ObservedClientQuery } from './client-query-tap.mts'
 export {
-  clientQueryText,
   observeTestPostgresClientQueries,
   observeTestPostgresQueryPools,
-  tapClientQueries,
-  type ObservedClientQuery,
 } from './query-pool-observer.mts'
 export {
   observePostgresReadRoutingForTest,

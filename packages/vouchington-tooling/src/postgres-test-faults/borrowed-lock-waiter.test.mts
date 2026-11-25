@@ -62,7 +62,10 @@ describe('createTestPostgresLockWaiter', () => {
     const { client, emitter, release, query } = createFakeNoticeClient()
     const pool = { connect: vi.fn(async () => client) } as unknown as pg.Pool
     const holder = createHolder([{ transaction_id: '777' }])
-    const txDispose = vi.fn(async () => undefined)
+    const txDispose = vi.fn(async () => {
+      // String ROLLBACK query succeeds because lock observation is restored before tx disposal.
+      await client.query('ROLLBACK')
+    })
     let resolveTarget!: () => void
     ;(client as unknown as { query: unknown }).query = (
       input: string | { text: string; values?: unknown[] },
@@ -81,13 +84,14 @@ describe('createTestPostgresLockWaiter', () => {
       [Symbol.asyncDispose]: txDispose,
     }
 
+    let callerAllowsNotice = false
     const waiter = await createTestPostgresLockWaiter({
       pool,
       holder,
       beginTransaction: async () => tx,
       lock: { kind: 'transaction' },
       selected: { marker: '/* target */', binding: { index: 0, value: 'row-1' } },
-      notice: { applicationNamePrefix: 'test-lock' },
+      notice: { applicationNamePrefix: 'test-lock', eligible: () => callerAllowsNotice },
     })
 
     const queryPromise = tx.run()
@@ -98,6 +102,18 @@ describe('createTestPostgresLockWaiter', () => {
     const waitPromise = waiter.waitForLock(action)
     expect(() => waiter.waitForLock(action)).toThrow('accepts one live action')
 
+    // Caller eligible predicate returning false suppresses the notice until allowed.
+    let waitSettled = false
+    void waitPromise.then(() => {
+      waitSettled = true
+    })
+    emitter.emit('notice', {
+      message: 'process 9001 still waiting for ShareLock on transaction 777 after 1.000 ms',
+    })
+    await Promise.resolve()
+    expect(waitSettled).toBe(false)
+
+    callerAllowsNotice = true
     emitter.emit('notice', {
       message: 'process 9001 still waiting for ShareLock on transaction 777 after 1.000 ms',
     })
@@ -153,23 +169,25 @@ describe('createTestPostgresLockWaiter', () => {
   })
 
   it('aggregates cleanup failures with primary setup failure or rejected action and destroys client', async () => {
+    const connectErr = new Error('connect boom')
     const failConnectPool = {
       connect: vi.fn(async () => {
-        throw new Error('connect boom')
+        throw connectErr
       }),
     } as unknown as pg.Pool
+    const holderErr = new Error('holder release boom')
     const failingHolder = createHolder([{ transaction_id: '55' }], async () => {
-      throw new Error('holder release boom')
+      throw holderErr
     })
-    await expect(
-      createTestPostgresLockWaiter({
-        pool: failConnectPool,
-        holder: failingHolder,
-        beginTransaction: async () => ({ [Symbol.asyncDispose]: async () => undefined }),
-        lock: { kind: 'transaction' },
-        selected: { marker: '/* m */', binding: { index: 0, value: 'v' } },
-      }),
-    ).rejects.toThrow('Owned PostgreSQL waiter cleanup failed')
+    const setupFailure = await createTestPostgresLockWaiter({
+      pool: failConnectPool,
+      holder: failingHolder,
+      beginTransaction: async () => ({ [Symbol.asyncDispose]: async () => undefined }),
+      lock: { kind: 'transaction' },
+      selected: { marker: '/* m */', binding: { index: 0, value: 'v' } },
+    }).catch((err: unknown) => err)
+    expect(setupFailure).toBeInstanceOf(AggregateError)
+    expect((setupFailure as AggregateError).errors).toEqual([connectErr, holderErr])
 
     const { client, emitter, release } = createFakeNoticeClient({
       closeFails: true,
@@ -177,12 +195,13 @@ describe('createTestPostgresLockWaiter', () => {
     })
     const pool = { connect: vi.fn(async () => client) } as unknown as pg.Pool
     const holder = createHolder([{ transaction_id: '88' }])
+    const txDisposeErr = new Error('tx dispose boom')
     const waiter = await createTestPostgresLockWaiter({
       pool,
       holder,
       beginTransaction: async () => ({
         [Symbol.asyncDispose]: async () => {
-          throw new Error('tx dispose boom')
+          throw txDisposeErr
         },
       }),
       lock: { kind: 'transaction' },
@@ -190,7 +209,8 @@ describe('createTestPostgresLockWaiter', () => {
     })
 
     void client.query({ text: '/* target */ SELECT 1', values: ['v'] })
-    const rejectedAction = Promise.reject(new Error('action boom'))
+    const actionErr = new Error('action boom')
+    const rejectedAction = Promise.reject(actionErr)
     void rejectedAction.catch(() => undefined)
     const waiting = waiter.waitForLock(rejectedAction)
     emitter.emit('notice', {
@@ -198,10 +218,82 @@ describe('createTestPostgresLockWaiter', () => {
     })
     await waiting.catch(() => undefined)
 
-    await expect(waiter[Symbol.asyncDispose]()).rejects.toThrow(
-      'Owned PostgreSQL waiter cleanup failed',
-    )
-    expect(release).toHaveBeenCalledWith(expect.any(AggregateError))
+    const disposeFailure = await waiter[Symbol.asyncDispose]().catch((err: unknown) => err)
+    expect(disposeFailure).toBeInstanceOf(AggregateError)
+    expect((disposeFailure as AggregateError).errors.map((err: Error) => err.message)).toEqual([
+      'action boom',
+      'tx dispose boom',
+      'restore settings failed',
+      'Owned lock queries did not finish draining',
+    ])
+    expect(release).toHaveBeenCalledWith(disposeFailure)
+  })
+
+  it('releases holder on registerCleanup error, discards client on beginTransaction error, and skips hang on holder release failure', async () => {
+    const regHolder = createHolder([{ transaction_id: '11' }])
+    await expect(
+      createTestPostgresLockWaiter({
+        pool: { connect: vi.fn() } as unknown as pg.Pool,
+        holder: regHolder,
+        beginTransaction: async () => ({ [Symbol.asyncDispose]: async () => undefined }),
+        lock: { kind: 'transaction' },
+        selected: { marker: '/* m */', binding: { index: 0, value: 'v' } },
+        registerCleanup: () => {
+          throw new Error('registerCleanup boom')
+        },
+      }),
+    ).rejects.toThrow('registerCleanup boom')
+    expect(regHolder.release).toHaveBeenCalledOnce()
+
+    // beginTransaction throwing after connect must discard the borrowed client.
+    const { client: txClient, release: txRelease } = createFakeNoticeClient()
+    const txHolder = createHolder([{ transaction_id: '22' }])
+    await expect(
+      createTestPostgresLockWaiter({
+        pool: { connect: vi.fn(async () => txClient) } as unknown as pg.Pool,
+        holder: txHolder,
+        beginTransaction: async () => {
+          throw new Error('beginTx boom')
+        },
+        lock: { kind: 'transaction' },
+        selected: { marker: '/* m */', binding: { index: 0, value: 'v' } },
+      }),
+    ).rejects.toThrow('beginTx boom')
+    expect(txRelease).toHaveBeenCalledWith(true)
+
+    // When holder.release() fails while action is blocked forever, dispose does not hang.
+    const {
+      client: blockedClient,
+      emitter: blockedEmitter,
+      release: blockedRelease,
+    } = createFakeNoticeClient({ keepPendingQuery: true })
+    const releaseErr = new Error('holder unlock failed')
+    const stuckHolder = createHolder([{ transaction_id: '33' }], async () => {
+      throw releaseErr
+    })
+    const txDisposeSpy = vi.fn(async () => undefined)
+    const stuckWaiter = await createTestPostgresLockWaiter({
+      pool: { connect: vi.fn(async () => blockedClient) } as unknown as pg.Pool,
+      holder: stuckHolder,
+      beginTransaction: async () => ({ [Symbol.asyncDispose]: txDisposeSpy }),
+      lock: { kind: 'transaction' },
+      selected: { marker: '/* target */', binding: { index: 0, value: 'v' } },
+    })
+    void blockedClient.query({ text: '/* target */ SELECT 1', values: ['v'] })
+    const neverAction = new Promise<void>(() => {})
+    const waiting = stuckWaiter.waitForLock(neverAction)
+    blockedEmitter.emit('notice', {
+      message: 'process 9001 still waiting for ShareLock on transaction 33 after 1.000 ms',
+    })
+    await waiting
+    const stuckError = await stuckWaiter[Symbol.asyncDispose]().catch((err: unknown) => err)
+    expect(stuckError).toBeInstanceOf(AggregateError)
+    expect((stuckError as AggregateError).errors.map((err: Error) => err.message)).toEqual([
+      'holder unlock failed',
+      'Owned lock queries did not finish draining',
+    ])
+    expect(txDisposeSpy).not.toHaveBeenCalled()
+    expect(blockedRelease).toHaveBeenCalledWith(stuckError)
   })
 
   it('aborts setup when cleanup runs mid-setup via registerCleanup', async () => {

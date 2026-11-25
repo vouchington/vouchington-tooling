@@ -90,8 +90,12 @@ export async function testBlockedBackendHoldsRelation(
           FROM pg_locks held
           WHERE held.pid = waiting.pid
             AND held.granted
-            AND held.relation IN (
-              SELECT relid FROM pg_partition_tree($2::regclass)
+            AND held.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+            AND (
+              held.relation = $2::regclass
+              OR held.relation IN (
+                SELECT relid FROM pg_partition_tree($2::regclass)
+              )
             )
         )
     ) AS holds

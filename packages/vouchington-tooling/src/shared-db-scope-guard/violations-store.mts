@@ -24,7 +24,7 @@ export function sharedDbScopeTestIdentity(): string {
 }
 
 export interface SharedDbScopeViolationStore<Event = unknown> {
-  unreported(filepath: string): readonly SharedDbScopeViolation<Event>[]
+  unreported(filepath: string): readonly SharedDbScopeViolation<unknown>[]
   markReported(filepath: string): void
   record(event: Event, message: string): void
 }
@@ -37,11 +37,11 @@ export function getSharedDbScopeViolationStore<Event = unknown>(
   const violationsKey = Symbol.for(`${name}.vitest-shared-db-scope-violations`)
   const reportedKey = Symbol.for(`${name}.vitest-shared-db-scope-reported`)
 
-  const violations = (): SharedDbScopeViolation<Event>[] => {
+  const violations = (): SharedDbScopeViolation<unknown>[] => {
     const host = globalThis as unknown as GlobalHost
-    const existing = host[violationsKey] as SharedDbScopeViolation<Event>[] | undefined
+    const existing = host[violationsKey] as SharedDbScopeViolation<unknown>[] | undefined
     if (existing) return existing
-    const created: SharedDbScopeViolation<Event>[] = []
+    const created: SharedDbScopeViolation<unknown>[] = []
     host[violationsKey] = created
     return created
   }
@@ -56,7 +56,7 @@ export function getSharedDbScopeViolationStore<Event = unknown>(
   }
 
   return {
-    unreported(filepath: string): readonly SharedDbScopeViolation<Event>[] {
+    unreported(filepath: string): readonly SharedDbScopeViolation<unknown>[] {
       return violations()
         .filter((violation) => violation.filepath === filepath)
         .slice(reportedCounts().get(filepath) ?? 0)

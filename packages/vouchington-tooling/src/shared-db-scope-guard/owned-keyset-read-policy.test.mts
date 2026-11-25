@@ -82,10 +82,13 @@ describe('OwnedKeysetReadPolicy', () => {
       'immediate UUID predecessor',
     )
 
+    const mutableFixture: OwnedKeysetFixture = { ...FIXTURE }
     const failures: string[] = []
-    const close = policy.register('test:1', FIXTURE, (_event, message) => {
+    const close = policy.register('test:1', mutableFixture, (_event, message) => {
       failures.push(message)
     })
+    mutableFixture.id = '019c64e6-f710-7000-8000-0000000000ff'
+    mutableFixture.timestamp = '2099-01-01T00:00:00.000000Z'
     const identity = Symbol('read-1')
     expect(policy.observe(startEvent(identity), 'test:1')).toBe(true)
     expect(policy.observe(completedEvent(identity, { rowCount: 2 }), 'test:1')).toBe(true)
@@ -192,6 +195,38 @@ describe('getSharedOwnedKeysetReadPolicy', () => {
       ...TARGET,
     })
     expect(custom).not.toBe(first)
+
+    // Different operations or page limits on the same database receive distinct default instances.
+    const otherOp = getSharedOwnedKeysetReadPolicy({
+      database: db,
+      operation: 'searchOrders',
+      table: 'orders',
+    })
+    const biggerLimit = getSharedOwnedKeysetReadPolicy({
+      database: db,
+      ...TARGET,
+      limit: 2,
+    })
+    expect(otherOp).not.toBe(first)
+    expect(biggerLimit).not.toBe(first)
+
+    // Reusing an explicit policyKey with a different target or limit is rejected.
+    expect(() =>
+      getSharedOwnedKeysetReadPolicy({
+        database: db,
+        policyKey: `${db}.custom-policy`,
+        operation: 'searchOrders',
+        table: 'orders',
+      }),
+    ).toThrow(RangeError)
+    expect(() =>
+      getSharedOwnedKeysetReadPolicy({
+        database: db,
+        policyKey: `${db}.custom-policy`,
+        ...TARGET,
+        limit: 2,
+      }),
+    ).toThrow(RangeError)
 
     expect(() =>
       getSharedOwnedKeysetReadPolicy({ database: db, policyKey: '   ', ...TARGET }),

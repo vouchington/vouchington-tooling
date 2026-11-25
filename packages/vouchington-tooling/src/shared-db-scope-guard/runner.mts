@@ -42,22 +42,34 @@ export function createSharedDbScopeGuardRunner<Base extends typeof TestRunner = 
 
     override async onBeforeRunSuite(suite: Parameters<TestRunner['onBeforeRunSuite']>[0]) {
       await super.onBeforeRunSuite(suite)
-      if (suite.result?.state === 'fail') this.#reportFileViolations(suite)
+      const isSkipped = suite.mode === 'skip' || suite.mode === 'todo'
+      if (suite.result?.state === 'fail' || isSkipped) {
+        this.#reportFileViolations(suite, isSkipped)
+      }
     }
 
     override async onAfterRunSuite(suite: Parameters<TestRunner['onAfterRunSuite']>[0]) {
       await super.onAfterRunSuite(suite)
-      this.#reportFileViolations(suite)
+      this.#reportFileViolations(suite, false)
     }
 
-    #reportFileViolations(suite: Parameters<TestRunner['onAfterRunSuite']>[0]): void {
+    #reportFileViolations(
+      suite: Parameters<TestRunner['onAfterRunSuite']>[0],
+      initializeResult: boolean,
+    ): void {
       if (!('filepath' in suite) || typeof suite.filepath !== 'string') return
       const violations = store.unreported(suite.filepath)
       store.markReported(suite.filepath)
       if (violations.length === 0) return
 
-      const result = suite.result
-      if (!result) throw new Error(violations.map((violation) => violation.message).join('\n'))
+      let result = suite.result
+      if (!result) {
+        if (!initializeResult) {
+          throw new Error(violations.map((violation) => violation.message).join('\n'))
+        }
+        result = { state: 'fail', errors: [] }
+        suite.result = result
+      }
       if (!result.errors) result.errors = []
       result.errors.push({
         name: 'SharedDbScopeViolation',

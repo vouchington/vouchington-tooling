@@ -1,90 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type pg from 'pg'
+import { clientQueryText, tapClientQueries, type ObservedClientQuery } from './client-query-tap.mts'
 import { runPoolObservationExclusively } from './observation-queue.mts'
-
-export type ObservedClientQuery<Label extends string = string> = {
-  pool: Label
-  text: string
-  values: readonly unknown[]
-}
-
-export function clientQueryText(input: unknown): string {
-  if (typeof input === 'string') return input
-  if (typeof input === 'object' && input !== null && 'text' in input) return String(input.text)
-  return ''
-}
-
-function clientQueryValues(args: readonly unknown[]): readonly unknown[] {
-  const [input, parameters] = args
-  if (
-    typeof input === 'object' &&
-    input !== null &&
-    'values' in input &&
-    Array.isArray(input.values)
-  ) {
-    return input.values
-  }
-  return Array.isArray(parameters) ? parameters : []
-}
-
-/** Taps every Promise `pool.connect()` client on `pool`, recording each `client.query` call. */
-export function tapClientQueries<Label extends string>(
-  pool: pg.Pool,
-  label: Label,
-  queries: ObservedClientQuery<Label>[],
-  onQueryComplete: (query: ObservedClientQuery<Label>) => Promise<void>,
-): () => void {
-  const restoreClients: Array<() => void> = []
-  const descriptor = Object.getOwnPropertyDescriptor(pool, 'connect')
-  const original = Reflect.get(pool, 'connect') as pg.Pool['connect']
-  Object.defineProperty(pool, 'connect', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value: ((...args: unknown[]) => {
-      if (args.some((arg) => typeof arg === 'function')) return Reflect.apply(original, pool, args)
-      return Promise.resolve(Reflect.apply(original, pool, args)).then((client: pg.PoolClient) => {
-        if (!client) return client
-        const queryDescriptor = Object.getOwnPropertyDescriptor(client, 'query')
-        const query = Reflect.get(client, 'query') as pg.PoolClient['query']
-        const wrappedQuery = ((...queryArgs: unknown[]) => {
-          const observed: ObservedClientQuery<Label> = {
-            pool: label,
-            text: clientQueryText(queryArgs[0]),
-            values: clientQueryValues(queryArgs),
-          }
-          queries.push(observed)
-          const pending: unknown = Reflect.apply(query, client, queryArgs)
-          if (
-            queryArgs.some((arg) => typeof arg === 'function') ||
-            typeof pending !== 'object' ||
-            pending === null ||
-            !('then' in pending) ||
-            typeof pending.then !== 'function'
-          ) {
-            return pending
-          }
-          return Promise.resolve(pending).then(async (result: unknown) => {
-            await onQueryComplete(observed)
-            return result
-          })
-        }) as typeof client.query
-        client.query = wrappedQuery
-        restoreClients.push(() => {
-          if (client.query !== wrappedQuery) return
-          if (queryDescriptor) Object.defineProperty(client, 'query', queryDescriptor)
-          else Reflect.deleteProperty(client, 'query')
-        })
-        return client
-      })
-    }) as typeof pool.connect,
-  })
-  return () => {
-    if (descriptor) Object.defineProperty(pool, 'connect', descriptor)
-    else Reflect.deleteProperty(pool, 'connect')
-    for (const restore of restoreClients.toReversed()) restore()
-  }
-}
 
 interface PoolObservationContext<Label extends string> {
   active: boolean
@@ -120,20 +37,18 @@ export async function observeTestPostgresQueryPools<Label extends string, Result
     }
     return poolObservationContext.run(context as PoolObservationContext<string>, async () => {
       const entries = Object.entries(pools) as Array<[Label, pg.Pool]>
-      const saved = entries.map(([label, pool]) => ({
-        label,
-        pool,
-        descriptor: Object.getOwnPropertyDescriptor(pool, 'query'),
-        original: Reflect.get(pool, 'query') as pg.Pool['query'],
-      }))
+      const saved: Array<{ pool: pg.Pool; descriptor: PropertyDescriptor | undefined }> = []
       try {
-        for (const { label, pool, original } of saved) {
+        for (const [label, pool] of entries) {
+          const descriptor = Object.getOwnPropertyDescriptor(pool, 'query')
+          const original = Reflect.get(pool, 'query') as pg.Pool['query']
           Object.defineProperty(pool, 'query', {
             configurable: true,
             enumerable: true,
             writable: true,
             value: wrapPoolQuery(pool, original, label, context as PoolObservationContext<string>),
           })
+          saved.push({ pool, descriptor })
         }
         const result = await operation()
         return { result, pools: [...context.pools] }
@@ -161,10 +76,11 @@ export async function observeTestPostgresClientQueries<Label extends string, Res
       if (active) await onQueryComplete?.(query)
     }
     const entries = Object.entries(pools) as Array<[Label, pg.Pool]>
-    const restores = entries.map(([label, pool]) =>
-      tapClientQueries(pool, label, queries, completed),
-    )
+    const restores: Array<() => void> = []
     try {
+      for (const [label, pool] of entries) {
+        restores.push(tapClientQueries(pool, label, queries, completed))
+      }
       const result = await operation()
       return { result, queries }
     } finally {
@@ -188,10 +104,25 @@ function wrapPoolQuery(
       expectedContext.active &&
       text.includes(expectedContext.queryMarker)
     if (matchesContext) expectedContext.pools.add(label)
+    const callbackIndex = args.findIndex((arg) => typeof arg === 'function')
+    if (matchesContext && expectedContext.onQueryComplete && callbackIndex >= 0) {
+      const callback = args[callbackIndex] as (...cbArgs: unknown[]) => unknown
+      const wrappedArgs = [...args]
+      wrappedArgs[callbackIndex] = function (this: unknown, ...cbArgs: unknown[]) {
+        if (cbArgs[0] == null && expectedContext.active) {
+          void Promise.resolve(expectedContext.onQueryComplete?.()).then(() =>
+            Reflect.apply(callback, this, cbArgs),
+          )
+          return
+        }
+        return Reflect.apply(callback, this, cbArgs)
+      }
+      return Reflect.apply(query, pool, wrappedArgs)
+    }
     const result = Reflect.apply(query, pool, args)
     if (matchesContext && expectedContext.onQueryComplete) {
       return Promise.resolve(result).then(async (value) => {
-        await expectedContext.onQueryComplete?.()
+        if (expectedContext.active) await expectedContext.onQueryComplete?.()
         return value
       })
     }

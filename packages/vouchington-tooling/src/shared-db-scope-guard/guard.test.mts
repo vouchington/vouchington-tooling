@@ -3,16 +3,15 @@ import {
   sharedDbCursorScope,
   sharedDbIdsScope,
 } from '@vouchington/postgres/query-telemetry'
-import { TestRunner } from 'vitest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   assertGuardedDatabaseName,
   createSharedDbScopeGuard,
-  createSharedDbScopeGuardRunner,
-  getSharedDbScopeViolationStore,
   getSharedDbTransactionReservationStore,
   installSharedDbScopeObserver,
+  OwnedKeysetReadPolicy,
   sharedDbScopeTestIdentity,
+  type SharedDbOwnedKeysetRead,
 } from './index.mts'
 
 const uniqueDb = () => `test_db_${crypto.randomUUID().replaceAll('-', '_')}`
@@ -29,7 +28,7 @@ describe('assertGuardedDatabaseName and installSharedDbScopeObserver', () => {
     expect(() => installSharedDbScopeObserver('   ', () => {})).toThrow(RangeError)
   })
 
-  it('installs, chains, and idempotently restores observers without clobbering replacements', () => {
+  it('installs, chains, and disposes observers without resurrecting disposed or clobbering duplicates', () => {
     const db = uniqueDb()
     const key = `${db}.shared-db-scope-observer`
     const observer = createSharedDbScopeObserver({
@@ -49,18 +48,43 @@ describe('assertGuardedDatabaseName and installSharedDbScopeObserver', () => {
     expect(seenA).toEqual([])
     expect(seenB).toEqual(['listOrders'])
 
-    // Disposing A while B is active must not overwrite B.
+    // Out-of-order: disposing A while B is active keeps B; later disposing B restores empty (not A).
     disposeA()
     disposeA()
     observer.observe('listOrders', sharedDbIdsScope(['order-2']))
     expect(seenB).toEqual(['listOrders', 'listOrders'])
 
-    // Disposing B restores A (previous when B installed).
     disposeB()
     observer.observe('listOrders', sharedDbIdsScope(['order-3']))
-    expect(seenA).toEqual(['listOrders'])
+    expect(seenA).toEqual([])
+    expect(seenB).toEqual(['listOrders', 'listOrders'])
 
-    // Clean up global slot.
+    // Installing the same callback twice gives distinct identities; LIFO restores the remaining one.
+    const sharedSeen: string[] = []
+    const sharedCb = (event: { operation: string }) => {
+      sharedSeen.push(event.operation)
+    }
+    const disposeFirst = installSharedDbScopeObserver(key, sharedCb)
+    const disposeSecond = installSharedDbScopeObserver(key, sharedCb)
+    disposeFirst()
+    observer.observe('listOrders', sharedDbIdsScope(['order-4']))
+    expect(sharedSeen).toEqual(['listOrders'])
+    disposeSecond()
+    observer.observe('listOrders', sharedDbIdsScope(['order-5']))
+    expect(sharedSeen).toEqual(['listOrders'])
+
+    // LIFO disposal restores the active predecessor; external replacement is preserved.
+    const disposeOuter = installSharedDbScopeObserver(key, (event) => {
+      seenA.push(event.operation)
+    })
+    const disposeInner = installSharedDbScopeObserver(key, (event) => {
+      seenB.push(event.operation)
+    })
+    disposeInner()
+    observer.observe('listOrders', sharedDbIdsScope(['order-6']))
+    expect(seenA).toEqual(['listOrders'])
+    observer.install(() => {})
+    disposeOuter()
     observer.install(undefined)
   })
 })
@@ -222,9 +246,10 @@ describe('createSharedDbScopeGuard', () => {
     release()
     expect(() => guard.rejectUnscopedCall(event)).toThrow('requires')
 
-    // Re-registering and having another release called after replacement does not delete the new entry.
+    // Calling the stale release while a replacement is registered does not delete the new entry.
     const reservations = getSharedDbTransactionReservationStore<object>(db)
     const release2 = reservations.register(tx)
+    release()
     expect(reservations.get(tx)?.owner).toBe(sharedDbScopeTestIdentity())
     release2()
     expect(reservations.get(tx)).toBeUndefined()
@@ -295,98 +320,73 @@ describe('createSharedDbScopeGuard', () => {
       guard.recordViolation({ operation: 'op', table: 'tbl', scope: { kind: 'global' } }, 'boom'),
     ).toThrow('Shared DB scope violation has no active test file: boom')
   })
-})
 
-describe('createSharedDbScopeGuardRunner', () => {
-  it('augments importFile failures and reports suite violations on before/after hooks', async () => {
+  it('routes owned-keyset completions directly to the admitting policy when multiple policies share an operation', () => {
     const db = uniqueDb()
-    const store = getSharedDbScopeViolationStore(db)
-    const filepath = expect.getState().testPath!
-
-    class FakeBaseRunner {
-      importError: unknown
-      async importFile(_filepath: string, _source: string): Promise<void> {
-        if (this.importError !== undefined) throw this.importError
-      }
-      async onBeforeRunSuite(_suite: unknown): Promise<void> {}
-      async onAfterRunSuite(_suite: unknown): Promise<void> {}
-    }
-
-    const RunnerClass = createSharedDbScopeGuardRunner({
-      database: db,
-      baseRunner: FakeBaseRunner as unknown as typeof TestRunner,
+    const policyOne = new OwnedKeysetReadPolicy({
+      operation: 'searchRows',
+      table: 'rows',
+      limit: 1,
     })
-    const runner = new RunnerClass({} as never) as unknown as FakeBaseRunner & {
-      importFile(filepath: string, source: 'collect' | 'setup'): Promise<void>
-      onBeforeRunSuite(suite: Record<string, unknown>): Promise<void>
-      onAfterRunSuite(suite: Record<string, unknown>): Promise<void>
+    const policyTwo = new OwnedKeysetReadPolicy({
+      operation: 'searchRows',
+      table: 'rows',
+      limit: 2,
+    })
+    const guard = createSharedDbScopeGuard<string, string, SharedDbOwnedKeysetRead>({
+      database: db,
+      policies: [policyOne, policyTwo],
+    })
+    const fixture = {
+      actorId: 'actor-1',
+      id: '019c64e6-f710-7000-8000-000000000002',
+      afterId: '019c64e6-f710-7000-8000-000000000001',
+      timestamp: '2026-01-01T00:00:00.000000Z',
     }
-
-    // importFile with no error succeeds.
-    await expect(runner.importFile(filepath, 'collect')).resolves.toBeUndefined()
-
-    // importFile with error and no violations rethrows original error.
-    const plainError = new Error('syntax error')
-    runner.importError = plainError
-    await expect(runner.importFile(filepath, 'collect')).rejects.toBe(plainError)
-
-    // importFile with Error + recorded violation wraps both.
-    store.record({ op: 'a' }, '[vitest-shared-db-scope] leaked during import')
-    await expect(runner.importFile(filepath, 'collect')).rejects.toThrow(
-      'syntax error\n\n[vitest-shared-db-scope] leaked during import',
-    )
-
-    // importFile with non-Error + recorded violation stringifies it.
-    runner.importError = 'non-error import failure'
-    store.record({ op: 'b' }, '[vitest-shared-db-scope] leaked non-error')
-    await expect(runner.importFile(filepath, 'collect')).rejects.toThrow(
-      'non-error import failure\n\n[vitest-shared-db-scope] leaked non-error',
-    )
-    runner.importError = undefined
-
-    // Suite without filepath is ignored.
-    await expect(runner.onAfterRunSuite({})).resolves.toBeUndefined()
-
-    // onBeforeRunSuite ignores non-failed suites, reports failed suites.
-    store.record({ op: 'c' }, '[vitest-shared-db-scope] failed setup')
-    const passingSuite = { filepath, result: { state: 'pass' } }
-    await runner.onBeforeRunSuite(passingSuite)
-    expect(passingSuite.result.state).toBe('pass')
-
-    const failedSuite: { filepath: string; result: { state: string; errors?: unknown[] } } = {
-      filepath,
-      result: { state: 'fail' },
+    const close = policyTwo.register(guard.currentTestIdentity(), fixture, () => {})
+    const id = Symbol('size-2')
+    const filepath = expect.getState().testPath!
+    try {
+      guard.rejectUnscopedCall({
+        operation: 'searchRows',
+        table: 'rows',
+        scope: { kind: 'global' },
+        keysetRead: {
+          phase: 'start',
+          identity: id,
+          actorId: fixture.actorId,
+          after: { timestamp: fixture.timestamp, id: fixture.afterId },
+          limit: 2,
+          sqlLimit: 3,
+        },
+      })
+      guard.rejectUnscopedCall({
+        operation: 'searchRows',
+        table: 'rows',
+        scope: { kind: 'global' },
+        keysetRead: {
+          phase: 'completed',
+          identity: id,
+          rowCount: 2,
+          first: { id: fixture.id, timestamp: fixture.timestamp },
+        },
+      })
+      expect(() =>
+        guard.rejectUnscopedCall({
+          operation: 'searchRows',
+          table: 'rows',
+          scope: { kind: 'global' },
+          keysetRead: {
+            phase: 'completed',
+            identity: id,
+            rowCount: 2,
+            first: { id: fixture.id, timestamp: fixture.timestamp },
+          },
+        }),
+      ).toThrow('Owned keyset query completed twice')
+    } finally {
+      close()
+      guard.markViolationsReported(filepath)
     }
-    await runner.onBeforeRunSuite(failedSuite)
-    expect(failedSuite.result.errors).toEqual([
-      {
-        name: 'SharedDbScopeViolation',
-        message: '[vitest-shared-db-scope] failed setup',
-      },
-    ])
-
-    // Already reported -> no duplicate onAfterRunSuite error.
-    await runner.onAfterRunSuite(failedSuite)
-    expect(failedSuite.result.errors).toHaveLength(1)
-
-    // Suite with existing errors array appends to it.
-    store.record({ op: 'd' }, '[vitest-shared-db-scope] caught in test')
-    const existingErrorsSuite = {
-      filepath,
-      result: { state: 'pass', errors: [{ name: 'Other', message: 'prior' }] },
-    }
-    await runner.onAfterRunSuite(existingErrorsSuite)
-    expect(existingErrorsSuite.result.state).toBe('fail')
-    expect(existingErrorsSuite.result.errors).toHaveLength(2)
-
-    // Suite without result throws directly.
-    store.record({ op: 'e' }, '[vitest-shared-db-scope] no result object')
-    await expect(runner.onAfterRunSuite({ filepath })).rejects.toThrow(
-      '[vitest-shared-db-scope] no result object',
-    )
-
-    // Default baseRunner (Vitest TestRunner) constructs cleanly.
-    const DefaultRunner = createSharedDbScopeGuardRunner({ database: db })
-    expect(Object.getPrototypeOf(DefaultRunner)).toBe(TestRunner)
   })
 })

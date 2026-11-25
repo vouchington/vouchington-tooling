@@ -25,25 +25,21 @@ export interface OwnedKeysetReadPolicyTarget<
 > {
   operation: Operation
   table: Table
-  /** Expected logical page size. Defaults to `1`. */
   limit?: number
-  /** Expected SQL fetch limit (`limit + 1`). Defaults to `limit + 1`. */
   sqlLimit?: number
 }
 
-type ReadEntry<Operation extends string, Table extends string> = {
-  event: SharedDbScopeEvent<Operation, Table, SharedDbOwnedKeysetRead>
-  completed: boolean
-}
+type KeysetEvent<Operation extends string, Table extends string> = SharedDbScopeEvent<
+  Operation,
+  Table,
+  SharedDbOwnedKeysetRead
+>
 
 type Registration<Operation extends string, Table extends string> = {
   owner: string
   fixture: OwnedKeysetFixture
-  reads: Map<symbol, ReadEntry<Operation, Table>>
-  reportFailure: (
-    event: SharedDbScopeEvent<Operation, Table, SharedDbOwnedKeysetRead>,
-    message: string,
-  ) => void
+  reads: Map<symbol, { event: KeysetEvent<Operation, Table>; completed: boolean }>
+  reportFailure: (event: KeysetEvent<Operation, Table>, message: string) => void
 }
 
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
@@ -78,17 +74,29 @@ export class OwnedKeysetReadPolicy<
     this.sqlLimit = target.sqlLimit ?? this.limit + 1
   }
 
+  matchesTarget(target: OwnedKeysetReadPolicyTarget<Operation, Table>): boolean {
+    const limit = target.limit ?? 1
+    const sqlLimit = target.sqlLimit ?? limit + 1
+    return (
+      this.operation === target.operation &&
+      this.table === target.table &&
+      this.limit === limit &&
+      this.sqlLimit === sqlLimit
+    )
+  }
+
   register(
     owner: string,
     fixture: OwnedKeysetFixture,
     reportFailure: Registration<Operation, Table>['reportFailure'],
   ): () => void {
-    if (!owner || !isImmediateUuidPredecessor(fixture.afterId, fixture.id)) {
+    const snapshot: OwnedKeysetFixture = { ...fixture }
+    if (!owner || !isImmediateUuidPredecessor(snapshot.afterId, snapshot.id)) {
       throw new Error('An owned keyset requires an active test and its immediate UUID predecessor')
     }
     const registration: Registration<Operation, Table> = {
       owner,
-      fixture,
+      fixture: snapshot,
       reads: new Map(),
       reportFailure,
     }
@@ -106,10 +114,7 @@ export class OwnedKeysetReadPolicy<
     }
   }
 
-  observe(
-    event: SharedDbScopeEvent<Operation, Table, SharedDbOwnedKeysetRead>,
-    owner: string,
-  ): boolean {
+  observe(event: KeysetEvent<Operation, Table>, owner: string): boolean {
     if (
       event.operation !== this.operation ||
       event.table !== this.table ||
@@ -160,16 +165,11 @@ export interface SharedOwnedKeysetReadPolicyOptions<
   Operation extends string = string,
   Table extends string = string,
 > extends OwnedKeysetReadPolicyTarget<Operation, Table> {
-  /** Logical name of the guarded database used to namespace the process-global policy registry. */
   database: string
-  /** Optional explicit `Symbol.for(...)` key. Defaults to `${database}.vitest-owned-keyset-read-policy`. */
   policyKey?: string
 }
 
-/**
- * Returns the process-global `OwnedKeysetReadPolicy` for `options.database`, preserving
- * registrations across Vitest module resets.
- */
+/** Returns the process-global `OwnedKeysetReadPolicy` for `options.database` and target. */
 export function getSharedOwnedKeysetReadPolicy<
   Operation extends string = string,
   Table extends string = string,
@@ -177,17 +177,21 @@ export function getSharedOwnedKeysetReadPolicy<
   options: SharedOwnedKeysetReadPolicyOptions<Operation, Table>,
 ): OwnedKeysetReadPolicy<Operation, Table> {
   const database = assertGuardedDatabaseName(options.database)
-  const key = options.policyKey ?? `${database}.vitest-owned-keyset-read-policy`
-  if (key.trim().length === 0) {
-    throw new RangeError('Owned keyset policy key must be a non-empty string')
-  }
+  const limit = options.limit ?? 1
+  const sqlLimit = options.sqlLimit ?? limit + 1
+  const key =
+    options.policyKey ??
+    `${database}.vitest-owned-keyset-read-policy:${options.operation}:${options.table}:${limit}:${sqlLimit}`
+  if (key.trim().length === 0) throw new RangeError('Owned keyset policy key must be non-empty')
   const symbol = Symbol.for(key)
-  const host = globalThis as unknown as Record<
-    symbol,
-    OwnedKeysetReadPolicy<Operation, Table> | undefined
-  >
+  const host = globalThis as unknown as Record<symbol, OwnedKeysetReadPolicy<Operation, Table>>
   const existing = host[symbol]
-  if (existing) return existing
+  if (existing) {
+    if (!existing.matchesTarget(options)) {
+      throw new RangeError(`Owned keyset policy key "${key}" is bound to a different target`)
+    }
+    return existing
+  }
   const policy = new OwnedKeysetReadPolicy<Operation, Table>(options)
   host[symbol] = policy
   return policy

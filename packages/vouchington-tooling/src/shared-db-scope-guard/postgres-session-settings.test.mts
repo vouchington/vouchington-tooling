@@ -37,6 +37,28 @@ describe('parseTestStatementTimeout', () => {
   ])('rejects invalid override %j', (raw) => {
     expect(() => parseTestStatementTimeout(raw)).toThrow(RangeError)
   })
+
+  it('validates timeout bounds and effective defaultMs even when raw is undefined', () => {
+    expect(() => parseTestStatementTimeout(undefined, { minMs: 100, maxMs: 900 })).toThrow(
+      RangeError,
+    )
+    expect(() =>
+      parseTestStatementTimeout(undefined, { defaultMs: 50, minMs: 100, maxMs: 900 }),
+    ).toThrow(RangeError)
+    expect(() =>
+      parseTestStatementTimeout(undefined, { defaultMs: 150.5, minMs: 100, maxMs: 900 }),
+    ).toThrow(RangeError)
+    expect(() => parseTestStatementTimeout(undefined, { minMs: 0, maxMs: 900 })).toThrow(RangeError)
+    expect(() => parseTestStatementTimeout(undefined, { minMs: 100.5, maxMs: 900 })).toThrow(
+      RangeError,
+    )
+    expect(() => parseTestStatementTimeout(undefined, { minMs: 100, maxMs: 900.5 })).toThrow(
+      RangeError,
+    )
+    expect(() => parseTestStatementTimeout(undefined, { minMs: 900, maxMs: 100 })).toThrow(
+      RangeError,
+    )
+  })
 })
 
 describe('configureTestPostgresSessions', () => {
@@ -107,5 +129,32 @@ describe('configureTestPostgresSessions', () => {
     const empty: NodeJS.ProcessEnv = {}
     configureTestPostgresSessions(empty)
     expect(empty).toEqual({})
+  })
+
+  it('escapes whitespace and backslashes in extraSettings and rejects statement_timeout or invalid names', () => {
+    const env: NodeJS.ProcessEnv = {
+      DATABASE_URL: 'postgres://localhost/escaped',
+    }
+    const extraSettings = { application_name: 'fixture\\ worker\t1' }
+    configureTestPostgresSessions(env, { extraSettings })
+    expect(new URL(env.DATABASE_URL!).searchParams.get('options')).toBe(
+      `-c jit=off -c statement_timeout=${FAST_TEST_STATEMENT_TIMEOUT_MS} -c application_name=fixture\\\\\\ worker\\\t1`,
+    )
+    const afterFirst = env.DATABASE_URL
+    configureTestPostgresSessions(env, { extraSettings })
+    expect(env.DATABASE_URL).toBe(afterFirst)
+
+    expect(() =>
+      configureTestPostgresSessions(env, { extraSettings: { statement_timeout: 0 } }),
+    ).toThrow(RangeError)
+    expect(() =>
+      configureTestPostgresSessions(env, { extraSettings: { STATEMENT_TIMEOUT: '0' } }),
+    ).toThrow(RangeError)
+    expect(() =>
+      configureTestPostgresSessions(env, { extraSettings: { 'bad name': '1' } }),
+    ).toThrow(RangeError)
+    expect(() =>
+      configureTestPostgresSessions(env, { extraSettings: { 'bad=name': '1' } }),
+    ).toThrow(RangeError)
   })
 })

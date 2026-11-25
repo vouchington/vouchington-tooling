@@ -62,6 +62,57 @@ describe('query-pool-observer', () => {
     expect(completed).toEqual(['done', 'done'])
     expect(Reflect.get(readPool, 'query')).toBe(readQuery)
     expect(Object.hasOwn(writePool, 'query')).toBe(false)
+
+    // Callback-form queries run onQueryComplete on success only, and late settlements are ignored.
+    let resolveLatePromise!: (value: { rows: [] }) => void
+    let lateCallback!: (err: Error | null, res?: { rows: [] }) => void
+    const cbPool = {
+      query: vi.fn((text: string, cb?: (err: Error | null, res?: { rows: [] }) => void) => {
+        if (typeof cb === 'function') {
+          if (text.includes('err')) cb(new Error('cb fail'))
+          else if (text.includes('late-cb')) lateCallback = cb
+          else cb(null, { rows: [] })
+          return undefined
+        }
+        return new Promise<{ rows: [] }>((resolve) => {
+          resolveLatePromise = resolve
+        })
+      }),
+    } as unknown as pg.Pool
+    const cbCompleted: string[] = []
+    let latePromise!: Promise<unknown>
+    await observeTestPostgresQueryPools(
+      { cb: cbPool },
+      '/* cb */',
+      async () => {
+        await new Promise<void>((resolve) => {
+          ;(cbPool.query as unknown as (t: string, cb: () => void) => void)('/* cb */ ok', () => {
+            cbCompleted.push('callback-ran')
+            resolve()
+          })
+        })
+        await new Promise<void>((resolve) => {
+          ;(cbPool.query as unknown as (t: string, cb: (e: Error | null) => void) => void)(
+            '/* cb */ err',
+            () => resolve(),
+          )
+        })
+        ;(cbPool.query as unknown as (t: string, cb: () => void) => void)(
+          '/* cb */ late-cb',
+          () => {
+            cbCompleted.push('late-cb-ran')
+          },
+        )
+        latePromise = cbPool.query('/* cb */ late-promise')
+      },
+      async () => {
+        cbCompleted.push('hook')
+      },
+    )
+    lateCallback(null, { rows: [] })
+    resolveLatePromise({ rows: [] })
+    await latePromise
+    expect(cbCompleted).toEqual(['hook', 'callback-ran', 'late-cb-ran'])
   })
 
   it('taps borrowed client queries, handles callbacks, sync values, replaced queries, and null clients', async () => {
@@ -86,12 +137,18 @@ describe('query-pool-observer', () => {
     const replacedClient = { query: vi.fn(async () => ({ rows: [] })) }
 
     let nextClient = 0
-    const clients = [ownClient, protoClient, replacedClient, null]
+    const clients = [ownClient, ownClient, protoClient, replacedClient, null]
+    let resolveDeferredConnect!: (client: unknown) => void
     const readPool = {
       connect: vi.fn((cb?: (err: null, client: unknown) => void) => {
         if (typeof cb === 'function') {
           cb(null, ownClient)
           return undefined
+        }
+        if (nextClient === clients.length) {
+          return new Promise((resolve) => {
+            resolveDeferredConnect = resolve
+          })
         }
         return Promise.resolve(clients[nextClient++])
       }),
@@ -113,6 +170,9 @@ describe('query-pool-observer', () => {
     expect(cbClient).toBe(ownClient)
 
     const c1 = (await readPool.connect()) as unknown as typeof ownClient
+    // Re-borrowing the same pooled client does not double-wrap client.query.
+    const c1Again = (await readPool.connect()) as unknown as typeof ownClient
+    expect(c1Again).toBe(c1)
     await (c1.query as (input: unknown) => Promise<unknown>)({ text: 'SELECT $1', values: ['v1'] })
 
     const c2 = (await readPool.connect()) as unknown as typeof protoClient
@@ -127,12 +187,34 @@ describe('query-pool-observer', () => {
     // Nullish client from connect passes through safely.
     expect(await readPool.connect()).toBeNull()
 
+    // A client resolving after restore() is not wrapped.
+    const lateClientQuery = vi.fn(async () => ({ rows: [] }))
+    const lateConnectClient = { query: lateClientQuery }
+    const pendingLateConnect = readPool.connect()
     restore()
+    resolveDeferredConnect(lateConnectClient)
+    expect(await pendingLateConnect).toBe(lateConnectClient)
+    expect(lateConnectClient.query).toBe(lateClientQuery)
+
     expect(ownClient.query).toBe(ownClientQuery)
     expect(Object.hasOwn(protoClient, 'query')).toBe(false)
     expect(c3.query).toBe(replacement)
     expect(queries).toHaveLength(4)
     expect(completed).toHaveLength(2)
+
+    // Partial setup failure restores already-tapped pools.
+    const goodConnect = vi.fn(async () => ownClient)
+    const goodPool = { connect: goodConnect } as unknown as pg.Pool
+    const frozenPool = {} as pg.Pool
+    Object.defineProperty(frozenPool, 'connect', {
+      value: vi.fn(),
+      configurable: false,
+      writable: false,
+    })
+    await expect(
+      observeTestPostgresClientQueries({ good: goodPool, frozen: frozenPool }, async () => 'never'),
+    ).rejects.toThrow(TypeError)
+    expect(Reflect.get(goodPool, 'connect')).toBe(goodConnect)
 
     // observeTestPostgresClientQueries records across pools and ignores late completions after return.
     let resolveLate!: () => void
@@ -277,5 +359,9 @@ describe('observePostgresReadRoutingForTest', () => {
     ;(replica as unknown as { connect: unknown }).connect = replacement
     await observerC.close()
     expect(Reflect.get(replica, 'connect')).toBe(replacement)
+
+    await expect(observePostgresReadRoutingForTest({ primary, replica: primary })).rejects.toThrow(
+      RangeError,
+    )
   })
 })

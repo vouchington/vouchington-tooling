@@ -59,26 +59,32 @@ export async function createTestPostgresLockWaiter<Tx extends AsyncDisposable>(
     (cleanupPromise ??= (async () => {
       closed = true
       const failures: unknown[] = []
+      let holderReleaseFailed = false
       try {
         await options.holder.release()
       } catch (err) {
+        holderReleaseFailed = true
         failures.push(err)
       }
       await reservation?.catch(() => undefined)
       await setup?.catch(() => undefined)
-      const settled = await actionOutcome
-      try {
-        await transaction?.[Symbol.asyncDispose]()
-      } catch (err) {
-        failures.push(err)
-      }
+      // If releasing the holder failed, the contender may stay blocked; discard without hanging on actionOutcome.
+      const settled = holderReleaseFailed ? undefined : await actionOutcome
+      const hadUndrainedQueries = (observation?.pendingQueries ?? 0) !== 0
       observation?.restore()
-      try {
-        await observer?.close()
-      } catch (err) {
-        failures.push(err)
+      if (!holderReleaseFailed) {
+        try {
+          await transaction?.[Symbol.asyncDispose]()
+        } catch (err) {
+          failures.push(err)
+        }
+        try {
+          await observer?.close()
+        } catch (err) {
+          failures.push(err)
+        }
       }
-      if ((observation?.pendingQueries ?? 0) !== 0) {
+      if (hadUndrainedQueries) {
         failures.push(new Error('Owned lock queries did not finish draining'))
       }
       if (failures.length && primaryFailure) failures.unshift(primaryFailure.reason)
@@ -89,8 +95,9 @@ export async function createTestPostgresLockWaiter<Tx extends AsyncDisposable>(
         ? new AggregateError(failures, 'Owned PostgreSQL waiter cleanup failed')
         : undefined
       if (client) {
-        client.release(failure)
-        if (failure) await ended.promise
+        const discard = failure ?? (primaryFailure !== undefined ? true : undefined)
+        client.release(discard)
+        if (discard) await ended.promise
         client.off('end', onEnd)
       }
       if (failure) throw failure
@@ -103,8 +110,8 @@ export async function createTestPostgresLockWaiter<Tx extends AsyncDisposable>(
     }
   }
   const registerCleanup = options.registerCleanup ?? onTestFinished
-  registerCleanup(() => (cleanupReported ? undefined : dispose()))
   try {
+    registerCleanup(() => (cleanupReported ? undefined : dispose()))
     setup = (async () => {
       const lock = await readHeldLock(options.holder, options.lock)
       requireOpen()
@@ -112,7 +119,9 @@ export async function createTestPostgresLockWaiter<Tx extends AsyncDisposable>(
       client = await reservation
       client.once('end', onEnd)
       requireOpen()
-      const eligible = () => observation?.selectedPending === true
+      const callerEligible = options.notice?.eligible
+      const eligible = () =>
+        observation?.selectedPending === true && (callerEligible ? callerEligible() : true)
       observer =
         lock.kind === 'advisory'
           ? observeTestAdvisoryLockNotice(client, lock.tag, { ...options.notice, eligible })

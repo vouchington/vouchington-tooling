@@ -20,7 +20,7 @@ export function observeTestPostgresLockQuery(
   const query = Reflect.get(client, 'query') as pg.PoolClient['query']
   let pendingQueries = 0
   let selectedPending = false
-  client.query = ((...args: unknown[]) => {
+  const wrappedQuery = ((...args: unknown[]) => {
     const input = args[0]
     if (
       args.length !== 1 ||
@@ -61,6 +61,7 @@ export function observeTestPostgresLockQuery(
       throw err
     }
   }) as typeof client.query
+  client.query = wrappedQuery
 
   return {
     get selectedPending() {
@@ -70,6 +71,7 @@ export function observeTestPostgresLockQuery(
       return pendingQueries
     },
     restore() {
+      if (Reflect.get(client, 'query') !== wrappedQuery) return
       if (descriptor) Object.defineProperty(client, 'query', descriptor)
       else Reflect.deleteProperty(client, 'query')
     },
