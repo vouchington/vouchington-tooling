@@ -19,10 +19,11 @@ export type PlaywrightTimeoutGuardOptions<
   maxTimeoutMs?: number
   /** Name of the automatic guard fixture. Callers must not override it in `extend` or `use`. */
   fixtureName?: Name
+  /** Reject per-test, hook, and suite timeout overrides regardless of value. Defaults to `false`. */
+  banOverrides?: boolean
 }
 
 type TimeoutInfo = Pick<TestInfo, 'timeout' | 'setTimeout' | 'slow'>
-
 type DefaultFixtureName = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE
 
 /** Without `fixtureName`, the guard registers and is typed by the default fixture name. */
@@ -36,12 +37,19 @@ export function createPlaywrightTimeoutGuard<const Name extends string>(
 export function createPlaywrightTimeoutGuard<Name extends string>(
   options: PlaywrightTimeoutGuardOptions<Name> = {},
 ): PlaywrightTimeoutGuard<Name> {
-  // The overloads guarantee `Name` is the default name whenever `fixtureName` is omitted.
   const fixtureName = (options.fixtureName ?? DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE) as Name
-  return buildTimeoutGuard(options.maxTimeoutMs ?? DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS, fixtureName)
+  return buildTimeoutGuard(
+    options.maxTimeoutMs ?? DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS,
+    fixtureName,
+    options.banOverrides ?? false,
+  )
 }
 
-function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureName: Name) {
+function buildTimeoutGuard<Name extends string>(
+  maxTimeoutMs: number,
+  fixtureName: Name,
+  banOverrides: boolean,
+) {
   if (!Number.isFinite(maxTimeoutMs) || maxTimeoutMs <= 0) {
     throw new RangeError(
       `Playwright timeout cap must be a positive finite number; got ${maxTimeoutMs}`,
@@ -63,11 +71,18 @@ function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureNam
   }
   const fixtureGuard: FixtureTimeoutGuard = { validate: testTimeout, fixtureName, capText }
 
+  function validateOverride(timeout: unknown, label: string): number {
+    if (banOverrides) {
+      throw new RangeError(`${label} overrides are forbidden by the ${capText} test cap`)
+    }
+    return testTimeout(timeout, label)
+  }
+
   function validateConfigTimeouts(config: PlaywrightTestConfig): PlaywrightTestConfig {
     if (config.timeout !== undefined) testTimeout(config.timeout, 'Playwright test timeout')
     for (const project of config.projects ?? []) {
       if (project.timeout !== undefined) {
-        testTimeout(project.timeout, `Playwright project ${project.name} timeout`)
+        testTimeout(project.timeout, `Playwright project ${project.name ?? '<unnamed>'} timeout`)
       }
     }
     return config
@@ -93,7 +108,7 @@ function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureNam
         configurable: false,
         value: (timeout: number) =>
           Reflect.apply(setTimeout, info, [
-            testTimeout(timeout, 'Playwright runtime test timeout'),
+            validateOverride(timeout, 'Playwright runtime test timeout'),
           ]),
       },
       slow: { value: rejectSlow, writable: false, configurable: false },
@@ -127,7 +142,9 @@ function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureNam
         writable: false,
         configurable: false,
         value: (timeout: number) =>
-          Reflect.apply(setTimeout, test, [testTimeout(timeout, 'Playwright public test timeout')]),
+          Reflect.apply(setTimeout, test, [
+            validateOverride(timeout, 'Playwright public test timeout'),
+          ]),
       },
       slow: { value: rejectSlow, writable: false, configurable: false },
       use: {
@@ -152,7 +169,7 @@ function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureNam
       configurable: false,
       value: (options: Parameters<typeof configure>[0]): unknown =>
         Reflect.apply(configure, test.describe, [
-          snapshotOptionsTimeout(options, testTimeout, 'Playwright suite test timeout'),
+          snapshotOptionsTimeout(options, validateOverride, 'Playwright suite test timeout'),
         ]),
     })
     return test
@@ -168,6 +185,7 @@ function buildTimeoutGuard<Name extends string>(maxTimeoutMs: number, fixtureNam
   return {
     maxTimeoutMs,
     fixtureName,
+    banOverrides,
     testTimeout,
     validateConfigTimeouts,
     assertResolvedTimeouts,

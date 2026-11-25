@@ -9,10 +9,31 @@ import type { FullConfig, PlaywrightTestConfig, TestInfo } from '@playwright/tes
 const invalid = [0, -1, 30_001, Number.POSITIVE_INFINITY, Number.NaN]
 
 describe('createPlaywrightTimeoutGuard options', () => {
-  it('defaults to a 30,000 ms cap and a neutral fixture name', () => {
+  it('defaults to a 30,000 ms cap, neutral fixture name, and banOverrides off', () => {
     const guard = createPlaywrightTimeoutGuard()
     expect(guard.maxTimeoutMs).toBe(DEFAULT_PLAYWRIGHT_TEST_TIMEOUT_MS)
     expect(guard.fixtureName).toBe(DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE)
+    expect(guard.banOverrides).toBe(false)
+  })
+
+  it('rejects unnamed project timeouts above the cap with an unnamed label', () => {
+    const { validateConfigTimeouts } = createPlaywrightTimeoutGuard()
+    expect(() => validateConfigTimeouts({ projects: [{ timeout: 30_001 }] })).toThrow(
+      'Playwright project <unnamed> timeout must be a positive finite number at most 30,000 ms',
+    )
+  })
+
+  it('forbids runtime info.setTimeout calls at any value when banOverrides is true', async () => {
+    const guard = createPlaywrightTimeoutGuard({ maxTimeoutMs: 12_500, banOverrides: true })
+    expect(guard.banOverrides).toBe(true)
+    const original = vi.fn<(timeout: number) => void>()
+    const info = { timeout: 12_500, setTimeout: original } as unknown as TestInfo
+    const use = vi.fn<() => Promise<void>>()
+    await guard.timeoutFixture({}, use, info)
+    expect(() => info.setTimeout(5_000)).toThrow(
+      'Playwright runtime test timeout overrides are forbidden by the 12,500 ms test cap',
+    )
+    expect(original).not.toHaveBeenCalled()
   })
 
   it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])('rejects cap %s', (cap) => {
