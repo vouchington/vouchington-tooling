@@ -521,6 +521,11 @@
       "types": "./dist/shared-db-scope-guard/index.d.mts",
       "import": "./dist/shared-db-scope-guard/index.mjs",
       "default": "./dist/shared-db-scope-guard/index.mjs"
+    },
+    "./integration-test-helpers": {
+      "types": "./dist/integration-test-helpers/index.d.mts",
+      "import": "./dist/integration-test-helpers/index.mjs",
+      "default": "./dist/integration-test-helpers/index.mjs"
     }
   },
   "publishConfig": {

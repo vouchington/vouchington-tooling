@@ -1690,6 +1690,28 @@ The package's own tests start a throwaway cluster with `initdb`/`pg_ctl` found t
 `POSTGRES_BIN_DIR`, `PATH` or a standard install location. They skip where no server can run and
 fail under `CI`.
 
+## Integration test helpers (test-only)
+
+`vouchington-tooling/integration-test-helpers` provides dev/test-only machinery for multi-process
+HTTP integration suites (no product fixtures or templates):
+
+- Transport & readiness: `isRetryableTransportError`, `isIdempotentHttpMethod`,
+  `FetchResponseRejectedError`, `fetchWithTransportRetry`, `retryOnTransportError`, `waitFor`,
+  `isHealthy`, and `poll`.
+- Process supervision & logs: `startManagedProcess` (takes explicit `logsDir`), `waitForService`,
+  `watchForPostReadyExit`, `serviceExitMessage`, `formatExitStatus`, `readRecentLog`, and
+  `POST_READY_EXIT_MARKER_PREFIX`.
+- Fetch-safe port allocation: `FETCH_FORBIDDEN_PORTS`, `isFetchForbiddenPort`, `isFetchSafePort`,
+  `allocateReservedPorts`, `reserveLoopbackPorts`, `listenOnFetchSafeEphemeralPort`,
+  `listenOnFetchSafeLoopback`, `readKernelEphemeralPortRange`, and `servicePortBand`.
+- Streaming HTTP trace proxy & asset concurrency broker: `createTraceProxy`, `buildUpstreamHeaders`,
+  `ASSET_CONCURRENCY_PATH`, `createAssetConcurrencyBroker`, and
+  `createCrossProcessConcurrencyLimiter`.
+- Client cookies, artifacts, and runtime harnesses: `WebIntegrationCookies`, `writePageArtifact`,
+  `printTrace`, `createAssetMetadataCache`, `startReservedProcess`, `ensureRequiredPathsExist`,
+  `cleanupManagedServices`, `closeWebApiClientRuntime`, `withWebApiClientRuntime`, and
+  `createLoopbackClientFetch` (the Vitest runtime helpers use the optional `vitest` peer).
+
 ## Runner policy
 
 `vouchington runner-policy [--config <file>] [--root <directory>]` checks GitHub Actions runner

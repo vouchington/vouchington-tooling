@@ -44,6 +44,7 @@ export default defineConfig({
         'packages/*/src/pg-schema-snapshot/index.mts',
         'packages/*/src/postgres-test-faults/index.mts',
         'packages/*/src/shared-db-scope-guard/index.mts',
+        'packages/*/src/integration-test-helpers/index.mts',
         'packages/*/src/request-query-profile/index.mts',
         'packages/*/src/request-query-profile/types.mts',
         'packages/*/src/openapi-document/index.mts',
