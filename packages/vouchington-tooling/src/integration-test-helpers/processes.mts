@@ -27,9 +27,7 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
   const forceKillGraceMs = options.forceKillGraceMs ?? 5_000
   let exitStatus: ManagedProcessExit | null = null
   let exitedSettled = false
-  let logStreamEnded = false
-  let logStreamFailed = false
-  let childClosed = false
+  let logStreamClosed = false
   let stopRequested = false
   let stopPromise: Promise<void> | undefined
   const exitedDeferred = Promise.withResolvers<ManagedProcessExit>()
@@ -46,17 +44,13 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
   })
 
   const writeLog = (chunk: Buffer | string): void => {
-    if (!logStreamFailed && !logStreamEnded) logStream.write(chunk)
+    if (!logStreamClosed) logStream.write(chunk)
   }
   const finishLogStream = (): void => {
-    if (!logStreamEnded) {
-      logStreamEnded = true
+    if (!logStreamClosed) {
+      logStreamClosed = true
       logStream.end(closedDeferred.resolve)
     }
-  }
-  const markChildTerminated = (): void => {
-    childClosed = true
-    childTerminated.resolve()
   }
   const requestStop = (): Promise<void> => {
     stopRequested = true
@@ -74,21 +68,18 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     }
     if (message) {
       writeStderr(message)
-      if (!logStreamFailed && !logStreamEnded) {
-        logStream.write(message, () => void resolve())
-        return
-      }
+      logStream.write(message, () => void resolve())
+      return
     }
     void resolve()
   }
 
   logStream.on('error', (error) => {
-    logStreamFailed = true
-    logStreamEnded = true
+    logStreamClosed = true
     closedDeferred.resolve()
     writeStderr(`[${options.logFilePrefix}] log stream error: ${error.message}\n`)
     settleExited({ code: null, error, signal: null })
-    if (!childClosed) void requestStop()
+    void requestStop()
   })
 
   child.stdout?.on('data', (chunk: Buffer) => {
@@ -100,7 +91,7 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     writeStderr(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
   })
   child.once('error', (error) => {
-    markChildTerminated()
+    childTerminated.resolve()
     settleExited(
       { code: null, error, signal: null },
       `[${options.logFilePrefix}] failed to start: ${error.message}\n`,
@@ -115,7 +106,7 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     settleExited({ code, signal })
   })
   child.once('close', () => {
-    markChildTerminated()
+    childTerminated.resolve()
     finishLogStream()
   })
 

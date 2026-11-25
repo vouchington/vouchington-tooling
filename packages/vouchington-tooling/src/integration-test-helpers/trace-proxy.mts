@@ -97,7 +97,7 @@ export async function createTraceProxy(
       outgoing.off('close', abort)
       if (abortController.signal.aborted || outgoing.destroyed || outgoing.writableEnded) return
       outgoing.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
-      outgoing.end(`Trace proxy failed: ${err instanceof Error ? err.message : String(err)}`)
+      outgoing.end(`Trace proxy failed: ${String(err)}`)
       return
     }
 

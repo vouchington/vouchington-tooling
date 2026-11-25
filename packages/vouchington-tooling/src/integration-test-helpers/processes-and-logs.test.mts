@@ -171,7 +171,7 @@ describe('startManagedProcess and waitForService', () => {
     const logErrProc = startManagedProcess({
       name: 'log-err',
       command: process.execPath,
-      args: ['-e', 'setTimeout(() => {}, 30000)'],
+      args: ['-e', 'console.log("ignored"); setTimeout(() => {}, 30000)'],
       cwd: dir,
       logFilePrefix: 'dirlog',
       logsDir: dir,
