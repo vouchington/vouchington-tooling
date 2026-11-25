@@ -3,7 +3,7 @@ description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
   without a pnpm store cache. One total deadline covers the pnpm binary download and the
   install; the download and the install each make a few short attempts inside that deadline and
-  retry (after a short fixed backoff, logging the reason) only an attempt that timed out or hit a
+  retry (after a short, growing backoff, logging the reason) only an attempt that timed out or hit a
   network/registry error, and only while budget remains.
   The caller must run actions/checkout before invoking this action.
   Set deadline-seconds below the calling step's timeout-minutes.
