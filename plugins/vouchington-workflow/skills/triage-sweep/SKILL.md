@@ -200,13 +200,13 @@ open flake issue's owner there.
 
 - **Stale runs (optional, on by default):** unless `staleRuns` is `false` in the configuration, on
   every full sweep (never a `--dry-run` sweep), for each repository, run
-  `python3 <ci-report skill>/scripts/stale.py --repo <repo> --dry-run` (threshold `olderThan`,
-  default `6h`) and report what it lists. GitHub does not clear runs stuck in `queued`. Then run
-  `stale.py --repo <repo> --older-than <cancelAfter>` (default `24h`), which cancels runs older than
-  that. A one-line summary is enough; say nothing when none are listed. Runs it prints as a
-  `never-started` summary line cannot be cancelled or deleted through the API: report that line
-  as is (they need GitHub Support), do not retry them, and do not treat them as failures. See
-  [ci-report](../ci-report/SKILL.md).
+  `python3 <github-ci-operations skill>/scripts/stale.py --repo <repo> --dry-run` (threshold
+  `olderThan`, default `6h`) and report what it lists. GitHub does not clear runs stuck in
+  `queued`. Then run `stale.py --repo <repo> --older-than <cancelAfter>` (default `24h`), which
+  cancels runs older than that. The script is in the jong-skills `github-ci-operations` skill. A
+  one-line summary is enough; say nothing when none are listed. Report its `never-started` and
+  `default-branch` summary lines as is: it never cancels default-branch runs, and never-started
+  runs refuse cancel. Do not retry either, do not delete runs, and do not treat them as failures.
 
 ## Phase G2 - Command comments
 

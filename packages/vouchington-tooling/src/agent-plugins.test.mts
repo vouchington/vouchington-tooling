@@ -39,7 +39,6 @@ describe('vouchington-workflow plugin', () => {
       .sort()
     expect(skillNames).toEqual([
       'blackboard',
-      'ci-report',
       'organize-github-issues',
       'pr-description',
       'retrospective',
