@@ -1702,3 +1702,37 @@ GitHub-formatted `::error file=<snapshotPath>::` diagnostics for:
   when listed in `catalog.allowedTokenCursorProtocolIds`.
 - Stale or duplicate entries across caller-supplied catalogs (disable with
   `enforceCatalogFreshness: false` for isolated synthetic schema tests).
+
+## Pull-request description validation
+
+`vouchington-tooling/pr-description` is a dev-only library for validating pull-request bodies,
+sanitizing Markdown sections, resolving GitHub closing references and closure provenance, auditing
+milestone siblings and removed-surface supersession, and assessing plan completion. Every
+repository-specific template, no-source marker pair, provenance hint, and route-path parser is
+passed in as policy input rather than hardcoded.
+
+- Body and section validation: `validatePrBody`, `validatePrBodyWithIssueReferences`,
+  `validatePrDescriptionContent`, `formatGitHubBodyLengthError`, `DEFAULT_PROVENANCE_RULES`,
+  `DEFAULT_REQUIRED_HEADINGS`, `DEFAULT_RELATED_ISSUES_HEADING`, `sanitizedLines`,
+  `extractRelatedIssuesLines`, `extractRelatedIssuesReferenceText`,
+  `findEscapeCommentClosingKeywordLeaks`.
+- No-source and partial-batch helpers: `hasRelatedIssuesNoSourcePair`,
+  `extractPartialBatchSourceRef`, `validatePartialBatchSourceRef`.
+- Closing references, closure provenance, and summaries: `ESCAPE_COMMENT_RE`,
+  `parseGitHubIssueApiResponse`, `validateResolvedIssueReferences`,
+  `createClosingIssueReferenceResolver`, `resolveClosingIssueReference`, `currentRepo`,
+  `formatReferencedIssueSummary`, `formatRelatedIssueHints`, `parsePullRequestIdentity`,
+  `parsePullRequestRefOids`, `createIssueClosureResolver`.
+- Issue audit markers, milestone completion, and plan completion:
+  `DEFAULT_AUDIT_CLASSIFICATIONS`, `isValidAuditClassification`,
+  `parseIssueAuditKeepOpenDecisions`, `formatIssueAuditMarkerHint`,
+  `DEFAULT_MILESTONE_COMPLETION_REMAINDER`, `buildMilestoneListArgs`,
+  `findMilestoneCompletionSiblings`, `groupClosedIssuesByMilestone`, `validateMilestoneSiblings`,
+  `createMilestoneAuditor`, `assessPlanCompletion`.
+- Removed surfaces and supersession auditing: `createDiffSummary`, `reduceDiffBlock`,
+  `parseRemovedExports`, `parseRemovedSurfaces`, `createAppRouterPathParser`,
+  `parseChangedPackageJsonPaths`, `DEFAULT_REMOVAL_STOPLIST`, `buildRemovalVocabulary`,
+  `findRemovedScripts`, `createLocalPackageJsonReader`, `createGhPackageJsonReader`,
+  `readPullRequestPatch`, `buildSupersessionSearchArgs`, `findSupersessionHits`,
+  `parseAuditDecisions`, `validateAuditHits`, `createSupersessionAuditor`,
+  `runAdvisorySupersessionSearch`.

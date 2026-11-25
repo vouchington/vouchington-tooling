@@ -59,12 +59,19 @@ export default defineConfig({
         'packages/*/src/agent-issue-labels/index.mts',
         'packages/*/src/fresh-base/index.mts',
         'packages/*/src/pull-request-diff/index.mts',
+        'packages/*/src/pr-description/index.mts',
         'packages/*/src/**/*-types.mts',
         'packages/*/src/scc-complexity/repo-cli.mts',
         'packages/*/src/pg-schema-snapshot/types.mts',
       ],
       thresholds: {
         'packages/vouchington-tooling/src/worker-query-profile/**': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 100,
+        },
+        'packages/vouchington-tooling/src/pr-description/**': {
           lines: 100,
           functions: 100,
           statements: 100,

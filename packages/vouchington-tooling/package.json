@@ -511,6 +511,11 @@
       "types": "./dist/relational-storage/index.d.mts",
       "import": "./dist/relational-storage/index.mjs",
       "default": "./dist/relational-storage/index.mjs"
+    },
+    "./pr-description": {
+      "types": "./dist/pr-description/index.d.mts",
+      "import": "./dist/pr-description/index.mjs",
+      "default": "./dist/pr-description/index.mjs"
     }
   },
   "publishConfig": {
