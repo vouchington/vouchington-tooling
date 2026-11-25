@@ -1,3 +1,4 @@
+import { ChildProcess } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -306,6 +307,41 @@ describe('startManagedProcess and waitForService', () => {
     }
     await wrapper.stop()
     expect(wrapper.wasStopRequested()).toBe(true)
+
+    // Kill failure on a spawned child rejects stop() without falsely settling exitStatus, and remains retryable.
+    const killErrReady = Promise.withResolvers<void>()
+    const killErrProc = startManagedProcess({
+      name: 'kill-err',
+      command: process.execPath,
+      args: ['-e', 'console.log("ready"); setTimeout(() => {}, 30000)'],
+      cwd: dir,
+      logFilePrefix: 'kill-err',
+      logsDir: dir,
+      writeStdout: (chunk) => {
+        if (chunk.includes('ready')) killErrReady.resolve()
+      },
+      writeStderr: () => {},
+    })
+    await killErrReady.promise
+    const groupKillSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid < 0) throw Object.assign(new Error('EPERM group'), { code: 'EPERM' })
+      return Reflect.apply(realKill, process, [pid, signal])
+    })
+    const childKillSpy = vi.spyOn(ChildProcess.prototype, 'kill').mockImplementation(function (
+      this: ChildProcess,
+    ) {
+      this.emit('error', Object.assign(new Error('EPERM child'), { code: 'EPERM' }))
+      return false
+    })
+    try {
+      await expect(killErrProc.stop()).rejects.toThrow('EPERM child')
+      expect(killErrProc.exitStatus()).toBeNull()
+    } finally {
+      childKillSpy.mockRestore()
+      groupKillSpy.mockRestore()
+    }
+    await killErrProc.stop()
+    expect(killErrProc.exitStatus()?.signal).toBe('SIGTERM')
   })
 
   it('waits for service readiness with or without a managed process and reports early crash', async () => {

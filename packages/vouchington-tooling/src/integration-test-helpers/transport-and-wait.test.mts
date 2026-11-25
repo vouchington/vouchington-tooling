@@ -425,6 +425,26 @@ describe('waitFor, isHealthy, and poll', () => {
     midAbort.abort(new Error('mid cancelled'))
     expect(await midAbortErr).toMatchObject({ message: 'mid cancelled' })
 
+    // Signal aborted synchronously inside fn() rejects immediately without leaking rejections.
+    const syncAbort = new AbortController()
+    let rejectLate!: (err: Error) => void
+    await expect(
+      waitFor(
+        'sync-abort',
+        () => {
+          syncAbort.abort(new Error('sync cancelled'))
+          return new Promise<boolean>((_resolve, reject) => {
+            rejectLate = reject
+          })
+        },
+        1_000,
+        100,
+        syncAbort.signal,
+      ),
+    ).rejects.toThrow('sync cancelled')
+    rejectLate(new Error('late ignored'))
+    await Promise.resolve()
+
     // isHealthy checks status list, ignores body cancel errors, and handles fetch rejection.
     const cancelRejectingResponse = new Response(
       new ReadableStream({

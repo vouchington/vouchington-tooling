@@ -28,6 +28,7 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
   let exitStatus: ManagedProcessExit | null = null
   let exitedSettled = false
   let logStreamClosed = false
+  let spawned = false
   let stopRequested = false
   let stopPromise: Promise<void> | undefined
   const exitedDeferred = Promise.withResolvers<ManagedProcessExit>()
@@ -42,6 +43,9 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     // Own process group so SIGTERM/SIGKILL terminate the whole tree.
     detached: true,
   })
+  child.once('spawn', () => {
+    spawned = true
+  })
 
   const writeLog = (chunk: Buffer | string): void => {
     if (!logStreamClosed) logStream.write(chunk)
@@ -54,7 +58,15 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
   }
   const requestStop = (): Promise<void> => {
     stopRequested = true
-    return (stopPromise ??= stopChild(child, forceKillGraceMs, childTerminated.promise))
+    return (stopPromise ??= stopChild(
+      child,
+      forceKillGraceMs,
+      childTerminated.promise,
+      () => spawned,
+    ).catch((error) => {
+      stopPromise = undefined
+      throw error
+    }))
   }
 
   function settleExited(exit: ManagedProcessExit, message?: string, endLog = false): void {
@@ -90,7 +102,8 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     writeLog(chunk)
     writeStderr(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
   })
-  child.once('error', (error) => {
+  child.on('error', (error) => {
+    if (spawned) return
     childTerminated.resolve()
     settleExited(
       { code: null, error, signal: null },
@@ -139,12 +152,19 @@ async function stopChild(
   child: ChildProcess,
   forceKillGraceMs: number,
   terminated: Promise<void>,
+  hasSpawned: () => boolean,
 ): Promise<void> {
+  const killFailure = Promise.withResolvers<never>()
+  const onKillError = (error: Error): void => {
+    if (hasSpawned()) killFailure.reject(error)
+  }
+  child.on('error', onKillError)
   signalProcessTree(child, 'SIGTERM')
   const forceKillTimer = setTimeout(() => signalProcessTree(child, 'SIGKILL'), forceKillGraceMs)
   try {
-    await terminated
+    await Promise.race([terminated, killFailure.promise])
   } finally {
     clearTimeout(forceKillTimer)
+    child.off('error', onKillError)
   }
 }

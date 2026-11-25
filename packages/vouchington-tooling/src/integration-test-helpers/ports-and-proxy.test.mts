@@ -289,42 +289,50 @@ describe('concurrency broker and trace proxy', () => {
     let maxInFlight = 0
     const releaseFirst = Promise.withResolvers<void>()
     const firstEntered = Promise.withResolvers<void>()
-    const first = strictLimiter(async () => {
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      firstEntered.resolve()
-      await releaseFirst.promise
-      inFlight -= 1
-      return 'first'
-    })
-    await firstEntered.promise
-    // Second caller waiting longer than timeoutMs rejects with TimeoutError while first holds lease.
-    await expect(
-      strictLimiter(async () => {
+    const started: Array<Promise<unknown>> = []
+    try {
+      const first = strictLimiter(async () => {
         inFlight += 1
         maxInFlight = Math.max(maxInFlight, inFlight)
-        return 'second'
-      }),
-    ).rejects.toMatchObject({ name: 'TimeoutError' })
-    // Even after 80ms (> 40ms acquisition timeout), a third caller still waits for first to finish.
-    await new Promise<void>((resolve) => setTimeout(resolve, 60))
-    const longWaitLimiter = createCrossProcessConcurrencyLimiter(brokerOrigin, {
-      path: '/slot',
-      timeoutMs: 1_000,
-    })
-    let thirdEntered = false
-    const third = longWaitLimiter(async () => {
-      thirdEntered = true
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      inFlight -= 1
-      return 'third'
-    })
-    await new Promise<void>((resolve) => setTimeout(resolve, 30))
-    expect(thirdEntered).toBe(false)
-    releaseFirst.resolve()
-    await expect(Promise.all([first, third])).resolves.toEqual(['first', 'third'])
-    expect(maxInFlight).toBe(1)
+        firstEntered.resolve()
+        await releaseFirst.promise
+        inFlight -= 1
+        return 'first'
+      })
+      started.push(first)
+      await firstEntered.promise
+      // Second caller waiting longer than timeoutMs rejects with TimeoutError while first holds lease.
+      await expect(
+        strictLimiter(async () => {
+          inFlight += 1
+          maxInFlight = Math.max(maxInFlight, inFlight)
+          return 'second'
+        }),
+      ).rejects.toMatchObject({ name: 'TimeoutError' })
+      // Even after 80ms (> 40ms acquisition timeout), a third caller still waits for first to finish.
+      await new Promise<void>((resolve) => setTimeout(resolve, 60))
+      const longWaitLimiter = createCrossProcessConcurrencyLimiter(brokerOrigin, {
+        path: '/slot',
+        timeoutMs: 1_000,
+      })
+      let thirdEntered = false
+      const third = longWaitLimiter(async () => {
+        thirdEntered = true
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        inFlight -= 1
+        return 'third'
+      })
+      started.push(third)
+      await new Promise<void>((resolve) => setTimeout(resolve, 30))
+      expect(thirdEntered).toBe(false)
+      releaseFirst.resolve()
+      await expect(Promise.all([first, third])).resolves.toEqual(['first', 'third'])
+      expect(maxInFlight).toBe(1)
+    } finally {
+      releaseFirst.resolve()
+      await Promise.allSettled(started)
+    }
   })
 
   it('forwards headers/cookies/streams, isolates request IDs, handles aborts & 502, and validates ports', async () => {
