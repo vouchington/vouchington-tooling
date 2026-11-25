@@ -278,17 +278,21 @@ describe('type-query exported facts', () => {
 
   it('follows a reexport to its declared type in a second real source file', () => {
     const directory = mkdtempSync(join(tmpdir(), 'type-query-alias-'))
+    // noLib: the fixtures use no global types, and parsing the default ESNext lib files
+    // for each of the two programs is what exceeded the 5s timeout on a loaded CI runner.
+    const options: ts.CompilerOptions = {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      noLib: true,
+      target: ts.ScriptTarget.ESNext,
+      types: [],
+    }
     try {
       const declared = join(directory, 'declared.ts')
       const reexported = join(directory, 'reexported.ts')
       writeFileSync(declared, 'export interface RecordValue { id: string; label: string }')
       writeFileSync(reexported, "export { RecordValue as PublicValue } from './declared'")
-      const linkedProgram = ts.createProgram([declared, reexported], {
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        skipLibCheck: true,
-        target: ts.ScriptTarget.ESNext,
-      })
+      const linkedProgram = ts.createProgram([declared, reexported], options)
       expect(linkedProgram.getSemanticDiagnostics()).toEqual([])
       expect(
         getExportedTypeFacts({
@@ -300,12 +304,7 @@ describe('type-query exported facts', () => {
         }),
       ).toMatchObject({ display: 'RecordValue', properties: { label: 'string' } })
       writeFileSync(reexported, "export { MissingThing as Broken } from './absent'")
-      const brokenProgram = ts.createProgram([reexported], {
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        skipLibCheck: true,
-        target: ts.ScriptTarget.ESNext,
-      })
+      const brokenProgram = ts.createProgram([reexported], options)
       expect(() =>
         getExportedTypeFacts({
           typescript: ts,
