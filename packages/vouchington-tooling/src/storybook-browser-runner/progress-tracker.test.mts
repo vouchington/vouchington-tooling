@@ -106,6 +106,28 @@ describe('ProgressTracker', () => {
     expect(tracker.context(0).inFlight).toEqual([])
   })
 
+  it('keeps two long modules with a shared prefix apart', () => {
+    const tracker = new ProgressTracker(PREFIX)
+    const first = `${'a'.repeat(500)}/one.stories.tsx`
+    const second = `${'a'.repeat(500)}/two.stories.tsx`
+    tracker.observe(marker(1, 'module-start', first) + marker(2, 'module-start', second), 0)
+    expect(tracker.context(0).inFlight).toHaveLength(2)
+    tracker.observe(marker(3, 'module-end', first), 0)
+    const left = tracker.context(0).inFlight
+    expect(left).toHaveLength(1)
+    expect(left[0]!.module).toMatch(/…#[0-9a-f]{8}$/)
+  })
+
+  it('clears a long multibyte test on test-end whatever the event and sequence width', () => {
+    const tracker = new ProgressTracker(PREFIX)
+    const test = '漢'.repeat(160)
+    tracker.observe(marker(1, 'module-start', 'm'), 0)
+    tracker.observe(marker(2, 'test-start', 'm', test), 0)
+    expect(tracker.context(0).inFlight[0]!.test).not.toBeNull()
+    tracker.observe(marker(1_000_000_000, 'test-end', 'm', test), 0)
+    expect(tracker.context(0).inFlight[0]!.test).toBeNull()
+  })
+
   it('evicts collected modules before running ones', () => {
     const tracker = new ProgressTracker(PREFIX)
     tracker.observe(marker(1, 'module-start', 'active'), 0)
