@@ -19,6 +19,24 @@ describe('Playwright timeout guard with banOverrides', () => {
     expect(result.marker).toBeUndefined()
   })
 
+  // Playwright's own `_setupArtifacts` fixture calls `testInfo.setTimeout(project.timeout)`.
+  it('allows a runtime reset to the project timeout', async () => {
+    const result = await runFixture('info.setTimeout(info.project.timeout)', {
+      banOverrides: true,
+      collection: 'test.beforeEach(async ({}, info) => { info.setTimeout(info.project.timeout) })',
+    })
+    expect(result.code).toBe(0)
+    expect(result.stats).toMatchObject({ expected: 1, unexpected: 0 })
+    expect(result.marker).toBe('continued')
+  })
+
+  it('still rejects a public setter call with the project timeout', async () => {
+    const result = await runFixture('test.setTimeout(info.project.timeout)', { banOverrides: true })
+    expect(result.code).toBe(1)
+    expect(result.output).toMatch(overrideForbidden)
+    expect(result.marker).toBeUndefined()
+  })
+
   it.each([
     ['beforeEach info setter', 'test.beforeEach(async ({}, info) => { info.setTimeout(5000) })'],
     [

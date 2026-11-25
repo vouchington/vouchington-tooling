@@ -19,11 +19,11 @@ export type PlaywrightTimeoutGuardOptions<
   maxTimeoutMs?: number
   /** Name of the automatic guard fixture. Callers must not override it in `extend` or `use`. */
   fixtureName?: Name
-  /** Reject per-test, hook, and suite timeout overrides regardless of value. Defaults to `false`. */
+  /** Reject test, hook, and suite timeout overrides except resets to the project timeout. */
   banOverrides?: boolean
 }
 
-type TimeoutInfo = Pick<TestInfo, 'timeout' | 'setTimeout' | 'slow'>
+type TimeoutInfo = Pick<TestInfo, 'timeout' | 'setTimeout' | 'slow' | 'project'>
 type DefaultFixtureName = typeof DEFAULT_PLAYWRIGHT_TIMEOUT_GUARD_FIXTURE
 
 /** Without `fixtureName`, the guard registers and is typed by the default fixture name. */
@@ -71,8 +71,8 @@ function buildTimeoutGuard<Name extends string>(
   }
   const fixtureGuard: FixtureTimeoutGuard = { validate: testTimeout, fixtureName, capText }
 
-  function validateOverride(timeout: unknown, label: string): number {
-    if (banOverrides) {
+  function validateOverride(timeout: unknown, label: string, reset?: number): number {
+    if (banOverrides && timeout !== reset) {
       throw new RangeError(`${label} overrides are forbidden by the ${capText} test cap`)
     }
     return testTimeout(timeout, label)
@@ -108,7 +108,7 @@ function buildTimeoutGuard<Name extends string>(
         configurable: false,
         value: (timeout: number) =>
           Reflect.apply(setTimeout, info, [
-            validateOverride(timeout, 'Playwright runtime test timeout'),
+            validateOverride(timeout, 'Playwright runtime test timeout', info.project.timeout),
           ]),
       },
       slow: { value: rejectSlow, writable: false, configurable: false },
