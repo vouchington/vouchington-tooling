@@ -89,6 +89,14 @@ export function completion(child: ChildProcess): Promise<{ code: number | null; 
 // 30s test timeout so a path that never appears still fails with this error.
 const pathWaitDeadlineMs = 20_000
 
+// A test that awaits waitForPath `waits` times in sequence can spend the full
+// deadline on each, so its Vitest timeout must exceed that sum plus the usual
+// 30s for the rest of the test. Otherwise Vitest reports a generic timeout
+// instead of the "Timed out waiting for <path>" error.
+export function sequentialWaitsTimeoutMs(waits: number): number {
+  return waits * pathWaitDeadlineMs + 30_000
+}
+
 export async function waitForPath(path: string): Promise<void> {
   const deadline = Date.now() + pathWaitDeadlineMs
   while (Date.now() < deadline) {

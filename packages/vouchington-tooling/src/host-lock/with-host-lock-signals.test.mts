@@ -10,6 +10,7 @@ import {
   hostLockScript,
   makeHome,
   spawnHostLock,
+  sequentialWaitsTimeoutMs,
   waitForPath,
 } from './with-host-lock.test-helpers.mts'
 
@@ -65,7 +66,7 @@ describe('with-host-lock.sh signals and ownership', () => {
       })
       await expect(stat(lock)).rejects.toMatchObject({ code: 'ENOENT' })
     },
-    30_000,
+    sequentialWaitsTimeoutMs(2),
   )
 
   it('keeps the command as lock owner if the wrapper is killed', async () => {
@@ -125,69 +126,75 @@ describe('with-host-lock.sh signals and ownership', () => {
     expect(source).toContain('kill -0 "$wrapper_pid"')
   }, 30_000)
 
-  it('holds the lock until a signalled process-group descendant exits', async () => {
-    const home = await makeHome()
-    const rootReady = join(home, 'root-ready')
-    const descendantReady = join(home, 'descendant-ready')
-    const descendantSignalled = join(home, 'descendant-signalled')
-    const contenderEntered = join(home, 'contender-entered')
-    const descendantScript = join(home, 'descendant.sh')
-    const lock = join(home, '.cache/host-lock/expensive-build.lock.d')
-    await writeFile(
-      descendantScript,
-      `#!/usr/bin/env bash
+  it(
+    'holds the lock until a signalled process-group descendant exits',
+    async () => {
+      const home = await makeHome()
+      const rootReady = join(home, 'root-ready')
+      const descendantReady = join(home, 'descendant-ready')
+      const descendantSignalled = join(home, 'descendant-signalled')
+      const contenderEntered = join(home, 'contender-entered')
+      const descendantScript = join(home, 'descendant.sh')
+      const lock = join(home, '.cache/host-lock/expensive-build.lock.d')
+      await writeFile(
+        descendantScript,
+        `#!/usr/bin/env bash
 signal_file=$1
 ready_file=$2
 trap 'touch "$signal_file"; sleep 1; exit 0' TERM INT
 touch "$ready_file"
 while :; do :; done
 `,
-    )
-    const wrapper = spawnHostLock(home, 'expensive-build', 5, [
-      'bash',
-      '-c',
-      `trap 'exit 0' TERM INT
+      )
+      const wrapper = spawnHostLock(home, 'expensive-build', 5, [
+        'bash',
+        '-c',
+        `trap 'exit 0' TERM INT
 bash "$1" "$2" "$3" &
 touch "$4"
 while :; do :; done`,
-      'host-lock-root',
-      descendantScript,
-      descendantSignalled,
-      descendantReady,
-      rootReady,
-    ])
-    const wrapperDone = completion(wrapper)
-    await waitForPath(rootReady)
-    await waitForPath(descendantReady)
-    const processGroup = Number((await readFile(join(lock, 'owner.pid'), 'utf8')).trim())
-    let contender: Promise<{ code: number | null; stderr: string }> | undefined
+        'host-lock-root',
+        descendantScript,
+        descendantSignalled,
+        descendantReady,
+        rootReady,
+      ])
+      const wrapperDone = completion(wrapper)
+      await waitForPath(rootReady)
+      await waitForPath(descendantReady)
+      const processGroup = Number((await readFile(join(lock, 'owner.pid'), 'utf8')).trim())
+      let contender: Promise<{ code: number | null; stderr: string }> | undefined
 
-    try {
-      wrapper.kill('SIGTERM')
-      await waitForPath(descendantSignalled)
-      contender = completion(spawnHostLock(home, 'expensive-build', 5, ['touch', contenderEntered]))
-      await new Promise((resolve) => setTimeout(resolve, 250))
-      await expect(stat(contenderEntered)).rejects.toMatchObject({
-        code: 'ENOENT',
-      })
-      await expect(wrapperDone).resolves.toMatchObject({
-        code: expect.any(Number),
-      })
-      await expect(contender).resolves.toEqual({
-        code: 0,
-        stderr: expect.stringMatching(/^with-host-lock: expensive-build acquired after \d+s\n$/),
-      })
-    } finally {
       try {
-        await execFileAsync('kill', ['-s', 'KILL', '--', String(-processGroup)])
-      } catch {
-        // The process group already exited through the successful signal path.
+        wrapper.kill('SIGTERM')
+        await waitForPath(descendantSignalled)
+        contender = completion(
+          spawnHostLock(home, 'expensive-build', 5, ['touch', contenderEntered]),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 250))
+        await expect(stat(contenderEntered)).rejects.toMatchObject({
+          code: 'ENOENT',
+        })
+        await expect(wrapperDone).resolves.toMatchObject({
+          code: expect.any(Number),
+        })
+        await expect(contender).resolves.toEqual({
+          code: 0,
+          stderr: expect.stringMatching(/^with-host-lock: expensive-build acquired after \d+s\n$/),
+        })
+      } finally {
+        try {
+          await execFileAsync('kill', ['-s', 'KILL', '--', String(-processGroup)])
+        } catch {
+          // The process group already exited through the successful signal path.
+        }
+        wrapper.kill('SIGKILL')
+        await wrapperDone
+        if (contender) await contender
       }
-      wrapper.kill('SIGKILL')
-      await wrapperDone
-      if (contender) await contender
-    }
-  }, 30_000)
+    },
+    sequentialWaitsTimeoutMs(3),
+  )
 
   it('terminates a lingering process group after the bounded drain period', async () => {
     const home = await makeHome()
