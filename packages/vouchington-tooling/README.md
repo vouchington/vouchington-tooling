@@ -1671,3 +1671,26 @@ reported at once. Policies:
 
 The check fails closed: no discovered workflows, a missing root, an unreadable config or workflow,
 a YAML parse error, or a config entry naming an undiscovered workflow is a failure, never a pass.
+
+## Relational storage guard
+
+`vouchington-tooling/relational-storage` is a dev-only static check that exports
+`checkRelationalStorage(schema, options)` (and the option/catalog types `RelationalStorageOptions`,
+`RelationalStorageCatalog`, `GeneratedFkAlias`, `GeneratedSelfRootAlias`, `ReviewedKeyCatalog`).
+It inspects a `SchemaSnapshot` (from `vouchington-tooling/pg-schema-snapshot`) and reports
+GitHub-formatted `::error file=<snapshotPath>::` diagnostics for:
+
+- Unresolved PostgreSQL domain types (anything outside built-in types, `schema.enums`, and
+  `catalog.extraKnownTypes`), reported before relational classification.
+- `uuid[]` array relationships, which always require concrete relational storage.
+- Sole UUID `id` primary keys without an independent generator (`identity`, `uuidv7()`, or
+  `gen_random_uuid()`) or a foreign key, unless listed in `catalog.allowedOwnPrimaryUuids`.
+- UUID `*_id`, `*_uuid`, and `work_key`/`entity_key`/`relation_key`/`target_key` columns without a
+  covering foreign key (unless matched by `catalog.generatedFkAliases`,
+  `catalog.generatedSelfRootAliases`, or a reviewed UUID exception catalog).
+- Encoded entity references (`text`/`varchar`/`char`/`name` columns named
+  `work_key`/`entity_key`/`relation_key`/`target_key`, `uuid_value` paired with `kind` without an
+  FK, or exact `table.column` entries in `catalog.extraEncodedReferenceColumns`), accepted only
+  when listed in `catalog.allowedTokenCursorProtocolIds`.
+- Stale or duplicate entries across caller-supplied catalogs (disable with
+  `enforceCatalogFreshness: false` for isolated synthetic schema tests).

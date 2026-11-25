@@ -92,6 +92,7 @@
         "src/retrospective-distill/index.mts!",
         "src/story-coverage/index.mts!",
         "src/transient-retry/index.mts!",
+        "src/relational-storage/index.mts!",
       ],
       "project": ["src/**/*.mts!", "!src/**/*.test.mts!", "!src/**/*.test-helpers.mts!"],
     },

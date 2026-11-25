@@ -506,6 +506,11 @@
       "types": "./dist/worker-query-profile/index.d.mts",
       "import": "./dist/worker-query-profile/index.mjs",
       "default": "./dist/worker-query-profile/index.mjs"
+    },
+    "./relational-storage": {
+      "types": "./dist/relational-storage/index.d.mts",
+      "import": "./dist/relational-storage/index.mjs",
+      "default": "./dist/relational-storage/index.mjs"
     }
   },
   "publishConfig": {
