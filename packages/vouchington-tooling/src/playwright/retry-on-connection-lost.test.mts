@@ -117,17 +117,44 @@ describe('retryOnConnectionLost', () => {
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
-  it('retries once on local page.goto timeout and returns result', async () => {
+  it.each([
+    'http://localhost:38267/my/news-preferences',
+    'https://example.com/my/news-preferences',
+  ])('does not retry a page.goto timeout for %s', async (target) => {
+    vi.useFakeTimers()
+    const error = new Error(
+      [
+        'page.goto: Timeout 15000ms exceeded.',
+        'Call log:',
+        `  - navigating to "${target}", waiting until "domcontentloaded"`,
+      ].join('\n'),
+    )
+    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
+
+    await expect(retryOnConnectionLost(fn, { maxRetries: 1 })).rejects.toBe(error)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry a goto timeout whose target URL contains a connection code', async () => {
+    vi.useFakeTimers()
+    const error = new Error(
+      [
+        'page.goto: Timeout 15000ms exceeded.',
+        'Call log:',
+        '  - navigating to "http://localhost:3000/x?e=ERR_CONNECTION_RESET", waiting until "domcontentloaded"',
+      ].join('\n'),
+    )
+    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
+
+    await expect(retryOnConnectionLost(fn, { maxRetries: 1 })).rejects.toBe(error)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries a real page.goto connection reset', async () => {
     vi.useFakeTimers()
     const fn = vi.fn<() => Promise<unknown>>()
     fn.mockRejectedValueOnce(
-      new Error(
-        [
-          'page.goto: Timeout 15000ms exceeded.',
-          'Call log:',
-          '  - navigating to "http://localhost:38267/my/news-preferences", waiting until "domcontentloaded"',
-        ].join('\n'),
-      ),
+      new Error('page.goto: net::ERR_CONNECTION_RESET at http://localhost:3000/'),
     )
     fn.mockResolvedValueOnce('ok')
 
@@ -135,21 +162,6 @@ describe('retryOnConnectionLost', () => {
     await vi.runAllTimersAsync()
     await expect(promise).resolves.toBe('ok')
     expect(fn).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not retry external page.goto timeout', async () => {
-    vi.useFakeTimers()
-    const error = new Error(
-      [
-        'page.goto: Timeout 15000ms exceeded.',
-        'Call log:',
-        '  - navigating to "https://example.com/my/news-preferences", waiting until "domcontentloaded"',
-      ].join('\n'),
-    )
-    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
-
-    await expect(retryOnConnectionLost(fn, { maxRetries: 1 })).rejects.toBe(error)
-    expect(fn).toHaveBeenCalledTimes(1)
   })
 
   it('retries up to maxRetries times before rethrowing', async () => {
@@ -259,16 +271,6 @@ describe('retryOnConnectionLost', () => {
 
     await expect(retryOnConnectionLost(fn, { maxRetries: 10 })).rejects.toBe(error)
     expect(fn).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not retry a timeout whose target is not a URL', async () => {
-    const error = new Error(
-      'page.goto: Timeout 30000ms exceeded\n  - navigating to "not a url", waiting until "load"',
-    )
-    const fn = vi.fn<() => Promise<unknown>>().mockRejectedValue(error)
-
-    await expect(retryOnConnectionLost(fn, { backoffMs: 50, maxRetries: 2 })).rejects.toBe(error)
-    expect(fn).toHaveBeenCalledOnce()
   })
 
   it('retries when the failure is not an Error instance', async () => {

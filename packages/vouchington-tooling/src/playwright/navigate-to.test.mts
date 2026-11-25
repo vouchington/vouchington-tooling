@@ -21,7 +21,7 @@ describe('navigateTo', () => {
     vi.unstubAllGlobals()
   })
 
-  it('installs turnstile stub and waits for network idle', async () => {
+  it('installs turnstile stub, waits for load and never for networkidle', async () => {
     const page = createMockPage()
 
     await navigateTo(
@@ -37,7 +37,7 @@ describe('navigateTo', () => {
     expect(mockInstallTurnstileStub).toHaveBeenCalledWith(page)
     expect(mockRetryOnConnectionLost).toHaveBeenCalledOnce()
     expect(page.goto).toHaveBeenCalledWith('/foo', { waitUntil: 'domcontentloaded' })
-    expect(page.waitForLoadState).toHaveBeenCalledWith('networkidle')
+    expect(page.waitForLoadState.mock.calls).toEqual([['load']])
     expect(page.evaluate).toHaveBeenCalledOnce()
   })
 
@@ -60,8 +60,8 @@ describe('navigateTo', () => {
     )
 
     // Once for the first document, once for the one the redirect landed on —
-    // both at 'networkidle', so the redirect cannot weaken the wait.
-    expect(page.waitForLoadState.mock.calls).toEqual([['networkidle'], ['networkidle']])
+    // both at 'load', never 'networkidle'.
+    expect(page.waitForLoadState.mock.calls).toEqual([['load'], ['load']])
     expect(page.evaluate).toHaveBeenCalledTimes(2)
   })
 

@@ -34,28 +34,15 @@ interface RetryOnConnectionLostOptions {
 
 const CONNECTION_LOST_PATTERN =
   /\bERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|SOCKET_NOT_CONNECTED|NETWORK_CHANGED|EMPTY_RESPONSE|ABORTED|INCOMPLETE_CHUNKED_ENCODING)\b/i
-const NAVIGATION_TIMEOUT_PATTERN = /\bpage\.goto: Timeout \d+ms exceeded\b/
+const GOTO_TIMEOUT_PATTERN = /\bpage\.goto: Timeout \d+ms exceeded\b/
 
-function isLocalUrl(value: string) {
-  try {
-    const { hostname } = new URL(value)
-    const normalizedHostname = hostname.replace(/^\[(.*)]$/, '$1')
-    return ['', 'localhost', '127.0.0.1', '::1'].includes(normalizedHostname)
-  } catch {
-    return false
-  }
-}
-
-function isLocalNavigationTimeout(message: string): boolean {
-  if (!NAVIGATION_TIMEOUT_PATTERN.test(message)) return false
-  const navigatingMatch = message.match(/navigating to "([^"]+)"/)
-  const target = navigatingMatch?.[1]
-  return target !== undefined && isLocalUrl(target)
-}
-
+// A page.goto timeout is deliberately not matched: it means the server is alive but
+// slow, and retrying aborts the in-flight load (ERR_ABORTED) and restarts it.
 function isConnectionLostError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
-  return CONNECTION_LOST_PATTERN.test(message) || isLocalNavigationTimeout(message)
+  // The timeout's call log echoes the URL, which may contain a connection code.
+  if (GOTO_TIMEOUT_PATTERN.test(message)) return false
+  return CONNECTION_LOST_PATTERN.test(message)
 }
 
 async function runWithDeadline<T>(fn: () => Promise<T>, deadlineMs: number): Promise<T> {
