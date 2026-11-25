@@ -268,6 +268,63 @@ describe('concurrency broker and trace proxy', () => {
     await expect(limiter(async () => 'never')).rejects.toThrow(
       'asset concurrency broker returned 503',
     )
+    vi.unstubAllGlobals()
+
+    // Acquisition timeout applies only while acquiring the lease, not while fn() runs.
+    const liveBroker = createAssetConcurrencyBroker(1, '/slot')
+    const brokerServer = http.createServer((req, res) => {
+      if (!liveBroker.handle(req.url ?? '/', res)) {
+        res.writeHead(404)
+        res.end()
+      }
+    })
+    cleanups.push(() => closeServer(brokerServer))
+    const brokerOrigin = await listenOnFetchSafeLoopback(brokerServer)
+    const strictLimiter = createCrossProcessConcurrencyLimiter(brokerOrigin, {
+      path: '/slot',
+      timeoutMs: 40,
+    })
+
+    let inFlight = 0
+    let maxInFlight = 0
+    const releaseFirst = Promise.withResolvers<void>()
+    const firstEntered = Promise.withResolvers<void>()
+    const first = strictLimiter(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      firstEntered.resolve()
+      await releaseFirst.promise
+      inFlight -= 1
+      return 'first'
+    })
+    await firstEntered.promise
+    // Second caller waiting longer than timeoutMs rejects with TimeoutError while first holds lease.
+    await expect(
+      strictLimiter(async () => {
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        return 'second'
+      }),
+    ).rejects.toMatchObject({ name: 'TimeoutError' })
+    // Even after 80ms (> 40ms acquisition timeout), a third caller still waits for first to finish.
+    await new Promise<void>((resolve) => setTimeout(resolve, 60))
+    const longWaitLimiter = createCrossProcessConcurrencyLimiter(brokerOrigin, {
+      path: '/slot',
+      timeoutMs: 1_000,
+    })
+    let thirdEntered = false
+    const third = longWaitLimiter(async () => {
+      thirdEntered = true
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      inFlight -= 1
+      return 'third'
+    })
+    await new Promise<void>((resolve) => setTimeout(resolve, 30))
+    expect(thirdEntered).toBe(false)
+    releaseFirst.resolve()
+    await expect(Promise.all([first, third])).resolves.toEqual(['first', 'third'])
+    expect(maxInFlight).toBe(1)
   })
 
   it('forwards headers/cookies/streams, isolates request IDs, handles aborts & 502, and validates ports', async () => {
@@ -276,8 +333,23 @@ describe('concurrency broker and trace proxy', () => {
     )
 
     let receivedHeaders: http.IncomingHttpHeaders | undefined
+    let doneHits = 0
     const upstream = http.createServer(async (req, res) => {
       receivedHeaders = req.headers
+      if (req.url === '/redirect') {
+        res.writeHead(302, {
+          Location: '/done',
+          'Set-Cookie': ['hop=1; Path=/'],
+        })
+        res.end()
+        return
+      }
+      if (req.url === '/done') {
+        doneHits += 1
+        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        res.end('followed')
+        return
+      }
       if (req.url === '/empty') {
         res.writeHead(204)
         res.end()
@@ -335,6 +407,13 @@ describe('concurrency broker and trace proxy', () => {
     expect(postRes.headers['x-keep-res']).toBe('keep')
     expect(receivedHeaders?.['x-drop-req']).toBeUndefined()
     expect(receivedHeaders?.['x-keep-req']).toBe('keep')
+
+    // Redirect responses are forwarded verbatim without following upstream.
+    const redirectRes = await fetch(`${proxy.origin}/redirect`, { redirect: 'manual' })
+    expect(redirectRes.status).toBe(302)
+    expect(redirectRes.headers.get('location')).toBe('/done')
+    expect(redirectRes.headers.getSetCookie()).toEqual(['hop=1; Path=/'])
+    expect(doneHits).toBe(0)
 
     // 204 empty response + concurrency limiter over live proxy
     const limiter = createCrossProcessConcurrencyLimiter(proxy.origin)

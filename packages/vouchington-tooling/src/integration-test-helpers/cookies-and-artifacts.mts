@@ -55,7 +55,7 @@ function getSetCookieHeaders(headers: Headers): string[] {
 }
 
 function splitCombinedSetCookieHeader(header: string): string[] {
-  return header.split(/,(?=\s*[^;,=\s]+=[^;,]+)/).map((part) => part.trim())
+  return header.split(/,(?=\s*[^;,=\s]+=)/).map((part) => part.trim())
 }
 
 /** Writes a JSON integration artifact under `artifactsDir` using a filesystem-safe filename. */

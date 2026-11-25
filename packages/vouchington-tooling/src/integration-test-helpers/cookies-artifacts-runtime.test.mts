@@ -45,15 +45,18 @@ describe('WebIntegrationCookies, artifacts, trace printing, and asset cache', ()
     expect(jar.get('b')).toBe('2')
     expect(jar.toHeader()).toBe('a=1; b=2')
 
-    // Clearing cookie via empty value + fallback parser when getSetCookie is absent.
+    // Clearing cookie via empty value (including after a comma) + fallback parser when getSetCookie is absent.
     const fakeResponse = {
       headers: {
         get: (name: string) =>
-          name === 'set-cookie' ? 'a=; Path=/, c=3; Expires=Wed, 21 Oct 2026 07:28:00 GMT, ' : null,
+          name === 'set-cookie'
+            ? 'a=; Path=/, c=3; Expires=Wed, 21 Oct 2026 07:28:00 GMT, b=; Path=/'
+            : null,
       },
     } as unknown as Response
     jar.captureSetCookies(fakeResponse)
     expect(jar.get('a')).toBeUndefined()
+    expect(jar.get('b')).toBeUndefined()
     expect(jar.get('c')).toBe('3')
 
     const emptyHeaderRes = {
@@ -128,16 +131,16 @@ describe('WebIntegrationCookies, artifacts, trace printing, and asset cache', ()
     ])
     expect(fetchAsset).toHaveBeenCalledTimes(1)
 
-    // Evicts rejections and >=400 responses.
+    // Evicts rejections immediately so retries inside .catch() issue a new fetch, and evicts >=400 responses.
     const flaky = vi
       .fn<(url: string) => Promise<Response>>()
       .mockRejectedValueOnce(new Error('net'))
       .mockResolvedValueOnce(new Response('err', { status: 502 }))
       .mockResolvedValueOnce(new Response('ok', { status: 200 }))
-    await expect(fetchCached('/_next/static/flaky.js', flaky)).rejects.toThrow('net')
-    await expect(fetchCached('/_next/static/flaky.js', flaky)).resolves.toMatchObject({
-      status: 502,
-    })
+    const immediateRetry = await fetchCached('/_next/static/flaky.js', flaky).catch(() =>
+      fetchCached('/_next/static/flaky.js', flaky),
+    )
+    expect(immediateRetry).toMatchObject({ status: 502 })
     await expect(fetchCached('/_next/static/flaky.js', flaky)).resolves.toMatchObject({
       status: 200,
     })
@@ -295,5 +298,9 @@ describe('setup, cleanup, and web-api client runtime helpers', () => {
     })
     expect(closed).toHaveBeenCalledOnce()
     expect(globalThis.fetch).toBe(originalFetch)
+
+    // Vitest must stay lazily loaded so non-Vitest consumers can import the barrel without vitest.
+    const setupSource = readFileSync(new URL('./setup-and-runtime.mts', import.meta.url), 'utf8')
+    expect(setupSource).not.toMatch(/^\s*import\s+.*from\s+['"]vitest['"]/mu)
   })
 })

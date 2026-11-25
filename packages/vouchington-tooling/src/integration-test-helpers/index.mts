@@ -18,9 +18,11 @@ export {
   formatExitStatus,
   POST_READY_EXIT_MARKER_PREFIX,
   serviceExitMessage,
+  waitForService,
   watchForPostReadyExit,
   type ManagedProcess,
   type ManagedProcessExit,
+  type WaitForServiceOptions,
 } from './exit-diagnostics.mts'
 export {
   FetchResponseRejectedError,
@@ -44,12 +46,7 @@ export {
   type ReservePorts,
   type ServicePortBandRange,
 } from './ports.mts'
-export {
-  startManagedProcess,
-  waitForService,
-  type StartManagedProcessOptions,
-  type WaitForServiceOptions,
-} from './processes.mts'
+export { startManagedProcess, type StartManagedProcessOptions } from './processes.mts'
 export {
   cleanupManagedServices,
   closeWebApiClientRuntime,

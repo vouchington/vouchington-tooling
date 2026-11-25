@@ -288,6 +288,33 @@ describe('fetchWithTransportRetry and retryOnTransportError', () => {
         { idempotent: true, label: 'app' },
       ),
     ).rejects.toBe(appErr)
+
+    // Non-idempotent whole-operation callbacks must not replay even on ECONNREFUSED.
+    const nonIdempotentAttempt = vi.fn(async () => {
+      throw err
+    })
+    await expect(
+      retryOnTransportError(nonIdempotentAttempt, { idempotent: false, label: 'non-idem' }),
+    ).rejects.toBe(err)
+    expect(nonIdempotentAttempt).toHaveBeenCalledTimes(1)
+
+    // Clock drift past retryDeadline during backoff throws without running another attempt.
+    const driftAttempt = vi.fn(async () => {
+      throw err
+    })
+    const driftedOp = retryOnTransportError(driftAttempt, {
+      idempotent: true,
+      label: 'drift-op',
+      backoffsMs: [10],
+      budgetMs: 500,
+      writeDiagnostic: () => {
+        vi.setSystemTime(Date.now() + 1_000)
+      },
+    })
+    const driftedOpErr = driftedOp.catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(10)
+    await expect(driftedOpErr).resolves.toBe(err)
+    expect(driftAttempt).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -339,6 +366,64 @@ describe('waitFor, isHealthy, and poll', () => {
     const pollErr = pollTimeout.catch((e: unknown) => e)
     await vi.advanceTimersByTimeAsync(300)
     expect(await pollErr).toMatchObject({ message: 'Polling timed out after 100ms' })
+
+    // Pending probes that never settle still time out at timeoutMs, and zero budgets reject immediately.
+    const hangingWait = waitFor('hanging', () => new Promise<boolean>(() => {}), 50, 10)
+    const hangingWaitErr = hangingWait.catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(50)
+    expect(await hangingWaitErr).toMatchObject({ message: 'Timed out waiting for hanging' })
+
+    const hangingPoll = poll(
+      () => new Promise<number>(() => {}),
+      () => true,
+      50,
+      10,
+    )
+    const hangingPollErr = hangingPoll.catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(50)
+    expect(await hangingPollErr).toMatchObject({ message: 'Polling timed out after 50ms' })
+
+    await expect(waitFor('zero', async () => true, 0)).rejects.toThrow('Timed out waiting for zero')
+    await expect(
+      poll(
+        async () => 1,
+        () => true,
+        0,
+      ),
+    ).rejects.toThrow('Polling timed out after 0ms')
+
+    // Probe rejections before timeout propagate unchanged.
+    await expect(
+      waitFor(
+        'probe-err',
+        async () => {
+          throw new Error('probe boom')
+        },
+        1_000,
+      ),
+    ).rejects.toThrow('probe boom')
+    await expect(
+      poll(
+        async () => {
+          throw new Error('poll boom')
+        },
+        () => true,
+        1_000,
+      ),
+    ).rejects.toThrow('poll boom')
+
+    // External signal aborting mid-probe rejects with signal.reason.
+    const midAbort = new AbortController()
+    const midAbortWait = waitFor(
+      'mid-abort',
+      () => new Promise<boolean>(() => {}),
+      1_000,
+      100,
+      midAbort.signal,
+    )
+    const midAbortErr = midAbortWait.catch((e: unknown) => e)
+    midAbort.abort(new Error('mid cancelled'))
+    expect(await midAbortErr).toMatchObject({ message: 'mid cancelled' })
 
     // isHealthy checks status list, ignores body cancel errors, and handles fetch rejection.
     const cancelRejectingResponse = new Response(

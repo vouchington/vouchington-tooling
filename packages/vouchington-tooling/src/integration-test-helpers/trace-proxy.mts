@@ -88,6 +88,7 @@ export async function createTraceProxy(
           ? (Readable.toWeb(incoming) as unknown as globalThis.ReadableStream<Uint8Array>)
           : null,
         duplex: 'half',
+        redirect: 'manual',
         signal: abortController.signal,
       }
       response = await fetch(requestUrl, requestInit)
@@ -122,9 +123,7 @@ export async function createTraceProxy(
     try {
       if (response.body) {
         await pipeline(Readable.from(response.body as AsyncIterable<Uint8Array>), outgoing)
-      } else {
-        outgoing.end()
-      }
+      } else outgoing.end()
     } catch (err) {
       if (!abortController.signal.aborted) outgoing.destroy(err as Error)
     } finally {

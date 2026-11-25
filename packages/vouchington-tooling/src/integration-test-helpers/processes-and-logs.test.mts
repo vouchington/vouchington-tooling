@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -148,7 +148,7 @@ describe('startManagedProcess and waitForService', () => {
     expect(failExit.code).toBe(3)
     expect(failStderr.join('')).toContain('[fail] exited with code 3')
 
-    // Spawn error (non-existent binary) settles with error.
+    // Spawn error (non-existent binary) settles with error, including when stop() runs immediately.
     const errStderr: string[] = []
     const errProc = startManagedProcess({
       name: 'missing-bin',
@@ -160,9 +160,29 @@ describe('startManagedProcess and waitForService', () => {
       writeStdout: () => {},
       writeStderr: (c) => errStderr.push(c),
     })
+    await errProc.stop()
     const errExit = await errProc.exited
     expect(errExit.error).toBeInstanceOf(Error)
     expect(errStderr.join('')).toContain('[missing] failed to start:')
+
+    // Log stream error (e.g. log path is a directory) reports failure, stops child, and settles without hanging.
+    mkdirSync(join(dir, 'dirlog.log'))
+    const logErrStderr: string[] = []
+    const logErrProc = startManagedProcess({
+      name: 'log-err',
+      command: process.execPath,
+      args: ['-e', 'setTimeout(() => {}, 30000)'],
+      cwd: dir,
+      logFilePrefix: 'dirlog',
+      logsDir: dir,
+      forceKillGraceMs: 50,
+      writeStdout: () => {},
+      writeStderr: (c) => logErrStderr.push(c),
+    })
+    const logErrExit = await logErrProc.exited
+    await logErrProc.stop()
+    expect(logErrExit.error).toBeInstanceOf(Error)
+    expect(logErrStderr.join('')).toContain('[dirlog] log stream error:')
   })
 
   it('stops a running process via SIGTERM and escalates to SIGKILL when SIGTERM is ignored', async () => {
@@ -214,6 +234,7 @@ describe('startManagedProcess and waitForService', () => {
       return Reflect.apply(realKill, process, [pid, signal])
     })
     try {
+      const ready = Promise.withResolvers<void>()
       const stubborn = startManagedProcess({
         name: 'stubborn',
         command: process.execPath,
@@ -225,16 +246,66 @@ describe('startManagedProcess and waitForService', () => {
         logFilePrefix: 'stubborn',
         logsDir: dir,
         forceKillGraceMs: 50,
-        writeStdout: () => {},
+        writeStdout: (chunk) => {
+          if (chunk.includes('ready')) ready.resolve()
+        },
         writeStderr: () => {},
       })
-      await new Promise<void>((resolve) => setTimeout(resolve, 150))
+      const readyTimeout = setTimeout(
+        () => ready.reject(new Error('stubborn ready timeout')),
+        5_000,
+      )
+      try {
+        await Promise.race([
+          ready.promise,
+          stubborn.exited.then(() => {
+            throw new Error('stubborn exited before ready')
+          }),
+        ])
+      } finally {
+        clearTimeout(readyTimeout)
+      }
       await stubborn.stop()
       expect(stubborn.exitStatus()?.signal).toBe('SIGKILL')
       expect(threwOnce).toBe(true)
     } finally {
       killSpy.mockRestore()
     }
+
+    // Wrapper that exits on SIGTERM while a descendant keeps stdout open is still cleaned up via SIGKILL.
+    const wrapperReady = Promise.withResolvers<void>()
+    const wrapper = startManagedProcess({
+      name: 'wrapper',
+      command: process.execPath,
+      args: [
+        '-e',
+        'const { spawn } = require("node:child_process"); const child = spawn(process.execPath, ["-e", "process.on(\\"SIGTERM\\", () => {}); console.log(\\"ready\\"); setTimeout(() => {}, 30000)"], { stdio: "inherit" }); process.on("SIGTERM", () => process.exit(0)); setTimeout(() => {}, 30000); void child;',
+      ],
+      cwd: dir,
+      logFilePrefix: 'wrapper',
+      logsDir: dir,
+      forceKillGraceMs: 50,
+      writeStdout: (chunk) => {
+        if (chunk.includes('ready')) wrapperReady.resolve()
+      },
+      writeStderr: () => {},
+    })
+    const wrapperTimer = setTimeout(
+      () => wrapperReady.reject(new Error('wrapper ready timeout')),
+      5_000,
+    )
+    try {
+      await Promise.race([
+        wrapperReady.promise,
+        wrapper.exited.then(() => {
+          throw new Error('wrapper exited before ready')
+        }),
+      ])
+    } finally {
+      clearTimeout(wrapperTimer)
+    }
+    await wrapper.stop()
+    expect(wrapper.wasStopRequested()).toBe(true)
   })
 
   it('waits for service readiness with or without a managed process and reports early crash', async () => {

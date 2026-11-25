@@ -1,8 +1,12 @@
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
-import { vi } from 'vitest'
 import type { ManagedProcess } from './exit-diagnostics.mts'
 import type { ReservedPort } from './ports.mts'
 import { startManagedProcess, type StartManagedProcessOptions } from './processes.mts'
+
+async function loadVitest() {
+  const { vi } = await import('vitest')
+  return vi
+}
 
 /** Releases a reserved port and immediately spawns the managed process that binds it. */
 export async function startReservedProcess(
@@ -78,6 +82,7 @@ export async function closeWebApiClientRuntime(state: WebApiClientRuntimeRestore
   await new Promise<void>((resolve) => {
     state.backendServer.close(() => resolve())
   })
+  const vi = await loadVitest()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
   globalThis.fetch = state.previousFetch
@@ -89,6 +94,7 @@ export async function withWebApiClientRuntime<T>(options: {
   setActive: (active: boolean, cookie: string | undefined) => void
   run: () => Promise<T>
 }): Promise<T> {
+  const vi = await loadVitest()
   options.setActive(true, options.cookieHeader?.Cookie)
   vi.stubGlobal('window', {})
   try {

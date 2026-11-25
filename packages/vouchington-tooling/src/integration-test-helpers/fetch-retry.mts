@@ -151,7 +151,7 @@ export async function retryOnTransportError<T>(
       // oxlint-disable-next-line no-await-in-loop -- each attempt must settle before deciding whether to retry
       return await attempt()
     } catch (err) {
-      if (!isRetryableTransportError(err, options.idempotent)) throw err
+      if (!options.idempotent || !isRetryableTransportError(err, true)) throw err
 
       if (attemptNumber === 1) retryDeadline = Date.now() + budgetMs
 
@@ -163,6 +163,7 @@ export async function retryOnTransportError<T>(
       )
       // oxlint-disable-next-line no-await-in-loop -- intentional backoff between retry attempts
       await delay(backoffMs)
+      if (Date.now() >= retryDeadline!) throw err
     }
   }
 }

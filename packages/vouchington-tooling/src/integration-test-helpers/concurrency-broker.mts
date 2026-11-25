@@ -72,7 +72,21 @@ export function createCrossProcessConcurrencyLimiter(
   const timeoutMs = options.timeoutMs ?? 60_000
 
   return async function runWithConcurrencyLimit<T>(fn: () => Promise<T>): Promise<T> {
-    const lease = await fetch(slotUrl, { signal: AbortSignal.timeout(timeoutMs) })
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      controller.abort(
+        new DOMException(
+          `Timed out acquiring concurrency slot after ${timeoutMs}ms`,
+          'TimeoutError',
+        ),
+      )
+    }, timeoutMs)
+    let lease: Response
+    try {
+      lease = await fetch(slotUrl, { signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+    }
     if (!lease.ok) {
       await lease.body?.cancel()
       throw new Error(`asset concurrency broker returned ${lease.status}`)

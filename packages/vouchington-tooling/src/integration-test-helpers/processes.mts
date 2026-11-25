@@ -1,13 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  serviceExitMessage,
-  watchForPostReadyExit,
-  type ManagedProcess,
-  type ManagedProcessExit,
-} from './exit-diagnostics.mts'
-import { isHealthy, waitFor } from './wait.mts'
+import type { ManagedProcess, ManagedProcessExit } from './exit-diagnostics.mts'
 
 export interface StartManagedProcessOptions {
   name: string
@@ -34,39 +28,43 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
   let exitStatus: ManagedProcessExit | null = null
   let exitedSettled = false
   let logStreamEnded = false
+  let logStreamFailed = false
+  let childClosed = false
   let stopRequested = false
+  let stopPromise: Promise<void> | undefined
   const exitedDeferred = Promise.withResolvers<ManagedProcessExit>()
   const closedDeferred = Promise.withResolvers<void>()
+  const childTerminated = Promise.withResolvers<void>()
   const logStream = createWriteStream(logPath, { flags: 'a' })
 
   const child = spawn(options.command, options.args, {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
     stdio: ['ignore', 'pipe', 'pipe'],
-    // Own process group so SIGKILL fallback can terminate the whole tree.
+    // Own process group so SIGTERM/SIGKILL terminate the whole tree.
     detached: true,
   })
 
-  child.stdout?.on('data', (chunk: Buffer) => {
-    logStream.write(chunk)
-    writeStdout(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
-  })
-
-  child.stderr?.on('data', (chunk: Buffer) => {
-    logStream.write(chunk)
-    writeStderr(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
-  })
-
-  function finishLogStream(): void {
+  const writeLog = (chunk: Buffer | string): void => {
+    if (!logStreamFailed && !logStreamEnded) logStream.write(chunk)
+  }
+  const finishLogStream = (): void => {
     if (!logStreamEnded) {
       logStreamEnded = true
       logStream.end(closedDeferred.resolve)
     }
   }
+  const markChildTerminated = (): void => {
+    childClosed = true
+    childTerminated.resolve()
+  }
+  const requestStop = (): Promise<void> => {
+    stopRequested = true
+    return (stopPromise ??= stopChild(child, forceKillGraceMs, childTerminated.promise))
+  }
 
   function settleExited(exit: ManagedProcessExit, message?: string, endLog = false): void {
     if (exitedSettled) return
-
     exitedSettled = true
     exitStatus = exit
     const resolve = async (): Promise<void> => {
@@ -76,108 +74,86 @@ export function startManagedProcess(options: StartManagedProcessOptions): Manage
     }
     if (message) {
       writeStderr(message)
-      logStream.write(message, () => {
-        void resolve()
-      })
-      return
+      if (!logStreamFailed && !logStreamEnded) {
+        logStream.write(message, () => void resolve())
+        return
+      }
     }
     void resolve()
   }
 
+  logStream.on('error', (error) => {
+    logStreamFailed = true
+    logStreamEnded = true
+    closedDeferred.resolve()
+    writeStderr(`[${options.logFilePrefix}] log stream error: ${error.message}\n`)
+    settleExited({ code: null, error, signal: null })
+    if (!childClosed) void requestStop()
+  })
+
+  child.stdout?.on('data', (chunk: Buffer) => {
+    writeLog(chunk)
+    writeStdout(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
+  })
+  child.stderr?.on('data', (chunk: Buffer) => {
+    writeLog(chunk)
+    writeStderr(`[${options.logFilePrefix}] ${chunk.toString('utf8')}`)
+  })
   child.once('error', (error) => {
+    markChildTerminated()
     settleExited(
       { code: null, error, signal: null },
       `[${options.logFilePrefix}] failed to start: ${error.message}\n`,
       true,
     )
   })
-
   child.once('exit', (code, signal) => {
-    if (code !== null && code !== 0 && !child.killed) {
+    if (code !== null && code !== 0 && !stopRequested && !child.killed) {
       settleExited({ code, signal }, `[${options.logFilePrefix}] exited with code ${code}\n`)
       return
     }
     settleExited({ code, signal })
   })
-  child.once('close', finishLogStream)
+  child.once('close', () => {
+    markChildTerminated()
+    finishLogStream()
+  })
 
   return {
     exited: exitedDeferred.promise,
     exitStatus: () => exitStatus,
     logPath,
     stop: async () => {
-      if (exitStatus === null) {
-        stopRequested = true
-        await stopChild(child, forceKillGraceMs)
-      }
+      if (stopPromise) await stopPromise
+      else if (exitStatus === null) await requestStop()
       await exitedDeferred.promise
     },
     wasStopRequested: () => stopRequested,
   }
 }
 
-export interface WaitForServiceOptions {
-  timeoutMs?: number
-  intervalMs?: number
-  write?: (chunk: string) => void
+function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal)
+      return
+    } catch {
+      // Fall back to signaling the direct child if group signaling fails.
+    }
+  }
+  child.kill(signal)
 }
 
-/** Waits until `url` returns one of `validStatuses`, failing early if `managedProcess` exits first. */
-export async function waitForService(
-  name: string,
-  url: string,
-  validStatuses: readonly number[] = [200],
-  managedProcess?: ManagedProcess,
-  options: WaitForServiceOptions = {},
+async function stopChild(
+  child: ChildProcess,
+  forceKillGraceMs: number,
+  terminated: Promise<void>,
 ): Promise<void> {
-  const timeoutMs = options.timeoutMs ?? 120_000
-  const intervalMs = options.intervalMs ?? 500
-  if (!managedProcess) {
-    await waitFor(name, (signal) => isHealthy(url, validStatuses, signal), timeoutMs, intervalMs)
-    return
-  }
-
-  const controller = new AbortController()
-  const ready = waitFor(
-    name,
-    (signal) => isHealthy(url, validStatuses, signal),
-    timeoutMs,
-    intervalMs,
-    controller.signal,
-  )
-  let active = true
+  signalProcessTree(child, 'SIGTERM')
+  const forceKillTimer = setTimeout(() => signalProcessTree(child, 'SIGKILL'), forceKillGraceMs)
   try {
-    await Promise.race([
-      ready,
-      managedProcess.exited.then((exit) => {
-        if (active) {
-          throw new Error(serviceExitMessage(name, url, managedProcess.logPath, exit))
-        }
-        return undefined
-      }),
-    ])
+    await terminated
   } finally {
-    active = false
-    controller.abort()
+    clearTimeout(forceKillTimer)
   }
-
-  watchForPostReadyExit(name, managedProcess, options.write)
-}
-
-async function stopChild(child: ChildProcess, forceKillGraceMs: number): Promise<void> {
-  child.kill('SIGTERM')
-  await new Promise<void>((resolve) => {
-    const forceKillTimer = setTimeout(() => {
-      try {
-        process.kill(-child.pid!, 'SIGKILL')
-      } catch {
-        child.kill('SIGKILL')
-      }
-    }, forceKillGraceMs)
-
-    child.once('exit', () => {
-      clearTimeout(forceKillTimer)
-      resolve()
-    })
-  })
 }

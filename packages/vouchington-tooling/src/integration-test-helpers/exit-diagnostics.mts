@@ -1,4 +1,5 @@
 import { readRecentLog } from './log-tail.mts'
+import { isHealthy, waitFor } from './wait.mts'
 
 export interface ManagedProcessExit {
   code: number | null
@@ -65,4 +66,50 @@ export function watchForPostReadyExit(
       )}\n`,
     )
   })
+}
+
+export interface WaitForServiceOptions {
+  timeoutMs?: number
+  intervalMs?: number
+  write?: (chunk: string) => void
+}
+
+/** Waits until `url` returns one of `validStatuses`, failing early if `managedProcess` exits first. */
+export async function waitForService(
+  name: string,
+  url: string,
+  validStatuses: readonly number[] = [200],
+  managedProcess?: ManagedProcess,
+  options: WaitForServiceOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 120_000
+  const intervalMs = options.intervalMs ?? 500
+  if (!managedProcess) {
+    await waitFor(name, (signal) => isHealthy(url, validStatuses, signal), timeoutMs, intervalMs)
+    return
+  }
+
+  const controller = new AbortController()
+  const ready = waitFor(
+    name,
+    (signal) => isHealthy(url, validStatuses, signal),
+    timeoutMs,
+    intervalMs,
+    controller.signal,
+  )
+  let active = true
+  try {
+    await Promise.race([
+      ready,
+      managedProcess.exited.then((exit) => {
+        if (active) throw new Error(serviceExitMessage(name, url, managedProcess.logPath, exit))
+        return undefined
+      }),
+    ])
+  } finally {
+    active = false
+    controller.abort()
+  }
+
+  watchForPostReadyExit(name, managedProcess, options.write)
 }
