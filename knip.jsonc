@@ -82,6 +82,7 @@
         "src/gha-review-payload/index.mts!",
         "src/fresh-base/index.mts!",
         "src/pull-request-diff/index.mts!",
+        "src/pr-description/index.mts!",
         "src/workflow-policy/index.mts!",
         "src/compiler-build/index.mts!",
         "src/github-projects/index.mts!",
