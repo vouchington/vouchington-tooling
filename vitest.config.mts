@@ -43,6 +43,7 @@ export default defineConfig({
         'packages/*/src/vitest-blob-manifest/index.mts',
         'packages/*/src/pg-schema-snapshot/index.mts',
         'packages/*/src/postgres-test-faults/index.mts',
+        'packages/*/src/shared-db-scope-guard/index.mts',
         'packages/*/src/request-query-profile/index.mts',
         'packages/*/src/request-query-profile/types.mts',
         'packages/*/src/openapi-document/index.mts',
@@ -72,6 +73,12 @@ export default defineConfig({
           branches: 100,
         },
         'packages/vouchington-tooling/src/pr-description/**': {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 100,
+        },
+        'packages/vouchington-tooling/src/shared-db-scope-guard/**': {
           lines: 100,
           functions: 100,
           statements: 100,
