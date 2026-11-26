@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gunzipSync } from 'node:zlib'
 
-import { deadlineMessage, parseDeadline, registryHost, registryUrl } from './deadline.mjs'
+import { getBuffer, retryDownload } from './bounded-download.mjs'
+import { registryUrl } from './deadline.mjs'
 
 export function platformPackage(platform, arch, musl) {
   return `@pnpm/exe.${platform}-${arch}${platform === 'linux' && musl ? '-musl' : ''}`
@@ -38,25 +39,6 @@ export function verifyIntegrity(bytes, integrity) {
   }
 }
 
-// `touch` runs on the response and on every body chunk, so the caller can tell a stalled
-// connection from a slow one that is still making progress.
-async function getBuffer(url, signal, fetchImpl, touch) {
-  const response = await fetchImpl(url, { signal })
-  touch()
-  if (!response.ok) {
-    throw Object.assign(new Error(`${url} responded ${response.status}`), {
-      status: response.status,
-    })
-  }
-  if (!response.body) return Buffer.from(await response.arrayBuffer())
-  const chunks = []
-  for await (const chunk of response.body) {
-    chunks.push(chunk)
-    touch()
-  }
-  return Buffer.concat(chunks)
-}
-
 export async function downloadPnpm(
   env,
   signal,
@@ -80,87 +62,25 @@ export async function downloadPnpm(
   return dir
 }
 
-export const ATTEMPTS = 3
-// Each attempt fails after IDLE_TIMEOUT_MS without a byte (a stall) or ATTEMPT_TIMEOUT_MS in all
-// (a trickle), whichever comes first, and never runs past the total deadline. The ~30 MB tarball
-// can therefore take longer than a flat 30s when the runner is slow but still receiving data.
-export const ATTEMPT_TIMEOUT_MS = 60_000
-export const IDLE_TIMEOUT_MS = 15_000
-// The wait before retry N is N times this, so a registry blip has 5s, then 10s, to clear.
-export const BACKOFF_MS = 5_000
-
-const NETWORK_CODES =
-  /^(?:ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ESOCKETTIMEDOUT|UND_ERR_\w+)$/u
-
-// Why a failed attempt is worth another one, or undefined when it is not: a per-attempt timeout,
-// a dropped connection, or a 408/429/5xx response. A 404 or an integrity failure is final.
-export function transientReason(error) {
-  if (error?.name === 'TimeoutError') return 'per-attempt timeout'
-  const status = error?.status
-  if (status === 408 || status === 429 || status >= 500) return `HTTP ${status}`
-  const code = error?.cause?.code ?? error?.code
-  return error instanceof TypeError || NETWORK_CODES.test(code ?? '')
-    ? `network error ${code ?? error.message}`
-    : undefined
-}
-
-const pause = (ms) => new Promise((done) => setTimeout(done, ms))
-
 export async function main(
   env = process.env,
   now = Date.now(),
   fetchImpl = fetch,
-  sleep = pause,
-  backoffMs = BACKOFF_MS,
+  sleep,
+  backoffMs,
 ) {
-  let deadline
-  try {
-    deadline = parseDeadline(env, now)
-  } catch (error) {
-    console.error(`::error::${error.message}`)
-    return 1
-  }
-  const host = registryHost(env)
-  const fail = () => {
-    console.error(`::error::${deadlineMessage(deadline.seconds, 'pnpm download', host)}`)
-    return 1
-  }
-  const total = AbortSignal.timeout(Math.max(deadline.endMs - now, 0))
-  if (deadline.endMs - now <= 0) return fail()
-  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    const attemptAbort = new AbortController()
-    const abortAfter = (ms, why) =>
-      setTimeout(() => attemptAbort.abort(new DOMException(why, 'TimeoutError')), ms)
-    const cap = abortAfter(ATTEMPT_TIMEOUT_MS, `no download within ${ATTEMPT_TIMEOUT_MS / 1000}s`)
-    let idle
-    const touch = () => {
-      clearTimeout(idle)
-      idle = abortAfter(IDLE_TIMEOUT_MS, `no data received for ${IDLE_TIMEOUT_MS / 1000}s`)
-    }
-    touch()
-    const signal = AbortSignal.any([total, attemptAbort.signal])
-    try {
+  return retryDownload(
+    'pnpm download',
+    async (signal, touch) => {
       const dir = await downloadPnpm(env, signal, fetchImpl, undefined, touch)
       if (env.GITHUB_PATH) appendFileSync(env.GITHUB_PATH, `${dir}\n`)
       console.log(`Installed pnpm ${env.PNPM_VERSION} to ${dir}`)
-      return 0
-    } catch (error) {
-      if (total.aborted) return fail()
-      const wait = backoffMs * attempt
-      const reason = transientReason(error)
-      const note = `pnpm download attempt ${attempt}/${ATTEMPTS} failed (${host}): ${error.message}`
-      if (reason === undefined || attempt === ATTEMPTS) {
-        console.error(`::error::setup-node-pnpm: ${note}`)
-        return 1
-      }
-      console.log(`::warning::setup-node-pnpm: ${note}; ${reason}, retrying in ${wait / 1000}s`)
-      await sleep(wait)
-    } finally {
-      clearTimeout(cap)
-      clearTimeout(idle)
-    }
-  }
-  return 1
+    },
+    env,
+    now,
+    sleep,
+    backoffMs,
+  )
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()

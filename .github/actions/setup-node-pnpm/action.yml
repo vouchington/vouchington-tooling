@@ -1,17 +1,18 @@
 name: Setup Node.js and pnpm
 description: >
   Sets up Node.js from a version file and pnpm 12, then installs the full workspace
-  without a pnpm store cache. One total deadline covers the pnpm binary download and the
-  install; the download and the install each make a few short attempts inside that deadline and
-  retry (after a short, growing backoff, logging the reason) only an attempt that timed out or hit a
-  network/registry error, and only while budget remains.
+  without a pnpm store cache. One total deadline covers the Node.js and pnpm binary downloads and
+  the install; each makes a few short attempts inside that deadline and retries only an attempt
+  that timed out or hit a network/registry error, and only while budget remains, logging the
+  reason. The Node.js and pnpm downloads wait a growing 5s, then 10s, between attempts; the
+  install waits a fixed 5s.
   The caller must run actions/checkout before invoking this action.
   Set deadline-seconds below the calling step's timeout-minutes.
 inputs:
   deadline-seconds:
     description: >
-      Total wall-clock limit, in seconds, from the start of this action, covering the pnpm
-      binary download and pnpm install together; set it below the calling step's timeout-minutes
+      Total wall-clock limit, in seconds, from the start of this action, covering the Node.js
+      and pnpm binary downloads and pnpm install together; set it below the calling step's timeout-minutes
     default: '270'
   install-scripts:
     description: 'Set false when dependency lifecycle scripts are intentionally deferred'
@@ -33,6 +34,21 @@ runs:
     - name: Start deadline
       shell: bash
       run: echo "SETUP_NODE_PNPM_STARTED_MS=$(date +%s)000" >> "$GITHUB_ENV"
+    # actions/setup-node has no idle timeout: a stalled Node tarball download from
+    # github.com/actions/node-versions waits for the ~300s action timeout. download-node.mjs
+    # first puts the release in the runner toolcache with the same idle timeout and retries as the
+    # pnpm download (and does nothing when the toolcache already has the version or the version
+    # file is not a plain version number), so setup-node below finds it and downloads nothing.
+    - name: Download Node.js
+      shell: bash
+      env:
+        NODE_VERSION_FILE: ${{ inputs.node-version-file }}
+        SETUP_NODE_PNPM_DEADLINE_SECONDS: ${{ inputs.deadline-seconds }}
+      run: |
+        # Without Node on PATH, setup-node below installs Node without the idle timeout.
+        if command -v node >/dev/null 2>&1; then
+          node "$GITHUB_ACTION_PATH/download-node.mjs"
+        fi
     - uses: actions/setup-node@363be39a57dfa5801e05c6e0c549d622a376cf15 # v7
       with:
         node-version-file: ${{ inputs.node-version-file }}

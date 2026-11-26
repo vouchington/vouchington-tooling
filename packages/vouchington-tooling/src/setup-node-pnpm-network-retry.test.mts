@@ -12,9 +12,11 @@ const dir = join(
 const { networkFailureReason } = (await import(join(dir, 'network-errors.mjs'))) as {
   networkFailureReason: (output: string) => string | undefined
 }
-const download = (await import(join(dir, 'download-pnpm.mjs'))) as {
+const bounded = (await import(join(dir, 'bounded-download.mjs'))) as {
   ATTEMPTS: number
   transientReason: (error: unknown) => string | undefined
+}
+const download = (await import(join(dir, 'download-pnpm.mjs'))) as {
   main: (
     env: Record<string, string>,
     now: number,
@@ -59,24 +61,20 @@ describe('pnpm download retries', () => {
   const noSleep = async () => {}
 
   it('classifies transient and final errors', () => {
-    expect(download.transientReason(new DOMException('t', 'TimeoutError'))).toBe(
+    expect(bounded.transientReason(new DOMException('t', 'TimeoutError'))).toBe(
       'per-attempt timeout',
     )
-    expect(download.transientReason(Object.assign(new Error('x'), { status: 503 }))).toBe(
-      'HTTP 503',
-    )
-    expect(download.transientReason(Object.assign(new Error('x'), { status: 429 }))).toBe(
-      'HTTP 429',
-    )
-    expect(download.transientReason(Object.assign(new Error('x'), { status: 404 }))).toBeUndefined()
-    expect(download.transientReason(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBe(
+    expect(bounded.transientReason(Object.assign(new Error('x'), { status: 503 }))).toBe('HTTP 503')
+    expect(bounded.transientReason(Object.assign(new Error('x'), { status: 429 }))).toBe('HTTP 429')
+    expect(bounded.transientReason(Object.assign(new Error('x'), { status: 404 }))).toBeUndefined()
+    expect(bounded.transientReason(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBe(
       'network error ECONNRESET',
     )
-    expect(download.transientReason(new TypeError('fetch failed'))).toBe(
+    expect(bounded.transientReason(new TypeError('fetch failed'))).toBe(
       'network error fetch failed',
     )
-    expect(download.transientReason(new Error('integrity'))).toBeUndefined()
-    expect(download.transientReason(undefined)).toBeUndefined()
+    expect(bounded.transientReason(new Error('integrity'))).toBeUndefined()
+    expect(bounded.transientReason(undefined)).toBeUndefined()
   })
 
   it('retries a network failure with a logged reason, then gives up after 3 attempts', async () => {
@@ -86,7 +84,7 @@ describe('pnpm download retries', () => {
       throw new TypeError('fetch failed')
     })
     expect(await download.main(env, Date.now(), fetchImpl, noSleep, 3000)).toBe(1)
-    expect(fetchImpl).toHaveBeenCalledTimes(download.ATTEMPTS)
+    expect(fetchImpl).toHaveBeenCalledTimes(bounded.ATTEMPTS)
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining(
         'attempt 1/3 failed (registry.npmjs.org): fetch failed; network error fetch failed, retrying in 3s',

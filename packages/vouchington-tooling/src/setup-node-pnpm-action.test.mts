@@ -50,8 +50,23 @@ describe('setup-node-pnpm composite action', () => {
     expect(source).not.toMatch(/vouchington|voucha/iu)
   })
 
-  it('records the deadline start first, then activates Node and downloads pnpm 12', () => {
-    const [start, node, resolve, download] = steps
+  it('records the deadline start first, then caches and activates Node and downloads pnpm 12', () => {
+    const [start, nodeDownload, node, resolve, download] = steps
+    expect(nodeDownload).toEqual({
+      name: 'Download Node.js',
+      shell: 'bash',
+      env: {
+        NODE_VERSION_FILE: '${{ inputs.node-version-file }}',
+        SETUP_NODE_PNPM_DEADLINE_SECONDS: '${{ inputs.deadline-seconds }}',
+      },
+      run: [
+        '# Without Node on PATH, setup-node below installs Node without the idle timeout.',
+        'if command -v node >/dev/null 2>&1; then',
+        '  node "$GITHUB_ACTION_PATH/download-node.mjs"',
+        'fi',
+        '',
+      ].join('\n'),
+    })
     expect(start?.run).toBe('echo "SETUP_NODE_PNPM_STARTED_MS=$(date +%s)000" >> "$GITHUB_ENV"')
     expect(node?.uses).toMatch(/^actions\/setup-node@[0-9a-f]{40}$/)
     expect(node?.with).toEqual({
