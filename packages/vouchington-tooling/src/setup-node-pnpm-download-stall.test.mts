@@ -11,9 +11,6 @@ const dir = join(
 )
 type Env = Record<string, string | undefined>
 const download = (await import(join(dir, 'download-pnpm.mjs'))) as {
-  ATTEMPT_TIMEOUT_MS: number
-  BACKOFF_MS: number
-  IDLE_TIMEOUT_MS: number
   downloadPnpm: (
     env: Env,
     signal: AbortSignal,
@@ -28,6 +25,11 @@ const download = (await import(join(dir, 'download-pnpm.mjs'))) as {
     sleep?: (ms: number) => Promise<void>,
   ) => Promise<number>
 }
+const bounds = (await import(join(dir, 'bounded-download.mjs'))) as {
+  ATTEMPT_TIMEOUT_MS: number
+  BACKOFF_MS: number
+  IDLE_TIMEOUT_MS: number
+}
 
 afterEach(() => {
   vi.useRealTimers()
@@ -41,8 +43,8 @@ describe('pnpm download stall handling', () => {
   const env = { PNPM_VERSION: '12.0.0', RUNNER_TEMP: mkdtempSync(join(tmpdir(), 'dl-stall-')) }
 
   it('gives a slow transfer longer than the old flat 30s, a stalled one only the idle window', () => {
-    expect(download.ATTEMPT_TIMEOUT_MS).toBeGreaterThan(30_000)
-    expect(download.IDLE_TIMEOUT_MS).toBeLessThan(download.ATTEMPT_TIMEOUT_MS)
+    expect(bounds.ATTEMPT_TIMEOUT_MS).toBeGreaterThan(30_000)
+    expect(bounds.IDLE_TIMEOUT_MS).toBeLessThan(bounds.ATTEMPT_TIMEOUT_MS)
   })
 
   it('aborts a stalled attempt after the idle window and backs off 5s then 10s', async () => {
@@ -55,10 +57,10 @@ describe('pnpm download stall handling', () => {
     }
     const fetchImpl = vi.fn(hangsUntilAborted)
     const done = download.main(env, Date.now(), fetchImpl, sleep)
-    await vi.advanceTimersByTimeAsync(download.IDLE_TIMEOUT_MS * 3 + 1000)
+    await vi.advanceTimersByTimeAsync(bounds.IDLE_TIMEOUT_MS * 3 + 1000)
     expect(await done).toBe(1)
     expect(fetchImpl).toHaveBeenCalledTimes(3)
-    expect(waits).toEqual([download.BACKOFF_MS, download.BACKOFF_MS * 2])
+    expect(waits).toEqual([bounds.BACKOFF_MS, bounds.BACKOFF_MS * 2])
     expect(err).toHaveBeenCalledWith(
       expect.stringContaining('attempt 3/3 failed (registry.npmjs.org): no data received for 15s'),
     )
@@ -84,7 +86,7 @@ describe('pnpm download stall handling', () => {
       })(),
     }))
     const done = download.main(env, Date.now(), fetchImpl, async () => undefined)
-    await vi.advanceTimersByTimeAsync(download.ATTEMPT_TIMEOUT_MS * 3 + 1000)
+    await vi.advanceTimersByTimeAsync(bounds.ATTEMPT_TIMEOUT_MS * 3 + 1000)
     expect(await done).toBe(1)
     expect(fetchImpl).toHaveBeenCalledTimes(3)
     expect(err).toHaveBeenCalledWith(expect.stringContaining('no download within 60s'))

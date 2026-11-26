@@ -10,14 +10,6 @@ import { gunzipSync } from 'node:zlib'
 import { getBuffer, retryDownload } from './bounded-download.mjs'
 import { registryUrl } from './deadline.mjs'
 
-export {
-  ATTEMPT_TIMEOUT_MS,
-  ATTEMPTS,
-  BACKOFF_MS,
-  IDLE_TIMEOUT_MS,
-  transientReason,
-} from './bounded-download.mjs'
-
 export function platformPackage(platform, arch, musl) {
   return `@pnpm/exe.${platform}-${arch}${platform === 'linux' && musl ? '-musl' : ''}`
 }

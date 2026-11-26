@@ -16,7 +16,6 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { getBuffer, retryDownload } from './bounded-download.mjs'
 
@@ -122,4 +121,4 @@ export async function main(
   )
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
+if (import.meta.main) process.exitCode = await main()
