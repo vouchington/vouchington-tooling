@@ -21,13 +21,17 @@ export async function getBuffer(url, signal, fetchImpl, touch) {
   return Buffer.concat(chunks)
 }
 
+/** @public Imported by the tests. */
 export const ATTEMPTS = 3
 // Each attempt fails after IDLE_TIMEOUT_MS without a byte (a stall) or ATTEMPT_TIMEOUT_MS in all
 // (a trickle), whichever comes first, and never runs past the total deadline. The ~30 MB tarball
 // can therefore take longer than a flat 30s when the runner is slow but still receiving data.
+/** @public */
 export const ATTEMPT_TIMEOUT_MS = 60_000
+/** @public */
 export const IDLE_TIMEOUT_MS = 15_000
 // The wait before retry N is N times this, so a registry blip has 5s, then 10s, to clear.
+/** @public */
 export const BACKOFF_MS = 5_000
 
 const NETWORK_CODES =
@@ -35,6 +39,7 @@ const NETWORK_CODES =
 
 // Why a failed attempt is worth another one, or undefined when it is not: a per-attempt timeout,
 // a dropped connection, or a 408/429/5xx response. A 404 or an integrity failure is final.
+/** @public */
 export function transientReason(error) {
   if (error?.name === 'TimeoutError') return 'per-attempt timeout'
   const status = error?.status
