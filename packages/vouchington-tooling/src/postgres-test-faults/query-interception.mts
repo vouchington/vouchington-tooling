@@ -109,14 +109,17 @@ export function answerPostgresWritesForTest(
   return () => spy.mockRestore()
 }
 
-/** Run each pool write for real, then invoke `after` with its statement, values, and result. */
+/**
+ * Run each pool write for real, then await `after` with its statement, values, and result. The
+ * write resolves only after `after` settles, and a rejected `after` rejects the write.
+ */
 export function runAfterPostgresWriteForTest(
   target: WriteQueryTarget,
   after: (
     statement: string,
     values: readonly unknown[],
     result: { rowCount: number | null; rows: readonly Record<string, unknown>[] },
-  ) => void,
+  ) => void | Promise<void>,
 ): () => void {
   const realWrite = target.write
   const spy = vi.spyOn(target, 'write').mockImplementation(async (query, ...rest) => {
@@ -125,7 +128,7 @@ export function runAfterPostgresWriteForTest(
       query,
       Array.isArray(rest[0]) ? (rest[0] as readonly unknown[]) : undefined,
     )
-    after(text, values, result)
+    await after(text, values, result)
     return result
   })
   return () => spy.mockRestore()
