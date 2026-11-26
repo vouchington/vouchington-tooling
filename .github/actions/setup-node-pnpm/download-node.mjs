@@ -32,7 +32,9 @@ export function parseSpec(text) {
     : undefined
 }
 
+// Stable releases only: a prerelease directory such as 24.0.0-rc.1 never satisfies a plain spec.
 export const satisfies = (version, spec) =>
+  !version.includes('-') &&
   version
     .split('.')
     .slice(0, spec.length)

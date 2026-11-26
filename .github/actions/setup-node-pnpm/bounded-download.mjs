@@ -45,7 +45,19 @@ export function transientReason(error) {
     : undefined
 }
 
-const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+// Resolves after `ms`, or earlier when `signal` aborts. The timer is cleared on abort.
+const pause = (ms, signal) =>
+  new Promise((done) => {
+    const timer = setTimeout(done, ms)
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer)
+        done()
+      },
+      { once: true },
+    )
+  })
 
 // Runs `task(signal, touch)` up to ATTEMPTS times under the shared deadline, retrying only a
 // transient failure. Returns the process exit code; `task` logs its own success.
@@ -96,7 +108,8 @@ export async function retryDownload(
         return 1
       }
       console.log(`::warning::setup-node-pnpm: ${note}; ${reason}, retrying in ${wait / 1000}s`)
-      await sleep(wait)
+      await sleep(wait, total)
+      if (total.aborted) return fail()
     } finally {
       clearTimeout(cap)
       clearTimeout(idle)

@@ -89,6 +89,7 @@ describe('version selection', () => {
     expect(node.satisfies('24.1.2', [24])).toBe(true)
     expect(node.satisfies('24.1.2', [24, 2])).toBe(false)
     expect(node.satisfies('24.1.2', [24, 1, 2])).toBe(true)
+    expect(node.satisfies('24.0.0-rc.1', [24])).toBe(false)
     const index = [{ version: 'v25.1.0' }, { version: 'v24.9.0' }, { version: 'v24.1.0' }]
     expect(node.resolveVersion(index, [24])).toBe('24.9.0')
     expect(() => node.resolveVersion(index, [23])).toThrow(/no Node.js release matches 23/u)
@@ -190,6 +191,17 @@ describe('node download', () => {
     expect(err).toHaveBeenCalledWith(
       expect.stringContaining('node download attempt 3/3 failed (nodejs.org): no data received'),
     )
+  })
+
+  it('stops waiting to retry as soon as the shared deadline expires', async () => {
+    const { err } = quiet()
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 503 }))
+    const env = { ...workspace('24'), SETUP_NODE_PNPM_DEADLINE_SECONDS: '1' }
+    const started = Date.now()
+    expect(await node.main(env, started, fetchImpl, undefined, undefined, 'linux', 'x64')).toBe(1)
+    expect(Date.now() - started).toBeLessThan(bounds.BACKOFF_MS)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('deadline 1s exceeded'))
   })
 
   it('fails on a deadline that has already passed without downloading', async () => {
