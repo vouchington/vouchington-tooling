@@ -343,6 +343,25 @@ describe('query interception helpers', () => {
     ])
     restoreAfterWrite()
 
+    // runAfterPostgresWriteForTest awaits an async `after` before the write resolves
+    const asyncEvents: string[] = []
+    const restoreAsyncAfter = runAfterPostgresWriteForTest(target, async (statement) => {
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      asyncEvents.push(`after ${statement}`)
+    })
+    await target.write('UPDATE async')
+    asyncEvents.push('write resolved')
+    expect(asyncEvents).toEqual(['after UPDATE async', 'write resolved'])
+    restoreAsyncAfter()
+
+    // runAfterPostgresWriteForTest rejects the write when `after` rejects
+    const afterError = new Error('after failed')
+    const restoreRejectingAfter = runAfterPostgresWriteForTest(target, async () => {
+      throw afterError
+    })
+    await expect(target.write('UPDATE rejected')).rejects.toBe(afterError)
+    restoreRejectingAfter()
+
     // observePostgresWritesForTest
     const observed = observePostgresWritesForTest(target, '/* obs */')
     await target.write('/* obs */ INSERT 1')
