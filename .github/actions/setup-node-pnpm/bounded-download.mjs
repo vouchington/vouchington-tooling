@@ -1,5 +1,6 @@
-// Bounded download and retry loop shared by the pnpm and Node downloads. Node >= 24, no
-// dependencies.
+// Bounded download and retry loop shared by the pnpm and Node downloads. The Node
+// download runs on the runner's system Node before setup-node (as old as Node 20), so use
+// nothing newer than Node 20. No dependencies.
 import { deadlineMessage, parseDeadline, registryHost } from './deadline.mjs'
 
 // `touch` runs on the response and on every body chunk, so the caller can tell a stalled

@@ -2,7 +2,9 @@
 // retry bounds as the pnpm download, so actions/setup-node finds it and never starts its own
 // unbounded download from github.com/actions/node-versions. Does nothing when the toolcache
 // already satisfies the version or when the version file is not a plain version number.
-// Node >= 24, no dependencies.
+// Runs on the runner's system Node before setup-node, which can be as old as Node 20 (the
+// ubuntu-24.04-arm image ships 20.20.0), so use nothing newer: no `import.meta.main`. No
+// dependencies.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
@@ -16,6 +18,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { getBuffer, retryDownload } from './bounded-download.mjs'
 
@@ -123,4 +126,4 @@ export async function main(
   )
 }
 
-if (import.meta.main) process.exitCode = await main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
