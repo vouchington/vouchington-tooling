@@ -176,6 +176,62 @@ describe('no-source and partial-batch helpers', () => {
     expect(hasRelatedIssuesNoSourcePair(scheduledWithSetup, SCHEDULED_TEMPLATE)).toBe(true)
   })
 
+  it('matches required body lines by whole-line pattern alongside exact lines', () => {
+    const pair = `## Related issues\n\n${SCHEDULED_TEMPLATE.visibleLine}\n${SCHEDULED_TEMPLATE.marker}\n`
+    const patternOnly = {
+      marker: SCHEDULED_TEMPLATE.marker,
+      visibleLine: SCHEDULED_TEMPLATE.visibleLine,
+      requiredBodyLinePatterns: [/Workspace setup: [\w-]+ scheduled prompt/],
+    }
+    const withSetup = (setup: string) => `${pair}\nWorkspace setup: ${setup}\n`
+    expect(hasRelatedIssuesNoSourcePair(withSetup('pg-schema scheduled prompt'), patternOnly)).toBe(
+      true,
+    )
+    expect(hasRelatedIssuesNoSourcePair(pair, patternOnly)).toBe(false)
+    // A pattern must match the whole line, not a prefix or a substring.
+    expect(
+      hasRelatedIssuesNoSourcePair(withSetup('pg-schema scheduled prompt, then more'), patternOnly),
+    ).toBe(false)
+    expect(
+      hasRelatedIssuesNoSourcePair(
+        `${pair}\nNote: Workspace setup: x scheduled prompt\n`,
+        patternOnly,
+      ),
+    ).toBe(false)
+
+    // Lazy quantifiers and a short earlier alternative still find the whole-line match.
+    const lazy = { ...patternOnly, requiredBodyLinePatterns: [/Workspace setup: .+?/] }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('triage-loop scheduled prompt'), lazy)).toBe(true)
+    const alternatives = {
+      ...patternOnly,
+      requiredBodyLinePatterns: [/Workspace setup: a|Workspace setup: a scheduled prompt/],
+    }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('a scheduled prompt'), alternatives)).toBe(true)
+    expect(hasRelatedIssuesNoSourcePair(withSetup('a scheduled prompt!'), alternatives)).toBe(false)
+    // Flags are preserved.
+    const caseless = {
+      ...patternOnly,
+      requiredBodyLinePatterns: [/workspace setup: \S+ SCHEDULED prompt/i],
+    }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('pg-schema scheduled prompt'), caseless)).toBe(
+      true,
+    )
+
+    const both = { ...patternOnly, requiredBodyLines: SCHEDULED_TEMPLATE.requiredBodyLines }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('Scheduled runner'), both)).toBe(true)
+    expect(hasRelatedIssuesNoSourcePair(withSetup('triage-loop scheduled prompt'), both)).toBe(true)
+    expect(hasRelatedIssuesNoSourcePair(withSetup('fresh worktree'), both)).toBe(false)
+  })
+
+  it.each([/Workspace setup: .+/g, /Workspace setup: .+/y])(
+    'rejects stateful %s required body line patterns',
+    (pattern) => {
+      const body = `## Related issues\n\n${SCHEDULED_TEMPLATE.visibleLine}\n${SCHEDULED_TEMPLATE.marker}\n`
+      const template = { ...SCHEDULED_TEMPLATE, requiredBodyLinePatterns: [pattern] }
+      expect(() => hasRelatedIssuesNoSourcePair(body, template)).toThrow(TypeError)
+    },
+  )
+
   it('extracts a single local or cross-repo partial-batch source ref and rejects ambiguity', () => {
     const localBody = [
       '## Related issues',

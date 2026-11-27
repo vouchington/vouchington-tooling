@@ -1801,7 +1801,9 @@ passed in as policy input rather than hardcoded.
   `extractRelatedIssuesLines`, `extractRelatedIssuesReferenceText`,
   `findEscapeCommentClosingKeywordLeaks`.
 - No-source and partial-batch helpers: `hasRelatedIssuesNoSourcePair`,
-  `extractPartialBatchSourceRef`, `validatePartialBatchSourceRef`.
+  `extractPartialBatchSourceRef`, `validatePartialBatchSourceRef`. A `NoSourceLinePairTemplate`
+  can require a body line from the exact `requiredBodyLines` set, or one that wholly matches a
+  `requiredBodyLinePatterns` RegExp (no `g` or `y` flag); either satisfies the requirement.
 - Closing references, closure provenance, and summaries: `ESCAPE_COMMENT_RE`,
   `parseGitHubIssueApiResponse`, `validateResolvedIssueReferences`,
   `createClosingIssueReferenceResolver`, `resolveClosingIssueReference`, `currentRepo`,

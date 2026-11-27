@@ -7,6 +7,8 @@ export type NoSourceLinePairTemplate = {
   visibleLine: string
   marker: string
   requiredBodyLines?: ReadonlySet<string>
+  /** Patterns that must each match a whole sanitized body line; no `g` or `y` flags. */
+  requiredBodyLinePatterns?: readonly RegExp[]
   relatedIssuesHeading?: RegExp
 }
 
@@ -30,9 +32,28 @@ function parseRenderedRefLine(line: string): ClosingIssueReference | undefined {
   return { key: formatReferenceKey({ number, owner, repo }), number, owner, repo }
 }
 
+// Anchoring inside the expression lets the engine backtrack to a whole-line match; checking the
+// first `exec` match's length would reject lazy quantifiers and earlier short alternatives.
+function wholeLinePattern(pattern: RegExp): RegExp {
+  if (pattern.global || pattern.sticky) {
+    throw new TypeError(`requiredBodyLinePatterns must not use the g or y flag: ${pattern}`)
+  }
+  return new RegExp(`^(?:${pattern.source})$`, pattern.flags)
+}
+
+function hasRequiredBodyLine(body: string, template: NoSourceLinePairTemplate): boolean {
+  const lines = template.requiredBodyLines
+  if (lines === undefined && template.requiredBodyLinePatterns === undefined) return true
+  const patterns = (template.requiredBodyLinePatterns ?? []).map(wholeLinePattern)
+  return sanitizedLines(body).some(
+    (line) => lines?.has(line) === true || patterns.some((pattern) => pattern.test(line)),
+  )
+}
+
 /**
  * Matches a caller-supplied exact `[visibleLine, marker]` pair inside the sanitized related-issues
- * section, optionally requiring at least one line from `requiredBodyLines` in the sanitized body.
+ * section, optionally requiring at least one sanitized body line that is in `requiredBodyLines` or
+ * wholly matches one of `requiredBodyLinePatterns`.
  */
 export function hasRelatedIssuesNoSourcePair(
   body: string,
@@ -43,10 +64,7 @@ export function hasRelatedIssuesNoSourcePair(
     (line, index) =>
       line === template.visibleLine && relatedIssuesLines[index + 1] === template.marker,
   )
-  if (!hasPair) return false
-  if (template.requiredBodyLines === undefined) return true
-  const required = template.requiredBodyLines
-  return sanitizedLines(body).some((line) => required.has(line))
+  return hasPair && hasRequiredBodyLine(body, template)
 }
 
 /**
