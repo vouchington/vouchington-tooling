@@ -32,24 +32,21 @@ function parseRenderedRefLine(line: string): ClosingIssueReference | undefined {
   return { key: formatReferenceKey({ number, owner, repo }), number, owner, repo }
 }
 
-function matchesWholeLine(pattern: RegExp, line: string): boolean {
-  const match = pattern.exec(line)
-  return match?.index === 0 && match[0].length === line.length
+// Anchoring inside the expression lets the engine backtrack to a whole-line match; checking the
+// first `exec` match's length would reject lazy quantifiers and earlier short alternatives.
+function wholeLinePattern(pattern: RegExp): RegExp {
+  if (pattern.global || pattern.sticky) {
+    throw new TypeError(`requiredBodyLinePatterns must not use the g or y flag: ${pattern}`)
+  }
+  return new RegExp(`^(?:${pattern.source})$`, pattern.flags)
 }
 
 function hasRequiredBodyLine(body: string, template: NoSourceLinePairTemplate): boolean {
   const lines = template.requiredBodyLines
-  const patterns = template.requiredBodyLinePatterns
-  if (lines === undefined && patterns === undefined) return true
-  for (const pattern of patterns ?? []) {
-    if (pattern.global || pattern.sticky) {
-      throw new TypeError(`requiredBodyLinePatterns must not use the g or y flag: ${pattern}`)
-    }
-  }
+  if (lines === undefined && template.requiredBodyLinePatterns === undefined) return true
+  const patterns = (template.requiredBodyLinePatterns ?? []).map(wholeLinePattern)
   return sanitizedLines(body).some(
-    (line) =>
-      lines?.has(line) === true ||
-      (patterns ?? []).some((pattern) => matchesWholeLine(pattern, line)),
+    (line) => lines?.has(line) === true || patterns.some((pattern) => pattern.test(line)),
   )
 }
 

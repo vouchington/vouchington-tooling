@@ -199,6 +199,24 @@ describe('no-source and partial-batch helpers', () => {
       ),
     ).toBe(false)
 
+    // Lazy quantifiers and a short earlier alternative still find the whole-line match.
+    const lazy = { ...patternOnly, requiredBodyLinePatterns: [/Workspace setup: .+?/] }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('triage-loop scheduled prompt'), lazy)).toBe(true)
+    const alternatives = {
+      ...patternOnly,
+      requiredBodyLinePatterns: [/Workspace setup: a|Workspace setup: a scheduled prompt/],
+    }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('a scheduled prompt'), alternatives)).toBe(true)
+    expect(hasRelatedIssuesNoSourcePair(withSetup('a scheduled prompt!'), alternatives)).toBe(false)
+    // Flags are preserved.
+    const caseless = {
+      ...patternOnly,
+      requiredBodyLinePatterns: [/workspace setup: \S+ SCHEDULED prompt/i],
+    }
+    expect(hasRelatedIssuesNoSourcePair(withSetup('pg-schema scheduled prompt'), caseless)).toBe(
+      true,
+    )
+
     const both = { ...patternOnly, requiredBodyLines: SCHEDULED_TEMPLATE.requiredBodyLines }
     expect(hasRelatedIssuesNoSourcePair(withSetup('Scheduled runner'), both)).toBe(true)
     expect(hasRelatedIssuesNoSourcePair(withSetup('triage-loop scheduled prompt'), both)).toBe(true)
